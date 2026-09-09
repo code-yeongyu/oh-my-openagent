@@ -1,20 +1,16 @@
 #!/usr/bin/env node
-// omo-codex-install:bc3bb113ea819d8b72c7576db558adb445ad7b64a2dbd605369dbfedf2f94008:158cd4d7e4bcbef5dcbb11c2e8383c25652125ae250905d68c7e8f70957a515e
-var __defProp = Object.defineProperty;
-var __returnValue = (v) => v;
-function __exportSetter(name, newValue) {
-  this[name] = __returnValue.bind(null, newValue);
-}
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, {
-      get: all[name],
-      enumerable: true,
-      configurable: true,
-      set: __exportSetter.bind(all, name)
-    });
+// omo-codex-install:bc3bb113ea819d8b72c7576db558adb445ad7b64a2dbd605369dbfedf2f94008:0561c2de4997c91ad4697e01debbafa99229f286703446218f0d6d643f5cf751
+var __esm = (fn, res, err) => () => {
+  if (fn)
+    try {
+      res = fn(fn = 0);
+    } catch (e) {
+      err = [e];
+    }
+  if (err)
+    throw err[0];
+  return res;
 };
-var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 
 // packages/utils/src/xdg-data-dir.ts
 import { accessSync, constants, mkdirSync } from "node:fs";
@@ -394,8 +390,8 @@ function createGetModuleFromFilename(basePath = process.argv[1] ? dirname10(proc
     return decodedFile;
   };
 }
-function normalizeWindowsPath(path2) {
-  return path2.replace(/^[A-Z]:/, "").replace(/\\/g, "/");
+function normalizeWindowsPath(path) {
+  return path.replace(/^[A-Z]:/, "").replace(/\\/g, "/");
 }
 var init_module_node = () => {};
 
@@ -801,9 +797,6 @@ function isError(candidate) {
     default:
       return isInstanceOf(candidate, Error);
   }
-}
-function isErrorEvent(event) {
-  return isBuiltin(event, "ErrorEvent");
 }
 function isEvent(candidate) {
   return typeof Event != "undefined" && isInstanceOf(candidate, Event);
@@ -1475,11 +1468,11 @@ async function raceWithTimeout(promise, timeoutMs, onTimeout) {
   try {
     return await Promise.race([
       promise,
-      new Promise((resolve9, reject) => {
+      new Promise((resolve, reject) => {
         timeoutHandle = safeSetTimeout(() => {
           try {
             onTimeout?.();
-            resolve9();
+            resolve();
           } catch (error) {
             reject(error);
           }
@@ -1521,14 +1514,14 @@ function newState() {
     remainingNodes: MAX_JSON_SAFE_VALUE_NODES
   };
 }
-function toOtlpKeyValueList(attrs, logger2) {
+function toOtlpKeyValueList(attrs, logger) {
   try {
-    return encodeKeyValueList(attrs, logger2, newState(), 0);
+    return encodeKeyValueList(attrs, logger, newState(), 0);
   } catch {
     return [];
   }
 }
-function encodeAnyValue(value, logger2, state, depth) {
+function encodeAnyValue(value, logger, state, depth) {
   if (state.remainingNodes <= 0)
     return {
       stringValue: TRUNCATED_VALUE
@@ -1554,7 +1547,7 @@ function encodeAnyValue(value, logger2, state, depth) {
         };
       const decimal = BigInt(value).toString();
       if (value >= INT64_RANGE_LIMIT || value < -INT64_RANGE_LIMIT) {
-        logger2?.debug(`Attribute ${decimal} is outside the int64 range; encoding it as a string`);
+        logger?.debug(`Attribute ${decimal} is outside the int64 range; encoding it as a string`);
         return {
           stringValue: decimal
         };
@@ -1600,17 +1593,17 @@ function encodeAnyValue(value, logger2, state, depth) {
       try {
         const toJSON = value.toJSON;
         if (typeof toJSON == "function")
-          return encodeAnyValue(toJSON.call(value), logger2, state, depth + 1);
+          return encodeAnyValue(toJSON.call(value), logger, state, depth + 1);
       } catch {}
       if (isArray(value))
         return {
           arrayValue: {
-            values: encodeArrayValues(value, logger2, state, depth + 1)
+            values: encodeArrayValues(value, logger, state, depth + 1)
           }
         };
       return {
         kvlistValue: {
-          values: encodeKeyValueList(value, logger2, state, depth + 1)
+          values: encodeKeyValueList(value, logger, state, depth + 1)
         }
       };
     } finally {
@@ -1621,7 +1614,7 @@ function encodeAnyValue(value, logger2, state, depth) {
     stringValue: sanitizeString(String(value))
   };
 }
-function encodeArrayValues(values, logger2, state, depth) {
+function encodeArrayValues(values, logger, state, depth) {
   const result = [];
   const itemCount = Math.min(values.length, MAX_JSON_SAFE_VALUE_ITEMS);
   let index = 0;
@@ -1630,7 +1623,7 @@ function encodeArrayValues(values, logger2, state, depth) {
       const element = index in values ? values[index] : undefined;
       if (isNullish(element))
         continue;
-      result.push(encodeAnyValue(element, logger2, state, depth));
+      result.push(encodeAnyValue(element, logger, state, depth));
     } catch {
       result.push({
         stringValue: UNSERIALIZABLE_VALUE
@@ -1642,12 +1635,12 @@ function encodeArrayValues(values, logger2, state, depth) {
     });
   return result;
 }
-function encodeKeyValueList(attrs, logger2, state, depth) {
+function encodeKeyValueList(attrs, logger, state, depth) {
   const result = [];
   for (const key in attrs)
     if (propertyIsEnumerable.call(attrs, key)) {
       if (result.length >= MAX_JSON_SAFE_VALUE_ITEMS || state.remainingNodes <= 0) {
-        logger2?.debug("Attributes truncated: the value exceeds the OTLP encoder budget");
+        logger?.debug("Attributes truncated: the value exceeds the OTLP encoder budget");
         break;
       }
       try {
@@ -1656,7 +1649,7 @@ function encodeKeyValueList(attrs, logger2, state, depth) {
           continue;
         result.push({
           key: sanitizeString(key),
-          value: encodeAnyValue(value, logger2, state, depth)
+          value: encodeAnyValue(value, logger, state, depth)
         });
       } catch {
         result.push({
@@ -2300,11 +2293,11 @@ class ErrorPropertiesBuilder {
     return context;
   }
   buildCoercingContext(mechanism, hint, depth = 0) {
-    const coerce = (input, depth2) => {
-      if (!(depth2 <= MAX_CAUSE_RECURSION))
+    const coerce = (input, depth) => {
+      if (!(depth <= MAX_CAUSE_RECURSION))
         return;
       {
-        const ctx = this.buildCoercingContext(mechanism, hint, depth2);
+        const ctx = this.buildCoercingContext(mechanism, hint, depth);
         return this.applyCoercers(input, ctx);
       }
     };
@@ -2363,8 +2356,8 @@ var init_safari = __esm(() => {
 var chromeRegexNoFnName, chromeRegex, chromeEvalRegex, chromeStackLineParser = (line, platform) => {
   const noFnParts = chromeRegexNoFnName.exec(line);
   if (noFnParts) {
-    const [, filename, line2, col] = noFnParts;
-    return createFrame(platform, filename, UNKNOWN_FUNCTION, +line2, +col);
+    const [, filename, line, col] = noFnParts;
+    return createFrame(platform, filename, UNKNOWN_FUNCTION, +line, +col);
   }
   const parts = chromeRegex.exec(line);
   if (parts) {
@@ -2417,27 +2410,13 @@ var init_gecko = __esm(() => {
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/winjs.mjs
-var winjsRegex, winjsStackLineParser = (line, platform) => {
-  const parts = winjsRegex.exec(line);
-  return parts ? createFrame(platform, parts[2], parts[1] || UNKNOWN_FUNCTION, +parts[3], parts[4] ? +parts[4] : undefined) : undefined;
-};
 var init_winjs = __esm(() => {
   init_base();
-  winjsRegex = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:[-a-z]+):.*?):(\d+)(?::(\d+))?\)?\s*$/i;
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/opera.mjs
-var opera10Regex, opera10StackLineParser = (line, platform) => {
-  const parts = opera10Regex.exec(line);
-  return parts ? createFrame(platform, parts[2], parts[3] || UNKNOWN_FUNCTION, +parts[1]) : undefined;
-}, opera11Regex, opera11StackLineParser = (line, platform) => {
-  const parts = opera11Regex.exec(line);
-  return parts ? createFrame(platform, parts[5], parts[3] || parts[4] || UNKNOWN_FUNCTION, +parts[1], +parts[2]) : undefined;
-};
 var init_opera = __esm(() => {
   init_base();
-  opera10Regex = / line (\d+).*script (?:in )?(\S+)(?:: in function (\S+))?$/i;
-  opera11Regex = / line (\d+), column (\d+)\s*(?:in (?:<anonymous function: ([^>]+)>|([^)]+))\(.*\))? in (.*):\s*$/i;
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/parsers/node.mjs
@@ -2571,35 +2550,6 @@ var init_parsers = __esm(() => {
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/dom-exception-coercer.mjs
-class DOMExceptionCoercer {
-  match(err) {
-    return this.isDOMException(err) || this.isDOMError(err);
-  }
-  coerce(err, ctx) {
-    const hasStack = isString(err.stack);
-    return {
-      type: this.getType(err),
-      value: this.getValue(err),
-      stack: hasStack ? err.stack : undefined,
-      cause: err.cause ? ctx.next(err.cause) : undefined,
-      synthetic: false
-    };
-  }
-  getType(candidate) {
-    return this.isDOMError(candidate) ? "DOMError" : "DOMException";
-  }
-  getValue(err) {
-    const name = err.name || (this.isDOMError(err) ? "DOMError" : "DOMException");
-    const message = err.message ? `${name}: ${err.message}` : name;
-    return message;
-  }
-  isDOMException(err) {
-    return isBuiltin(err, "DOMException");
-  }
-  isDOMError(err) {
-    return isBuiltin(err, "DOMError");
-  }
-}
 var init_dom_exception_coercer = __esm(() => {
   init_utils();
 });
@@ -2638,39 +2588,6 @@ var init_error_coercer = __esm(() => {
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/error-event-coercer.mjs
-class ErrorEventCoercer {
-  constructor() {}
-  match(err) {
-    if (!isErrorEvent(err))
-      return false;
-    const errorEvent = err;
-    return errorEvent.error != null || this._hasUsableMessage(errorEvent);
-  }
-  coerce(err, ctx) {
-    if (err.error != null)
-      return ctx.apply(err.error);
-    const exceptionLike = ctx.apply(err.message);
-    return {
-      ...exceptionLike,
-      stack: this._buildLocationStack(err) ?? exceptionLike.stack,
-      synthetic: true
-    };
-  }
-  _hasUsableMessage(err) {
-    return isString(err.message) && err.message.length > 0;
-  }
-  _buildLocationStack(err) {
-    const location = err;
-    const lineno = location.lineno ?? 0;
-    const colno = location.colno ?? 0;
-    if (!isString(location.filename) || location.filename.length === 0)
-      return;
-    if (lineno === 0)
-      return;
-    return `Error
-    at ${location.filename}:${lineno}:${colno}`;
-  }
-}
 var init_error_event_coercer = __esm(() => {
   init_utils();
 });
@@ -2849,41 +2766,6 @@ var init_primitive_coercer = __esm(() => {
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/coercers/promise-rejection-event.mjs
-class PromiseRejectionEventCoercer {
-  match(err) {
-    return isBuiltin(err, "PromiseRejectionEvent") || this.isCustomEventWrappingRejection(err);
-  }
-  isCustomEventWrappingRejection(err) {
-    if (!isEvent(err))
-      return false;
-    try {
-      const detail = err.detail;
-      return detail != null && typeof detail == "object" && "reason" in detail;
-    } catch {
-      return false;
-    }
-  }
-  coerce(err, ctx) {
-    const reason = this.getUnhandledRejectionReason(err);
-    if (isPrimitive(reason))
-      return {
-        type: "UnhandledRejection",
-        value: `Non-Error promise rejection captured with value: ${String(reason)}`,
-        stack: ctx.syntheticException?.stack,
-        synthetic: true
-      };
-    return ctx.apply(reason);
-  }
-  getUnhandledRejectionReason(error) {
-    try {
-      if ("reason" in error)
-        return error.reason;
-      if ("detail" in error && error.detail != null && typeof error.detail == "object" && "reason" in error.detail)
-        return error.detail.reason;
-    } catch {}
-    return error;
-  }
-}
 var init_promise_rejection_event = __esm(() => {
   init_utils();
 });
@@ -2928,127 +2810,7 @@ class ReduceableCache {
 var init_utils3 = () => {};
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/exception-steps.mjs
-function resolveExceptionStepsConfig(config) {
-  if (!config)
-    return {
-      ...DEFAULT_EXCEPTION_STEPS_CONFIG
-    };
-  return {
-    enabled: config.enabled ?? DEFAULT_EXCEPTION_STEPS_CONFIG.enabled,
-    max_bytes: normalizePositiveInteger(config.max_bytes, DEFAULT_EXCEPTION_STEPS_CONFIG.max_bytes)
-  };
-}
-function stripReservedExceptionStepFields(properties) {
-  if (!properties)
-    return {
-      sanitizedProperties: {},
-      droppedKeys: []
-    };
-  const droppedKeys = [];
-  const sanitizedProperties = Object.keys(properties).reduce((acc, key) => {
-    if (RESERVED_EXCEPTION_STEP_KEYS.has(key)) {
-      droppedKeys.push(key);
-      return acc;
-    }
-    acc[key] = properties[key];
-    return acc;
-  }, {});
-  return {
-    sanitizedProperties,
-    droppedKeys
-  };
-}
-
-class ExceptionStepsBuffer {
-  constructor(config) {
-    this._entries = [];
-    this._totalBytes = 0;
-    this._config = resolveExceptionStepsConfig(config);
-  }
-  setConfig(config) {
-    this._config = resolveExceptionStepsConfig(config);
-    this._trimToMaxBytes();
-  }
-  add(step) {
-    const serialized = normalizeAndSerializeStep(step);
-    if (!serialized)
-      return;
-    const bytes = getUtf8ByteLength(serialized.json);
-    if (bytes > this._config.max_bytes)
-      return;
-    this._entries.push({
-      step: serialized.step,
-      bytes
-    });
-    this._totalBytes += bytes;
-    this._trimToMaxBytes();
-  }
-  getAttachable() {
-    return this._entries.map((e) => e.step);
-  }
-  clear() {
-    this._entries = [];
-    this._totalBytes = 0;
-  }
-  size() {
-    return this._entries.length;
-  }
-  _trimToMaxBytes() {
-    while (this._totalBytes > this._config.max_bytes && this._entries.length > 0) {
-      const evicted = this._entries.shift();
-      if (evicted)
-        this._totalBytes -= evicted.bytes;
-    }
-  }
-}
-function normalizePositiveInteger(input, fallback) {
-  if (!isNumber(input) || input === 1 / 0 || input === -1 / 0)
-    return fallback;
-  const normalized = Math.floor(input);
-  if (normalized < 0)
-    return fallback;
-  return normalized;
-}
-function normalizeAndSerializeStep(step) {
-  let json;
-  try {
-    json = safeJsonStringify(step);
-  } catch {
-    return;
-  }
-  try {
-    const parsed = JSON.parse(json);
-    if (!isObject(parsed))
-      return;
-    const parsedStep = parsed;
-    const message = parsedStep[EXCEPTION_STEP_INTERNAL_FIELDS.MESSAGE];
-    const timestamp = parsedStep[EXCEPTION_STEP_INTERNAL_FIELDS.TIMESTAMP];
-    if (!isString(message) || message.trim().length === 0)
-      return;
-    if (!isString(timestamp) && !isNumber(timestamp))
-      return;
-    return {
-      step: parsedStep,
-      json
-    };
-  } catch {
-    return;
-  }
-}
-function getUtf8ByteLength(value) {
-  if (typeof TextEncoder != "undefined")
-    return new TextEncoder().encode(value).length;
-  const encoded = encodeURIComponent(value);
-  let byteLength = 0;
-  for (let i = 0;i < encoded.length; i++)
-    if (encoded[i] === "%") {
-      byteLength += 1;
-      i += 2;
-    } else
-      byteLength += 1;
-  return byteLength;
-}
-var EXCEPTION_STEP_INTERNAL_FIELDS, RESERVED_EXCEPTION_STEP_KEYS, DEFAULT_EXCEPTION_STEPS_CONFIG;
+var EXCEPTION_STEP_INTERNAL_FIELDS, RESERVED_EXCEPTION_STEP_KEYS;
 var init_exception_steps = __esm(() => {
   init_utils();
   EXCEPTION_STEP_INTERNAL_FIELDS = {
@@ -3059,10 +2821,6 @@ var init_exception_steps = __esm(() => {
     EXCEPTION_STEP_INTERNAL_FIELDS.MESSAGE,
     EXCEPTION_STEP_INTERNAL_FIELDS.TIMESTAMP
   ]);
-  DEFAULT_EXCEPTION_STEPS_CONFIG = {
-    enabled: true,
-    max_bytes: 32768
-  };
 });
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/release.mjs
@@ -3073,35 +2831,6 @@ function getInjectedReleaseId() {
 var init_release = () => {};
 
 // node_modules/.bun/@posthog+core@1.48.9/node_modules/@posthog/core/dist/error-tracking/index.mjs
-var exports_error_tracking = {};
-__export(exports_error_tracking, {
-  DEFAULT_EXCEPTION_STEPS_CONFIG: () => DEFAULT_EXCEPTION_STEPS_CONFIG,
-  DOMExceptionCoercer: () => DOMExceptionCoercer,
-  EXCEPTION_STEP_INTERNAL_FIELDS: () => EXCEPTION_STEP_INTERNAL_FIELDS,
-  ErrorCoercer: () => ErrorCoercer,
-  ErrorEventCoercer: () => ErrorEventCoercer,
-  ErrorPropertiesBuilder: () => ErrorPropertiesBuilder,
-  EventCoercer: () => EventCoercer,
-  ExceptionStepsBuffer: () => ExceptionStepsBuffer,
-  ObjectCoercer: () => ObjectCoercer,
-  PrimitiveCoercer: () => PrimitiveCoercer,
-  PromiseRejectionEventCoercer: () => PromiseRejectionEventCoercer,
-  ReduceableCache: () => ReduceableCache,
-  StringCoercer: () => StringCoercer,
-  chromeStackLineParser: () => chromeStackLineParser,
-  createDefaultStackParser: () => createDefaultStackParser,
-  createStackParser: () => createStackParser,
-  geckoStackLineParser: () => geckoStackLineParser,
-  getInjectedReleaseId: () => getInjectedReleaseId,
-  getUtf8ByteLength: () => getUtf8ByteLength,
-  nodeStackLineParser: () => nodeStackLineParser,
-  opera10StackLineParser: () => opera10StackLineParser,
-  opera11StackLineParser: () => opera11StackLineParser,
-  resolveExceptionStepsConfig: () => resolveExceptionStepsConfig,
-  reverseAndStripFrames: () => reverseAndStripFrames,
-  stripReservedExceptionStepFields: () => stripReservedExceptionStepFields,
-  winjsStackLineParser: () => winjsStackLineParser
-});
 var init_error_tracking = __esm(() => {
   init_error_properties_builder();
   init_parsers();
@@ -3571,15 +3300,15 @@ class PostHogCoreStateless {
     };
     const response = await this.fetchWithRetry(url, fetchOptions, {
       type: "required",
-      consume: (response2) => {
-        if (response2.status !== 200 || !response2.json) {
-          const msg = `Surveys API could not be loaded: ${response2.status}`;
+      consume: (response) => {
+        if (response.status !== 200 || !response.json) {
+          const msg = `Surveys API could not be loaded: ${response.status}`;
           const error = new Error(msg);
           this._logger.error(error);
           this._events.emit("error", new Error(msg));
           return Promise.resolve(undefined);
         }
-        return response2.json();
+        return response.json();
       }
     }).catch((error) => {
       this._logger.error("Surveys API could not be loaded", error);
@@ -4269,7 +3998,7 @@ import { constants as constants2 } from "node:fs";
 import { open as promises_open } from "node:fs/promises";
 import { isAbsolute as isAbsolute7 } from "node:path";
 import { createInterface } from "node:readline";
-async function addSourceContext(frames, openSourceFile = promises_open, logger2) {
+async function addSourceContext(frames, openSourceFile = promises_open, logger) {
   const filesToLines = {};
   let basePath;
   try {
@@ -4305,7 +4034,7 @@ async function addSourceContext(frames, openSourceFile = promises_open, logger2)
     if (ranges.every((r) => rangeExistsInContentCache(cacheKey, r)))
       continue;
     const cache = emplace(LRU_FILE_CONTENTS_CACHE, cacheKey, {});
-    readlinePromises.push(getContextLinesFromFile(file, ranges, cache, cacheKey, openSourceFile, logger2));
+    readlinePromises.push(getContextLinesFromFile(file, ranges, cache, cacheKey, openSourceFile, logger));
   }
   await Promise.all(readlinePromises).catch(() => {});
   if (frames && frames.length > 0)
@@ -4313,16 +4042,16 @@ async function addSourceContext(frames, openSourceFile = promises_open, logger2)
   LRU_FILE_CONTENTS_CACHE.reduce();
   return frames;
 }
-async function openRegularSourceFile(path2, openSourceFile, logger2) {
+async function openRegularSourceFile(path, openSourceFile, logger) {
   let fileHandle;
   let isValid = false;
   try {
-    fileHandle = await openSourceFile(path2, constants2.O_RDONLY | constants2.O_NONBLOCK);
+    fileHandle = await openSourceFile(path, constants2.O_RDONLY | constants2.O_NONBLOCK);
     const fileStat = await fileHandle.stat();
     if (!fileStat.isFile())
       return;
     if (fileStat.size > MAX_CONTEXTLINES_FILE_SIZE)
-      return void logger2?.debug(`Skipping source context for oversized file ${path2}: ${fileStat.size} bytes exceeds ${MAX_CONTEXTLINES_FILE_SIZE}`);
+      return void logger?.debug(`Skipping source context for oversized file ${path}: ${fileStat.size} bytes exceeds ${MAX_CONTEXTLINES_FILE_SIZE}`);
     isValid = true;
     return fileHandle;
   } catch {
@@ -4332,19 +4061,19 @@ async function openRegularSourceFile(path2, openSourceFile, logger2) {
       await fileHandle.close().catch(() => {});
   }
 }
-async function getContextLinesFromFile(path2, ranges, output, cacheKey, openSourceFile, logger2) {
-  const fileHandle = await openRegularSourceFile(path2, openSourceFile, logger2);
+async function getContextLinesFromFile(path, ranges, output, cacheKey, openSourceFile, logger) {
+  const fileHandle = await openRegularSourceFile(path, openSourceFile, logger);
   if (fileHandle === undefined)
     return void LRU_FILE_CONTENTS_FS_READ_FAILED.set(cacheKey, 1);
   const openedFileHandle = fileHandle;
-  return new Promise((resolve9) => {
+  return new Promise((resolve) => {
     let finished = false;
-    function destroyStreamAndResolve(stream2) {
+    function destroyStreamAndResolve(stream) {
       if (finished)
         return;
       finished = true;
-      stream2?.destroy();
-      openedFileHandle.close().then(resolve9, resolve9);
+      stream?.destroy();
+      openedFileHandle.close().then(resolve, resolve);
     }
     let stream;
     try {
@@ -4396,14 +4125,14 @@ async function getContextLinesFromFile(path2, ranges, output, cacheKey, openSour
           return;
         }
         currentRangeIndex++;
-        const range2 = ranges[currentRangeIndex];
-        if (range2 === undefined) {
+        const range = ranges[currentRangeIndex];
+        if (range === undefined) {
           lineReaded.close();
           lineReaded.removeAllListeners();
           return;
         }
-        rangeStart = range2[0];
-        rangeEnd = range2[1];
+        rangeStart = range[0];
+        rangeEnd = range[1];
       }
     });
   });
@@ -4445,8 +4174,8 @@ function clearLineContext(frame) {
   delete frame.context_line;
   delete frame.post_context;
 }
-function shouldSkipContextLinesForFile(path2) {
-  return path2.startsWith("node:") || path2.endsWith(".min.js") || path2.endsWith(".min.cjs") || path2.endsWith(".min.mjs") || path2.startsWith("data:");
+function shouldSkipContextLinesForFile(path) {
+  return path.startsWith("node:") || path.endsWith(".min.js") || path.endsWith(".min.cjs") || path.endsWith(".min.mjs") || path.startsWith("data:");
 }
 function shouldSkipContextLinesForFrame(frame) {
   if (frame.lineno !== undefined && frame.lineno > MAX_CONTEXTLINES_LINENO)
@@ -4455,15 +4184,15 @@ function shouldSkipContextLinesForFrame(frame) {
     return true;
   return false;
 }
-function makeSourceCacheKey(path2, basePath) {
-  if (isAbsolute7(path2))
+function makeSourceCacheKey(path, basePath) {
+  if (isAbsolute7(path))
     return JSON.stringify([
       null,
-      path2
+      path
     ]);
   return basePath === undefined ? undefined : JSON.stringify([
     basePath,
-    path2
+    path
   ]);
 }
 function rangeExistsInContentCache(cacheKey, range) {
@@ -4547,8 +4276,8 @@ function snipLine(line, colno) {
 var LRU_FILE_CONTENTS_CACHE, LRU_FILE_CONTENTS_FS_READ_FAILED, DEFAULT_LINES_OF_CONTEXT = 7, MAX_CONTEXTLINES_COLNO = 1000, MAX_CONTEXTLINES_LINENO = 1e4, MAX_CONTEXTLINES_FILE_SIZE = 10485760;
 var init_context_lines_node = __esm(() => {
   init_dist();
-  LRU_FILE_CONTENTS_CACHE = new exports_error_tracking.ReduceableCache(25);
-  LRU_FILE_CONTENTS_FS_READ_FAILED = new exports_error_tracking.ReduceableCache(20);
+  LRU_FILE_CONTENTS_CACHE = new ReduceableCache(25);
+  LRU_FILE_CONTENTS_FS_READ_FAILED = new ReduceableCache(20);
 });
 
 // node_modules/.bun/posthog-node@5.51.1/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
@@ -5291,21 +5020,21 @@ function matchProperty(property, propertyValues, warnFunction) {
       warnFunction(`Property ${key} cannot have a value of null/undefined with the ${operator} operator`);
     return false;
   }
-  function computeExactMatch(value2, overrideValue2) {
-    if (Array.isArray(value2))
-      return value2.map((val) => String(val).toLowerCase()).includes(String(overrideValue2).toLowerCase());
-    return String(value2).toLowerCase() === String(overrideValue2).toLowerCase();
+  function computeExactMatch(value, overrideValue) {
+    if (Array.isArray(value))
+      return value.map((val) => String(val).toLowerCase()).includes(String(overrideValue).toLowerCase());
+    return String(value).toLowerCase() === String(overrideValue).toLowerCase();
   }
-  function compare(lhs, rhs, operator2) {
-    if (operator2 === "gt")
+  function compare(lhs, rhs, operator) {
+    if (operator === "gt")
       return lhs > rhs;
-    if (operator2 === "gte")
+    if (operator === "gte")
       return lhs >= rhs;
-    if (operator2 === "lt")
+    if (operator === "lt")
       return lhs < rhs;
-    if (operator2 === "lte")
+    if (operator === "lte")
       return lhs <= rhs;
-    throw new Error(`Invalid operator: ${operator2}`);
+    throw new Error(`Invalid operator: ${operator}`);
   }
   switch (operator) {
     case "exact":
@@ -5805,7 +5534,7 @@ class error_tracking_ErrorTracking {
     };
     const exceptionProperties = builder.buildFromUnknown(error, hint);
     exceptionProperties.$exception_list = await builder.modifyFrames(exceptionProperties.$exception_list);
-    const injectedReleaseId = exports_error_tracking.getInjectedReleaseId();
+    const injectedReleaseId = getInjectedReleaseId();
     if (injectedReleaseId)
       properties.$release_id = injectedReleaseId;
     return {
@@ -5930,10 +5659,10 @@ function isRecord3(value) {
 }
 function toRfc3339(timestamp) {
   if (typeof timestamp == "string") {
-    const asDate2 = new Date(timestamp);
-    if (Number.isNaN(asDate2.getTime()))
+    const asDate = new Date(timestamp);
+    if (Number.isNaN(asDate.getTime()))
       return new Date().toISOString();
-    const normalized = asDate2.toISOString();
+    const normalized = asDate.toISOString();
     const fractionalSeconds = timestamp.match(/\.(\d+)(?:Z|[+-]\d{2}:?\d{2})?$/i)?.[1];
     return fractionalSeconds && fractionalSeconds.length > 3 ? normalized.replace(/\.\d{3}Z$/, `.${fractionalSeconds}Z`) : normalized;
   }
@@ -6034,7 +5763,7 @@ class V1CaptureSender {
     this.fetchFn = hooks.fetch;
     this.onError = hooks.onError;
     this.now = hooks.now ?? Date.now;
-    this.sleep = hooks.sleep ?? ((ms) => new Promise((resolve9) => safeSetTimeout(resolve9, ms)));
+    this.sleep = hooks.sleep ?? ((ms) => new Promise((resolve) => safeSetTimeout(resolve, ms)));
     this.generateRequestId = hooks.generateRequestId ?? uuidv7;
     this.compress = hooks.compress ?? gzipCompress;
   }
@@ -6448,9 +6177,9 @@ var init_client = __esm(() => {
       if (this.disabled || this.optedOut)
         return;
       if (!this._waitUntilCycle) {
-        let resolve9;
+        let resolve;
         const promise = new Promise((r) => {
-          resolve9 = r;
+          resolve = r;
         });
         try {
           waitUntil(promise);
@@ -6458,7 +6187,7 @@ var init_client = __esm(() => {
           return;
         }
         this._waitUntilCycle = {
-          resolve: resolve9,
+          resolve,
           startedAt: Date.now(),
           timer: undefined
         };
@@ -6484,11 +6213,11 @@ var init_client = __esm(() => {
       return cycle?.resolve;
     }
     async resolveWaitUntilFlush() {
-      const resolve9 = this._consumeWaitUntilCycle();
+      const resolve = this._consumeWaitUntilCycle();
       try {
         await this.flushWithPendingPromises();
       } catch {} finally {
-        resolve9?.();
+        resolve?.();
       }
     }
     getPersistedProperty(key) {
@@ -6767,15 +6496,15 @@ var init_client = __esm(() => {
         return true;
       if (this.featureFlagsPoller === undefined)
         return false;
-      return new Promise((resolve9) => {
+      return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           cleanup();
-          resolve9(false);
+          resolve(false);
         }, timeoutMs);
         const cleanup = this._events.on("localEvaluationFlagsLoaded", (count) => {
           clearTimeout(timeout);
           cleanup();
-          resolve9(count > 0);
+          resolve(count > 0);
         });
       });
     }
@@ -7325,7 +7054,7 @@ var init_client = __esm(() => {
     }
     async _shutdown(shutdownTimeoutMs) {
       const shutdownDeadlineMs = Date.now() + (shutdownTimeoutMs ?? 30000);
-      const resolve9 = this._consumeWaitUntilCycle();
+      const resolve = this._consumeWaitUntilCycle();
       await this.featureFlagsPoller?.stopPoller(shutdownTimeoutMs);
       this.errorTracking.shutdown();
       if (this._metrics) {
@@ -7336,7 +7065,7 @@ var init_client = __esm(() => {
         return await super._shutdown(Math.max(0, shutdownDeadlineMs - Date.now()));
       } finally {
         this.distinctIdHasSentFlagCalls = {};
-        resolve9?.();
+        resolve?.();
       }
     }
     async _requestRemoteConfigPayload(flagKey) {
@@ -7674,7 +7403,7 @@ function createEventProcessor(_posthog, { organization, projectId, prefix, sever
       $sentry_exception_type: exceptions[0]?.type,
       $sentry_tags: event.tags
     };
-    const injectedReleaseId = exports_error_tracking.getInjectedReleaseId();
+    const injectedReleaseId = getInjectedReleaseId();
     if (injectedReleaseId)
       properties.$release_id = injectedReleaseId;
     if (organization && projectId)
@@ -7756,13 +7485,13 @@ var init_index_node = __esm(() => {
       return new PostHogContext;
     }
     createErrorPropertiesBuilder() {
-      return new exports_error_tracking.ErrorPropertiesBuilder([
-        new exports_error_tracking.EventCoercer,
-        new exports_error_tracking.ErrorCoercer,
-        new exports_error_tracking.ObjectCoercer,
-        new exports_error_tracking.StringCoercer,
-        new exports_error_tracking.PrimitiveCoercer
-      ], exports_error_tracking.createStackParser("node:javascript", exports_error_tracking.nodeStackLineParser), [
+      return new ErrorPropertiesBuilder([
+        new EventCoercer,
+        new ErrorCoercer,
+        new ObjectCoercer,
+        new StringCoercer,
+        new PrimitiveCoercer
+      ], createStackParser("node:javascript", nodeStackLineParser), [
         createModulerModifier(),
         (frames) => addSourceContext(frames, undefined, this._logger),
         createRelativePathModifier()
@@ -8143,26 +7872,8 @@ function createPostHogClient(source, options = {}) {
 function getPostHogDistinctId() {
   return getTelemetryDistinctId(MACHINE_ID_PREFIX, resolveOsProvider());
 }
-function createCliPostHog() {
-  return createPostHogClient("cli");
-}
 function createInstallPostHog() {
   return createPostHogClient("install");
-}
-function createPluginPostHog() {
-  return createPostHogClient("plugin");
-}
-function __setOsProviderForTesting(provider) {
-  osProviderOverride2 = provider;
-}
-function __resetOsProviderForTesting() {
-  osProviderOverride2 = null;
-}
-function __setActivityStateProviderForTesting(provider) {
-  activityStateProviderOverride = provider;
-}
-function __resetActivityStateProviderForTesting() {
-  activityStateProviderOverride = null;
 }
 var osProviderOverride2 = null, activityStateProviderOverride = null, transportFactoryOverride = null, NO_OP_POSTHOG;
 var init_posthog = __esm(() => {
@@ -8181,17 +7892,6 @@ var init_posthog = __esm(() => {
 });
 
 // packages/omo-codex/src/telemetry/index.ts
-var exports_telemetry = {};
-__export(exports_telemetry, {
-  __resetActivityStateProviderForTesting: () => __resetActivityStateProviderForTesting,
-  __resetOsProviderForTesting: () => __resetOsProviderForTesting,
-  __setActivityStateProviderForTesting: () => __setActivityStateProviderForTesting,
-  __setOsProviderForTesting: () => __setOsProviderForTesting,
-  createCliPostHog: () => createCliPostHog,
-  createInstallPostHog: () => createInstallPostHog,
-  createPluginPostHog: () => createPluginPostHog,
-  getPostHogDistinctId: () => getPostHogDistinctId
-});
 var init_telemetry = __esm(() => {
   init_posthog();
 });
@@ -8646,16 +8346,16 @@ async function removeLegacyCodexComponentBins(binDir, platform) {
 }
 async function removeLegacyCodexComponentBin(linkPath, component, platform) {
   try {
-    const stat2 = await lstat3(linkPath);
+    const stat = await lstat3(linkPath);
     if (platform !== "win32") {
-      if (!stat2.isSymbolicLink())
+      if (!stat.isSymbolicLink())
         return;
       const target = await readlink2(linkPath);
       if (isManagedLegacyComponentTarget(target, component))
         await rm2(linkPath, { force: true });
       return;
     }
-    if (!stat2.isFile())
+    if (!stat.isFile())
       return;
     const content = await readFile2(linkPath, "utf8");
     if (content.includes(COMMAND_SHIM_MARKER))
@@ -8832,10 +8532,10 @@ async function linkRootRuntimeBin(input) {
   const nodeCliPath = join4(input.repoRoot, "dist", "cli-node", "index.js");
   await mkdir(input.binDir, { recursive: true });
   if (platform === "win32") {
-    const linkPath2 = join4(input.binDir, `${binName}.cmd`);
-    await replaceRuntimeWrapper(linkPath2, windowsRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath));
+    const linkPath = join4(input.binDir, `${binName}.cmd`);
+    await replaceRuntimeWrapper(linkPath, windowsRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath));
     await removeGeneratedRuntimeWrapper(legacyPath);
-    return { name: binName, path: linkPath2, target: cliPath };
+    return { name: binName, path: linkPath, target: cliPath };
   }
   const linkPath = join4(input.binDir, binName);
   await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath));
@@ -8845,9 +8545,9 @@ async function linkRootRuntimeBin(input) {
 }
 async function linkCachedPluginBin(binDir, link, platform) {
   if (platform === "win32") {
-    const linkPath2 = join4(binDir, `${link.name}.cmd`);
-    await replaceCommandShim(linkPath2, link.target);
-    return linkPath2;
+    const linkPath = join4(binDir, `${link.name}.cmd`);
+    await replaceCommandShim(linkPath, link.target);
+    return linkPath;
   }
   const linkPath = join4(binDir, link.name);
   await replaceSymlink(linkPath, link.target);
@@ -8979,10 +8679,10 @@ async function readGeneratedWrapperContent(path) {
 }
 async function existingNonRuntimeWrapper(path) {
   try {
-    const stat3 = await lstat4(path);
-    if (stat3.isSymbolicLink())
+    const stat = await lstat4(path);
+    if (stat.isSymbolicLink())
       return false;
-    if (!stat3.isFile())
+    if (!stat.isFile())
       return true;
     const content = await readFile3(path, "utf8");
     return !content.includes(RUNTIME_WRAPPER_MARKER);
@@ -8994,8 +8694,8 @@ async function existingNonRuntimeWrapper(path) {
 }
 async function existingNonShim(path) {
   try {
-    const stat3 = await lstat4(path);
-    if (!stat3.isFile())
+    const stat = await lstat4(path);
+    if (!stat.isFile())
       return true;
     const content = await readFile3(path, "utf8");
     if (content.includes(COMMAND_SHIM_MARKER))
@@ -9009,8 +8709,8 @@ async function existingNonShim(path) {
 }
 async function existingNonSymlink(path) {
   try {
-    const stat3 = await lstat4(path);
-    if (!stat3.isSymbolicLink())
+    const stat = await lstat4(path);
+    if (!stat.isSymbolicLink())
       return true;
     await readlink3(path);
     return false;
@@ -9045,22 +8745,22 @@ var BUNDLED_MCP_RUNTIMES = [
 ];
 async function copyBundledMcpRuntimeDists(input) {
   const sourceArgs = await readSourceMcpArgs(join5(input.sourceRoot, ".mcp.json"));
-  for (const runtime2 of BUNDLED_MCP_RUNTIMES) {
-    if (!sourceArgs.has(runtime2.sourceArg))
+  for (const runtime of BUNDLED_MCP_RUNTIMES) {
+    if (!sourceArgs.has(runtime.sourceArg))
       continue;
-    await copyBundledMcpRuntimeDist(input.pluginRoot, input.sourceRoot, runtime2);
+    await copyBundledMcpRuntimeDist(input.pluginRoot, input.sourceRoot, runtime);
   }
 }
 function resolveBundledMcpRuntimeArg(pluginRoot, arg) {
-  const runtime2 = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg);
-  return runtime2 ? join5(pluginRoot, runtime2.destinationArg) : null;
+  const runtime = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg);
+  return runtime ? join5(pluginRoot, runtime.destinationArg) : null;
 }
-async function copyBundledMcpRuntimeDist(pluginRoot, sourceRoot, runtime2) {
-  const sourcePath = resolve3(sourceRoot, runtime2.sourceDistFromPlugin);
+async function copyBundledMcpRuntimeDist(pluginRoot, sourceRoot, runtime) {
+  const sourcePath = resolve3(sourceRoot, runtime.sourceDistFromPlugin);
   if (!await isDirectory(sourcePath)) {
-    throw new Error(`missing built ${runtime2.label} dist at ${sourcePath}`);
+    throw new Error(`missing built ${runtime.label} dist at ${sourcePath}`);
   }
-  const destinationPath = join5(pluginRoot, runtime2.destinationDistFromPlugin);
+  const destinationPath = join5(pluginRoot, runtime.destinationDistFromPlugin);
   await mkdir2(dirname2(destinationPath), { recursive: true });
   await cp(sourcePath, destinationPath, { recursive: true });
 }
@@ -9542,10 +9242,10 @@ async function restoreBackupDirectory(backupPath, targetPath, renameDirectory) {
   await renameDirectory(backupPath, targetPath);
 }
 function shouldCopyPluginPath(path, root) {
-  const relative4 = path === root ? "" : path.slice(root.length + sep5.length);
-  if (relative4 === "")
+  const relative = path === root ? "" : path.slice(root.length + sep5.length);
+  if (relative === "")
     return true;
-  const parts = relative4.split(sep5);
+  const parts = relative.split(sep5);
   if (parts.some((part) => part === ".git" || part === "node_modules"))
     return false;
   return !isNestedComponentMcpManifest(parts);
@@ -9829,9 +9529,9 @@ function replaceOrInsertSetting(config, section, key, value) {
       offset += line.length;
       continue;
     }
-    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const replacement = replaceTomlAssignmentValue(line, assignmentIndex, value);
     const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(section.text, offset + line.length, multilineScan.nextQuote) : offset + line.length;
-    const sectionReplacement = section.text.slice(0, offset) + replacement2 + section.text.slice(assignmentEnd);
+    const sectionReplacement = section.text.slice(0, offset) + replacement + section.text.slice(assignmentEnd);
     return config.slice(0, section.start) + sectionReplacement + config.slice(section.end);
   }
   const replacement = insertSetting(section.text, key, value);
@@ -9893,9 +9593,9 @@ function replaceOrInsertRootDottedSetting(config, keyPath, value) {
       offset += line.length;
       continue;
     }
-    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const replacement = replaceTomlAssignmentValue(line, assignmentIndex, value);
     const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(config, offset + line.length, multilineScan.nextQuote) : offset + line.length;
-    return config.slice(0, offset) + replacement2 + config.slice(assignmentEnd);
+    return config.slice(0, offset) + replacement + config.slice(assignmentEnd);
   }
   const sectionStart = findFirstTableStart(config);
   const root = config.slice(0, sectionStart).trimEnd();
@@ -11289,8 +10989,8 @@ var resolveGitBashForCurrentProcess2 = (input = {}) => {
   return toCodexResolution(resolveGitBashForCurrentProcess(input));
 };
 async function prepareGitBashForInstall(input) {
-  const resolve7 = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess2({ platform: input.platform, env: input.env }));
-  const initialResolution = resolve7();
+  const resolve = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess2({ platform: input.platform, env: input.env }));
+  const initialResolution = resolve();
   return initialResolution;
 }
 function toCodexResolution(resolution) {
@@ -11921,10 +11621,10 @@ function localSourcePath(source) {
 function validateLocalSourcePath(path) {
   if (!path.startsWith("./"))
     throw new Error("local plugin source path must start with ./");
-  const relative4 = path.slice(2);
-  if (relative4.length === 0)
+  const relative = path.slice(2);
+  if (relative.length === 0)
     throw new Error("local plugin source path must not be empty");
-  for (const part of relative4.split(/[\\/]/)) {
+  for (const part of relative.split(/[\\/]/)) {
     if (part === "" || part === "." || part === "..") {
       throw new Error("local plugin source path must stay within the marketplace root");
     }
@@ -11974,10 +11674,10 @@ async function writeSnapshotPlugin(marketplaceRoot, plugin) {
   return { name: plugin.name, path: targetPath };
 }
 function shouldCopyMarketplaceSourcePath(path, root) {
-  const relative4 = path === root ? "" : path.slice(root.length + sep6.length);
-  if (relative4 === "")
+  const relative = path === root ? "" : path.slice(root.length + sep6.length);
+  if (relative === "")
     return true;
-  const parts = relative4.split(sep6);
+  const parts = relative.split(sep6);
   return !parts.some((part) => part === ".git" || part === "node_modules");
 }
 
@@ -12358,7 +12058,7 @@ import { connect } from "node:net";
 import { basename as basename5 } from "node:path";
 var PROBE_TIMEOUT_MS = 500;
 async function probeLegacyJsonRpcEndpoint(endpoint, timeoutMs = PROBE_TIMEOUT_MS) {
-  return await new Promise((resolve8) => {
+  return await new Promise((resolve) => {
     const socket = connect(endpoint);
     let settled = false;
     let buffer = "";
@@ -12368,7 +12068,7 @@ async function probeLegacyJsonRpcEndpoint(endpoint, timeoutMs = PROBE_TIMEOUT_MS
       settled = true;
       clearTimeout(timer);
       socket.destroy();
-      resolve8(value);
+      resolve(value);
     };
     const timer = setTimeout(() => finish(false), timeoutMs);
     timer.unref?.();
@@ -12501,13 +12201,13 @@ function isNodeCliDaemonCommand(command) {
   return /\bnode(?:\.exe)?\b/i.test(command) && /\bcli\.js\b/.test(command) && /\bdaemon\b/.test(command);
 }
 async function executeForStdout(executeFileImpl, file, args) {
-  return await new Promise((resolve8) => {
+  return await new Promise((resolve) => {
     executeFileImpl(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1000 }, (error, stdout) => {
       if (error !== null) {
-        resolve8(null);
+        resolve(null);
         return;
       }
-      resolve8(stdout);
+      resolve(stdout);
     });
   });
 }
@@ -12653,7 +12353,7 @@ async function defaultWaitForProcessExit(pid, timeoutMs) {
       return true;
     if (Date.now() >= deadline)
       return false;
-    await new Promise((resolve8) => setTimeout(resolve8, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }
 function processIsRunning(pid) {
@@ -12753,12 +12453,12 @@ function defaultSpawnProcess(command, args, options) {
     windowsHide: true
   });
   let settled = false;
-  const outcome = new Promise((resolve9) => {
+  const outcome = new Promise((resolve) => {
     const settle = (result) => {
       if (settled)
         return;
       settled = true;
-      resolve9(result);
+      resolve(result);
     };
     child.once("error", (error) => {
       settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
@@ -12878,9 +12578,9 @@ async function installAstGrepForCodex(options) {
 // packages/omo-codex/src/install/codex-install-telemetry.ts
 async function trackCodexInstallTelemetry() {
   try {
-    const { createInstallPostHog: createInstallPostHog2, getPostHogDistinctId: getPostHogDistinctId2 } = await Promise.resolve().then(() => (init_telemetry(), exports_telemetry));
-    const posthog = createInstallPostHog2();
-    posthog.trackActive(getPostHogDistinctId2(), "install_completed");
+    await Promise.resolve().then(() => init_telemetry());
+    const posthog = createInstallPostHog();
+    posthog.trackActive(getPostHogDistinctId(), "install_completed");
     await posthog.shutdown();
   } catch (error) {
     if (error instanceof Error)
@@ -12892,22 +12592,22 @@ async function trackCodexInstallTelemetry() {
 // packages/omo-codex/src/install/install-codex.ts
 var SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
 async function runCodexInstaller(options = {}) {
-  const env2 = options.env ?? process.env;
+  const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
-  const repoRoot = resolve9(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env2 }));
-  const codexHome = resolve9(options.codexHome ?? env2.CODEX_HOME ?? join33(homedir2(), ".codex"));
-  const projectDirectory = resolve9(options.projectDirectory ?? env2.OMO_CODEX_PROJECT ?? process.cwd());
-  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env2 });
+  const repoRoot = resolve9(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env }));
+  const codexHome = resolve9(options.codexHome ?? env.CODEX_HOME ?? join33(homedir2(), ".codex"));
+  const projectDirectory = resolve9(options.projectDirectory ?? env.OMO_CODEX_PROJECT ?? process.cwd());
+  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env });
   const runCommand = options.runCommand ?? defaultRunCommand;
   const log = options.log ?? (() => {
     return;
   });
   const buildSource = await shouldBuildSourcePackages(repoRoot);
-  const versionOverride = env2.LAZYCODEX_DEV_VERSION?.trim() || undefined;
+  const versionOverride = env.LAZYCODEX_DEV_VERSION?.trim() || undefined;
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
-    env: env2,
-    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env: env2 })) : undefined
+    env,
+    resolveGitBash: platform === "win32" ? options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess2({ platform, env })) : undefined
   });
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
@@ -12926,27 +12626,27 @@ async function runCodexInstaller(options = {}) {
     if (manifest.name !== entry.name) {
       throw new Error(`plugin manifest name ${JSON.stringify(manifest.name)} does not match marketplace name ${JSON.stringify(entry.name)}`);
     }
-    const version2 = resolveLazyCodexPluginVersion({
+    const version = resolveLazyCodexPluginVersion({
       manifestVersion: manifest.version,
       marketplaceName: marketplace.name,
       pluginName: entry.name,
       distributionManifest,
       versionOverride
     });
-    validatePathSegment(version2, "plugin version");
-    log(`Building ${entry.name}@${version2}`);
+    validatePathSegment(version, "plugin version");
+    log(`Building ${entry.name}@${version}`);
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
-      env: env2,
+      env,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
       sourcePath,
-      version: version2
+      version
     });
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
-      await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version: version2 });
+      await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version });
       await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest });
       await writeInstalledCodexBinDir({ pluginRoot: plugin.path, binDir });
       await removeGitBashHooksOffWindows({ platform, pluginRoot: plugin.path });
@@ -13293,25 +12993,25 @@ async function runDelegatedOmoCommand(parsed, options) {
     options.log(formatShellCommand(invocation.command, invocation.args));
     return;
   }
-  const env2 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo-agent-toolkit", ...invocation.env } : { ...process.env, ...invocation.env };
-  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env2 });
+  const env = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo-agent-toolkit", ...invocation.env } : { ...process.env, ...invocation.env };
+  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env });
 }
 function buildDelegatedOmoInvocation(parsed) {
   if (parsed.command === "doctor")
     return buildLazyCodexDoctorInvocation(parsed.args);
   if (parsed.command === "install") {
-    const args2 = ["--yes", "oh-my-openagent@latest", parsed.command, "--platform=codex"];
+    const args = ["--yes", "oh-my-openagent@latest", parsed.command, "--platform=codex"];
     if (parsed.noTui)
-      args2.push("--no-tui");
+      args.push("--no-tui");
     if (parsed.skipAuth)
-      args2.push("--skip-auth");
+      args.push("--skip-auth");
     if (parsed.autonomousPermissions !== false)
-      args2.push("--codex-autonomous");
+      args.push("--codex-autonomous");
     if (parsed.autonomousPermissions === false)
-      args2.push("--no-codex-autonomous");
+      args.push("--no-codex-autonomous");
     if (parsed.repoRoot)
-      args2.push(`--repo-root=${parsed.repoRoot}`);
-    return { command: "npx", args: args2, delegatesToOmo: true };
+      args.push(`--repo-root=${parsed.repoRoot}`);
+    return { command: "npx", args, delegatesToOmo: true };
   }
   const args = ["--yes", "--package", "oh-my-openagent", "omo-agent-toolkit", parsed.command];
   if (parsed.command === "cleanup") {
@@ -13425,22 +13125,22 @@ import { fileURLToPath } from "node:url";
 
 // packages/omo-codex/src/install/lazycodex-bun-global-paths.ts
 import { join as join34 } from "node:path";
-function isBunGlobalEntrypointPath(invokedPath, env2) {
+function isBunGlobalEntrypointPath(invokedPath, env) {
   if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
     return false;
   const normalizedPath = normalizePathForPrefix(invokedPath);
-  return resolveBunGlobalRoots(env2).some((root) => normalizedPath.startsWith(root));
+  return resolveBunGlobalRoots(env).some((root) => normalizedPath.startsWith(root));
 }
-function resolveBunGlobalRoots(env2) {
-  const bunInstallRoot = env2.BUN_INSTALL?.trim();
-  const homeRoot = env2.HOME?.trim();
+function resolveBunGlobalRoots(env) {
+  const bunInstallRoot = env.BUN_INSTALL?.trim();
+  const homeRoot = env.HOME?.trim();
   return [
     ...bunInstallRoot ? [join34(bunInstallRoot, "bin"), join34(bunInstallRoot, "install", "global", "node_modules")] : [],
     ...homeRoot ? [join34(homeRoot, ".bun", "bin"), join34(homeRoot, ".bun", "install", "global", "node_modules")] : []
   ].map(normalizePathForPrefix);
 }
-function normalizePathForPrefix(path2) {
-  const normalized = path2.replaceAll("\\", "/").replace(/\/+$/, "");
+function normalizePathForPrefix(path) {
+  const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "");
   return normalized.endsWith("/node_modules") || normalized.endsWith("/bin") ? `${normalized}/` : normalized;
 }
 
@@ -13462,17 +13162,17 @@ var KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES = new Set([
 ]);
 var KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES = ["@oh-my-opencode/", "oh-my-openagent-", "oh-my-opencode-"];
 async function runLazyCodexManualUpdate(input = {}) {
-  const env2 = input.env ?? process.env;
+  const env = input.env ?? process.env;
   const log = input.log ?? console.log;
   const commandRunner = input.runCommand ?? defaultRunCommandForManualUpdate;
-  const currentVersion = resolveCurrentVersion(env2);
-  const latestVersion = resolveLatestVersion(env2);
+  const currentVersion = resolveCurrentVersion(env);
+  const latestVersion = resolveLatestVersion(env);
   const plan = resolveLazyCodexUpdatePlan({
     currentVersion,
     latestVersion,
-    command: resolveCommand2(env2),
-    args: resolveArgs(env2),
-    env: env2,
+    command: resolveCommand2(env),
+    args: resolveArgs(env),
+    env,
     invokedPath: input.invokedPath ?? process.argv[1]
   });
   if (!plan.shouldUpdate) {
@@ -13486,15 +13186,15 @@ async function runLazyCodexManualUpdate(input = {}) {
       log(`${DEFAULT_UPDATE_COMMAND} ${DEFAULT_UPDATE_ARGS.join(" ")}`);
     return 0;
   }
-  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env: env2 });
+  await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env });
   if (plan.postUpdate === "bun-global-trust") {
     await handleBunGlobalTrust({
-      env: env2,
+      env,
       log,
       commandRunner,
       isInteractive: input.isInteractive ?? (process.stdin.isTTY === true && process.stdout.isTTY === true)
     });
-    await commandRunner(DEFAULT_UPDATE_COMMAND, DEFAULT_UPDATE_ARGS, { cwd: process.cwd(), env: env2 });
+    await commandRunner(DEFAULT_UPDATE_COMMAND, DEFAULT_UPDATE_ARGS, { cwd: process.cwd(), env });
   }
   return 0;
 }
@@ -13512,12 +13212,12 @@ function resolveLazyCodexUpdatePlan(input = {}) {
   }
   return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS, postUpdate: "none" };
 }
-function resolveCommand2(env2) {
-  return env2.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
+function resolveCommand2(env) {
+  return env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
 }
-function resolveArgs(env2) {
-  if (env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
-    const parsed = JSON.parse(env2.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
+function resolveArgs(env) {
+  if (env.LAZYCODEX_AUTO_UPDATE_ARGS_JSON) {
+    const parsed = JSON.parse(env.LAZYCODEX_AUTO_UPDATE_ARGS_JSON);
     if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== "string")) {
       throw new TypeError("LAZYCODEX_AUTO_UPDATE_ARGS_JSON must be a JSON string array");
     }
@@ -13525,23 +13225,23 @@ function resolveArgs(env2) {
   }
   return DEFAULT_UPDATE_ARGS;
 }
-function resolveCurrentVersion(env2) {
-  if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
-    return env2.LAZYCODEX_CURRENT_VERSION.trim();
+function resolveCurrentVersion(env) {
+  if (env.LAZYCODEX_CURRENT_VERSION?.trim())
+    return env.LAZYCODEX_CURRENT_VERSION.trim();
   const pluginRoot = dirname11(dirname11(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join35(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join35(pluginRoot, ".codex-plugin", "plugin.json"));
+  return readVersionManifest(resolveInstalledVersionPath(env, pluginRoot)) ?? readVersionManifest(join35(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join35(pluginRoot, ".codex-plugin", "plugin.json"));
 }
-function resolveLatestVersion(env2) {
-  if (env2.LAZYCODEX_LATEST_VERSION?.trim())
-    return env2.LAZYCODEX_LATEST_VERSION.trim();
+function resolveLatestVersion(env) {
+  if (env.LAZYCODEX_LATEST_VERSION?.trim())
+    return env.LAZYCODEX_LATEST_VERSION.trim();
   const result = spawnSync2("npm", ["view", "lazycodex-ai", "version", "--silent"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"]
   });
   if (result.status !== 0)
     return;
-  const version2 = result.stdout.trim();
-  return version2.length > 0 ? version2 : undefined;
+  const version = result.stdout.trim();
+  return version.length > 0 ? version : undefined;
 }
 async function handleBunGlobalTrust(input) {
   const packageNames = resolveKnownBunGlobalUntrustedPackages(input.env);
@@ -13561,10 +13261,10 @@ ${trustCommand}`);
   input.log(`Skipped Bun postinstall trust. To run it later:
 ${trustCommand}`);
 }
-function resolveKnownBunGlobalUntrustedPackages(env2) {
+function resolveKnownBunGlobalUntrustedPackages(env) {
   const result = spawnSync2(BUN_UPDATE_COMMAND, BUN_GLOBAL_UNTRUSTED_ARGS, {
     encoding: "utf8",
-    env: env2,
+    env,
     stdio: ["ignore", "pipe", "ignore"]
   });
   if (result.status !== 0)
@@ -13591,11 +13291,11 @@ async function confirmBunGlobalTrust(packageNames) {
 function isKnownLazyCodexBunTrustPackage(packageName) {
   return KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) || KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES.some((prefix) => packageName.startsWith(prefix));
 }
-function isBunGlobalEntrypoint(invokedPath, env2) {
-  return isBunGlobalEntrypointPath(invokedPath, env2);
+function isBunGlobalEntrypoint(invokedPath, env) {
+  return isBunGlobalEntrypointPath(invokedPath, env);
 }
 function defaultRunCommandForManualUpdate(command, args, options) {
-  return new Promise((resolve10, reject) => {
+  return new Promise((resolve, reject) => {
     const child = spawn3(command, args, {
       cwd: options.cwd,
       env: options.env,
@@ -13605,17 +13305,17 @@ function defaultRunCommandForManualUpdate(command, args, options) {
     child.once("error", reject);
     child.once("close", (code) => {
       if (code === 0) {
-        resolve10();
+        resolve();
         return;
       }
       reject(new Error(`${command} ${args.join(" ")} exited with ${code ?? "unknown status"}`));
     });
   });
 }
-function parseVersion(version2) {
-  if (typeof version2 !== "string")
+function parseVersion(version) {
+  if (typeof version !== "string")
     return null;
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([^+]+))?(?:\+.*)?$/.exec(version2.trim());
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([^+]+))?(?:\+.*)?$/.exec(version.trim());
   if (match === null)
     return null;
   const major = Number.parseInt(match[1] ?? "", 10);
@@ -13642,14 +13342,14 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-function resolveInstalledVersionPath(env2, pluginRoot) {
-  if (env2.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
-    return env2.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
+function resolveInstalledVersionPath(env, pluginRoot) {
+  if (env.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
+    return env.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
   return join35(pluginRoot, INSTALLED_VERSION_FILE);
 }
-function readVersionManifest(path2) {
+function readVersionManifest(path) {
   try {
-    const parsed = JSON.parse(readFileSync4(path2, "utf8"));
+    const parsed = JSON.parse(readFileSync4(path, "utf8"));
     if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
       return parsed.version;
     }
@@ -13713,8 +13413,8 @@ async function runLazyCodexInstallLocalCli(input) {
   }
   if (parsed.kind === "version") {
     const packageJson = JSON.parse(await readFile23(join37(input.defaultRepoRoot, "package.json"), "utf8"));
-    const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
-    input.log(`lazycodex-ai ${version2}`);
+    const version = typeof packageJson.version === "string" ? packageJson.version : "unknown";
+    input.log(`lazycodex-ai ${version}`);
     return 0;
   }
   if (parsed.kind === "command") {
@@ -13727,13 +13427,13 @@ async function runLazyCodexInstallLocalCli(input) {
         input.log(`node ${input.entrypointPath} install --repo-root=${parsed.repoRoot}`);
         return 0;
       }
-      const result2 = await installMarketplaceLocally({
+      const result = await installMarketplaceLocally({
         repoRoot: resolve10(parsed.repoRoot),
         autonomousPermissions: true,
         env: input.env,
         log: logWarning
       });
-      input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
+      input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
       return 0;
     }
     return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath });

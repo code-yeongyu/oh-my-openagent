@@ -31,12 +31,17 @@ export interface MemoryWiringOptions {
   readonly footerTimers?: MemoryFooterTimers
 }
 
+export interface MemorySessionShutdownInput extends ShutdownDrainInput {
+  /** Current callback context; Senpi may replace the extension runner after session_start. */
+  readonly eventCtx: unknown
+}
+
 export interface MemoryWiring {
   registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void
   afterBind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void>
   flushSkillsUsage(): Promise<void>
   /** IC-10: bounded drain the session_shutdown handler awaits before the session is released. */
-  onSessionShutdown(input: ShutdownDrainInput): Promise<void>
+  onSessionShutdown(input: MemorySessionShutdownInput): Promise<void>
   /** IC-10: appends an evaluator run last on quit; unregistered is a no-op. */
   registerShutdownEvaluator(evaluator: ShutdownEvaluator): void
   /** Clears the memory status footer for the session behind this event context. */

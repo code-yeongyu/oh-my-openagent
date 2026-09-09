@@ -21,7 +21,7 @@ import {
 import { createMemoryRuntimeWiring, type MemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
 import type { MemoryCommandSettings } from "./commands/types"
-import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
+import type { MemorySessionShutdownInput, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
@@ -197,12 +197,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await flushSkillsUsageTrackers()
     },
 
-    async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+    async onSessionShutdown(input: MemorySessionShutdownInput): Promise<void> {
       // The journal flush runs FIRST, before the pre-drain awaits can consume the fixed budget:
       // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
       // one first-position flush captures everything and the drain must never re-run it.
       const journalFlushed = await shutdownDrain.flushJournal(input)
-      reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
+      lastEventCtx.current = input.eventCtx
+      reflectionLive.shutdown(input.sessionId, options.sessions.get(input.sessionId)?.context?.identity)
       await kibitzerRef.current?.onSessionShutdown(input.sessionId)
       await kibitzerRef.current?.gate.onSessionShutdown(input.sessionId)
       const identity = resolveContext(input.sessionId)

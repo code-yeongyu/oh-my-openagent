@@ -1,0 +1,211 @@
+bun test v1.4.1 (4661e494f)
+
+packages\omo-senpi\src\runtime-dependency-resolution.test.ts:
+(pass) omo-senpi local-path runtime dependencies > packageNameOf resolves package names from subpath imports [2.82ms]
+56 | 
+57 |     for (const packageName of new Set(runtimeImports.map(packageNameOf))) {
+58 |       const dependencyRoot = findPackageRoot(packageName)
+59 |       const linkPath = join(isolatedPackageRoot, "node_modules", ...packageName.split("/"))
+60 |       mkdirSync(dirname(linkPath), { recursive: true })
+61 |       symlinkSync(dependencyRoot, linkPath, "dir")
+           ^
+error: EPERM: operation not permitted, symlink 'D:\repo\repostew\oh-my-openagent-7132-recovery-20260909\node_modules\.bun\@earendil-works+pi-tui@0.84.2\node_modules\@earendil-works\pi-tui' -> 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-senpi-symlink-k2idIM\checkout\packages\omo-senpi\node_modules\@earendil-works\pi-tui'
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\src\runtime-dependency-resolution.test.ts:61:7)
+(fail) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [37.17ms]
+
+packages\omo-senpi\scripts\qa\isolation-ultrabrain-blockers.test.mjs:
+(pass) #given an observation I/O error #when the canonical verdict is built #then untouched fails closed [1.31ms]
+(pass) #given a truncated bounded observation #when the canonical verdict is built #then untouched fails closed [0.60ms]
+(skip) #given a persistent symlink is created and retargeted #when snapshots are compared #then both changes are observed without following targets
+(skip) #given a symlink escapes the observation root #when its target contents change #then the link digest stays stable
+(skip) #given an enumerated directory is replaced by an external symlink before recursive open #when observed #then traversal fails closed without dereferencing
+218 | 	const outside = mkdtempSync(join(tmpdir(), "omo-senpi-protected-target-"));
+219 | 	const target = join(outside, "private.json");
+220 | 	try {
+221 | 		writeFileSync(target, "before-private-content");
+222 | 		const authPath = join(root, "auth.json");
+223 | 		symlinkSync(target, authPath);
+        ^
+error: EPERM: operation not permitted, symlink 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-senpi-protected-target-qZLCd4\private.json' -> 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-senpi-protected-link-socxaM\auth.json'
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\scripts\qa\isolation-ultrabrain-blockers.test.mjs:223:3)
+(fail) #given protected state is an external symlink #when its target changes #then protected reads never follow it and fail closed [2.62ms]
+(pass) #given POSIX and Windows path styles #when observed paths are classified #then only the producing style treats backslash as a separator [1.27ms]
+
+packages\omo-senpi\scripts\qa\task-rpc-e2e.windows.test.ts:
+136 |         }
+137 |       }
+138 |     }
+139 |     const diagnostic = { exit, error: spawnError === undefined ? undefined : String(spawnError), stdout, stderr }
+140 |     if (exit.code !== 0 || exit.signal !== null || stderr !== "" || spawnError !== undefined) {
+141 |       throw new Error(`WINDOWS_TASK_RPC_E2E ${JSON.stringify(diagnostic)}`)
+                      ^
+error: WINDOWS_TASK_RPC_E2E {"exit":{"code":1,"signal":null},"stdout":"","stderr":"90 | \tif (xdgCacheHome !== undefined) mkdirp(xdgCacheHome);\n91 | \tconst settings = {\n92 | \t\tdefaultProjectTrust: \"ask\",\n93 | \t\tpackages: [pluginRoot],\n94 | \t};\n95 | \twriteFileSync(\n      ^\nENOENT: no such file or directory, open 'C:\\Users\\dajiaohuang\\AppData\\Local\\Temp\\omo-senpi-qa-bPYkXj\\agent\\settings.json'\n    path: \"C:\\\\Users\\\\dajiaohuang\\\\AppData\\\\Local\\\\Temp\\\\omo-senpi-qa-bPYkXj\\\\agent\\\\settings.json\",\n syscall: \"open\",\n   errno: -4058,\n    code: \"ENOENT\"\n\n      at seedSandbox (D:\\repo\\repostew\\oh-my-openagent-7132-basecheck-20260909\\packages\\omo-senpi\\scripts\\qa\\drive.mjs:95:2)\n      at prepareScenarioSandbox (D:\\repo\\repostew\\oh-my-openagent-7132-basecheck-20260909\\packages\\omo-senpi\\scripts\\qa\\task-rpc-e2e-scenarios.mjs:74:3)\n      at main (D:\\repo\\repostew\\oh-my-openagent-7132-basecheck-20260909\\packages\\omo-senpi\\scripts\\qa\\task-rpc-e2e.mjs:150:45)\n      at D:\\repo\\repostew\\oh-my-openagent-7132-basecheck-20260909\\packages\\omo-senpi\\scripts\\qa\\task-rpc-e2e.mjs:275:9\n\nBun v1.4.1 (Windows x64)\n"}
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\scripts\qa\task-rpc-e2e.windows.test.ts:141:17)
+(fail) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child [210.73ms]
+
+packages\omo-senpi\src\components\config-watch\paths.test.ts:
+(pass) resolveOmoConfigWatchTargets > #given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd-to-home ancestor [10.81ms]
+(pass) resolveOmoConfigWatchTargets > #given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation [3.94ms]
+124 |   it("#given a symlinked project .omo directory #when resolving targets #then ignores the symlinked config directory", () => {
+125 |     const fixture = createFixture()
+126 |     const outsideOmoDirectory = join(fixture.homeDir, "outside-omo")
+127 |     mkdirSync(outsideOmoDirectory, { recursive: true })
+128 |     writeFileSync(join(outsideOmoDirectory, "omo.jsonc"), "{}")
+129 |     symlinkSync(outsideOmoDirectory, join(fixture.projectDir, ".omo"))
+          ^
+error: EPERM: operation not permitted, symlink 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-config-watch-paths-eejw6Z\home\outside-omo' -> 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-config-watch-paths-eejw6Z\home\work\project\.omo'
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\src\components\config-watch\paths.test.ts:129:5)
+(fail) resolveOmoConfigWatchTargets > #given a symlinked project .omo directory #when resolving targets #then ignores the symlinked config directory [1.61ms]
+(pass) resolveOmoConfigWatchTargets > #given an existing project .omo directory without a config file #when resolving targets #then watches it for either omo config filename [3.56ms]
+(pass) resolveOmoConfigWatchTargets > #given the default install layout #when resolving targets #then watches ~/.omo config and reports discovery as watched [4.56ms]
+(pass) resolveOmoConfigWatchTargets > #given cwd at HOME with the default install layout #when resolving targets #then retains the ~/.omo config target [2.57ms]
+(pass) resolveOmoConfigWatchTargets > #given a missing ~/.omo user config directory #when resolving targets #then emits a basename-anchored HOME creation target and watches discovery [6.56ms]
+(pass) resolveOmoConfigWatchTargets > #given the senpi agent dir defaulting under HOME #when resolving targets #then keeps safe config globs and drops protected intersections [6.75ms]
+(pass) resolveOmoConfigWatchTargets > #given protected paths #when checking targets #then rejects unanchored and protected-resolving globs but permits safe anchored globs [2.19ms]
+(pass) resolveOmoConfigWatchTargets > #given an explicit SENPI_CODING_AGENT_DIR under HOME #when resolving targets #then drops only targets intersecting its protected paths [6.49ms]
+(pass) resolveOmoConfigWatchTargets > #given ancestor creation targets #when resolving targets #then every creation glob is root-anchored [3.15ms]
+(pass) resolveOmoConfigWatchTargets > #given the user config parent creation target #when resolving targets #then its glob is root-anchored [3.04ms]
+(pass) resolveOmoConfigWatchTargets > #given an existing .omo directory holding runtime state #when resolving targets #then its config globs are root-anchored so the subtree is not scanned [7.64ms]
+(pass) resolveOmoConfigWatchTargets > #given a Plan 9 project filesystem #when resolving targets #then skips project and ancestor watches while retaining native user config [7.51ms]
+(pass) resolveOmoConfigWatchTargets > #given a native project filesystem #when resolving targets #then preserves project and ancestor watches [4.14ms]
+(pass) resolveOmoConfigWatchTargets > #given a Plan 9 user config filesystem #when resolving targets #then skips the user config watch [3.00ms]
+
+packages\omo-senpi\src\components\init-deep-advisor\coverage.test.ts:
+(pass) computeCandidateDirs > #given three dirs with 8+ source files #when computing candidates #then all three qualify [19.87ms]
+(pass) computeCandidateDirs > #given a dir with few files but 500+ LOC #when computing candidates #then it qualifies by LOC [8.59ms]
+(pass) computeCandidateDirs > #given a tiny repo below both thresholds #when computing candidates #then none qualify [9.59ms]
+(pass) computeCandidateDirs > #given nested dirs sharing a subtree #when computing candidates #then files are counted per directory only [11.27ms]
+(pass) computeCandidateDirs > #given a candidate dir deeper than the max depth #when computing candidates #then it is not returned [8.64ms]
+(pass) computeCandidateDirs > #given excluded directory names #when computing candidates #then they are skipped [19.54ms]
+111 |   test("#given a symlinked directory #when computing candidates #then the symlink is skipped", () => {
+112 |     // given
+113 |     const root = makeTempDir("omo-coverage-symlink-")
+114 |     makeDirWithSourceFiles(root, "real", 8)
+115 |     mkdirSync(join(root, "holder"), { recursive: true })
+116 |     symlinkSync(join(root, "real"), join(root, "holder", "linked"), "dir")
+          ^
+error: EPERM: operation not permitted, symlink 'C:\Users\dajiaohuang\AppData\Local\Temp\omo-coverage-symlink-zjdCyM\real' -> 'C:\Users\dajiaohuang\AppData\Local\Temp\omo-coverage-symlink-zjdCyM\holder\linked'
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\src\components\init-deep-advisor\coverage.test.ts:116:5)
+(fail) computeCandidateDirs > #given a symlinked directory #when computing candidates #then the symlink is skipped [5.72ms]
+(pass) isCovered > #given a dir with its own AGENTS.md #when checking coverage #then it is covered [6.33ms]
+(pass) isCovered > #given an ancestor with AGENTS.md #when checking coverage #then the descendant inherits coverage [6.37ms]
+(pass) isCovered > #given only a root AGENTS.md #when checking a nested dir #then root counts as an inclusive ancestor [6.69ms]
+(pass) isCovered > #given no AGENTS.md anywhere #when checking a nested dir #then it is not covered [6.22ms]
+(pass) computeCoverageRatio and shouldProposeInit > #given three candidate dirs and zero AGENTS.md #when computing coverage #then missingRatio is 1.0 and init is proposed [16.41ms]
+(pass) computeCoverageRatio and shouldProposeInit > #given three candidate dirs all covered #when computing coverage #then missingRatio is 0.0 and init is not proposed [19.52ms]
+(pass) computeCoverageRatio and shouldProposeInit > #given zero candidate dirs #when computing coverage #then it returns null and init is not proposed [2.97ms]
+(pass) computeCoverageRatio and shouldProposeInit > #given full nested coverage without a root AGENTS.md #when deciding #then init is not proposed [16.77ms]
+(pass) computeCoverageRatio and shouldProposeInit > #given half the candidate dirs uncovered #when deciding #then the 0.50 threshold proposes [9.28ms]
+(pass) computeCoverageRatio and shouldProposeInit > #given a null missingRatio #when deciding #then it never proposes [0.73ms]
+
+packages\omo-senpi\src\components\memory\guard.test.ts:
+(pass) memory cross-identity guard > #given a bound identity #when read targets a foreign identity file #then the call is blocked with the stable reason [6.43ms]
+(pass) memory cross-identity guard > #given a bound identity #when write targets its own repo or worktree #then both calls are allowed [8.67ms]
+(pass) memory cross-identity guard > #given no bound identity #when a file tool targets another identity #then the guard never blocks [5.70ms]
+(pass) memory cross-identity guard > #given a bound identity #when unknown tools or file tools without path arguments run #then they are allowed [6.17ms]
+(pass) memory cross-identity guard > #given a relative traversal from the workspace #when a suffixed case-variant file tool resolves into foreign memory #then it is blocked [5.14ms]
+(pass) memory cross-identity guard > #given paths contains own and foreign targets #when glob runs #then the foreign array member is blocked [4.54ms]
+130 |   })
+131 | 
+132 |   test("#given an outside symlink points into foreign memory #when a file and a not-yet-created descendant are targeted #then realpath and nearest-real-parent both block", async () => {
+133 |     const setup = fixture()
+134 |     const link = join(setup.workspace, "foreign-link")
+135 |     symlinkSync(dirname(setup.foreignFile), link)
+          ^
+EPERM: operation not permitted, symlink 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-memory-guard-on5lZI\agents\foreign\repo\system' -> 'C:\Users\DAJIAO~1\AppData\Local\Temp\omo-memory-guard-workspace-EIqkpK\foreign-link'
+    path: "C:\\Users\\DAJIAO~1\\AppData\\Local\\Temp\\omo-memory-guard-on5lZI\\agents\\foreign\\repo\\system",
+    dest: "C:\\Users\\DAJIAO~1\\AppData\\Local\\Temp\\omo-memory-guard-workspace-EIqkpK\\foreign-link",
+ syscall: "symlink",
+   errno: -4048,
+    code: "EPERM"
+
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\src\components\memory\guard.test.ts:135:5)
+(fail) memory cross-identity guard > #given an outside symlink points into foreign memory #when a file and a not-yet-created descendant are targeted #then realpath and nearest-real-parent both block [6.67ms]
+(pass) memory cross-identity guard > #given the identities root and one of its ancestors #when enumeration tools target them #then cross-identity enumeration is blocked [9.55ms]
+(pass) memory cross-identity guard > #given a namespaced apply-patch variant #when its patch directives touch foreign memory #then every directive path is guarded [3.94ms]
+(pass) memory cross-identity guard > #given bash contains a forbidden foreign-root literal #when invoked repeatedly in one session #then it warns once and never blocks [4.56ms]
+(pass) memory cross-identity guard > #given separate sessions invoke bash with a forbidden root #when advisory state is tracked #then each session receives one warning [4.72ms]
+
+packages\omo-senpi\src\components\task\status-ui-spend.test.ts:
+(pass) createTaskStatusUi spend > #given live solo and process-member rows with cost facts #when rendered #then cost sits before tps without cache rate [5.13ms]
+
+packages\omo-senpi\src\components\thread\addressing.test.ts:
+(pass) resolveTarget exact ladder > #given a durable thread_id #when resolved in the caller's workspace #then it wins immediately as an id resolution [33.70ms]
+(pass) resolveTarget exact ladder > #given an id that also equals another thread's name #when resolved #then the id hit wins, never the name [29.92ms]
+(pass) resolveTarget exact ladder > #given a unique name differing only by case, surrounding space, and internal whitespace #when resolved #then normalization matches it as a name resolution [23.50ms]
+(pass) resolveTarget exact ladder > #given two visible threads sharing a normalized name #when resolved #then ambiguous_target returns both candidates and never picks one [23.66ms]
+(pass) resolveTarget exact ladder > #given an ambiguous_target candidate #when inspected #then it is ThreadCandidate-shaped with all six fields [25.28ms]
+(pass) resolveTarget exact ladder > #given twelve visible threads sharing a name #when resolved #then ambiguous_target caps the candidate list at the ten most recently updated [26.19ms]
+(pass) resolveTarget exact ladder > #given a name that only a thread outside the default scope carries #when resolved #then the answer is not_found because scope_denied is reserved for id hits [51.48ms]
+(pass) resolveTarget exact ladder > #given no entries at all #when an address is resolved #then it is not_found, never a throw [0.83ms]
+(pass) resolveTarget workspace scope > #given an exact id hit outside the caller's workspace #when resolved without all_scope #then it returns scope_denied and never degrades to not_found [51.62ms]
+(pass) resolveTarget workspace scope > #given all_scope true #when the same out-of-workspace id and name are resolved #then both widen to the daemon-wide scope [0.48ms]
+(pass) resolveTarget workspace scope > #given all_scope true without any caller root #when an address is resolved #then the widened scope alone makes every entry visible [0.36ms]
+(pass) resolveTarget workspace scope > #given no caller workspace root and no all_scope #when an address is resolved #then the call reports caller_context_missing as data [0.35ms]
+(pass) resolveTarget workspace scope > #given a git repository where the entry cwd is a subdirectory of the caller root #when resolved #then the canonical git root makes them one workspace even though the paths differ [107.08ms]
+(pass) resolveTarget workspace scope > #given two different git repositories #when an id hit lives in the other repo #then it is out of scope [152.14ms]
+246 |   test("#given a symlinked cwd for a directory that is not a git work tree #when scope is computed #then realpath equality, not raw-path equality, decides visibility", () => {
+247 |     const holder = makeTempDir()
+248 |     const real = join(holder, "real-workspace")
+249 |     const link = join(holder, "link-workspace")
+250 |     mkdirSync(real)
+251 |     symlinkSync(real, link)
+          ^
+error: EPERM: operation not permitted, symlink 'C:\Users\DAJIAO~1\AppData\Local\Temp\thread-addressing-MkpOSp\real-workspace' -> 'C:\Users\DAJIAO~1\AppData\Local\Temp\thread-addressing-MkpOSp\link-workspace'
+      at <anonymous> (D:\repo\repostew\oh-my-openagent-7132-basecheck-20260909\packages\omo-senpi\src\components\thread\addressing.test.ts:251:5)
+(fail) resolveTarget workspace scope > #given a symlinked cwd for a directory that is not a git work tree #when scope is computed #then realpath equality, not raw-path equality, decides visibility [1.77ms]
+(pass) resolveTarget malformed input > #given an empty string target #when resolved #then it is invalid_arguments data, never a throw [0.47ms]
+(pass) resolveTarget malformed input > #given a whitespace-only target, including NFKC-folded spaces #when resolved #then it is invalid_arguments [3.07ms]
+(pass) resolveTarget malformed input > #given a target with embedded control characters #when resolved #then it is invalid_arguments and never matches anything [0.47ms]
+(pass) NFKC name normalization > #given a composed name and a decomposed target #when resolved #then NFKC composition makes them one name [23.36ms]
+(pass) NFKC name normalization > #given a fullwidth latin target and an ascii name #when resolved #then NFKC compatibility folding matches them [24.25ms]
+(pass) NFKC name normalization > #given a composed name and a decomposed duplicate #when resolved #then NFKC also unifies the ambiguity path [22.15ms]
+(pass) NFKC name normalization > #given normalizeThreadName #when composed, spaced, and cased input arrives #then it NFKC-normalizes, trims, lowercases, and collapses whitespace [1.01ms]
+(pass) fuzzyMatch trigram dice > #given a top score of 0.75 with a 0.10 margin #when fuzzy-matched #then the leader is accepted with its score and basis [1.25ms]
+(pass) fuzzyMatch trigram dice > #given a best score of 0.70, under the 0.72 floor #when fuzzy-matched #then it is rejected as not_found [0.91ms]
+(pass) fuzzyMatch trigram dice > #given a leader at 0.80 with a runner-up at 0.75, a 0.05 margin under the 0.08 bar #when fuzzy-matched #then it is ambiguous_target with both candidates [1.02ms]
+(pass) fuzzyMatch trigram dice > #given a preview that matches the query exactly while the name does not #when fuzzy-matched #then the preview term accepts at its 0.85 weight [1.09ms]
+(pass) fuzzyMatch trigram dice > #given only a cwd basename equal to the query #when fuzzy-matched #then the 0.70 weighted term stays under the 0.72 floor and cannot accept alone [0.85ms]
+(pass) fuzzyMatch trigram dice > #given a query of exactly three normalized characters #when fuzzy-matched against an identical name #then it still accepts at score 1 [0.78ms]
+(pass) fuzzyMatch trigram dice > #given queries shorter than three normalized characters #when fuzzy-matched #then they are rejected as invalid_arguments data [0.40ms]
+(pass) fuzzyMatch trigram dice > #given a query with control characters #when fuzzy-matched #then it is invalid_arguments, never a throw [0.34ms]
+(pass) fuzzyMatch trigram dice > #given no entries #when fuzzy-matched #then it is not_found, never a throw [0.33ms]
+(pass) fuzzyMatch scan cap > #given 501 candidate threads #when fuzzy-matched #then the scan cap returns an ambiguous_target narrowing error before any scoring [0.58ms]
+(pass) fuzzyMatch scan cap > #given exactly 500 candidate threads #when fuzzy-matched #then the boundary scans and still resolves a clear leader [3.01ms]
+(pass) checkNameConflict > #given a name no visible thread uses #when checked #then it is ok [0.50ms]
+(pass) checkNameConflict > #given a name colliding after normalization #when checked #then it returns name_conflict data with the conflicting candidate, never an auto-suffix [0.38ms]
+(pass) checkNameConflict > #given a decomposed name colliding with a composed stored name #when checked #then NFKC unifies them into a name_conflict [0.35ms]
+(pass) checkNameConflict > #given an empty, whitespace-only, or control-character name #when checked #then it is invalid_arguments, never ok [0.33ms]
+(pass) checkNameConflict > #given an empty entry list #when a name is checked #then any well-formed name is ok [0.33ms]
+(pass) error recovery wording (R7) > #given every error this module can return #when inspected #then each next_action names thread_list [100.07ms]
+
+packages\omo-senpi\src\components\memory\worker\memory-run-supervisor.integration.test.ts:
+(pass) memory run supervisor > #given an unrelated active handle #when the durable outcome is published #then the standalone supervisor exits [466.39ms]
+(pass) memory run supervisor > #given a retryable model miss and a next attempt #when the supervisor publishes the outcome #then the ledger advances first [363.88ms]
+(pass) memory run supervisor > #given a fixture launch manifest #when supervised #then identity is durable before the command starts and the outcome is published once [378.48ms]
+(pass) memory run supervisor > #given a detached supervisor launched by a parent #when the parent is killed #then the supervisor still publishes the child outcome [256.54ms]
+(pass) memory run supervisor > #given a bootstrap waiting for release #when its parent pipe closes #then it exits without starting the manifest command [66.21ms]
+(pass) memory run supervisor > #given a released child #when the supervisor is killed abruptly #then the recorded live process group can be terminated [603.85ms]
+(pass) memory run supervisor > #given a child that exits during termination grace #when the absolute deadline arrives #then timeout is recorded without escalation [553.60ms]
+(pass) memory run supervisor > #given a child that ignores SIGTERM #when termination grace expires #then the process group is killed [559.87ms]
+
+3 tests skipped:
+(skip) #given a persistent symlink is created and retargeted #when snapshots are compared #then both changes are observed without following targets
+(skip) #given a symlink escapes the observation root #when its target contents change #then the link digest stays stable
+(skip) #given an enumerated directory is replaced by an external symlink before recursive open #when observed #then traversal fails closed without dereferencing
+
+
+7 tests failed:
+(fail) omo-senpi local-path runtime dependencies > #given a symlinked plugin without host hoisting #when Node imports its runtime dependencies #then each resolves from the real path [37.17ms]
+(fail) #given protected state is an external symlink #when its target changes #then protected reads never follow it and fail closed [2.62ms]
+(fail) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child [210.73ms]
+(fail) resolveOmoConfigWatchTargets > #given a symlinked project .omo directory #when resolving targets #then ignores the symlinked config directory [1.61ms]
+(fail) computeCandidateDirs > #given a symlinked directory #when computing candidates #then the symlink is skipped [5.72ms]
+(fail) memory cross-identity guard > #given an outside symlink points into foreign memory #when a file and a not-yet-created descendant are targeted #then realpath and nearest-real-parent both block [6.67ms]
+(fail) resolveTarget workspace scope > #given a symlinked cwd for a directory that is not a git work tree #when scope is computed #then realpath equality, not raw-path equality, decides visibility [1.77ms]
+
+ 92 pass
+ 3 skip
+ 7 fail
+ 407 expect() calls
+Ran 102 tests across 9 files. [11.43s]

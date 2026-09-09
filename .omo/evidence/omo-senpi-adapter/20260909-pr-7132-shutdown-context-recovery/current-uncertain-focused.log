@@ -1,0 +1,19 @@
+bun test v1.4.1 (4661e494f)
+
+packages\omo-senpi\src\components\task\status-ui-spend.test.ts:
+(pass) createTaskStatusUi spend > #given live solo and process-member rows with cost facts #when rendered #then cost sits before tps without cache rate [12.04ms]
+
+packages\omo-senpi\src\components\memory\worker\memory-run-supervisor.integration.test.ts:
+(pass) memory run supervisor > #given an unrelated active handle #when the durable outcome is published #then the standalone supervisor exits [1113.55ms]
+(pass) memory run supervisor > #given a retryable model miss and a next attempt #when the supervisor publishes the outcome #then the ledger advances first [820.98ms]
+(pass) memory run supervisor > #given a fixture launch manifest #when supervised #then identity is durable before the command starts and the outcome is published once [519.41ms]
+(pass) memory run supervisor > #given a detached supervisor launched by a parent #when the parent is killed #then the supervisor still publishes the child outcome [343.42ms]
+(pass) memory run supervisor > #given a bootstrap waiting for release #when its parent pipe closes #then it exits without starting the manifest command [81.38ms]
+(pass) memory run supervisor > #given a released child #when the supervisor is killed abruptly #then the recorded live process group can be terminated [702.42ms]
+(pass) memory run supervisor > #given a child that exits during termination grace #when the absolute deadline arrives #then timeout is recorded without escalation [641.14ms]
+(pass) memory run supervisor > #given a child that ignores SIGTERM #when termination grace expires #then the process group is killed [637.33ms]
+
+ 9 pass
+ 0 fail
+ 24 expect() calls
+Ran 9 tests across 2 files. [7.49s]
