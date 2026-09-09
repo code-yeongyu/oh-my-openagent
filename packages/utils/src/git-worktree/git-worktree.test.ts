@@ -40,13 +40,72 @@ describe("git-worktree", () => {
       { path: "src/c.ts", added: 0, removed: 4, status: "deleted" },
     ])
 
-    expect(summary).toContain("[FILE CHANGES SUMMARY]")
-    expect(summary).toContain("Modified files:")
-    expect(summary).toContain("Created files:")
-    expect(summary).toContain("Deleted files:")
-    expect(summary).toContain("src/a.ts")
-    expect(summary).toContain("src/b.ts")
-    expect(summary).toContain("src/c.ts")
+    expect(summary).toBe(`[FILE CHANGES SUMMARY]
+Modified files:
+  src/a.ts  (+1, -2)
+
+Created files:
+  src/b.ts  (+3)
+
+Deleted files:
+  src/c.ts  (-4)
+`)
+  })
+
+  test("#given a large worktree #when formatting #then bounds each category and reports omitted counts", () => {
+    const summary = formatFileChanges([
+      ...Array.from({ length: 25 }, (_, index) => ({
+        path: `src/modified-${index + 1}.ts`,
+        added: index + 1,
+        removed: index,
+        status: "modified" as const,
+      })),
+      ...Array.from({ length: 23 }, (_, index) => ({
+        path: `src/added-${index + 1}.ts`,
+        added: index + 1,
+        removed: 0,
+        status: "added" as const,
+      })),
+      ...Array.from({ length: 21 }, (_, index) => ({
+        path: `src/deleted-${index + 1}.ts`,
+        added: 0,
+        removed: index + 1,
+        status: "deleted" as const,
+      })),
+    ])
+
+    expect(summary).toContain("Modified files (25 total, showing 20):")
+    expect(summary).toContain("Created files (23 total, showing 20):")
+    expect(summary).toContain("Deleted files (21 total, showing 20):")
+    expect(summary).toContain("... 5 more modified files omitted.")
+    expect(summary).toContain("... 3 more created files omitted.")
+    expect(summary).toContain("... 1 more deleted file omitted.")
+    expect(summary).toContain("src/modified-20.ts")
+    expect(summary).not.toContain("src/modified-21.ts")
+    expect(summary).toContain("src/added-20.ts")
+    expect(summary).not.toContain("src/added-21.ts")
+    expect(summary).toContain("src/deleted-20.ts")
+    expect(summary).not.toContain("src/deleted-21.ts")
+  })
+
+  test("#given an oversized path outside the displayed prefix #when formatting #then bounds paths and preserves the notepad marker", () => {
+    const notepadPath = `.omo/notepads/${"nested/".repeat(80)}notes.md`
+    const stats = [
+      ...Array.from({ length: 20 }, (_, index) => ({
+        path: `src/file-${index + 1}.ts`,
+        added: 1,
+        removed: 0,
+        status: "modified" as const,
+      })),
+      { path: notepadPath, added: 4, removed: 0, status: "modified" as const },
+    ]
+
+    const summary = formatFileChanges(stats, notepadPath)
+
+    expect(summary).toContain("... 1 more modified file omitted.")
+    expect(summary).toContain("[NOTEPAD UPDATED]")
+    expect(summary).toContain("[path truncated]")
+    expect(summary.length).toBeLessThan(10_000)
   })
 
   test("#given notepad path #when formatting omo plan changes #then does not report notepad updated", () => {
