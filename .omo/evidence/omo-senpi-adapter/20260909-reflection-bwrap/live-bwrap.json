@@ -1,0 +1,24 @@
+{
+  "result": "PASS",
+  "absentBefore": true,
+  "wasSandboxed": true,
+  "exit": 0,
+  "signal": null,
+  "sessionDirectoryMode": "700",
+  "nestedDirectoryMode": "700",
+  "wroteGranted": true,
+  "outsideUnchanged": true,
+  "requests": [
+    {
+      "model": "fixture",
+      "reasoning": "low"
+    },
+    {
+      "model": "fixture",
+      "reasoning": "low"
+    }
+  ],
+  "sandboxAgentDir": "/home/lsu1080/omo-reflection-work/.omo/evidence/omo-senpi-adapter/20260909-reflection-bwrap/sandbox-vNBeVf/agent",
+  "realCredentialsUntouched": true,
+  "sandboxCleanupComplete": true
+}

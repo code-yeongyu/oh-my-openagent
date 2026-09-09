@@ -1,0 +1,13 @@
+Command:
+npm exec --yes --package=bun@1.4.2 -- bun run test:senpi
+
+Exit code: 0
+
+Captured test summary:
+ 3047 pass
+ 3 skip
+ 0 fail
+Ran 3050 tests across 392 files. [78.37s]
+ 10 pass
+ 0 fail
+Ran 10 tests across 1 file. [3.15s]
