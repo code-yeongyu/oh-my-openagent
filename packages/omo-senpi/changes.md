@@ -1,3 +1,9 @@
+## 2026-09-09 — Pin persona assets to the payload a process started from
+
+The memory component read each persona markdown from beside the bundle at child-launch time, so the asset had to still be on disk, under its current name, every time a gate fired. The install tree is mutable while a session runs: a global install replaces it in place and the omob launcher rebuilds and prunes runtime dirs. After the Kibitzer rename shipped, sessions whose process had loaded the pre-rename bundle kept opening `extensions/memorian-persona.md` in the replaced tree and every recall gate died with `session_create_failed` (ENOENT). The same shape hit omob runtime dirs on 2026-09-07 through a prune.
+
+Persona filenames now have one definition (`memory-core/src/personas/manifest.ts`), the loaders read through a process-level cache that serves the content the process started with, and the memory component primes all four personas at registration. A read that fails is reported once, naming the asset and its cause, and is never substituted at runtime: a genuinely incomplete payload is a packaging failure, so the packing validators own it. `plugin-artifacts.ts` derives its persona entries from the manifest and is now the single required-artifact list; `script/build-omo-native.ts` re-exports it instead of keeping a hand-copied mirror, which had drifted and stopped requiring `extensions/omo-task.js`, `extensions/omo-member.js` and the gate persona in the published `omo-ai` payload.
+
 ## 2026-09-09 — Rename the memory advisor to Kibitzer
 
 Renamed the Memorian implementation, persona asset, packaging references, QA drivers and documentation to Kibitzer. Recall notices now identify Kibitzer instead of the former Aha! wording, and English/Korean model-facing hints name their source.

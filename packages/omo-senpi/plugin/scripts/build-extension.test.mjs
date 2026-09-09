@@ -4,12 +4,15 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
+
 import {
   buildExtension,
   checkExtensionCurrent,
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
+import { runtimePersonaSources } from "./persona-artifacts.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
@@ -110,6 +113,14 @@ describe("checkExtensionCurrent", () => {
     for (const [name, source] of personas) {
       expect(await readFile(join(dirname(outputs.outputPath), name), "utf8")).toBe(await readFile(source, "utf8"))
     }
+  })
+
+  test("#given the runtime persona manifest #when staging sources are listed #then the staged names match it", () => {
+    // given / when
+    const staged = runtimePersonaSources(repoRoot).map(([name]) => name)
+
+    // then
+    expect(staged).toEqual([...PERSONA_ASSET_FILES])
   })
 
   test("#given platform-specific source paths #when normalized #then build markers use portable separators", () => {

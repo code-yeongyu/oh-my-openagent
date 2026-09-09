@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs"
 import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
+
 import {
   ensurePrebuiltNativeInputs,
   PAYLOAD_DIRECTORIES,
@@ -15,6 +17,19 @@ import {
   REQUIRED_PLUGIN_ARTIFACTS,
   type PrebuiltInputDependencies,
 } from "./build-omo-native"
+
+describe("runtime persona coverage", () => {
+  test("#given the runtime persona manifest #when the payload requirements are read #then every persona is required", () => {
+    // given
+    const required = new Set<string>(REQUIRED_PLUGIN_ARTIFACTS)
+
+    // when
+    const unguarded = PERSONA_ASSET_FILES.filter((filename) => !required.has(join("extensions", filename)))
+
+    // then
+    expect(unguarded).toEqual([])
+  })
+})
 
 function recordingDependencies(input: {
   readonly existing: readonly string[]

@@ -12,6 +12,7 @@ import {
 import { logBindReconcileFailure } from "./bind-reconcile-log"
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
+import { primeMemoryPersonaAssets } from "./persona-prime"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { shutdownDeadlineAt, type ShutdownReason } from "./shutdown-drain"
 import { resolveMemorySettings } from "./identity-runtime"
@@ -73,6 +74,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         ctx.logger.warn("omo-senpi memory component skipped: missing ExtensionAPI capabilities", { missing })
         return
       }
+
+      primeMemoryPersonaAssets({ logger: ctx.logger })
 
       const wiring = createMemoryWiring({
         sessions,

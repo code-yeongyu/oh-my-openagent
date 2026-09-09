@@ -85,6 +85,7 @@ describe("build:omo-native staged payload", () => {
             join("extensions", "reflection-persona.md"),
             join("extensions", "dream-persona.md"),
             join("extensions", "facts-persona.md"),
+            join("extensions", "kibitzer-persona.md"),
             join("runtime", "ast-grep-mcp", "cli.js"),
             join("runtime", "agent-toolkit", "cli.js"),
             join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -136,6 +137,13 @@ describe("build:omo-native staged payload", () => {
               "\n",
             ),
           ).toBe("/plugin/\n")
+
+          rmSync(join(outputDir, "extensions", "kibitzer-persona.md"))
+          const missingGatePersona = runBuild(["--output", outputDir, "--check-only"])
+          expect(missingGatePersona.exitCode).toBe(1)
+          expect(missingGatePersona.output).toContain(
+            `missing required artifact: ${join("extensions", "kibitzer-persona.md")}`,
+          )
 
           rmSync(join(outputDir, "extensions", "dream-persona.md"))
           const missingPersona = runBuild(["--output", outputDir, "--check-only"])
