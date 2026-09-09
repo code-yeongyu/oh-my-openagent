@@ -54,10 +54,15 @@ export function formatGoalForTool(goal: Goal | null): string {
 	if (!goal) return "No active goal is set.";
 	const lines = [
 		`Objective: ${goal.objective}`,
+	];
+	if (goal.originalObjective !== undefined && goal.originalObjective !== goal.objective) {
+		lines.push(`Original objective: ${goal.originalObjective}`);
+	}
+	lines.push(
 		`Status: ${goalStatusLabel(goal.status)}`,
 		`Time used: ${formatGoalElapsedSeconds(goal.timeUsedSeconds)}`,
 		`Tokens used: ${formatTokensCompact(goal.tokensUsed)}${goal.tokenBudget === undefined ? "" : `/${formatTokensCompact(goal.tokenBudget)}`}`,
-	];
+	);
 	if (goal.completedAt) lines.push(`Completed at: ${new Date(goal.completedAt * 1000).toISOString()}`);
 	return lines.join("\n");
 }
@@ -84,6 +89,8 @@ function goalToolSnapshot(goal: Goal): GoalToolSnapshot {
 		createdAt: goal.createdAt,
 		updatedAt: goal.updatedAt,
 	};
+	if (goal.originalObjective !== undefined) snapshot.originalObjective = goal.originalObjective;
+	if (goal.deliverables !== undefined) snapshot.deliverables = goal.deliverables;
 	if (goal.tokenBudget !== undefined) snapshot.tokenBudget = goal.tokenBudget;
 	return snapshot;
 }

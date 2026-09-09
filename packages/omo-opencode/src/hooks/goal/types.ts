@@ -5,10 +5,17 @@ export const GOAL_STATUS_VALUES = ["active", "paused", "complete"] as const
 export const GoalStatusSchema = z.enum(GOAL_STATUS_VALUES)
 export type GoalStatus = z.infer<typeof GoalStatusSchema>
 
+export const GoalDeliverableSchema = z.object({
+  text: z.string(),
+})
+export type GoalDeliverable = z.infer<typeof GoalDeliverableSchema>
+
 export const GoalSchema = z.object({
   id: z.string(),
   sessionID: z.string(),
   objective: z.string(),
+  originalObjective: z.string().optional(),
+  deliverables: z.array(GoalDeliverableSchema).optional(),
   status: GoalStatusSchema,
   tokensUsed: z.number().int().nonnegative(),
   timeUsedSeconds: z.number().int().nonnegative(),
@@ -50,6 +57,8 @@ export type GoalUpdate = {
 export const GoalToolSnapshotSchema = z.object({
   sessionID: z.string(),
   objective: z.string(),
+  originalObjective: z.string().optional(),
+  deliverables: z.array(GoalDeliverableSchema).optional(),
   status: GoalStatusSchema,
   tokensUsed: z.number().int().nonnegative(),
   timeUsedSeconds: z.number().int().nonnegative(),

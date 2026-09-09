@@ -7,8 +7,9 @@ import {
 	InvalidGoalStoreError,
 	UnsupportedGoalStoreVersionError,
 } from "./errors.js";
-import type { Goal, GoalAccountingMode, GoalFile, GoalStoreRef, GoalUpdate, TokenUsageSnapshot } from "./types.js";
+import type { Goal, GoalAccountingMode, GoalDeliverable, GoalFile, GoalStoreRef, GoalUpdate, TokenUsageSnapshot } from "./types.js";
 import { isRecord } from "./types.js";
+import { deriveDeliverables } from "./session-goal.js";
 import { validateObjective, validateTokenBudget } from "./validation.js";
 
 const STORE_VERSION = 1;
@@ -50,6 +51,8 @@ export async function createGoal(ref: GoalStoreRef, objective: string, tokenBudg
 		id: randomUUID(),
 		threadId: ref.threadId,
 		objective: normalizedObjective,
+		originalObjective: normalizedObjective,
+		deliverables: deriveDeliverables(normalizedObjective),
 		status: "active",
 		tokensUsed: 0,
 		timeUsedSeconds: 0,
@@ -82,6 +85,8 @@ export async function updateGoal(ref: GoalStoreRef, update: GoalUpdate): Promise
 			id: randomUUID(),
 			threadId: ref.threadId,
 			objective,
+			originalObjective: objective,
+			deliverables: deriveDeliverables(objective),
 			status,
 			tokensUsed: 0,
 			timeUsedSeconds: 0,
@@ -251,6 +256,8 @@ function isGoal(value: unknown): value is Goal {
 		typeof value["id"] === "string" &&
 		typeof value["threadId"] === "string" &&
 		typeof value["objective"] === "string" &&
+		(value["originalObjective"] === undefined || typeof value["originalObjective"] === "string") &&
+		(value["deliverables"] === undefined || isGoalDeliverables(value["deliverables"])) &&
 		isGoalStatus(value["status"]) &&
 		(value["tokenBudget"] === undefined || isPositiveSafeInteger(value["tokenBudget"])) &&
 		isNonNegativeSafeInteger(value["tokensUsed"]) &&
@@ -260,6 +267,11 @@ function isGoal(value: unknown): value is Goal {
 		(value["lastStartedAt"] === undefined || isNonNegativeSafeInteger(value["lastStartedAt"])) &&
 		(value["completedAt"] === undefined || isNonNegativeSafeInteger(value["completedAt"]))
 	);
+}
+
+function isGoalDeliverables(value: unknown): value is GoalDeliverable[] {
+	if (!Array.isArray(value)) return false;
+	return value.every((deliverable) => isRecord(deliverable) && typeof deliverable["text"] === "string");
 }
 
 function isGoalStatus(value: unknown): value is Goal["status"] {

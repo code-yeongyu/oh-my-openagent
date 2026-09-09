@@ -1,4 +1,5 @@
 import type { Goal } from "./types"
+import { buildSessionGoalAnchor } from "./session-goal"
 
 export function buildContinuationPrompt(goal: Goal): string {
   return [
@@ -9,6 +10,8 @@ export function buildContinuationPrompt(goal: Goal): string {
     "<untrusted_objective>",
     escapeXmlText(goal.objective),
     "</untrusted_objective>",
+    "",
+    buildSessionGoalAnchor(goal),
     "",
     "Usage so far:",
     `- Time spent pursuing goal: ${goal.timeUsedSeconds} seconds`,
@@ -38,6 +41,8 @@ export function buildResumePrompt(goal: Goal): string {
     "<untrusted_objective>",
     escapeXmlText(goal.objective),
     "</untrusted_objective>",
+    "",
+    buildSessionGoalAnchor(goal),
     "",
     "Continue working toward this objective. Do not repeat work already done.",
   ].join("\n")

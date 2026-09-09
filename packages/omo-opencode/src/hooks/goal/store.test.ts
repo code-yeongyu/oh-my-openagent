@@ -92,4 +92,47 @@ describe("goal store", () => {
 
     expect(reRead).toEqual(goal)
   })
+
+  test("createGoal initializes the original objective and derived deliverables once", () => {
+    const ref = createRef()
+    const objective = "Ship the release\n- tag the repo\n2. announce the changelog"
+
+    const goal = createGoal(ref, objective)
+
+    expect(goal.originalObjective).toBe(objective)
+    expect(goal.deliverables).toEqual([{ text: "tag the repo" }, { text: "announce the changelog" }])
+  })
+
+  test("updateGoal preserves the original objective across status-only updates", () => {
+    const ref = createRef()
+    const created = createGoal(ref, "Original objective")
+
+    updateGoal(ref, { status: "paused" })
+    const resumed = updateGoal(ref, { status: "active" })
+
+    expect(resumed?.id).toBe(created.id)
+    expect(resumed?.originalObjective).toBe("Original objective")
+    expect(resumed?.deliverables).toEqual([{ text: "Original objective" }])
+  })
+
+  test("parses version-1 goal files without originalObjective or deliverables", () => {
+    const ref = createRef()
+    const legacyGoal = {
+      id: "legacy-1",
+      sessionID: ref.sessionID,
+      objective: "Legacy objective",
+      status: "active",
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 1,
+      updatedAt: 2,
+    }
+    writeFileSync(goalFilePath(ref), JSON.stringify({ version: 1, goal: legacyGoal }, null, 2), "utf-8")
+
+    const goal = readGoal(ref)
+
+    expect(goal?.objective).toBe("Legacy objective")
+    expect(goal?.originalObjective).toBeUndefined()
+    expect(goal?.deliverables).toBeUndefined()
+  })
 })

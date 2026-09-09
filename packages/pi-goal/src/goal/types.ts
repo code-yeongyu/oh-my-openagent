@@ -11,10 +11,16 @@ export type GoalStoreRef = {
 
 export type GoalAccountingMode = "activeStatusOnly" | "active" | "activeOrComplete" | "activeOrStopped";
 
+export type GoalDeliverable = {
+	text: string;
+};
+
 export type Goal = {
 	id: string;
 	threadId: string;
 	objective: string;
+	originalObjective?: string;
+	deliverables?: GoalDeliverable[];
 	status: GoalStatus;
 	tokenBudget?: number;
 	tokensUsed: number;
@@ -47,6 +53,8 @@ export type GoalUpdate = {
 export type GoalToolSnapshot = {
 	threadId: string;
 	objective: string;
+	originalObjective?: string;
+	deliverables?: GoalDeliverable[];
 	status: GoalStatus;
 	tokenBudget?: number;
 	tokensUsed: number;

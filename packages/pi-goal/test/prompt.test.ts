@@ -37,6 +37,43 @@ describe("goal prompts", () => {
 		expect(prompt).not.toContain("<untrusted_objective>");
 		expect(changedAccounting).not.toBe(prompt);
 	});
+
+	it("embeds a session-goal anchor with original and current objectives in continuation prompts", () => {
+		const prompt = buildContinuationPrompt(
+			testGoal("Narrowed subtask", {
+				originalObjective: "Full original request",
+				deliverables: [{ text: "first artifact" }, { text: "second artifact" }],
+			}),
+		);
+
+		expect(prompt).toContain("<session-goal>");
+		expect(prompt).toContain("Full original request");
+		expect(prompt).toContain("Narrowed subtask");
+		expect(prompt).toContain("first artifact");
+		expect(prompt).toContain("second artifact");
+	});
+
+	it("escapes session-goal anchor content at its data boundary", () => {
+		const prompt = buildContinuationPrompt(testGoal("A < B", { originalObjective: "X & Y < Z" }));
+
+		expect(prompt).toContain("X &amp; Y &lt; Z");
+	});
+
+	it("falls back to the current objective as the original for version-1 goals without one", () => {
+		const prompt = buildContinuationPrompt(testGoal("Legacy only"));
+
+		expect(prompt).toContain("<session-goal>");
+		expect(prompt).toContain("Legacy only");
+	});
+
+	it("embeds the session-goal anchor in budget-limited prompts", () => {
+		const prompt = buildBudgetLimitedPrompt(
+			testGoal("Current objective", { status: "budgetLimited", originalObjective: "Original objective" }),
+		);
+
+		expect(prompt).toContain("<session-goal>");
+		expect(prompt).toContain("Original objective");
+	});
 });
 
 function testGoal(objective: string, overrides: Partial<Goal> = {}): Goal {
