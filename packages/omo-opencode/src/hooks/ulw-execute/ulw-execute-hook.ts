@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { UlwExecuteConfig } from "../../config/schema/ulw-execute"
 import {
   readBoulderState,
   findPrometheusPlans,
@@ -13,7 +14,7 @@ import {
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildUlwExecuteContextInfo } from "./context-info-builder"
-import { createPrDeliveryBlock, createWorktreeActiveBlock } from "./worktree-block"
+import { createIntegrationHoldBlock, createPrDeliveryBlock, createWorktreeActiveBlock } from "./worktree-block"
 import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "ulw-execute" as const
@@ -154,7 +155,11 @@ function resolveWorktreeContext(
   }
 }
 
-export function createUlwExecuteHook(ctx: PluginInput) {
+export interface UlwExecuteHookOptions {
+  readonly ulwExecute?: Partial<UlwExecuteConfig>
+}
+
+export function createUlwExecuteHook(ctx: PluginInput, options?: UlwExecuteHookOptions) {
   const processUlwExecute = async (
     input: UlwExecuteHookInput,
     output: UlwExecuteHookOutput,
@@ -189,7 +194,11 @@ export function createUlwExecuteHook(ctx: PluginInput) {
 
     const { planName: explicitPlanName, explicitWorktreePath, makePr, ship } = parseUserRequest(promptText)
     const { worktreePath, block } = resolveWorktreeContext(explicitWorktreePath)
-    const worktreeBlock = block + createPrDeliveryBlock({ makePr, ship }, worktreePath)
+    const prDeliveryBlock = createPrDeliveryBlock({ makePr, ship }, worktreePath)
+    const integrationHoldBlock = options?.ulwExecute?.auto_merge === false && prDeliveryBlock === ""
+      ? createIntegrationHoldBlock()
+      : ""
+    const worktreeBlock = block + prDeliveryBlock + integrationHoldBlock
     const preferredPlanPath = explicitPlanName
       ? null
       : await findRecentSessionPlanPath({
