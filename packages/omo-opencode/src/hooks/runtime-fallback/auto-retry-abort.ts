@@ -11,7 +11,10 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "session.status.retry-signal" ||
       source === "message.updated.retry-signal" ||
       source === "message.updated.quota-fallback" ||
-      source === "session.timeout"
+      source === "session.timeout" ||
+      // The watchdog aborts a silent subagent and immediately dispatches a
+      // fallback; its abort echo must preserve the prepared state (#6751).
+      source === "first-prompt-watchdog"
     ) {
       deps.internallyAbortedSessions.add(sessionID)
       deps.sessionLastAccess.set(sessionID, Date.now())

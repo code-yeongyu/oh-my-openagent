@@ -257,6 +257,170 @@ describe("createEventHandler", () => {
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
   })
 
+  it("#given a mid-cycle fallback state and our own abort in flight #when session.stop echoes back #then the fallback position is preserved (issue #6751)", async () => {
+    // given - a fallback hop was just prepared (primary failed, dispatch to
+    // fallback model in flight) and our machinery aborted the session, so
+    // internallyAbortedSessions carries the flag. opencode echoes session.stop
+    // back at us; that echo must not wipe fallbackIndex/failedModels.
+    const sessionID = "session-6751-stop-echo"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    state.pendingFallbackModel = "go/fallback-a"
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    deps.internallyAbortedSessions.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({ event: { type: "session.stop", properties: { sessionID } } })
+
+    // then - position bookkeeping intact so the cycle can advance forward
+    const preserved = deps.sessionStates.get(sessionID)
+    expect(preserved).toBe(state)
+    expect(preserved?.fallbackIndex).toBe(1)
+    expect(preserved?.currentModel).toBe("go/fallback-a")
+    expect(preserved?.originalModel).toBe("zai/primary")
+    expect(preserved?.attemptCount).toBe(1)
+    expect(preserved?.pendingFallbackModel).toBe("go/fallback-a")
+    expect(preserved?.failedModels.get("zai/primary")).toBeDefined()
+  })
+
+  it("#given a mid-cycle fallback state and our own abort in flight #when session.stop and session.idle echo back #then the fallback position survives both echoes (issue #6751)", async () => {
+    // given - a fallback hop was just prepared and our machinery aborted the
+    // session. opencode echoes stop then idle ("Cleared fallback retry state
+    // for cancelled session on idle" in the issue log); neither echo may wipe
+    // fallbackIndex/failedModels/pendingFallbackModel mid-cycle.
+    const sessionID = "session-6751-idle-echo"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    state.pendingFallbackModel = "go/fallback-a"
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.internallyAbortedSessions.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({ event: { type: "session.stop", properties: { sessionID } } })
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then
+    const preserved = deps.sessionStates.get(sessionID)
+    expect(preserved).toBe(state)
+    expect(preserved?.fallbackIndex).toBe(1)
+    expect(preserved?.currentModel).toBe("go/fallback-a")
+    expect(preserved?.pendingFallbackModel).toBe("go/fallback-a")
+    expect(preserved?.failedModels.get("zai/primary")).toBeDefined()
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+  })
+
+  it("#given an internal-abort echo wiped into a reset #when the next failure arrives #then the chain still advances forward past already-failed models (issue #6751)", async () => {
+    // given - issue shape: primary is chain[0], primary and first fallback both
+    // fail. The abort echoes between hops must not rewind the position.
+    const sessionID = "ses_6751_forward-only"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "zai/primary",
+          fallback_models: ["zai/primary", "go/fallback-a", "zen/fallback-b"],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const dispatchedModels: string[] = []
+    const helpers: AutoRetryHelpers = {
+      ...createHelpers(deps, abortCalls, clearCalls),
+      autoRetryWithFallback: async (_sessionID, newModel) => {
+        dispatchedModels.push(newModel)
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => "sisyphus",
+    }
+    const handler = createEventHandler(deps, helpers)
+
+    // when - primary fails -> hop to index 1; our abort echoes stop+idle;
+    // then the first fallback fails too.
+    await handler({
+      event: {
+        type: "session.created",
+        properties: { info: { id: sessionID, agent: "sisyphus", model: "zai/primary" } },
+      },
+    })
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "ProviderError", message: "service unavailable", statusCode: 503 } },
+      },
+    })
+    deps.internallyAbortedSessions.add(sessionID)
+    await handler({ event: { type: "session.stop", properties: { sessionID } } })
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError", message: "aborted" } },
+      },
+    })
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "ProviderError", message: "monthly usage limit reached", statusCode: 503 } },
+      },
+    })
+
+    // then - second hop must be zen/fallback-b (index 2), never a repeat of
+    // zai/primary or go/fallback-a
+    expect(dispatchedModels).toEqual(["go/fallback-a", "zen/fallback-b"])
+    const finalState = deps.sessionStates.get(sessionID)
+    expect(finalState?.fallbackIndex).toBe(2)
+    expect(finalState?.currentModel).toBe("zen/fallback-b")
+    expect(finalState?.originalModel).toBe("zai/primary")
+    expect(finalState?.failedModels.has("zai/primary")).toBe(true)
+    expect(finalState?.failedModels.has("go/fallback-a")).toBe(true)
+  })
+
+  it("#given a genuine user stop with no internal abort in flight #when session.stop fires #then the fallback position is fully reset as a new-cycle boundary", async () => {
+    // given - regression guard for #6751 fix: explicit user action keeps its
+    // existing full-reset semantics. No internallyAbortedSessions entry here.
+    const sessionID = "session-6751-genuine-stop"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.attemptCount = 2
+    state.pendingFallbackModel = "go/fallback-a"
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({ event: { type: "session.stop", properties: { sessionID } } })
+
+    // then
+    const reset = deps.sessionStates.get(sessionID)
+    expect(reset).not.toBe(state)
+    expect(reset?.originalModel).toBe("zai/primary")
+    expect(reset?.currentModel).toBe("zai/primary")
+    expect(reset?.fallbackIndex).toBe(-1)
+    expect(reset?.attemptCount).toBe(0)
+    expect(reset?.failedModels.size).toBe(0)
+    expect(reset?.pendingFallbackModel).toBe(undefined)
+  })
+
   it("#given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315)", async () => {
     // given - since opencode 1.15.x, session.created info.model is an object
     // { id, providerID, variant } rather than a string. Storing it verbatim
