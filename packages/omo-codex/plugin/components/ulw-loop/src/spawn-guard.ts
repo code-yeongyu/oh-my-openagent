@@ -89,11 +89,16 @@ export async function runSpawnAdmissionRecorderCli(
 		const dataDir = process.env["PLUGIN_DATA"];
 		if (typeof dataDir !== "string" || typeof payload["session_id"] !== "string") return;
 		const markerDir = join(dataDir, "spawn-breaker");
-		mkdirSync(markerDir, { recursive: true });
-		atomicWriteJson(join(markerDir, `${payload["session_id"]}.json`), {
-			reason: response,
-			at: new Date().toISOString(),
-		});
+		try {
+			mkdirSync(markerDir, { recursive: true });
+			atomicWriteJson(join(markerDir, `${payload["session_id"]}.json`), {
+				reason: response,
+				at: new Date().toISOString(),
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stderr.write(`[ulw-loop] spawn-guard: could not persist admission failure: ${message}\n`);
+		}
 	} catch {
 		/* malformed hook input is ignored */
 	}

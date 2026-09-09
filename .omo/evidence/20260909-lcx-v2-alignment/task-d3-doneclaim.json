@@ -1,0 +1,31 @@
+{
+  "task": "d3",
+  "task_id": "st_01a0846e",
+  "status": "done",
+  "finding": "F2 finding 2 — spawn-guard breaker write failures swallowed",
+  "outcome": "mkdir/atomic-write failures in runSpawnAdmissionRecorderCli now write one stderr line and still complete without throwing (CLI exits 0). JSON parse / malformed hook input remains silent fail-open. Deny logic and stdout contract unchanged.",
+  "commit": "b18223868c3eea5263b7a2a6ac075c17ae9ca5a3",
+  "commit_subject": "fix(ulw-loop): report spawn-guard storage errors on stderr instead of swallowing them",
+  "changed_files": [
+    "packages/omo-codex/plugin/components/ulw-loop/src/spawn-guard.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/test/spawn-guard.test.ts"
+  ],
+  "diff_stat": "2 files changed, 31 insertions(+), 6 deletions(-)",
+  "tests": [
+    "packages/omo-codex/plugin/components/ulw-loop/test/spawn-guard.test.ts — one new skipIf-root case: PLUGIN_DATA is a file, recorder stdout stays empty, stderr contains 'could not persist'",
+    "bun test / vitest / node --test not run locally (task prohibition); pending remote gate"
+  ],
+  "ci_parity": {
+    "cwd": "packages/omo-codex/plugin/components/ulw-loop",
+    "tsc": "bunx tsc --noEmit → exit 0",
+    "biome": "bunx biome check . → Checked 105 files in 61ms. No fixes applied."
+  },
+  "must_not": {
+    "shared_skills": "untouched",
+    "generated_files": "untouched",
+    "prose_pinning_tests": "none",
+    "fixed_sleeps": "none",
+    "stdout_contract": "unchanged (empty on persist failure)",
+    "deny_logic": "unchanged"
+  }
+}

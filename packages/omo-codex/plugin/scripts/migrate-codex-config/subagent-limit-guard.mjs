@@ -21,6 +21,7 @@ export function ensureSubagentConcurrencyLimit(config, options = {}) {
 	const version = options.multiAgentVersion !== undefined
 		? options.multiAgentVersion
 		: resolveMultiAgentVersionFromConfig(config, options);
+	// Keep this V2-active rule aligned with src/install/codex-multi-agent-v2-config.ts.
 	const v2Section = findSection(config, CODEX_MULTI_AGENT_V2_HEADER);
 	const v2Preferred = prefersMultiAgentV2(version, options.sessionModel)
 		|| (v2Section !== null && /^\s*enabled\s*=\s*true[ \t]*(?:#[^\n]*)?$/m.test(v2Section.text));

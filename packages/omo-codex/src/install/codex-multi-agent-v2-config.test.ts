@@ -57,6 +57,72 @@ describe("codex MultiAgentV2 config", () => {
     }
   })
 
+  test("#given V2 enabled with an unknown root model and a user agents cap #when updating config #then removes max_threads", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-enabled-unknown-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      ['model = "unknown-model"', "", "[features.multi_agent_v2]", "enabled = true", "", "[agents]", "max_threads = 6", ""].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    expect(await readFile(configPath, "utf8")).not.toMatch(/^\s*max_threads\s*=/m)
+  })
+
+  test("#given V2 disabled with an unknown root model and a user agents cap #when updating config #then preserves max_threads", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-disabled-unknown-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['model = "unknown-model"', "", "[agents]", "max_threads = 6", ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    expect(await readFile(configPath, "utf8")).toMatch(/^\s*max_threads\s*=\s*6\s*$/m)
+  })
+
+  test("#given V2 enabled with a user session concurrency cap #when updating config #then preserves the user cap", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-enabled-user-cap-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      ["[features.multi_agent_v2]", "enabled = true", "max_concurrent_threads_per_session = 4", ""].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const parsed = Bun.TOML.parse(await readFile(configPath, "utf8")) as {
+      readonly features: { readonly multi_agent_v2: { readonly max_concurrent_threads_per_session: number } }
+    }
+    expect(parsed.features.multi_agent_v2.max_concurrent_threads_per_session).toBe(4)
+  })
+
   test("#given legacy boolean flag and table #when updating config #then output remains valid TOML without enabling V2", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-valid-toml-"))

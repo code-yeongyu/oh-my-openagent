@@ -44,7 +44,9 @@ export function ensureCodexMultiAgentV2Config(
   options: { readonly multiAgentVersion?: CodexMultiAgentVersion } = {},
 ): string {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2")
+  // Keep this V2-active rule aligned with plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs.
   const v2Preferred = options.multiAgentVersion === "v2"
+    || isMultiAgentV2Enabled(featureFlag.config)
   const agentsConfig = removeAgentsMaxThreads(featureFlag.config, v2Preferred)
   const preserveDisable = featureFlag.value === false && !v2Preferred
   const featureConfig = preserveDisable
@@ -134,6 +136,11 @@ function removeFeatureFlagSetting(
     config: removeSetting(config, section, featureName),
     value: readBooleanSetting(section.text, featureName),
   }
+}
+
+function isMultiAgentV2Enabled(config: string): boolean {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER)
+  return section !== null && /^\s*enabled\s*=\s*true[ \t]*(?:#.*)?$/m.test(section.text)
 }
 
 function removeAgentsMaxThreads(config: string, v2Preferred: boolean): string {
