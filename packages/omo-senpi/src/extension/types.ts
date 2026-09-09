@@ -60,6 +60,7 @@ export interface ComponentLogger {
 
 export interface ComponentContext {
   logger: ComponentLogger
+  sharedHostEnabled?: boolean
   config: {
     getFlag(name: string): boolean | string | undefined
   }
