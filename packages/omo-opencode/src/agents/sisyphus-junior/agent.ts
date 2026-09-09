@@ -156,8 +156,10 @@ export function createSisyphusJuniorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
+  let resolvedVariant: string | undefined
   if (override?.variant !== undefined) {
     base.variant = override.variant
+    resolvedVariant = override.variant
   }
 
   if (isGptModel(model)) {
@@ -168,9 +170,12 @@ export function createSisyphusJuniorAgentWithOverrides(
     return base as AgentConfig
   }
 
+  const overrideThinking = override?.thinking
   return {
     ...base,
-    ...buildClaudeThinkingConfig(model),
+    ...(overrideThinking !== undefined
+      ? { thinking: overrideThinking }
+      : buildClaudeThinkingConfig(model, resolvedVariant)),
   } as AgentConfig
 }
 

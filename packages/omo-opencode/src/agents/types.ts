@@ -41,19 +41,47 @@ export {
 const CLAUDE_THINKING_BUDGET_TOKENS = 32000;
 
 /**
+ * Variant-derived thinking budgets for Claude models on the manual
+ * enabled-thinking path (issue #6387). The ladder is strictly increasing and
+ * every value satisfies Anthropic's budget_tokens >= 1024 floor. "max" stays
+ * strictly below the 64000 maxTokens configured on sisyphus/sisyphus-junior
+ * because Anthropic requires budget_tokens < max_tokens.
+ */
+export const CLAUDE_THINKING_BUDGET_BY_VARIANT: Record<string, number> = {
+  minimal: 4096,
+  low: 8192,
+  medium: 16000,
+  high: CLAUDE_THINKING_BUDGET_TOKENS,
+  xhigh: 48000,
+  max: 60000,
+};
+
+/**
+ * Resolves the Anthropic thinking budget for a resolved reasoning variant.
+ * Unknown, "off", and undefined variants fall back to the legacy flat default
+ * so existing configs keep byte-identical behavior.
+ */
+export function resolveClaudeThinkingBudget(variant: string | undefined): number {
+  if (variant === undefined) return CLAUDE_THINKING_BUDGET_TOKENS;
+  return CLAUDE_THINKING_BUDGET_BY_VARIANT[variant.toLowerCase()] ?? CLAUDE_THINKING_BUDGET_TOKENS;
+}
+
+/**
  * Anthropic Opus 4.7+, Fable, and Mythos models reject thinking.type "enabled";
  * they require adaptive thinking plus an effort, which OpenCode core derives from
  * the model variant. For those models emit no thinking config and let core drive
  * it (issue #4614; opencode core #31546). All other Claude models keep the
- * explicit enabled-thinking budget.
+ * explicit enabled-thinking budget, scaled by the resolved variant when one is
+ * known (issue #6387); without a variant the legacy flat default is kept.
  */
 export function buildClaudeThinkingConfig(
   model: string,
+  variant?: string,
 ): { thinking: { type: "enabled"; budgetTokens: number } } | Record<string, never> {
   if (isClaudeOpus47OrLaterModel(model) || isClaudeFableOrMythosModel(model)) {
     return {};
   }
-  return { thinking: { type: "enabled", budgetTokens: CLAUDE_THINKING_BUDGET_TOKENS } };
+  return { thinking: { type: "enabled", budgetTokens: resolveClaudeThinkingBudget(variant) } };
 }
 
 /**
