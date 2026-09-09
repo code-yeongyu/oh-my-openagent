@@ -7,6 +7,7 @@ import { createFallbackState } from "./fallback-state"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared"
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
@@ -311,7 +312,10 @@ describe("createSessionStatusHandler", () => {
             modelID: modelParts.join("/"),
           },
         },
-        { message: {} },
+        {
+          message: {},
+          parts: [{ type: "text", text: OMO_RUNTIME_FALLBACK_RETRY_MARKER }],
+        },
       )
       return { accepted: true, status: "dispatched" }
     }
@@ -393,7 +397,10 @@ describe("createSessionStatusHandler", () => {
         sessionID,
         model: { providerID: "openai", modelID: "gpt-5.4" },
       },
-      { message: {} },
+      {
+        message: {},
+        parts: [{ type: "text", text: OMO_RUNTIME_FALLBACK_RETRY_MARKER }],
+      },
     )
     await handler({
       sessionID,
