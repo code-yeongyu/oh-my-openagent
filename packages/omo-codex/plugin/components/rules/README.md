@@ -26,6 +26,8 @@ Project-level sources:
 
 User-home sources are also supported by the ported engine when available. `AGENTS.md` is not part of `auto` source selection because Codex already loads it as native project instructions, so re-injecting it through hooks duplicates context; opt into it explicitly with `CODEX_RULES_ENABLED_SOURCES` if you need hook-level migration behavior. Claude user-home sources (`~/.claude/rules`, `~/.claude/CLAUDE.md`) are also excluded from `auto` because they usually contain Claude Code runtime instructions rather than Codex rules; opt into them explicitly when you want that migration behavior.
 
+Bundled rules under `bundled-rules/` ship with the plugin. The Hephaestus persona is picked per model family from the hook payload's `model`: any slug containing `gpt-6` (the default `gpt-6-astra`, plus `gpt-6-astra-fast`) loads `hephaestus/gpt-6.md`, `gpt-5.6*` loads `gpt-5.6.md`, and everything else falls back to `gpt-5.5.md`. The post-compact budget table knows `gpt-6-astra` and `gpt-6-astra-fast` as 600k-context models; unknown slugs use the 200k fallback.
+
 Markdown rule files may use frontmatter such as:
 
 ```md

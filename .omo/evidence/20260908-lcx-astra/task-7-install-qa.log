@@ -1,0 +1,45 @@
+REAL_HOME_SHASUM_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+
+COMMAND: scripts/install-verify.sh --self-test (isolated HOME as well as CODEX_HOME)
+installing local omo into /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.T880NnIxyU/codex ...
+PASS: plugin cache present (5.0.0-beta.48)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (9 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged (ABSENT)
+PASS: install-verify
+
+COMMAND: scripts/install-verify.sh --keep (fresh real install)
+installing local omo into /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.5Bd1XmRAj7/codex ...
+PASS: plugin cache present (5.0.0-beta.48)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (9 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged (ABSENT)
+kept isolated home: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.5Bd1XmRAj7/codex
+PASS: install-verify
+21 | const cache = join(home, "plugins/cache/sisyphuslabs/omo")
+22 | const versions = readdirSync(cache)
+23 | assert.equal(versions.length, 1)
+24 | const installedManifest = JSON.parse(readFileSync(join(cache, versions[0], ".codex-plugin/plugin.json"), "utf8"))
+25 | const sourceManifest = JSON.parse(readFileSync(join(repo, "packages/omo-codex/plugin/.codex-plugin/plugin.json"), "utf8"))
+26 | assert.equal(installedManifest.hooks.length, sourceManifest.hooks.length)
+            ^
+AssertionError: Expected values to be strictly equal:
+
+19 !== 21
+
+ generatedMessage: true,
+     actual: 19,
+   expected: 21,
+   operator: "strictEqual",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at /Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models/.omo/evidence/20260908-lcx-astra/task-7-install-assertions.ts:26:8
+
+Bun v1.4.0 (macOS arm64)
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+REAL_HOME_SHASUM_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.n3jL1CyL3L
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.5Bd1XmRAj7

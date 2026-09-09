@@ -1,0 +1,41 @@
+# RED, captured before the fix
+# machine: gorky (Linux x86_64), bun test v1.4.2 (744846f84)
+# tree:    /tmp/omo-persona-20260909 at dev 72860584d + the persona manifest and its coverage test only
+# command: bun test script/build-omo-native.test.ts
+# 2026-09-09T07:34Z
+
+script/build-omo-native.test.ts:
+25 |
+26 |     // when
+27 |     const unguarded = PERSONA_ASSET_FILES.filter((filename) => !required.has(join("extensions", filename)))
+28 |
+29 |     // then
+30 |     expect(unguarded).toEqual([])
+                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "kibitzer-persona.md",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/tmp/omo-persona-20260909/script/build-omo-native.test.ts:30:23)
+(fail) runtime persona coverage > #given the runtime persona manifest #when the payload requirements are read #then every persona is required [0.94ms]
+(pass) ensurePrebuiltNativeInputs > #given both prebuilt artifacts present #when ensuring #then no root build script runs [0.23ms]
+(pass) ensurePrebuiltNativeInputs > #given no prebuilt artifacts #when ensuring #then each input builds via its root script in order [0.10ms]
+(pass) ensurePrebuiltNativeInputs > #given only the daemon dist missing #when ensuring #then only build:lsp-daemon runs [0.06ms]
+(pass) ensurePrebuiltNativeInputs > #given a root build script exits nonzero #when ensuring #then the exit code surfaces [0.11ms]
+(pass) ensurePrebuiltNativeInputs > #given the spawn itself errors #when ensuring #then the error propagates [0.08ms]
+(pass) plugin payload allowlist parity > #given the plugin files allowlist #when compared with the payload lists #then every published entry is copied [0.09ms]
+(pass) plugin payload allowlist parity > #given the conditional x-search skill #when checking the payload #then it is both copied and required [0.12ms]
+
+ 7 pass
+ 1 fail
+ 11 expect() calls
+Ran 8 tests across 1 file. [926.00ms]
+
+# The unguarded asset is exactly the one the recall gate boots from: the published payload validator
+# never required it, so a staging regression would ship a package whose every gate fire ENOENTs.

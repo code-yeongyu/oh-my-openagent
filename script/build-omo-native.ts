@@ -21,46 +21,11 @@ const packageDir = join(repoRoot, "packages", "omo-native")
 const sourcePluginDir = join(repoRoot, "packages", "omo-senpi", "plugin")
 const defaultOutputDir = join(packageDir, "plugin")
 
-// Mirrors REQUIRED_PLUGIN_ARTIFACTS in packages/omo-senpi/src/install/plugin-artifacts.ts.
-export const REQUIRED_PLUGIN_ARTIFACTS = [
-  join("extensions", "omo.js"),
-  join("extensions", "memory-run-supervisor.mjs"),
-  join("extensions", "reflection-persona.md"),
-  join("extensions", "dream-persona.md"),
-  join("extensions", "facts-persona.md"),
-  join("skills", "ast-grep", "SKILL.md"),
-  join("skills", "coding-agent-sessions", "SKILL.md"),
-  join("skills", "debugging", "SKILL.md"),
-  join("skills", "frontend", "SKILL.md"),
-  join("skills", "git-master", "SKILL.md"),
-  join("skills", "init-deep", "SKILL.md"),
-  join("skills", "lsp-setup", "SKILL.md"),
-  join("skills", "programming", "SKILL.md"),
-  join("skills", "refactor", "SKILL.md"),
-  join("skills", "remove-ai-slops", "SKILL.md"),
-  join("skills", "review-work", "SKILL.md"),
-  join("skills", "ulw-execute", "SKILL.md"),
-  join("skills", "ultimate-browsing", "SKILL.md"),
-  join("skills", "ultrawork", "SKILL.md"),
-  join("skills", "ulw-loop", "SKILL.md"),
-  join("skills", "ulw-plan", "SKILL.md"),
-  join("skills", "ulw-research", "SKILL.md"),
-  join("skills", "visual-qa", "SKILL.md"),
-  join("skills-conditional", "x-search", "SKILL.md"),
-  join("runtime", "ast-grep-mcp", "cli.js"),
-  join("runtime", "agent-toolkit", "cli.js"),
-  join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
-  join("runtime", "agent-toolkit", "omo-agent-toolkit"),
-  join("runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
-  join("runtime", "lsp-daemon", "dist", "cli.js"),
-  join("runtime", "lsp-daemon", "dist", "index.js"),
-  join("runtime", "lsp-daemon", "dist", "index.d.ts"),
-  join("runtime", "lsp-daemon", "dist", "daemon-client.js"),
-  join("runtime", "lsp-daemon", "dist", "daemon-client.d.ts"),
-  join("runtime", "lsp-daemon", "dist", "package.json"),
-  join("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
-  join("scripts", "install.mjs"),
-] as const
+// The published payload must require exactly what the local install validates, so this gate
+// re-exports that list instead of keeping a copy of it.
+import { REQUIRED_PLUGIN_ARTIFACTS } from "../packages/omo-senpi/src/install/plugin-artifacts"
+
+export { REQUIRED_PLUGIN_ARTIFACTS }
 
 // Mirrors the files allowlist in packages/omo-senpi/plugin/package.json (locked by build-omo-native.test.ts).
 export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const

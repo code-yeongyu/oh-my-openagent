@@ -1,4 +1,4 @@
-// Memorian recall wiring (plan .omo/plans/memorian-m3-gate.md todo 1).
+// Kibitzer recall wiring (plan .omo/plans/memorian-m3-gate.md todo 1).
 //
 // Recall owns its OWN before_agent_start handler, NOT an extra field on the memory prompt
 // handler's result: senpi's ExtensionRunner.emitBeforeAgentStart pushes every handler's
@@ -8,7 +8,7 @@
 //
 // The lexical auto-injection path is GONE: nothing is injected from a plain corpus match. Candidate
 // collection now runs at SETTLE time (the turn is complete there, so the current-prompt seam
-// disappears) and feeds the memorian gate child, whose validated nudges are what a later turn
+// disappears) and feeds the kibitzer gate child, whose validated nudges are what a later turn
 // injects. before_agent_start is the delivery half: it only drains the pending file the gate wrote.
 // Every step stays fail-open: an unreadable memory repo or a corrupt corpus drops the collection
 // and logs, and the turn proceeds untouched.
@@ -72,7 +72,7 @@ export interface MemoryRecallWiringOptions {
   readonly pendingFor?: (context: MemoryIdentityContext) => PendingNudgesPort
   readonly drainQueued?: (sessionId: string, context: MemoryIdentityContext) => RecallNudge[]
   /**
-   * The session's live compaction epoch, owned by the memorian gate wiring. A pending payload is
+   * The session's live compaction epoch, owned by the kibitzer gate wiring. A pending payload is
    * stamped with the epoch its judge ran under, so passing the live one here is what rejects a
    * verdict about a transcript a compaction has since rewritten. Absent means "never compacted",
    * matching the gate wiring's own default for an unknown session.
@@ -81,7 +81,7 @@ export interface MemoryRecallWiringOptions {
   readonly logger?: ComponentLogger
 }
 
-/** Everything the memorian gate child needs about one settled turn's lexical candidates. */
+/** Everything the kibitzer gate child needs about one settled turn's lexical candidates. */
 export interface CollectedRecallCandidates {
   readonly sessionId: string
   readonly context: MemoryIdentityContext
@@ -120,7 +120,7 @@ export interface MemoryRecallWiring {
 // A memory worker child must never receive recall hints: it reasons ABOUT memory, and an injected
 // hint would both pollute its transcript and re-enter memory on the next extraction pass. The
 // reflection and facts sentinels are here for the sharper reason: those children must not judge
-// or consume the hints produced by the memorian gate.
+// or consume the hints produced by the kibitzer gate.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
 const RECALL_PATH_ENTRY_WINDOW = 200
 

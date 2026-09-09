@@ -4,7 +4,7 @@ import { PendingNudges, RecallLedger, renderNudgeBlock } from "@oh-my-opencode/m
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
-import { NUDGED_ENTRY_TYPE } from "./memorian-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
 import { createRecallDrain } from "./recall-drain"
 import {
   ROLLOUTS_PATH,

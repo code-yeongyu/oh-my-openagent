@@ -1,4 +1,4 @@
-// Memorian gate output contract: the in-process judge child speaks only through the nudge
+// Kibitzer gate output contract: the in-process judge child speaks only through the nudge
 // tool, whose closure records each accepted nudge against the launch input. The parent is
 // authoritative: every collected nudge is re-validated against the candidate set, the session
 // ledger, the hint shape and the configured cap (defence in depth - the closure already

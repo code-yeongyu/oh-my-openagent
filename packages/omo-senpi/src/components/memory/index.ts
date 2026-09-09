@@ -12,10 +12,12 @@ import {
 import { logBindReconcileFailure } from "./bind-reconcile-log"
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
+import { primeMemoryPersonaAssets } from "./persona-prime"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { shutdownDeadlineAt, type ShutdownReason } from "./shutdown-drain"
 import { resolveMemorySettings } from "./identity-runtime"
 import { memoryModuleSupervisor } from "./supervisor"
+import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
 const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
@@ -73,6 +75,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         return
       }
 
+      primeMemoryPersonaAssets({ logger: ctx.logger })
+
       const wiring = createMemoryWiring({
         sessions,
         loadConfig,
@@ -86,6 +90,14 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         // enablement latch depends on the ORDER of reads across boot -> session_start -> reload.
       })
       wiring.registerStatic(pi, ctx)
+      const unregisterReadClassifier = registerMemoryReadClassifier(pi, {
+        resolveRepos: function* () {
+          for (const state of sessions.values()) {
+            if (state.context !== undefined) yield state.context.identityPaths.repo
+          }
+        },
+        logger: ctx.logger,
+      })
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
@@ -150,6 +162,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         wiring.clearStatus(eventCtx)
         releaseSession(sessions.get(sessionId))
         sessions.delete(sessionId)
+        if (sessions.size === 0) unregisterReadClassifier?.()
         unsubscribeReload?.()
       })
     },

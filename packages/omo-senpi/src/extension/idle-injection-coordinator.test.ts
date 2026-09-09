@@ -227,30 +227,30 @@ describe("IdleInjectionCoordinator", () => {
     expect(events).toEqual(["provider rejected"])
   })
 
-  it("#given only a passive memorian entry #when flushOnIdle runs #then nothing is delivered and the entry stays queued", () => {
+  it("#given only a passive kibitzer entry #when flushOnIdle runs #then nothing is delivered and the entry stays queued", () => {
     const { coordinator, calls } = createCoordinator()
-    coordinator.enqueue({ key: "memorian:1", source: "memorian", content: "recall", passive: true })
+    coordinator.enqueue({ key: "kibitzer:1", source: "kibitzer", content: "recall", passive: true })
 
     expect(coordinator.flushOnIdle()).toBe(0)
     expect(calls).toHaveLength(0)
     expect(coordinator.pendingCount()).toBe(1)
   })
 
-  it("#given a passive memorian entry and a task-completion entry #when flushOnIdle runs #then one delivery carries both contents with memorian last and the passive onFlushed fires", () => {
+  it("#given a passive kibitzer entry and a task-completion entry #when flushOnIdle runs #then one delivery carries both contents with kibitzer last and the passive onFlushed fires", () => {
     const events: string[] = []
     const { coordinator, calls } = createCoordinator()
     coordinator.enqueue({
-      key: "memorian:1",
-      source: "memorian",
+      key: "kibitzer:1",
+      source: "kibitzer",
       content: "recall",
       passive: true,
-      onFlushed: () => events.push("memorian"),
+      onFlushed: () => events.push("kibitzer"),
     })
     coordinator.enqueue({ key: "task:1", source: "task-completion", content: "task done" })
 
     expect(coordinator.flushOnIdle()).toBe(2)
     expect(calls[0]?.content).toBe("task done\n\nrecall")
-    expect(events).toEqual(["memorian"])
+    expect(events).toEqual(["kibitzer"])
   })
 
   it("#given a passive entry #when scheduleFlush's deferred pass runs #then nothing is delivered", () => {
@@ -259,7 +259,7 @@ describe("IdleInjectionCoordinator", () => {
     const coordinator = new IdleInjectionCoordinator((message, options) => calls.push({ content: message.content, options }), {
       scheduleFlush: (flush) => scheduled.push(flush),
     })
-    coordinator.enqueue({ key: "memorian:1", source: "memorian", content: "recall", passive: true })
+    coordinator.enqueue({ key: "kibitzer:1", source: "kibitzer", content: "recall", passive: true })
 
     coordinator.scheduleFlush()
     scheduled[0]?.()

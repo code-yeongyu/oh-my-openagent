@@ -1,0 +1,191 @@
+CONFIG_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+COMMAND: ["/Users/yeongyu/.bun/install/global/node_modules/.bin/codex", "--version"]
+codex-cli 0.147.0
+EXIT=0
+COMMAND: ["node", "/Users/yeongyu/lcx-inboard-20260909/omo/packages/omo-codex/scripts/install-local.mjs", "install"]
+
+removed 1 package, and audited 89 packages in 376ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @sisyphuslabs/omo-codex-plugin@5.0.0-beta.49 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 5.0.0-beta.49 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.49 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 14ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.49 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 9ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.49 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 22ms
+
+  cli.js  156.17 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 19ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 17ms
+
+  cli.js  4.22 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.49 build
+> tsc -p tsconfig.build.json
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.49 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 17ms
+
+  cli.js  14.52 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.49 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 7ms
+
+  cli.js  8.79 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 25ms
+
+  cli.js  156.38 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.49 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 27ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 33ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 7ms
+
+  cli.js  14.78 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 5ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.49 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 7ms
+
+  cli.js  35.17 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 19ms
+
+  cli.js  0.27 MB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.49 build
+> node scripts/build.mjs
+
+
+  dist/cli.js  149.4kb
+
+⚡ Done in 8ms
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 4ms
+
+  cli.js  35.34 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.49 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 45 modules in 7ms
+
+  cli.js  186.91 KB  (entry point)
+
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 7ms
+
+  cli.js  153.90 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 45 modules in 5ms
+
+  cli.js  187.89 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.49 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.49 build
+> node scripts/build-runtime.mjs
+
+
+added 15 packages in 639ms
+Installed 1 plugin(s) from sisyphuslabs.
+STDERR: npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+EXIT=0
+COMMAND: ["jq", ".hooks|length", "/Users/yeongyu/lcx-inboard-20260909/omo/packages/omo-codex/plugin/.codex-plugin/plugin.json"]
+21
+EXIT=0
+COMMAND: ["jq", ".hooks|length", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-3yqiqlec/fresh/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.49/.codex-plugin/plugin.json"]
+19
+EXIT=0
+
+FRESH_INSTALL_QA_EXIT=1
+AssertionError: installed_count == source_count == 21; actual installed_count=19, source_count=21.
+The preceding parsed config assertions passed: gpt-6-astra, 600000, high/xhigh, 12 agents.* blocks, 12 Astra TOMLs, no max_threads or max_concurrent_threads_per_session.
+Diagnosis: existing removeGitBashHooksOffWindows in packages/omo-codex/src/install/codex-git-bash-hooks.ts removes ./hooks/pre-tool-use-recommending-git-bash-mcp.json and ./hooks/post-compact-resetting-git-bash-mcp-reminder.json on non-Windows. Introduced by c754caba8. This unmet plan assertion is not changed to green.

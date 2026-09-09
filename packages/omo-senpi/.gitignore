@@ -1,7 +1,7 @@
 /plugin/extensions/*
 !/plugin/extensions/dream-persona.md
 !/plugin/extensions/facts-persona.md
-!/plugin/extensions/memorian-persona.md
+!/plugin/extensions/kibitzer-persona.md
 !/plugin/extensions/memory-run-supervisor.mjs
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js

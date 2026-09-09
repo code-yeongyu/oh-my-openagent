@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PreToolUsePayload } from "../src/codex-hook.ts";
 import { applySpawnGuards, DEFAULT_FANOUT_LIMIT, runSpawnAdmissionRecorderCli } from "../src/spawn-guard.ts";
@@ -158,6 +158,26 @@ describe("spawn admission breaker", () => {
 		expect(existsSync(join(sessionDir(), "spawn-count.json"))).toBe(false);
 		expect(existsSync(join(sessionDir(), "review-spawn-counts.json"))).toBe(false);
 	});
+
+	it.skipIf(process.getuid?.() === 0)(
+		"#given PLUGIN_DATA is a file #when recording an admission failure #then reports persist failure on stderr and keeps stdout empty",
+		async () => {
+			const blocked = join(workDir, "blocked-plugin-data");
+			writeFileSync(blocked, "not-a-directory");
+			process.env["PLUGIN_DATA"] = blocked;
+			const err: string[] = [];
+			const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
+				err.push(chunk.toString());
+				return true;
+			});
+			try {
+				await expect(record("too many active cells")).resolves.toBe("");
+				expect(err.join("")).toContain("could not persist");
+			} finally {
+				spy.mockRestore();
+			}
+		},
+	);
 });
 
 describe("applySpawnGuards fan-out cap", () => {

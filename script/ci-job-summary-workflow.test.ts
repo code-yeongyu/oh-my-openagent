@@ -30,6 +30,7 @@ const workflowExpectations = [
     ],
   },
   { path: ".github/workflows/cla.yml", jobs: ["cla"] },
+  { path: ".github/workflows/compiled-worker.yml", jobs: ["relocated-worker"] },
   { path: ".github/workflows/bot-merge.yml", jobs: ["merge"] },
   { path: ".github/workflows/lint-workflows.yml", jobs: ["actionlint"] },
   { path: ".github/workflows/package-labels.yml", jobs: ["ensure-labels", "label-pull-request", "label-issue"] },

@@ -1,0 +1,1900 @@
+EXECUTED RED/GREEN EVIDENCE - TODO 2
+Task: st_01a08154
+Session start: 2026-09-08T14:05:52.245Z
+Session finish: 2026-09-08T14:10:34.564Z
+Machine: mengmotaMac macos/aarch64
+RED source: pristine origin/dev 8bd0c35b3ba532ab0cb0df49ea71467303aa92ba
+GREEN source: pushed lcx/astra-default-models b97e0acdf4264d0d4c989dbb8a41a3808147f3dd
+Remote directory: /tmp/lcx-reda-20260908
+Toolchain: Bun 1.4.0; Node v26.7.0; Darwin arm64
+
+WHAT WAS TESTED
+The exact requested commands below ran once per phase in one SDK session. RED used a fresh dev Git clone after frozen install, plugin dependency install, and generated-skills preparation. Only the branch's changed test files/test support were overlaid (47 files, SHA256-verified). Production files remained dev. GREEN used a forced checkout of the exact pushed branch HEAD in the same disposable clone; test bytes were unchanged. Temporary fixture directories were scoped under the remote directory through TMPDIR.
+
+WHAT WAS OBSERVED
+Node RED: 68 pass / 20 fail, including aggregate-model-catalog default/verifier/worker assertion (Sol catalog version received instead of Astra) and three auto-update assertions. Bun RED: 8 pass / 4 fail. GREEN: Node 88 pass / 0 fail and Bun 12 pass / 0 fail. Each RED command TEST_EXIT=1; each GREEN command TEST_EXIT=0.
+
+WHY IT IS ENOUGH
+The captured failing assertion names and assertion differences demonstrate executable RED, not source comparisons or setup failure. The same commands then passed against the branch without edits to tests or product files. Full raw output is retained alongside the requested tail-120 capture, with byte count and SHA256 per command. The shell saves PIPESTATUS[0] before any later command can replace it. Remote read() bytes/artifact streams were decoded to UTF-8 and all retained full-output hashes were verified locally.
+
+WHAT WAS OMITTED
+This is an executed failing-first reconstruction after the branch was authored, not a claim about original implementation-time test order. No local bun test, new tests, product edits, full test:codex rerun, installer/manual hook QA, or fixes for other verify-a3 objections. Existing DoneClaim fields outside red_proof retain their historical results and are not re-certified by this scoped capture. No git commit or push was created.
+
+METHOD DECISION
+Using a pristine dev checkout plus a tests-only overlay was selected over reverting product files in the feature branch: it avoids accidentally running RED against already-modified sources. GREEN checks out the exact pushed branch rather than copying a partial source selection, and git diff --exit-code confirms no tracked mutations after the run.
+
+SETUP AND SOURCE PROVENANCE
+STAGE: frozen-install-dev
+COMMAND: bun install --frozen-lockfile
+STAGE_EXIT=0
+OUTPUT_BYTES=15765 OUTPUT_SHA256=f7c5b386ba58fbf1e20e312566203b3b9992e4fa02ed1c75e7ccabeabc76f6a6
+STAGE: plugin-dependencies-dev
+COMMAND: npm --prefix packages/omo-codex/plugin ci
+STAGE_EXIT=0
+OUTPUT_BYTES=547 OUTPUT_SHA256=fef328c57586a242562ba636fe773d052b8f4d901a329d6a71d32f6b986b1d63
+STAGE: generated-skills-dev
+COMMAND: cd packages/omo-codex/plugin && node scripts/sync-skills.mjs
+STAGE_EXIT=0
+OUTPUT_BYTES=0 OUTPUT_SHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+STAGE: test-only-overlay
+COMMAND: tar -xf '/tmp/lcx-reda-20260908/branch-tests.tar' && node --input-type=module -e 'import {readFileSync} from '\''node:fs'\''; import {createHash} from '\''node:crypto'\''; const rows=JSON.parse(readFileSync('\''/tmp/lcx-reda-20260908/test-manifest.json'\'','\''utf8'\'')); for (const row of rows) { const sha=createHash('\''sha256'\'').update(readFileSync(row.path)).digest('\''hex'\''); if(sha!==row.sha256) throw new Error(row.path); } console.log('\''BRANCH_TEST_BYTES_MATCH='\''+rows.length);' && git status --porcelain && git diff --name-only
+STAGE_EXIT=0
+OUTPUT_BYTES=6097 OUTPUT_SHA256=4eaca4ac60fb854f9576fab104e7144149992189cbc4b4519582461422f9ca1c
+STAGE: verify-docs-baseline
+COMMAND: node --input-type=module -e 'import {readFileSync} from '\''node:fs'\''; const baseline=JSON.parse(readFileSync('\''/tmp/lcx-reda-20260908/origin-dev-docs.json'\'','\''utf8'\'')); for (const file of baseline.files) { if(readFileSync(file.path,'\''utf8'\'')!==file.content) throw new Error('\''Remote pristine dev docs differ from local git show origin/dev:'\''+file.path); } console.log('\''ALL_FIVE_DOCS_BYTE_IDENTICAL_TO_LOCAL_GIT_SHOW_ORIGIN_DEV='\''+baseline.revision);'
+STAGE_EXIT=0
+OUTPUT_BYTES=99 OUTPUT_SHA256=3864506f27a8dd284948b769656991fbfefe9dbfb6baf4ee758dd259a028ec5b
+STAGE: checkout-pushed-branch
+COMMAND: git fetch --depth 1 origin lcx/astra-default-models && git checkout -f -B lcx/astra-default-models 'b97e0acdf4264d0d4c989dbb8a41a3808147f3dd' && test "$(git rev-parse HEAD)" = 'b97e0acdf4264d0d4c989dbb8a41a3808147f3dd' && git status --porcelain && git rev-parse HEAD
+STAGE_EXIT=0
+OUTPUT_BYTES=206 OUTPUT_SHA256=3a6c25d3edfd79d597d8463e43873a5b946afa822227ad0bb83aecefa6e6dcd1
+STAGE: generated-skills-branch
+COMMAND: cd packages/omo-codex/plugin && node scripts/sync-skills.mjs
+STAGE_EXIT=0
+OUTPUT_BYTES=0 OUTPUT_SHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+STAGE: verify-source-and-tests-unchanged
+COMMAND: git diff --exit-code && node --input-type=module -e 'import {readFileSync} from '\''node:fs'\''; import {createHash} from '\''node:crypto'\''; const rows=JSON.parse(readFileSync('\''/tmp/lcx-reda-20260908/test-manifest.json'\'','\''utf8'\'')); for (const row of rows) { const sha=createHash('\''sha256'\'').update(readFileSync(row.path)).digest('\''hex'\''); if(sha!==row.sha256) throw new Error(row.path); } console.log('\''BRANCH_TEST_BYTES_UNCHANGED='\''+rows.length);'
+STAGE_EXIT=0
+OUTPUT_BYTES=31 OUTPUT_SHA256=846514b087b8d48347d5e04465e40c71556ac78ea355dfedabd4f086fff18eb6
+
+COMPLETE TEST-ONLY OVERLAY STATUS
+BRANCH_TEST_BYTES_MATCH=47
+ M packages/git-bash-mcp/src/runner.test.ts
+ M packages/omo-codex/plugin/components/rules/test/hephaestus-model-variant.test.ts
+ M packages/omo-codex/plugin/components/rules/test/post-compact-budget.test.ts
+ M packages/omo-codex/plugin/test/aggregate-agents.test.mjs
+ M packages/omo-codex/plugin/test/aggregate-model-catalog.test.mjs
+ M packages/omo-codex/plugin/test/auto-update.test.mjs
+ M packages/omo-codex/plugin/test/migrate-codex-config.test.mjs
+ M packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs
+ M packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs
+ M packages/omo-codex/scripts/install-config-reasoning.test.mjs
+ M packages/omo-codex/scripts/install-config.test.mjs
+ M packages/omo-codex/scripts/install-generated-bundle.test.mjs
+ M packages/omo-codex/src/install/codex-config-reasoning.test.ts
+ M packages/omo-codex/src/install/codex-config-toml.test.ts
+ M packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts
+ M packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts
+ M packages/omo-codex/src/install/codex-subagent-limit-config.test.ts
+ M packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts
+ M packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts
+ M packages/omo-codex/src/version-coherence.test.ts
+ M packages/omo-opencode/src/cli/worktree-sweep/worktree-sweep.test.ts
+ M packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-delivering-loss.test.ts
+ M packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts
+ M packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-pending-delivery-verify.test.ts
+ M packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts
+ M packages/omo-senpi/src/components/memory/bind-reconcile-log.test.ts
+ M packages/omo-senpi/src/components/memory/dream-trigger-idle.test.ts
+ M packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts
+ M packages/omo-senpi/src/components/memory/memorian-delivery-idle.test.ts
+ M packages/omo-senpi/src/components/memory/memorian-delivery.test.ts
+ M packages/omo-senpi/src/components/memory/memorian-notice.test.ts
+ M packages/omo-senpi/src/components/memory/memorian-nudge-tool.test.ts
+ M packages/omo-senpi/src/components/memory/memorian-observability.test.ts
+ M packages/omo-senpi/src/components/memory/recall-drain-union.test.ts
+ M packages/omo-senpi/src/components/memory/recall-drain.test.ts
+ M packages/omo-senpi/src/components/memory/recall-notice.test.ts
+ M packages/omo-senpi/src/components/task/dag-rpc-bridge.test.ts
+ M packages/rules-engine/src/engine/finder.test.ts
+ M packages/rules-engine/src/engine/truncator.test.ts
+ M packages/senpi-task/src/dag/manager.test.ts
+ M packages/senpi-task/src/dag/recovery.test.ts
+ M packages/senpi-task/src/dag/store.test.ts
+ M packages/senpi-task/src/runners/rpc/terminate.test.ts
+ M packages/senpi-task/src/store/record-parse-v1.test.ts
+ M packages/senpi-task/src/team/spawn-members-task-summary.test.ts
+?? packages/memory-core/src/recall/gate-filler-validation.test.ts
+?? packages/omo-senpi/src/components/memory/memorian-openers.test.ts
+packages/git-bash-mcp/src/runner.test.ts
+packages/omo-codex/plugin/components/rules/test/hephaestus-model-variant.test.ts
+packages/omo-codex/plugin/components/rules/test/post-compact-budget.test.ts
+packages/omo-codex/plugin/test/aggregate-agents.test.mjs
+packages/omo-codex/plugin/test/aggregate-model-catalog.test.mjs
+packages/omo-codex/plugin/test/auto-update.test.mjs
+packages/omo-codex/plugin/test/migrate-codex-config.test.mjs
+packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs
+packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs
+packages/omo-codex/scripts/install-config-reasoning.test.mjs
+packages/omo-codex/scripts/install-config.test.mjs
+packages/omo-codex/scripts/install-generated-bundle.test.mjs
+packages/omo-codex/src/install/codex-config-reasoning.test.ts
+packages/omo-codex/src/install/codex-config-toml.test.ts
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts
+packages/omo-codex/src/install/codex-subagent-limit-config.test.ts
+packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts
+packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts
+packages/omo-codex/src/version-coherence.test.ts
+packages/omo-opencode/src/cli/worktree-sweep/worktree-sweep.test.ts
+packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-delivering-loss.test.ts
+packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts
+packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-pending-delivery-verify.test.ts
+packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts
+packages/omo-senpi/src/components/memory/bind-reconcile-log.test.ts
+packages/omo-senpi/src/components/memory/dream-trigger-idle.test.ts
+packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts
+packages/omo-senpi/src/components/memory/memorian-delivery-idle.test.ts
+packages/omo-senpi/src/components/memory/memorian-delivery.test.ts
+packages/omo-senpi/src/components/memory/memorian-notice.test.ts
+packages/omo-senpi/src/components/memory/memorian-nudge-tool.test.ts
+packages/omo-senpi/src/components/memory/memorian-observability.test.ts
+packages/omo-senpi/src/components/memory/recall-drain-union.test.ts
+packages/omo-senpi/src/components/memory/recall-drain.test.ts
+packages/omo-senpi/src/components/memory/recall-notice.test.ts
+packages/omo-senpi/src/components/task/dag-rpc-bridge.test.ts
+packages/rules-engine/src/engine/finder.test.ts
+packages/rules-engine/src/engine/truncator.test.ts
+packages/senpi-task/src/dag/manager.test.ts
+packages/senpi-task/src/dag/recovery.test.ts
+packages/senpi-task/src/dag/store.test.ts
+packages/senpi-task/src/runners/rpc/terminate.test.ts
+packages/senpi-task/src/store/record-parse-v1.test.ts
+packages/senpi-task/src/team/spawn-members-task-summary.test.ts
+
+TEST MANIFEST (git diff --name-only origin/dev..HEAD, existing branch tests/test support only)
+[
+  {
+    "path": "packages/git-bash-mcp/src/runner.test.ts",
+    "sha256": "5a44e25929c18755518b38622e428f86656a7b8f5af36016c2c5ee2f8a331eb0"
+  },
+  {
+    "path": "packages/memory-core/src/recall/gate-filler-validation.test.ts",
+    "sha256": "1986d7b38b5ef32ff625ff9074bc10f949c9f63995fbbb223b0f81750fa444a8"
+  },
+  {
+    "path": "packages/omo-codex/plugin/components/rules/test/hephaestus-model-variant.test.ts",
+    "sha256": "2f34e7b92b2568159c0b7930a22534478d8cc9771857622433bc90b8d93663e9"
+  },
+  {
+    "path": "packages/omo-codex/plugin/components/rules/test/post-compact-budget.test.ts",
+    "sha256": "577f2103a3ab8b5547f5583955e749a950f8410e9fcecf1e64f4e0b4d3e8425a"
+  },
+  {
+    "path": "packages/omo-codex/plugin/test/aggregate-agents.test.mjs",
+    "sha256": "1eea53904a8d8f469944abf70e8af6db62ceabbabe7357eba0b1a50398befe1f"
+  },
+  {
+    "path": "packages/omo-codex/plugin/test/aggregate-model-catalog.test.mjs",
+    "sha256": "18646e0a06df3d31896dc26ebb1a469ef32204802417f24bf687be8bb7852ef1"
+  },
+  {
+    "path": "packages/omo-codex/plugin/test/auto-update.test.mjs",
+    "sha256": "68d631f1d77a9f9c227e3a7636e8e9ce687660bb088541975d445dbca839b184"
+  },
+  {
+    "path": "packages/omo-codex/plugin/test/migrate-codex-config.test.mjs",
+    "sha256": "b3432ab664d53a00b0cdeece0cb1820bf13cd7e7dd3b112bbfb7f7866a84f33a"
+  },
+  {
+    "path": "packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs",
+    "sha256": "b556c26cef35920c26d8e467b81889a3f3b4064d289f9b7ec8c484803b73a57c"
+  },
+  {
+    "path": "packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs",
+    "sha256": "3d6723a463269c66f70d4100a3aba44fcc1d96a483c7c14db64f0ba148409648"
+  },
+  {
+    "path": "packages/omo-codex/scripts/install-config-reasoning.test.mjs",
+    "sha256": "bdabd76f9247c09220ab62b07d62e6fa8b66a3d1b9c663092b22ddf568d0fd4c"
+  },
+  {
+    "path": "packages/omo-codex/scripts/install-config.test.mjs",
+    "sha256": "8807ffd63fb22f0e97310eb025f721a62f4307612e3ce1ef1c3e87f7da1e5bc4"
+  },
+  {
+    "path": "packages/omo-codex/scripts/install-generated-bundle.test.mjs",
+    "sha256": "1e231d3d151fcbb4e2faf6f08b60fa8501436e0e5a4e06afa970f91f786ae76c"
+  },
+  {
+    "path": "packages/omo-codex/src/install/codex-config-reasoning.test.ts",
+    "sha256": "0a8198c090394f731e2eb190367abeaaafc32e883881903a539588776d60bc4a"
+  },
+  {
+    "path": "packages/omo-codex/src/install/codex-config-toml.test.ts",
+    "sha256": "07940292b932d4dd887a2aaecbae31b64c91094f18bceab006e35dbf52bfa50e"
+  },
+  {
+    "path": "packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts",
+    "sha256": "62fe0305019e2728a35548cc46bd8498a0ddfcebd82e1be750bcd3191e9b3aa5"
+  },
+  {
+    "path": "packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts",
+    "sha256": "64f4dedb2efa64446a8ea2121248c48d8b15cab719d61459a122f422a8f19a5b"
+  },
+  {
+    "path": "packages/omo-codex/src/install/codex-subagent-limit-config.test.ts",
+    "sha256": "910a2709daf95a5736789504cb8cf8b67c6025c2963b37943ea237ca6e9e03dd"
+  },
+  {
+    "path": "packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts",
+    "sha256": "54007b34dd2bdea576e751c0850c7fb1512faf5d0fbd824c6ef89e2902295ca0"
+  },
+  {
+    "path": "packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts",
+    "sha256": "790f4c53ec8f8b82fcd63047d052944aeff78ce835b60684ddb49d4a99faf4fc"
+  },
+  {
+    "path": "packages/omo-codex/src/version-coherence.test.ts",
+    "sha256": "cf056127a3b9769ab5ec2b77cc312f1cc0dc4f0bc0c1cbab19eee4f2b389395f"
+  },
+  {
+    "path": "packages/omo-opencode/src/cli/worktree-sweep/worktree-sweep.test.ts",
+    "sha256": "db71d3935132fbf9c8991453d7aa3d49463e7156ebd5f38ff964642d049ec132"
+  },
+  {
+    "path": "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-delivering-loss.test.ts",
+    "sha256": "264742da4a8db7d9c0e54e8b718f8ff414aa20c489b487f7edb5d9956968500d"
+  },
+  {
+    "path": "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts",
+    "sha256": "5110c55bc535d6c0947e85592328e600b84cad08c0fc64f92dff5a0a6188640e"
+  },
+  {
+    "path": "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-pending-delivery-verify.test.ts",
+    "sha256": "af09376354e7798048fc05a040291d9105f2a486637e67d391ed9dc66b7414d0"
+  },
+  {
+    "path": "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts",
+    "sha256": "3b1a7a55899ffde20d8efffc710b0731cc304cf6e6103fa71664f7f0419486b5"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/bind-reconcile-log.test.ts",
+    "sha256": "ffffea911c9ecd6ff3f6939f837894128a6a3a4c9d46177c00d28dcadf0ade67"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/dream-trigger-idle.test.ts",
+    "sha256": "efffe008a5ff6601071bb6314c64e5d4b53e687484558ad41b61f7d828ff84d5"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts",
+    "sha256": "1f8728ed71dd72e9e89b8fce45baee824140bcf3561fd66b49e8f4914b975678"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/memorian-delivery-idle.test.ts",
+    "sha256": "8a661da8450e135bde45abad24cb04382b23f3ad50ab8a5532b905641fa096e5"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/memorian-delivery.test.ts",
+    "sha256": "b1fd6fe556975b00f3ad85037c29715039889e956897a0562441bb036e6e6364"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/memorian-notice.test.ts",
+    "sha256": "6e7c2061849ecfc8893e8c23e4b1f8be4ec212d9167a6af1f4a8b775d8195f62"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/memorian-nudge-tool.test.ts",
+    "sha256": "01c3515e71d4b6a178b6677d269af999ea9e749308207822a4603370dfa3bbed"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/memorian-observability.test.ts",
+    "sha256": "d6f392ede612801cffa8afc3eb2112e96ae8c80dedf907dfce2730f6e9f415f5"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/memorian-openers.test.ts",
+    "sha256": "c0ac03195ed751ae15a81f30199d59346c6312e4e0777cce709a71cd9822ae3c"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/recall-drain-union.test.ts",
+    "sha256": "c3018f95f2ac04fde80808f8328d8355e3fe4fb2ba809c19b070ffdd46f09e47"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/recall-drain.test.ts",
+    "sha256": "17c2ea44a56a1a10cd2da1f00c9cb97ccef12a425b85539ab5f78bf28937aafa"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/memory/recall-notice.test.ts",
+    "sha256": "642a2430ec2c1f098d1e34bbe16409eeac6c4210c19bb77dd8db6e235341efd8"
+  },
+  {
+    "path": "packages/omo-senpi/src/components/task/dag-rpc-bridge.test.ts",
+    "sha256": "2b53645386defd6df0c1cc8c8e49428f7fdcec8f9fa449c4fe40016f25d321c4"
+  },
+  {
+    "path": "packages/rules-engine/src/engine/finder.test.ts",
+    "sha256": "603c19badfad3d2c087500a214c27ce9d0fb4bb55e81caa3f376cc7101ac909d"
+  },
+  {
+    "path": "packages/rules-engine/src/engine/truncator.test.ts",
+    "sha256": "aff173049acb5b59c2ecd22e9567169c8208e67dc23a45ad37e210916d8c32f4"
+  },
+  {
+    "path": "packages/senpi-task/src/dag/manager.test.ts",
+    "sha256": "52f1998a1b707cfac407c5e038a0b6a5af7c05f4449d2f1b87b726b1c41ca4e0"
+  },
+  {
+    "path": "packages/senpi-task/src/dag/recovery.test.ts",
+    "sha256": "ebf66f296c430ac85035d54a9a4a3b9be3f4c3918ff6f9c95d986676771abca9"
+  },
+  {
+    "path": "packages/senpi-task/src/dag/store.test.ts",
+    "sha256": "bf52fa8625b428a577473b89f7a76fe01968024ac39a89881fed612b2ea2015b"
+  },
+  {
+    "path": "packages/senpi-task/src/runners/rpc/terminate.test.ts",
+    "sha256": "d80989b41a57a1468d0d0fb1b6e284ed00d58c08a6f8d36ed552582cb205c145"
+  },
+  {
+    "path": "packages/senpi-task/src/store/record-parse-v1.test.ts",
+    "sha256": "88c73aa0a1f602a6462c1548e05afbb94ca459e48dac87f2a76595bc7f7abcfb"
+  },
+  {
+    "path": "packages/senpi-task/src/team/spawn-members-task-summary.test.ts",
+    "sha256": "edfc615315a7d5928a56d6fbd90ae00f33a865a8c21cf5d8f47301204820584d"
+  }
+]
+
+COMPLETE FROZEN-INSTALL OUTPUT
+bun install v1.4.0 (34cbb9a40)
+
+$ node postinstall.mjs
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Submodule 'packages/shared-skills/upstreams/designpowers' (https://github.com/Owl-Listener/designpowers) registered for path 'packages/shared-skills/upstreams/designpowers'
+Submodule 'packages/shared-skills/upstreams/open-design' (https://github.com/nexu-io/open-design) registered for path 'packages/shared-skills/upstreams/open-design'
+Submodule 'packages/shared-skills/upstreams/taste-skill' (https://github.com/Leonxlnx/taste-skill) registered for path 'packages/shared-skills/upstreams/taste-skill'
+Submodule 'packages/shared-skills/upstreams/ui-ux-pro-max' (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) registered for path 'packages/shared-skills/upstreams/ui-ux-pro-max'
+Cloning into '/private/tmp/lcx-reda-20260908/omo/packages/shared-skills/upstreams/designpowers'...
+Cloning into '/private/tmp/lcx-reda-20260908/omo/packages/shared-skills/upstreams/open-design'...
+Cloning into '/private/tmp/lcx-reda-20260908/omo/packages/shared-skills/upstreams/taste-skill'...
+Cloning into '/private/tmp/lcx-reda-20260908/omo/packages/shared-skills/upstreams/ui-ux-pro-max'...
+Submodule path 'packages/shared-skills/upstreams/designpowers': checked out 'cb00757da9d554591fa78d27aa1854d60a05c4f7'
+From https://github.com/nexu-io/open-design
+ * branch              6afe7eae156bfa29251a51fd0636649c257f7444 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/open-design': checked out '6afe7eae156bfa29251a51fd0636649c257f7444'
+From https://github.com/Leonxlnx/taste-skill
+ * branch            b17742737e796305d829b3ad39eda3add0d79060 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/taste-skill': checked out 'b17742737e796305d829b3ad39eda3add0d79060'
+From https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+ * branch            f32d6a61cdf0bfd57404c45854583fd19ff95088 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/ui-ux-pro-max': checked out 'f32d6a61cdf0bfd57404c45854583fd19ff95088'
+[materialize] wrote 148 frontend reference files from submodules
+build:git-bash-mcp
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 295ms
+
+  cli.js  22.68 KB  (entry point)
+
+build:ast-grep-mcp
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 103 modules in 344ms
+
+  cli.js  85.17 KB  (entry point)
+
+build:tui
+Bundled 554 modules in 784ms
+
+  tui.js  2.15 MB  (entry point)
+
+build:codex-install
+$ bun run script/build-codex-install.ts
+build:cli
+Bundled 923 modules in 1078ms
+
+  index.js  3.35 MB  (entry point)
+
+build:cli-node
+$ bun run script/build-cli-node.ts
+built dist/cli-node (1 output)
+build:omo-schema
+$ bun run script/build-omo-schema.ts
+Generating omo JSON Schema...
+✓ omo JSON Schema generated: assets/omo.schema.json
+build:schema
+$ bun run script/build-schema.ts
+Generating JSON Schemas...
+✓ JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+build:index
+Bundled 2000 modules in 1714ms
+
+  index.js  5.87 MB  (entry point)
+
+build:node-require-shim
+$ bun run script/patch-node-require-shim.ts
+Patched Node/Electron require shim in dist/index.js
+build:shared-skills-assets
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+build:declarations
+build:lsp-tools-mcp
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 52 packages, and audited 55 packages in 3s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 11ms
+
+  cli.js               195.27 KB  (entry point)
+  mcp.js               194.80 KB  (entry point)
+  tools.js             182.91 KB  (entry point)
+  request-context.js   7.47 KB    (entry point)
+  lsp/manager.js       109.46 KB  (entry point)
+
+build:lsp-daemon
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 3s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 14ms
+
+  cli.js     250.54 KB  (entry point)
+  index.js   231.32 KB  (entry point)
+  client.js  229.0 KB   (entry point)
+
+build:codex-plugin
+$ npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build
+
+added 71 packages, and audited 89 packages in 2s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.48 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 23ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 7ms
+
+  cli.js  4.18 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 7ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 4ms
+
+  cli.js  4.22 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 78ms
+
+  cli.js  14.55 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 90ms
+
+  cli.js  155.86 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 101ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 16ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 11ms
+
+  cli.js  156.1 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.48 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 14ms
+
+  cli.js  34.88 KB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 8ms
+
+  cli.js  14.80 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 15ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 5ms
+
+  cli.js  35.0 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 6ms
+
+  cli.js  5.75 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 45 modules in 7ms
+
+  cli.js  186.10 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 6ms
+
+  cli.js  8.32 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 build
+> node scripts/build-runtime.mjs
+
+Bundled 10 modules in 12ms
+
+  cli.js  228.00 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.48 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [54]
+Saved lockfile
+
+  dist/cli.js  148.2kb
+
+⚡ Done in 12ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 8ms
+
+  cli.js  152.66 KB  (entry point)
+
+build:senpi-plugin
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Staged Senpi LSP runtime: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+Bundled 45 modules in 7ms
+
+  cli.js  187.38 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+  omo-agent-toolkit ulw-loop help
+  omo-agent-toolkit ulw-loop create-goals --brief "..." [--brief-file <path>] [--from-stdin] [--codex-goal-mode aggregate|per_story] [--validation-batch-json <json-or-path>] [--force] [--json]
+  omo-agent-toolkit ulw-loop status [--json]
+  omo-agent-toolkit ulw-loop complete-goals [--retry-failed] [--json]
+  omo-agent-toolkit ulw-loop criteria --goal-id <id> [--json]
+  omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "..." [--notes "..."] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --print-template [--goal-id <id>] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete|failed|blocked --evidence "..." --codex-goal-json <...> [--quality-gate-json <...>] [--no-advance] [--json]
+  omo-agent-toolkit ulw-loop steer --kind <kind> ... --evidence "..." --rationale "..." [--proposals-json <json-or-path>] [--json]
+  omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]
+  omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "..." --objective "..." --evidence "..." --codex-goal-json <...> [--json]
+
+Every state subcommand needs a session scope: [--session-id <id>] or the session env (OMO_ULW_LOOP_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID / PI_SESSION_ID); state lives under .omo/ulw-loop/<id>/ and the unscoped root is never used implicitly.
+Every subcommand accepts --help | -h to print its own usage line.
+Staged Senpi agent-toolkit runtime: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/runtime/agent-toolkit
+Staged x-search conditional skill: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 901 modules in 63ms
+
+  omo.js  1.62 MB  (entry point)
+
+Bundled 679 modules in 63ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 20ms
+
+  omo-member.js  176.88 KB  (entry point)
+
+Bundled 139 modules in 18ms
+
+  memory-run-supervisor.mjs  38.64 KB  (entry point)
+
+Bundled 118 modules in 14ms
+
+  omo-init-deep-advisor.js  84.59 KB  (entry point)
+
+Built omo-senpi extensions: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/extensions/omo.js, /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/extensions/omo-task.js, /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/extensions/omo-member.js, /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/skills
+generated directive is current: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 5ms
+
+  install.mjs  20.59 KB  (entry point)
+
+Built omo-senpi installer: /private/tmp/lcx-reda-20260908/omo/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [69.01s]
+
+COMPLETE PLUGIN-DEPENDENCY OUTPUT
+
+added 71 packages, and audited 89 packages in 2s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+===== RED: TODO 2 / catalog-node =====
+COMMAND: cd packages/omo-codex/plugin && node --test test/aggregate-model-catalog.test.mjs test/migrate-codex-config.test.mjs test/auto-update.test.mjs
+CWD: /tmp/lcx-reda-20260908/omo
+CAPTURE: command 2>&1 | tee <full-log> | tail -120; rc=${PIPESTATUS[0]}; echo TEST_EXIT=$rc
+FULL OUTPUT BEGIN (34874 bytes; sha256=9b37330ec3c0bd0f00a98fa2a16cbce26179da07c44b32b90201b71bfe82d5dc)
+✖ #given bundled model catalog #when inspected #then default verifier and worker roles are pinned (18.153833ms)
+✔ #given bundled model catalog #when inspected #then no role or managed preset uses pure GPT-5.4 (4.506041ms)
+✔ #given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended (9.172125ms)
+✔ #given auto update is disabled #when resolving plan #then no command is scheduled (1.494667ms)
+✔ #given SessionStart payload with model #when reading stdin #then returns the model (3.677167ms)
+✔ #given empty or malformed stdin #when reading session model #then returns null (1.928542ms)
+✔ #given a TTY stdin #when reading session model #then returns null without waiting (0.468666ms)
+✔ #given stale state #when resolving plan #then installer update command is scheduled (3.000209ms)
+✔ #given Windows npm shims #when resolving spawn commands #then cmd shims are used (0.26725ms)
+✔ #given current version #when resolving update plan #then skips installer (0.116667ms)
+✔ #given latest version is newer #when resolving update plan #then schedules installer (0.111833ms)
+✔ #given current version is a prerelease of latest #when resolving update plan #then schedules stable installer (0.128833ms)
+✔ #given malformed latest version #when resolving update plan #then fails closed without scheduling (0.157541ms)
+✔ #given current version #when resolving auto update plan #then no command is scheduled (0.321542ms)
+✔ #given recent state #when resolving plan #then update is throttled (0.2895ms)
+✔ #given installed lazycodex version snapshot #when resolving auto update plan #then uses distribution version (8.242166ms)
+✖ #given test command override #when running check #then records state and launches command (77.595667ms)
+✔ #given failed waited update #when retry window passes #then next update is not blocked by success throttle (112.807375ms)
+✖ #given active lock #when running check #then skips concurrent update (6.285ms)
+✔ #given stale lock #when running check #then removes lock and runs update (40.7185ms)
+✔ #given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice (4.304375ms)
+✔ #given marketplace flow with stale local cache state #when running check #then starts npx repair instead of marketplace skip (49.955875ms)
+✔ #given stale marketplace cache and recent success state #when resolving plan #then repair bypasses success throttle (3.403542ms)
+✔ #given stale marketplace cache and recent started state #when resolving plan #then repair honors retry throttle (7.777667ms)
+✔ #given marketplace flow with stale Windows generated shim #when resolving plan #then starts local repair (2.090541ms)
+✔ #given marketplace flow with non-managed stale cache-shaped bin #when resolving plan #then skips local repair (1.834417ms)
+✔ #given install snapshot at plugin root #when running check #then npx update behavior is unchanged (50.663041ms)
+✔ #given marketplace skip already recorded #when next session is within interval #then throttled without repeated notice (2.867583ms)
+✔ #given unreadable install snapshot #when running check #then conservatively keeps npx flow and logs unknown detection (52.024ms)
+✔ #given install flow fixtures #when detecting install flow #then discriminates on the install snapshot (1.136916ms)
+✔ #given workspace tree without install snapshot #when detecting install flow #then stays npx-local (1.679625ms)
+✔ #given snapshot path that is not a regular file #when detecting install flow #then reports unknown (0.771125ms)
+✔ #given LAZYCODEX_INSTALLED_VERSION_PATH override #when detecting install flow #then honors the override path (1.23425ms)
+✖ #given throttled updater and stale Codex config #when running check #then config migration still runs (4.267375ms)
+✖ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (3.352042ms)
+✖ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (0.389958ms)
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (38.627709ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (5.17175ms)
+✖ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (5.434209ms)
+✖ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (3.209709ms)
+✖ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (5.369625ms)
+✖ #given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode (3.696625ms)
+✖ #given managed config state is malformed #when migrating #then migration ignores stale state safely (3.412041ms)
+✔ #given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used (4.931791ms)
+✔ #given managed catalog state #when catalog version advances #then only previously managed config is updated (5.693958ms)
+✖ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (3.505667ms)
+✔ #given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy (3.207417ms)
+✔ #given real Context7 API key and placeholder comment #when migrating #then preserves user server settings (3.823583ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then flips the flag to false (0.213458ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then appends a disabled section (0.186583ms)
+✔ #given multi_agent_v2 section without enabled key #when forcing disable #then inserts enabled = false (0.073ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = true #when forcing disable #then removes it and appends a disabled section (0.160041ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out (0.141542ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then annotates the appended section (0.190125ms)
+✔ #given an annotated managed section #when forcing disable runs again #then does not duplicate the comment (0.096125ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table (105.216ms)
+✔ #given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged (0.176ms)
+✖ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (9.171042ms)
+✖ #given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root (51.900708ms)
+✔ #given queue multi-agent mode #when removing unsupported root key #then deletes root setting (0.208834ms)
+✔ #given proactive multi-agent mode #when removing unsupported root key #then deletes root setting (0.038584ms)
+✔ #given inline-comment features table #when removing unsupported root key #then config stays unchanged (56.528417ms)
+✔ #given indented root proactive mode #when removing unsupported root key #then no root setting remains (0.164584ms)
+✖ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (5.628917ms)
+✔ #given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment (0.457875ms)
+✔ #given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table (0.138708ms)
+✔ #given an already-guarded commented config #when re-running #then output is byte-identical (0.126125ms)
+✔ #given user-disabled with an inline comment #when forcing disable #then returns config unchanged (0.05325ms)
+✔ #given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table (0.113375ms)
+✔ #given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section (0.17625ms)
+✔ #given gpt-5.6-terra with managed disable #when model catalog prefers v2 #then clears enabled=false and managed comments (0.405208ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=false #when clearing #then removes the stale metadata override (0.17025ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=true #when clearing #then leaves the default-matching value alone (0.09725ms)
+✔ #given v1 model with hide_spawn_agent_metadata=false #when forcing disable #then keeps the metadata override (0.071167ms)
+✔ #given gpt-5.6-sol with no multi_agent_v2 section #when model catalog prefers v2 #then does not append a disable (0.109333ms)
+✖ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (7.854083ms)
+✔ #given config default gpt-5.5 #when SessionStart model is gpt-5.6-terra #then prefers session model and clears disable (0.264334ms)
+✔ #given SessionStart without model #when requireSessionModel is set #then skips legacy force-disable (0.088375ms)
+✔ #given legacy [features] shorthand #when requireSessionModel skips force-disable #then still removes the shorthand (0.074208ms)
+✔ #given legacy [features] shorthand #when session model has no catalog entry #then still removes the shorthand (0.056708ms)
+✖ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (71.652084ms)
+✔ #given SoT migration failure #when hook migration runs #then config.toml repair still happens (13.454458ms)
+✖ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (2.925625ms)
+✔ #given no session model and no root model #when forcing disable #then leaves the enable state untouched (0.217375ms)
+✔ #given no session model and no root model #when config has no multi_agent_v2 section #then does not append a disable (0.059708ms)
+✖ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (3.630333ms)
+✖ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (5.126708ms)
+✔ #given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable (3.544542ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 68
+ℹ fail 20
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 501.071958
+
+✖ failing tests:
+
+test at test/aggregate-model-catalog.test.mjs:8:1
+✖ #given bundled model catalog #when inspected #then default verifier and worker roles are pinned (18.153833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '2026-08-27.gpt-5.6-sol-650k-high'
+  - '2026-09-08.gpt-6-astra-600k-high'
+           ^
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/aggregate-model-catalog.test.mjs:11:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '2026-08-27.gpt-5.6-sol-650k-high',
+    expected: '2026-09-08.gpt-6-astra-600k-high',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/auto-update.test.mjs:180:1
+✖ #given test command override #when running check #then records state and launches command (77.595667ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model = "gpt-6-astra"/. Input:
+  
+  '\n' +
+    'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/auto-update.test.mjs:228:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '\nmodel = "gpt-5.6-sol"\nmodel_context_window = 650000\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model = "gpt-6-astra"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/auto-update.test.mjs:266:1
+✖ #given active lock #when running check #then skips concurrent update (6.285ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model_context_window = 600000/. Input:
+  
+  '\n' +
+    'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/auto-update.test.mjs:282:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '\nmodel = "gpt-5.6-sol"\nmodel_context_window = 650000\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model_context_window = 600000/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/auto-update.test.mjs:614:1
+✖ #given throttled updater and stale Codex config #when running check #then config migration still runs (4.267375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model = "gpt-6-astra"/. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features]\n' +
+    'plugins = true\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/auto-update.test.mjs:648:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features]\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model = "gpt-6-astra"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:39:1
+✖ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (3.352042ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model = "gpt-6-astra"/. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features]\n' +
+    'plugins = true\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:57:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features]\nplugins = true\n',
+    expected: /model = "gpt-6-astra"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:65:1
+✖ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (0.389958ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^model = "gpt-6-astra"$/m. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    '\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '[model_providers.openai]\n' +
+    'model = "provider-scoped-value"\n' +
+    'model_context_window = 123456\n' +
+    '\n' +
+    '[profiles.review]\n' +
+    'model_reasoning_effort = "medium"\n' +
+    'plan_mode_reasoning_effort = "medium"\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:82:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\n\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n[model_providers.openai]\nmodel = "provider-scoped-value"\nmodel_context_window = 123456\n\n[profiles.review]\nmodel_reasoning_effort = "medium"\nplan_mode_reasoning_effort = "medium"\n',
+    expected: /^model = "gpt-6-astra"$/m,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:148:1
+✖ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (5.434209ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model = "gpt-6-astra"/. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    '\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:164:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\n\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model = "gpt-6-astra"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:168:1
+✖ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (3.209709ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model = "gpt-6-astra"/. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    '\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:186:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\n\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model = "gpt-6-astra"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:190:1
+✖ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (5.369625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model = "gpt-6-astra"/. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    '\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:209:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\n\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model = "gpt-6-astra"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:213:1
+✖ #given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode (3.696625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   '/tmp/lcx-reda-20260908/tmp/lazycodex-config-custom-yfOJR3/codex-home/config.toml'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '/tmp/lcx-reda-20260908/tmp/lazycodex-config-custom-yfOJR3/codex-home/config.toml' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:249:1
+✖ #given managed config state is malformed #when migrating #then migration ignores stale state safely (3.412041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /model_context_window = 600000/. Input:
+  
+  'model = "gpt-5.6-sol"\n' +
+    'model_context_window = 650000\n' +
+    '\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:265:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_context_window = 650000\n\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /model_context_window = 600000/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:351:1
+✖ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (3.505667ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /^\s*max_threads\s*=/m. Input:
+  
+  'model = "gpt-5.5"\n' +
+    'model_context_window = 400000\n' +
+    'model_reasoning_effort = "high"\n' +
+    'plan_mode_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n' +
+    'enabled = false\n' +
+    '\n' +
+    '[agents]\n' +
+    'max_threads = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:407:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.5"\nmodel_context_window = 400000\nmodel_reasoning_effort = "high"\nplan_mode_reasoning_effort = "xhigh"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\nenabled = false\n\n[agents]\nmax_threads = 1000\n',
+    expected: /^\s*max_threads\s*=/m,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:622:1
+✖ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (9.171042ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model = "gpt-5.5"\n' +
+    'model_reasoning_effort = "high"\n' +
+    '\n' +
+    '# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start\n' +
+    '# because enabling it fails every turn with HTTP 400 (openai/codex#26753).\n' +
+    '# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n' +
+    'enabled = false\n' +
+    '\n' +
+    '[agents]\n' +
+    'max_threads = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:645:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.5"\nmodel_reasoning_effort = "high"\n\n# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start\n# because enabling it fails every turn with HTTP 400 (openai/codex#26753).\n# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\nenabled = false\n\n[agents]\nmax_threads = 1000\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:650:1
+✖ #given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root (51.900708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'gpt-5.6-sol'
+  - 'gpt-6-astra'
+         ^
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:673:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'gpt-5.6-sol',
+    expected: 'gpt-6-astra',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:725:1
+✖ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (5.628917ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /^\s*max_threads\s*=/m. Input:
+  
+  'model = "gpt-5.5"\n' +
+    'model_reasoning_effort = "high"\n' +
+    '\n' +
+    '# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start\n' +
+    '# because enabling it fails every turn with HTTP 400 (openai/codex#26753).\n' +
+    '# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).\n' +
+    '[features.multi_agent_v2]\n' +
+    'enabled = false\n' +
+    'max_concurrent_threads_per_session = 10000\n' +
+    '\n' +
+    '[agents]\n' +
+    'max_threads = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:753:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.5"\nmodel_reasoning_effort = "high"\n\n# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start\n# because enabling it fails every turn with HTTP 400 (openai/codex#26753).\n# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).\n[features.multi_agent_v2]\nenabled = false\nmax_concurrent_threads_per_session = 10000\n\n[agents]\nmax_threads = 1000\n',
+    expected: /^\s*max_threads\s*=/m,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:909:1
+✖ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (7.854083ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model = "gpt-5.6-terra"\n' +
+    'model_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[agents]\n' +
+    'max_depth = 2\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:951:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-terra"\nmodel_reasoning_effort = "xhigh"\n\n[agents]\nmax_depth = 2\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 1000\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1012:1
+✖ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (71.652084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  16 !== undefined
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1033:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 16,
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1072:1
+✖ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (2.925625ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model = "gpt-5.5"\n' +
+    'model_reasoning_effort = "high"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1113:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.5"\nmodel_reasoning_effort = "high"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 1000\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1135:1
+✖ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (3.630333ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model_reasoning_effort = "high"\n' +
+    '\n' +
+    '[features]\n' +
+    'plugins = true\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1154:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model_reasoning_effort = "high"\n\n[features]\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1183:1
+✖ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (5.126708ms)
+  AssertionError [ERR_ASSERTION]: managed agents.max_threads must be removed
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1214:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_catalog_json = "/tmp/lcx-reda-20260908/tmp/lazycodex-multi-agent-v2-catalog-override-6jQJHa/custom-catalog.json"\n\n[agents]\nmax_threads = 1000\nmax_depth = 2\n\n[features.multi_agent_v2]\nenabled = false\nmax_concurrent_threads_per_session = 1000\n',
+    expected: /^\s*max_threads\s*=/m,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+FULL OUTPUT END
+LAST 120 LINES / ACTUAL COMMAND EXIT:
+    '\n' +
+    '# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start\n' +
+    '# because enabling it fails every turn with HTTP 400 (openai/codex#26753).\n' +
+    '# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).\n' +
+    '[features.multi_agent_v2]\n' +
+    'enabled = false\n' +
+    'max_concurrent_threads_per_session = 10000\n' +
+    '\n' +
+    '[agents]\n' +
+    'max_threads = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:753:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.5"\nmodel_reasoning_effort = "high"\n\n# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start\n# because enabling it fails every turn with HTTP 400 (openai/codex#26753).\n# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).\n[features.multi_agent_v2]\nenabled = false\nmax_concurrent_threads_per_session = 10000\n\n[agents]\nmax_threads = 1000\n',
+    expected: /^\s*max_threads\s*=/m,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:909:1
+✖ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (7.854083ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model = "gpt-5.6-terra"\n' +
+    'model_reasoning_effort = "xhigh"\n' +
+    '\n' +
+    '[agents]\n' +
+    'max_depth = 2\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:951:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-terra"\nmodel_reasoning_effort = "xhigh"\n\n[agents]\nmax_depth = 2\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 1000\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1012:1
+✖ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (71.652084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  16 !== undefined
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1033:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 16,
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1072:1
+✖ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (2.925625ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model = "gpt-5.5"\n' +
+    'model_reasoning_effort = "high"\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 1000\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1113:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.5"\nmodel_reasoning_effort = "high"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 1000\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1135:1
+✖ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (3.630333ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /max_concurrent_threads_per_session\s*=/. Input:
+  
+  'model_reasoning_effort = "high"\n' +
+    '\n' +
+    '[features]\n' +
+    'plugins = true\n' +
+    '\n' +
+    '[features.multi_agent_v2]\n' +
+    'max_concurrent_threads_per_session = 16\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1154:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'model_reasoning_effort = "high"\n\n[features]\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n',
+    expected: /max_concurrent_threads_per_session\s*=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at test/migrate-codex-config.test.mjs:1183:1
+✖ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (5.126708ms)
+  AssertionError [ERR_ASSERTION]: managed agents.max_threads must be removed
+      at TestContext.<anonymous> (file:///private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1214:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'model = "gpt-5.6-sol"\nmodel_catalog_json = "/tmp/lcx-reda-20260908/tmp/lazycodex-multi-agent-v2-catalog-override-6jQJHa/custom-catalog.json"\n\n[agents]\nmax_threads = 1000\nmax_depth = 2\n\n[features.multi_agent_v2]\nenabled = false\nmax_concurrent_threads_per_session = 1000\n',
+    expected: /^\s*max_threads\s*=/m,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+TEST_EXIT=1
+
+TEST_EXIT=1
+
+===== RED: TODO 2 / catalog-bun =====
+COMMAND: bun test ./packages/omo-codex/src/install/codex-config-reasoning.test.ts ./packages/omo-codex/src/version-coherence.test.ts
+CWD: /tmp/lcx-reda-20260908/omo
+CAPTURE: command 2>&1 | tee <full-log> | tail -120; rc=${PIPESTATUS[0]}; echo TEST_EXIT=$rc
+FULL OUTPUT BEGIN (5251 bytes; sha256=a4ca4df2323bcd4109fc1fa1585316c0db7bb6469283c954add5a75f6633b157)
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-codex/src/install/codex-config-reasoning.test.ts:
+(pass) codex-config-reasoning unified reasoning override > #given reasoning override #when updating config #then override wins over catalog default [4.56ms]
+(pass) codex-config-reasoning unified reasoning override > #given off reasoning override #when updating config #then maps to codex wire spelling none [1.23ms]
+(pass) codex-config-reasoning unified reasoning override > #given unknown reasoning token #when updating config #then catalog default is kept [2.53ms]
+86 |       pluginNames: ["omo"],
+87 |     })
+88 | 
+89 |     // then
+90 |     const content = await readFile(configPath, "utf8")
+91 |     expect(content).toContain('model = "gpt-6-astra"')
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "model = \"gpt-6-astra\""
+Received: "model = \"gpt-5.6-sol\"\nmodel_context_window = 650000\nmodel_reasoning_effort = \"high\"\nplan_mode_reasoning_effort = \"xhigh\"\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T14:07:51Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/install/codex-config-reasoning.test.ts:91:21)
+(fail) codex-config-reasoning > #given empty Codex config #when updating config #then sets worker model and reasoning defaults [1.69ms]
+125 |     const content = await readFile(configPath, "utf8")
+126 |     expect(content.match(/^model\s*=/gm)).toHaveLength(1)
+127 |     expect(content.match(/^model_context_window\s*=/gm)).toHaveLength(1)
+128 |     expect(content.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
+129 |     expect(content.match(/^plan_mode_reasoning_effort\s*=/gm)).toHaveLength(1)
+130 |     expect(content).toContain('model = "gpt-6-astra"')
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "model = \"gpt-6-astra\""
+Received: "model = \"gpt-5.6-sol\"\nmodel_context_window = 650000\nmodel_reasoning_effort = \"high\"\nplan_mode_reasoning_effort = \"xhigh\"\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T14:07:51Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/install/codex-config-reasoning.test.ts:130:21)
+(fail) codex-config-reasoning > #given existing model and reasoning config #when updating config #then replaces stale defaults without duplicate keys [2.63ms]
+(pass) codex-config-reasoning > #given user-customized model config #when updating config #then preserves user reasoning values [1.97ms]
+(pass) codex-config-reasoning > #given bundled model catalog #when updating config #then reads defaults from catalog [1.95ms]
+213 | 
+214 |     // when
+215 |     const catalog = await readCodexModelCatalog(root)
+216 | 
+217 |     // then
+218 |     expect(catalog.current.model).toBe("gpt-6-astra")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "gpt-6-astra"
+Received: "gpt-5.6-sol"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/install/codex-config-reasoning.test.ts:218:35)
+(fail) codex-config-reasoning > #given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4 [0.41ms]
+
+packages/omo-codex/src/version-coherence.test.ts:
+50 |   // app UI. If any manifest drifts from the single source of truth (root
+51 |   // package.json) a release can leak a placeholder version like 0.1.0, which is
+52 |   // exactly the confusion this guard exists to prevent.
+53 |   it("#given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used", () => {
+54 |     const catalog = readJson(join(pluginRoot, "model-catalog.json"))
+55 |     expect(catalog.version).toBe("2026-09-08.gpt-6-astra-600k-high")
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: "2026-09-08.gpt-6-astra-600k-high"
+Received: "2026-08-27.gpt-5.6-sol-650k-high"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/version-coherence.test.ts:55:29)
+(fail) OMO Codex version coherence > #given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used [0.35ms]
+(pass) OMO Codex version coherence > #given every versioned Codex manifest #when compared to root package.json #then versions match [0.98ms]
+(pass) OMO Codex version coherence > #given no manifest is missing a version #when checking versioned manifests #then each declares a string version [0.44ms]
+(pass) OMO Codex version coherence > #given every committed hooks.json #when scanning LazyCodex status messages #then none carry a stale version label [0.68ms]
+
+ 8 pass
+ 4 fail
+ 46 expect() calls
+Ran 12 tests across 2 files. [1199.00ms]
+
+FULL OUTPUT END
+LAST 120 LINES / ACTUAL COMMAND EXIT:
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-codex/src/install/codex-config-reasoning.test.ts:
+(pass) codex-config-reasoning unified reasoning override > #given reasoning override #when updating config #then override wins over catalog default [4.56ms]
+(pass) codex-config-reasoning unified reasoning override > #given off reasoning override #when updating config #then maps to codex wire spelling none [1.23ms]
+(pass) codex-config-reasoning unified reasoning override > #given unknown reasoning token #when updating config #then catalog default is kept [2.53ms]
+86 |       pluginNames: ["omo"],
+87 |     })
+88 | 
+89 |     // then
+90 |     const content = await readFile(configPath, "utf8")
+91 |     expect(content).toContain('model = "gpt-6-astra"')
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "model = \"gpt-6-astra\""
+Received: "model = \"gpt-5.6-sol\"\nmodel_context_window = 650000\nmodel_reasoning_effort = \"high\"\nplan_mode_reasoning_effort = \"xhigh\"\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T14:07:51Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/install/codex-config-reasoning.test.ts:91:21)
+(fail) codex-config-reasoning > #given empty Codex config #when updating config #then sets worker model and reasoning defaults [1.69ms]
+125 |     const content = await readFile(configPath, "utf8")
+126 |     expect(content.match(/^model\s*=/gm)).toHaveLength(1)
+127 |     expect(content.match(/^model_context_window\s*=/gm)).toHaveLength(1)
+128 |     expect(content.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
+129 |     expect(content.match(/^plan_mode_reasoning_effort\s*=/gm)).toHaveLength(1)
+130 |     expect(content).toContain('model = "gpt-6-astra"')
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "model = \"gpt-6-astra\""
+Received: "model = \"gpt-5.6-sol\"\nmodel_context_window = 650000\nmodel_reasoning_effort = \"high\"\nplan_mode_reasoning_effort = \"xhigh\"\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T14:07:51Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/install/codex-config-reasoning.test.ts:130:21)
+(fail) codex-config-reasoning > #given existing model and reasoning config #when updating config #then replaces stale defaults without duplicate keys [2.63ms]
+(pass) codex-config-reasoning > #given user-customized model config #when updating config #then preserves user reasoning values [1.97ms]
+(pass) codex-config-reasoning > #given bundled model catalog #when updating config #then reads defaults from catalog [1.95ms]
+213 | 
+214 |     // when
+215 |     const catalog = await readCodexModelCatalog(root)
+216 | 
+217 |     // then
+218 |     expect(catalog.current.model).toBe("gpt-6-astra")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "gpt-6-astra"
+Received: "gpt-5.6-sol"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/install/codex-config-reasoning.test.ts:218:35)
+(fail) codex-config-reasoning > #given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4 [0.41ms]
+
+packages/omo-codex/src/version-coherence.test.ts:
+50 |   // app UI. If any manifest drifts from the single source of truth (root
+51 |   // package.json) a release can leak a placeholder version like 0.1.0, which is
+52 |   // exactly the confusion this guard exists to prevent.
+53 |   it("#given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used", () => {
+54 |     const catalog = readJson(join(pluginRoot, "model-catalog.json"))
+55 |     expect(catalog.version).toBe("2026-09-08.gpt-6-astra-600k-high")
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: "2026-09-08.gpt-6-astra-600k-high"
+Received: "2026-08-27.gpt-5.6-sol-650k-high"
+
+      at <anonymous> (/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/src/version-coherence.test.ts:55:29)
+(fail) OMO Codex version coherence > #given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used [0.35ms]
+(pass) OMO Codex version coherence > #given every versioned Codex manifest #when compared to root package.json #then versions match [0.98ms]
+(pass) OMO Codex version coherence > #given no manifest is missing a version #when checking versioned manifests #then each declares a string version [0.44ms]
+(pass) OMO Codex version coherence > #given every committed hooks.json #when scanning LazyCodex status messages #then none carry a stale version label [0.68ms]
+
+ 8 pass
+ 4 fail
+ 46 expect() calls
+Ran 12 tests across 2 files. [1199.00ms]
+TEST_EXIT=1
+
+TEST_EXIT=1
+
+===== GREEN: TODO 2 / catalog-node =====
+COMMAND: cd packages/omo-codex/plugin && node --test test/aggregate-model-catalog.test.mjs test/migrate-codex-config.test.mjs test/auto-update.test.mjs
+CWD: /tmp/lcx-reda-20260908/omo
+CAPTURE: command 2>&1 | tee <full-log> | tail -120; rc=${PIPESTATUS[0]}; echo TEST_EXIT=$rc
+FULL OUTPUT BEGIN (10889 bytes; sha256=ba8b3cbfea59a2a4affa0ba38ebab159f9790da8f7540ef2ac8ebd444fee6508)
+✔ #given bundled model catalog #when inspected #then default verifier and worker roles are pinned (10.096084ms)
+✔ #given bundled model catalog #when inspected #then no role or managed preset uses pure GPT-5.4 (4.290083ms)
+✔ #given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended (16.758958ms)
+✔ #given auto update is disabled #when resolving plan #then no command is scheduled (1.108334ms)
+✔ #given SessionStart payload with model #when reading stdin #then returns the model (2.186833ms)
+✔ #given empty or malformed stdin #when reading session model #then returns null (1.30125ms)
+✔ #given a TTY stdin #when reading session model #then returns null without waiting (0.193ms)
+✔ #given stale state #when resolving plan #then installer update command is scheduled (3.259917ms)
+✔ #given Windows npm shims #when resolving spawn commands #then cmd shims are used (0.308667ms)
+✔ #given current version #when resolving update plan #then skips installer (0.1395ms)
+✔ #given latest version is newer #when resolving update plan #then schedules installer (0.135416ms)
+✔ #given current version is a prerelease of latest #when resolving update plan #then schedules stable installer (0.134125ms)
+✔ #given malformed latest version #when resolving update plan #then fails closed without scheduling (0.161042ms)
+✔ #given current version #when resolving auto update plan #then no command is scheduled (0.314667ms)
+✔ #given recent state #when resolving plan #then update is throttled (0.267375ms)
+✔ #given installed lazycodex version snapshot #when resolving auto update plan #then uses distribution version (14.573ms)
+✔ #given test command override #when running check #then records state and launches command (87.397167ms)
+✔ #given failed waited update #when retry window passes #then next update is not blocked by success throttle (120.776ms)
+✔ #given active lock #when running check #then skips concurrent update (6.188666ms)
+✔ #given stale lock #when running check #then removes lock and runs update (62.815542ms)
+✔ #given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice (8.725458ms)
+✔ #given marketplace flow with stale local cache state #when running check #then starts npx repair instead of marketplace skip (70.877ms)
+✔ #given stale marketplace cache and recent success state #when resolving plan #then repair bypasses success throttle (2.647542ms)
+✔ #given stale marketplace cache and recent started state #when resolving plan #then repair honors retry throttle (4.559916ms)
+✔ #given marketplace flow with stale Windows generated shim #when resolving plan #then starts local repair (1.825417ms)
+✔ #given marketplace flow with non-managed stale cache-shaped bin #when resolving plan #then skips local repair (4.722625ms)
+✔ #given install snapshot at plugin root #when running check #then npx update behavior is unchanged (53.991125ms)
+✔ #given marketplace skip already recorded #when next session is within interval #then throttled without repeated notice (3.044542ms)
+✔ #given unreadable install snapshot #when running check #then conservatively keeps npx flow and logs unknown detection (61.877083ms)
+✔ #given install flow fixtures #when detecting install flow #then discriminates on the install snapshot (1.5915ms)
+✔ #given workspace tree without install snapshot #when detecting install flow #then stays npx-local (2.098708ms)
+✔ #given snapshot path that is not a regular file #when detecting install flow #then reports unknown (2.191666ms)
+✔ #given LAZYCODEX_INSTALLED_VERSION_PATH override #when detecting install flow #then honors the override path (2.410833ms)
+✔ #given throttled updater and stale Codex config #when running check #then config migration still runs (4.89525ms)
+✔ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (3.277875ms)
+✔ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (0.304708ms)
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (55.2885ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (12.265292ms)
+✔ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (5.563541ms)
+✔ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (3.906375ms)
+✔ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (4.945917ms)
+✔ #given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode (3.104417ms)
+✔ #given managed config state is malformed #when migrating #then migration ignores stale state safely (10.039959ms)
+✔ #given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used (4.740042ms)
+✔ #given managed catalog state #when catalog version advances #then only previously managed config is updated (6.451916ms)
+✔ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (4.736791ms)
+✔ #given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy (3.380708ms)
+✔ #given real Context7 API key and placeholder comment #when migrating #then preserves user server settings (5.208958ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then flips the flag to false (0.1985ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then appends a disabled section (0.217167ms)
+✔ #given multi_agent_v2 section without enabled key #when forcing disable #then inserts enabled = false (0.112792ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = true #when forcing disable #then removes it and appends a disabled section (0.216458ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out (0.130125ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then annotates the appended section (0.107292ms)
+✔ #given an annotated managed section #when forcing disable runs again #then does not duplicate the comment (0.105666ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table (101.4595ms)
+✔ #given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged (0.186792ms)
+✔ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (7.656208ms)
+✔ #given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root (79.868042ms)
+✔ #given queue multi-agent mode #when removing unsupported root key #then deletes root setting (0.264042ms)
+✔ #given proactive multi-agent mode #when removing unsupported root key #then deletes root setting (0.106209ms)
+✔ #given inline-comment features table #when removing unsupported root key #then config stays unchanged (76.223709ms)
+✔ #given indented root proactive mode #when removing unsupported root key #then no root setting remains (0.225416ms)
+✔ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (4.960875ms)
+✔ #given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment (0.372542ms)
+✔ #given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table (0.124583ms)
+✔ #given an already-guarded commented config #when re-running #then output is byte-identical (0.135333ms)
+✔ #given user-disabled with an inline comment #when forcing disable #then returns config unchanged (0.049167ms)
+✔ #given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table (0.122ms)
+✔ #given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section (0.117417ms)
+✔ #given gpt-5.6-terra with managed disable #when model catalog prefers v2 #then clears enabled=false and managed comments (0.339291ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=false #when clearing #then removes the stale metadata override (0.134417ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=true #when clearing #then leaves the default-matching value alone (0.087041ms)
+✔ #given v1 model with hide_spawn_agent_metadata=false #when forcing disable #then keeps the metadata override (0.067666ms)
+✔ #given gpt-5.6-sol with no multi_agent_v2 section #when model catalog prefers v2 #then does not append a disable (0.099875ms)
+✔ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (6.194375ms)
+✔ #given config default gpt-5.5 #when SessionStart model is gpt-5.6-terra #then prefers session model and clears disable (0.18475ms)
+✔ #given SessionStart without model #when requireSessionModel is set #then skips legacy force-disable (0.068375ms)
+✔ #given legacy [features] shorthand #when requireSessionModel skips force-disable #then still removes the shorthand (0.056ms)
+✔ #given legacy [features] shorthand #when session model has no catalog entry #then still removes the shorthand (0.048166ms)
+✔ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (78.61475ms)
+✔ #given SoT migration failure #when hook migration runs #then config.toml repair still happens (19.124292ms)
+✔ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (3.756083ms)
+✔ #given no session model and no root model #when forcing disable #then leaves the enable state untouched (0.150375ms)
+✔ #given no session model and no root model #when config has no multi_agent_v2 section #then does not append a disable (0.076542ms)
+✔ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (3.3075ms)
+✔ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (5.851875ms)
+✔ #given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable (5.3295ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 88
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 627.90525
+
+FULL OUTPUT END
+LAST 120 LINES / ACTUAL COMMAND EXIT:
+✔ #given bundled model catalog #when inspected #then default verifier and worker roles are pinned (10.096084ms)
+✔ #given bundled model catalog #when inspected #then no role or managed preset uses pure GPT-5.4 (4.290083ms)
+✔ #given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended (16.758958ms)
+✔ #given auto update is disabled #when resolving plan #then no command is scheduled (1.108334ms)
+✔ #given SessionStart payload with model #when reading stdin #then returns the model (2.186833ms)
+✔ #given empty or malformed stdin #when reading session model #then returns null (1.30125ms)
+✔ #given a TTY stdin #when reading session model #then returns null without waiting (0.193ms)
+✔ #given stale state #when resolving plan #then installer update command is scheduled (3.259917ms)
+✔ #given Windows npm shims #when resolving spawn commands #then cmd shims are used (0.308667ms)
+✔ #given current version #when resolving update plan #then skips installer (0.1395ms)
+✔ #given latest version is newer #when resolving update plan #then schedules installer (0.135416ms)
+✔ #given current version is a prerelease of latest #when resolving update plan #then schedules stable installer (0.134125ms)
+✔ #given malformed latest version #when resolving update plan #then fails closed without scheduling (0.161042ms)
+✔ #given current version #when resolving auto update plan #then no command is scheduled (0.314667ms)
+✔ #given recent state #when resolving plan #then update is throttled (0.267375ms)
+✔ #given installed lazycodex version snapshot #when resolving auto update plan #then uses distribution version (14.573ms)
+✔ #given test command override #when running check #then records state and launches command (87.397167ms)
+✔ #given failed waited update #when retry window passes #then next update is not blocked by success throttle (120.776ms)
+✔ #given active lock #when running check #then skips concurrent update (6.188666ms)
+✔ #given stale lock #when running check #then removes lock and runs update (62.815542ms)
+✔ #given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice (8.725458ms)
+✔ #given marketplace flow with stale local cache state #when running check #then starts npx repair instead of marketplace skip (70.877ms)
+✔ #given stale marketplace cache and recent success state #when resolving plan #then repair bypasses success throttle (2.647542ms)
+✔ #given stale marketplace cache and recent started state #when resolving plan #then repair honors retry throttle (4.559916ms)
+✔ #given marketplace flow with stale Windows generated shim #when resolving plan #then starts local repair (1.825417ms)
+✔ #given marketplace flow with non-managed stale cache-shaped bin #when resolving plan #then skips local repair (4.722625ms)
+✔ #given install snapshot at plugin root #when running check #then npx update behavior is unchanged (53.991125ms)
+✔ #given marketplace skip already recorded #when next session is within interval #then throttled without repeated notice (3.044542ms)
+✔ #given unreadable install snapshot #when running check #then conservatively keeps npx flow and logs unknown detection (61.877083ms)
+✔ #given install flow fixtures #when detecting install flow #then discriminates on the install snapshot (1.5915ms)
+✔ #given workspace tree without install snapshot #when detecting install flow #then stays npx-local (2.098708ms)
+✔ #given snapshot path that is not a regular file #when detecting install flow #then reports unknown (2.191666ms)
+✔ #given LAZYCODEX_INSTALLED_VERSION_PATH override #when detecting install flow #then honors the override path (2.410833ms)
+✔ #given throttled updater and stale Codex config #when running check #then config migration still runs (4.89525ms)
+✔ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (3.277875ms)
+✔ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (0.304708ms)
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (55.2885ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (12.265292ms)
+✔ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (5.563541ms)
+✔ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (3.906375ms)
+✔ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (4.945917ms)
+✔ #given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode (3.104417ms)
+✔ #given managed config state is malformed #when migrating #then migration ignores stale state safely (10.039959ms)
+✔ #given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used (4.740042ms)
+✔ #given managed catalog state #when catalog version advances #then only previously managed config is updated (6.451916ms)
+✔ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (4.736791ms)
+✔ #given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy (3.380708ms)
+✔ #given real Context7 API key and placeholder comment #when migrating #then preserves user server settings (5.208958ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then flips the flag to false (0.1985ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then appends a disabled section (0.217167ms)
+✔ #given multi_agent_v2 section without enabled key #when forcing disable #then inserts enabled = false (0.112792ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = true #when forcing disable #then removes it and appends a disabled section (0.216458ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out (0.130125ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then annotates the appended section (0.107292ms)
+✔ #given an annotated managed section #when forcing disable runs again #then does not duplicate the comment (0.105666ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table (101.4595ms)
+✔ #given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged (0.186792ms)
+✔ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (7.656208ms)
+✔ #given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root (79.868042ms)
+✔ #given queue multi-agent mode #when removing unsupported root key #then deletes root setting (0.264042ms)
+✔ #given proactive multi-agent mode #when removing unsupported root key #then deletes root setting (0.106209ms)
+✔ #given inline-comment features table #when removing unsupported root key #then config stays unchanged (76.223709ms)
+✔ #given indented root proactive mode #when removing unsupported root key #then no root setting remains (0.225416ms)
+✔ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (4.960875ms)
+✔ #given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment (0.372542ms)
+✔ #given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table (0.124583ms)
+✔ #given an already-guarded commented config #when re-running #then output is byte-identical (0.135333ms)
+✔ #given user-disabled with an inline comment #when forcing disable #then returns config unchanged (0.049167ms)
+✔ #given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table (0.122ms)
+✔ #given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section (0.117417ms)
+✔ #given gpt-5.6-terra with managed disable #when model catalog prefers v2 #then clears enabled=false and managed comments (0.339291ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=false #when clearing #then removes the stale metadata override (0.134417ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=true #when clearing #then leaves the default-matching value alone (0.087041ms)
+✔ #given v1 model with hide_spawn_agent_metadata=false #when forcing disable #then keeps the metadata override (0.067666ms)
+✔ #given gpt-5.6-sol with no multi_agent_v2 section #when model catalog prefers v2 #then does not append a disable (0.099875ms)
+✔ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (6.194375ms)
+✔ #given config default gpt-5.5 #when SessionStart model is gpt-5.6-terra #then prefers session model and clears disable (0.18475ms)
+✔ #given SessionStart without model #when requireSessionModel is set #then skips legacy force-disable (0.068375ms)
+✔ #given legacy [features] shorthand #when requireSessionModel skips force-disable #then still removes the shorthand (0.056ms)
+✔ #given legacy [features] shorthand #when session model has no catalog entry #then still removes the shorthand (0.048166ms)
+✔ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (78.61475ms)
+✔ #given SoT migration failure #when hook migration runs #then config.toml repair still happens (19.124292ms)
+✔ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (3.756083ms)
+✔ #given no session model and no root model #when forcing disable #then leaves the enable state untouched (0.150375ms)
+✔ #given no session model and no root model #when config has no multi_agent_v2 section #then does not append a disable (0.076542ms)
+✔ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (3.3075ms)
+✔ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (5.851875ms)
+✔ #given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable (5.3295ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 88
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 627.90525
+TEST_EXIT=0
+
+TEST_EXIT=0
+
+===== GREEN: TODO 2 / catalog-bun =====
+COMMAND: bun test ./packages/omo-codex/src/install/codex-config-reasoning.test.ts ./packages/omo-codex/src/version-coherence.test.ts
+CWD: /tmp/lcx-reda-20260908/omo
+CAPTURE: command 2>&1 | tee <full-log> | tail -120; rc=${PIPESTATUS[0]}; echo TEST_EXIT=$rc
+FULL OUTPUT BEGIN (2013 bytes; sha256=1f9cb405d968d97cf59cd60a976def90a5cf283312494b86f2b64d9627fa4ff5)
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-codex/src/install/codex-config-reasoning.test.ts:
+(pass) codex-config-reasoning unified reasoning override > #given reasoning override #when updating config #then override wins over catalog default [5.01ms]
+(pass) codex-config-reasoning unified reasoning override > #given off reasoning override #when updating config #then maps to codex wire spelling none [1.38ms]
+(pass) codex-config-reasoning unified reasoning override > #given unknown reasoning token #when updating config #then catalog default is kept [1.89ms]
+(pass) codex-config-reasoning > #given empty Codex config #when updating config #then sets worker model and reasoning defaults [1.25ms]
+(pass) codex-config-reasoning > #given existing model and reasoning config #when updating config #then replaces stale defaults without duplicate keys [2.78ms]
+(pass) codex-config-reasoning > #given user-customized model config #when updating config #then preserves user reasoning values [1.60ms]
+(pass) codex-config-reasoning > #given bundled model catalog #when updating config #then reads defaults from catalog [2.26ms]
+(pass) codex-config-reasoning > #given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4 [0.44ms]
+
+packages/omo-codex/src/version-coherence.test.ts:
+(pass) OMO Codex version coherence > #given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used [0.24ms]
+(pass) OMO Codex version coherence > #given every versioned Codex manifest #when compared to root package.json #then versions match [2.56ms]
+(pass) OMO Codex version coherence > #given no manifest is missing a version #when checking versioned manifests #then each declares a string version [0.55ms]
+(pass) OMO Codex version coherence > #given every committed hooks.json #when scanning LazyCodex status messages #then none carry a stale version label [1.82ms]
+
+ 12 pass
+ 0 fail
+ 58 expect() calls
+Ran 12 tests across 2 files. [1225.00ms]
+
+FULL OUTPUT END
+LAST 120 LINES / ACTUAL COMMAND EXIT:
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-codex/src/install/codex-config-reasoning.test.ts:
+(pass) codex-config-reasoning unified reasoning override > #given reasoning override #when updating config #then override wins over catalog default [5.01ms]
+(pass) codex-config-reasoning unified reasoning override > #given off reasoning override #when updating config #then maps to codex wire spelling none [1.38ms]
+(pass) codex-config-reasoning unified reasoning override > #given unknown reasoning token #when updating config #then catalog default is kept [1.89ms]
+(pass) codex-config-reasoning > #given empty Codex config #when updating config #then sets worker model and reasoning defaults [1.25ms]
+(pass) codex-config-reasoning > #given existing model and reasoning config #when updating config #then replaces stale defaults without duplicate keys [2.78ms]
+(pass) codex-config-reasoning > #given user-customized model config #when updating config #then preserves user reasoning values [1.60ms]
+(pass) codex-config-reasoning > #given bundled model catalog #when updating config #then reads defaults from catalog [2.26ms]
+(pass) codex-config-reasoning > #given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4 [0.44ms]
+
+packages/omo-codex/src/version-coherence.test.ts:
+(pass) OMO Codex version coherence > #given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used [0.24ms]
+(pass) OMO Codex version coherence > #given every versioned Codex manifest #when compared to root package.json #then versions match [2.56ms]
+(pass) OMO Codex version coherence > #given no manifest is missing a version #when checking versioned manifests #then each declares a string version [0.55ms]
+(pass) OMO Codex version coherence > #given every committed hooks.json #when scanning LazyCodex status messages #then none carry a stale version label [1.82ms]
+
+ 12 pass
+ 0 fail
+ 58 expect() calls
+Ran 12 tests across 2 files. [1225.00ms]
+TEST_EXIT=0
+
+TEST_EXIT=0
+
+PRIOR GREP/SOURCE-COMPARISON RECORD (retained verbatim; supplementary only, NOT executed test RED)
+=== ORIGINAL origin/dev catalog JSON ===
+gpt-5.6-sol
+=== ORIGINAL origin/dev catalog.mjs (FALLBACK_CATALOG.current.model) ===
+	current: {
+		model: "gpt-5.6-sol",
+		model_context_window: 650_000,
+=== ORIGINAL origin/dev codex-model-catalog.ts (default model) ===
+6:  readonly model: string
+=== ORIGINAL origin/dev parity (three source current models) ===
+json=gpt-5.6-sol
+catalog.mjs=gpt-5.6-sol
+typescript=gpt-5.6-sol
+MISMATCH (origin/dev sources use legacy default)
+=== WORKTREE catalog JSON ===
+gpt-6-astra
+=== WORKTREE catalog.mjs (FALLBACK_CATALOG.current.model) ===
+7:	current: {
+8-		model: "gpt-6-astra",
+9-		model_context_window: 600_000,
+=== WORKTREE codex-model-catalog.ts (default model) ===
+6:  readonly model: string
+=== WORKTREE parity ===
+MATCH
+
+FINAL BRANCH SOURCE/TEST CHECK
+BRANCH_TEST_BYTES_UNCHANGED=47
+
+REMOTE CLEANUP RECEIPT
+COMMAND: rm -rf /tmp/lcx-reda-20260908
+dir REMOVED: /tmp/lcx-reda-20260908
+CLEANUP_EXIT=0
+
+PER-TODO EXIT SUMMARY
+{"cleanup_exit": 0, "green": [0, 0], "red": [1, 1], "todo": 2}

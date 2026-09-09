@@ -190,7 +190,7 @@ describe("memory journal wiring", () => {
   })
 
   test("#given role-custom entries in the branch #when settled #then only user and assistant rows journal, whatever the custom type", async () => {
-    // given: a memorian recall hint and a foreign extension's custom message, both in the
+    // given: a kibitzer recall hint and a foreign extension's custom message, both in the
     // role-custom `message` shape older writers can leave behind
     const { paths } = fixture()
     const pi = new FakeExtensionAPI()
@@ -210,7 +210,7 @@ describe("memory journal wiring", () => {
     })
     const entries = [
       userEntry("u1", "deploy question"),
-      customEntry("x1", "omo-memorian:recall"),
+      customEntry("x1", "omo-kibitzer:recall"),
       customEntry("x2", "vendor-banner:notice"),
       assistantEntry("a1", { texts: ["answer one"] }),
     ]

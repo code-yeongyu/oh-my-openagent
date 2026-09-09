@@ -220,8 +220,8 @@ describe("memory recall wiring", () => {
     const recall = messages.find((result) => result.message?.customType === RECALL_CUSTOM_TYPE)
     const notice = messages.find((result) => result.message?.customType === MEMORY_NOTICE_CUSTOM_TYPE)
     expect(recall).toBeUndefined()
-    // The memorian prompt trigger may append its gate observability entry; nothing else may land.
-    expect(pi.entries.filter((entry) => entry.customType !== "omo-memorian:gate")).toEqual([])
+    // The kibitzer prompt trigger may append its gate observability entry; nothing else may land.
+    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate")).toEqual([])
     expect(notice?.systemPrompt).toContain("persona")
   }, 30_000)
 })
@@ -818,7 +818,7 @@ describe("facts shutdown wiring", () => {
 })
 
 describe("session shutdown journal durability", () => {
-  // Issue #7889: the pre-drain awaits (memorian drain, gate cancel, facts cancel) run inside the
+  // Issue #7889: the pre-drain awaits (kibitzer drain, gate cancel, facts cancel) run inside the
   // same handler as the drain but BEFORE it, while the 1500ms budget is already fixed at entry, so
   // slow pre-drain work starved the FIRST drain step - journal-flush - and the session's journal
   // tail was never made durable. The invariant is reason-independent: every ShutdownReason goes

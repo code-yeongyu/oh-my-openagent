@@ -15,9 +15,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
   return {
     name: "thread",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      if (ctx.sharedHostEnabled !== true) return
       const host = options.host ?? createLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
-      ctx.logger.info("omo-senpi thread tools use lazy shared-host availability")
       registerThreadTools(pi, {
         host,
         stateDirectory,

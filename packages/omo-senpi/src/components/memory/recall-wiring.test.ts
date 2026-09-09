@@ -84,9 +84,9 @@ async function dispatch(
 }
 
 describe("RECALL_CUSTOM_TYPE", () => {
-  test("#given the recall injection channel #when the custom type is read #then it is the memorian recall channel", () => {
+  test("#given the recall injection channel #when the custom type is read #then it is the kibitzer recall channel", () => {
     // given / when / then
-    expect(RECALL_CUSTOM_TYPE).toBe("omo-memorian:recall")
+    expect(RECALL_CUSTOM_TYPE).toBe("omo-kibitzer:recall")
   })
 })
 
@@ -334,19 +334,19 @@ describe("createMemoryRecallWiring collectCandidates", () => {
     const { repo, context } = await fixture(tempDirs)
     const reflection = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_REFLECTION: "1" } })
     const facts = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_FACTS: "1" } })
-    const memorian = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_FACTS: "1" } })
+    const kibitzer = wiringFor({ repo, identity: context, env: { SENPI_MEMORY_FACTS: "1" } })
 
     // when
     const ctx = eventContext([userEntry("m1", KUBERNETES_PROMPT)])
     const reflectionCollected = await reflection.collectCandidates(ctx)
     const factsCollected = await facts.collectCandidates(ctx)
-    const memorianCollected = await memorian.collectCandidates(ctx)
+    const kibitzerCollected = await kibitzer.collectCandidates(ctx)
 
     // then
     expect(reflectionCollected).toBeUndefined()
     expect(factsCollected).toBeUndefined()
     // A gate child must not spawn a second gate over its own transcript.
-    expect(memorianCollected).toBeUndefined()
+    expect(kibitzerCollected).toBeUndefined()
   }, 30_000)
 
   test("#given a settled turn #when candidates are collected #then the judge input carries both roles and the surfaced set", async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { RECALL_HINT_HEADER, renderNudgeBlock, renderNudgeMessage } from "./render"
+import { RECALL_HINT_HEADER, RECALL_HINT_HEADER_KO, renderNudgeBlock, renderNudgeMessage } from "./render"
 
 describe("renderNudgeBlock", () => {
   it("#given a judged nudge #when the block is rendered #then the hint replaces the description and excerpt inside the sourced framing", () => {
@@ -12,7 +12,7 @@ describe("renderNudgeBlock", () => {
     // then
     expect(block).toBe(
       '<recalled-memory source="[[reference/a.md]]">\n' +
-        "A stored memory surfaced. It is a hint, not current state — verify before relying on it; read the source path for full context.\n" +
+        `${RECALL_HINT_HEADER}\n` +
         "The deploy gate requires a green smoke run.\n" +
         "</recalled-memory>",
     )
@@ -21,7 +21,7 @@ describe("renderNudgeBlock", () => {
   it("#given a Korean hint #when the block is rendered #then the Korean header is used", () => {
     const block = renderNudgeBlock({ path: "reference/a.md", hint: "맹모타맥에서는 bun test를 로컬에서 실행하지 않는다." })
 
-    expect(block).toContain("저장된 메모리가 떠올랐습니다. 현재 상태가 아니라 힌트입니다 — 의존하기 전에 확인하고, 전체 맥락은 출처 경로를 읽으세요.")
+    expect(block).toContain(RECALL_HINT_HEADER_KO)
     expect(block).not.toContain(RECALL_HINT_HEADER)
   })
 
@@ -29,7 +29,7 @@ describe("renderNudgeBlock", () => {
     const block = renderNudgeBlock({ path: "reference/a.md", hint: "Run the checks locally before relying on this memory." })
 
     expect(block).toContain(RECALL_HINT_HEADER)
-    expect(block).not.toContain("저장된 메모리가 떠올랐습니다. 현재 상태가 아니라 힌트입니다 — 의존하기 전에 확인하고, 전체 맥락은 출처 경로를 읽으세요.")
+    expect(block).not.toContain(RECALL_HINT_HEADER_KO)
   })
 
   it("#given a hostile path #when rendered #then markup stays inside one escaped sourced block", () => {

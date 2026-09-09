@@ -1,17 +1,17 @@
-// Session-shaped reads for the memorian recall channel: the live ctx snapshot, the
+// Session-shaped reads for the kibitzer recall channel: the live ctx snapshot, the
 // planner's user-only window, and the judge's dual-role transcript. Memory-owned
 // hidden channels are excluded so a previous hint cannot re-enter the query.
 
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
 
-export const RECALL_CUSTOM_TYPE = "omo-memorian:recall"
+export const RECALL_CUSTOM_TYPE = "omo-kibitzer:recall"
 
 /** Newest conversation texts feeding the query planner; older turns are not what the user is on. */
 export const RECALL_TEXT_WINDOW = 6
 
 // Memory-owned hidden channels. Their content is derived FROM memory, so feeding them back into
 // the query planner would make recall search for the hint it just injected.
-export const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, MEMORY_NOTICE_CUSTOM_TYPE])
+export const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, "omo-memorian:recall", MEMORY_NOTICE_CUSTOM_TYPE])
 
 /** One line of the judge's transcript window: both roles, oldest first. */
 export interface RecallTranscriptTurn {
@@ -20,7 +20,7 @@ export interface RecallTranscriptTurn {
 }
 
 /**
- * The ctx-derived half of a settle, read synchronously while the ctx is still alive. The memorian
+ * The ctx-derived half of a settle, read synchronously while the ctx is still alive. The kibitzer
  * gate detaches its launch, and the host disposes the ctx as soon as the settle handler returns, so
  * the gate captures this first and the async work consumes only these plain values.
  */

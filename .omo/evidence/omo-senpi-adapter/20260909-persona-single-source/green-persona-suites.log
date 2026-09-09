@@ -1,0 +1,242 @@
+# gorky (Linux x86_64, bun 1.4.0) - focused suites for the persona change
+TYPECHECK_OK
+Senpi LSP runtime is current: /tmp/omo-persona-20260909/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Senpi ast-grep-mcp runtime is current: /tmp/omo-persona-20260909/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js sha256=73c8be0b3098809e001fe61355e11b3d7991c9eb352e1b4b6f10f2a25d83f555
+Senpi agent-toolkit runtime is current: /tmp/omo-persona-20260909/packages/omo-senpi/plugin/runtime/agent-toolkit sha256=b1c578e6f3622fff6ccce887021f21d6be1eb25695e0686d9c5d7147411b3ae2
+x-search conditional skill is current: /tmp/omo-persona-20260909/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 907 modules in 208ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 682 modules in 192ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 160ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 156ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 154ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+omo-senpi extension build is current: /tmp/omo-persona-20260909/packages/omo-senpi/plugin/extensions/omo.js
+FRESHNESS_OK
+bun test v1.3.14 (0d9b296a)
+
+script/build-omo-native.test.ts:
+(pass) runtime persona coverage > #given the runtime persona manifest #when the payload requirements are read #then every persona is required [1.02ms]
+(pass) ensurePrebuiltNativeInputs > #given both prebuilt artifacts present #when ensuring #then no root build script runs [0.28ms]
+(pass) ensurePrebuiltNativeInputs > #given no prebuilt artifacts #when ensuring #then each input builds via its root script in order [0.12ms]
+(pass) ensurePrebuiltNativeInputs > #given only the daemon dist missing #when ensuring #then only build:lsp-daemon runs [0.07ms]
+(pass) ensurePrebuiltNativeInputs > #given a root build script exits nonzero #when ensuring #then the exit code surfaces [0.16ms]
+(pass) ensurePrebuiltNativeInputs > #given the spawn itself errors #when ensuring #then the error propagates [0.12ms]
+(pass) plugin payload allowlist parity > #given the plugin files allowlist #when compared with the payload lists #then every published entry is copied [0.17ms]
+(pass) plugin payload allowlist parity > #given the conditional x-search skill #when checking the payload #then it is both copied and required [0.09ms]
+
+packages/memory-core/src/personas/load.test.ts:
+(pass) loadPersonaAsset > #given a persona already read #when its file leaves the tree #then the process keeps serving the same content [0.70ms]
+(pass) loadPersonaAsset > #given a read that failed #when the asset appears later #then the repaired tree is served without a restart [0.45ms]
+
+packages/omo-senpi/src/install/local-launcher.test.ts:
+(pass) local omo launcher > #given a sibling-store install > #when the launcher is rendered > #then it hands the engine the same product identity as the published launcher [0.36ms]
+(pass) local omo launcher > #given a sibling-store install > #when it is installed > #then it lands executable on the user's PATH directory [0.59ms]
+(pass) local omo launcher > #given a sibling-store install > #when it is installed > #then reinstalling is idempotent [0.38ms]
+(pass) local omo launcher > #given a sibling-store install > #when it is installed > #then a foreign file at that path is never overwritten [0.33ms]
+(pass) local omo launcher > #given a sibling-store install > #when it is uninstalled > #then only a generated launcher is removed [0.37ms]
+(pass) local omo launcher > #given a sibling-store install > #when it is uninstalled > #then a foreign file survives [0.33ms]
+
+packages/omo-senpi/src/install/install-senpi-refresh.test.ts:
+(pass) runSenpiInstaller source refresh > #given complete generated artifacts #when installing from source #then every build step still refreshes them [5.44ms]
+(pass) runSenpiInstaller source refresh > #given an older local OMO package entry #when installing the current source #then the stale package is replaced [6.92ms]
+(pass) runSenpiInstaller source refresh > #given dead generated and unrelated package entries #when installing #then only the generated omo entry is pruned [2.59ms]
+(pass) runSenpiInstaller source refresh > #given current and stale OMO entries #when refreshing #then the current package keeps its precedence [4.10ms]
+
+packages/omo-senpi/src/install/install-senpi.test.ts:
+(pass) runSenpiInstaller > #given temp SENPI_CODING_AGENT_DIR #when installing twice #then it writes one absolute plugin package entry and creates backups [11.17ms]
+(pass) runSenpiInstaller > #given existing user settings #when installing #then unrelated values are preserved and package entries are deduped [9.62ms]
+(pass) runSenpiInstaller > #given legacy goal and webfetch packages #when installing #then builtin-shadowing entries are removed [7.13ms]
+(pass) runSenpiInstaller > #given a Windows packed runtime with a POSIX manifest mode #when installing #then matching content passes integrity [6.79ms]
+(pass) runSenpiInstaller > #given a POSIX packed runtime with a mismatched manifest mode #when installing #then integrity fails [8.89ms]
+(pass) runSenpiInstaller > #given packed ast-grep runtime differs from its manifest #when installing #then integrity failure leaves settings unchanged [6.69ms]
+(pass) runSenpiInstaller > #given packed ast-grep runtime missing its manifest #when installing #then integrity failure leaves settings unchanged [7.99ms]
+(pass) runSenpiInstaller > #given a packed plugin missing the run supervisor #when installing #then artifact validation fails before settings change [6.10ms]
+(pass) runSenpiInstaller > #given a packed plugin missing the dream persona #when installing #then artifact validation fails before settings change [8.79ms]
+(pass) runSenpiInstaller > #given a packed plugin missing the kibitzer persona #when installing #then artifact validation fails before settings change [5.04ms]
+(pass) runSenpiInstaller > #given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written [4.51ms]
+(pass) runSenpiInstaller > #given packed plugin missing the lazy task runtime #when installing #then settings stay unchanged [6.93ms]
+(pass) runSenpiInstaller > #given a packed plugin missing the conditional x-search skill #when installing #then artifact validation fails before settings change [5.96ms]
+(pass) runSenpiUninstaller > #given mixed package settings #when uninstalling #then only the omo-senpi plugin path is removed [8.36ms]
+
+packages/omo-senpi/src/install/install-senpi-launcher.test.ts:
+(pass) runSenpiInstaller local launcher > #given a sandbox home #when installing #then the launcher is written under that home and reported [58.44ms]
+(pass) runSenpiInstaller local launcher > #given a foreign omo launcher #when installing #then the plugin is registered and the launcher is left untouched [11.99ms]
+(pass) runSenpiInstaller local launcher > #given an installed launcher #when uninstalling #then the launcher under that home is removed [9.99ms]
+
+packages/omo-senpi/src/install/cli-local.test.ts:
+(pass) cli-local > #given isolated agent dir #when install then uninstall are invoked #then stdout is one-line JSON and settings round-trip [438.94ms]
+(pass) cli-local > #given invalid positional arg #when invoked #then it exits non-zero with one-line JSON error [268.75ms]
+
+packages/memory-core/src/recall/assets/assets.test.ts:
+(pass) kibitzer persona asset > #given the source asset #when loaded through assets.ts #then it equals the real file and is non-empty [0.32ms]
+
+packages/memory-core/src/reflection/assets/assets.test.ts:
+(pass) dream persona asset > #given the source asset and the packaged plugin copy #when loaded and read #then all copies are identical [0.59ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded [0.16ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the memory-usage ledger input is documented [0.15ms]
+(pass) reflection persona asset > #given the source asset #when loaded through assets.ts #then it equals the real source [0.23ms]
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.26ms]
+
+packages/omo-senpi/src/components/memory/persona-prime.test.ts:
+(pass) primeMemoryPersonaAssets > #given every persona readable #when priming #then each asset is read once and nothing is reported [0.32ms]
+(pass) primeMemoryPersonaAssets > #given one unreadable persona #when priming #then registration continues and the asset is named once [0.20ms]
+
+ 47 pass
+ 0 fail
+ 110 expect() calls
+Ran 47 tests across 10 files. [2.07s]
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/plugin/scripts/build-extension.test.mjs:
+(pass) checkExtensionCurrent > #given the host platform #when resolving the Bun executable #then Windows bypasses the command shell [1.00ms]
+Bundled 907 modules in 203ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 688 modules in 192ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 163ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 153ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 154ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+Bundled 907 modules in 212ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 682 modules in 181ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 161ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 157ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 157ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+(pass) checkExtensionCurrent > #given freshly built outputs #when the executable bundles are inspected #then the shebang stays the first bytes and the marker still parses [15153.19ms]
+(pass) checkExtensionCurrent > #given an empty output directory #when extensions are built #then all runtime personas match their sources [1.20ms]
+(pass) checkExtensionCurrent > #given the runtime persona manifest #when staging sources are listed #then the staged names match it [0.19ms]
+(pass) checkExtensionCurrent > #given platform-specific source paths #when normalized #then build markers use portable separators [0.09ms]
+Bundled 907 modules in 213ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 682 modules in 192ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 161ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 150ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 159ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+(pass) checkExtensionCurrent > #given current generated outputs with old mtimes #when checked #then freshness passes [7286.39ms]
+(pass) checkExtensionCurrent > #given a missing supervisor artifact #when checked #then freshness reports that output [5.53ms]
+Bundled 907 modules in 211ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 682 modules in 192ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 161ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 162ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 160ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+(pass) checkExtensionCurrent > #given a stale supervisor artifact #when checked #then freshness reports that output [7313.49ms]
+Bundled 907 modules in 203ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 682 modules in 187ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 162ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 166ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 163ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+(pass) checkExtensionCurrent > #given changed generated bytes with future mtimes #when checked #then freshness fails [7158.44ms]
+Bundled 919 modules in 216ms
+
+  omo.js  1.63 MB  (entry point)
+
+Bundled 682 modules in 196ms
+
+  omo-task.js  0.99 MB  (entry point)
+
+Bundled 212 modules in 160ms
+
+  omo-member.js  177.1 KB  (entry point)
+
+Bundled 142 modules in 157ms
+
+  memory-run-supervisor.mjs  38.81 KB  (entry point)
+
+Bundled 118 modules in 169ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+(pass) checkExtensionCurrent > #given intact generated bytes with a stale source digest #when checked #then source reproduction fails [7187.99ms]
+(pass) checkExtensionCurrent > #given freshly built outputs #when inspected #then normalization removes whitespace-only lines [5.08ms]
+(pass) checkExtensionCurrent > #given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar [0.71ms]
+(pass) checkExtensionCurrent > #given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar [3.24ms]
+
+ 13 pass
+ 0 fail
+ 27 expect() calls
+Ran 13 tests across 1 file. [45.23s]

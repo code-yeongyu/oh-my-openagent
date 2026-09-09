@@ -29,6 +29,18 @@ describe("memory tool registration", () => {
     }
   })
 
+  test("#given memory tools that carry renderResult #when created #then each definition has renderShell self", () => {
+    // given / when
+    const tools = createMemoryTools(() => undefined)
+
+    // then
+    expect(tools.length).toBeGreaterThan(0)
+    for (const tool of tools) {
+      expect(typeof tool.renderResult).toBe("function")
+      expect(tool.renderShell).toBe("self")
+    }
+  })
+
   test("#given the memory tool description #when inspected #then it documents omo identity, frontmatter rules, and result strings", () => {
     // given
     const pi = new FakeExtensionAPI()

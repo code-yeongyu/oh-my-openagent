@@ -14,7 +14,7 @@ import {
   resolveMemoryConfig,
 } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "./memorian-notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
@@ -149,6 +149,9 @@ describe("createMemoryComponent", () => {
       RECALL_CUSTOM_TYPE,
       NUDGED_ENTRY_TYPE,
       GATE_ENTRY_TYPE,
+      "omo-memorian:recall",
+      "omo-memorian:nudged",
+      "omo-memorian:gate",
       MEMORY_BINDING_CUSTOM_TYPE,
     ])
     // Direct registration is the only surface: the memory tool always registers directly and no MCP server is offered.

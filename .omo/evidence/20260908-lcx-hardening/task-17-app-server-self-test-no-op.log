@@ -1,0 +1,13 @@
+CONFIG_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+QA-only adaptation: disposable skill copy; mock startup uses FIFO read -t 15, not polling.
+BYTE_IDENTICAL=app-server-drive.sh SHA256=45967e49d06a26889a629bc05e33a77614441e5ed7cef147d6bd0f9c70c5e26b
+BYTE_IDENTICAL=lib/app-server-client.mjs SHA256=4976a02402a3b7044e2ec721299d3874f364a1fffe2eda67646a5c4fe528c5a1
+BYTE_IDENTICAL=lib/mock-model.mjs SHA256=53b4dda5f6099dc7747b3457445759da47adb8710e321da43395962060b29904
+COMMAND: ["bash", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/codex-qa/scripts/app-server-drive.sh", "--self-test"]
+
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+PASS: app-server turn completed; assistant text: 
+STDERR: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/codex-qa/scripts/lib/common.sh: line 130: 77138 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$fifo" 2> "$CQA_HOME_ROOT/mock.stderr"
+
+EXIT=0
+CONFIG_SHA_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml

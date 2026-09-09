@@ -1,5 +1,5 @@
-// Delivery half of the memorian recall channel. before_agent_start drains the pending
-// file the gate wrote and injects one hidden omo-memorian:recall message. Fail-open:
+// Delivery half of the kibitzer recall channel. before_agent_start drains the pending
+// file the gate wrote and injects one hidden omo-kibitzer:recall message. Fail-open:
 // an unreadable ledger or a failed visible trace never suppresses a nudge the judge
 // already paid for.
 
@@ -10,7 +10,7 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderMemorianGateEntry, renderMemorianNudgedEntry, type MemorianNudgedRecord } from "./memorian-notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerNudgedRecord } from "./kibitzer-notice"
 import { renderRecallEntry } from "./recall-notice"
 import { RECALL_CUSTOM_TYPE, readSession } from "./recall-session-read"
 
@@ -27,7 +27,7 @@ export interface RecallDrainOptions {
   readonly pendingFor: (context: MemoryIdentityContext) => PendingNudgesPort
   readonly drainQueued?: (sessionId: string, context: MemoryIdentityContext) => RecallNudge[]
   /**
-   * The session's live compaction epoch, owned by the memorian gate wiring. A pending payload is
+   * The session's live compaction epoch, owned by the kibitzer gate wiring. A pending payload is
    * stamped with the epoch its judge ran under, so passing the live one here is what rejects a
    * verdict about a transcript a compaction has since rewritten. Absent means "never compacted",
    * matching the gate wiring's own default for an unknown session.
@@ -43,14 +43,14 @@ export interface RecallDrain {
 // A memory worker child must never receive recall hints: it reasons ABOUT memory, and an injected
 // hint would both pollute its transcript and re-enter memory on the next extraction pass. The
 // reflection and facts sentinels are here for the sharper reason: those children must not judge
-// or consume the hints produced by the memorian gate.
+// or consume the hints produced by the kibitzer gate.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
 
 /**
  * Provenance recorded next to a surfaced path. The ledger keys on the path alone - the hash exists
  * so a reader can tell a gate-delivered hint from a lexically matched one.
  */
-export const GATE_SURFACE_HASH = "memorian-gate"
+export const GATE_SURFACE_HASH = "kibitzer-gate"
 
 export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
   /** Drain the gate's pending nudges for this turn. Returns undefined when there is nothing to say. */
@@ -113,8 +113,12 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
   return {
     register(pi): void {
       pi.registerEntryRenderer(RECALL_CUSTOM_TYPE, renderRecallEntry)
-      pi.registerEntryRenderer(NUDGED_ENTRY_TYPE, renderMemorianNudgedEntry)
-      pi.registerEntryRenderer(GATE_ENTRY_TYPE, renderMemorianGateEntry)
+      pi.registerEntryRenderer(NUDGED_ENTRY_TYPE, renderKibitzerNudgedEntry)
+      pi.registerEntryRenderer(GATE_ENTRY_TYPE, renderKibitzerGateEntry)
+      // Read aliases keep stored sessions renderable; new entries use Kibitzer only.
+      pi.registerEntryRenderer("omo-memorian:recall", renderRecallEntry)
+      pi.registerEntryRenderer("omo-memorian:nudged", renderKibitzerNudgedEntry)
+      pi.registerEntryRenderer("omo-memorian:gate", renderKibitzerGateEntry)
       pi.on("before_agent_start", async (payload, eventCtx) => {
         try {
           const injection = await inject(payload, eventCtx)
@@ -126,7 +130,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
               version: 1,
               nudges: injection.nudges.map(({ path, hint }) => ({ path, hint })),
               via: "prompt",
-            } satisfies MemorianNudgedRecord)
+            } satisfies KibitzerNudgedRecord)
           } catch (error) {
             // Fail-open: the visible trace is bookkeeping - its failure must never suppress a
             // nudge the ledger already recorded as delivered.
