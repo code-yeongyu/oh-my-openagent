@@ -202,6 +202,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
       // one first-position flush captures everything and the drain must never re-run it.
       const journalFlushed = await shutdownDrain.flushJournal(input)
+      lastEventCtx.current = input.eventCtx
       reflectionLive.shutdown(input.sessionId, options.sessions.get(input.sessionId)?.context?.identity)
       await kibitzerRef.current?.onSessionShutdown(input.sessionId)
       await kibitzerRef.current?.gate.onSessionShutdown(input.sessionId)
