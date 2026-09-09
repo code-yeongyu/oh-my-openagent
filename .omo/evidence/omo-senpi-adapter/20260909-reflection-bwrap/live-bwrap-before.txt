@@ -1,0 +1,24 @@
+Command:
+npm exec --yes --package=bun@1.4.2 -- bun .omo/evidence/omo-senpi-adapter/20260909-reflection-bwrap/live-bwrap.mjs
+
+Exit code: 1
+
+stderr:
+bwrap: Can't find source path /home/lsu1080/omo-reflection-work/.omo/evidence/omo-senpi-adapter/20260909-reflection-bwrap/sandbox-fxE7zh/runtime/reflection-sessions: No such file or directory
+
+Receipt:
+{
+  "result": "FAIL",
+  "absentBefore": true,
+  "wasSandboxed": true,
+  "exit": 1,
+  "signal": null,
+  "sessionDirectoryMode": null,
+  "nestedDirectoryMode": null,
+  "wroteGranted": false,
+  "outsideUnchanged": true,
+  "requests": [],
+  "sandboxAgentDir": "/home/lsu1080/omo-reflection-work/.omo/evidence/omo-senpi-adapter/20260909-reflection-bwrap/sandbox-fxE7zh/agent",
+  "realCredentialsUntouched": true,
+  "sandboxCleanupComplete": true
+}

@@ -117,6 +117,13 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     }))
   }
 
+  // bwrap --bind source target dies child_exit when source does not exist. Reflection runtime
+  // dirs are granted before anything creates them; mkdir the declared path (0700) so the bind
+  // names that exact directory instead of dying or widening to an existing ancestor.
+  for (const writableDir of writableDirs) {
+    mkdirSync(writableDir, { recursive: true, mode: 0o700 })
+  }
+
   return guardedSandboxedTransform(input.surface, input.command, input.env, (spawnArgs, innerCommand) => ({
     ...spawnArgs,
     command: executable,
