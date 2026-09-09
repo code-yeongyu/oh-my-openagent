@@ -1,0 +1,8 @@
+real_db=$XDG_DATA_HOME/opencode/opencode.db sessions_before=18886
+sandbox_root=$QA_SANDBOX
+sessions_before=18886 sessions_after=18886 (host has concurrent live opencode instances; delta not attributable to QA)
+sandbox_db=$QA_SANDBOX/data/opencode/opencode.db
+sandbox_sessions=1
+real_db_sessions_rooted_at_sandbox=0
+newest_real_db_session_directory=<unrelated-host-session>
+ISOLATION=PASS qa session captured in sandbox only; zero sandbox-rooted sessions in real db

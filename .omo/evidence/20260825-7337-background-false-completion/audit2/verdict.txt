@@ -1,0 +1,3 @@
+QA-PASS: real opencode booted modified plugin from worktree source;
+session completed E2E via fake LLM; assistant text observed;
+real DB unchanged (18886 -> 18886); sandbox sessions=1.
