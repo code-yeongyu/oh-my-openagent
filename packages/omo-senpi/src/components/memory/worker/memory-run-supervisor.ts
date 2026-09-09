@@ -99,7 +99,7 @@ async function runSupervisor(runDir: string): Promise<void> {
   const stdoutFd = openSync(manifest.stdoutPath, "w")
   const stderrFd = openSync(manifest.stderrPath, "w")
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
-    env: process.env,
+    env: { ...process.env, BUN_BE_BUN: "1" },
     detached: true,
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
     windowsHide: true,
