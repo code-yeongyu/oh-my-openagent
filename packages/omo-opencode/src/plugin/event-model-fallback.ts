@@ -9,6 +9,7 @@ import {
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
+import { getSessionModel } from "../shared/session-model-state";
 import {
   extractErrorMessage,
   extractErrorName,
@@ -45,6 +46,13 @@ export function createModelFallbackEventHandler(args: {
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
+  // When event metadata lacks modelID, prefer the session's actual primary model
+  // over the static first-rung constant: assuming a fallback rung failed corrupts
+  // dedupe keys and re-arm checks, stalling the chain after the first rung (#7161).
+  const resolveMissingMetadataModelID = (sessionID: string): string =>
+    getSessionModel(sessionID)?.modelID
+    ?? lastKnownModelBySession.get(sessionID)?.modelID
+    ?? SISYPHUS_MISSING_METADATA_CURRENT_MODEL_ID;
   const continuationsInFlight = new Set<string>();
   const lastDispatchedContinuationKeys = new Map<
     string,
@@ -136,7 +144,7 @@ export function createModelFallbackEventHandler(args: {
 
     const providerHint = params.info.providerID as string | undefined;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
-    const rawModel = (params.info.modelID as string | undefined) ?? SISYPHUS_MISSING_METADATA_CURRENT_MODEL_ID;
+    const rawModel = (params.info.modelID as string | undefined) ?? resolveMissingMetadataModelID(params.sessionID);
     const currentModel = normalizeFallbackModelID(rawModel);
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
@@ -179,10 +187,9 @@ export function createModelFallbackEventHandler(args: {
     if (!agentName) return false;
 
     const parsed = extractProviderModelFromErrorMessage(retryMessage);
-    const lastKnown = lastKnownModelBySession.get(params.sessionID);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
     const currentModel = normalizeFallbackModelID(
-      parsed.modelID ?? lastKnown?.modelID ?? SISYPHUS_MISSING_METADATA_CURRENT_MODEL_ID,
+      parsed.modelID ?? resolveMissingMetadataModelID(params.sessionID),
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: parsed.providerID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
@@ -219,7 +226,7 @@ export function createModelFallbackEventHandler(args: {
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined) || parsed.modelID || SISYPHUS_MISSING_METADATA_CURRENT_MODEL_ID,
+      (params.props?.modelID as string | undefined) || parsed.modelID || resolveMissingMetadataModelID(params.sessionID),
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);

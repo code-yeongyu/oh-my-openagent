@@ -1,0 +1,57 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/model-core/src/model-error-classifier.test.ts:
+483 | 
+484 |     //#when
+485 |     const result = shouldRetryError(error)
+486 | 
+487 |     //#then - must cycle to the configured fallback chain instead of stopping
+488 |     expect(result).toBe(true)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7161/packages/model-core/src/model-error-classifier.test.ts:488:20)
+(fail) model-error-classifier > Z.AI weekly/monthly Limit Exhausted triggers fallback despite containing 'monthly limit' (#7161) [0.30ms]
+497 | 
+498 |     //#when
+499 |     const results = errors.map((error) => shouldRetryError(error))
+500 | 
+501 |     //#then
+502 |     expect(results).toEqual([true, true])
+                          ^
+error: expect(received).toEqual(expected)
+
+  [
+-   true,
+-   true,
++   false,
++   false,
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7161/packages/model-core/src/model-error-classifier.test.ts:502:21)
+(fail) model-error-classifier > Z.AI weekly-only and monthly-only Limit Exhausted variants trigger fallback [0.28ms]
+511 | 
+512 |     //#when
+513 |     const result = isRetryableModelError(error)
+514 | 
+515 |     //#then
+516 |     expect(result).toBe(true)
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7161/packages/model-core/src/model-error-classifier.test.ts:516:20)
+(fail) model-error-classifier > Z.AI Limit Exhausted with 429 statusCode triggers fallback [0.12ms]
+
+ 40 pass
+ 3 fail
+ 43 expect() calls
+Ran 43 tests across 1 file. [230.00ms]
