@@ -8,6 +8,7 @@ import type { ToolRegistryFactories } from "./tool-registry-factories"
 import { isInteractiveBashEnabled } from "../interactive-bash-availability"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { log } from "../shared"
+import { stableStringify } from "../shared/stable-stringify"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 import { createCoreTools } from "./tool-registry-core-tools"
 import { defaultToolRegistryFactories } from "./tool-registry-factories"
@@ -26,6 +27,53 @@ export type ToolRegistryResult = {
   taskSystemEnabled: boolean
 }
 
+const CACHE_KEY_SEPARATOR = "\0"
+
+const frozenRegistryCache = new Map<string, ToolRegistryResult>()
+
+export function clearToolRegistryCache(): void {
+  frozenRegistryCache.clear()
+}
+
+function readRegistryGateSnapshot(args: {
+  pluginConfig: OhMyOpenCodeConfig
+  taskSystemEnabled: boolean
+  interactiveBashEnabled: boolean
+}): Record<string, unknown> {
+  const { pluginConfig, taskSystemEnabled, interactiveBashEnabled } = args
+  return {
+    interactiveBashEnabled,
+    teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    monitorEnabled: pluginConfig.monitor?.enabled ?? false,
+    taskSystemEnabled,
+    maxTools: pluginConfig.experimental?.max_tools,
+    disabledTools: pluginConfig.disabled_tools,
+    disabledAgents: pluginConfig.disabled_agents,
+    goalEnabled: pluginConfig.goal?.enabled ?? false,
+    hashlineEdit: pluginConfig.hashline_edit ?? false,
+  }
+}
+
+function toRegistryCacheKey(sessionID: string, snapshot: Record<string, unknown>): string {
+  return [sessionID, stableStringify(snapshot)].join(CACHE_KEY_SEPARATOR)
+}
+
+function sortToolsRecord(tools: ToolsRecord): ToolsRecord {
+  const sorted: ToolsRecord = {}
+  for (const toolName of Object.keys(tools).sort()) {
+    sorted[toolName] = tools[toolName]
+  }
+  return sorted
+}
+
+function normalizeSortedTools(tools: ToolsRecord): ToolsRecord {
+  const sorted = sortToolsRecord(tools)
+  for (const toolDefinition of Object.values(sorted)) {
+    normalizeToolArgSchemas(toolDefinition)
+  }
+  return sorted
+}
+
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
@@ -34,6 +82,7 @@ export function createToolRegistry(args: {
   availableCategories: AvailableCategory[]
   interactiveBashEnabled?: boolean
   toolFactories?: Partial<ToolRegistryFactories>
+  sessionID?: string
 }): ToolRegistryResult {
   const {
     ctx,
@@ -43,6 +92,7 @@ export function createToolRegistry(args: {
     availableCategories,
     interactiveBashEnabled = isInteractiveBashEnabled(),
     toolFactories,
+    sessionID,
   } = args
   const factories: ToolRegistryFactories = {
     ...defaultToolRegistryFactories,
@@ -73,10 +123,6 @@ export function createToolRegistry(args: {
     teamToolCount,
   })
 
-  for (const toolDefinition of Object.values(allTools)) {
-    normalizeToolArgSchemas(toolDefinition)
-  }
-
   const filteredTools: ToolsRecord = filterDisabledTools(allTools, pluginConfig.disabled_tools)
 
   const maxTools = pluginConfig.experimental?.max_tools
@@ -84,8 +130,24 @@ export function createToolRegistry(args: {
     trimToolsToCap(filteredTools, maxTools)
   }
 
-  return {
-    filteredTools,
+  const snapshot = readRegistryGateSnapshot({ pluginConfig, taskSystemEnabled, interactiveBashEnabled })
+  if (sessionID === undefined) {
+    return {
+      filteredTools: normalizeSortedTools(filteredTools),
+      taskSystemEnabled,
+    }
+  }
+
+  const cacheKey = toRegistryCacheKey(sessionID, snapshot)
+  const cached = frozenRegistryCache.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const result: ToolRegistryResult = {
+    filteredTools: Object.freeze(normalizeSortedTools(filteredTools)),
     taskSystemEnabled,
   }
+  frozenRegistryCache.set(cacheKey, result)
+  return result
 }
