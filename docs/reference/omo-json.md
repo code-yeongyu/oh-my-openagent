@@ -161,6 +161,48 @@ Both attributions ship enabled by default. To opt out of the co-author trailer:
 
 The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Senpi harness.
 
+### `side_panel` (Senpi harness)
+
+The optional `side_panel` block controls the omo side panel (`schema/side-panel.ts`): a right-hand
+column in the Senpi TUI carrying session, context, usage, subagent, tool, git and memory state. The
+transcript reflows into the remaining width instead of being covered. The panel is **off by
+default** because it rearranges the whole screen.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `enabled` | boolean | `false` | Render the panel. |
+| `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
+| `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
+| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
+| `sections` | object | all `true` | Per-section switches: `session`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. |
+
+```jsonc
+{
+  "side_panel": {
+    "enabled": true,
+    "width": "24%",
+    "sections": { "usage": false }
+  }
+}
+```
+
+`--omo-side-panel` forces the panel on for one run. It cannot force it off: senpi sets a boolean
+extension flag to `true` whatever value follows it (`--omo-side-panel=false` still turns it on) and
+rejects a `--no-` form as an unknown option, so `enabled` in `omo.json` is the switch that can say no.
+
+The reflowing column needs the fullscreen TUI (`--tui-mode fullscreen`, or `tuiMode: "fullscreen"` in
+senpi's settings): only that renderer owns a layout root to wrap. In the default regular mode - and on
+any host that does not expose the layout seam - the same rows render as a block above the editor
+instead, and a headless run renders nothing.
+
+The `files` section lists the working copy as `git status` sees it, both status columns included.
+`/side-panel-diff` opens the diff of any file it lists in a scrollable read-only viewer; clicking a
+row is deliberately not the only route, because mouse routing is not part of the host's public
+surface. No keyboard chord is registered by default.
+
+The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the
+normal resolution order.
+
 ### `models` (shared catalog)
 
 A record of short name to catalog entry (`schema/model-catalog.ts`). The canonical strict shape is `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs remain accepted and are normalized to `reasoning`; other tuning fields are not catalog-entry keys.

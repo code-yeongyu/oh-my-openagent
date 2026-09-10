@@ -6,6 +6,7 @@ import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./g
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
+import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
@@ -26,6 +27,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
 }).strict()
 
 export const OmoConfigProfileSchema = z.object({
@@ -38,6 +40,7 @@ export const OmoConfigProfileSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
@@ -54,6 +57,7 @@ export const OmoConfigSchema = z.object({
   models: OmoModelCatalogSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  side_panel: OmoSidePanelSettingsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
@@ -73,6 +77,7 @@ export const OmoConfigLayerSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
