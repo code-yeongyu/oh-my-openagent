@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-51 `*.test.mjs` suites + `index.js` loader asserting contracts over GENERATED/INSTALLED artifacts — manifests, aggregate hook JSON, built CLIs, synced skills — not over component sources. Runs via `npm test` from `plugin/` after `npm run build`; also the tail of repo-root `bun run test:codex`.
+47 `*.test.mjs` suites + 4 shared support modules + `index.js` loader, asserting contracts over GENERATED/INSTALLED artifacts — manifests, aggregate hook JSON, built CLIs, synced skills — not over component sources. Runs via `npm test` from `plugin/` after `npm run build`; also the tail of repo-root `bun run test:codex`.
 
 ## KEY FILES
 

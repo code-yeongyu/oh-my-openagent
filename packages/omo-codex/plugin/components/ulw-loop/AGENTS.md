@@ -47,10 +47,10 @@ Conventions for human contributors and AI agents working on this repository.
 - `src/cli.ts`: bin entry (`omo-ulw-loop`, `ulw`, `ulw-loop` all map to `dist/cli.js`); documented invocation form `omo-agent-toolkit ulw-loop <subcommand>`.
 - `src/cli-commands.ts`: subcommand dispatch (`ULW_LOOP_SUBCOMMANDS`, `ulwLoopCommand`, flag/value readers).
 - `src/plan-io.ts`: plan persistence, append-only `ledger.jsonl`, `withUlwLoopMutationLock`.
-- `src/quality-gate.ts` (188 LOC), `src/checkpoint.ts` (247), `src/steering.ts` (203): state-transition hotspots (evidence containment, checkpoint reconciliation, steering mutations).
+- `src/quality-gate.ts` (221 LOC), `src/checkpoint.ts` (226), `src/steering.ts` (226): state-transition hotspots (evidence containment, checkpoint reconciliation, steering mutations). Per-file detail for the 46-module tree lives in [`src/AGENTS.md`](src/AGENTS.md); the 70-file suite in [`test/AGENTS.md`](test/AGENTS.md).
 - `src/quality-gate-artifacts.ts`: artifact-ref / surface-kind primitives shared by the gate validator; `src/quality-gate-aggregate.ts`: non-throwing defect pre-pass that aggregates every gate defect into one error.
 - `src/codex-hook.ts`: UserPromptSubmit steering injection + `create_goal` budget guard.
-- `src/spawn-guard.ts`, `src/stop-resume-hook.ts`: spawn guards, Stop auto-resume.
+- `src/spawn-guard.ts` (315 LOC, largest module), `src/stop-resume-hook.ts` (228): spawn admission guards, Stop auto-resume.
 - `src/surface.ts`: toolkit surface + reviewer-identity resolution (`lazycodex` default; staged `surface.json` marker or `OMO_AGENT_TOOLKIT_SURFACE` selects `omo-senpi`).
 - `src/ultrawork-skill-pointer.ts`: byte-identical mirror of ultrawork's pointer (pinned by `plugin/test/ultrawork-skill-pointer.test.mjs`).
 - `directive.md`: runtime-read directive (never inlined into TypeScript). GENERATED from the canonical `packages/prompts-core/prompts/ultrawork/codex.md` by `components/ultrawork/scripts/sync-directive.mjs` and checked in, because this package is published standalone with no prompts-core dependency. Do not hand-edit; byte identity is pinned by `test/ultrawork-directive.test.ts`.
@@ -58,7 +58,7 @@ Conventions for human contributors and AI agents working on this repository.
 ## Build and Hooks
 
 - Build output goes to `dist/`.
-- `hooks/hooks.json` wires `hook user-prompt-submit --with-ultrawork` (UserPromptSubmit), `hook pre-tool-use` (create_goal budget), `hook pre-tool-use-spawn` (spawn guards), and `hook stop` (auto-resume).
+- `hooks/hooks.json` wires `hook user-prompt-submit --with-ultrawork` (UserPromptSubmit), `hook pre-tool-use` (create_goal budget), `hook pre-tool-use-spawn` (spawn guards), `hook post-tool-use-spawn` (admission-failure breaker recorder), and `hook stop` (auto-resume). The spawn hooks match `spawn_agent`, `collaborationspawn_agent`, and `collaboration.spawn_agent`.
 
 ## Commands
 

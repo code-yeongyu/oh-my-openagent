@@ -6,7 +6,7 @@
 
 **DEPRECATED.** Superseded by [`goal/`](../goal/) (PR #6184 "goal-replaces-ralph"). `ralphLoop` was removed from `HookNameSchema` and `create-session-hooks.ts`; the `/ralph-loop`, `/ulw-loop`, `/cancel-ralph` builtin commands and templates were removed; `ralph_loop` config is a deprecated passthrough for migration. The directory, `createRalphLoopHook` factory, and barrel export remain, but no composer imports them.
 
-~52 .ts files (31 impl + 21 tests). Iterates a development loop until the agent emits `<promise>DONE</promise>` or max iterations reached. No longer wired into any tier.
+51 TypeScript files (29 implementation/support modules and 22 tests). Iterates a development loop until the agent emits `<promise>DONE</promise>` or max iterations reached. No longer wired into any tier.
 
 ## LOOP LIFECYCLE
 
@@ -26,7 +26,7 @@
 | `ralph-loop-hook.ts` | `createRalphLoopHook()` -- composes controller + recovery + event handler |
 | `ralph-loop-event-handler.ts` | `createRalphLoopEventHandler()` -- handles session.idle, drives loop |
 | `loop-state-controller.ts` | State CRUD: startLoop, cancelLoop, getState, persist to disk |
-| `loop-session-recovery.ts` | Recover from crashed/interrupted loop sessions |
+| `session-event-handler.ts` | Handle session lifecycle events around loop iterations |
 | `completion-promise-detector.ts` | Scan session transcript for `<promise>DONE</promise>` |
 | `continuation-prompt-builder.ts` | Build continuation message for next iteration |
 | `continuation-prompt-injector.ts` | Inject built prompt into active session |

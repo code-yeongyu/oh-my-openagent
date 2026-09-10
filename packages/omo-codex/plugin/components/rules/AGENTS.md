@@ -18,7 +18,8 @@ Conventions for human contributors and AI agents working on this repository.
 - `src/tool-paths.ts`: Codex file path extraction for reads, edits, `apply_patch`, shell-style tools (`extractCodexToolPaths`).
 - `src/transcript-search.ts` / `src/transcript-rule-filter.ts`: transcript scanning and filtering.
 - `src/rules-engine-factory.ts`: bridges `@oh-my-opencode/rules-engine` (discovery, parsing, matching, config).
-- `bundled-rules/`: shipped Markdown rules (`hephaestus/`, `windows-git-bash.md`); ordering and platform candidates pinned by tests.
+- `bundled-rules/`: shipped Markdown rules (`hephaestus/{gpt-5.5,gpt-5.6,gpt-6}.md`, `windows-git-bash.md`); model variant selection lives in `packages/rules-engine/src/engine/finder.ts`, and ordering plus platform candidates are pinned by tests.
+- `src/post-compact-budget.ts`: per-model post-compact output budgets; a new model family needs an entry here.
 - `hooks/hooks.json`: registration. `scripts/bench-codex-rules.mjs`: benchmark.
 
 ## Commands

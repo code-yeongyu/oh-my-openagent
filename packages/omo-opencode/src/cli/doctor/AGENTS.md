@@ -1,4 +1,4 @@
-# src/cli/doctor/ — Health Diagnostics (25 Check Files)
+# src/cli/doctor/ — Health Diagnostics (26 Check Files)
 
 **Generated:** 2026-08-10 / 38d268995
 
@@ -34,7 +34,7 @@ Registered by `getCodexCheckDefinitions()` (3): **CODEX** (critical, `checks/cod
 
 `checks/legacy-config-leftovers.ts` is not registered standalone; the Config aggregator invokes it.
 
-## SUPPORTING CHECK FILES (25 total)
+## SUPPORTING CHECK FILES (26 total, including the registry)
 
 ```
 checks/

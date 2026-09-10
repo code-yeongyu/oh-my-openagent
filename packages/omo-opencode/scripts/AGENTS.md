@@ -6,7 +6,7 @@ Earned its file: score 8, distinct domain. Only code in this package outside `sr
 
 ## OVERVIEW
 
-2 files, 700 LOC: `generate-opengateway-models.ts` (fetches the OpenGateway + models.dev catalogs, writes the tracked `src/features/opengateway-provider/opengateway-models.json`) plus its bun:test suite.
+3 files, 765 LOC: `generate-opengateway-models.ts` (fetches the OpenGateway + models.dev catalogs, writes the tracked `src/features/opengateway-provider/opengateway-models.json`), its bun:test suite, and the local guidance file.
 
 ## WHERE TO LOOK
 

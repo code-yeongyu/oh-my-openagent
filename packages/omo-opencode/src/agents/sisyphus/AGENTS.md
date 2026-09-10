@@ -9,14 +9,16 @@ description: Developer reference for Sisyphus orchestrator model-specific prompt
 
 ## OVERVIEW
 
-Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyphus-agent-factory.ts` routes to the correct variant based on active model.
+Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyphus-agent-factory.ts` (re-exported through `sisyphus.ts`) routes to the correct variant based on active model; this directory currently holds 15 TypeScript prompt modules and no tests of its own — routing coverage lives beside the factory in `../sisyphus-agent-factory.test.ts`.
 
 ## FILES
 
 | File | Purpose |
 |------|---------|
-| `default.ts` | Base/Claude variant: task management, delegation guides, 542 LOC |
+| `default.ts` | Base/Claude variant: task management, delegation guides, 545 LOC |
 | `claude-opus-4-7.ts` | Opus 4.7-native: literal-instruction tuning, bounded exploration/thinking |
+| `claude-opus-5.ts` | Opus 5-native: scope constraint, delegation cap, and verification calibration |
+| `claude-fable-5.ts` | Fable 5-native prompt variant |
 | `claude-opus-4-8.ts` | Opus 4.8-native: silence-default narration, small-decision autonomy, bounded exploration |
 | `claude-opus-5.ts` | Opus 5-native: scope constraint, delegation cap, over-verification removal, narration cadence |
 | `claude-fable-5.ts` | Fable 5-native: top-tier model, Opus 4.8 tuning direction |

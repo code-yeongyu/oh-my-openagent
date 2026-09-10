@@ -2,7 +2,7 @@
 
 **Generated:** 2026-08-24
 
-**Score:** 17 (33 files, 2.4k LOC, own module boundary; not described in `shared/AGENTS.md` beyond one row)
+**Score:** 17 (42 files, 2.9k LOC, own module boundary; direct tmux implementation is now largely delegated to `@oh-my-opencode/tmux-core`)
 
 ## OVERVIEW
 
@@ -21,7 +21,7 @@ Tmux pane/session/window/layout utilities under `shared/tmux/`. Pure decision lo
 
 ## CONVENTIONS
 
-- Barrel `index.ts` exports ONLY `killTmuxSessionIfExists`; everything else is consumed via direct file imports (notably `src/create-managers.ts` and `features/tmux-subagent/`).
+- Nested `index.ts` exports ONLY `killTmuxSessionIfExists`; the top-level `tmux-utils.ts` remains the broader direct-import facade. Most implementation modules adapt `@oh-my-opencode/tmux-core` and retain injectable deps for tests.
 - New tmux invocation goes into a `*-runner.ts` with injected spawn deps — never spawn `tmux` inside logic modules; the separation exists so logic stays unit-testable without a tmux binary.
 
 ## ANTI-PATTERNS

@@ -17,7 +17,8 @@ The `skill` tool. Dual purpose: (1) load a skill by name to inject its SKILL.md 
 | `native-skills.ts` | Merges `PluginInput.skills` entries into discovered skill list |
 | `description-formatter.ts` | Builds LLM-visible `<available_items>` listing with scope tags |
 | `mcp-capability-formatter.ts` | Lists skill-embedded MCP tools/resources/prompts for `skill_mcp` calls |
-| `session-skill-cache.ts` | Dedupes repeated skill loads per session via `seenSessionIDs` |
+| `session-skill-cache.ts` | First load per session invalidates the discovery cache (`seenSessionIDs`) |
+| `description-formatter.test-support.ts` | Fixtures shared by formatter tests |
 | `types.ts` | `SkillArgs`, `SkillInfo`, `SkillLoadOptions` |
 | `constants.ts` | Tool name and description prefix |
 | `index.ts` | Barrel exports |
@@ -46,3 +47,4 @@ Project configs override user configs, which override opencode builtins. `sortBy
 - Discovery: `opencode-skill-loader` feature module scans `.opencode/skills/`, `~/.config/opencode/skills/`, and built-in paths
 - MCP spawn: `skill-mcp-manager` feature module starts embedded MCP servers per session on demand
 - Commands: `slashcommand/` module feeds discovered commands into the tool description
+- Registration: `tools.ts` also exports a `skill` singleton built with `process.cwd()`; the registry uses `createSkillTool` with explicit context. Agent-restricted skills are hidden from the description and rejected at call time.

@@ -1,10 +1,10 @@
 # src/features/builtin-skills/ — Built-in Skill Catalog
 
-**Generated:** 2026-08-24 (f3642fcda; prior 2026-07-17 7d664b96b)
+**Generated:** 2026-09-10 (bee8c2ba4; prior 2026-07-17 7d664b96b)
 
 ## OVERVIEW
 
-Skills shipped inside the plugin (always available, no install). Registered via `createBuiltinSkills()`. Each skill implements the `BuiltinSkill` interface with name, description, content, and optional MCP config. Loaded by `opencode-skill-loader` with scope priority `opencode-project > project > opencode > user > config > builtin = shared` (`merger/scope-priority.ts`). User-installed skills with the same name override built-ins.
+Skills shipped inside the plugin (always available, no install). Registered via `createBuiltinSkills()`. Each skill implements the `BuiltinSkill` interface (`types.ts`): `name`, `description`, `template` (the rendered prompt body), plus optional `resolvedPath`, `license`, `compatibility`, `metadata`, `allowedTools`, `agent`, `model`, `subtask`, `argumentHint`, and `mcpConfig`. Loaded by `opencode-skill-loader` with scope priority `opencode-project > project > opencode > user > config > builtin = shared` (`merger/scope-priority.ts`). User-installed skills with the same name override built-ins.
 
 ## STRUCTURE
 
@@ -68,6 +68,7 @@ Config `browser_automation_engine` selects which browser skill loads:
 | `"playwright"` (default) | playwright (MCP-backed) |
 | `"playwright-cli"` | playwright-cli (CLI-backed) |
 | `"agent-browser"` | agent-browser (`agent-browser-skill.ts`) |
+| `"dev-browser"` | dev-browser (`dev-browser.ts`) |
 
 Only one browser skill is active per session; non-selected variants are skipped.
 `resolveActiveBuiltinSkills({ systemMcpNames })` additionally filters out builtin
@@ -77,23 +78,12 @@ For the `playwright` (MCP) variant, `browser_automation_engine.playwright_mcp_ar
 
 ## TEAM-MODE SKILL GATING
 
-The `team-mode` skill is registered unconditionally but only **rendered** when `team_mode.enabled: true`:
-
-```typescript
-// skills/team-mode.ts (paraphrase)
-const teamModeSkill: BuiltinSkill = {
-  name: "team-mode",
-  shouldLoad: (config) => config.team_mode?.enabled === true,
-  // ...
-}
-```
-
-When disabled, the skill is filtered out before agent prompt assembly so agents do not see `team_*` tool docs they cannot use.
+Gating lives in the factory, not on the skill object: `createBuiltinSkills({ teamModeEnabled })` appends `teamModeSkill` only when `teamModeEnabled` is true and `"team-mode"` is not in `disabledSkills`. The `BuiltinSkill` interface has no `shouldLoad` field. When disabled, the skill never enters the returned array, so agents do not see `team_*` tool docs they cannot use.
 
 ## ADDING A NEW BUILT-IN SKILL
 
 1. Create `skills/{name}.ts` exporting a `BuiltinSkill` object
 2. Register in `skills.ts` `createBuiltinSkills()` factory
 3. Add resources (if any) under a sibling directory: `{name}/SKILL.md`, prompt sections, etc.
-4. If the skill is conditional, set `shouldLoad: (config) => …`
+4. If the skill is conditional, gate it inside `createBuiltinSkills()` from an explicit option (as `teamModeEnabled` does) — conditions are factory logic, not skill fields
 5. Optionally declare an MCP server in the skill (loaded by `skill-mcp-manager` per session)

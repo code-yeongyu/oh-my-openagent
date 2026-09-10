@@ -1,16 +1,16 @@
 # shared-skills — Cross-Harness SKILL.md Bundle (Skills)
 
-**Generated:** 2026-08-24 (f3642fcda)
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 
-Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`; it probes `SKILLS_PROBE_SPECIFIERS` (`./skills/`, `../skills/`, `../../skills/`) nearest-first and returns the first that exists, falling back to the sibling path. The three levels cover `dist/index.js` (sibling), `dist/cli/index.js` (parent), and the Codex marketplace layout `plugins/omo/dist/cli/` (grandparent). Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
+Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`; it probes `SKILLS_PROBE_SPECIFIERS` (`./skills/`, `../skills/`, `../../skills/`) nearest-first and returns the first that exists, falling back to the sibling path. The three levels cover `dist/index.js` (sibling), `dist/cli/index.js` (parent), and the Codex marketplace layout `plugins/omo/dist/cli/` (grandparent). A second export, `skill-source-filter.mjs`, publishes `ignoredSkillSourceDirNames`, `ignoredSkillSourceFileNames`, and `createSkillSourceCopyFilter()` so every plugin sync excludes caches and source metadata identically. Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`, `skill-source-filter.mjs`, `skill-source-filter.d.ts`).
 
 ## SKILLS (17 under `skills/<name>/`)
 
 `programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `ulw-execute`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
 
-`ultimate-browsing` is the one skill carrying a real sub-project: `skills/ultimate-browsing/engine/` is a 17-module Python package with its own CLI, config schemas, and test suite. It is a deliberately pinned, locally diverged snapshot of `fivetaku/insane-search`, not a follow-HEAD mirror. Before changing or re-vendoring it, read [`skills/ultimate-browsing/engine/AGENTS.md` §UPSTREAM BASELINE AND VERSION POLICY](skills/ultimate-browsing/engine/AGENTS.md#upstream-baseline-and-version-policy).
+`coding-agent-sessions` and `ultimate-browsing` are the two skills carrying real sub-projects (each with its own guide): `skills/ultimate-browsing/engine/` is a 13-module Python package plus a 4-file test suite, with its own CLI and YAML config schemas. It is a deliberately pinned, locally diverged snapshot of `fivetaku/insane-search`, not a follow-HEAD mirror. Before changing or re-vendoring it, read [`skills/ultimate-browsing/engine/AGENTS.md` §UPSTREAM BASELINE AND VERSION POLICY](skills/ultimate-browsing/engine/AGENTS.md#upstream-baseline-and-version-policy).
 
 The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
@@ -22,7 +22,8 @@ Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `descriptio
 skills/ (source)
   ├─ build:shared-skills-assets (root) → cp -R skills dist/skills          # literal copy, no transform
   ├─ skills-loader-core → loadSkillsFromDir(sharedSkillsRootPath(), scope:"shared")   # OpenCode runtime
-  └─ omo-codex/plugin/scripts/sync-skills.mjs → plugin/skills/             # the only transformer
+  ├─ omo-codex/plugin/scripts/sync-skills.mjs → plugin/skills/             # Codex transformer
+  └─ omo-senpi/plugin/scripts/sync-skills.mjs → plugin/skills/             # senpi transformer
         1. copies 10 omo-codex COMPONENT skills FIRST (comment-checker, lcx-*, lsp, rules,
            teammode, ulw-loop, ulw-plan, ultrawork from plugin/components/*/skills/*); same-named
            shared skills are skipped → ulw-plan/ultrawork in Codex come from components, NOT from here
@@ -55,7 +56,8 @@ upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submod
 
 - `skills-loader-core` (`workspace:*`) — default `skillsRootPath` for builtin/shared skill loading.
 - `omo-opencode/src/cli/install-ast-grep-sg.ts` — finds the ast-grep skill dir for binary install.
-- `omo-codex/plugin` (`file:` dep) — `sync-skills.mjs` is the only transformer.
+- `omo-codex/plugin` (`file:` dep) — `sync-skills.mjs`, the Codex transformer.
+- `omo-senpi/plugin` (`workspace:*`) — its own `plugin/scripts/sync-skills.mjs` copies shared skills through `createSkillSourceCopyFilter`, rewrites Codex naming to omo-senpi, strips harness-compatibility sections, and overlays ulw-execute/ulw-plan; it additionally excludes `agents/openai.yaml`. Run from `build:senpi-plugin:stage`.
 
 ## NOTES
 

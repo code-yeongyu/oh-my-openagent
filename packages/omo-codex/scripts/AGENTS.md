@@ -1,6 +1,6 @@
 # scripts — published Node installer entrypoints + parity tests
 
-**Score 10** (35 files, ~18.8k LOC dominated by the generated bundle; distinct domain: stable published CLI surface).
+**Score 10** (37 files, ~18.9k LOC dominated by the generated bundle; distinct domain: stable published CLI surface).
 
 ## OVERVIEW
 
@@ -13,7 +13,7 @@ The installer's published CLI paths. `install-local.mjs` is a thin Node ESM shim
 | Stable entry (published path; never rename) | `install-local.mjs` (`installMarketplaceLocally`, `parseLazyCodexInstallCliArgs`, `runDelegatedOmoCommand`) |
 | Generated bundle (NEVER hand-edit) | `install-dist/install-local.mjs` |
 | Installer behavior source | `../src/install/` (own AGENTS.md) |
-| Largest suites | `install-config.test.mjs` (579 LOC), `install-bin-links.test.mjs` (461) |
+| Largest suites | `install-config.test.mjs` (577 LOC), `install-bin-links.test.mjs` (461) |
 | Generated-bundle API pins | `install-generated-bundle.test.mjs`, `install-local-entrypoint.test.mjs` |
 | Dev dogfood install | repo root `bun run install:codex-dev` |
 

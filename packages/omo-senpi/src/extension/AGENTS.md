@@ -6,9 +6,9 @@ Senpi ExtensionAPI composition layer: validates the host surface, registers comp
 
 | Path | Purpose |
 |------|---------|
-| `types.ts` | Structural host ports: `SenpiExtensionAPI`, `ComponentContext`, `ComponentLogger`, `OmoSenpiComponent`. The sanctioned description of the host surface; components import these, never concrete senpi types. Optional members (`rpc`, `events`, `cwd`, `appendEntry`, `registerMcpServer`, ...) stay optional so older hosts still load. |
-| `compose.ts` | `composeOmoSenpiExtension` - the activation sequence: provision toolkit PATH + `OMO_DAG_SDK_ROOT` BEFORE any component registers; capability mismatch logs one warning and disables the extension (never throws); registers the global `omo-senpi-disabled` flag plus one `omo-senpi-<name>-disabled` flag per component; installs the capture registry and idle coordinator before the component loop; each `register` is individually try/caught so one failing component never blocks the rest. |
-| `component-list.ts` | `createOmoSenpiComponents(taskComponent)`: the 18-component registration array; the task component is injected by the entry file. Order is load-bearing (documented in `../../AGENTS.md`). |
+| `types.ts` | Structural host ports: `SenpiExtensionAPI`, `ComponentContext`, `ComponentLogger`, `OmoSenpiComponent`. The sanctioned description of the host surface; components import these, never concrete senpi types. Optional members (`rpc`, `events`, `cwd`, `sharedHostEnabled`, `appendEntry`, `registerMcpServer`, ...) stay optional so older hosts still load. |
+| `compose.ts` | `composeOmoSenpiExtension` - the activation sequence: provision toolkit PATH + `OMO_DAG_SDK_ROOT` BEFORE any component registers; capability mismatch logs one warning and disables the extension (never throws); registers the global `omo-senpi-disabled` flag plus one `omo-senpi-<name>-disabled` flag per component; installs the capture registry and idle coordinator before the component loop; each `register` is individually try/caught so one failing component never blocks the rest. It also narrows the host's `sharedHostEnabled` capability into `ComponentContext` (`=== true`), which is the gate the `thread` component consumes. |
+| `component-list.ts` | `createOmoSenpiComponents(taskComponent)`: the 20-component registration array; the task component is injected by the entry file. Order is load-bearing (documented in `../../AGENTS.md`). |
 | `index.ts` | Source/dev entry: composes with the eager `createTaskComponent()` and default-exports the extension. |
 | `bundled-index.ts` | Built-artifact entry: swaps in a lazy task shim that `await import("#omo-task-runtime")`; the alias is created by `plugin/scripts/build-extension.mjs`. |
 | `idle-injection-coordinator.ts` | Shared idle-edge arbiter: components enqueue key-deduped, source-tagged injections; one flush per idle tick emits a single hidden `omo-senpi:wake` message wrapping all pending custom payloads. Production defers via a 200 ms `setTimeout` batch window (injectable `scheduleFlush` for tests) so notifications becoming ready together collapse into ONE steer injection. Passive entries (`passive: true`, used by kibitzer nudges) ride a flush that carries at least one non-passive entry and never cause a flush by themselves: a queue holding only passive entries flushes 0. |
@@ -22,7 +22,7 @@ Senpi ExtensionAPI composition layer: validates the host surface, registers comp
 
 - Components reach the shared seams only through the injected `ComponentContext` (`logger`, `config.getFlag`, `getCapturedTools`, `idleCoordinator`) - never module singletons.
 - New cross-component seams are added here, not duplicated inside components.
-- `session-start-ordering.test.ts` pins registration order; `dag-sdk.test.ts` / `toolkit-path-provisioning.test.ts` pin the env provisioning seams.
+- `session-start-ordering.test.ts` pins registration order; `dag-sdk.test.ts` / `toolkit-path-provisioning.test.ts` pin the env provisioning seams; `thread-policy.test.ts` pins the shared-host capability matrix.
 
 ## Anti-patterns
 

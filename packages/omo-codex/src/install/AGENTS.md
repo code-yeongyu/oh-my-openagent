@@ -1,6 +1,6 @@
 # src/install — Codex installer engine (TypeScript source of truth)
 
-**Score 14** (63 source modules + 53 colocated tests, ~15.7k LOC; the package's largest code mass).
+**Score 14** (66 production modules + 49 colocated tests, ~16.0k LOC; the package's largest code mass).
 
 ## OVERVIEW
 
@@ -38,7 +38,7 @@ Everything the `lazycodex` install/upgrade surface does: plugin cache install, `
 
 - NO generic TOML serializer: sections, dotted keys, and multiline values are edited by text-scanning `toml-section-editor.ts`, so comments, ordering, and unknown user sections survive.
 - Writes atomic (`codex-config-atomic-write.ts` temp+rename).
-- Tests colocated `*.test.ts`, Bun test, real-filesystem tempdirs, explicit platform cases. Heaviest: `codex-config-toml.test.ts` (878 LOC), `codex-cleanup.test.ts` (783), `codex-cache.test.ts` (654).
+- Tests colocated `*.test.ts`, Bun test, real-filesystem tempdirs, explicit platform cases. Heaviest: `codex-config-toml.test.ts` (876 LOC), `codex-cleanup.test.ts` (782), `codex-cache.test.ts` (625).
 - Source imports omit `.ts` extensions (Bun/bundler resolution).
 
 ## ANTI-PATTERNS

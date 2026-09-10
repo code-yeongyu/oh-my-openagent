@@ -44,3 +44,6 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | `context7.ts` | Context7 with optional auth header |
 | `grep-app.ts` | Grep.app (no auth) |
 | `lsp.ts` | Local stdio MCP config for packaged `lsp-tools-mcp` |
+| `runtime-executable.ts` | `RuntimeExecutableResolver`: pick node vs bun for the local CLI |
+| `cli-suffix.ts` | CLI path suffix helpers shared by the resolvers |
+| `shared/ancestor-cli-resolver.ts` | Ancestor-directory search for dist/source CLI candidates |

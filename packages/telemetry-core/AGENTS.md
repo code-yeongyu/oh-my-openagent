@@ -1,6 +1,6 @@
 # telemetry-core — Daily-Active Telemetry Primitives (Core)
 
-**Generated:** 2026-08-24
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 
@@ -13,7 +13,7 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, 
 | `record-daily-active.ts` | `recordDailyActive(input)` — orchestrator: enabled? → client → dedup → `trackActive` → flush → shutdown |
 | `posthog-client.ts` | `createTelemetryClient`, `isTelemetryClientEnabled`, `createDefaultPostHogTransport` |
 | `activity-state.ts` | `getDailyActiveCaptureState`, `resolveTelemetryStateDir`, `getTelemetryActivityStateFilePath` |
-| `env.ts` | `shouldDisableTelemetry`, `getTelemetryApiKey/Host`, `hasTelemetryApiKey` |
+| `env.ts` | `shouldDisableTelemetry`, `getTelemetryApiKey/Host`, `hasTelemetryApiKey`, `isConfiguredTelemetryApiKey` (a build that never stamped a key resolves to `UNCONFIGURED_POSTHOG_API_KEY` and counts as no key) |
 | `machine-id.ts` | `getTelemetryDistinctId`, `getDefaultTelemetryOsProvider` |
 | `events.ts` | `createEventTelemetryClient` — typed event capture wrapper (see NOTES) + `EventTelemetryClient`, `EventPropertyAllowlist`, `CreateEventTelemetryClientInput`, … |
 | `diagnostics.ts` | `writeTelemetryDiagnostic`, `cleanupTelemetryDiagnostics` |

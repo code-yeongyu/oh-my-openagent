@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-~39 files (~5.5k LOC incl. tests; `storage/` subdir persists tool results). Most complex hook. Recovers from context window limit errors via multiple strategies applied in sequence.
+49 TypeScript files and 5.6k LOC including tests; the `storage/` subtree persists tool results. Most complex hook. Recovers from context window limit errors via multiple strategies applied in sequence.
 
 ## RECOVERY STRATEGIES (in priority order)
 

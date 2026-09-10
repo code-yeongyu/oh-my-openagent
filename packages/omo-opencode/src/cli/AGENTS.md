@@ -30,29 +30,33 @@ Commander.js CLI with 12 commands (`sparkshell` removed 2026-07). Entry: `index.
 ```
 cli/
 ├── index.ts                     # Entry point → runCli()
-├── cli-program.ts               # Commander.js program (10 commands)
+├── cli-program.ts               # Commander.js root program and core command registration
 ├── install.ts                   # Routes to TUI or CLI installer
 ├── cli-installer.ts             # Non-interactive (console output)
 ├── tui-installer.ts             # Interactive (@clack/prompts)
 ├── model-fallback.ts            # Model config gen by provider availability
 ├── provider-availability.ts     # Provider detection
 ├── fallback-chain-resolution.ts # Fallback chain logic
-├── config-manager/              # 27 config utilities
+├── config-manager/             # 28 config utilities
 │   ├── plugin registration, provider config
 │   ├── JSONC operations, auth plugins
 │   └── npm dist-tags, binary detection
 ├── doctor/
 │   ├── runner.ts                # Parallel check execution
 │   ├── formatter.ts             # Output formatting
-│   └── checks/                  # 25 check files (8 registered + 3 Codex-only) — see [doctor/AGENTS.md](doctor/AGENTS.md)
+│   └── checks/                  # 26 check files (8 registered + 3 Codex-only) — see [doctor/AGENTS.md](doctor/AGENTS.md)
 ├── run/                         # Session launcher
 │   ├── runner.ts                # Main orchestration
 │   ├── agent-resolver.ts        # Flag → env → config → Sisyphus
 │   ├── session-resolver.ts      # Create/resume sessions
 │   ├── event-handlers.ts        # Event processing
 │   └── poll-for-completion.ts   # Wait for todos/background tasks
-├── worktree-sweep/               # Stale git worktree classification + sweep
-└── mcp-oauth/                   # OAuth token management
+├── boulder/                     # Boulder state inspection and formatting
+├── get-local-version/           # Installed-versus-local version resolution
+├── worktree-sweep/              # Stale git worktree classification + sweep
+├── mcp-oauth/                   # OAuth token management
+├── install-senpi/               # Canonical Senpi installer adapter
+└── install-codex/               # Canonical Codex installer adapter
 ```
 
 ## MODEL FALLBACK SYSTEM

@@ -1,6 +1,6 @@
 # scripts — plugin build/sync/migration orchestration
 
-**Score 14** (29 files, ~3.5k LOC; distinct domain: executable orchestration layer between manifests and components).
+**Score 14** (27 files, ~3.3k LOC; distinct domain: executable orchestration layer between manifests and components).
 
 ## OVERVIEW
 
@@ -10,7 +10,7 @@ Executable Node ESM scripts driving the plugin build pipeline, SessionStart conf
 
 | File | Role |
 |------|------|
-| `build-components.mjs` | Sequential component builds (captured output, no interleave); `bun build` re-bundle for bootstrap |
+| `build-components.mjs` | Component builds fanned out to `availableParallelism()`, each child's output buffered and flushed as one block (no interleave); `bun build` re-bundle unless the component ships `dist/.omo-runtime-manifest.json` |
 | `sync-version.mjs` | Stamps the version across plugin/component manifests |
 | `sync-hook-status-messages.mjs` | Generates `(OmO <version>)` statusMessage stamps |
 | `sync-skills.mjs` | Wipes + regenerates the aggregate `skills/` tree |
@@ -22,9 +22,9 @@ Executable Node ESM scripts driving the plugin build pipeline, SessionStart conf
 
 ## CONVENTIONS
 
-- Every CLI entry guards with `isCliEntry()` (`pathToFileURL(process.argv[1])` comparison); without it a symlinked plugin-cache path silently no-ops the whole hook.
+- Any script that is BOTH importable and runnable guards its CLI body with `isCliEntry()` (`auto-update`, `migrate-codex-config`, `materialize-shared-upstreams`, `sync-version`, `sync-hook-status-messages`, `sync-skills`); a plain `pathToFileURL(process.argv[1])` comparison silently no-ops the whole hook when the plugin cache is reached through a symlink. Build-only drivers (`build-components.mjs`, `build-bundled-mcp-runtimes.mjs`) execute at top level by design.
 - TOML is edited via `migrate-codex-config/toml-section-editor.mjs` (455 LOC, own scanner preserving comments/order/multiline) — never a generic TOML parser.
-- Subprocess orchestration captures output sequentially; component tasks run `npm run build`, bundling uses `bun build --target node --format esm`.
+- Subprocess output is captured per child and flushed whole, so parallel builds stay readable; component tasks run `npm run build`, bundling uses `bun build --target node --format esm` with `node:` builtin specifiers normalized afterwards.
 
 ## ANTI-PATTERNS
 
@@ -35,5 +35,5 @@ Executable Node ESM scripts driving the plugin build pipeline, SessionStart conf
 
 ## COMMANDS
 
-- `node plugin/scripts/<script>.mjs` (entries are `isCliEntry`-guarded; safe to import)
+- `node plugin/scripts/<script>.mjs` (guarded entries are safe to import without executing)
 - Full pipeline: `npm run build` from `plugin/`

@@ -25,8 +25,8 @@ tool.execute.after (read/write/edit/multiedit)
 | File | Purpose |
 |------|---------|
 | `hook.ts` | `createRulesInjectorHook()` — wires cache + injector, handles tool events |
-| `injector.ts` | `createRuleInjectionProcessor()` — orchestrates find → cache → inject |
-| `finder.ts` | `findRuleFiles()` + `calculateDistance()` — locate AGENTS.md near target path |
+| `injector.ts` | Facade re-exporting the processor, cache, and transcript contracts |
+| `finder.ts` | Facade re-exporting rule discovery and distance helpers |
 | `rule-file-finder.ts` | Walk directory tree to find AGENTS.md / .rules files |
 | `rule-file-scanner.ts` | Scan for rule files in a directory |
 | `matcher.ts` | Match file paths against rule file scope |
@@ -37,7 +37,7 @@ tool.execute.after (read/write/edit/multiedit)
 | `storage.ts` | Persist injected paths across tool calls |
 | `parser.ts` | Parse rule file content |
 | `constants.ts` | Rule file names: `AGENTS.md`, `.rules`, `CLAUDE.md` |
-| `types.ts` | `RuleFile`, `InjectionResult`, `RuleFileScope` |
+| `injection-types.ts` / `types.ts` | Processor contracts and rule metadata types |
 
 ## RULE FILE DISCOVERY
 

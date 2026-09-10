@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-This module provides a bidirectional integration system: **outbound** session event notifications (Discord/Telegram/HTTP webhook/shell command) AND **inbound** reply handling (daemon polls chat apps, injects replies back into tmux session). Harness-neutral gateway, daemon, session registry, and tmux injection primitives are extracted to [`packages/openclaw-core/`](../../../../packages/openclaw-core); this directory keeps OpenCode startup/event wiring stable.
+This directory is a thin compatibility surface over `@oh-my-opencode/openclaw-core`: every local module is a one-line re-export that keeps OpenCode import paths stable. Outbound gateway dispatch, inbound reply listeners, daemon state, session registry, and tmux injection are implemented in the core package - change behavior there, and keep the layout below only as the map of which core module owns what.
 
 ## BIDIRECTIONAL FLOW
 
@@ -24,7 +24,7 @@ Discord/Telegram API → reply-listener daemon (separate Bun process)
   → reply-listener-injection.ts: send-keys into tmux pane (rate limited)
 ```
 
-## KEY FILES
+## KEY FILES (each re-exports the same-named core module)
 
 | File | Purpose |
 |------|---------|
@@ -59,7 +59,7 @@ Discord/Telegram API → reply-listener daemon (separate Bun process)
 - `src/plugin/event.ts` — calls `dispatchOpenClawEvent()` for session.created/deleted/idle
 - `src/config/schema/openclaw.ts` — Zod config schema
 
-## DAEMON LIFECYCLE
+## DAEMON LIFECYCLE (IMPLEMENTED IN CORE)
 
 ```
 initializeOpenClaw(config)
@@ -70,7 +70,7 @@ initializeOpenClaw(config)
   → on reply: lookup in session-registry → inject into tmux via send-keys
 ```
 
-## SECURITY
+## SECURITY (ENFORCED IN CORE)
 
 - **URL validation**: HTTPS required except localhost (config.ts)
 - **Authorized users**: Inbound replies filtered by allowed user ID list

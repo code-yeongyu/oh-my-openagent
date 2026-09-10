@@ -1,6 +1,6 @@
 # skills-loader-core — Skill Loading + Matching (Core)
 
-**Generated:** 2026-08-24 (f3642fcda)
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 
@@ -25,6 +25,6 @@ Confirmed by grep: consumed by `omo-opencode` skill features in ~70 files across
 - **Exports:** barrel root plus subpath exports for `./opencode-skill-loader`, `./builtin-skills`, `./opencode-runtime-skills`, `./skill`, `./auto-slash-command`, `./shared/*`, and `./config/*`.
 - **Skill matching:** `tools/skill/skill-matcher.ts` provides `matchSkillByName()`, `matchCommandByName()`, and `findPartialMatches()`; ambiguous short-name matches refuse to resolve.
 - **Runtime skill source:** `features/opencode-runtime-skills/` exports `selectRuntimeSecuritySkills()` and `createRuntimeSkillSourceServer()`; dual-runtime (Bun.serve preferred, Node http fallback), loopback-only, `cache-control: no-store`, 404 on unknown paths.
-- **123 TypeScript files** under `src/` (86 non-test). Barrel entry `src/index.ts`.
+- **124 TypeScript files** under `src/` (86 non-test), plus embedded Markdown skill resources. Barrel entry `src/index.ts`.
 
 Parent: [packages/AGENTS.md](../AGENTS.md)

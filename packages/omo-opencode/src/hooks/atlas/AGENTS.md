@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-~60 files (~14k LOC incl. tests; 34 production modules). The `atlasHook` — Continuation Tier hook that monitors session.idle events and forces continuation when boulder sessions (ralph-loop, task-spawned agents) have incomplete work. Also enforces write/edit policies for subagent sessions and runs a first-prompt watchdog (90s default) for sessions that never produce output.
+62 files and 11.3k LOC including tests (34 production modules). The `atlasHook` — Continuation Tier hook that monitors session.idle events and forces continuation when boulder sessions (ralph-loop, task-spawned agents) have incomplete work. Also enforces write/edit policies for subagent sessions and runs a first-prompt watchdog (90s default) for sessions that never produce output.
 
 ## WHAT ATLAS DOES
 

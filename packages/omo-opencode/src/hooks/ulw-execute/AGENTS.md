@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-20 files (11 impl + 9 tests). Session Tier hook powering `/ulw-execute`: detects the command template in the prompt, picks a Prometheus plan (explicit arg, session history affinity, or discovery), initializes/resumes boulder state, scaffolds notepads, and appends a context block to the first text part. Also parses `--worktree`, `--make-pr`, `--ship` flags.
+21 files (13 implementation + 7 tests + this file). Session Tier hook powering `/ulw-execute`: detects the command template in the prompt, picks a Prometheus plan (explicit arg, session history affinity, or discovery), initializes/resumes boulder state, scaffolds notepads, and appends a context block to the first text part. Also parses `--worktree`, `--make-pr`, `--ship` flags.
 
 ## STRUCTURE
 
@@ -14,6 +14,7 @@
 | `ulw-execute-hook.ts` | Hook factory. Handlers for `chat.message` + `command.execute.before`, both call `processUlwExecute`. `$SESSION_ID`/`$TIMESTAMP` substitution, marker-guarded injection |
 | `parse-user-request.ts` | Extracts `<user-request>` body -> `{planName, explicitWorktreePath, makePr, ship}`. Strips `ultrawork|ulw` keywords and wrapping quotes |
 | `context-info-builder.ts` | `buildUlwExecuteContextInfo`: routing brain. Multiple resume options -> pick list; single -> resume; none -> discovery |
+| `context-info-formatters.ts` | Renders resume/discovery/pick-list context blocks emitted by the builder |
 | `plan-discovery-context.ts` | `shouldResume*` / `shouldDiscoverPlans` predicates + discovery output (no plans / all complete / auto-select / multi-plan pick list) |
 | `explicit-plan-context.ts` | Named-plan path: match existing work, else `findPlanByName`, else fall back to sole incomplete plan, else "Plan Not Found" |
 | `plan-selection.ts` | `findPlanByName` (exact -> normalized -> partial), `pickPreferredIncompletePlan`, list formatting, missing-plan context |

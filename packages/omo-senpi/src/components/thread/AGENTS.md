@@ -2,7 +2,7 @@
 
 Cross-session thread tools: six agent-callable tools that address PEER sessions (terminal, desktop, or tool-created) through the shared `senpi --mode rpc --multi-session` socket host. The host, its ensure/handshake, and the lifecycle supervisor live in senpi (`packages/coding-agent/src/modes/rpc/`); this directory owns the tool contracts, addressing, the address book, the transcript reader, durable receipts, the ordered-delivery mailbox, prompt routing, and the tool-search discovery metadata.
 
-Assembly status: `index.ts` re-exports contracts and errors only. No assembled `thread_*` tool handler exists yet; the components are driven directly, which is exactly what the QA suites do.
+Assembly status: the six tools ARE assembled. `tools.ts` builds them (`createThreadTools` / `registerThreadTools`) and `component.ts` registers them, but only when the host advertises the shared multi-session host (`ctx.sharedHostEnabled === true`); otherwise the component registers nothing at all. `index.ts` re-exports the whole surface. The QA suites still drive the components directly against a real socket host.
 
 ## Anatomy
 
@@ -16,6 +16,9 @@ Assembly status: `index.ts` re-exports contracts and errors only. No assembled `
 | `receipts.ts` | Durable idempotency receipts under `receipts/` in the component state dir. `begin`/`complete`/`execute` over fsynced atomic writes with a lock dir; 30-day retention (`RECEIPT_RETENTION_MS`), `prune()` removes expired receipts. |
 | `mailbox.ts` | `createOrderedDeliveryMailbox`: per-target FIFO with durable on-disk state, delivery modes auto/steer/follow_up, bounds of 128 messages and 1 MiB per queue, and a 50 ms retry timer per target. |
 | `prompt-routing.ts` | `PromptRouter` over senpi's existing `extension_ui_request` frames: routes each prompt per policy (`answer-here`, `leave-to-own-client`, `auto-cancel`), authorizes the answerer, and cancels with a recorded reason on timeout or `close()`. |
+| `tools.ts` | Assembles the six tools: receipt admission (`replay`/`conflict`/`in_progress`/`uncertain`), address-book resolution, mailbox delivery, and error mapping. A missing socket surfaces as `host_unavailable`. |
+| `component.ts` | `createThreadComponent`: shared-host gate, live surface or injected host seam, state directory, caller identity. |
+| `live-surface.ts` | Client for senpi's existing supervisor-owned socket (`THREAD_SOCKET_ENV_NAMES`, `resolveThreadSocket`). It never starts or replaces a host. |
 | `metadata.ts` | Tool-search entries (`exposure: "search"`, group `threads`, verb-led labels, unique keywords) plus the single family-wide `promptGuidelines` string. No indexed field carries a negated-use sentence because BM25 indexes negated words positively. |
 | `discovery.test.ts` and the other `*.test.ts` | Pure-seam unit tests; live-socket behavior is proven by the QA harnesses below instead. |
 
@@ -62,11 +65,11 @@ Prompt routing: the policy of an in-flight prompt is immutable; `changePolicy` t
 
 ## Error taxonomy
 
-Thread tool codes (`THREAD_ERROR_CODES`): `invalid_arguments`, `caller_context_missing`, `not_found`, `ambiguous_target`, `scope_denied`, `name_conflict`, `not_resumable`, `orphaned`, `foreign_live_owner`, `no_active_turn`, `turn_conflict`, `not_steerable`, `message_too_large`, `queue_full`, `cursor_invalid`, `cursor_stale`, `idempotency_conflict`, `idempotency_in_progress`, `idempotency_uncertain`, `approval_unavailable`, `approval_route_locked`, `partial_commit`, `unsupported`, `overloaded`, `transport_closed`, `internal_error`.
+Thread tool codes (`THREAD_ERROR_CODES`): `invalid_arguments`, `caller_context_missing`, `not_found`, `ambiguous_target`, `scope_denied`, `name_conflict`, `not_resumable`, `orphaned`, `foreign_live_owner`, `no_active_turn`, `turn_conflict`, `not_steerable`, `message_too_large`, `queue_full`, `cursor_invalid`, `cursor_stale`, `idempotency_conflict`, `idempotency_in_progress`, `idempotency_uncertain`, `approval_unavailable`, `approval_route_locked`, `partial_commit`, `unsupported`, `overloaded`, `transport_closed`, `host_unavailable`, `internal_error`.
 
 Prompt-route codes (separate union in `prompt-routing.ts`): `prompt_route_locked`, `prompt_response_not_authorized`, `prompt_not_found`.
 
-Common mappings: an oversized message is `message_too_large` (32 KiB tool cap, 1 MiB mailbox cap); a full per-target queue (128 messages or 1 MiB) is `queue_full`; a changed active turn under steer is `turn_conflict` with the message held undelivered; reusing an idempotency key with different arguments is `idempotency_conflict`; a concurrent in-flight operation on the same key is `idempotency_in_progress`; a delivery target with no live owner is `not_resumable`.
+Common mappings: an oversized message is `message_too_large` (32 KiB tool cap, 1 MiB mailbox cap); a full per-target queue (128 messages or 1 MiB) is `queue_full`; a changed active turn under steer is `turn_conflict` with the message held undelivered; reusing an idempotency key with different arguments is `idempotency_conflict`; a concurrent in-flight operation on the same key is `idempotency_in_progress`; a delivery target with no live owner is `not_resumable`; an absent or unreachable socket is `host_unavailable`.
 
 ## Desktop mirror
 

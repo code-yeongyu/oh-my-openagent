@@ -1,6 +1,7 @@
 # omo-config-core - Harness-Neutral omo.json Config Core
 
-**Generated:** 2026-07-07
+**Generated:** 2026-09-10
+**Commit:** bee8c2ba4
 
 ## OVERVIEW
 
@@ -16,8 +17,10 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 | `src/schema/model-catalog.ts` | `OmoModelCatalogSchema` / `*Layer` variants: record of short name to `{ model, variant?, reasoningEffort? }`. |
 | `src/schema/category.ts` | `OmoCategoryConfigSchema` / `OmoCategoriesConfigSchema`. Keeps the OpenCode camelCase keys (`maxTokens`, `reasoningEffort`, `textVerbosity`) verbatim for parity. |
 | `src/schema/git-master.ts` | `OmoGitMasterSettingsSchema` (`commit_footer` bool\|string, `include_co_authored_by` bool, both default `true`) + `resolveOmoGitMasterSettings` for commit attribution in the Senpi harness. |
+| `src/schema/format-on-mutation.ts` | Layered `format_on_mutation` settings and canonical parsed type used by mutation consumers. |
 | `src/schema/agent.ts` | `OmoAgentDefSchema` / `OmoAgentsConfigSchema` (`execution_mode`, `max_depth`, `allowed_subagents`, ...). |
-| `src/schema/task.ts` | `OmoTaskSettingsSchema` + nested `OmoTaskNotificationSchema`, `OmoTaskWaitSchema`, `OmoTaskTeamSettingsSchema`, all with defaults. |
+| `src/schema/task.ts` | `OmoTaskSettingsSchema` + nested `OmoTaskNotificationSchema`, `OmoTaskWaitSchema`, `OmoTaskTeamSettingsSchema`, and DAG settings, all with defaults. |
+| `src/schema/memory.ts` | Memory reflection, sync, search, recall, nudge, facts, dream, people, and soul settings plus layered override schemas. |
 | `src/schema/team.ts` | `OmoTeamSpecSchema` (discriminated `category` / `subagent_type` members) + `OmoTeamsConfigSchema`; `*Layer` partial variants for per-file overrides. |
 | `src/schema/fallback-models.ts` | `OmoFallbackModelsSchema` union (string, string[], object[], mixed[]) + `OmoThinkingConfigSchema`. |
 | `src/loader/loader.ts` | `loadOmoConfig(options)` - reads each layer, JSONC-parses, validates the layer, merges, resolves the harness/profile view, then validates the merged config with defaults applied once at the end. |
@@ -61,7 +64,7 @@ Recursively deep-merges plain objects; scalars and arrays replace. `__proto__`, 
 ## DEPENDENCIES & CONSUMERS
 
 - **Depends on:** `@oh-my-opencode/utils` (`parseJsoncSafe`, `isPlainObject`, `isUnsafeObjectKey`), `jsonc-parser`, `zod`.
-- **Consumed by:** `packages/senpi-task` (schema types re-used by the task/team config surface), `packages/omo-senpi` (`components/config-resolution` wraps `loadOmoConfig` + `resolveModelReferences`; `components/config-startup` runs the migration engine at startup; `components/task` consumes the resolved config), `packages/omo-opencode` (`plugin-config/omo-config-chain.ts` builds the per-layer OpenCode views and the user-only protected view; `startup-migration.ts` drives the engine; `config-migration/` supplies OpenCode-side discovery + transform), and `packages/omo-codex` (`plugin/shared/src/config-loader.ts` + `config-migration.ts` for the `config.jsonc` group).
+- **Consumed by:** `packages/senpi-task` (schema types re-used by the task/team config surface), `packages/omo-senpi` (`components/config-resolution` wraps `loadOmoConfig` + `resolveModelReferences`; `components/config-startup` runs the migration engine at startup; `components/task` consumes the resolved config), `packages/omo-opencode` (`plugin-config/omo-config-chain.ts` builds the per-layer OpenCode views and the user-only protected view; `startup-migration.ts` drives the engine; `config-migration/` supplies OpenCode-side discovery + transform), and `packages/omo-codex` (`plugin/shared/src/config-loader.ts` + `config-migration.ts` for the `config.jsonc` group). Model-reference expansion is a separate post-view step, so consumers must use its returned diagnostics as well as the resolved config.
 
 ## QA
 

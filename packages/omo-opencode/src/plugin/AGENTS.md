@@ -4,13 +4,13 @@
 
 ## OVERVIEW
 
-Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `PluginInterface` here (an additional 2, `experimental.session.compacting` + `experimental.compaction.autocontinue`, are wired in `src/testing/create-plugin-module.ts`). Each handler file maps to one OpenCode hook type.
+Core glue layer. Direct files assemble the OpenCode hook handlers wired into `PluginInterface` (compaction handlers are wired separately by `src/testing/create-plugin-module.ts`). The directory also owns tool-registry assembly and runtime skill context.
 
 ## HANDLER FILES
 
 | File | OpenCode Hook | Purpose |
 |------|---------------|---------|
-| `config.ts` | `config` | 6-phase config loading pipeline (delegates to `plugin-handlers/`) |
+| `plugin-interface.ts` (sibling) | `config` and runtime hook wiring | The direct handler factories are composed here; config work delegates to `plugin-handlers/` |
 | `tool-registry.ts` | `tool` | 12-38 tools assembled with config gates (team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1, goal +3); split across `tool-registry-{core-tools,team-tools,gated-tools}.ts` |
 | `tool-definition.ts` | `tool.definition` | Per-tool definition transform (applies todo-description-override) |
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection, goal command dispatch + default goal auto-start |
@@ -85,7 +85,7 @@ const allTools = {
 
 ## KEY PATTERNS
 
-- Each handler exports a function receiving `(hookRecord, ctx, pluginConfig, managers)` → returns the OpenCode hook function.
+- Handler factories receive the hook records and runtime dependencies, then return OpenCode hook functions; `plugin-interface.ts` is the final composition boundary.
 - Handlers iterate over hook records, calling each hook with `(input, output)` in registration order.
 - `safeHook()` wrapper isolates hook errors so one broken hook does not crash the chain.
 - `filterDisabledTools(allTools, disabled_tools)` prunes tools listed in `disabled_tools` config.

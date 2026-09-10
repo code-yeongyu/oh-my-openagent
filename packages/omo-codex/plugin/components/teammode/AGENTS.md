@@ -21,6 +21,7 @@ Codex team-mode component. Two deliverables in one dir:
 - `skills/teammode/scripts/team-worktree.mjs` - git worktree provisioning + `merge --no-ff --no-edit` integration; conflict leaves the tree mid-merge for the leader to resolve and re-run.
 - `skills/teammode/scripts/team-guide.mjs` - pure string builders for `guide.md` + the short member bootstrap trigger, branched by transport (V2: `/root` leader target + `members[].agentPath` peers + `send_message`/`followup_task`; codex_app: `codex_app.send_message_to_thread` + `codex://threads/<id>` deep links), `WORKING:` / `BLOCKED:` heartbeat rules, English-only member traffic.
 - `test/thread-title-hook.test.ts` - hook unit tests (vitest-style imports, run via `bun test`).
+- `test/v2-spawn-schema.test.ts` - guards the `multi_agent_v2` spawn payload shape the skill documents.
 
 ## WHERE TO LOOK
 

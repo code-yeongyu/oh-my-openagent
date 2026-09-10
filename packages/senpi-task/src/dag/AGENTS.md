@@ -1,6 +1,6 @@
 # dag - Dependency-Frontier Task DAG Engine
 
-Compile a node definition into an execution graph, admit each node the moment every node it dependsOn has completed (plus a free resident slot), journal every boundary transition to a filesystem WAL, and recover runs after crashes. Largest subsystem in senpi-task (35 files, ~13.9k LOC; added after the 2026-07 package snapshot). Public surface: `index.ts` barrel + package subpath `./dag`; consumer is the omo-senpi task component (`dag-runtime.ts`, `dag-tool.ts`, `dag-rpc-bridge.ts`).
+Compile a node definition into an execution graph, admit each node the moment every node it dependsOn has completed (plus a free resident slot), journal every boundary transition to a filesystem WAL, and recover runs after crashes. Largest subsystem in senpi-task (39 TypeScript files - 19 implementation, 20 test - ~16.3k LOC; added after the 2026-07 package snapshot). Public surface: `index.ts` barrel + package subpath `./dag`; consumer is the omo-senpi task component (`dag-runtime.ts`, `dag-tool.ts`, `dag-rpc-bridge.ts`).
 
 ## Anatomy
 
@@ -11,7 +11,7 @@ Compile a node definition into an execution graph, admit each node the moment ev
 | `fingerprint.ts` | `dagFingerprint` (canonicalize -> sha256), `dagDefinitionFingerprint`, `nodeFingerprintInput`. |
 | `events.ts` | Pure builders for all 17 boundary events. No seq/lane metadata here. |
 | `journal.ts` | `createDagJournal` / `subscribeDagJournal`: sequenced append + checkpoint projection seam. |
-| `store.ts` | `createDagFileStore`: WAL append/read with torn-tail recovery, checkpoint/result/key persistence, run/key/task-owner locks, per-session run cap, retention pruning. Layout `<stateDir>/dag/{runs,events,results,keys,locks}`; key ids `dagKeyHash = sha256(parentSessionId + "\0" + runKey)`. Atomic temp+rename writes, fsync on by default. |
+| `store.ts` | `createDagFileStore`: WAL append/read with torn-tail recovery, checkpoint/result/key persistence, run/key/task-owner locks, per-session run cap, retention pruning. Layout `<stateDir>/dag/{runs,events,results,keys,locks}`; key ids `dagKeyHash = sha256(parentSessionId + "\0" + runKey)`. Atomic temp+rename writes, fsync on by default. Locks publish with exclusive `wx` creation, and Windows-only `EPERM`/`EBUSY` cleanup races are retried instead of failing an owned start. |
 | `manager.ts` | `createDagManager`: start/amend/replay, `DagRunRecordV1` projection, fingerprint-keyed run reuse; amendment guards `invalid_amendment`, `amend_running_node`, `run_still_active`. |
 | `scheduler.ts` | `createDagScheduler`, `applyDagSchedulerEvent`, `observeDagSchedulers`: dependency-frontier execution (node admitted when every dependsOn node completed + a free slot), residency-denied retry queue, task attach/outcome folding, dependent skip cascade (runs at frontier quiescence), cancellation, event replay. |
 | `node-control-context.ts` + `node-retry.ts` + `node-send.ts` | Node-scoped recovery: retry failed/cancelled/skipped nodes (un-skips cascaded dependents), steer a running node's child or revive a finished one. Codes `node_not_found` / `node_not_retryable` / `node_not_continuable`. |

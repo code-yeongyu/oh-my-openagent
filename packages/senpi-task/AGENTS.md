@@ -1,17 +1,17 @@
 # senpi-task - Senpi Task State Machine + Tool Surface
 
-**Generated:** 2026-08-24 / f3642fcda
+**Generated:** 2026-09-10 / bee8c2ba4
 
 ## OVERVIEW
 
-The Senpi-coupled engine behind the `omo-senpi` task component: a durable task state machine, a persistent record store, two child runners (in-process and RPC process), a residency/TTL/reconcile lifecycle, an exactly-once completion notifier, a steering engine, a named-team runtime, and the 4 task + 7 lead-team `ToolDefinition`s. Package: `@oh-my-opencode/senpi-task` (private, `sideEffects: false`). `@code-yeongyu/senpi` and `typebox` are optional peers (`package.json:62`) so pure state/store/schema code stays runnable without a live Senpi import; runner and tool code that needs the Senpi surface is isolated. Do not import `packages/omo-opencode` from here.
+The Senpi-coupled engine behind the `omo-senpi` task component: a durable task state machine, a persistent record store, two child runners (in-process and RPC process), a residency/TTL/reconcile lifecycle, an exactly-once completion notifier, a steering engine, a named-team runtime, and the 4 task + 6 lead-team `ToolDefinition`s. Package: `@oh-my-opencode/senpi-task` (private, `sideEffects: false`). `@code-yeongyu/senpi` and `typebox` are optional peers (`package.json:62`) so pure state/store/schema code stays runnable without a live Senpi import; runner and tool code that needs the Senpi surface is isolated. Do not import `packages/omo-opencode` from here. Every subsystem below carries its own AGENTS.md (`src/`, `state/`, `store/`, `manager/`, `lifecycle/`, `runners/` + `runners/rpc/`, `completion/`, `steering/`, `category/`, `agents/`, `team/` + `messaging/` + `member-extension/`, `dag/`, and each `tools/*` surface); read the nearest one before editing that area.
 
 ## ANATOMY
 
 | Area | Path | Purpose |
 |------|------|---------|
 | State machine | `src/state/` | `TaskStatus` (7: `pending`/`running`/`completed`/`error`/`cancelled`/`interrupted`/`lost`) and `ResidencyState` (5) enums, `TaskRecord`, and `transitionTaskRecord` with late/invalid-transition audits (`state/types.ts`, `state/transitions.ts`). |
-| Store | `src/store/` | `createTaskRecordStore` JSONL record store with an in-memory read cache (mtime+size validated; `list()` prunes entries whose files vanished on disk) and a capped (16) LRU append-fd pool reusing open JSONL log handles; `resolveStateDir` (`<project_dir>/.omo/senpi-task` default, `store/state-dir.ts:6`), redaction, and the security test. |
+| Store | `src/store/` | `createTaskRecordStore` - one JSON record per task under `tasks/` plus a separate JSONL event log per task under `logs/` - with an in-memory read cache (mtime+size validated; `list()` prunes entries whose files vanished on disk) and a capped (16) LRU append-fd pool reusing open JSONL log handles; `resolveStateDir` (`<project_dir>/.omo/senpi-task` default, `store/state-dir.ts:6`), redaction, and the security test. |
 | Runners | `src/runners/` | `InProcessRunner` (shares parent tool closures; `ChildSpec.completion` defaults to `final-text` and supports `turn` for tool-only children) and `RpcProcessRunner` (spawns a child Senpi process with JSON-RPC steer/abort/prompt). RPC internals under `src/runners/rpc/`. |
 | Manager | `src/manager/` | `createTaskManager` wiring runners, concurrency, name registry, depth policy, execution-mode resolution, and transcript logging. |
 | Lifecycle | `src/lifecycle/` | `createTaskLifecycle` - residency admission (`residency.ts`), session-shutdown suspension (`shutdown.ts`), crash reconcile and scoped resume revival (`reconcile.ts` + `reconcile-revival.ts`, batch admission under the fenced lease in `admission-lease.ts`), and the two-phase TTL sweep (`ttl.ts`, tombstones inside the record lock so deletion cannot orphan a live handle or a fresh revival claim). See SESSION SUSPEND AND RESUME REVIVAL. |
@@ -110,7 +110,7 @@ bun test packages/senpi-task
 ```
 
 - Co-located `*.test.ts` throughout use given/when/then. The seeded chaos bench (`src/__adversarial__/chaos-bench.test.ts`, 200 iterations, `SEED=<label>` to rerun a seed) asserts: (1) exactly-once notification per `(task_id, run_epoch)`, (2) terminal idempotence, (3) no concurrency slot leak, (4) no unhandled rejection.
-- Standalone manual QA scripts write a disposable fixture tree and never touch repo state: `bun packages/senpi-task/scripts/manual-qa.ts <evidence-dir>` (store + transitions), plus `manual-category-qa.ts`, `manual-agents-qa.ts`, `manual-output-qa.ts`.
+- Standalone manual QA scripts write a disposable fixture tree and never touch repo state: `bun packages/senpi-task/scripts/manual-qa.ts <evidence-dir>` (store + transitions), plus `manual-category-qa.ts`, `manual-agents-qa.ts`, `manual-output-qa.ts`, and `manual-routing-policy-qa.ts`.
 - Live end-to-end proof runs through the `omo-senpi` task component drivers, not this package alone. `task-e2e.mjs` proves single and `tasks:[...]` batch delegation; `team-e2e.mjs` proves injection-driven delivery, reservation reclaim, and kill-between-inject-and-commit restart deduplication. See [`packages/omo-senpi/AGENTS.md`](../omo-senpi/AGENTS.md).
 
 Parent: [`packages/AGENTS.md`](../AGENTS.md).
