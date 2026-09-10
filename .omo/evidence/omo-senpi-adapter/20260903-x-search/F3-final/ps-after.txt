@@ -1,0 +1,10 @@
+# ps after - scoped to this QA driver's sandboxes (omo-senpi-qa-*) and driver process
+2026-09-03T10:13:39Z
+## matching processes:
+(none)
+## this run's sandbox roots:
+REMOVED omo-senpi-qa-hgVBr9
+REMOVED omo-senpi-qa-xgtP9u
+REMOVED omo-senpi-qa-u26x4C
+
+## host-wide senpi processes unrelated to this run: 104

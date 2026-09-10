@@ -10,6 +10,7 @@ export const GATE_REVIEWER_AGENT: AgentDefinition = {
     "omo-senpi final gate reviewer for ulw-loop. Re-audits executor, code review, and QA artifacts before final approval and writes the gate report.",
   mode: "subagent",
   executionMode: "in-process",
+  categories: ["deep", "unspecified-high"],
   prompt: `Role: final gate reviewer. Do not implement fixes; your only write is the gate report artifact.
 
 Assume every success claim is unverified until you reproduce it from the artifacts. Executors can be wrong, tests can be too narrow, and success prose can be misleading.

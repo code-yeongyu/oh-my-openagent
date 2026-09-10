@@ -1,0 +1,29 @@
+{
+  "task": "2 catalog trio to gpt-6-astra",
+  "changed_files": [
+    "packages/omo-codex/plugin/model-catalog.json",
+    "packages/omo-codex/plugin/scripts/migrate-codex-config/catalog.mjs",
+    "packages/omo-codex/src/install/codex-model-catalog.ts",
+    "packages/omo-codex/scripts/check-model-catalog-parity.mjs",
+    "packages/omo-codex/plugin/test/aggregate-model-catalog.test.mjs",
+    "packages/omo-codex/plugin/test/migrate-codex-config.test.mjs",
+    "packages/omo-codex/scripts/install-config-reasoning.test.mjs",
+    "packages/omo-codex/src/install/codex-config-reasoning.test.ts",
+    "packages/omo-codex/src/version-coherence.test.ts",
+    "packages/omo-codex/plugin/test/auto-update.test.mjs"
+  ],
+  "red_proof": "Executed failing-first reconstruction in task-2-red.log (st_01a08154, mengmotaMac, 2026-09-08T14:05:52Z). Pristine dev 8bd0c35b3ba532ab0cb0df49ea71467303aa92ba plus branch TEST files only: node --test aggregate-model-catalog/migrate-codex-config/auto-update -> 68 pass, 20 fail, TEST_EXIT=1; aggregate-model-catalog's default/verifier/worker assertion expected Astra catalog version but received Sol, with the failing name and assertion visible. bun test codex-config-reasoning/version-coherence -> 8 pass, 4 fail, TEST_EXIT=1. Same commands after exact branch checkout b97e0acdf4264d0d4c989dbb8a41a3808147f3dd -> 88 Node tests and 12 Bun tests passed, each TEST_EXIT=0. Full commands, raw output hashes, tests-only provenance, and /tmp/lcx-reda-20260908 dir REMOVED / CLEANUP_EXIT=0 are in that capture. Prior grep RED remains below the executed output as supplementary evidence only. Other fields retain historical results; this scoped capture does not close separate manual-QA objections.",
+  "remote_tests": {
+    "machine": "mengmotaMac",
+    "aggregate-model-catalog.test.mjs": "3 pass, 0 fail, TEST_EXIT=0",
+    "install-config-reasoning.test.mjs": "2 pass, 3 fail, TEST_EXIT=1; failures are stale thread-cap/legacy-default expectations outside todo 2",
+    "version-coherence.test.ts + codex-config-reasoning.test.ts": "11 pass, 0 fail, TEST_EXIT=0"
+  },
+  "acceptance": [
+    "jq -r .current.model -> gpt-6-astra",
+    "worktree parity script -> MATCH",
+    "origin/dev source comparison -> MISMATCH with gpt-5.6-sol",
+    "remote checkout cleanup confirmed: ls -d /tmp/lcx-fix2-20260908 -> No such file or directory"
+  ],
+  "status": "Evidence recaptured. The required catalog aggregate and TypeScript suites pass remotely; the separately run install-config-reasoning suite remains red on stale expectations for todo 4 behavior, and is recorded verbatim rather than claimed green."
+}

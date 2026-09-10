@@ -14,6 +14,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
 
 const AGGREGATE_EXPECTED_LABELS = new Map([
+	["hooks/post-tool-use-recording-spawn-admission.json:PostToolUse:0:0", "Recording Spawn Admission"],
 	["hooks/hooks.json:SessionStart:0:0", "Loading Project Rules"],
 	["hooks/hooks.json:SessionStart:1:0", "Recording Session Telemetry"],
 	["hooks/hooks.json:SessionStart:2:0", "Checking Auto Update"],
@@ -25,17 +26,16 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:PreToolUse:1:0", "Enforcing Unlimited Goal Budget"],
 	["hooks/hooks.json:PostToolUse:0:0", "Checking Comments"],
 	["hooks/hooks.json:PostToolUse:0:1", "Checking LSP Diagnostics"],
-	["hooks/hooks.json:PostToolUse:0:2", "Checking CodeGraph Init Guidance"],
 	["hooks/hooks.json:PostToolUse:1:0", "Matching Project Rules"],
 	["hooks/hooks.json:PostCompact:0:0", "Resetting Git Bash MCP Reminder"],
 	["hooks/hooks.json:PostCompact:1:0", "Resetting Project Rule Cache"],
 	["hooks/hooks.json:PostCompact:2:0", "Resetting LSP Diagnostics Cache"],
 	["hooks/hooks.json:Stop:0:0", "Checking Ulw-Execute Continuation"],
-	["hooks/hooks.json:SubagentStop:0:0", "Checking Ulw-Execute Continuation"],
-	["hooks/hooks.json:SubagentStop:1:0", "Verifying LazyCodex Executor Evidence"],
+	["hooks/hooks.json:SubagentStop:0:0", "Verifying LazyCodex Executor Evidence"],
 ]);
 
 const COMPONENT_EXPECTED_LABELS = new Map([
+	["components/ulw-loop/hooks/hooks.json:PostToolUse:0:0", "Recording Spawn Admission"],
 	["components/comment-checker/hooks/hooks.json:PostToolUse:0:0", "Checking Comments"],
 	["components/lsp/hooks/hooks.json:PostToolUse:0:0", "Checking LSP Diagnostics"],
 	["components/lsp/hooks/hooks.json:PostCompact:0:0", "Resetting LSP Diagnostics Cache"],
@@ -48,7 +48,6 @@ const COMPONENT_EXPECTED_LABELS = new Map([
 	["components/ulw-loop/hooks/hooks.json:UserPromptSubmit:0:0", "Checking Ulw-Loop Steering"],
 	["components/ulw-loop/hooks/hooks.json:PreToolUse:0:0", "Enforcing Unlimited Ulw-Loop Budget"],
 	["components/ulw-execute-continuation/hooks/hooks.json:Stop:0:0", "Checking Ulw-Execute Continuation"],
-	["components/ulw-execute-continuation/hooks/hooks.json:SubagentStop:0:0", "Checking Ulw-Execute Continuation"],
 	[
 		"components/lazycodex-executor-verify/hooks/hooks.json:SubagentStop:0:0",
 		"Verifying LazyCodex Executor Evidence",

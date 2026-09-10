@@ -1,0 +1,13 @@
+sandbox_root=<sandbox>
+project=<sandbox>/project
+xdg_config=<sandbox>/config
+xdg_data=<sandbox>/data
+xdg_state=<sandbox>/state
+xdg_cache=<sandbox>/cache
+real_db=<live-opencode-db>
+real_session_count_before=1814
+real_session_count_after=1814
+real_session_count_unchanged=yes
+sandbox_db=<sandbox>/data/opencode/opencode.db
+sandbox_session_count=1
+sandbox_retained_for_review=<sandbox>

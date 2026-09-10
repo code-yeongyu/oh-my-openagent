@@ -1,0 +1,175 @@
+{
+  "queryId": "q05",
+  "lane": "omo-tool",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 반도체 외인 매수 since:2026-08-31 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-31",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421364,
+    "completed_at": 1788421364,
+    "id": "27a1817a-c3fd-96f5-a031-28c7afc131df",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-1ae07fc7-658d-43c0-8638-ab72d7d2f3ee-0",
+        "input": "{\"query\":\"코스피 반도체 외인 매수 since:2026-08-31 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_27a1817a-c3fd-96f5-a031-28c7afc131df_call-1ae07fc7-658d-43c0-8638-ab72d7d2f3ee-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_27a1817a-c3fd-96f5-a031-28c7afc131df_call-1ae07fc7-658d-43c0-8638-ab72d7d2f3ee-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/hyakue0123waje/status/2094680652314763652 - 09/01 증시마감: 코스피 0.23% 상승 6835.80, 외인·기관 매도 속 개인 매수, 반도체 대형주 반등 (@hyakue0123waje, 2026-09-01)\nhttps://x.com/jichoi18/status/2094302297643954391 - KR market overview 2026-08-31: 코스피 강회복, 외인 반도체 매수 전환 SK하이닉스 순매수, 삼성전자 매도 지속 (@jichoi18, 2026-08-31)\nhttps://x.com/n2txbf/status/2094287180013457763 - 09/01 장중 코멘트: 코스피 -2.10% 반도체주 급락, 외인·기관 순매도 (@n2txbf, 2026-08-31)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094680652314763652",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094680652314763652"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094287180013457763",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094287180013457763"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094302297643954391",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094302297643954391"
+              }
+            ]
+          }
+        ],
+        "id": "msg_27a1817a-c3fd-96f5-a031-28c7afc131df",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-31",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 81946500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 81946500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:42:44.443Z"
+}

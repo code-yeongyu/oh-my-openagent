@@ -1,0 +1,1497 @@
+WHAT WAS TESTED
+Todo 4, PR A lcx/astra-default-models, base 7c1c66c61b83a0dce97e2b30f9d8971a1ff7d881.
+Changed only the allowed guards, installer source, enumerated tests with obsolete cap expectations, and the regenerated installer bundle. bootstrap source has no cap re-exports; bootstrap-hooks.test.mjs needed no changes and passes unmodified.
+
+WHAT WAS OBSERVED
+Remote RED: 13 pass / 4 fail in the new installer test seam; received config included the forced 1000/16 caps.
+Final stable wider Bun gate: 293 pass / 1 skip / 1 fail across 295 tests. Every todo-4 installer test and both bundle-freshness tests passed. The sole failure is outside this task: src/install/link-cached-plugin-agents-regression.test.ts:18 expects high, receives xhigh.
+Final enumerated Node tests: 105 pass / 0 fail, including the committed installer API, migration, and bootstrap hook tests.
+Local tsgo: exit 0. LSP diagnostics were checked on all 14 changed code/generated files: no errors or warnings; the existing unused rm import hint remains in install-codex-project-local-cleanup.test.ts.
+Isolated installer QA: seeded managed caps removed (0 matches); user V2 cap 4 preserved. Real ~/.codex/config.toml SHA1 before and after: b012e531f5aa9fb1bce9003593c3eadf07081fcd.
+
+WHY IT IS ENOUGH
+Chose targeted cleanup in the two existing guards instead of a TOML-wide rewrite: it preserves existing model-catalog precedence, flag normalization, explicit-disable handling, agent role blocks, and user values. The explicit plan exception remains: V2-preferred sessions remove the incompatible agents.max_threads key. Tests cover old V2 cap 16, managed 1000 caps, user V1 6 and V2 8/4, Astra and Astra-fast catalog fallback, quoted cap keys, multiline-string lookalikes, and idempotence. The rebuilt bundle is exercised through the real installer surface and its source/body digests match.
+
+WHAT WAS OMITTED / SETUP ADJUSTMENTS
+No local bun test, no agentic probe, no auth-file access, and no commit/push/checkout/stash occurred.
+The plain frozen install initially failed in prepare because pushTree omits .git but prepare initializes submodules. The remote dependency install therefore uses --ignore-scripts after capturing that setup error. Bun does not run these node:test .mjs files in its suite discovery here; node --test explicitly executed all six enumerated .mjs paths.
+Bundle freshness reads the Git index, not the working tree. In the disposable remote tree only, git init and git add of the uploaded bundle supplied that index without creating a commit. Both freshness checks passed. No local staging occurred.
+A remote snapshot taken while isolated QA was rebuilding component dist files missed rules/comment-checker CLI artifacts; that setup failure is captured below. The stable final snapshot was taken after QA/build completion and the resulting gate has only the out-of-scope agent-effort failure. No failing tests were skipped or deleted.
+The broad rg acceptance also matches cleanup comparisons and unrelated numeric fixtures; there are no cap-producing constants or cap write/raise paths. All remaining 1000 substring matches are classified below.
+
+
+===== INITIAL SETUP FAILURE (not RED) =====
+MACHINES mengmotaHost:offline,vultr-tokyo:online,sionicMac:online,gorky:online,mengmotaMac:online
+REMOTE mengmotaMac
+EXIT 1
+STDOUT
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+fatal: not a git repository (or any of the parent directories): .git
+file:///private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.7.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+
+STDERR
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+
+
+===== CAPTURED RED =====
+MACHINES mengmotaHost:offline,vultr-tokyo:online,sionicMac:online,gorky:online,mengmotaMac:online
+REMOTE mengmotaMac
+EXIT 1
+STDOUT
+bun install v1.4.0 (34cbb9a40)
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [1386.00ms]
+bun test v1.4.0 (34cbb9a40)
+
+STDERR
+
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:
+(pass) codex MultiAgentV2 config > #given legacy boolean flag and table #when updating config #then output remains valid TOML without enabling V2 [7.68ms]
+(pass) codex MultiAgentV2 config > #given an inline-commented V2 thread cap #when updating config twice #then preserves the line and ordering byte-for-byte [8.71ms]
+(pass) codex MultiAgentV2 config > #given installer config has a escaped quoted V2 header #when updating twice #then preserves the semantic cap without duplication [4.96ms]
+(pass) codex MultiAgentV2 config > #given installer config has a quoted cap key #when updating twice #then preserves the semantic cap without duplication [3.87ms]
+(pass) codex MultiAgentV2 config > #given installer config has a escaped quoted cap key #when updating twice #then preserves the semantic cap without duplication [4.24ms]
+(pass) codex MultiAgentV2 config > #given installer config has a dotted cap key #when updating twice #then preserves the semantic cap without duplication [3.08ms]
+(pass) codex MultiAgentV2 config > #given installer config has a root-qualified dotted cap key #when updating twice #then preserves the semantic cap without duplication [3.56ms]
+(pass) codex MultiAgentV2 config > #given multiline string contains V2 cap lookalikes #when updating config #then writes the absent semantic default [2.40ms]
+(pass) codex MultiAgentV2 config > #given V2 section multiline value contains a cap lookalike #when updating config #then writes the absent default [2.39ms]
+(pass) codex MultiAgentV2 config > #given root-dotted features and string lookalikes #when updating config #then replaces the semantic flag only [2.93ms]
+(pass) codex MultiAgentV2 config > #given root-dotted plugin flag has a multiline value #when updating config #then replaces the whole semantic assignment [5.35ms]
+(pass) codex MultiAgentV2 config > #given multiline string closes after an escaped quote #when updating config #then preserves the following explicit cap [2.21ms]
+303 |       marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+304 |       pluginNames: ["omo"],
+305 |     })
+306 | 
+307 |     const content = await readFile(configPath, "utf8")
+308 |     expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+                              ^
+error: expect(received).not.toMatch(expected)
+
+Expected substring or pattern: not /^\s*max_threads\s*=/m
+Received: "model = \"gpt-6-astra\"\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[agents]\nmax_threads = 1000\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T10:08:17Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:308:25)
+(fail) codex MultiAgentV2 config > #given no limits #when updating config #then does not add either thread cap [2.41ms]
+333 |       pluginNames: ["omo"],
+334 |     } as const
+335 | 
+336 |     await updateCodexConfig(updateInput)
+337 |     const managed = await readFile(configPath, "utf8")
+338 |     expect(managed).not.toMatch(/^\s*max_threads\s*=/m)
+                              ^
+error: expect(received).not.toMatch(expected)
+
+Expected substring or pattern: not /^\s*max_threads\s*=/m
+Received: "model = \"gpt-6-astra\"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 1000\n\n[agents]\nmax_threads = 1000\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T10:08:17Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:338:25)
+(fail) codex MultiAgentV2 config > #given managed and user thread caps #when updating config #then removes managed values and preserves user values [2.76ms]
+360 |       marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+361 |       pluginNames: ["omo"],
+362 |     })
+363 | 
+364 |     const content = await readFile(configPath, "utf8")
+365 |     expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+                              ^
+error: expect(received).not.toMatch(expected)
+
+Expected substring or pattern: not /^\s*max_threads\s*=/m
+Received: "model = \"gpt-6-astra\"\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[agents]\nmax_threads = 1000\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 16\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T10:08:17Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:365:25)
+(fail) codex MultiAgentV2 config > #given gpt-6-astra with unavailable catalog #when resolving multi-agent mode #then prefers V2 [2.00ms]
+377 |       marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+378 |       pluginNames: ["omo"],
+379 |     })
+380 | 
+381 |     const content = await readFile(configPath, "utf8")
+382 |     expect(content).toMatch(/^\s*max_threads\s*=\s*6/m)
+                          ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /^\s*max_threads\s*=\s*6/m
+Received: "model = \"gpt-5.5\"\n\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 8\n\n[agents]\nmax_threads = 1000\n\n[features]\nmulti_agent = true\nplugin_hooks = true\nplugins = true\n\n[marketplaces.debug]\nlast_updated = \"2026-09-08T10:08:17Z\"\nsource_type = \"local\"\nsource = \"/repo/packages/omo-codex\"\n\n[plugins.\"omo@debug\"]\nenabled = true\n"
+
+      at <anonymous> (/private/tmp/lcx-t4-20260908-red/omo/packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:382:21)
+(fail) codex MultiAgentV2 config > #given user caps #when updating config #then does not raise them [2.02ms]
+(pass) codex MultiAgentV2 config > #given disabled boolean shorthand #when updating config #then explicit disable is preserved in table form [2.82ms]
+
+ 13 pass
+ 4 fail
+ 53 expect() calls
+Ran 17 tests across 1 file. [1.51s]
+
+
+===== FINAL STABLE BUN GATE (including bundle freshness) =====
+MACHINES mengmotaHost:offline,vultr-tokyo:online,sionicMac:online,gorky:online,mengmotaMac:online
+REMOTE mengmotaMac DIR /tmp/lcx-t4-20260908-6b518e32/omo COMMAND git init -q && git add packages/omo-codex/scripts/install-dist/install-local.mjs && bun install --frozen-lockfile --ignore-scripts && bun test packages/omo-codex/src/install packages/omo-codex/scripts packages/omo-codex/plugin/test script/codex-install-bundle-freshness.test.ts EXIT 1
+bun install v1.4.0 (34cbb9a40)
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [4.79s]
+bun test v1.4.0 (34cbb9a40)
+
+script/codex-install-bundle-freshness.test.ts:
+(pass) committed Codex installer bundle > #given the tracked bundle #when its build marker is read #then it is present and self-consistent [39.52ms]
+(pass) committed Codex installer bundle > #given current installer sources #when compared with the tracked bundle marker #then the bundle is current [63.41ms]
+
+packages/omo-codex/src/install/codex-cache.test.ts:
+(pass) codex-cache > rewrites cached mcp manifest relative args and cwd [2.66ms]
+(pass) codex-cache > rewrites bundled mcp manifest args that point outside the plugin cache into bundled cache paths [2.40ms]
+(pass) codex-cache > rewrites cached package file dependencies that point outside the plugin cache back to the source package [25.12ms]
+(pass) codex-cache > #given source plugin has an npm lockfile #when caching plugin #then lockfile is preserved for deterministic install [11.67ms]
+(pass) codex-cache > #given stale sparkshell guidance in prompt surfaces #when caching plugin #then cache promotion is rejected [14.45ms]
+(pass) codex-cache > #given stale sparkshell guidance in component prompt surfaces #when caching plugin #then cache promotion is rejected [90.92ms]
+(pass) codex-cache > #given existing cache #when npm install fails #then previous active cache is preserved [37.86ms]
+(pass) codex-cache > #given existing cache #when final promotion fails #then previous active cache is restored [54.00ms]
+(pass) codex-cache > #given source plugin has built component runtimes #when caching plugin #then component dist files are preserved for hooks [85.67ms]
+(pass) codex-cache > #given packaged root CLI runtimes #when caching omo plugin #then root dist is materialized into the plugin cache [106.37ms]
+(pass) codex-cache > links cached plugin bins and stays idempotent [57.50ms]
+(pass) codex-cache > #given nested component declares reserved omo bin #when linking cached plugin bins #then skips the nested top-level command [30.38ms]
+(pass) codex-cache > #given stale managed ulw-loop omo symlink #when linking cached plugin bins #then removes it [20.06ms]
+(pass) codex-cache > #given stale local-source ulw-loop omo symlink #when linking cached plugin bins #then removes it [17.20ms]
+(pass) codex-cache > #given stale public ulw symlink points at deleted cache payload #when linking cached plugin bins #then removes the dangling managed link [6.22ms]
+(pass) codex-cache > #given dangling symlink points at another cached plugin #when linking cached plugin bins #then preserves it [3.98ms]
+(pass) codex-cache > #given non-managed bin points at deleted omo cache payload #when linking cached plugin bins #then preserves the user symlink [3.73ms]
+(pass) codex-cache > #given legacy codex-prefixed component symlinks #when linking cached plugin bins #then removes stale managed symlinks without touching user files [16.17ms]
+(pass) codex-cache > #given user-owned codex-prefixed symlink #when linking cached plugin bins #then preserves the user symlink [7.23ms]
+(pass) codex-cache > #given user-owned codex symlink with component-like target #when linking cached plugin bins #then preserves the user symlink [3.31ms]
+(pass) codex-cache > writes Windows command shims for cached plugin bins [4.29ms]
+(pass) codex-cache > rejects existing non-generated Windows command shims [15.68ms]
+
+packages/omo-codex/src/install/codex-cache-mcp-manifest.context7.test.ts:
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has placeholder api-key args #when rewriting #then drops placeholder auth [3.92ms]
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has real api-key args #when rewriting #then preserves user auth [3.67ms]
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has env-only placeholder auth #when rewriting #then drops placeholder env [1.39ms]
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has dangling api-key flag #when rewriting #then drops blank auth flag [2.01ms]
+
+packages/omo-codex/src/install/codex-subagent-limit-config.test.ts:
+(pass) codex subagent limit config > #given empty Codex config #when updating config #then leaves both thread limits unset [22.65ms]
+(pass) codex subagent limit config > #given existing low agents max_threads #when updating config #then preserves the root cap [14.29ms]
+
+packages/omo-codex/src/install/link-cached-plugin-agents.test.ts:
+(pass) linkCachedPluginAgents > creates regular file copies on linux so agent roles survive snapshot cleanup [27.46ms]
+(pass) linkCachedPluginAgents > creates regular file copies on darwin (macOS) [14.30ms]
+(pass) linkCachedPluginAgents > creates regular file copies on Windows (no symlinks) [29.35ms]
+(pass) linkCachedPluginAgents > replaces stale broken symlinks with regular files on unix [34.55ms]
+(pass) linkCachedPluginAgents > overwrites stale copies on Windows [36.34ms]
+(pass) linkCachedPluginAgents > preserves installed agent reasoning effort when reinstalling file copies [28.60ms]
+(pass) linkCachedPluginAgents > ignores malformed installed agent reasoning effort when reinstalling file copies [21.01ms]
+(pass) linkCachedPluginAgents > preserves removed installed agent service tier when reinstalling file copies [30.70ms]
+(pass) linkCachedPluginAgents > ignores malformed installed agent service tier when reinstalling file copies [18.85ms]
+(pass) linkCachedPluginAgents > preserves reviewer reasoning like any other compatibility fixture [9.88ms]
+(pass) linkCachedPluginAgents > writes a manifest under the plugin cache listing installed agent paths for clean uninstall [5.09ms]
+(pass) linkCachedPluginAgents > is idempotent across re-runs [11.33ms]
+(pass) linkCachedPluginAgents > discovers TOMLs across multiple component agent directories [8.15ms]
+(pass) linkCachedPluginAgents > returns empty list when plugin has no bundled agents [3.79ms]
+(pass) linkCachedPluginAgents > auto-detects host platform when platform parameter is omitted [13.64ms]
+
+packages/omo-codex/src/install/codex-cached-marketplace-manifest.test.ts:
+(pass) writeCachedMarketplaceManifest > #given installed plugin directory exists #when writing cached marketplace manifest #then local source points at that directory [4.96ms]
+(pass) writeCachedMarketplaceManifest > #given installed plugin directory is missing #when writing cached marketplace manifest #then existing manifest is preserved [8.84ms]
+
+packages/omo-codex/src/install/install-codex-reasoning.test.ts:
+(pass) #given a canonical reasoning level #when the Codex installer runs #then config.toml carries the mapped model_reasoning_effort [99.74ms]
+
+packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:
+(pass) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [2347.37ms]
+(pass) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML [3748.58ms]
+
+packages/omo-codex/src/install/codex-config-toml.test.ts:
+(pass) codex-config-toml > #given autonomous permissions requested #when updating config #then enables full Codex autonomy [4.12ms]
+(pass) codex-config-toml > #given empty Codex config #when updating config #then leaves MultiAgentV2 settings unset without root multi-agent mode [5.12ms]
+(pass) codex-config-toml > #given stale queue multi-agent mode #when updating config #then removes unsupported root key [6.33ms]
+(pass) codex-config-toml > #given stale indented steering mode and inline-comment features table #when updating config #then removes root key and preserves table [10.71ms]
+(pass) codex-config-toml > #given stale proactive multi-agent mode #when updating config #then removes unsupported root key [23.84ms]
+(pass) codex-config-toml > #given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning without setting a thread limit [3.10ms]
+(pass) codex-config-toml > #given empty Codex config #when updating config #then leaves Context7 to the plugin MCP manifest [8.53ms]
+(pass) codex-config-toml > #given sisyphuslabs omo install #when updating config #then enables Context7 plugin mcp policy [7.93ms]
+(pass) codex-config-toml > #given existing Context7 MCP server #when updating config #then leaves user server settings untouched [5.84ms]
+(pass) codex-config-toml > #given real Context7 API key and placeholder comment #when updating config #then preserves user server settings [2.77ms]
+(pass) codex-config-toml > #given stale Context7 placeholder MCP server #when updating config #then removes it for the plugin MCP [14.23ms]
+(pass) codex-config-toml > #given legacy boolean MultiAgentV2 flag and table #when updating config #then normalizes to table config [7.78ms]
+(pass) codex-config-toml > #given legacy boolean MultiAgentV2 flag false #when updating config #then normalizes to a disabled table config [5.70ms]
+(pass) codex-config-toml > #given legacy agents max_threads #when updating config #then preserves the user root subagent thread cap [3.58ms]
+(pass) codex-config-toml > #given gpt-5.6 v2 model in models_cache #when updating config #then skips agents.max_threads and legacy disable [3.69ms]
+(pass) codex-config-toml > #given gpt-5.6 family model without models_cache #when updating config #then treats it as V2-preferred [3.07ms]
+(pass) codex-config-toml > #given gpt-5.6-luna resolving v1 in models_cache #when updating config #then keeps the v1 thread cap [3.13ms]
+(pass) codex-config-toml > #given user-modified config without root model #when updating config #then does not introduce agents.max_threads [4.08ms]
+(pass) codex-config-toml > #given managed agent role sections #when updating config #then preserves role config without raising root agents max_threads [3.06ms]
+(pass) codex-config-toml > writes config blocks and stays idempotent [9.04ms]
+(pass) codex-config-toml > #given marketplace bootstrap preserves source #when marketplace block exists #then existing source stays byte-identical [3.36ms]
+(pass) codex-config-toml > #given config path is a symlink #when updating config #then writes through target and preserves link [24.83ms]
+(pass) codex-config-toml > repairs existing agent config_file entries without dropping descriptions [11.15ms]
+(pass) codex-config-toml > #given git marketplace source #when updating config #then writes second-precision timestamp and ref [14.73ms]
+(pass) codex-config-toml > #given agent name needs quoting #when updating config #then writes quoted agent key [16.30ms]
+(pass) #given model_catalog_json declares a v2 family model as v1 #when updating config #then keeps agents.max_threads [12.12ms]
+
+packages/omo-codex/src/install/codex-config-agent-cleanup.test.ts:
+(pass) codex config managed agent cleanup > #given stale managed OMO agent sections #when updating with current agent links #then removes missing managed roles [3.95ms]
+
+packages/omo-codex/src/install/codex-cache-paths.test.ts:
+(pass) codex cache path helpers > resolves the canonical OMO plugin cache root [0.20ms]
+(pass) codex cache path helpers > resolves cached component CLI paths under a plugin version root [0.14ms]
+(pass) codex cache path helpers > selects the newest cached component CLI from an OMO cache tree [2.88ms]
+(pass) codex cache path helpers > preserves legacy component bin lookup priority [0.18ms]
+
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:
+(pass) codex MultiAgentV2 config > #given the former V2 default cap #when normalizing #then removes the cap and preserves the explicit disable [0.35ms]
+(pass) codex MultiAgentV2 config > #given legacy boolean flag and table #when updating config #then output remains valid TOML without enabling V2 [4.14ms]
+(pass) codex MultiAgentV2 config > #given an inline-commented V2 thread cap #when updating config twice #then preserves the line and ordering byte-for-byte [10.36ms]
+(pass) codex MultiAgentV2 config > #given installer config has a escaped quoted V2 header #when updating twice #then preserves the semantic cap without duplication [17.66ms]
+(pass) codex MultiAgentV2 config > #given installer config has a quoted cap key #when updating twice #then preserves the semantic cap without duplication [8.97ms]
+(pass) codex MultiAgentV2 config > #given installer config has a escaped quoted cap key #when updating twice #then preserves the semantic cap without duplication [32.99ms]
+(pass) codex MultiAgentV2 config > #given installer config has a dotted cap key #when updating twice #then preserves the semantic cap without duplication [31.47ms]
+(pass) codex MultiAgentV2 config > #given installer config has a root-qualified dotted cap key #when updating twice #then preserves the semantic cap without duplication [26.02ms]
+(pass) codex MultiAgentV2 config > #given multiline string contains V2 cap lookalikes #when updating config #then leaves the semantic cap absent [9.23ms]
+(pass) codex MultiAgentV2 config > #given V2 section multiline value contains a cap lookalike #when updating config #then leaves the cap absent [7.59ms]
+(pass) codex MultiAgentV2 config > #given root-dotted features and string lookalikes #when updating config #then replaces the semantic flag only [6.25ms]
+(pass) codex MultiAgentV2 config > #given root-dotted plugin flag has a multiline value #when updating config #then replaces the whole semantic assignment [10.47ms]
+(pass) codex MultiAgentV2 config > #given multiline string closes after an escaped quote #when updating config #then preserves the following explicit cap [4.01ms]
+(pass) codex MultiAgentV2 config > #given no limits #when updating config #then does not add either thread cap [4.54ms]
+(pass) codex MultiAgentV2 config > #given managed and user thread caps #when updating config #then removes managed values and preserves user values [4.08ms]
+(pass) codex MultiAgentV2 config > #given gpt-6-astra with unavailable catalog #when resolving multi-agent mode #then prefers V2 [1.95ms]
+(pass) codex MultiAgentV2 config > #given user caps #when updating config #then does not raise them [1.57ms]
+(pass) codex MultiAgentV2 config > #given disabled boolean shorthand #when updating config #then explicit disable is preserved in table form [1.54ms]
+
+packages/omo-codex/src/install/codex-process.test.ts:
+(pass) codex-process > #given Windows npm command #when resolving run command invocation #then uses cmd shim [0.17ms]
+(pass) codex-process > #given non-Windows npm command #when resolving run command invocation #then preserves direct execution [0.11ms]
+(pass) codex-process > #given Windows codex command #when resolving run command invocation #then uses cmd shim so the npm-installed codex.cmd resolves instead of ENOENT [0.10ms]
+(pass) codex-process > #given non-Windows codex command #when resolving run command invocation #then preserves direct execution [0.08ms]
+(pass) codex-process > #given Windows non-shim command #when resolving run command invocation #then preserves direct execution [0.08ms]
+
+packages/omo-codex/src/install/git-bash.test.ts:
+(pass) git-bash > #given non-Windows platform #when resolving Git Bash #then no preflight is required [0.25ms]
+(pass) git-bash > #given Windows env override to bash.exe #when the file exists #then env path wins [0.16ms]
+(pass) git-bash > #given Windows env override not pointing to bash.exe #when resolving #then reports invalid override and stops [0.14ms]
+(pass) git-bash > #given Windows standard 64-bit Git Bash exists #when resolving #then uses Program Files path [0.10ms]
+(pass) git-bash > #given Windows standard 32-bit Git Bash exists #when resolving #then uses Program Files x86 path [0.09ms]
+(pass) git-bash > #given Windows bash on PATH #when standard paths are missing #then uses where bash candidate [0.13ms]
+(pass) git-bash > #given Windows System32 bash alias is the only PATH candidate #when resolving #then it is not accepted as Git Bash [0.10ms]
+(pass) git-bash > #given WindowsApps bash alias is the only PATH candidate #when resolving #then it is not accepted as Git Bash [0.10ms]
+(pass) git-bash > #given Windows without Git Bash #when resolving #then returns install guidance [0.10ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing Codex install #then winget is not run automatically [0.15ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing #then winget is not run and install hint is returned [0.11ms]
+(pass) git-bash > #given non-Windows platform #when preparing #then winget is never called [0.11ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing #then original install hint is preserved [0.12ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing #then resolver is not retried after system install [0.11ms]
+
+packages/omo-codex/src/install/lazycodex-routing.test.ts:
+(pass) lazycodex install routing > defaults platform to codex when invoked as lazycodex [0.39ms]
+(pass) lazycodex install routing > defaults platform to codex when invoked as lazycodex-ai [0.12ms]
+(pass) lazycodex install routing > respects explicit --platform=both [0.13ms]
+(pass) lazycodex install routing > leaves omo install unresolved so argsToConfig applies opencode default [0.09ms]
+(pass) lazycodex install routing > leaves unset invocation unresolved so argsToConfig applies opencode default [0.11ms]
+
+packages/omo-codex/src/install/codex-cache-security.test.ts:
+(pass) codex-cache security boundaries > #given an array input #when using the cache record guard #then arrays remain rejected [0.36ms]
+(pass) codex-cache security boundaries > #given a malformed path #when checking existence #then non-missing filesystem errors propagate [0.23ms]
+(pass) codex-cache security boundaries > #given a package bin name with path traversal #when linking cached plugin bins #then the installer rejects it [8.13ms]
+(pass) codex-cache security boundaries > #given a package bin target outside the package root #when linking cached plugin bins #then the installer rejects it [3.71ms]
+(pass) codex-cache security boundaries > #given marketplace cache disappears between checks #when pruning marketplace cache #then missing roots are ignored [1.56ms]
+(pass) codex-cache security boundaries > #given plugin cache disappears between checks #when pruning plugin caches #then missing roots are ignored [4.32ms]
+
+packages/omo-codex/src/install/codex-config-shell-settings.test.ts:
+(pass) codex-config shell settings > #given Codex config update #when Git Bash is required by installer #then no fake shell config is written [3.09ms]
+
+packages/omo-codex/src/install/link-cached-plugin-agents-regression.test.ts:
+13 |     await writeFile(join(codexHome, "agents", "librarian.toml"), agentToml("librarian", "gpt-5.6-luna-fast", "low"))
+14 |     const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+15 | 
+16 |     await linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning })
+17 | 
+18 |     expect(await readAgentEffort(codexHome, "momus")).toBe("high")
+                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: "high"
+Received: "xhigh"
+
+      at <anonymous> (/private/tmp/lcx-t4-20260908-6b518e32/omo/packages/omo-codex/src/install/link-cached-plugin-agents-regression.test.ts:18:55)
+(fail) managed bundled agent effort migration > #given old bundled support-agent efforts #when agents are re-linked #then upgrades to current bundled defaults [18.09ms]
+(pass) managed bundled agent effort migration > #given custom installed support-agent efforts #when agents are re-linked #then preserves customization [9.83ms]
+(pass) managed bundled agent effort migration > #given old effort on a non-default model #when agents are re-linked #then preserves customization [7.11ms]
+
+packages/omo-codex/src/install/install-ast-grep-sg.test.ts:
+(pass) installAstGrepForCodex > #given cached omo plugin with ast-grep skill #when Codex provisioning runs #then it targets CODEX_HOME runtime [0.26ms]
+(pass) installAstGrepForCodex > #given vendored installer fails #when Codex installer calls it #then installation continues without throwing [0.17ms]
+
+packages/omo-codex/src/install/install-codex.test.ts:
+(pass) install-codex > #given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package [2.02ms]
+(pass) install-codex > #given wrapper root env #when resolving vendored repo root #then prefers wrapper package root [1.74ms]
+(pass) install-codex > #given canonical installer package nesting #when resolving vendored repo root #then walks past the legacy five-parent cap [2.10ms]
+(pass) install-codex > #given default CODEX_HOME #when resolving installer bin dir without override #then preserves user local bin precedence [0.39ms]
+(pass) install-codex > #given custom CODEX_HOME #when resolving installer bin dir without override #then keeps generated omo inside that Codex home [0.11ms]
+(pass) install-codex > #given explicit CODEX_LOCAL_BIN_DIR #when resolving installer bin dir #then preserves installed omo precedence [0.11ms]
+(pass) install-codex > #given codex installer #when installing omo #then registers local marketplace and cached plugin [4888.48ms]
+(pass) install-codex > #given codex installer #when installing omo #then never spawns a repo script that is not shipped [5945.39ms]
+(pass) install-codex > #given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper [248.18ms]
+(pass) install-codex > #given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home [17353.85ms]
+(pass) install-codex > #given autonomous permissions requested #when installing omo #then writes Codex autonomy settings [12910.87ms]
+
+packages/omo-codex/src/install/codex-config-autonomous-features.test.ts:
+(pass) codex-config autonomous features > #given autonomous permissions requested #when updating config #then enables Codex autonomy feature flags [23.45ms]
+(pass) codex-config autonomous features > #given autonomous permissions disabled #when updating config #then keeps native Codex feature flags enabled [11.84ms]
+(pass) codex-config autonomous features > #given existing child_agents_md setting #when updating config #then preserves it without stamping unsupported values [12.30ms]
+(pass) codex-config autonomous features > #given config without child_agents_md #when updating config #then does not add unsupported feature key [12.59ms]
+
+packages/omo-codex/src/install/codex-cache-bins.test.ts:
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the canonical runtime wrapper #then uses the new name, marker, and edition exports [17.25ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given a marker-bearing legacy omo wrapper #when writing the canonical wrapper #then deletes the legacy wrapper [27.82ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given an unmarked user-owned omo #when writing the canonical wrapper twice #then preserves omo byte-identical and remains idempotent [42.80ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the canonical runtime wrapper #then uses the new name and environment exports [17.22ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the omo-agent-toolkit runtime wrapper #then embeds the node fallback chain [17.03ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when bun is absent everywhere #then the wrapper falls back to node before exiting 127 [15.27ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then embeds the node fallback chain [8.82ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then discovers Codex bundled Node from config before bare node [9.19ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix wrapper target was removed #when running omo #then exits with reinstall guidance [434.20ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token [500.06ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec [16.50ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token [8.24ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink resolving to a marker-bearing wrapper #when writing the canonical wrapper #then removes the symlink and keeps its target [23.61ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink to an unmarked user file #when writing the canonical wrapper #then preserves the symlink [13.48ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing [14.59ms]
+
+packages/omo-codex/src/install/codex-installation-detection.test.ts:
+(pass) detectCodexInstallation > #given Codex CLI on PATH #when detecting installation #then returns the CLI path [0.35ms]
+(pass) detectCodexInstallation > #given macOS Codex app bundle #when detecting installation #then returns the app path [0.23ms]
+(pass) detectCodexInstallation > #given only a downloaded macOS Codex dmg #when detecting installation #then returns a missing result with the dmg hint [0.14ms]
+(pass) detectCodexInstallation > #given Windows standard Codex CLI install location #when detecting installation #then returns the standard CLI path [0.32ms]
+(pass) detectCodexInstallation > #given Windows Codex Start Apps entry #when detecting installation #then returns the desktop app source [0.14ms]
+(pass) detectCodexInstallation > #given Linux without Codex CLI #when detecting installation #then returns a missing result with an install hint [0.09ms]
+
+packages/omo-codex/src/install/preserved-agent-settings.test.ts:
+(pass) restorePreservedServiceTier > #given a user changed the tier to standard #when a reinstall relinks the bundled fast agent #then the user tier is restored [9.32ms]
+(pass) restorePreservedServiceTier > #given a user removed the tier entirely #when a reinstall relinks the bundled fast agent #then the tier stays absent so the parent tier is inherited [12.62ms]
+(pass) restorePreservedServiceTier > #given a fresh install with nothing preserved #when relinking #then the bundled fast tier is left unchanged [13.52ms]
+
+packages/omo-codex/src/install/codex-cache-install.test.ts:
+(pass) codex-cache install > #given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache [36.77ms]
+(pass) codex-cache install > #given outer npx env has allow-scripts case variants #when caching plugin #then npm install commands preserve only unrelated env [13.64ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed package.json #when caching plugin #then npm install reconciles the lock drift instead of npm ci [12.83ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed nothing #when caching plugin #then the install stays npm ci --omit=dev [53.98ms]
+(pass) codex-cache install > #given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached [26.03ms]
+(pass) codex-cache install > #given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved [36.20ms]
+(pass) codex-cache install > #given npm creates workspace bin shims in the cache #when caching plugin #then plugin-owned shims are removed [54.18ms]
+(pass) codex-cache install > #given packaged plugin has stale aggregate skills #when caching plugin #then syncs skills after production dependencies install [73.32ms]
+
+packages/omo-codex/src/install/codex-config-git-bash.test.ts:
+(pass) Codex config Git Bash MCP policy > #given windows platform with Git Bash enabled #when updating sisyphuslabs plugin config #then enables git_bash plugin mcp policy [12.11ms]
+(pass) Codex config Git Bash MCP policy > #given windows platform without Git Bash enabled #when updating sisyphuslabs plugin config #then disables git_bash plugin mcp policy [6.94ms]
+(pass) Codex config Git Bash MCP policy > #given non-windows platforms #when updating sisyphuslabs plugin config #then disables git_bash plugin mcp policy [10.59ms]
+
+packages/omo-codex/src/install/codex-cleanup.test.ts:
+(pass) codex cleanup > #given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config [70.97ms]
+(pass) codex cleanup > #given malformed project directory #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [25.97ms]
+(pass) codex cleanup > #given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links [47.61ms]
+(pass) codex cleanup > #given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [33.37ms]
+(pass) codex cleanup > #given provisioned runtime binaries and bootstrap plugin data #when cleanup runs #then removes only the managed subtrees [32.03ms]
+(pass) codex cleanup > #given runtime holding only the managed subtrees #when cleanup runs #then prunes the empty runtime directory [4.96ms]
+(pass) codex cleanup > #given codex home without bootstrap or runtime artifacts #when cleanup runs #then succeeds with no removed paths [5.70ms]
+(pass) codex cleanup > #given an artifact recreated after the first removal pass #when removeManagedPathBestEffort runs #then the retry clears it within one call [2.33ms]
+(pass) codex cleanup > #given a mid-flight worker recreates bootstrap state between uninstall runs #when cleanup runs twice #then the second pass clears it without error [6.64ms]
+(pass) codex cleanup > #given config sections shaped like the bootstrap worker setup output #when config text cleanup runs #then managed sections are removed and user sections survive [0.36ms]
+(pass) codex cleanup > #given single-quoted managed hook state table #when config text cleanup runs #then removes the managed hook state [0.19ms]
+(pass) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files [5.40ms]
+(pass) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones [23.34ms]
+(pass) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw [18.18ms]
+(pass) codex cleanup > #given a codex home resolving to a filesystem root #when cleanup runs #then no bin link is scanned or removed [27.02ms]
+(pass) codex cleanup > #given a user copy of a generated wrapper #when cleanup runs #then only installer bin names are removed [38.45ms]
+(pass) codex cleanup > #given a user-owned bin using an installer name without the marker #when cleanup runs #then it is kept [23.38ms]
+(pass) codex cleanup > #given a managed windows wrapper left on disk with different casing #when cleanup runs #then it is still removed [27.07ms]
+(pass) codex cleanup > #given a user-owned windows bin using an installer name in different casing #when cleanup runs #then it is kept [26.68ms]
+(pass) codex cleanup > #given an install that used a one-shot CODEX_LOCAL_BIN_DIR #when uninstall runs without that variable #then the wrapper in the recorded dir is still removed [34.65ms]
+(pass) codex cleanup > #given a recorded install bin dir and an explicit CODEX_LOCAL_BIN_DIR at uninstall #when cleanup runs #then the environment override wins [66.46ms]
+(pass) codex cleanup > #given a legacy install under another marketplace #when cleanup runs #then its legacy bins are still removed [23.93ms]
+(pass) codex cleanup > #given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept [73.85ms]
+
+packages/omo-codex/src/install/codex-config-reasoning.test.ts:
+(pass) codex-config-reasoning unified reasoning override > #given reasoning override #when updating config #then override wins over catalog default [15.62ms]
+(pass) codex-config-reasoning unified reasoning override > #given off reasoning override #when updating config #then maps to codex wire spelling none [16.81ms]
+(pass) codex-config-reasoning unified reasoning override > #given unknown reasoning token #when updating config #then catalog default is kept [11.75ms]
+(pass) codex-config-reasoning > #given empty Codex config #when updating config #then sets worker model and reasoning defaults [8.87ms]
+(pass) codex-config-reasoning > #given existing model and reasoning config #when updating config #then replaces stale defaults without duplicate keys [41.87ms]
+(pass) codex-config-reasoning > #given user-customized model config #when updating config #then preserves user reasoning values [19.90ms]
+(pass) codex-config-reasoning > #given bundled model catalog #when updating config #then reads defaults from catalog [32.14ms]
+(pass) codex-config-reasoning > #given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4 [5.85ms]
+
+packages/omo-codex/src/install/codex-package-layout-semantic.test.ts:
+(pass) Codex installer source package build split > #given monorepo source checkout without root src #when resolving TS installer build mode #then source packages are built [9.97ms]
+(pass) Codex installer source package build split > #given packaged lazycodex adapter #when resolving TS installer build mode #then bundled package artifacts are used [5.97ms]
+
+packages/omo-codex/src/install/codex-cleanup-safety.test.ts:
+(pass) codex cleanup safety > #given destructive cleanup targets #when managed removal runs #then rejects them and records skipped paths [14.17ms]
+(pass) codex cleanup safety > #given traversal-shaped cleanup target #when managed removal runs #then canonical parent escapes are skipped [11.64ms]
+(pass) codex cleanup safety > #given filesystem root as Codex home #when managed removal runs #then refuses even shaped managed paths [0.33ms]
+
+packages/omo-codex/src/install/lazycodex-install-surface.test.ts:
+(pass) lazycodex install surface > #given codex installer #when installing omo #then exposes durable LazyCodex agent roles [677.04ms]
+(pass) lazycodex install surface > #given codex installer #when installing omo #then links documented component binaries to cached runtimes [172.30ms]
+(pass) lazycodex install surface > #given installation guide #when component binaries and LazyCodex roles are documented #then docs match install surface [1.36ms]
+(pass) lazycodex install surface > #given Codex prunes an old plugin cache version #when LazyCodex roles were installed #then roles still resolve from Codex home [228.81ms]
+(pass) lazycodex install surface > #given Codex temporary marketplace snapshot is removed #when LazyCodex roles were installed #then roles still resolve from Codex home [279.66ms]
+
+packages/omo-codex/src/install/codex-project-local-cleanup.test.ts:
+(pass) codex project-local cleanup > #given stale project-local Codex config #when repairing from a nested directory #then removes legacy agent concurrency keys with a backup [20.61ms]
+(pass) codex project-local cleanup > #given root and nested project-local Codex configs #when repairing from the nested directory #then repairs every config layer Codex loads [36.94ms]
+(pass) codex project-local cleanup > #given project-local legacy artifacts #when repairing #then reports them without deleting user-owned paths [22.06ms]
+(pass) codex project-local cleanup > #given project-local config without enabled MultiAgentV2 #when repairing #then leaves legacy agent settings unchanged [19.13ms]
+(pass) codex project-local cleanup > #given no project-local config and CODEX_HOME in the parent chain #when repairing #then does not treat global Codex home as project state [12.56ms]
+(pass) codex project-local cleanup > #given project-local config is a symlink to CODEX_HOME #when repairing #then skips it without copying or mutating the target [16.15ms]
+(pass) codex project-local cleanup > #given malformed project directory from the environment #when repairing #then skips project-local cleanup without failing install [1.51ms]
+
+packages/omo-codex/src/install/codex-marketplace.test.ts:
+(pass) codex-marketplace > reads marketplace and resolves plugin source with override [9.91ms]
+(pass) codex-marketplace > rejects traversal source path [10.24ms]
+
+packages/omo-codex/src/install/codex-package-manifest.test.ts:
+(pass) Codex package manifest > includes the aggregate Codex plugin manifest in npm packages [0.23ms]
+
+packages/omo-codex/src/install/spawned-script-targets.test.ts:
+(pass) spawned script targets > #given a node invocation naming a repo script that is gone #when targets are checked #then that path is reported [3.75ms]
+(pass) spawned script targets > #given a node invocation naming a script that exists #when targets are checked #then nothing is reported [4.16ms]
+(pass) spawned script targets > #given non-script invocations and paths outside the repo #when targets are checked #then none are reported [1.32ms]
+
+packages/omo-codex/src/install/install-codex-git-bash-hooks.test.ts:
+(pass) install-codex Git Bash hooks > #given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks [265.46ms]
+(pass) install-codex Git Bash hooks > #given simulated Linux Codex install #when installing omo #then keeps git_bash MCP disabled without registering shell reminder hooks [190.96ms]
+
+packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts:
+(pass) resolveManagedAgentReasoning > #given a preserved terra/medium default #when resolving #then the new bundled effort wins [0.24ms]
+(pass) resolveManagedAgentReasoning > #given a preserved gpt-5.6-luna-fast/low default #when resolving #then the chained upgrade still lands on the new effort [0.15ms]
+(pass) resolveManagedAgentReasoning > #given a user-customized effort #when resolving #then the customization is preserved [0.54ms]
+(pass) resolveManagedAgentReasoning > #given an unlisted agent #when resolving #then the preserved effort is untouched [0.16ms]
+(pass) resolveManagedAgentReasoning > #given a preserved plan sol/max default #when resolving against sol/high #then the new bundled effort wins [0.10ms]
+(pass) resolveManagedAgentReasoning > #given a preserved worker-medium luna/max default #when resolving against terra/high #then the new bundled effort wins [0.10ms]
+(pass) resolveManagedAgentReasoning > #given a preserved qa-executor terra/medium default #when resolving against luna/high #then the new bundled effort wins [0.10ms]
+(pass) resolveManagedAgentReasoning > #given a preserved gate-reviewer sol/high default #when resolving against sol/low #then the new bundled effort wins [0.11ms]
+(pass) resolveManagedAgentReasoning > #given old high worker and reviewer defaults #when resolving #then each new bundled effort wins [0.12ms]
+(pass) resolveManagedAgentReasoning > #given a second resolve over already-migrated values #when resolving #then the result is stable [0.11ms]
+
+packages/omo-codex/src/install/lsp-daemon-reaper.test.ts:
+(pass) reapLspDaemons > #given a legacy fixture home #when creating it #then it uses the platform-safe temp root that the reaper also validates [1.64ms]
+(pass) reapLspDaemons > #given Git Bash resolves node as an MSYS path #when normalizing for Windows spawn #then it returns a native executable path [0.32ms]
+(pass) reapLspDaemons > #given PowerShell resolves node as a native path #when normalizing for Windows spawn #then it preserves the executable path [0.10ms]
+(pass) reapLspDaemons > #given legacy live endpoint selection #when targeting Unix and Windows #then it chooses a platform-valid fixture endpoint [0.81ms]
+(pass) reapLspDaemons > #given a native Windows temp Codex home #when selecting a Unix legacy endpoint #then it preserves the Windows version path and appends the socket leaf [0.20ms]
+(pass) reapLspDaemons > #given a stale hashed Unix endpoint #when reaping #then it removes the dead legacy directory idempotently [10.27ms]
+(pass) reapLspDaemons > #given a Unix hashed endpoint under Windows reaper semantics #when reaping #then it fails closed as outside the frozen vectors [6.11ms]
+(pass) reapLspDaemons > #given malformed legacy metadata #when reaping #then it removes the stale state with a structured reason [2.58ms]
+(pass) reapLspDaemons > #given a non-version entry under the legacy daemon root #when reaping #then it removes the entry with a structured version reason [2.81ms]
+(pass) reapLspDaemons > #given symlinked metadata files #when reaping #then it refuses to follow them and removes only the version dir [11.16ms]
+(pass) reapLspDaemons > #given an endpoint outside the frozen legacy vectors #when reaping #then it removes the version dir without probing or signaling [3.96ms]
+(pass) reapLspDaemons > #given a live Windows named pipe legacy daemon #when reaping #then it defers instead of signaling a pid it cannot attest [3.54ms]
+
+packages/omo-codex/src/install/install-codex-packaged.test.ts:
+(pass) #given packaged lazycodex tarball layout #when installing Codex plugin #then uses bundled artifacts without source builds [122.58ms]
+(pass) #given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform [162.69ms]
+
+packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts:
+(pass) install-codex MCP manifest > #given codex installer #when installing omo #then caches research MCPs without ast-grep MCP [12066.73ms]
+
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:
+(pass) codex MultiAgentV2 release blockers > #given gpt-5.6 v2 catalog and existing table disable #when updating config #then removes the disable [94.61ms]
+(pass) codex MultiAgentV2 release blockers > #given relative model_catalog_json declares gpt-5.6 model as v1 #when updating config #then resolves catalog beside config [123.40ms]
+(pass) codex MultiAgentV2 release blockers > #given root gpt-5.6 model without catalog #when updating config #then removes stale V2 disable [113.85ms]
+
+packages/omo-codex/src/install/codex-installed-bin-dir.test.ts:
+(pass) installed codex bin dir record > #given a bin dir recorded under the plugin version cache #when it is read back #then the recorded dir is returned [62.63ms]
+(pass) installed codex bin dir record > #given a bin dir recorded under the marketplace snapshot #when it is read back #then the recorded dir is returned [2.70ms]
+(pass) installed codex bin dir record > #given no record at all #when it is read #then null is returned so normal resolution applies [0.97ms]
+(pass) installed codex bin dir record > #given a malformed or blank record #when it is read #then null is returned rather than a bad directory [4.16ms]
+
+packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts:
+(pass) install-codex project-local cleanup > #given stale project-local Codex config #when installing Codex Light #then repairs the local conflict before returning success [35.58ms]
+(pass) install-codex project-local cleanup > #given only global CODEX_HOME config under a parent directory #when installing Codex Light #then project cleanup leaves it to the global config updater [465.49ms]
+(pass) install-codex project-local cleanup > #given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup [625.44ms]
+
+packages/omo-codex/src/install/codex-cache-bundled-mcps.pin.test.ts:
+(pass) copyBundledMcpRuntimeDists > #given the current Codex MCP manifest #when copying bundled runtimes #then it pins the copied runtime set [60.15ms]
+
+packages/omo-codex/src/install/codex-config-plugins.test.ts:
+(pass) ensureHookTrusted > #given single-quoted literal hook state table #when ensuring same Windows hook key #then updates in place [0.40ms]
+(pass) ensureHookTrusted > #given double-quoted basic hook state table #when ensuring same Windows hook key #then updates in place [0.77ms]
+
+packages/omo-codex/src/install/install-codex-git-bash-preflight.test.ts:
+(pass) install-codex Git Bash preflight > #given Windows without Git Bash #when installing Codex profile #then rejects before marketplace or config mutation [1.56ms]
+(pass) install-codex Git Bash preflight > #given Windows without Git Bash #when installing Codex profile #then winget is not run and install stops with guidance [2.11ms]
+(pass) install-codex Git Bash preflight > #given non-Windows install #when running installer #then winget is never called [736.25ms]
+(pass) install-codex Git Bash preflight > #given Windows with Git Bash #when installing Codex profile #then proceeds and reports detected path [399.06ms]
+(pass) install-codex Git Bash preflight > #given Windows env override in installer options #when no custom resolver is provided #then default resolver uses it [516.85ms]
+(pass) install-codex Git Bash preflight > #given non-Windows install #when Git Bash resolver would fail #then installer keeps existing behavior [665.14ms]
+
+packages/omo-codex/src/install/codex-cleanup-bins-coverage.test.ts:
+(pass) managed Codex bin coverage > #given every plugin component package bin #when uninstall coverage is checked #then each name is a managed bin name [230.25ms]
+
+packages/omo-codex/src/install/codex-config-permissions.test.ts:
+(pass) #given unreadable existing config #when updating config #then rejects and preserves content [25.28ms]
+(pass) #given config with legacy top-level network_access #when ensuring autonomous permissions #then removes the unsupported root key [0.41ms]
+
+packages/omo-codex/src/install/codex-hook-trust.test.ts:
+(pass) codex-hook-trust > computes trusted hook hashes for vendored plugin [11.26ms]
+(pass) codex-hook-trust > #given a command hook with commandWindows #when computing Windows trust state #then the trusted hash uses the Windows command [2.81ms]
+
+packages/omo-codex/src/install/lsp-daemon-reaper-live.test.ts:
+(pass) reapLspDaemons live ownership > #given a proven legacy daemon owner #when reaping #then it SIGTERMs the process waits for exit and removes only that version dir [229.27ms]
+(pass) reapLspDaemons live ownership > #given a responding endpoint and a reused pid #when reaping #then it defers without signaling the unrelated process [373.73ms]
+(pass) reapLspDaemons live ownership > #given a proven owner that ignores SIGTERM #when reaping #then it defers with a timeout warning and preserves the version dir [5364.79ms]
+(pass) reapLspDaemons live ownership > #given a first deferred reused pid run and a later dead endpoint #when reaping twice #then the follow-up pass removes the stale directory [3210.06ms]
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+
+1 tests skipped:
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+
+
+1 tests failed:
+(fail) managed bundled agent effort migration > #given old bundled support-agent efforts #when agents are re-linked #then upgrades to current bundled defaults [18.09ms]
+
+ 293 pass
+ 1 skip
+ 1 fail
+ 1041 expect() calls
+Ran 295 tests across 50 files. [81.57s]
+
+/tmp/lcx-t4-20260908-6b518e32 dir REMOVED
+
+
+===== FINAL NODE GATE =====
+COMMAND cd /tmp/lcx-t4-20260908-mjs-all/omo && bun install --frozen-lockfile --ignore-scripts && node --test packages/omo-codex/scripts/install-config.test.mjs packages/omo-codex/scripts/install-generated-bundle.test.mjs packages/omo-codex/plugin/test/migrate-codex-config.test.mjs packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs packages/omo-codex/plugin/test/bootstrap-hooks.test.mjs 
+EXIT 0 
+STDOUT
+bun install v1.4.0 (34cbb9a40)
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [7.73s]
+✔ #given every hooks.json under the plugin #when handlers are inspected #then no entry opts into unsupported async execution (1514.252ms)
+✔ #given aggregate and component hook manifests #when command targets are resolved #then every command and commandWindows target exists (169.979167ms)
+✔ #given aggregate hook manifests #when command handlers are inspected #then each has a Windows dispatcher (2.335125ms)
+✔ #given the bootstrap component #when its SessionStart registration is inspected #then aggregate and component entries declare both platform commands (2.146375ms)
+✔ #given non-bootstrap aggregate hook manifests #when commandWindows entries are read #then they launch the managed Node dispatcher (1.5935ms)
+✔ #given the built bootstrap bundle #when its module references are inspected #then it depends on Node built-ins only (22.192791ms)
+✔ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (1.397542ms)
+✔ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (1.184ms)
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (216.444959ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (139.313083ms)
+✔ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (77.463458ms)
+✔ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (51.103667ms)
+✔ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (148.686042ms)
+✔ #given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode (12.502541ms)
+✔ #given managed config state is malformed #when migrating #then migration ignores stale state safely (28.484833ms)
+✔ #given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used (105.469708ms)
+✔ #given managed catalog state #when catalog version advances #then only previously managed config is updated (53.725334ms)
+✔ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (186.193083ms)
+✔ #given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy (30.410334ms)
+✔ #given real Context7 API key and placeholder comment #when migrating #then preserves user server settings (22.878083ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then flips the flag to false (0.517375ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then appends a disabled section (0.229916ms)
+✔ #given multi_agent_v2 section without enabled key #when forcing disable #then inserts enabled = false (0.08575ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = true #when forcing disable #then removes it and appends a disabled section (0.140375ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out (0.0835ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then annotates the appended section (0.14475ms)
+✔ #given an annotated managed section #when forcing disable runs again #then does not duplicate the comment (0.193834ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table (628.74075ms)
+✔ #given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged (0.122ms)
+✔ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (89.607916ms)
+✔ #given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root (194.377708ms)
+✔ #given queue multi-agent mode #when removing unsupported root key #then deletes root setting (0.167208ms)
+✔ #given proactive multi-agent mode #when removing unsupported root key #then deletes root setting (0.040375ms)
+✔ #given inline-comment features table #when removing unsupported root key #then config stays unchanged (195.105292ms)
+✔ #given indented root proactive mode #when removing unsupported root key #then no root setting remains (0.182459ms)
+✔ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (84.493208ms)
+✔ #given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment (0.477084ms)
+✔ #given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table (0.142333ms)
+✔ #given an already-guarded commented config #when re-running #then output is byte-identical (0.184083ms)
+✔ #given user-disabled with an inline comment #when forcing disable #then returns config unchanged (0.059708ms)
+✔ #given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table (0.178083ms)
+✔ #given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section (0.105291ms)
+✔ #given gpt-5.6-terra with managed disable #when model catalog prefers v2 #then clears enabled=false and managed comments (0.244208ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=false #when clearing #then removes the stale metadata override (0.104958ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=true #when clearing #then leaves the default-matching value alone (0.059ms)
+✔ #given v1 model with hide_spawn_agent_metadata=false #when forcing disable #then keeps the metadata override (0.180042ms)
+✔ #given gpt-5.6-sol with no multi_agent_v2 section #when model catalog prefers v2 #then does not append a disable (0.050459ms)
+✔ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (66.929667ms)
+✔ #given config default gpt-5.5 #when SessionStart model is gpt-5.6-terra #then prefers session model and clears disable (0.218125ms)
+✔ #given SessionStart without model #when requireSessionModel is set #then skips legacy force-disable (0.057542ms)
+✔ #given legacy [features] shorthand #when requireSessionModel skips force-disable #then still removes the shorthand (0.0405ms)
+✔ #given legacy [features] shorthand #when session model has no catalog entry #then still removes the shorthand (0.0335ms)
+✔ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (221.434042ms)
+✔ #given SoT migration failure #when hook migration runs #then config.toml repair still happens (384.9275ms)
+✔ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (102.644417ms)
+✔ #given no session model and no root model #when forcing disable #then leaves the enable state untouched (0.214292ms)
+✔ #given no session model and no root model #when config has no multi_agent_v2 section #then does not append a disable (0.049167ms)
+✔ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (22.94675ms)
+✔ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (99.77075ms)
+✔ #given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable (80.114459ms)
+✔ #given relative model_catalog_json declares gpt-5.6 model as v1 #when migrating #then resolves catalog from config directory (170.592958ms)
+✔ #given no SessionStart model and root gpt-5.6 model without catalog #when migrating #then clears stale V2 disable (116.334625ms)
+✔ #given SessionStart migration sees an inline-commented V2 cap #when migrating twice #then preserves the line and ordering byte-for-byte (121.633125ms)
+✔ #given SessionStart migration sees equivalent V2 header ["features"."multi_agent_v2"] #when migrating twice #then preserves one valid table and the explicit cap (1589.578792ms)
+✔ #given SessionStart migration sees equivalent V2 header [ features . multi_agent_v2 ] #when migrating twice #then preserves one valid table and the explicit cap (240.955334ms)
+✔ #given SessionStart migration sees equivalent V2 header ["features"."multi_agent_v\u0032"] #when migrating twice #then preserves one valid table and the explicit cap (243.9035ms)
+✔ #given SessionStart migration sees a quoted cap key #when migrating twice #then preserves the semantic cap without duplication (167.5545ms)
+✔ #given SessionStart migration sees a escaped quoted cap key #when migrating twice #then preserves the semantic cap without duplication (177.49775ms)
+✔ #given SessionStart migration sees a dotted cap key #when migrating twice #then preserves the semantic cap without duplication (565.330958ms)
+✔ #given SessionStart migration sees a root-qualified dotted cap key #when migrating twice #then preserves the semantic cap without duplication (300.301875ms)
+✔ #given multiline string contains V2 cap lookalikes #when SessionStart migrates #then leaves the semantic cap absent (251.744583ms)
+✔ #given V2 section multiline value contains a cap lookalike #when SessionStart migrates #then leaves the cap absent (398.236042ms)
+✔ #given V2 root-dotted disable and cap #when gpt-5.6 SessionStart migrates #then removes disable and V1 agents cap (334.419875ms)
+✔ #given quoted dotted V1 keys under features #when SessionStart migrates #then replaces enabled without a duplicate (306.670584ms)
+✔ #given multiline string closes after an escaped quote #when SessionStart migrates #then preserves the following explicit cap (982.303208ms)
+✔ #given gpt-5.6 session model with no models_cache and an explicit V2 cap #when migrating #then removes agents.max_threads but preserves the cap (184.492791ms)
+✔ #given SessionStart config migration has no V2 cap #when migrating #then leaves the cap unset (100.6965ms)
+✔ #given config without any model #when migrating #then does not introduce agents.max_threads (3.034292ms)
+✔ #given todo 4 cap cases #when migrating #then removes managed caps, preserves user caps, and detects gpt-6 V2 (25.74075ms)
+✔ #given config without any model but an existing low cap #when migrating #then preserves the existing cap (2.64425ms)
+✔ #given empty Codex config #when script installer updates config #then leaves thread limits unset without forcing MultiAgentV2 (68.808583ms)
+✔ #given queue multi-agent mode #when script installer updates config #then removes unsupported root key (57.175583ms)
+✔ #given indented steering mode and inline-comment features table #when script installer updates config #then removes root key and keeps one features table (101.557ms)
+✔ #given empty Codex config #when script installer updates config #then leaves Context7 to the plugin MCP manifest (29.352458ms)
+✔ #given sisyphuslabs omo install #when script installer updates config #then enables Context7 plugin mcp policy (30.33825ms)
+✔ #given existing Context7 MCP config #when script installer updates config #then leaves user setup untouched (41.088375ms)
+✔ #given real Context7 API key and placeholder comment #when script installer updates config #then preserves user setup (28.519709ms)
+✔ #given stale Context7 placeholder MCP config #when script installer updates config #then removes it for plugin MCP (35.911542ms)
+✔ #given Codex config is a symlink #when script installer updates config #then writes through the target (41.576375ms)
+✔ #given sisyphuslabs config without explicit source #when script installer updates config #then uses local marketplace (121.00775ms)
+✔ #given existing MultiAgentV2 table #when script installer updates config #then preserves unrelated tuning while setting subagent thread limits (27.162208ms)
+✔ #given empty Codex config #when script installer updates config #then sets the generated MultiAgentV2 thread limit (6.731167ms)
+✔ #given user config hiding spawn_agent metadata #when script installer updates config #then preserves the generated source behavior (11.367417ms)
+✔ #given legacy boolean MultiAgentV2 flag and table #when script installer updates config #then normalizes to table config (26.701417ms)
+✔ #given legacy boolean MultiAgentV2 flag false #when script installer updates config #then normalizes to a disabled table config (104.231083ms)
+✔ #given legacy agents max_threads #when script installer updates config #then preserves the user root subagent thread cap (51.340875ms)
+✔ #given managed agent role sections #when script installer updates config #then preserves role config without raising root agents max_threads (70.802792ms)
+✔ #given existing trust and lsp blocks #when updating config #then existing blocks are preserved (125.716084ms)
+✔ #given the stable installer entrypoint #when inspecting imports #then it delegates to generated output (18.651917ms)
+✔ #given generated installer output #when importing install-local #then public installer API comes from the bundle (6.987583ms)
+✔ #given generated installer output #when importing direct bundle #then compatibility helper APIs are exported (22.624833ms)
+✔ #given no root model #when generated bundle updates config #then it does not introduce agents max_threads (72.192875ms)
+✔ #given an inline-commented V2 thread cap #when generated bundle updates config twice #then preserves the line and ordering byte-for-byte (125.495667ms)
+✔ #given explicit v1 model_catalog_json and stale models_cache v2 #when generated bundle updates config #then explicit catalog preserves disable and cap (61.796125ms)
+✔ #given explicit v2 model_catalog_json and stale models_cache v1 #when generated bundle updates config #then explicit catalog clears managed disable and cap (44.328625ms)
+ℹ tests 105
+ℹ suites 0
+ℹ pass 105
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6296.008875
+
+STDERR
+warn: Slow filesystem detected. If /Users/yeongyu/.bun/install/cache is a network drive, consider setting $BUN_INSTALL_CACHE_DIR to a local folder.
+
+/tmp/lcx-t4-20260908-mjs-all dir REMOVED
+
+===== FINAL RAW ISOLATED QA RECIPE =====
+#!/usr/bin/env bash
+set -e
+cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models
+source .agents/skills/codex-qa/scripts/lib/common.sh
+cqa_guard_real_home
+printf 'REAL_HOME_BEFORE=%s\n' "$CQA_REAL_HOME_SUM"
+cqa_mk_isolated_home
+happy_root="$CQA_HOME_ROOT"
+printf '%s\n' '[features.multi_agent_v2]' 'max_concurrent_threads_per_session = 1000' '[agents]' 'max_threads = 1000' > "$CODEX_HOME/config.toml"
+printf 'HAPPY_SEED\n'; cat "$CODEX_HOME/config.toml"
+REPO_ROOT="$PWD" cqa_install_local_omo
+printf 'HAPPY_INSTALL_EXIT=0\n'
+if rg -n 'max_threads|max_concurrent' "$CODEX_HOME/config.toml"; then
+  printf 'FAIL: managed caps remain\n'; exit 1
+else
+  [ "$?" -eq 1 ]; printf 'HAPPY_CAP_MATCHES=0\n'
+fi
+cqa_assert_real_home_unchanged
+cqa_mk_isolated_home
+preserve_root="$CQA_HOME_ROOT"
+printf '%s\n' '[features.multi_agent_v2]' 'max_concurrent_threads_per_session = 4' > "$CODEX_HOME/config.toml"
+printf 'PRESERVATION_SEED\n'; cat "$CODEX_HOME/config.toml"
+REPO_ROOT="$PWD" cqa_install_local_omo
+printf 'PRESERVATION_INSTALL_EXIT=0\n'
+rg -n '^max_concurrent_threads_per_session = 4$' "$CODEX_HOME/config.toml"
+cqa_assert_real_home_unchanged
+cqa_cleanup
+[ ! -e "$happy_root" ] && printf '%s dir REMOVED\n' "$happy_root"
+[ ! -e "$preserve_root" ] && printf '%s dir REMOVED\n' "$preserve_root"
+
+===== FINAL RAW ISOLATED QA OUTPUT =====
+REAL_HOME_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+HAPPY_SEED
+[features.multi_agent_v2]
+max_concurrent_threads_per_session = 1000
+[agents]
+max_threads = 1000
+HAPPY_INSTALL_EXIT=0
+HAPPY_CAP_MATCHES=0
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+PRESERVATION_SEED
+[features.multi_agent_v2]
+max_concurrent_threads_per_session = 4
+PRESERVATION_INSTALL_EXIT=0
+9:max_concurrent_threads_per_session = 4
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.CiWaxbo1lI dir REMOVED
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.MOr5hPgWtb dir REMOVED
+
+===== FINAL LOCAL ACCEPTANCE =====
+COMMAND: git diff --check
+EXIT=0
+COMMAND: ./node_modules/.bin/tsgo --noEmit -p packages/omo-codex/tsconfig.json
+EXIT=0
+COMMAND: working-tree bundle digest validation
+SOURCE_AND_BODY_MATCH 9ea5152615fe0d7d66fb68f09cbe4f26241131d70e24f0fa19a851ccfba02533 d5a65bcbc89b34e661f449c6cc64f3bafff32cb6047d2e9af19c594f31f5d864
+EXIT=0
+COMMAND: node --check (both migration guards)
+EXIT=0
+
+===== REGENERATION COMMAND OUTPUT =====
+$ bun run script/build-codex-install.ts
+
+===== REMOTE CLEANUP RECEIPTS =====
+/tmp/lcx-t4-20260908-red dir REMOVED
+
+/tmp/lcx-t4-20260908-green dir REMOVED
+
+/tmp/lcx-t4-20260908-mjs dir REMOVED
+
+/tmp/lcx-t4-20260908-full dir REMOVED
+
+/tmp/lcx-t4-20260908-final dir REMOVED
+
+
+===== INTERMEDIATE SNAPSHOT SETUP FAILURE =====
+MACHINES mengmotaHost:offline,vultr-tokyo:online,sionicMac:online,gorky:online,mengmotaMac:online
+REMOTE mengmotaMac DIR /tmp/lcx-t4-20260908-7ed760da/omo COMMAND git init -q && git add packages/omo-codex/scripts/install-dist/install-local.mjs && bun install --frozen-lockfile --ignore-scripts && bun test packages/omo-codex/src/install packages/omo-codex/scripts packages/omo-codex/plugin/test script/codex-install-bundle-freshness.test.ts EXIT 1
+bun install v1.4.0 (34cbb9a40)
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [9.00s]
+bun test v1.4.0 (34cbb9a40)
+
+script/codex-install-bundle-freshness.test.ts:
+(pass) committed Codex installer bundle > #given the tracked bundle #when its build marker is read #then it is present and self-consistent [180.53ms]
+(pass) committed Codex installer bundle > #given current installer sources #when compared with the tracked bundle marker #then the bundle is current [112.97ms]
+
+packages/omo-codex/src/install/codex-cache.test.ts:
+(pass) codex-cache > rewrites cached mcp manifest relative args and cwd [3.59ms]
+(pass) codex-cache > rewrites bundled mcp manifest args that point outside the plugin cache into bundled cache paths [2.81ms]
+(pass) codex-cache > rewrites cached package file dependencies that point outside the plugin cache back to the source package [88.41ms]
+(pass) codex-cache > #given source plugin has an npm lockfile #when caching plugin #then lockfile is preserved for deterministic install [16.15ms]
+(pass) codex-cache > #given stale sparkshell guidance in prompt surfaces #when caching plugin #then cache promotion is rejected [99.64ms]
+(pass) codex-cache > #given stale sparkshell guidance in component prompt surfaces #when caching plugin #then cache promotion is rejected [233.44ms]
+(pass) codex-cache > #given existing cache #when npm install fails #then previous active cache is preserved [15.73ms]
+(pass) codex-cache > #given existing cache #when final promotion fails #then previous active cache is restored [18.24ms]
+(pass) codex-cache > #given source plugin has built component runtimes #when caching plugin #then component dist files are preserved for hooks [98.25ms]
+(pass) codex-cache > #given packaged root CLI runtimes #when caching omo plugin #then root dist is materialized into the plugin cache [33.84ms]
+(pass) codex-cache > links cached plugin bins and stays idempotent [54.43ms]
+(pass) codex-cache > #given nested component declares reserved omo bin #when linking cached plugin bins #then skips the nested top-level command [34.14ms]
+(pass) codex-cache > #given stale managed ulw-loop omo symlink #when linking cached plugin bins #then removes it [9.75ms]
+(pass) codex-cache > #given stale local-source ulw-loop omo symlink #when linking cached plugin bins #then removes it [55.78ms]
+(pass) codex-cache > #given stale public ulw symlink points at deleted cache payload #when linking cached plugin bins #then removes the dangling managed link [14.90ms]
+(pass) codex-cache > #given dangling symlink points at another cached plugin #when linking cached plugin bins #then preserves it [25.96ms]
+(pass) codex-cache > #given non-managed bin points at deleted omo cache payload #when linking cached plugin bins #then preserves the user symlink [35.32ms]
+(pass) codex-cache > #given legacy codex-prefixed component symlinks #when linking cached plugin bins #then removes stale managed symlinks without touching user files [10.71ms]
+(pass) codex-cache > #given user-owned codex-prefixed symlink #when linking cached plugin bins #then preserves the user symlink [39.67ms]
+(pass) codex-cache > #given user-owned codex symlink with component-like target #when linking cached plugin bins #then preserves the user symlink [90.31ms]
+(pass) codex-cache > writes Windows command shims for cached plugin bins [20.70ms]
+(pass) codex-cache > rejects existing non-generated Windows command shims [47.48ms]
+
+packages/omo-codex/src/install/codex-cache-mcp-manifest.context7.test.ts:
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has placeholder api-key args #when rewriting #then drops placeholder auth [3.91ms]
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has real api-key args #when rewriting #then preserves user auth [1.60ms]
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has env-only placeholder auth #when rewriting #then drops placeholder env [1.26ms]
+(pass) codex-cache Context7 MCP manifest rewrite > #given cached Context7 manifest has dangling api-key flag #when rewriting #then drops blank auth flag [1.39ms]
+
+packages/omo-codex/src/install/codex-subagent-limit-config.test.ts:
+(pass) codex subagent limit config > #given empty Codex config #when updating config #then leaves both thread limits unset [30.40ms]
+(pass) codex subagent limit config > #given existing low agents max_threads #when updating config #then preserves the root cap [43.86ms]
+
+packages/omo-codex/src/install/link-cached-plugin-agents.test.ts:
+(pass) linkCachedPluginAgents > creates regular file copies on linux so agent roles survive snapshot cleanup [36.73ms]
+(pass) linkCachedPluginAgents > creates regular file copies on darwin (macOS) [17.47ms]
+(pass) linkCachedPluginAgents > creates regular file copies on Windows (no symlinks) [40.92ms]
+(pass) linkCachedPluginAgents > replaces stale broken symlinks with regular files on unix [9.26ms]
+(pass) linkCachedPluginAgents > overwrites stale copies on Windows [25.66ms]
+(pass) linkCachedPluginAgents > preserves installed agent reasoning effort when reinstalling file copies [17.51ms]
+(pass) linkCachedPluginAgents > ignores malformed installed agent reasoning effort when reinstalling file copies [52.59ms]
+(pass) linkCachedPluginAgents > preserves removed installed agent service tier when reinstalling file copies [21.11ms]
+(pass) linkCachedPluginAgents > ignores malformed installed agent service tier when reinstalling file copies [24.83ms]
+(pass) linkCachedPluginAgents > preserves reviewer reasoning like any other compatibility fixture [31.80ms]
+(pass) linkCachedPluginAgents > writes a manifest under the plugin cache listing installed agent paths for clean uninstall [20.18ms]
+(pass) linkCachedPluginAgents > is idempotent across re-runs [118.80ms]
+(pass) linkCachedPluginAgents > discovers TOMLs across multiple component agent directories [29.08ms]
+(pass) linkCachedPluginAgents > returns empty list when plugin has no bundled agents [6.83ms]
+(pass) linkCachedPluginAgents > auto-detects host platform when platform parameter is omitted [20.90ms]
+
+packages/omo-codex/src/install/codex-cached-marketplace-manifest.test.ts:
+(pass) writeCachedMarketplaceManifest > #given installed plugin directory exists #when writing cached marketplace manifest #then local source points at that directory [5.65ms]
+(pass) writeCachedMarketplaceManifest > #given installed plugin directory is missing #when writing cached marketplace manifest #then existing manifest is preserved [2.69ms]
+
+packages/omo-codex/src/install/install-codex-reasoning.test.ts:
+(pass) #given a canonical reasoning level #when the Codex installer runs #then config.toml carries the mapped model_reasoning_effort [748.90ms]
+
+packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at async installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at async runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at async <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:59:11)
+(fail) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [4002.25ms]
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at async installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at async runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at async <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts:83:11)
+(fail) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML [3745.38ms]
+
+packages/omo-codex/src/install/codex-config-toml.test.ts:
+(pass) codex-config-toml > #given autonomous permissions requested #when updating config #then enables full Codex autonomy [36.96ms]
+(pass) codex-config-toml > #given empty Codex config #when updating config #then leaves MultiAgentV2 settings unset without root multi-agent mode [9.94ms]
+(pass) codex-config-toml > #given stale queue multi-agent mode #when updating config #then removes unsupported root key [7.27ms]
+(pass) codex-config-toml > #given stale indented steering mode and inline-comment features table #when updating config #then removes root key and preserves table [14.36ms]
+(pass) codex-config-toml > #given stale proactive multi-agent mode #when updating config #then removes unsupported root key [7.45ms]
+(pass) codex-config-toml > #given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning without setting a thread limit [2.85ms]
+(pass) codex-config-toml > #given empty Codex config #when updating config #then leaves Context7 to the plugin MCP manifest [3.46ms]
+(pass) codex-config-toml > #given sisyphuslabs omo install #when updating config #then enables Context7 plugin mcp policy [1.17ms]
+(pass) codex-config-toml > #given existing Context7 MCP server #when updating config #then leaves user server settings untouched [2.81ms]
+(pass) codex-config-toml > #given real Context7 API key and placeholder comment #when updating config #then preserves user server settings [2.71ms]
+(pass) codex-config-toml > #given stale Context7 placeholder MCP server #when updating config #then removes it for the plugin MCP [1.61ms]
+(pass) codex-config-toml > #given legacy boolean MultiAgentV2 flag and table #when updating config #then normalizes to table config [1.94ms]
+(pass) codex-config-toml > #given legacy boolean MultiAgentV2 flag false #when updating config #then normalizes to a disabled table config [1.89ms]
+(pass) codex-config-toml > #given legacy agents max_threads #when updating config #then preserves the user root subagent thread cap [4.00ms]
+(pass) codex-config-toml > #given gpt-5.6 v2 model in models_cache #when updating config #then skips agents.max_threads and legacy disable [26.25ms]
+(pass) codex-config-toml > #given gpt-5.6 family model without models_cache #when updating config #then treats it as V2-preferred [5.21ms]
+(pass) codex-config-toml > #given gpt-5.6-luna resolving v1 in models_cache #when updating config #then keeps the v1 thread cap [4.06ms]
+(pass) codex-config-toml > #given user-modified config without root model #when updating config #then does not introduce agents.max_threads [4.37ms]
+(pass) codex-config-toml > #given managed agent role sections #when updating config #then preserves role config without raising root agents max_threads [3.48ms]
+(pass) codex-config-toml > writes config blocks and stays idempotent [8.68ms]
+(pass) codex-config-toml > #given marketplace bootstrap preserves source #when marketplace block exists #then existing source stays byte-identical [4.98ms]
+(pass) codex-config-toml > #given config path is a symlink #when updating config #then writes through target and preserves link [2.49ms]
+(pass) codex-config-toml > repairs existing agent config_file entries without dropping descriptions [2.79ms]
+(pass) codex-config-toml > #given git marketplace source #when updating config #then writes second-precision timestamp and ref [4.84ms]
+(pass) codex-config-toml > #given agent name needs quoting #when updating config #then writes quoted agent key [7.44ms]
+(pass) #given model_catalog_json declares a v2 family model as v1 #when updating config #then keeps agents.max_threads [6.14ms]
+
+packages/omo-codex/src/install/codex-config-agent-cleanup.test.ts:
+(pass) codex config managed agent cleanup > #given stale managed OMO agent sections #when updating with current agent links #then removes missing managed roles [4.76ms]
+
+packages/omo-codex/src/install/codex-cache-paths.test.ts:
+(pass) codex cache path helpers > resolves the canonical OMO plugin cache root [0.12ms]
+(pass) codex cache path helpers > resolves cached component CLI paths under a plugin version root [0.08ms]
+(pass) codex cache path helpers > selects the newest cached component CLI from an OMO cache tree [1.26ms]
+(pass) codex cache path helpers > preserves legacy component bin lookup priority [0.12ms]
+
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:
+(pass) codex MultiAgentV2 config > #given the former V2 default cap #when normalizing #then removes the cap and preserves the explicit disable [0.53ms]
+(pass) codex MultiAgentV2 config > #given legacy boolean flag and table #when updating config #then output remains valid TOML without enabling V2 [7.24ms]
+(pass) codex MultiAgentV2 config > #given an inline-commented V2 thread cap #when updating config twice #then preserves the line and ordering byte-for-byte [29.74ms]
+(pass) codex MultiAgentV2 config > #given installer config has a escaped quoted V2 header #when updating twice #then preserves the semantic cap without duplication [4.16ms]
+(pass) codex MultiAgentV2 config > #given installer config has a quoted cap key #when updating twice #then preserves the semantic cap without duplication [9.31ms]
+(pass) codex MultiAgentV2 config > #given installer config has a escaped quoted cap key #when updating twice #then preserves the semantic cap without duplication [6.22ms]
+(pass) codex MultiAgentV2 config > #given installer config has a dotted cap key #when updating twice #then preserves the semantic cap without duplication [4.66ms]
+(pass) codex MultiAgentV2 config > #given installer config has a root-qualified dotted cap key #when updating twice #then preserves the semantic cap without duplication [6.22ms]
+(pass) codex MultiAgentV2 config > #given multiline string contains V2 cap lookalikes #when updating config #then leaves the semantic cap absent [4.61ms]
+(pass) codex MultiAgentV2 config > #given V2 section multiline value contains a cap lookalike #when updating config #then leaves the cap absent [11.92ms]
+(pass) codex MultiAgentV2 config > #given root-dotted features and string lookalikes #when updating config #then replaces the semantic flag only [148.41ms]
+(pass) codex MultiAgentV2 config > #given root-dotted plugin flag has a multiline value #when updating config #then replaces the whole semantic assignment [2.05ms]
+(pass) codex MultiAgentV2 config > #given multiline string closes after an escaped quote #when updating config #then preserves the following explicit cap [2.58ms]
+(pass) codex MultiAgentV2 config > #given no limits #when updating config #then does not add either thread cap [1.77ms]
+(pass) codex MultiAgentV2 config > #given managed and user thread caps #when updating config #then removes managed values and preserves user values [2.91ms]
+(pass) codex MultiAgentV2 config > #given gpt-6-astra with unavailable catalog #when resolving multi-agent mode #then prefers V2 [1.88ms]
+(pass) codex MultiAgentV2 config > #given user caps #when updating config #then does not raise them [1.99ms]
+(pass) codex MultiAgentV2 config > #given disabled boolean shorthand #when updating config #then explicit disable is preserved in table form [2.13ms]
+
+packages/omo-codex/src/install/codex-process.test.ts:
+(pass) codex-process > #given Windows npm command #when resolving run command invocation #then uses cmd shim [0.13ms]
+(pass) codex-process > #given non-Windows npm command #when resolving run command invocation #then preserves direct execution [0.08ms]
+(pass) codex-process > #given Windows codex command #when resolving run command invocation #then uses cmd shim so the npm-installed codex.cmd resolves instead of ENOENT [0.06ms]
+(pass) codex-process > #given non-Windows codex command #when resolving run command invocation #then preserves direct execution [0.06ms]
+(pass) codex-process > #given Windows non-shim command #when resolving run command invocation #then preserves direct execution [0.05ms]
+
+packages/omo-codex/src/install/git-bash.test.ts:
+(pass) git-bash > #given non-Windows platform #when resolving Git Bash #then no preflight is required [0.27ms]
+(pass) git-bash > #given Windows env override to bash.exe #when the file exists #then env path wins [0.14ms]
+(pass) git-bash > #given Windows env override not pointing to bash.exe #when resolving #then reports invalid override and stops [0.14ms]
+(pass) git-bash > #given Windows standard 64-bit Git Bash exists #when resolving #then uses Program Files path [0.11ms]
+(pass) git-bash > #given Windows standard 32-bit Git Bash exists #when resolving #then uses Program Files x86 path [0.12ms]
+(pass) git-bash > #given Windows bash on PATH #when standard paths are missing #then uses where bash candidate [0.14ms]
+(pass) git-bash > #given Windows System32 bash alias is the only PATH candidate #when resolving #then it is not accepted as Git Bash [0.12ms]
+(pass) git-bash > #given WindowsApps bash alias is the only PATH candidate #when resolving #then it is not accepted as Git Bash [0.11ms]
+(pass) git-bash > #given Windows without Git Bash #when resolving #then returns install guidance [0.13ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing Codex install #then winget is not run automatically [0.17ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing #then winget is not run and install hint is returned [0.15ms]
+(pass) git-bash > #given non-Windows platform #when preparing #then winget is never called [0.15ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing #then original install hint is preserved [0.14ms]
+(pass) git-bash > #given Windows without Git Bash #when preparing #then resolver is not retried after system install [0.15ms]
+
+packages/omo-codex/src/install/lazycodex-routing.test.ts:
+(pass) lazycodex install routing > defaults platform to codex when invoked as lazycodex [0.37ms]
+(pass) lazycodex install routing > defaults platform to codex when invoked as lazycodex-ai [0.12ms]
+(pass) lazycodex install routing > respects explicit --platform=both [0.12ms]
+(pass) lazycodex install routing > leaves omo install unresolved so argsToConfig applies opencode default [0.11ms]
+(pass) lazycodex install routing > leaves unset invocation unresolved so argsToConfig applies opencode default [0.10ms]
+
+packages/omo-codex/src/install/codex-cache-security.test.ts:
+(pass) codex-cache security boundaries > #given an array input #when using the cache record guard #then arrays remain rejected [0.14ms]
+(pass) codex-cache security boundaries > #given a malformed path #when checking existence #then non-missing filesystem errors propagate [0.39ms]
+(pass) codex-cache security boundaries > #given a package bin name with path traversal #when linking cached plugin bins #then the installer rejects it [2.42ms]
+(pass) codex-cache security boundaries > #given a package bin target outside the package root #when linking cached plugin bins #then the installer rejects it [1.65ms]
+(pass) codex-cache security boundaries > #given marketplace cache disappears between checks #when pruning marketplace cache #then missing roots are ignored [3.76ms]
+(pass) codex-cache security boundaries > #given plugin cache disappears between checks #when pruning plugin caches #then missing roots are ignored [1.82ms]
+
+packages/omo-codex/src/install/codex-config-shell-settings.test.ts:
+(pass) codex-config shell settings > #given Codex config update #when Git Bash is required by installer #then no fake shell config is written [2.05ms]
+
+packages/omo-codex/src/install/link-cached-plugin-agents-regression.test.ts:
+13 |     await writeFile(join(codexHome, "agents", "librarian.toml"), agentToml("librarian", "gpt-5.6-luna-fast", "low"))
+14 |     const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+15 | 
+16 |     await linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning })
+17 | 
+18 |     expect(await readAgentEffort(codexHome, "momus")).toBe("high")
+                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: "high"
+Received: "xhigh"
+
+      at <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/link-cached-plugin-agents-regression.test.ts:18:55)
+(fail) managed bundled agent effort migration > #given old bundled support-agent efforts #when agents are re-linked #then upgrades to current bundled defaults [16.26ms]
+(pass) managed bundled agent effort migration > #given custom installed support-agent efforts #when agents are re-linked #then preserves customization [79.21ms]
+(pass) managed bundled agent effort migration > #given old effort on a non-default model #when agents are re-linked #then preserves customization [27.66ms]
+
+packages/omo-codex/src/install/install-ast-grep-sg.test.ts:
+(pass) installAstGrepForCodex > #given cached omo plugin with ast-grep skill #when Codex provisioning runs #then it targets CODEX_HOME runtime [0.32ms]
+(pass) installAstGrepForCodex > #given vendored installer fails #when Codex installer calls it #then installation continues without throwing [0.21ms]
+
+packages/omo-codex/src/install/install-codex.test.ts:
+(pass) install-codex > #given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package [5.52ms]
+(pass) install-codex > #given wrapper root env #when resolving vendored repo root #then prefers wrapper package root [25.75ms]
+(pass) install-codex > #given canonical installer package nesting #when resolving vendored repo root #then walks past the legacy five-parent cap [7.68ms]
+(pass) install-codex > #given default CODEX_HOME #when resolving installer bin dir without override #then preserves user local bin precedence [0.22ms]
+(pass) install-codex > #given custom CODEX_HOME #when resolving installer bin dir without override #then keeps generated omo inside that Codex home [0.12ms]
+(pass) install-codex > #given explicit CODEX_LOCAL_BIN_DIR #when resolving installer bin dir #then preserves installed omo precedence [0.12ms]
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at async installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at async runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at async <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.test.ts:137:25)
+(fail) install-codex > #given codex installer #when installing omo #then registers local marketplace and cached plugin [4717.98ms]
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at /private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.test.ts:221:11
+      at processTicksAndRejections (unknown:7:39)
+(fail) install-codex > #given codex installer #when installing omo #then never spawns a repo script that is not shipped [3262.33ms]
+(pass) install-codex > #given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper [420.40ms]
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at async installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at async runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at async <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.test.ts:275:13)
+(fail) install-codex > #given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home [2882.86ms]
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at async installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at async runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at async <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.test.ts:303:11)
+(fail) install-codex > #given autonomous permissions requested #when installing omo #then writes Codex autonomy settings [2924.43ms]
+
+packages/omo-codex/src/install/codex-config-autonomous-features.test.ts:
+(pass) codex-config autonomous features > #given autonomous permissions requested #when updating config #then enables Codex autonomy feature flags [3.58ms]
+(pass) codex-config autonomous features > #given autonomous permissions disabled #when updating config #then keeps native Codex feature flags enabled [3.65ms]
+(pass) codex-config autonomous features > #given existing child_agents_md setting #when updating config #then preserves it without stamping unsupported values [6.88ms]
+(pass) codex-config autonomous features > #given config without child_agents_md #when updating config #then does not add unsupported feature key [5.04ms]
+
+packages/omo-codex/src/install/codex-cache-bins.test.ts:
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the canonical runtime wrapper #then uses the new name, marker, and edition exports [5.62ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given a marker-bearing legacy omo wrapper #when writing the canonical wrapper #then deletes the legacy wrapper [5.31ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given an unmarked user-owned omo #when writing the canonical wrapper twice #then preserves omo byte-identical and remains idempotent [19.80ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the canonical runtime wrapper #then uses the new name and environment exports [18.49ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the omo-agent-toolkit runtime wrapper #then embeds the node fallback chain [20.95ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when bun is absent everywhere #then the wrapper falls back to node before exiting 127 [12.03ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then embeds the node fallback chain [2.01ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then discovers Codex bundled Node from config before bare node [3.47ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix wrapper target was removed #when running omo #then exits with reinstall guidance [312.64ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token [637.48ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec [17.60ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token [10.55ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink resolving to a marker-bearing wrapper #when writing the canonical wrapper #then removes the symlink and keeps its target [4.37ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a symlink to an unmarked user file #when writing the canonical wrapper #then preserves the symlink [2.48ms]
+(pass) legacy omo reclamation across link kinds > #given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing [1.99ms]
+
+packages/omo-codex/src/install/codex-installation-detection.test.ts:
+(pass) detectCodexInstallation > #given Codex CLI on PATH #when detecting installation #then returns the CLI path [0.21ms]
+(pass) detectCodexInstallation > #given macOS Codex app bundle #when detecting installation #then returns the app path [0.27ms]
+(pass) detectCodexInstallation > #given only a downloaded macOS Codex dmg #when detecting installation #then returns a missing result with the dmg hint [0.42ms]
+(pass) detectCodexInstallation > #given Windows standard Codex CLI install location #when detecting installation #then returns the standard CLI path [0.30ms]
+(pass) detectCodexInstallation > #given Windows Codex Start Apps entry #when detecting installation #then returns the desktop app source [0.26ms]
+(pass) detectCodexInstallation > #given Linux without Codex CLI #when detecting installation #then returns a missing result with an install hint [0.10ms]
+
+packages/omo-codex/src/install/preserved-agent-settings.test.ts:
+(pass) restorePreservedServiceTier > #given a user changed the tier to standard #when a reinstall relinks the bundled fast agent #then the user tier is restored [1.24ms]
+(pass) restorePreservedServiceTier > #given a user removed the tier entirely #when a reinstall relinks the bundled fast agent #then the tier stays absent so the parent tier is inherited [1.16ms]
+(pass) restorePreservedServiceTier > #given a fresh install with nothing preserved #when relinking #then the bundled fast tier is left unchanged [0.89ms]
+
+packages/omo-codex/src/install/codex-cache-install.test.ts:
+(pass) codex-cache install > #given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache [7.40ms]
+(pass) codex-cache install > #given outer npx env has allow-scripts case variants #when caching plugin #then npm install commands preserve only unrelated env [9.77ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed package.json #when caching plugin #then npm install reconciles the lock drift instead of npm ci [53.76ms]
+(pass) codex-cache install > #given the local file: dependency rewrite changed nothing #when caching plugin #then the install stays npm ci --omit=dev [32.91ms]
+(pass) codex-cache install > #given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached [23.47ms]
+(pass) codex-cache install > #given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved [29.82ms]
+(pass) codex-cache install > #given npm creates workspace bin shims in the cache #when caching plugin #then plugin-owned shims are removed [59.77ms]
+(pass) codex-cache install > #given packaged plugin has stale aggregate skills #when caching plugin #then syncs skills after production dependencies install [29.06ms]
+
+packages/omo-codex/src/install/codex-config-git-bash.test.ts:
+(pass) Codex config Git Bash MCP policy > #given windows platform with Git Bash enabled #when updating sisyphuslabs plugin config #then enables git_bash plugin mcp policy [14.81ms]
+(pass) Codex config Git Bash MCP policy > #given windows platform without Git Bash enabled #when updating sisyphuslabs plugin config #then disables git_bash plugin mcp policy [25.97ms]
+(pass) Codex config Git Bash MCP policy > #given non-windows platforms #when updating sisyphuslabs plugin config #then disables git_bash plugin mcp policy [44.50ms]
+
+packages/omo-codex/src/install/codex-cleanup.test.ts:
+(pass) codex cleanup > #given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config [108.38ms]
+(pass) codex cleanup > #given malformed project directory #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [7.35ms]
+(pass) codex cleanup > #given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links [27.29ms]
+(pass) codex cleanup > #given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [22.69ms]
+(pass) codex cleanup > #given provisioned runtime binaries and bootstrap plugin data #when cleanup runs #then removes only the managed subtrees [79.93ms]
+(pass) codex cleanup > #given runtime holding only the managed subtrees #when cleanup runs #then prunes the empty runtime directory [13.73ms]
+(pass) codex cleanup > #given codex home without bootstrap or runtime artifacts #when cleanup runs #then succeeds with no removed paths [7.58ms]
+(pass) codex cleanup > #given an artifact recreated after the first removal pass #when removeManagedPathBestEffort runs #then the retry clears it within one call [5.69ms]
+(pass) codex cleanup > #given a mid-flight worker recreates bootstrap state between uninstall runs #when cleanup runs twice #then the second pass clears it without error [27.92ms]
+(pass) codex cleanup > #given config sections shaped like the bootstrap worker setup output #when config text cleanup runs #then managed sections are removed and user sections survive [0.46ms]
+(pass) codex cleanup > #given single-quoted managed hook state table #when config text cleanup runs #then removes the managed hook state [0.26ms]
+(pass) codex cleanup > #given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files [53.91ms]
+(pass) codex cleanup > #given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones [12.66ms]
+(pass) codex cleanup > #given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw [9.47ms]
+(pass) codex cleanup > #given a codex home resolving to a filesystem root #when cleanup runs #then no bin link is scanned or removed [7.15ms]
+(pass) codex cleanup > #given a user copy of a generated wrapper #when cleanup runs #then only installer bin names are removed [13.13ms]
+(pass) codex cleanup > #given a user-owned bin using an installer name without the marker #when cleanup runs #then it is kept [7.08ms]
+(pass) codex cleanup > #given a managed windows wrapper left on disk with different casing #when cleanup runs #then it is still removed [7.63ms]
+(pass) codex cleanup > #given a user-owned windows bin using an installer name in different casing #when cleanup runs #then it is kept [60.93ms]
+(pass) codex cleanup > #given an install that used a one-shot CODEX_LOCAL_BIN_DIR #when uninstall runs without that variable #then the wrapper in the recorded dir is still removed [64.68ms]
+(pass) codex cleanup > #given a recorded install bin dir and an explicit CODEX_LOCAL_BIN_DIR at uninstall #when cleanup runs #then the environment override wins [22.54ms]
+(pass) codex cleanup > #given a legacy install under another marketplace #when cleanup runs #then its legacy bins are still removed [8.68ms]
+(pass) codex cleanup > #given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept [54.33ms]
+
+packages/omo-codex/src/install/codex-config-reasoning.test.ts:
+(pass) codex-config-reasoning unified reasoning override > #given reasoning override #when updating config #then override wins over catalog default [29.31ms]
+(pass) codex-config-reasoning unified reasoning override > #given off reasoning override #when updating config #then maps to codex wire spelling none [12.57ms]
+(pass) codex-config-reasoning unified reasoning override > #given unknown reasoning token #when updating config #then catalog default is kept [4.90ms]
+(pass) codex-config-reasoning > #given empty Codex config #when updating config #then sets worker model and reasoning defaults [3.31ms]
+(pass) codex-config-reasoning > #given existing model and reasoning config #when updating config #then replaces stale defaults without duplicate keys [9.80ms]
+(pass) codex-config-reasoning > #given user-customized model config #when updating config #then preserves user reasoning values [4.00ms]
+(pass) codex-config-reasoning > #given bundled model catalog #when updating config #then reads defaults from catalog [4.37ms]
+(pass) codex-config-reasoning > #given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4 [0.52ms]
+
+packages/omo-codex/src/install/codex-package-layout-semantic.test.ts:
+(pass) Codex installer source package build split > #given monorepo source checkout without root src #when resolving TS installer build mode #then source packages are built [2.31ms]
+(pass) Codex installer source package build split > #given packaged lazycodex adapter #when resolving TS installer build mode #then bundled package artifacts are used [0.76ms]
+
+packages/omo-codex/src/install/codex-cleanup-safety.test.ts:
+(pass) codex cleanup safety > #given destructive cleanup targets #when managed removal runs #then rejects them and records skipped paths [2.31ms]
+(pass) codex cleanup safety > #given traversal-shaped cleanup target #when managed removal runs #then canonical parent escapes are skipped [2.65ms]
+(pass) codex cleanup safety > #given filesystem root as Codex home #when managed removal runs #then refuses even shaped managed paths [0.32ms]
+
+packages/omo-codex/src/install/lazycodex-install-surface.test.ts:
+(pass) lazycodex install surface > #given codex installer #when installing omo #then exposes durable LazyCodex agent roles [575.98ms]
+(pass) lazycodex install surface > #given codex installer #when installing omo #then links documented component binaries to cached runtimes [164.77ms]
+(pass) lazycodex install surface > #given installation guide #when component binaries and LazyCodex roles are documented #then docs match install surface [5.66ms]
+(pass) lazycodex install surface > #given Codex prunes an old plugin cache version #when LazyCodex roles were installed #then roles still resolve from Codex home [471.14ms]
+(pass) lazycodex install surface > #given Codex temporary marketplace snapshot is removed #when LazyCodex roles were installed #then roles still resolve from Codex home [418.72ms]
+
+packages/omo-codex/src/install/codex-project-local-cleanup.test.ts:
+(pass) codex project-local cleanup > #given stale project-local Codex config #when repairing from a nested directory #then removes legacy agent concurrency keys with a backup [12.96ms]
+(pass) codex project-local cleanup > #given root and nested project-local Codex configs #when repairing from the nested directory #then repairs every config layer Codex loads [23.00ms]
+(pass) codex project-local cleanup > #given project-local legacy artifacts #when repairing #then reports them without deleting user-owned paths [6.54ms]
+(pass) codex project-local cleanup > #given project-local config without enabled MultiAgentV2 #when repairing #then leaves legacy agent settings unchanged [4.64ms]
+(pass) codex project-local cleanup > #given no project-local config and CODEX_HOME in the parent chain #when repairing #then does not treat global Codex home as project state [8.73ms]
+(pass) codex project-local cleanup > #given project-local config is a symlink to CODEX_HOME #when repairing #then skips it without copying or mutating the target [5.58ms]
+(pass) codex project-local cleanup > #given malformed project directory from the environment #when repairing #then skips project-local cleanup without failing install [0.56ms]
+
+packages/omo-codex/src/install/codex-marketplace.test.ts:
+(pass) codex-marketplace > reads marketplace and resolves plugin source with override [1.71ms]
+(pass) codex-marketplace > rejects traversal source path [4.47ms]
+
+packages/omo-codex/src/install/codex-package-manifest.test.ts:
+(pass) Codex package manifest > includes the aggregate Codex plugin manifest in npm packages [0.21ms]
+
+packages/omo-codex/src/install/spawned-script-targets.test.ts:
+(pass) spawned script targets > #given a node invocation naming a repo script that is gone #when targets are checked #then that path is reported [14.61ms]
+(pass) spawned script targets > #given a node invocation naming a script that exists #when targets are checked #then nothing is reported [2.84ms]
+(pass) spawned script targets > #given non-script invocations and paths outside the repo #when targets are checked #then none are reported [1.79ms]
+
+packages/omo-codex/src/install/install-codex-git-bash-hooks.test.ts:
+(pass) install-codex Git Bash hooks > #given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks [420.66ms]
+(pass) install-codex Git Bash hooks > #given simulated Linux Codex install #when installing omo #then keeps git_bash MCP disabled without registering shell reminder hooks [351.18ms]
+
+packages/omo-codex/src/install/managed-agent-reasoning-defaults.test.ts:
+(pass) resolveManagedAgentReasoning > #given a preserved terra/medium default #when resolving #then the new bundled effort wins [0.31ms]
+(pass) resolveManagedAgentReasoning > #given a preserved gpt-5.6-luna-fast/low default #when resolving #then the chained upgrade still lands on the new effort [0.12ms]
+(pass) resolveManagedAgentReasoning > #given a user-customized effort #when resolving #then the customization is preserved [0.09ms]
+(pass) resolveManagedAgentReasoning > #given an unlisted agent #when resolving #then the preserved effort is untouched [0.09ms]
+(pass) resolveManagedAgentReasoning > #given a preserved plan sol/max default #when resolving against sol/high #then the new bundled effort wins [0.08ms]
+(pass) resolveManagedAgentReasoning > #given a preserved worker-medium luna/max default #when resolving against terra/high #then the new bundled effort wins [0.09ms]
+(pass) resolveManagedAgentReasoning > #given a preserved qa-executor terra/medium default #when resolving against luna/high #then the new bundled effort wins [0.09ms]
+(pass) resolveManagedAgentReasoning > #given a preserved gate-reviewer sol/high default #when resolving against sol/low #then the new bundled effort wins [0.09ms]
+(pass) resolveManagedAgentReasoning > #given old high worker and reviewer defaults #when resolving #then each new bundled effort wins [0.09ms]
+(pass) resolveManagedAgentReasoning > #given a second resolve over already-migrated values #when resolving #then the result is stable [0.08ms]
+
+packages/omo-codex/src/install/lsp-daemon-reaper.test.ts:
+(pass) reapLspDaemons > #given a legacy fixture home #when creating it #then it uses the platform-safe temp root that the reaper also validates [6.78ms]
+(pass) reapLspDaemons > #given Git Bash resolves node as an MSYS path #when normalizing for Windows spawn #then it returns a native executable path [0.25ms]
+(pass) reapLspDaemons > #given PowerShell resolves node as a native path #when normalizing for Windows spawn #then it preserves the executable path [0.11ms]
+(pass) reapLspDaemons > #given legacy live endpoint selection #when targeting Unix and Windows #then it chooses a platform-valid fixture endpoint [2.87ms]
+(pass) reapLspDaemons > #given a native Windows temp Codex home #when selecting a Unix legacy endpoint #then it preserves the Windows version path and appends the socket leaf [0.15ms]
+(pass) reapLspDaemons > #given a stale hashed Unix endpoint #when reaping #then it removes the dead legacy directory idempotently [15.03ms]
+(pass) reapLspDaemons > #given a Unix hashed endpoint under Windows reaper semantics #when reaping #then it fails closed as outside the frozen vectors [10.81ms]
+(pass) reapLspDaemons > #given malformed legacy metadata #when reaping #then it removes the stale state with a structured reason [7.96ms]
+(pass) reapLspDaemons > #given a non-version entry under the legacy daemon root #when reaping #then it removes the entry with a structured version reason [8.08ms]
+(pass) reapLspDaemons > #given symlinked metadata files #when reaping #then it refuses to follow them and removes only the version dir [8.42ms]
+(pass) reapLspDaemons > #given an endpoint outside the frozen legacy vectors #when reaping #then it removes the version dir without probing or signaling [5.04ms]
+(pass) reapLspDaemons > #given a live Windows named pipe legacy daemon #when reaping #then it defers instead of signaling a pid it cannot attest [3.50ms]
+
+packages/omo-codex/src/install/install-codex-packaged.test.ts:
+(pass) #given packaged lazycodex tarball layout #when installing Codex plugin #then uses bundled artifacts without source builds [164.47ms]
+(pass) #given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform [64.27ms]
+
+packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts:
+49 | 
+50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
+51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
+52 |   if (missing.length === 0) return
+53 |   const relativeMissing = missing.map((path) => path.split(`${pluginRoot}${sep}`).join("").split(sep).join("/"))
+54 |   throw new Error(
+                 ^
+error: Plugin payload is missing 2 hook command target(s) referenced by hooks.json: components/rules/dist/cli.js, components/comment-checker/dist/cli.js. The previous plugin cache was left untouched; this payload was not activated.
+      at assertHookCommandTargets (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-hook-targets.ts:54:13)
+      at async installCachedPlugin (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/codex-cache-install.ts:53:11)
+      at async runCodexInstaller (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex.ts:77:26)
+      at async <anonymous> (/private/tmp/lcx-t4-20260908-7ed760da/omo/packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts:28:26)
+(fail) install-codex MCP manifest > #given codex installer #when installing omo #then caches research MCPs without ast-grep MCP [3201.57ms]
+
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:
+(pass) codex MultiAgentV2 release blockers > #given gpt-5.6 v2 catalog and existing table disable #when updating config #then removes the disable [34.78ms]
+(pass) codex MultiAgentV2 release blockers > #given relative model_catalog_json declares gpt-5.6 model as v1 #when updating config #then resolves catalog beside config [22.27ms]
+(pass) codex MultiAgentV2 release blockers > #given root gpt-5.6 model without catalog #when updating config #then removes stale V2 disable [13.37ms]
+
+packages/omo-codex/src/install/codex-installed-bin-dir.test.ts:
+(pass) installed codex bin dir record > #given a bin dir recorded under the plugin version cache #when it is read back #then the recorded dir is returned [16.68ms]
+(pass) installed codex bin dir record > #given a bin dir recorded under the marketplace snapshot #when it is read back #then the recorded dir is returned [8.10ms]
+(pass) installed codex bin dir record > #given no record at all #when it is read #then null is returned so normal resolution applies [7.37ms]
+(pass) installed codex bin dir record > #given a malformed or blank record #when it is read #then null is returned rather than a bad directory [9.88ms]
+
+packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts:
+(pass) install-codex project-local cleanup > #given stale project-local Codex config #when installing Codex Light #then repairs the local conflict before returning success [130.33ms]
+(pass) install-codex project-local cleanup > #given only global CODEX_HOME config under a parent directory #when installing Codex Light #then project cleanup leaves it to the global config updater [64.66ms]
+(pass) install-codex project-local cleanup > #given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup [105.07ms]
+
+packages/omo-codex/src/install/codex-cache-bundled-mcps.pin.test.ts:
+(pass) copyBundledMcpRuntimeDists > #given the current Codex MCP manifest #when copying bundled runtimes #then it pins the copied runtime set [13.02ms]
+
+packages/omo-codex/src/install/codex-config-plugins.test.ts:
+(pass) ensureHookTrusted > #given single-quoted literal hook state table #when ensuring same Windows hook key #then updates in place [0.28ms]
+(pass) ensureHookTrusted > #given double-quoted basic hook state table #when ensuring same Windows hook key #then updates in place [0.43ms]
+
+packages/omo-codex/src/install/install-codex-git-bash-preflight.test.ts:
+(pass) install-codex Git Bash preflight > #given Windows without Git Bash #when installing Codex profile #then rejects before marketplace or config mutation [2.59ms]
+(pass) install-codex Git Bash preflight > #given Windows without Git Bash #when installing Codex profile #then winget is not run and install stops with guidance [1.51ms]
+(pass) install-codex Git Bash preflight > #given non-Windows install #when running installer #then winget is never called [932.83ms]
+(pass) install-codex Git Bash preflight > #given Windows with Git Bash #when installing Codex profile #then proceeds and reports detected path [1227.30ms]
+(pass) install-codex Git Bash preflight > #given Windows env override in installer options #when no custom resolver is provided #then default resolver uses it [174.06ms]
+(pass) install-codex Git Bash preflight > #given non-Windows install #when Git Bash resolver would fail #then installer keeps existing behavior [566.87ms]
+
+packages/omo-codex/src/install/codex-cleanup-bins-coverage.test.ts:
+(pass) managed Codex bin coverage > #given every plugin component package bin #when uninstall coverage is checked #then each name is a managed bin name [94.31ms]
+
+packages/omo-codex/src/install/codex-config-permissions.test.ts:
+(pass) #given unreadable existing config #when updating config #then rejects and preserves content [11.03ms]
+(pass) #given config with legacy top-level network_access #when ensuring autonomous permissions #then removes the unsupported root key [0.29ms]
+
+packages/omo-codex/src/install/codex-hook-trust.test.ts:
+(pass) codex-hook-trust > computes trusted hook hashes for vendored plugin [25.89ms]
+(pass) codex-hook-trust > #given a command hook with commandWindows #when computing Windows trust state #then the trusted hash uses the Windows command [10.57ms]
+
+packages/omo-codex/src/install/lsp-daemon-reaper-live.test.ts:
+(pass) reapLspDaemons live ownership > #given a proven legacy daemon owner #when reaping #then it SIGTERMs the process waits for exit and removes only that version dir [174.93ms]
+(pass) reapLspDaemons live ownership > #given a responding endpoint and a reused pid #when reaping #then it defers without signaling the unrelated process [388.91ms]
+(pass) reapLspDaemons live ownership > #given a proven owner that ignores SIGTERM #when reaping #then it defers with a timeout warning and preserves the version dir [5415.05ms]
+(pass) reapLspDaemons live ownership > #given a first deferred reused pid run and a later dead endpoint #when reaping twice #then the follow-up pass removes the stale directory [3141.41ms]
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+
+1 tests skipped:
+(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
+
+
+8 tests failed:
+(fail) install-codex legacy agent purge > #given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts [4002.25ms]
+(fail) install-codex legacy agent purge > #given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML [3745.38ms]
+(fail) managed bundled agent effort migration > #given old bundled support-agent efforts #when agents are re-linked #then upgrades to current bundled defaults [16.26ms]
+(fail) install-codex > #given codex installer #when installing omo #then registers local marketplace and cached plugin [4717.98ms]
+(fail) install-codex > #given codex installer #when installing omo #then never spawns a repo script that is not shipped [3262.33ms]
+(fail) install-codex > #given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home [2882.86ms]
+(fail) install-codex > #given autonomous permissions requested #when installing omo #then writes Codex autonomy settings [2924.43ms]
+(fail) install-codex MCP manifest > #given codex installer #when installing omo #then caches research MCPs without ast-grep MCP [3201.57ms]
+
+ 286 pass
+ 1 skip
+ 8 fail
+ 987 expect() calls
+Ran 295 tests across 50 files. [56.42s]
+
+/tmp/lcx-t4-20260908-7ed760da dir REMOVED
+
+
+===== EXACT SOURCE RG ACCEPTANCE =====
+COMMAND: rg -n "1000|= 16\b" packages/omo-codex/src/install/*.ts packages/omo-codex/plugin/scripts/migrate-codex-config/*.mjs
+packages/omo-codex/src/install/codex-config-toml.test.ts:210:    expect(content).not.toContain("max_concurrent_threads_per_session = 1000")
+packages/omo-codex/src/install/codex-config-toml.test.ts:437:        "max_threads = 16",
+packages/omo-codex/src/install/codex-config-toml.test.ts:479:        "max_threads = 16",
+packages/omo-codex/src/install/codex-config-toml.test.ts:589:        "max_threads = 16",
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:14:      const content = ensureCodexMultiAgentV2Config(`[features.multi_agent_v2]\nenabled = false\n${key} = 16\n`)
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:146:      expect(secondPass).not.toMatch(/^max_concurrent_threads_per_session = 16$/m)
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:191:        "max_concurrent_threads_per_session = 16",
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:209:    expect(parsed.features.multi_agent_v2.notes).toBe("max_concurrent_threads_per_session = 16\n")
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:329:        "max_concurrent_threads_per_session = 1000",
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:332:        "max_threads = 1000",
+packages/omo-codex/src/install/codex-multi-agent-v2-config.ts:142:  const pattern = v2Preferred ? /^\s*max_threads\s*=/ : /^\s*max_threads\s*=\s*1000\s*(?:#.*)?$/
+packages/omo-codex/src/install/codex-multi-agent-v2-config.ts:149:  return removeMatchingCap(config, section, /^\s*max_concurrent_threads_per_session\s*=\s*(?:1000|16)\s*(?:#.*)?$/)
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:22:        "max_threads = 16",
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:45:    expect(sectionText(content, "[features.multi_agent_v2]")).not.toContain("max_concurrent_threads_per_session = 1000")
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:89:        "max_threads = 16",
+packages/omo-codex/plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs:33:	const value = v2Preferred ? /^\s*max_threads\s*=\s*([^#\n]*)(?:#[^\n]*)?$/m.exec(section.text)?.[1]?.trim() : "1000";
+packages/omo-codex/plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs:40:	const withoutLegacyCap = removeTomlSectionSetting(config, section, "max_concurrent_threads_per_session", "1000");
+No production cap-forcing constants remain; production hits are exclusively removal comparisons.
+
+===== REVIEW OF EVERY REMAINING 1000 SUBSTRING MATCH =====
+NEGATIVE_ASSERTION: packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:45:    expect(sectionText(content, "[features.multi_agent_v2]")).not.toContain("max_concurrent_threads_per_session = 1000")
+INPUT_FIXTURE: packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:329:        "max_concurrent_threads_per_session = 1000",
+INPUT_FIXTURE: packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:332:        "max_threads = 1000",
+NEGATIVE_ASSERTION: packages/omo-codex/src/install/codex-config-toml.test.ts:210:    expect(content).not.toContain("max_concurrent_threads_per_session = 1000")
+NEGATIVE_ASSERTION: packages/omo-codex/scripts/install-config.test.mjs:317:	assert.doesNotMatch(config, /max_concurrent_threads_per_session = 1000/);
+INPUT_FIXTURE: packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs:223:			"max_threads = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs:293:			"max_threads = 1000",
+NEGATIVE_ASSERTION: packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs:334:	assert.doesNotMatch(content, /max_concurrent_threads_per_session = 1000/);
+INPUT_FIXTURE: packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs:365:			config: ['model = "gpt-6-astra"', 'model_reasoning_effort = "medium"', "", "[features.multi_agent_v2]", "max_concurrent_threads_per_session = 1000", "", "[agents]", "max_threads = 1000", ""].join("\n"),
+NEGATIVE_ASSERTION: packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs:402:	assert.doesNotMatch(content, /max_threads = 1000/);
+INPUT_FIXTURE: packages/omo-codex/plugin/components/rules/test/event-budget.test.ts:84:				CODEX_RULES_DYNAMIC_MAX_RULE_CHARS: "1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs:21:			"max_threads = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs:53:			"max_threads = 1000",
+UNRELATED_NUMERIC_INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:299:					model_context_window: 1000000,
+UNRELATED_NUMERIC_INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:492:		"max_concurrent_threads_per_session = 10000",
+USER_CAP_10000_PRESERVATION: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:500:	assert.match(result, /max_concurrent_threads_per_session = 10000/);
+UNRELATED_NUMERIC_INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:524:		"max_concurrent_threads_per_session = 10000",
+USER_CAP_10000_PRESERVATION: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:531:	assert.match(result, /max_concurrent_threads_per_session = 10000/);
+UNRELATED_NUMERIC_INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:613:		"max_concurrent_threads_per_session = 10000",
+UNRELATED_NUMERIC_INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:738:			"max_concurrent_threads_per_session = 10000",
+USER_CAP_10000_PRESERVATION: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:752:	assert.match(content, /max_concurrent_threads_per_session = 10000/);
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:873:		"max_concurrent_threads_per_session = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:889:		"max_concurrent_threads_per_session = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:924:			"max_threads = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:929:			"max_concurrent_threads_per_session = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1084:			"max_threads = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1088:			"max_concurrent_threads_per_session = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1195:		"max_threads = 1000",
+INPUT_FIXTURE: packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:1200:		"max_concurrent_threads_per_session = 1000",
+UNRELATED_NUMERIC_INPUT_FIXTURE: packages/omo-codex/plugin/test/component-bundled-cli.test.mjs:387:			"setTimeout(() => process.exit(1), 10000).unref();",
+INPUT_FIXTURE: packages/omo-codex/plugin/components/ulw-loop/test/spawn-guard.test.ts:576:		expect(applySpawnGuards(payload("spawn_agent", { message: "scan" }), { lockTimeoutMs: 1000 })).toBe("");
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook.test.ts:237:		resolveB("error[typescript] (1000) at 1:1: src/b.ts failed.");
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook.test.ts:239:		resolveA("error[typescript] (1000) at 1:1: src/a.ts failed.");
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:38:				return "error[markdown] (1000) at 1:1: second call should have been skipped.";
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:61:				return "error[markdown] (1000) at 1:1: cached call should have been skipped.";
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:81:				return "error[markdown] (1000) at 1:1: post-compact cached call should have been skipped.";
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:111:				return "error[markdown] (1000) at 1:1: recovered markdown diagnostic.";
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:158:				return "error[markdown] (1000) at 1:1: cached call should have been skipped.";
+INPUT_FIXTURE: packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:173:				return "error[markdown] (1000) at 1:1: re-cached call should have been skipped.";
+
+COMMAND: rg -c "1000" packages/omo-codex --glob "*.test.*" --glob "!**/node_modules/**"
+packages/omo-codex/src/install/codex-multi-agent-v2-regression.test.ts:1
+packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts:2
+packages/omo-codex/src/install/codex-config-toml.test.ts:1
+packages/omo-codex/scripts/install-config.test.mjs:1
+packages/omo-codex/plugin/components/rules/test/event-budget.test.ts:1
+packages/omo-codex/plugin/test/component-bundled-cli.test.mjs:1
+packages/omo-codex/plugin/test/multi-agent-v2-regression.test.mjs:2
+packages/omo-codex/plugin/test/migrate-codex-config.test.mjs:16
+packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs:5
+packages/omo-codex/plugin/components/ulw-loop/test/spawn-guard.test.ts:1
+packages/omo-codex/plugin/components/lsp/test/codex-hook.test.ts:2
+packages/omo-codex/plugin/components/lsp/test/codex-hook-unavailable.test.ts:6
+
+BOOTSTRAP RE-EXPORT CHECK: 1 (no matches)
+ .../scripts/install-dist/install-local.mjs         | 152 ++++++++++++++-------
+ 1 file changed, 101 insertions(+), 51 deletions(-)

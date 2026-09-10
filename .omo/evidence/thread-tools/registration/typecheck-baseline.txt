@@ -1,0 +1,2 @@
+clean origin/dev scratch: bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json exit 0
+branch: same command exit 0 after correcting test ExtensionContext typing

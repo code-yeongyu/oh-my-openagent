@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.ts";
-import { ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE } from "../src/goal-status.js";
+import { aggregateCodexObjectiveForScope } from "../src/goal-status.js";
+import { CLI_TEST_SCOPE, CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 import { QA_DIR, qualityGateJson } from "./fixtures/quality-gate-builder.js";
 
 let testDir: string;
@@ -24,6 +25,7 @@ beforeEach(async () => {
 	delete process.env["CODEX_SESSION_ID"];
 	delete process.env["CODEX_THREAD_ID"];
 	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SESSION_ID;
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -56,7 +58,7 @@ function stdoutJson(): Record<string, unknown> {
 }
 
 function codexSnapshot(status: "active" | "complete" = "active"): string {
-	return JSON.stringify({ goal: { objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE, status } });
+	return JSON.stringify({ goal: { objective: aggregateCodexObjectiveForScope(CLI_TEST_SCOPE), status } });
 }
 
 async function createPlan(brief = "- Goal A\n- Goal B"): Promise<Record<string, unknown>> {

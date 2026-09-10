@@ -32,16 +32,12 @@ export const OmoMemorySearchSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
-// Recall (M1 lexical; no gated mode)
+// Recall (kibitzer gate; on/off plus how many nudges one turn may carry)
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryRecallSchema = z.object({
   enabled: z.boolean().default(true),
   max_items: z.number().int().min(1).max(5).default(2),
-  budget_tokens: z.number().int().positive().default(600),
-  excerpt_chars: z.number().int().positive().default(200),
-  min_score: z.number().optional(),
-  exclude: z.array(z.string()).default([]),
 }).strict()
 
 // ---------------------------------------------------------------------------
@@ -94,7 +90,7 @@ export const OmoMemorySoulSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
-// Write notice (memory / memory_apply_patch tool-result row)
+// Write notice (memory tool-result row)
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryWriteNoticeSchema = z.object({
@@ -131,10 +127,6 @@ export const OmoMemorySearchLayerSchema = z.object({
 export const OmoMemoryRecallLayerSchema = z.object({
   enabled: z.boolean().optional(),
   max_items: z.number().int().min(1).max(5).optional(),
-  budget_tokens: z.number().int().positive().optional(),
-  excerpt_chars: z.number().int().positive().optional(),
-  min_score: z.number().optional(),
-  exclude: z.array(z.string()).optional(),
 }).strict()
 
 export const OmoMemoryNudgeLayerSchema = z.object({
@@ -199,7 +191,6 @@ export const OmoMemorySettingsSchema = z.object({
   agent: z.string().min(1).default("auto"),
   // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
   // extension-declared MCP server surfaced through senpi's tool_search catalog.
-  tool_exposure: z.enum(["direct", "search"]).default("direct"),
   reflection: OmoMemoryReflectionSchema.default({
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -223,13 +214,7 @@ export const OmoMemorySettingsSchema = z.object({
   write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
   sync: OmoMemorySyncSchema.default({ enabled: true }),
   search: OmoMemorySearchSchema.default({ enabled: true }),
-  recall: OmoMemoryRecallSchema.default({
-    enabled: true,
-    max_items: 2,
-    budget_tokens: 600,
-    excerpt_chars: 200,
-    exclude: [],
-  }),
+  recall: OmoMemoryRecallSchema.default({ enabled: true, max_items: 2 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()
@@ -237,7 +222,6 @@ export const OmoMemorySettingsSchema = z.object({
 export const OmoMemorySettingsLayerSchema = z.object({
   enabled: z.boolean().optional(),
   agent: z.string().min(1).optional(),
-  tool_exposure: z.enum(["direct", "search"]).optional(),
   reflection: OmoMemoryReflectionLayerSchema.optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),

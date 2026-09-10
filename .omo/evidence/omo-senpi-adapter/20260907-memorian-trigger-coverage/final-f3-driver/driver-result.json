@@ -1,0 +1,171 @@
+{
+  "ok": true,
+  "scenarios": {
+    "s3": {
+      "result": "PASS",
+      "parentRequests": 3,
+      "judgeRequests": 2,
+      "assistantMessages": 3,
+      "recallMessages": 1,
+      "nudgedEntries": 1,
+      "pendingFilePresent": false,
+      "realSenpiUntouched": true
+    },
+    "s4": {
+      "result": "PASS",
+      "parentRequests": 3,
+      "judgeRequests": 2,
+      "assistantMessages": 3,
+      "recallMessages": 1,
+      "nudgedEntries": 1,
+      "pendingFilePresent": false,
+      "realSenpiUntouched": true
+    },
+    "s5": {
+      "result": "PASS",
+      "parentRequests": 2,
+      "judgeRequests": 2,
+      "assistantMessages": 2,
+      "recallMessages": 0,
+      "nudgedEntries": 0,
+      "pendingFilePresent": true,
+      "parentRequestsBefore": 2,
+      "parentRequestsAfter": 2,
+      "assistantMessagesBefore": 2,
+      "assistantMessagesAfter": 2,
+      "realSenpiUntouched": true
+    },
+    "s6": {
+      "result": "PASS",
+      "parentRequests": 3,
+      "judgeRequests": 2,
+      "assistantMessages": 3,
+      "recallMessages": 1,
+      "nudgedEntries": 1,
+      "pendingFilePresent": false,
+      "tool": "eval",
+      "argumentLength": 580,
+      "candidatePaths": [
+        "reference/kubernetes-rollouts.md"
+      ],
+      "realSenpiUntouched": true
+    }
+  },
+  "checks": [
+    {
+      "name": "s3.judge-accepted",
+      "ok": true,
+      "detail": "pending or nudged before first tool result"
+    },
+    {
+      "name": "s3.mid-turn-recall",
+      "ok": true,
+      "detail": "recall after first tool result and before second tool call"
+    },
+    {
+      "name": "s3.nudged-steer",
+      "ok": true,
+      "detail": "count=1 via=steer"
+    },
+    {
+      "name": "s3.parent-requests",
+      "ok": true,
+      "detail": "parentRequests=3"
+    },
+    {
+      "name": "s3.pending-absent",
+      "ok": true,
+      "detail": "pending=false"
+    },
+    {
+      "name": "s3.realSenpiUntouched",
+      "ok": true,
+      "detail": "realSenpiUntouched=true"
+    },
+    {
+      "name": "s4.turn1-parent-requests",
+      "ok": true,
+      "detail": "parentRequests=2"
+    },
+    {
+      "name": "s4.turn1-no-recall",
+      "ok": true,
+      "detail": "recall=0"
+    },
+    {
+      "name": "s4.turn2-recall",
+      "ok": true,
+      "detail": "recallMessages=1"
+    },
+    {
+      "name": "s4.nudged-prompt",
+      "ok": true,
+      "detail": "count=1 via=prompt"
+    },
+    {
+      "name": "s4.parent-requests-total",
+      "ok": true,
+      "detail": "parentRequests=3"
+    },
+    {
+      "name": "s4.realSenpiUntouched",
+      "ok": true,
+      "detail": "realSenpiUntouched=true"
+    },
+    {
+      "name": "s5.parent-before",
+      "ok": true,
+      "detail": "parentRequestsBefore=2"
+    },
+    {
+      "name": "s5.idle-unchanged",
+      "ok": true,
+      "detail": "parent requests and assistant messages held for 5s"
+    },
+    {
+      "name": "s5.realSenpiUntouched",
+      "ok": true,
+      "detail": "realSenpiUntouched=true"
+    },
+    {
+      "name": "s6.tool-fixture",
+      "ok": true,
+      "detail": "tool=eval codeLength=580 token=rollout.md"
+    },
+    {
+      "name": "s6.judge-accepted",
+      "ok": true,
+      "detail": "pending nudge before first tool result"
+    },
+    {
+      "name": "s6.tool-executed",
+      "ok": true,
+      "detail": "tool=eval isError=false"
+    },
+    {
+      "name": "s6.judge-launched",
+      "ok": true,
+      "detail": "recallRuns=1"
+    },
+    {
+      "name": "s6.arg-harvested",
+      "ok": true,
+      "detail": "candidates=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-Y5Kbcj/memory/agents/project-1750cf06/runtime/recall/runs/dde72717-4827-4ff6-a9aa-98991492238a/candidates.json seedPath=reference/kubernetes-rollouts.md"
+    },
+    {
+      "name": "s6.mid-turn-recall",
+      "ok": true,
+      "detail": "recall after first tool result and before second tool call"
+    },
+    {
+      "name": "s6.no-extra-round",
+      "ok": true,
+      "detail": "parentRequests=3"
+    },
+    {
+      "name": "s6.realSenpiUntouched",
+      "ok": true,
+      "detail": "realSenpiUntouched=true"
+    }
+  ]
+}

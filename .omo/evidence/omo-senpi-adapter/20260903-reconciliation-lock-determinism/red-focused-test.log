@@ -1,0 +1,25 @@
+$ bun test packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts:
+114 |
+115 | export function contendedReservation(lockPath: string, owner: LockRecord | null): ReservationStatePort {
+116 |   return {
+117 |     readState: async (options?: { readonly waitTimeoutMs?: number }) => {
+118 |       if (options?.waitTimeoutMs !== 0) {
+119 |         throw new Error("scheduler contention must use an immediate lock attempt")
+                        ^
+error: scheduler contention must use an immediate lock attempt
+      at readState (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/reconciliation-lock/packages/omo-senpi/src/components/memory/worker/run-reconciliation.test-support.ts:119:19)
+      at reconcilePrelaunch (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/reconciliation-lock/packages/omo-senpi/src/components/memory/worker/run-reconciliation.ts:84:45)
+      at reconcileReflectionRuns (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/reconciliation-lock/packages/omo-senpi/src/components/memory/worker/run-reconciliation.ts:65:29)
+      at withinPhase (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/reconciliation-lock/packages/omo-senpi/src/components/memory/worker/run-reconciliation.test-support.ts:109:32)
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/reconciliation-lock/packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts:32:26)
+(fail) reflection and dream run reconciliation > #given the scheduler owner is unreadable on Windows #when reconciliation defers #then reservation state is not mutated [175.48ms]
+
+ 9 pass
+ 1 fail
+ 36 expect() calls
+Ran 10 tests across 1 file. [2.48s]
+
+Command exited with code 1

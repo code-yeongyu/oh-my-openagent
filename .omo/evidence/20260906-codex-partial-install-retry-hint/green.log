@@ -1,0 +1,25 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-opencode\src\cli\cli-installer.platform.test.ts:
+(pass) runCliInstaller platform branching > runs only OpenCode installation for platform=opencode [4.44ms]
+(pass) runCliInstaller platform branching > runs only Codex installation and skips OpenCode version checks for platform=codex [2.16ms]
+(pass) runCliInstaller platform branching > runs only Senpi installation and skips OpenCode provider checks for platform=senpi [1.81ms]
+(pass) runCliInstaller platform branching > passes Codex autonomous selection into Codex installer [2.18ms]
+(pass) runCliInstaller platform branching > passes explicit Codex autonomous opt-out into Codex installer [1.72ms]
+(pass) runCliInstaller platform branching > runs OpenCode and Codex installation for platform=both [1.51ms]
+(pass) runCliInstaller platform branching > fails when Senpi-only installation cannot install Senpi [1.21ms]
+(pass) runCliInstaller platform branching > fails when Codex-only installation cannot install Codex [1.34ms]
+(pass) runCliInstaller platform branching > keeps OpenCode success when Codex fails for platform=both [2.81ms]
+(pass) runCliInstaller platform branching > does not print star commands in noninteractive installs [1.52ms]
+(pass) runCliInstaller platform branching > does not prompt for GitHub stars in noninteractive installs even when stdout is a TTY [9.34ms]
+
+packages\omo-opencode\src\cli\tui-installer-codex-installation.test.ts:
+(pass) runTuiInstaller Codex installation detection > #given Codex is missing #when installing Codex interactively #then warns and still installs [2.29ms]
+(pass) runTuiInstaller Codex installation detection > #given Codex is installed #when installing Codex interactively #then suppresses the missing-install warning [1.23ms]
+(pass) runTuiInstaller Codex install failure exit status > #given a Codex-only install whose Codex step fails #when the installer runs #then it reports failure and the exit status is non-zero [1.40ms]
+(pass) runTuiInstaller Codex install failure exit status > #given platform=both where OpenCode succeeds and Codex fails #when the installer runs #then the partial-success warning path is preserved [1.29ms]
+
+ 15 pass
+ 0 fail
+ 47 expect() calls
+Ran 15 tests across 2 files. [2.15s]

@@ -1,0 +1,21 @@
+bun test v1.3.14 (0d9b296a)
+
+script\npm-pack-paths.test.ts:
+(pass) npm pack path reader > #given npm 11 array output #when packed paths are read #then every packed path is returned [7.58ms]
+(pass) npm pack path reader > #given npm 12 object output keyed by package name #when packed paths are read #then the same paths are returned [2.88ms]
+(pass) npm pack path reader > #given output of neither shape #when packed paths are read #then it fails naming npm pack instead of throwing on undefined [4.99ms]
+(pass) npm pack path reader > #given output that is not JSON at all #when packed paths are read #then it fails naming npm pack rather than raising a bare SyntaxError [4.78ms]
+(pass) npm pack path reader > #given a packed entry without a string path #when packed paths are read #then it fails naming the entry [3.83ms]
+
+script\npm-payload-containment.test.ts:
+(pass) root npm payload containment > #given root files allowlist #when senpi containment is checked #then senpi plugin payload is not shipped [5.92ms]
+(pass) root npm payload containment > #given root files allowlist #when hygiene negations are checked #then nested node_modules and retired component residue are excluded [17.25ms]
+(pass) root npm payload containment > #given root files allowlist #when vendored MCP shipping is checked #then each ships its package.json alongside dist [2.36ms]
+(pass) root npm payload containment > #given root files allowlist #when the Codex plugin payload is checked #then the canonical prompts-core directive sync:skills reads is shipped [2.63ms]
+(pass) lazycodex-ai publish payload containment > #given publish workflow files override #when hygiene negations are checked #then the rewritten files list carries the same exclusions [12.87ms]
+(pass) lazycodex-ai publish payload containment > #given publish workflow #when payload guards are checked #then verify-npm-payload runs before both npm publish paths [3.10ms]
+
+ 11 pass
+ 0 fail
+ 27 expect() calls
+Ran 11 tests across 2 files. [12.99s]

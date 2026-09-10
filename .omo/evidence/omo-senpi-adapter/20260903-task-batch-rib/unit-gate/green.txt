@@ -1,0 +1,69 @@
+ M packages/senpi-task/src/tools/task/AGENTS.md
+ M packages/senpi-task/src/tools/task/argument-normalization.test.ts
+ M packages/senpi-task/src/tools/task/argument-normalization.ts
+ M packages/senpi-task/src/tools/task/description.ts
+ M packages/senpi-task/src/tools/task/execute-batch.ts
+ M packages/senpi-task/src/tools/task/execute.ts
+ M packages/senpi-task/src/tools/task/params.ts
+ M packages/senpi-task/src/tools/task/validation.ts
+?? packages/senpi-task/src/tools/task/batch-item-details.ts
+?? packages/senpi-task/src/tools/task/batch-progress.ts
+?? packages/senpi-task/src/tools/task/execute-batch-progress.test.ts
+?? packages/senpi-task/src/tools/task/execute-batch-run-in-background.test.ts
+=== tools/task ===
+packages/senpi-task/src/tools/task/description.test.ts:
+packages/senpi-task/src/tools/task/execute-skills.test.ts:
+packages/senpi-task/src/tools/task/gated-categories.test.ts:
+packages/senpi-task/src/tools/task/execute-progress.test.ts:
+packages/senpi-task/src/tools/task/start-presentation.test.ts:
+packages/senpi-task/src/tools/task/execute-continuation.test.ts:
+packages/senpi-task/src/tools/task/execute-collision.test.ts:
+packages/senpi-task/src/tools/task/execute-plan-review-contract.test.ts:
+packages/senpi-task/src/tools/task/execute-spawn-validation.test.ts:
+packages/senpi-task/src/tools/task/renderers-run-stats.test.ts:
+packages/senpi-task/src/tools/task/validation.test.ts:
+packages/senpi-task/src/tools/task/execute-abort.test.ts:
+packages/senpi-task/src/tools/task/execute-spawn.test.ts:
+packages/senpi-task/src/tools/task/execute-plan-error.test.ts:
+packages/senpi-task/src/tools/task/integration.test.ts:
+packages/senpi-task/src/tools/task/model-visibility.test.ts:
+packages/senpi-task/src/tools/task/renderers-invalid-arguments.test.ts:
+packages/senpi-task/src/tools/task/params.test.ts:
+packages/senpi-task/src/tools/task/execute-continuation-scope.test.ts:
+packages/senpi-task/src/tools/task/argument-normalization.test.ts:
+packages/senpi-task/src/tools/task/description-plan-gated.test.ts:
+ 196 pass
+ 0 fail
+ 599 expect() calls
+Ran 196 tests across 34 files. [1240.00ms]
+=== package ===
+packages/senpi-task/src/runners/rpc/handle-steer-delivery.test.ts:
+packages/senpi-task/src/runners/rpc/spawn-marker.test.ts:
+packages/senpi-task/src/runners/rpc/handle-user-abort.test.ts:
+packages/senpi-task/src/runners/rpc/model-admission-confirm.test.ts:
+packages/senpi-task/src/runners/rpc/spawn-node-runtime.test.ts:
+packages/senpi-task/src/runners/rpc/handle.test.ts:
+packages/senpi-task/src/runners/rpc/model-admission-cache.test.ts:
+packages/senpi-task/src/runners/rpc/exit-mapping.test.ts:
+packages/senpi-task/src/runners/rpc/ui-auto-answer.test.ts:
+packages/senpi-task/src/runners/rpc/protocol-client.test.ts:
+packages/senpi-task/src/runners/rpc/spawn.test.ts:
+packages/senpi-task/src/runners/rpc/parent-extensions.test.ts:
+packages/senpi-task/src/agents/builtin/fallback-chains.test.ts:
+packages/senpi-task/src/agents/builtin/builtin-agents.test.ts:
+packages/senpi-task/src/tools/output/transcript/session-jsonl.test.ts:
+packages/senpi-task/src/tools/output/transcript/session-dir.test.ts:
+packages/senpi-task/src/tools/output/transcript/read-bounded.test.ts:
+packages/senpi-task/src/tools/output/transcript/event-log.test.ts:
+1 tests skipped:
+(skip) #given a console-less parent #when the default RPC child starts #then windowsHide suppresses its console
+ 1847 pass
+ 1 skip
+ 0 fail
+ 6034 expect() calls
+Ran 1848 tests across 259 files. [19.49s]
+=== tsgo omo-senpi ===
+TSGO_RC=0
+=== tsgo senpi-task ===
+packages/senpi-task/tsconfig.json
+TSGO2_RC=0

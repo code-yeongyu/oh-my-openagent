@@ -14,7 +14,12 @@ import type { FileHandle } from "../fs/resilient"
 import { hostname } from "node:os"
 import path from "node:path"
 
-import { sweepStaleLockCandidates } from "./candidate-sweep"
+import {
+  CANDIDATE_UNLINK_ATTEMPTS,
+  forgetLeakedCandidate,
+  sweepStaleLockCandidates,
+  trackLeakedCandidate,
+} from "./candidate-sweep"
 import type { LockRecord } from "./lock-record"
 import { parseLockRecord } from "./lock-record"
 import { getPidLiveness, getProcessStartIdentity } from "./process-identity"
@@ -45,6 +50,40 @@ export class LockContentionError extends Error {
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
   return typeof error.code === "string" ? error.code : undefined
+}
+
+function isUnlinkSharingError(error: unknown, override?: (error: unknown) => boolean): boolean {
+  if (override !== undefined) return override(error)
+  if (process.platform !== "win32") return false
+  const code = errorCode(error)
+  return code === "EBUSY" || code === "EPERM" || code === "EACCES"
+}
+
+async function unlinkCandidate(candidatePath: string): Promise<boolean> {
+  for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {
+    try {
+      await (candidateFs.unlink ?? unlink)(candidatePath)
+      forgetLeakedCandidate(candidatePath)
+      return true
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") {
+        forgetLeakedCandidate(candidatePath)
+        return true
+      }
+      const sharing = isUnlinkSharingError(error, candidateFs.isSharingError)
+      if (!sharing) {
+        trackLeakedCandidate(candidatePath)
+        rearmCandidateSweep(path.dirname(candidatePath))
+        throw error
+      }
+      if (attempt + 1 === CANDIDATE_UNLINK_ATTEMPTS) {
+        trackLeakedCandidate(candidatePath)
+        rearmCandidateSweep(path.dirname(candidatePath))
+        return false
+      }
+    }
+  }
+  return false
 }
 
 function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
@@ -84,9 +123,8 @@ async function openFreshCandidate(
     try {
       return { candidatePath, handle: await open(candidatePath, "wx", 0o600) }
     } catch (error) {
-      await unlink(candidatePath).catch((unlinkError: unknown) => {
-        if (errorCode(unlinkError) !== "ENOENT") throw unlinkError
-      })
+      const removed = await unlinkCandidate(candidatePath)
+      if (!removed) rearmCandidateSweep(path.dirname(lockPath))
       if (errorCode(error) !== "EINTR" || attempt >= EINTR_RETRY_CAP) throw error
     }
   }
@@ -111,9 +149,7 @@ async function publishExclusive(lockPath: string, record: LockRecord): Promise<b
       throw error
     }
   } finally {
-    await unlink(candidatePath).catch((error: unknown) => {
-      if (errorCode(error) !== "ENOENT") throw error
-    })
+    if (!(await unlinkCandidate(candidatePath))) rearmCandidateSweep(path.dirname(lockPath))
   }
 }
 
@@ -126,6 +162,24 @@ export function isCandidatePublishRace(error: unknown): boolean {
 }
 
 const sweptLockDirectories = new Set<string>()
+
+export interface LockCandidateFs {
+  readonly unlink?: (path: string) => Promise<void>
+  readonly isSharingError?: (error: unknown) => boolean
+}
+
+let candidateFs: LockCandidateFs = {}
+
+/** Test seam for deterministic Windows sharing-failure coverage; production uses resilient fs. */
+export function setLockCandidateFsForTests(next: LockCandidateFs | undefined): () => void {
+  const previous = candidateFs
+  candidateFs = next ?? {}
+  return () => { candidateFs = previous }
+}
+
+function rearmCandidateSweep(lockDirectory: string): void {
+  sweptLockDirectories.delete(lockDirectory)
+}
 
 async function isProvenDead(owner: LockRecord): Promise<boolean> {
   if (owner.hostname !== hostname()) return false
@@ -178,8 +232,14 @@ export async function acquireLock(
   if (!sweptLockDirectories.has(lockDirectory)) {
     sweptLockDirectories.add(lockDirectory)
     // Opportunistic hygiene, once per process per directory: a failed sweep must never
-    // block or fail the acquisition it rides on.
-    await sweepStaleLockCandidates(lockDirectory).catch(() => undefined)
+    // block or fail the acquisition it rides on. Failed candidate cleanup re-arms this memo.
+    await sweepStaleLockCandidates(lockDirectory, Date.now, {
+      ...(candidateFs.unlink === undefined ? {} : { unlink: candidateFs.unlink }),
+      ...(candidateFs.isSharingError === undefined ? {} : { isSharingError: candidateFs.isSharingError }),
+      onFailure: () => rearmCandidateSweep(lockDirectory),
+    }).catch(() => {
+      rearmCandidateSweep(lockDirectory)
+    })
   }
   const deadline = Date.now() + waitTimeoutMs
 

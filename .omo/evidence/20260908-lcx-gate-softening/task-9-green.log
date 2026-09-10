@@ -1,0 +1,36 @@
+machine: mengmotaMac (macos/aarch64 online)
+GREEN: also copy quality-gate-fields.ts, cli-output.ts, status-next-actions.ts
+COMMAND: export PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH; cd /tmp/lcx-t9-20260908/omo && bash -c 'bun --cwd packages/omo-codex/plugin/components/ulw-loop test ./test/quality-gate-fields-messages.test.ts ./test/quality-gate-blockers.test.ts 2>&1 | tail -150; echo TEST_EXIT=${PIPESTATUS[0]}'
+=== GREEN ===
+exitCode=0
+--- stdout ---
+$ vitest --run ./test/quality-gate-fields-messages.test.ts ./test/quality-gate-blockers.test.ts
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/private/tmp/lcx-t9-20260908/omo/packages/omo-codex/plugin/components/ulw-loop[39m
+
+ [32m✓[39m test/quality-gate-blockers.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m test/quality-gate-fields-messages.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m   Start at [22m 20:51:40
+[2m   Duration [22m 275ms[2m (transform 148ms, setup 0ms, import 209ms, tests 9ms, environment 0ms)[22m
+
+TEST_EXIT=0
+
+--- stderr ---
+
+=== TSGO ===
+exitCode=0
+--- stdout ---
+TSGO_OMO_CODEX_EXIT=0
+
+--- stderr ---
+
+=== CLEANUP ===
+exitCode=0
+--- stdout ---
+ls: /tmp/lcx-t9-20260908: No such file or directory
+CLEANUP_LS_EXIT=1
+
+--- stderr ---

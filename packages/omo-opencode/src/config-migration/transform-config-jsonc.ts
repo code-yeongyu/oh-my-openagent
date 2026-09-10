@@ -32,7 +32,6 @@ export function transformConfigJsoncSources(
     diagnostics,
     document: {
       $schema: OMO_SCHEMA_URL,
-      ...(recordAt(legacy, "codegraph") === undefined ? {} : { codegraph: recordAt(legacy, "codegraph") }),
       ...(recordAt(legacy, "[opencode]") === undefined ? {} : { "[opencode]": recordAt(legacy, "[opencode]") }),
       ...(recordAt(legacy, "[codex]") === undefined ? {} : { "[codex]": recordAt(legacy, "[codex]") }),
       ...(senpi === undefined && omo === undefined ? {} : { "[senpi]": senpi ?? omo }),

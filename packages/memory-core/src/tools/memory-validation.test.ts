@@ -163,7 +163,7 @@ describe("runMemoryTool", () => {
       const setup = await fixture()
       await seed(setup, "note.md", "same")
       const head = await setup.repo.head()
-      await expect(run(setup, params)).rejects.toThrow(`memory: ${params.command} made no effective changes`)
+      await expect(run(setup, params)).rejects.toThrow(`memory: ${params.command} made no changes`)
       expect(await setup.repo.head()).toBe(head)
       expect(await setup.repo.status()).toBe("")
     }

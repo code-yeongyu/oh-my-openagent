@@ -1,0 +1,23 @@
+WHAT WAS TESTED: todo 5 agent TOML/default reasoning acceptance
+RED PROOF (before edits): rg -c 'model = "gpt-6-astra"' packages/omo-codex/plugin/components/ultrawork/agents/*.toml
+RESULT: no matches (exit 1); current models were gpt-5.6-luna/sol/terra.
+GREEN: rg -c 'model = "gpt-6-astra"' ...
+packages/omo-codex/plugin/components/ultrawork/agents/plan.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/momus.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-medium.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/metis.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-low.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-worker-high.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-code-reviewer.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-qa-executor.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-gate-reviewer.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-clone-fidelity-reviewer.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/librarian.toml:1
+packages/omo-codex/plugin/components/ultrawork/agents/explorer.toml:1
+GREEN: all twelve files have exactly one Astra model:
+PASS
+GREEN: syntax/whitespace:
+PASS
+BUNDLE QA: deferred to todo 7 because committed installer bundle is rebuilt by todo 4.
+TYPECHECK: tsgo --noEmit -p packages/omo-codex/tsconfig.json -> FAIL: Cannot find type definition file for bun-types (environment dependency missing).
+REAL HOME SHASUM: not modified; raw-pipe installer QA deferred to todo 7.

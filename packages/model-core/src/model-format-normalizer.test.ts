@@ -22,6 +22,12 @@ describe("normalizeModelFormat", () => {
       const result = normalizeModelFormat("")
       expect(result).toBeUndefined()
     })
+
+    it("returns undefined when provider or model segment is empty", () => {
+      expect(normalizeModelFormat("/glm-5-free")).toBeUndefined()
+      expect(normalizeModelFormat("opencode/")).toBeUndefined()
+      expect(normalizeModelFormat("opencode/   ")).toBeUndefined()
+    })
   })
 
   describe("object format input", () => {

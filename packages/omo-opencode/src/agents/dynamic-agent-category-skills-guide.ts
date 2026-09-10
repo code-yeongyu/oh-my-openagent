@@ -102,14 +102,14 @@ Check the \`skill\` tool for available skills and their descriptions. For EVERY 
 task(
   category="[selected-category]",
   load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills - ESPECIALLY user-installed ones
-  run_in_background=false,
+  run_in_background=true,
   prompt="..."
 )
 \`\`\`
 
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
-task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
+task(category="...", load_skills=[], run_in_background=true, prompt="...")  // Empty load_skills without justification
 \`\`\`
 
 ---
@@ -118,23 +118,23 @@ task(category="...", load_skills=[], run_in_background=false, prompt="...")  // 
 
 Every delegation MUST use the category that matches the task's domain. Mismatched categories produce measurably worse output because each category runs on a model optimized for that specific domain.
 
-**VISUAL WORK = ALWAYS \`visual-engineering\`. NO EXCEPTIONS.**
+**ANY VISUAL DESIGN RELATION = ALWAYS \`visual-engineering\`. NO EXCEPTIONS.**
 
-Any task involving UI, UX, CSS, styling, layout, animation, design, or frontend components MUST go to \`visual-engineering\`. Never delegate visual work to \`quick\`, \`unspecified-*\`, or any other category.
+Any task with even a minor visual-design relationship — including UI, UX, CSS, styling, layout, animation, design systems, frontend components, screenshots, diagrams, visual polish, or presentation — MUST go to \`visual-engineering\`. Never delegate it to \`quick\`, \`unspecified-*\`, or any other category.
 
 \`\`\`typescript
 // CORRECT: Visual work → visual-engineering category
-task(category="visual-engineering", load_skills=["frontend"], run_in_background=false, prompt="Redesign the sidebar layout with new spacing...")
+task(category="visual-engineering", load_skills=["frontend"], run_in_background=true, prompt="Redesign the sidebar layout with new spacing...")
 
 // WRONG: Visual work in wrong category - WILL PRODUCE INFERIOR RESULTS
-task(category="quick", load_skills=[], run_in_background=false, prompt="Redesign the sidebar layout with new spacing...")
+task(category="quick", load_skills=[], run_in_background=true, prompt="Redesign the sidebar layout with new spacing...")
 \`\`\`
 
 | Task Domain | MUST Use Category |
 |---|---|
-| UI, styling, animations, layout, design | \`visual-engineering\` |
-| Hard logic, architecture decisions, algorithms | \`ultrabrain\` |
-| Autonomous research + end-to-end implementation | \`deep\` |
+| Visual design, UI, styling, animations, layout, design systems | \`visual-engineering\` |
+| Hard logic and architecture decisions | \`ultrabrain\` |
+| 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, autonomous research + end-to-end implementation | \`deep\` |
 | Single-file typo, trivial config change | \`quick\` |
 
 **When in doubt about category, it is almost never \`quick\` or \`unspecified-*\`. Match the domain.**`

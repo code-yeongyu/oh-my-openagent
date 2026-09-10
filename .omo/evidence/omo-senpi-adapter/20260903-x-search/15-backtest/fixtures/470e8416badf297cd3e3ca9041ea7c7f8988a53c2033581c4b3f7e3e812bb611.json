@@ -1,0 +1,292 @@
+{
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"삼성전자 실적 외인 수급 since:2026-08-27 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-27",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788418572,
+    "completed_at": 1788418572,
+    "id": "3a2e24e4-ff71-9c89-9864-fbeff51a1d40",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_3a2e24e4-ff71-9c89-9864-fbeff51a1d40_call-94978372-a1c3-4a03-bcdb-e6cd7e01da7d-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "삼성전자 실적 외인 수급",
+          "sources": [
+            {
+              "type": "url",
+              "url": "http://www.thedailymoney.com/news/articleView.html?idxno=1140428"
+            },
+            {
+              "type": "url",
+              "url": "https://www.choicestock.co.kr/stock/news_view/150048?bu="
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=JbuzXUfUtXE"
+            },
+            {
+              "type": "url",
+              "url": "https://simplywall.st/ko/stocks/kr/tech/kose-a005930/samsung-electronics-shares"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=3o1-c0rIycw"
+            },
+            {
+              "type": "url",
+              "url": "https://www.betanews.net/article/view/beta202605250012"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankyung.com/article/2025092329501"
+            },
+            {
+              "type": "url",
+              "url": "https://www.ytn.co.kr/_ln/0134_202605220723556706"
+            },
+            {
+              "type": "url",
+              "url": "https://www.newsis.com/view/NISX20250108_0003025464"
+            },
+            {
+              "type": "url",
+              "url": "https://www.yna.co.kr/view/AKR20260901150800008"
+            },
+            {
+              "type": "url",
+              "url": "https://www.news1.kr/finance/market-exr/6093043"
+            },
+            {
+              "type": "url",
+              "url": "https://stockplus.com/m/stocks/KOREA-A005930/quotations/foreign"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/en/stock/11929158"
+            },
+            {
+              "type": "url",
+              "url": "https://n.news.naver.com/mnews/article/022/0004154601"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=ggnFmBrK_vM"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_3a2e24e4-ff71-9c89-9864-fbeff51a1d40_call-94978372-a1c3-4a03-bcdb-e6cd7e01da7d-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**삼성전자 실적과 외국인(외인) 수급 동향 요약** (2025~2026년 주요 흐름, 최신 검색 결과 기준)\n\n### 1. 최근 실적 현황 (2026년 2분기 중심)\n- **2026년 2Q 실적**: 매출 약 **172조 원** (전년 대비 +130%), 영업이익 **89.5조 원**, 순이익 **71조 원**, 영업이익률 **42%**. EPS는 10,811원으로 전년(652원) 대비 대폭 개선.[[1]](https://simplywall.st/ko/stocks/kr/tech/kose-a005930/samsung-electronics-shares)\n- 실적 호조 배경: AI 수요에 따른 **D램·낸드 가격 급등** (분기 60%대 상승), HBM(고대역폭메모리) 관련 기대감. 메모리 사이클 턴어라운드가 명확해지며 실적 저점 통과 관측이 나오고 있음.\n- 향후 전망: 3분기 영업이익 120조 원, 4분기 126조 원, 내년 연간 559조 원 수준으로 보는 증권사 전망도 존재. HBM 수익화와 D램 ASP(평균판매가격) 상승이 핵심 변수.[[2]](https://n.news.naver.com/mnews/article/022/0004154601)\n\n### 2. 외국인 수급 동향 (외인 매수·매도 흐름)\n외국인 수급은 **실적 호재 vs. 매크로·차익실현·리밸런싱**으로 크게 엇갈리는 양상을 보임.\n\n- **대규모 매도 국면 (2026년 5~7월)**:\n  - 5월 7~22일 약 12거래일 동안 **삼성전자 18.9조 원 + SK하이닉스 19.5조 원** 총 **38조 원** 순매도.[[3]](https://www.choicestock.co.kr/stock/news_view/150048?bu=)[[4]](https://www.betanews.net/article/view/beta202605250012)\n  - 5월 18~22일 1주일만 **삼성전자 5.3조 + SK하이닉스 5.3조** 총 **10.6조 원** 매도.\n  - 배경: 반도체 주가 급등 후 차익실현 + MSCI 지수 리밸런싱 매도 + 금리·매크로 우려. 외국인 지분율이 올해 최저 수준(48.42%대, 최저 47.58%까지 하락)까지 떨어짐.[[5]](http://www.thedailymoney.com/news/articleView.html?idxno=1140428)\n\n- **매수 반전 및 숏커버링 국면 (5월 말~7월, 9월)**:\n  - 5월 21일경: 외국인 **숏커버링(공매도 청산) 성격**의 매수 유입 + 기관 지원으로 삼성전자 **5.62% 급등**, 29만 원 돌파 시도. 외인 지분율 바닥 인식 속 선별적 귀환.[[5]](http://www.thedailymoney.com/news/articleView.html?idxno=1140428)\n  - 7월: 외국인 삼성전자·SK하이닉스 합산 **8,000억~9,000억 원** 순매수 기록 (숏커버링 성격 강함).[[6]](https://www.youtube.com/watch?v=JbuzXUfUtXE)\n  - 9월 1일 기준: **삼성전자 1,845억 원 순매도** (SK하이닉스는 1,668억 원 순매수). 최근 변동성이 여전.[[7]](https://www.yna.co.kr/view/AKR20260901150800008)\n  - 2025년 9월경 과거 사례: 외국인 5거래일 **1.36조 원** 순매수하며 지분율 51.25%까지 상승 (HBM 테스트 통과 기대).[[8]](https://www.hankyung.com/article/2025092329501)\n\n- **최근 패턴 (2026년 8~9월)**: 자사주 매입에도 외국인 매도가 이어지며 상승 동력이 제한적이라는 분석. 외인 수급 안정화가 주가 추가 상승의 핵심 키로 꼽힘.[[9]](https://www.youtube.com/watch?v=3o1-c0rIycw)\n\n### 3. 종합 해석 및 시장 반응\n- **실적은 강력 호재**인데, 외국인 수급이 **차익실현·글로벌 매크로**에 민감하게 반응하면서 주가가 실적 대비 부진한 경우가 많음 (“실적은 현재, 주가는 미래”).\n- 개인투자자(개미)는 반대로 순매수(예: 5월 11조 원 규모)하며 지지하는 모습.[[10]](https://www.ytn.co.kr/_ln/0134_202605220723556706)\n- 외국인 지분율 바닥(47~48%대) 후 숏커버링이나 순매수 전환이 주가 급등 촉매로 작용한 사례가 반복됨.\n- 현재(2026년 9월 초) 변동성이 높아, HBM 본격 수익화·관세 이슈·글로벌 금리 흐름이 외인 수급 방향성을 결정할 전망.\n\n더 구체적인 날짜(예: 최신 1개월 일별 수급)나 특정 기간 실적·목표주가 비교가 필요하시면 추가로 말씀해주세요!",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://simplywall.st/ko/stocks/kr/tech/kose-a005930/samsung-electronics-shares",
+                "start_index": 225,
+                "end_index": 311,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://n.news.naver.com/mnews/article/022/0004154601",
+                "start_index": 532,
+                "end_index": 592,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.choicestock.co.kr/stock/news_view/150048?bu=",
+                "start_index": 784,
+                "end_index": 847,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.betanews.net/article/view/beta202605250012",
+                "start_index": 847,
+                "end_index": 908,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "http://www.thedailymoney.com/news/articleView.html?idxno=1140428",
+                "start_index": 1079,
+                "end_index": 1150,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "http://www.thedailymoney.com/news/articleView.html?idxno=1140428",
+                "start_index": 1297,
+                "end_index": 1368,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.youtube.com/watch?v=JbuzXUfUtXE",
+                "start_index": 1436,
+                "end_index": 1486,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.yna.co.kr/view/AKR20260901150800008",
+                "start_index": 1558,
+                "end_index": 1612,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.hankyung.com/article/2025092329501",
+                "start_index": 1693,
+                "end_index": 1746,
+                "title": "8"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.youtube.com/watch?v=3o1-c0rIycw",
+                "start_index": 1844,
+                "end_index": 1894,
+                "title": "9"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ytn.co.kr/_ln/0134_202605220723556706",
+                "start_index": 2061,
+                "end_index": 2118,
+                "title": "10"
+              }
+            ]
+          }
+        ],
+        "id": "msg_3a2e24e4-ff71-9c89-9864-fbeff51a1d40",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 194051500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 194051500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T06:56:12.774Z"
+}

@@ -1,0 +1,13 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/runners/in-process/shared-tool-filter.test.ts:
+(pass) shared parent tool family filter > #given task, team, and workflow orchestration names #when classified #then only orchestration names match [0.86ms]
+(pass) shared parent tool family filter > #given shared tools with family and ui-only entries #when filtered #then family and ui-only removed [0.12ms]
+(pass) shared parent tool family filter > #given family tool in shared and in member-scoped #when merged #then only member-scoped family crosses the exclusion [1.89ms]
+(pass) shared parent tool family filter > #given no member-scoped tools #when merged #then result is only the filtered shared set [0.12ms]
+(pass) shared parent tool family filter > #given x_search and thread_create search-exposed tools #when filtered #then only x_search is direct and copied [0.10ms]
+
+ 5 pass
+ 0 fail
+ 17 expect() calls
+Ran 5 tests across 1 file. [517.00ms]

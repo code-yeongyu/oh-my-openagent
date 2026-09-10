@@ -1,0 +1,28 @@
+node:internal/child_process:1127
+    result.error = new ErrnoException(result.error, 'spawnSync ' + options.file);
+                   ^
+
+<ref *1> Error: spawnSync npm ENOENT
+    at Object.spawnSync (node:internal/child_process:1127:20)
+    at spawnSync (node:child_process:911:24)
+    at execFileSync (node:child_process:954:15)
+    at packedPaths (file:///C:/Users/LilMG/Desktop/oh-my-openagent/.local-ignore/pr-worktrees/win-spawn/script/verify-npm-payload.mjs:28:15)
+    at file:///C:/Users/LilMG/Desktop/oh-my-openagent/.local-ignore/pr-worktrees/win-spawn/script/verify-npm-payload.mjs:37:15
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:636:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'spawnSync npm',
+  path: 'npm',
+  spawnargs: [ 'pack', '--dry-run', '--json', '--ignore-scripts' ],
+  error: [Circular *1],
+  status: null,
+  signal: null,
+  output: null,
+  pid: 0,
+  stdout: undefined,
+  stderr: undefined
+}
+
+Node.js v26.1.0

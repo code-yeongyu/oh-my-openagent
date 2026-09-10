@@ -82,7 +82,7 @@ function raceWorkerSource(projectDir: string, prompt: string): string {
     `  const started = await dag.start({ definition, parentSessionId: ${JSON.stringify(parentSessionId)}, rootSessionId: ${JSON.stringify(rootSessionId)} })`,
     `  process.stdout.write(JSON.stringify({ ok: true, reused: started.reused, runId: started.snapshot.runId }) + "\\n")`,
     `} catch (error) {`,
-    `  process.stdout.write(JSON.stringify({ ok: false, code: error.code ?? "unknown" }) + "\\n")`,
+    `  process.stdout.write(JSON.stringify({ ok: false, code: error.code ?? "unknown", message: error.message, syscall: error.syscall, path: error.path }) + "\\n")`,
     `}`,
   ].join("\n")
 }
@@ -111,6 +111,9 @@ type RaceOutcome = {
   readonly reused?: boolean
   readonly runId?: string
   readonly code?: string
+  readonly message?: string
+  readonly syscall?: string
+  readonly path?: string
 }
 
 async function raceStarts(projectDir: string, prompts: readonly string[]): Promise<readonly RaceOutcome[]> {
@@ -432,6 +435,19 @@ describe("createDagManager list", () => {
     expect(clamped).toHaveLength(3)
     expect(() => dag.list(parentSessionId, { limit: 0 })).toThrow(DagManagerError)
   })
+
+  test("#given the runs directory vanished after the store opened #when listed #then the session has no runs instead of an ENOENT crash", async () => {
+    // given - a worktree cleanup (git clean, rm -rf .omo) removes the state dir while the session is live
+    const { store, dag } = manager(tempProject())
+    await dag.start({ definition: definition(), parentSessionId, rootSessionId })
+    fs.rmSync(store.paths.runs, { recursive: true, force: true })
+
+    // when
+    const listed = dag.list(parentSessionId)
+
+    // then
+    expect(listed).toEqual([])
+  })
 })
 
 describe("createDagManager amend", () => {
@@ -634,7 +650,10 @@ describe("createDagManager concurrent starts", () => {
     // then
     const store = createDagFileStore({ project_dir: projectDir })
     expect(runFiles(store)).toHaveLength(1)
-    expect(outcomes.map((outcome) => outcome.ok)).toEqual([true, true])
+    expect(outcomes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ ok: true }),
+      expect.objectContaining({ ok: true }),
+    ]))
     expect(new Set(outcomes.map((outcome) => outcome.runId)).size).toBe(1)
     expect(outcomes.filter((outcome) => outcome.reused === false)).toHaveLength(1)
     expect(outcomes.filter((outcome) => outcome.reused === true)).toHaveLength(1)

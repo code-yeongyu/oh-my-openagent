@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
@@ -15,20 +15,89 @@ const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 const excludedSnapshotRoots = new Set(["omo-local-update", "omo-runtime-worktree"])
 const defaultReceiptDir = resolve(".omo/evidence/20260730-ulw-goal-footer/tui")
-const activeUlwStatus = JSON.stringify({
-  ok: true,
-  plan: {
-    activeGoalId: "G001",
-    goals: [
-      {
-        id: "G001",
-        status: "in_progress",
-        title: "Render the combined footer",
-        successCriteria: [{ id: "C001", status: "pending" }],
-      },
-    ],
-  },
-})
+const activePlan = {
+  activeGoalId: "G001",
+  goals: [
+    {
+      id: "G001",
+      status: "in_progress",
+      title: "Render the combined footer",
+      successCriteria: [{ id: "C001", status: "pending" }],
+    },
+  ],
+}
+const activeUlwStatus = JSON.stringify({ ok: true, plan: activePlan })
+const scopedGoalsDocument = JSON.stringify(activePlan)
+
+// The host gates the whole footer on `<cwd>/.omo/ulw-loop/<sessionId>/goals.json` before it ever spawns
+// the toolkit (`src/components/ulw-loop/index.ts:readActiveStatus` -> `ulwLoopPlanExists`), and it derives
+// `<sessionId>` from its own session identity, not from this process env. A fake `create-goals` that only
+// makes the unscoped `.omo/ulw-loop` directory therefore drives a scenario the host always answers
+// "inactive" to, so the driver would report a green run while rendering no `ultraworking` frames. The fake
+// mirrors the toolkit's own scope resolution instead: explicit `--session-id` first, then the toolkit env
+// keys in `packages/omo-codex/plugin/components/ulw-loop/src/paths.ts` order, normalized by the same rules.
+const ULW_LOOP_SESSION_ENV_KEYS = [
+  "OMO_ULW_LOOP_SESSION_ID",
+  "CODEX_SESSION_ID",
+  "CODEX_THREAD_ID",
+  "PI_SESSION_ID",
+]
+
+// Mirrors toolkit `normalizeUlwLoopSessionId`; the parity that matters here is the directory name the
+// host will later stat, so a drifting rule must surface as a failing self-test rather than a silent miss.
+function normalizeUlwLoopSessionId(sessionId) {
+  const trimmed = typeof sessionId === "string" ? sessionId.trim() : ""
+  if (trimmed.length === 0) return null
+  const pathSegments = trimmed.split(/[\\/]+/).filter((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+  const candidate = (pathSegments.length > 0 ? pathSegments.join("-") : trimmed)
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^\.+/, "")
+    .replace(/^[.-]+|[.-]+$/g, "")
+  return candidate.length > 0 ? candidate : null
+}
+
+function resolveFakeCreateGoalsSessionId(argv, env) {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === "--session-id") {
+      const normalized = normalizeUlwLoopSessionId(argv[index + 1])
+      if (normalized !== null) return normalized
+    }
+    if (typeof arg === "string" && arg.startsWith("--session-id=")) {
+      const normalized = normalizeUlwLoopSessionId(arg.slice("--session-id=".length))
+      if (normalized !== null) return normalized
+    }
+  }
+  for (const key of ULW_LOOP_SESSION_ENV_KEYS) {
+    const normalized = normalizeUlwLoopSessionId(env[key])
+    if (normalized !== null) return normalized
+  }
+  return null
+}
+
+// `create-goals` runs as the fake `omo` shell binary inside the sandbox, so the resolution above is
+// re-expressed as a node one-liner the shell delegates to; keeping one implementation avoids the fake and
+// the self-test agreeing with each other while disagreeing with the toolkit.
+function fakeCreateGoalsHelperSource() {
+  return [
+    "import { mkdirSync, writeFileSync } from 'node:fs'",
+    "import { dirname, join } from 'node:path'",
+    `const ULW_LOOP_SESSION_ENV_KEYS = ${JSON.stringify(ULW_LOOP_SESSION_ENV_KEYS)}`,
+    `const scopedGoalsDocument = ${JSON.stringify(scopedGoalsDocument)}`,
+    normalizeUlwLoopSessionId.toString(),
+    resolveFakeCreateGoalsSessionId.toString(),
+    "const sessionId = resolveFakeCreateGoalsSessionId(process.argv.slice(2), process.env)",
+    "if (sessionId === null) {",
+    "  process.stdout.write(JSON.stringify({ ok: false, error: { code: 'ULW_LOOP_SESSION_ID_MISSING' } }) + '\\n')",
+    "  process.exit(3)",
+    "}",
+    "const goalsPath = join(process.cwd(), '.omo', 'ulw-loop', sessionId, 'goals.json')",
+    "mkdirSync(dirname(goalsPath), { recursive: true })",
+    "writeFileSync(goalsPath, scopedGoalsDocument + '\\n')",
+    "process.stdout.write(JSON.stringify({ ok: true, goalsPath }) + '\\n')",
+  ].join("\n")
+}
 
 function parseArgs(argv) {
   if (argv.length === 0) return { help: false, selfTest: false }
@@ -61,6 +130,9 @@ function prepareScenario() {
   seedSandbox(sandbox)
   const sessionDir = join(sandbox.root, "sessions")
   const fakeBinDir = join(sandbox.root, "bin")
+  // Only used to exercise the fake from `--self-test`, where no live host session exists. The live run
+  // resolves the id from `PI_SESSION_ID`, which the engine's bash tool sets to the host's own session id.
+  const scenarioSessionId = normalizeUlwLoopSessionId(basename(sandbox.root))
   const pluginRoot = join(sandbox.root, "plugin")
   const ulwActiveMarker = join(sandbox.root, "ulw-active")
   mkdirSync(sessionDir, { recursive: true })
@@ -84,10 +156,12 @@ function prepareScenario() {
     join(sandbox.agentDir, "settings.json"),
     `${JSON.stringify({ defaultProjectTrust: "ask", packages: [pluginRoot] }, null, 2)}\n`,
   )
+  const createGoalsHelper = join(fakeBinDir, "create-goals.mjs")
+  writeFileSync(createGoalsHelper, `${fakeCreateGoalsHelperSource()}\n`)
   const omoBin = join(fakeBinDir, "omo")
   writeFileSync(
     omoBin,
-    `#!/bin/sh\nif [ "$1 $2" = "ulw-loop create-goals" ]; then\n  : > '${ulwActiveMarker}'\n  mkdir -p .omo/ulw-loop\n  exit 0\nfi\nif [ "$1 $2 $3" = "ulw-loop status --json" ]; then\n  if [ -f '${ulwActiveMarker}' ]; then printf '%s\\n' '${activeUlwStatus}'; else printf '%s\\n' '{"ok":false,"error":{"code":"ULW_LOOP_PLAN_MISSING"}}'; fi\n  exit 0\nfi\nexit 2\n`,
+    `#!/bin/sh\nif [ "$1 $2" = "ulw-loop create-goals" ]; then\n  shift 2\n  '${process.execPath}' '${createGoalsHelper}' "$@" || exit $?\n  : > '${ulwActiveMarker}'\n  mkdir -p .omo/ulw-loop\n  exit 0\nfi\nif [ "$1 $2 $3" = "ulw-loop status --json" ]; then\n  if [ -f '${ulwActiveMarker}' ]; then printf '%s\\n' '${activeUlwStatus}'; else printf '%s\\n' '{"ok":false,"error":{"code":"ULW_LOOP_PLAN_MISSING"}}'; fi\n  exit 0\nfi\nexit 2\n`,
   )
   chmodSync(omoBin, 0o755)
   writeFileSync(
@@ -100,10 +174,22 @@ function prepareScenario() {
             name: "create_goal",
             arguments: { objective: "Keep the real TUI open while the active ulw-loop footer animates." },
           },
+          // The engine exposes shell only as `tool.bash` inside an `eval` cell; a bare `bash` tool call is
+          // rejected with "Tool bash not found", which would leave the plan uncreated and the footer inactive.
+          // The command deliberately passes no `--session-id`: the engine's bash tool exports
+          // `PI_SESSION_ID = ctx.sessionManager.getSessionId()`, the very id the host stats, so the fake's env
+          // fallback writes the host's own directory. A pinned id would name a directory the host never reads.
           {
             type: "tool_call",
-            name: "bash",
-            arguments: { command: "\"$OMO_BIN\" ulw-loop create-goals" },
+            name: "eval",
+            arguments: {
+              language: "js",
+              summary: "activate the session-scoped ulw-loop plan",
+              code: [
+                'const out = await tool.bash({ command: \'"$OMO_BIN" ulw-loop create-goals\' })',
+                "String(out)",
+              ].join("\n"),
+            },
           },
           { type: "text", text: "The goal and ulw-loop are active. Observe the footer animation." },
         ],
@@ -112,7 +198,7 @@ function prepareScenario() {
       2,
     )}\n`,
   )
-  return { sandbox, sessionDir, omoBin, pluginRoot }
+  return { sandbox, sessionDir, omoBin, pluginRoot, scenarioSessionId }
 }
 
 function composeCommand(senpiBin, sessionDir) {
@@ -141,6 +227,9 @@ function childEnv(baseEnv, prepared, senpiBin) {
     if (value === undefined) continue
     if (/TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY/i.test(key)) continue
     if (key === "SENPI_CODING_AGENT_DIR" || key === "SENPI_CODING_AGENT_SESSION_DIR") continue
+    // A session id inherited from whatever shell launched this driver would outrank the id the engine's
+    // bash tool exports, sending the fake's plan to a directory the live host never stats.
+    if (ULW_LOOP_SESSION_ENV_KEYS.includes(key)) continue
     env[key] = value
   }
   return {
@@ -241,6 +330,70 @@ async function runScenario() {
   }
 }
 
+// The regression this guards: a fake `create-goals` that only makes the unscoped `.omo/ulw-loop` directory
+// leaves the host's `ulwLoopPlanExists` gate closed, so the driver renders no footer yet still exits green.
+// Running the fake for real and stating the exact path the host stats is the only assertion that fails when
+// the fake regresses to `mkdir -p .omo/ulw-loop`.
+function assertFakeCreateGoalsWritesScopedPlan(prepared, env) {
+  const sessionId = prepared.scenarioSessionId
+  if (typeof sessionId !== "string" || sessionId.length === 0) {
+    throw new Error("self-test: scenario session id missing")
+  }
+  for (const key of ULW_LOOP_SESSION_ENV_KEYS) {
+    if (env[key] !== undefined) throw new Error(`self-test: ${key} must not be inherited into the child env`)
+  }
+  // The live plan directory has to be the host's own session id, which only the engine's bash tool knows.
+  const mockScript = readFileSync(join(prepared.sandbox.cwd, "mock-script.json"), "utf8")
+  if (!mockScript.includes("ulw-loop create-goals")) {
+    throw new Error("self-test: scenario must activate the ulw-loop through the shell")
+  }
+  if (mockScript.includes("--session-id")) {
+    throw new Error("self-test: create-goals must inherit PI_SESSION_ID, not pin a session id")
+  }
+
+  const created = spawnSync(prepared.omoBin, ["ulw-loop", "create-goals", "--session-id", sessionId], {
+    cwd: prepared.sandbox.cwd,
+    encoding: "utf8",
+  })
+  if (created.status !== 0) {
+    throw new Error(`self-test: fake create-goals failed: ${created.stderr || created.stdout}`)
+  }
+  const scopedGoalsPath = join(prepared.sandbox.cwd, ".omo", "ulw-loop", sessionId, "goals.json")
+  if (!existsSync(scopedGoalsPath)) {
+    throw new Error(`self-test: fake create-goals did not write ${scopedGoalsPath}`)
+  }
+  const plan = JSON.parse(readFileSync(scopedGoalsPath, "utf8"))
+  if (plan.activeGoalId !== "G001" || !Array.isArray(plan.goals) || plan.goals.length === 0) {
+    throw new Error("self-test: scoped goals.json does not describe an active plan")
+  }
+
+  // Scope resolution parity with the toolkit: env fallback and normalization must pick the same directory,
+  // otherwise a live run writes one path while the host stats another.
+  if (resolveFakeCreateGoalsSessionId([], { PI_SESSION_ID: "a/b c" }) !== "a-b-c") {
+    throw new Error("self-test: session id normalization drifted from the toolkit rules")
+  }
+  if (resolveFakeCreateGoalsSessionId(["--session-id", "flag-wins"], { PI_SESSION_ID: "env-loses" }) !== "flag-wins") {
+    throw new Error("self-test: --session-id must take precedence over the env fallback")
+  }
+  const envScoped = spawnSync(prepared.omoBin, ["ulw-loop", "create-goals"], {
+    cwd: prepared.sandbox.cwd,
+    encoding: "utf8",
+    env: { ...process.env, OMO_ULW_LOOP_SESSION_ID: "", CODEX_SESSION_ID: "", CODEX_THREAD_ID: "", PI_SESSION_ID: "env-session" },
+  })
+  if (envScoped.status !== 0 || !existsSync(join(prepared.sandbox.cwd, ".omo", "ulw-loop", "env-session", "goals.json"))) {
+    throw new Error("self-test: fake create-goals ignored the toolkit env fallback")
+  }
+
+  // Without any resolvable id the fake must refuse loudly; silently writing nothing is exactly the
+  // failure mode that let the old driver pass.
+  const unscoped = spawnSync(prepared.omoBin, ["ulw-loop", "create-goals"], {
+    cwd: prepared.sandbox.cwd,
+    encoding: "utf8",
+    env: { ...process.env, OMO_ULW_LOOP_SESSION_ID: "", CODEX_SESSION_ID: "", CODEX_THREAD_ID: "", PI_SESSION_ID: "" },
+  })
+  if (unscoped.status === 0) throw new Error("self-test: fake create-goals must fail without a session id")
+}
+
 function runSelfTest() {
   if (!parseArgs(["--self-test"]).selfTest) throw new Error("self-test: argument parser failed")
   const prepared = prepareScenario()
@@ -254,6 +407,7 @@ function runSelfTest() {
     throw new Error("self-test: environment isolation failed")
   }
   if (env.OMO_BIN !== prepared.omoBin || !existsSync(prepared.omoBin)) throw new Error("self-test: fake omo missing")
+  assertFakeCreateGoalsWritesScopedPlan(prepared, env)
   if (prepared.pluginRoot === undefined || !existsSync(join(prepared.pluginRoot, "extensions", "omo.js"))) {
     throw new Error("self-test: minimal plugin missing")
   }

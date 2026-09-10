@@ -19,6 +19,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  checks: write
 
 jobs:
   gate:
@@ -41,7 +42,7 @@ jobs:
             } else {
               core.info('No active review claim labels. Gate is green.');
             }
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
@@ -91,7 +92,7 @@ jobs:
             }
             await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pr.number, reviewers: [claimer] });
             core.info(`Requested review from claimer ${claimer}.`);
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
@@ -136,11 +137,13 @@ jobs:
                 latestLabeler[ev.label.name] = ev.actor ? ev.actor.login : undefined;
               }
             }
+            let removedAny = false;
             for (const name of present) {
               if (latestLabeler[name] === reviewer) {
                 try {
                   await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name });
                   core.info(`Removed ${name}: claimer ${reviewer} submitted their review.`);
+                  removedAny = true;
                 } catch (e) {
                   if (e.status === 403) {
                     core.warning(`Token is read-only in this PR context; the hourly sweep will release ${name} instead.`);
@@ -152,7 +155,22 @@ jobs:
                 core.info(`Kept ${name}: claimed by ${latestLabeler[name] ?? 'unknown'}, review came from ${reviewer}.`);
               }
             }
-      - name: Workflow summary
+            if (removedAny) {
+              const { data: rest } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr.number });
+              if (!rest.some((l) => CLAIMS.includes(l.name))) {
+                try {
+                  await github.rest.checks.create({
+                    owner, repo, name: 'Review claim gate', head_sha: pr.head.sha,
+                    status: 'completed', conclusion: 'success',
+                    output: { title: 'No active review claims', summary: 'Claim released by the claimer review; merge unblocked.' },
+                  });
+                  core.info('Refreshed the Review claim gate check to success.');
+                } catch (e) {
+                  core.warning(`Gate check refresh skipped: ${e.message}`);
+                }
+              }
+            }
+      - name: Write job summary
         if: always()
         shell: bash
         run: |
@@ -221,8 +239,21 @@ jobs:
                 await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [STALE] });
                 core.info(`PR #${pr.number}: applied ${STALE}.`);
               }
+              const { data: rest } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr.number });
+              if (!rest.some((l) => CLAIMS.includes(l.name))) {
+                try {
+                  await github.rest.checks.create({
+                    owner, repo, name: 'Review claim gate', head_sha: pr.head.sha,
+                    status: 'completed', conclusion: 'success',
+                    output: { title: 'No active review claims', summary: 'Claims cleared by the sweep; merge unblocked.' },
+                  });
+                  core.info(`PR #${pr.number}: refreshed the Review claim gate check to success.`);
+                } catch (e) {
+                  core.warning(`PR #${pr.number}: gate check refresh skipped: ${e.message}`);
+                }
+              }
             }
-      - name: Workflow summary
+      - name: Write job summary
         if: always()
         shell: bash
         run: |

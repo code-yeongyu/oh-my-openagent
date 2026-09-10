@@ -98,6 +98,18 @@ describe("omo-senpi ulw-loop omo-command .js spawn target", () => {
     expect(target.args).toEqual(["/usr/local/lib/omo-agent-toolkit.js", "--version"])
   })
 
+  it("#given a .js target #when building the spawn target #then the env forces Bun runtime mode so a packaged omo binary runs the toolkit instead of itself", () => {
+    const target = toSpawnTarget("/usr/local/lib/omo-agent-toolkit.js", ["ulw-loop", "status", "--json"], "darwin")
+
+    expect(target.env).toEqual({ ...process.env, BUN_BE_BUN: "1" })
+  })
+
+  it("#given a plain bin #when building the spawn target #then no env override is attached", () => {
+    const target = toSpawnTarget("/usr/local/bin/omo-agent-toolkit", ["status"], "darwin")
+
+    expect(target.env).toBeUndefined()
+  })
+
   it("#given a .js target with the default platform #when building the spawn target #then it spawns via process.execPath", () => {
     const target = toSpawnTarget("/opt/omo/bin/oh-my-opencode.js", ["doctor"])
 

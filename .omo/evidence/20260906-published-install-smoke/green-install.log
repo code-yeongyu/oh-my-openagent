@@ -1,0 +1,53 @@
+[smoke] Building omo@5.0.0-beta.43
+
+added 15 packages in 2s
+npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice run @sisyphuslabs/omo-codex-plugin@5.0.0-beta.43 sync:skills
+npm notice run node scripts/sync-skills.mjs
+[smoke] Linked omo-comment-checker -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\comment-checker\dist\cli.js
+[smoke] Linked omo-git-bash-hook -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\git-bash\dist\cli.js
+[smoke] Linked lazycodex-executor-verify -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\lazycodex-executor-verify\dist\cli.js
+[smoke] Linked omo-lsp -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\lsp\dist\cli.js
+[smoke] Linked omo-rules -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\rules\dist\cli.js
+[smoke] Linked omo-telemetry -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\telemetry\dist\cli.js
+[smoke] Linked omo-ultrawork -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ultrawork\dist\cli.js
+[smoke] Linked omo-ulw-execute-continuation -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-execute-continuation\dist\cli.js
+[smoke] Linked omo-ulw-loop -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-loop\dist\cli.js
+[smoke] Linked ulw -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-loop\dist\cli.js
+[smoke] Linked ulw-loop -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-loop\dist\cli.js
+[smoke] Linked omo-agent-toolkit -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\extracted\package\dist\cli\index.js
+[smoke] Linked agent explorer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\explorer.toml
+[smoke] Linked agent lazycodex-clone-fidelity-reviewer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-clone-fidelity-reviewer.toml
+[smoke] Linked agent lazycodex-code-reviewer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-code-reviewer.toml
+[smoke] Linked agent lazycodex-gate-reviewer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-gate-reviewer.toml
+[smoke] Linked agent lazycodex-qa-executor.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-qa-executor.toml
+[smoke] Linked agent lazycodex-worker-high.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-worker-high.toml
+[smoke] Linked agent lazycodex-worker-low.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-worker-low.toml
+[smoke] Linked agent lazycodex-worker-medium.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-worker-medium.toml
+[smoke] Linked agent librarian.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\librarian.toml
+[smoke] Linked agent metis.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\metis.toml
+[smoke] Linked agent momus.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\momus.toml
+[smoke] Linked agent plan.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\plan.toml
+node:internal/modules/cjs/loader:1505
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\extracted\package\packages\omo-codex\plugin\scripts\migrate-omo-sot.mjs'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1502:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1073:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1097:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1118:12)
+    at Module._load (node:internal/modules/cjs/loader:1287:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v26.1.0
+[smoke] Warning: skipped OMO SOT seed/migration: C:\Program Files\nodejs\node.exe C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\extracted\package\packages\omo-codex\plugin\scripts\migrate-omo-sot.mjs --seed failed in C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\extracted\package with exit code 1
+published install smoke OK (1 plugin(s), C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-FhuIHD\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43)

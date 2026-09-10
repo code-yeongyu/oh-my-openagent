@@ -1,5 +1,6 @@
 // biome-ignore-all format: compact port must stay within the requested pure LOC budget.
 
+import { codexSnapshotMismatchError } from "./checkpoint-reconciliation.js";
 import { readCodexGoalSnapshotInput, reconcileCodexGoalSnapshot } from "./codex-goal-snapshot.js";
 import { codexGoalMode, compatibleCodexObjectives, expectedCodexObjective, isFinalRunCompletionCandidate } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
@@ -55,8 +56,9 @@ export async function recordFinalReviewBlockers(
 
 		const snapshot = await readCodexGoalSnapshotInput(args.codexGoalJson, repoRoot);
 		const aggregate = codexGoalMode(plan) === "aggregate";
-		const reconciliation = reconcileCodexGoalSnapshot(snapshot, { expectedObjective: expectedCodexObjective(plan, goal), ...(aggregate ? { acceptedObjectives: compatibleCodexObjectives(plan) } : {}), allowedStatuses: ["active"], requireSnapshot: true, requireComplete: false });
-		if (!reconciliation.ok) ulwLoopError(reconciliation.errors.join(" "), "ulw_loop_codex_snapshot_mismatch");
+		const expected = expectedCodexObjective(plan, goal);
+		const reconciliation = reconcileCodexGoalSnapshot(snapshot, { expectedObjective: expected, ...(aggregate ? { acceptedObjectives: compatibleCodexObjectives(plan) } : {}), allowedStatuses: ["active"], requireSnapshot: true, requireComplete: false });
+		if (!reconciliation.ok) throw codexSnapshotMismatchError({ reconciliation, snapshot, expectedObjective: expected });
 
 		const now = iso();
 		for (const field of BLOCKER_FIELDS) Reflect.deleteProperty(goal, field);

@@ -1,0 +1,63 @@
+REMOTE_HEAD=1b46e0033
+mengmotaMac
+(pass) resolveReflectionModel > #given a pinned model that find() cannot locate #when resolved #then it still fails closed [0.15ms]
+(pass) resolveReflectionModel > #given canonical models and a stale availability snapshot #when find locates the chain #then reflection preserves every fallback [0.24ms]
+(pass) resolveReflectionModel > #given the LAST canonical rung is selected #when earlier rungs are still findable #then they remain reflection fallbacks [0.23ms]
+(pass) resolveReflectionModel > #given legacy fallback_models and a stale availability snapshot #when find locates the chain #then reflection preserves every fallback [0.20ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when the live registry exposes priced chat models #then the cheapest one resolves as registry fallback [0.18ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when a pricier session model is also present #then the registry candidate still wins the ladder [0.17ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when the session model is cheaper than every registry candidate #then the cost chooser inherits it [0.17ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when the registry scan finds nothing but a session model exists #then reflection inherits the session model [0.14ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when even the registry object is missing #then the session model still resolves [0.11ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when an explicitly pinned model is unresolvable but other models exist #then the fallback keeps reflection alive [0.15ms]
+(pass) resolveReflectionModel > #given no category rung covers the connected providers > #when neither registry nor session model can help #then it still fails closed [0.12ms]
+(pass) resolveReflectionModel > #given the task warning suppression convention #when evaluated #then global opt-out and per-category opt-in retain their precedence [0.31ms]
+(pass) resolveReflectionModel > #given a pinned user model whose model id contains a slash #when the availability snapshot is stale #then the whole model id is looked up rather than its first segment [0.20ms]
+
+packages/omo-senpi/src/components/memory/worker/spawn.test.ts:
+(pass) worker payload mode relaxation > #given a missing facts payload from the first launch #when mode relaxation reports ENOENT #then preparation continues [1.46ms]
+(pass) worker payload mode relaxation > #given facts payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [0.60ms]
+(pass) worker payload mode relaxation > #given reflection payload mode relaxation fails unexpectedly #when preparation runs #then the chmod failure is surfaced [1.11ms]
+(pass) dream token budget launch contract > #given a pressure dream fixture repo #when its spawn is prepared #then all three budget inputs carry the committed per-file estimate [4.47ms]
+(pass) dream token budget launch contract > #given configured compile pressure #when the production candidate assembly prepares a dream #then budget and target reuse the shared soft ratio [5.19ms]
+(pass) worker senpi command resolution > #given an env whose PATH cannot resolve senpi #when a facts spawn is prepared #then the command is executable rather than the bare name [1.31ms]
+(pass) worker senpi command resolution > #given an explicit senpiCommand #when a facts spawn is prepared #then the override is preserved [1.05ms]
+(pass) worker senpi prefix args > #given senpiCommand and senpiPrefixArgs #when a reflection spawn is prepared #then the command is preserved and args start with the prefix [1.91ms]
+(pass) worker senpi prefix args > #given senpiCommand and senpiPrefixArgs #when a reflection fork spawn is prepared #then args start with the prefix before -p/--fork [1.70ms]
+(pass) worker senpi prefix args > #given runner-style senpiPrefixArgs #when prepareReflectionCandidateSpawn builds the spawn #then the prefix is forwarded onto args [2.58ms]
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-claim.test.ts:
+(pass) per-run finalization claim > #given concurrent finalizers #when the first publishes final #then the waiter observes terminal without executing [13.35ms]
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-race.test.ts:
+(pass) run finalization publication races > #given outcome publishes during abandonment state read #when terminalized #then matching outcome wins and abandoned is never published [583.02ms]
+(pass) run finalization publication races > #given publication is scheduled after every unknown-liveness read #when abandonment writes #then the matching publisher wins atomically [505.32ms]
+(pass) run finalization publication races > #given attempt two and a stale attempt-one outcome #when current attempt is confirmed dead #then stale outcome is ignored [616.79ms]
+
+1 tests skipped:
+(skip) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child
+
+ 2627 pass
+ 1 skip
+ 0 fail
+ 8335 expect() calls
+Ran 2628 tests across 346 files. [351.18s]
+bun test v1.4.0 (34cbb9a40)
+
+.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs:
+(pass) resolveEvidenceDir > #given a git worktree and a safe slug #when resolved #then it returns the canonical adapter evidence directory [5.69ms]
+(pass) resolveEvidenceDir > #given a relative git worktree path #when resolved #then it still returns an absolute evidence directory [0.51ms]
+(pass) resolveEvidenceDir > #given a resolved evidence path #when the resolver returns #then it has created no directory [0.60ms]
+(pass) resolveEvidenceDir > #given the adapter evidence root #when it is the declared relative root #then it stays under .omo/evidence [0.13ms]
+(pass) resolveEvidenceDir > #given an unsafe slug #when resolved #then it is rejected before any path is produced [0.64ms]
+(pass) resolveEvidenceDir > #given a directory that is not a git worktree #when resolved #then it is rejected [0.37ms]
+(pass) resolveEvidenceDir > #given a rejected slug #when the error surfaces #then it names the offending slug for the operator [0.62ms]
+(pass) resolveEvidenceDir > #given the documented Node CLI #when valid and invalid slugs run #then stdout and exit codes enforce the contract [118.65ms]
+(pass) resolveEvidenceDir > #given a symlink to the documented Node CLI #when invoked #then the entrypoint still enforces the contract [54.94ms]
+(pass) resolveEvidenceDir > #given an embedding runner with a missing argv path #when the module is imported #then exports still load [58.52ms]
+
+ 10 pass
+ 0 fail
+ 31 expect() calls
+Ran 10 tests across 1 file. [1150.00ms]
+

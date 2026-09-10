@@ -1,0 +1,175 @@
+{
+  "queryId": "q12",
+  "lane": "api-direct",
+  "variant": "v2",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"OpenAI agents API update since:2026-08-23 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-23",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422486,
+    "completed_at": 1788422486,
+    "id": "be250ed1-3e1a-9c98-9381-0763112cf8b5",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-d9ee0d11-fcce-40ba-af12-d7f4396900be-0",
+        "input": "{\"query\":\"OpenAI agents API update since:2026-08-23 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_be250ed1-3e1a-9c98-9381-0763112cf8b5_call-d9ee0d11-fcce-40ba-af12-d7f4396900be-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_be250ed1-3e1a-9c98-9381-0763112cf8b5_call-d9ee0d11-fcce-40ba-af12-d7f4396900be-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/taisalless/status/2094896473028911509 - openai path to astra update: not shipping today. \"available soon.\" they paused frontier training after hugging face. big rl run restarted aug 28. the actual user note: long agents in chatgpt/codex can get paused by the misalignment monitor. you click continue. api just stops. that's the product changelog. not the press release. (@taisalless, 2026-09-01)\nhttps://x.com/TreehornHQ/status/2092701827397804221 - UPDATE: A new OpenAI report says agents bypassed internet controls with a screenshot service. They had it fetch API data, render the response as an image, then decoded the pixels to recover cloud credentials. (@TreehornHQ, 2026-08-26)\nhttps://x.com/helenamy/status/2091910883572101257 - Really happy to get this update from OpenAI today. GPT 5.6 Sol API pricing has officially been reduced, which is genuinely great news if you use frontier models for heavy reasoning, coding, agents, research, or long running experimental systems. New GPT 5.6 Sol pricing per 1 million tokens: Input: $4.00 Cached input: $0.40 Output: $20.00 For comparison, Sol previously cost $5 per 1M input tokens and $30 per 1M output tokens. So the input cost is down by 20%, while output is now about 33% cheaper. Cached input at $0.40 is especially useful for systems that repeatedly reuse large amounts of context, instructions, memory, or stable prompt material. And the output reduction matters a lot for agentic workloads, because reasoning loops, planning, tool use, reflection, coding, and multi step architectures can generate a LOT of tokens very quickly. Same Sol intelligence. More room to actually build with it. As someone constantly experimenting with AI systems, this is the kind of announcement I am very happy to receive. 😌🔥 #OpenAI #GPT56 #GPT56Sol #Codex #AI #ArtificialIntelligence #LLM #MachineLearning #AIAgents #AIResearch #API (@helenamy, 2026-08-24)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092701827397804221",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092701827397804221"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094896473028911509",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094896473028911509"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2091910883572101257",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2091910883572101257"
+              }
+            ]
+          }
+        ],
+        "id": "msg_be250ed1-3e1a-9c98-9381-0763112cf8b5",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-23",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 82047000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 82047000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:01:22.356Z"
+}

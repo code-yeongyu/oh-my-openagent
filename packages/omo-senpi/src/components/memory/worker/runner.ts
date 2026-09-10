@@ -13,11 +13,10 @@ import {
 } from "./completion"
 import {
   chooseMemoryLaunchRoute,
-  MEMORY_WORKLOAD_PROFILES,
   type MemoryLaunchRoute,
   type MemoryLaunchSurface,
 } from "./fork-cost"
-import { readModelPricing } from "./registry-fallback"
+import { memoryLaunchRouteInput, reflectionPayloadTokens } from "./runner-launch-route"
 import {
   resolveReflectionModel,
   shouldWarnCategoryUnavailable,
@@ -41,13 +40,6 @@ export type {
 } from "./runner-types"
 
 import type { ExecutionResult, ReflectionRunResult, ReflectionRunner, SenpiSubprocessRunnerOptions } from "./runner-types"
-
-function quickCandidateCost(model: string, registry: ReturnType<SenpiSubprocessRunnerOptions["resolveModelRegistry"]>) {
-  if (registry === undefined) return undefined
-  const separator = model.indexOf("/")
-  if (separator <= 0) return undefined
-  return readModelPricing(registry.find(model.slice(0, separator), model.slice(separator + 1)))
-}
 
 // missing_providers rides the failure detail so the health fingerprint and the remediation hint
 // can name what to connect; the fingerprint truncates at 60 chars, keeping it stable.
@@ -121,31 +113,17 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     sessionModel: ReflectionSessionModel | undefined,
   ): MemoryLaunchRoute {
     const surface: MemoryLaunchSurface = run.request.trigger === "dream" ? "dream" : "reflection"
-    const quickCost = quickCandidateCost(resolution.model, registry)
-    const sessionCost = sessionModel === undefined || registry === undefined
-      ? undefined
-      : readModelPricing(registry.find(sessionModel.provider, sessionModel.id))
     const parentContextTokens = this.options.resolveParentContextTokens?.()
-    return chooseMemoryLaunchRoute({
+    return chooseMemoryLaunchRoute(memoryLaunchRouteInput({
       surface,
-      quick: {
-        model: resolution.model,
-        ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }),
-        ...(quickCost === undefined ? {} : { cost: quickCost }),
-      },
-      ...(sessionModel === undefined || sessionCost === undefined
-        ? {}
-        : {
-            session: {
-              model: `${sessionModel.provider}/${sessionModel.id}`,
-              ...(sessionModel.thinking === undefined ? {} : { thinking: sessionModel.thinking }),
-              cost: sessionCost,
-            },
-          }),
+      quickModel: resolution.model,
+      ...(resolution.thinking === undefined ? {} : { quickThinking: resolution.thinking }),
+      registry,
+      ...(sessionModel === undefined ? {} : { sessionModel }),
       ...(parentContextTokens === undefined ? {} : { parentContextTokens }),
-      turns: MEMORY_WORKLOAD_PROFILES[surface].turns,
+      payloadTokens: reflectionPayloadTokens(run.request.snapshots),
       cacheHit: this.options.resolveParentCacheReusable?.() ?? false,
-    })
+    }))
   }
 
   private settle(

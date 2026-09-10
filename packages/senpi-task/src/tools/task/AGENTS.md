@@ -8,11 +8,12 @@ Single or `tasks:[...]` batch spawn of child tasks routed by category or agent. 
 |------|---------|
 | `tool.ts` | `createTaskTool` / `TASK_TOOL_NAME` (`"task"`). |
 | `params.ts` | TypeBox `TaskToolParams`; `MAX_TASK_BATCH_ITEMS = 16` (schema `maxItems` + execution cap). Prompts MUST be English; `prompt` XOR `tasks`. |
-| `argument-normalization.ts` | Batch item inheritance from top-level params; empty provider padding normalized before validation. |
-| `validation.ts` | `validateTaskTarget`, `resolveSpawnItems`, `validateBatchShape`; codes `both_targets` / `no_target` / `category_with_model`. |
+| `argument-normalization.ts` | Batch item inheritance from top-level params; empty provider padding normalized before validation; item-level `run_in_background` mirrors survive. |
+| `validation.ts` | `validateTaskTarget`, `resolveSpawnItems`, `validateBatchShape`, `resolveRunInBackground`; codes `both_targets` / `no_target` / `category_with_model` / `run_in_background_conflict`. |
 | `categories.ts` / `description.ts` | Category/agent discovery and prompt description builders (plan-gated names get their own line). |
 | `execute.ts` | Entry: shape validation -> item resolution -> single/batch dispatch. |
 | `execute-single.ts` / `execute-batch.ts` / `execute-spec.ts` | Single spawn, batch aggregation (start/error/background/foreground), start-spec construction. |
+| `batch-item-details.ts` / `batch-progress.ts` | Per-item result details for batches; throttled per-child progress partials for a foreground batch (one status row per child). |
 | `foreground-wait.ts` | Foreground wait surface. |
 | `invocation-gate.ts` / `plan-review-contract.ts` | metis/momus plan-gate consult before `manager.start` (single: `denied`; batch item: `plan_unresolved` / `invalid_target`). |
 | `spawn-policy.ts` | `evaluateSpawnPolicy` verdicts. |
@@ -24,6 +25,7 @@ Single or `tasks:[...]` batch spawn of child tasks routed by category or agent. 
 
 - Pure-ish `run*` functions + `create*Tool` adapters; runtime seams injected via `TaskToolDeps` / `TaskToolContext` (tests use `__fixtures__/task-tool-fakes.ts`).
 - Every effective spawn has exactly one target after batch inheritance; an effective category item carries no own or inherited model.
+- `run_in_background` is batch-wide: the top-level value and every item-level mirror must agree (`resolveRunInBackground`); agreement is hoisted, disagreement is `invalid_arguments`.
 - Validation hard-fails invalid targets with the fix named in the message; fields are never silently ignored.
 
 ## Anti-patterns

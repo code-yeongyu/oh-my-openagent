@@ -1,0 +1,33 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-native/test/setup-import.test.ts:
+187 |     await database(join(unknown.home, ".omp", "agent", "agent.db"), 99, [["google", "api_key", secrets[0], null]])
+188 |     const unknownResult = run(unknown, ["setup", "--yes"])
+189 |     expect(unknownResult.status).toBe(0)
+190 |     expect(unknownResult.stdout).toContain("auth schema version 99 is unknown")
+191 |     expect(existsSync(join(unknown.agentDir, "auth.json"))).toBe(false)
+192 |     expect(databaseHandles.map((database) => database.isOpen)).toEqual([false, false, false])
+                                                                     ^
+error: expect(received).toEqual(expected)
+
+  [
+-   false,
+-   false,
+-   false,
++   true,
++   true,
++   true,
+  ]
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/Users/sungsoopark/Documents/GitHub/oh-my-openagent/.local-ignore/pr-worktrees/setup-import-handle-leak/packages/omo-native/test/setup-import.test.ts:192:64)
+(fail) omo setup credential inheritance > #given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed [102.36ms]
+
+ 8 pass
+ 1 fail
+ 99 expect() calls
+Ran 9 tests across 1 file. [2.53s]
+
+Command exited with code 1

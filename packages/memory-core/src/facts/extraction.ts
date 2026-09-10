@@ -63,7 +63,7 @@ export function parseFactsExtractionJsonl(raw: string): FactsExtractionRecord[] 
     } catch {
       throw invalid(index, "line is not valid JSON")
     }
-    records.push(parseRecord(value, index))
+    records.push(parseFactsExtractionRecord(value, index))
   }
   return records
 }
@@ -99,7 +99,7 @@ export function validateFactsRecovery(
   }
 }
 
-function parseRecord(value: unknown, index: number): FactsExtractionRecord {
+export function parseFactsExtractionRecord(value: unknown, index: number): FactsExtractionRecord {
   if (!isRecord(value)) throw invalid(index, "record must be an object")
   const text = nonEmpty(value.text)
   const date = validDate(value.date)

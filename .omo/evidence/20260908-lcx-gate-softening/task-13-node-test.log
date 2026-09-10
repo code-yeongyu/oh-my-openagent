@@ -1,0 +1,17 @@
+✔ #given sentinel OpenCode tool content #when compatibility guidance is inserted #then the production artifact is placed after frontmatter and before the tool token (0.586333ms)
+✔ #given shared skill source anchors #when Codex overlays are applied #then exact anchors transform and match the generated artifacts (11.509833ms)
+✔ #given already transformed sentinel content #when compatibility guidance is inserted again #then the transform is idempotent (0.190917ms)
+✔ #given a stale generated compatibility block #when guidance is inserted #then the production artifact replaces it (0.078583ms)
+✔ #given a custom compatibility block before an OpenCode tool token #when guidance is inserted #then the custom block is preserved (0.066666ms)
+✔ #given an exported template wrapper containing an OpenCode tool token #when guidance is inserted #then wrapper bytes are preserved (0.072208ms)
+✔ #given real shared skills that need Codex translation #when aggregate skills are synced #then each generated skill injects the production compatibility artifact once before any remaining OpenCode tool token (10.360167ms)
+✔ #given the aggregate sync implementation #when its skill adaptation pipeline is inspected #then it still applies compatibility guidance before overlays (0.557916ms)
+✔ #given the flattened plugin cache the Codex installer produces #when sync-skills runs inside it #then it resolves shared skills through the linked package and writes the skill tree (581.857541ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 657.3635

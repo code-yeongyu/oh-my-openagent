@@ -1,8 +1,9 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
+import type { DetachedRevivalResult, DetachedRevivalRollbackResult } from "../lifecycle/port"
 import type { TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 
-export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff"
+export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -24,6 +25,9 @@ export type SteeringPort = {
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
+  reserveForDetachedRevive?(record: TaskRecord): ReviveReservation
+  reviveDetached?(taskId: string, reservation?: ReviveReservation): Promise<DetachedRevivalResult>
+  rollbackDetachedRevival?(prior: TaskRecord): DetachedRevivalRollbackResult
   readonly destruction: DestructionPort
   // Snapshot of the manager-owned run-stats accumulator for a live task, attached to the cancel
   // transition steering performs (the manager's later outcome transition is late-transition
@@ -49,6 +53,13 @@ export const DEFAULT_SEND_DELIVERY: SendDelivery = "followUp"
 export type SendOutcome =
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: SendDelivery }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
+  | {
+      readonly kind: "delivery_uncertain"
+      readonly task_id: string
+      readonly run_epoch: number
+      readonly reason: string
+      readonly suggestion: string
+    }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }

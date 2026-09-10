@@ -33,12 +33,12 @@ describe("agent tuning on the builtin fallback chain", () => {
     expect(result.resolved_model?.reasoning_effort).toBe("minimal")
   })
 
-  // momus resolves through a chain rung that carries its own variant ("high"), so these two cases
+  // momus resolves through a chain rung that carries its own variant ("xhigh"), so these two cases
   // can actually distinguish configured-wins from rung-wins rather than both passing vacuously.
   test("#given an agent with a top level variant #when a variant bearing chain rung resolves #then the configured variant wins", () => {
     // given
     const agents = roster({ name: "momus", variant: "low" })
-    const models = registry([{ provider: "openai", id: "gpt-5.6-terra" }])
+    const models = registry([{ provider: "openai", id: "gpt-6-astra" }])
 
     // when
     const result = expectResolved(resolveAgent("momus", agents, models))
@@ -50,13 +50,13 @@ describe("agent tuning on the builtin fallback chain", () => {
   test("#given an agent with no configured tuning #when a variant bearing chain rung resolves #then the rung variant survives and no effort is invented", () => {
     // given
     const agents = roster({ name: "momus" })
-    const models = registry([{ provider: "openai", id: "gpt-5.6-terra" }])
+    const models = registry([{ provider: "openai", id: "gpt-6-astra" }])
 
     // when
     const result = expectResolved(resolveAgent("momus", agents, models))
 
     // then
-    expect(result.resolved_model?.variant).toBe("high")
+    expect(result.resolved_model?.variant).toBe("xhigh")
     expect(result.resolved_model?.reasoning_effort).toBeUndefined()
   })
 })

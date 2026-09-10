@@ -6,9 +6,15 @@ import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor, resolveMemoryConfig } from "./index"
+import {
+  MEMORY_BINDING_CUSTOM_TYPE,
+  createMemoryComponent,
+  isMemoryChildProcess,
+  memoryModuleSupervisor,
+  resolveMemoryConfig,
+} from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
-import { MEMORY_WRITE_UPDATED_ENTRY_TYPE } from "./memory-notice-wiring"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
@@ -102,6 +108,7 @@ describe("createMemoryComponent", () => {
       expect({ sentinel, handlers: pi.handlers, tools: pi.tools, commands: pi.commands, renderers: pi.entryRenderers }).toEqual({
         sentinel, handlers: [], tools: [], commands: [], renderers: [],
       })
+      expect({ sentinel, child: isMemoryChildProcess({ [sentinel]: "1" }) }).toEqual({ sentinel, child: true })
     }
   })
 
@@ -139,13 +146,16 @@ describe("createMemoryComponent", () => {
       "senpi-memory.reflection-summary",
       "senpi-memory.health",
       SOUL_UPDATED_ENTRY_TYPE,
-      MEMORY_WRITE_UPDATED_ENTRY_TYPE,
       RECALL_CUSTOM_TYPE,
+      NUDGED_ENTRY_TYPE,
+      GATE_ENTRY_TYPE,
+      "omo-memorian:recall",
+      "omo-memorian:nudged",
+      "omo-memorian:gate",
       MEMORY_BINDING_CUSTOM_TYPE,
     ])
-    // Direct registration is the default surface so memory always works; the exposure-search MCP
-    // variant is an explicit opt-in asserted in tool-surface.test.ts.
-    expect(pi.tools.map((tool) => tool.name)).toEqual(["memory", "memory_apply_patch"])
+    // Direct registration is the only surface: the memory tool always registers directly and no MCP server is offered.
+    expect(pi.tools.map((tool) => tool.name)).toEqual(["memory"])
     expect(pi.mcpServers.map((server) => server.name)).toEqual([])
     expect(pi.entries).toEqual([{
       customType: MEMORY_BINDING_CUSTOM_TYPE,

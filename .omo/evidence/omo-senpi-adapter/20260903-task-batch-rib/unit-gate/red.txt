@@ -1,0 +1,74 @@
+ M packages/senpi-task/src/tools/task/argument-normalization.test.ts
+?? packages/senpi-task/src/tools/task/execute-batch-progress.test.ts
+?? packages/senpi-task/src/tools/task/execute-batch-run-in-background.test.ts
+TREE=6adccea HEAD=ed5eca4
+
+packages/senpi-task/src/tools/task/execute-progress.test.ts:
+
+packages/senpi-task/src/tools/task/start-presentation.test.ts:
+
+packages/senpi-task/src/tools/task/execute-continuation.test.ts:
+
+packages/senpi-task/src/tools/task/execute-collision.test.ts:
+
+packages/senpi-task/src/tools/task/execute-plan-review-contract.test.ts:
+
+packages/senpi-task/src/tools/task/execute-spawn-validation.test.ts:
+
+packages/senpi-task/src/tools/task/renderers-run-stats.test.ts:
+
+packages/senpi-task/src/tools/task/validation.test.ts:
+
+packages/senpi-task/src/tools/task/execute-abort.test.ts:
+
+packages/senpi-task/src/tools/task/execute-spawn.test.ts:
+
+packages/senpi-task/src/tools/task/execute-plan-error.test.ts:
+
+packages/senpi-task/src/tools/task/integration.test.ts:
+
+packages/senpi-task/src/tools/task/model-visibility.test.ts:
+
+packages/senpi-task/src/tools/task/renderers-invalid-arguments.test.ts:
+
+packages/senpi-task/src/tools/task/params.test.ts:
+
+packages/senpi-task/src/tools/task/execute-continuation-scope.test.ts:
+
+packages/senpi-task/src/tools/task/argument-normalization.test.ts:
+201 |       ],
+202 |     })
+203 | 
+204 |     // then
+205 |     expect(prepared.run_in_background).toBeUndefined()
+206 |     expect(prepared.tasks?.map((item) => item.run_in_background)).toEqual([true, false, undefined])
+                                                                        ^
+error: expect(received).toEqual(expected)
+
+  [
+-   true,
+-   false,
++   undefined,
++   undefined,
+    undefined,
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/tmp/omo-taskrib-20260903/packages/senpi-task/src/tools/task/argument-normalization.test.ts:206:67)
+(fail) task argument normalization > #given items that mirror run_in_background #when arguments are prepared #then the item flags survive normalization [1.67ms]
+
+packages/senpi-task/src/tools/task/description-plan-gated.test.ts:
+
+5 tests failed:
+(fail) foreground batch progress > #given a foreground batch with two live children #when a child emits a tool event #then partial updates name every child and the event, then stop at completion [2006.18ms]
+(fail) task batch run_in_background resolution > #given every item sets run_in_background true and no top-level flag #when the batch executes #then it returns immediately as a background batch [1.52ms]
+(fail) task batch run_in_background resolution > #given a top-level false and one item true #when the batch executes #then it fails typed before any child starts [0.50ms]
+(fail) task batch run_in_background resolution > #given items that disagree with each other #when the batch executes #then it fails typed and names both values [0.36ms]
+(fail) task argument normalization > #given items that mirror run_in_background #when arguments are prepared #then the item flags survive normalization [1.67ms]
+
+ 191 pass
+ 5 fail
+ 580 expect() calls
+Ran 196 tests across 34 files. [3.25s]

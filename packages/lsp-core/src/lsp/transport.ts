@@ -1,4 +1,6 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js";
+import { realTimerProvider } from "./timer-provider.js";
+import type { TimerProvider } from "./timer-provider.js";
 import { INIT_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STOP_HARD_KILL_TIMEOUT_MS, STOP_SIGKILL_GRACE_MS } from "./constants.js";
 import { LspConnectionClosedError, LspProcessExitedError, LspRequestTimeoutError } from "./errors.js";
 import { JsonRpcConnection } from "./json-rpc-connection.js";
@@ -12,6 +14,7 @@ export { createLspSpawnEnv } from "./transport-protocol.js";
 export interface LspClientTimeoutOptions {
 	requestTimeoutMs?: number;
 	initializeTimeoutMs?: number;
+	timerProvider?: TimerProvider;
 }
 
 type WorkspaceApplyEditHandler = (params: unknown) => Promise<WorkspaceApplyEditResponse>;
@@ -35,6 +38,7 @@ export class LspClientTransport {
 	protected readonly diagnosticsStore = new Map<string, Diagnostic[]>();
 	protected readonly requestTimeoutMs: number;
 	protected readonly initializeTimeoutMs: number;
+	protected readonly timerProvider: TimerProvider;
 	private workspaceApplyEditHandler: WorkspaceApplyEditHandler | null = null;
 	private diagnosticPullSupported = false;
 	private documentFormattingSupported = false;
@@ -46,6 +50,7 @@ export class LspClientTransport {
 	) {
 		this.requestTimeoutMs = timeouts.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
 		this.initializeTimeoutMs = timeouts.initializeTimeoutMs ?? INIT_TIMEOUT_MS;
+		this.timerProvider = timeouts.timerProvider ?? realTimerProvider;
 	}
 
 	pid(): number | undefined {
@@ -187,7 +192,7 @@ export class LspClientTransport {
 		const options = args[1];
 		const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
 		const timeoutController = new AbortController();
-		const timeoutHandle = setTimeout(() => {
+		const timeoutHandle = this.timerProvider.setTimeout(() => {
 			const stderrTail = this.stderrBuffer.slice(-5).join("\n");
 			timeoutController.abort(new LspRequestTimeoutError(method, stderrTail || undefined));
 		}, timeoutMs);
@@ -213,7 +218,7 @@ export class LspClientTransport {
 			}
 			throw error;
 		} finally {
-			clearTimeout(timeoutHandle);
+			this.timerProvider.clearTimeout(timeoutHandle);
 			combinedSignal.dispose();
 		}
 	}

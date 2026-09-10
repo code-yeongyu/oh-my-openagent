@@ -12,12 +12,9 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = resolve(packageRoot, "..", "..")
 const codexPluginRoot = join(repoRoot, "packages", "omo-codex", "plugin")
-const codexPluginNodeModules = join(codexPluginRoot, "node_modules")
-const defaultSourceEntry = join(codexPluginRoot, "components", "ulw-loop", "dist", "cli.js")
+const defaultSourceEntry = process.env.OMO_AGENT_TOOLKIT_SOURCE_ENTRY ?? join(codexPluginRoot, "components", "ulw-loop", "dist", "cli.js")
 const defaultDirectiveEntry = join(codexPluginRoot, "components", "ulw-loop", "directive.md")
-const defaultTargetDir = join(pluginRoot, "runtime", "agent-toolkit")
-const packageLock = join(codexPluginRoot, "package-lock.json")
-const installedPackageLock = join(codexPluginRoot, "node_modules", ".package-lock.json")
+const defaultTargetDir = process.env.OMO_AGENT_TOOLKIT_TARGET ?? join(pluginRoot, "runtime", "agent-toolkit")
 
 const dispatcher = `import { spawnSync } from "node:child_process"
 import { dirname, join } from "node:path"
@@ -161,25 +158,15 @@ export async function checkAgentToolkitFresh(options = {}) {
 }
 
 async function buildAggregateBundle() {
-  // The lockfile comparison alone is not enough: a pruned or partially installed tree can match the lock
-  // and still be missing the compiler the component build shells out to.
-  const compiler = join(codexPluginRoot, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc")
-  const needsInstall = !(await filesEqual(packageLock, installedPackageLock)) || !(await fileExists(compiler))
-  if (needsInstall) {
-    // The root `bun install` links this plugin's workspaces before its prepare script reaches this
-    // build, and `npm ci` aborts on those pre-existing links with
-    // `EEXIST: file already exists, symlink '../../components/teammode'` rather than replacing them.
-    // Removing the tree first makes the install deterministic whoever populated it.
-    await rm(codexPluginNodeModules, { recursive: true, force: true })
-    run("npm", ["--prefix", "packages/omo-codex/plugin", "ci"])
-  }
+  // Bundle directly from source so native staging never mutates the shared Codex workspace dist tree.
+  // The repository install owns the dependencies; this path deliberately performs no npm install.
   // Only the ulw-loop bundle is staged here. Building every codex component instead would couple this
   // staging step to unrelated components, and one of them failing to emit its dist takes the whole
   // senpi plugin build down with it.
-  run("npm", ["--prefix", "packages/omo-codex/plugin", "run", "--workspace", "components/ulw-loop", "build"])
-  // The component build only runs tsc, whose output still imports its siblings by relative path. The
-  // staged runtime is copied out on its own, so it has to be bundled into a single self-contained file
-  // exactly like build-components.mjs does after each component build.
+  // Bun resolves the TypeScript entry directly and emits the self-contained file in the shared
+  // component location; the caller supplies an invocation-specific output root when needed.
+  // The staged runtime is copied out on its own, so it has to be bundled into a single self-contained
+  // file exactly like build-components.mjs does after each component build.
   run("bun", [
     "build",
     join(codexPluginRoot, "components", "ulw-loop", "src", "cli.ts"),

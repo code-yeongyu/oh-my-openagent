@@ -4,6 +4,8 @@ Codex plugin that injects a compact orchestration directive (the **ultrawork** p
 
 Bundled Codex agent role TOMLs in `agents/` are installed into `CODEX_HOME/agents/` by the omo-codex installer (`linkCachedPluginAgents`, in `src/cli/install-codex/link-cached-plugin-agents.ts`). Install-time writes regular file copies on every platform. For the public `sisyphuslabs` marketplace, those files are copied from Codex's local installed-marketplace snapshot so they keep resolving after Codex prunes old plugin-cache versions or temporary marketplace state. There is no runtime Python hook.
 
+All 12 bundled agent TOMLs set `model = "gpt-6-astra"`; each role keeps its own `model_reasoning_effort` (explorer and librarian `low`, the gate reviewer `low`, the code reviewer and `lazycodex-worker-high` `medium`, the rest `high`). When a user has customized an installed agent's effort, the installer keeps that effort while moving the model to `gpt-6-astra` (`src/install/managed-agent-reasoning-defaults.ts`).
+
 ## What the injected directive enforces
 
 | Mandate | Behavior |

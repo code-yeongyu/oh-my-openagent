@@ -138,20 +138,3 @@ export function pidAlive(pid) {
     return false
   }
 }
-
-export function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-// Poll the on-disk task records until one matches, or the deadline passes. Used by the kill and
-// reconcile scenarios to catch the child WHILE it is still a live, non-terminal process (a hanging
-// mock turn keeps status="running" so there is a real pid to signal / reconcile).
-export async function pollRecord(stateDir, predicate, timeoutMs = 20_000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const match = readRecords(stateDir).find(predicate)
-    if (match !== undefined) return match
-    await sleep(200)
-  }
-  return undefined
-}

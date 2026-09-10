@@ -41,6 +41,14 @@ describe("root npm payload containment", () => {
       expect(files).toContain(`packages/${vendoredMcp}/package.json`)
     }
   })
+
+  test("#given root files allowlist #when the Codex plugin payload is checked #then the canonical prompts-core directive sync:skills reads is shipped", () => {
+    // given
+    const files = readRootFiles()
+
+    // when / then
+    expect(files).toContain("packages/prompts-core/prompts/ultrawork/codex.md")
+  })
 })
 
 describe("lazycodex-ai publish payload containment", () => {

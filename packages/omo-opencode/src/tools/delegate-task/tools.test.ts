@@ -163,7 +163,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-opus-5")
+      expect(category.model).toBe("anthropic/claude-fable-5-1")
       expect(category.variant).toBe("max")
     })
 
@@ -173,8 +173,8 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.6-sol")
-      expect(category.variant).toBe("xhigh")
+      expect(category.model).toBe("openai/gpt-6-astra")
+      expect(category.variant).toBe("max")
     })
 
     test("deep category has model and variant config", () => {
@@ -183,18 +183,18 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.6-sol")
-      expect(category.variant).toBe("medium")
+      expect(category.model).toBe("openai/gpt-6-astra")
+      expect(category.variant).toBe("high")
     })
 
-    test("unspecified-high category uses Opus 5 xhigh as primary", () => {
+    test("unspecified-high category uses GPT-6 Astra high as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("anthropic/claude-opus-5")
-      expect(category.variant).toBe("xhigh")
+      expect(category.model).toBe("openai/gpt-6-astra")
+      expect(category.variant).toBe("high")
     })
   })
 
@@ -850,7 +850,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe("anthropic/claude-fable-5")
+      expect(result?.model).toBe("anthropic/claude-fable-5-1")
     })
 
     test("allows artistry when availability is empty", () => {
@@ -866,10 +866,10 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe("anthropic/claude-fable-5")
+      expect(result?.model).toBe("anthropic/claude-fable-5-1")
     })
 
-    test("returns null for deep when gpt-5.6-sol is unavailable and no user config overrides it", () => {
+    test("returns null for deep when neither gpt-6-astra nor gpt-5.6-sol is available and no user config overrides it", () => {
       // #given
       const categoryName = "deep"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-7"])
@@ -884,8 +884,8 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("resolves deep at gpt-5.6-sol medium when the gate model is available", () => {
-      // #given
+    test("keeps deep available with its builtin gpt-6-astra high config when only the gpt-5.6-sol gate model is present", () => {
+      // #given: the gate opens on either flagship; the runtime chain later lands the sol rung
       const categoryName = "deep"
       const availableModels = new Set<string>(["openai/gpt-5.6-sol"])
 
@@ -897,8 +897,25 @@ describe("sisyphus-task", () => {
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("openai/gpt-5.6-sol")
-      expect(resolved.config.variant).toBe("medium")
+      expect(resolved.config.model).toBe("openai/gpt-6-astra")
+      expect(resolved.config.variant).toBe("high")
+    })
+
+    test("keeps deep available when only gpt-6-astra is present", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>(["openai/gpt-6-astra"])
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+      })
+
+      // #then
+      const resolved = expectResolvedCategoryConfig(result)
+      expect(resolved.config.model).toBe("openai/gpt-6-astra")
+      expect(resolved.config.variant).toBe("high")
     })
 
     test("bypasses requiresModel when explicit user config provided", () => {
@@ -950,7 +967,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-opus-5")
+      expect(resolved.config.model).toBe("anthropic/claude-fable-5-1")
       expect(resolved.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -1036,7 +1053,7 @@ describe("sisyphus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-opus-5")
+      expect(resolved.config.model).toBe("anthropic/claude-fable-5-1")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -1078,7 +1095,7 @@ describe("sisyphus-task", () => {
 
       // then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("anthropic/claude-opus-5")
+      expect(resolved.config.model).toBe("anthropic/claude-fable-5-1")
     })
   })
 
@@ -3807,8 +3824,8 @@ describe("sisyphus-task", () => {
       
       // then - catalog model is used
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.config.model).toBe("openai/gpt-5.6-sol")
-      expect(category.config.variant).toBe("xhigh")
+      expect(category.config.model).toBe("openai/gpt-6-astra")
+      expect(category.config.variant).toBe("max")
     })
 
     test("default model is used for category with default entry", () => {
@@ -3832,10 +3849,10 @@ describe("sisyphus-task", () => {
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then - category's built-in model wins (ultrabrain uses gpt-5.6-sol)
+      // then - category's built-in model wins (ultrabrain uses gpt-6-astra)
       const category = expectResolvedCategoryConfig(resolved)
       const actualModel = category.config.model
-      expect(actualModel).toBe("openai/gpt-5.6-sol")
+      expect(actualModel).toBe("openai/gpt-6-astra")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -3889,12 +3906,12 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const inheritedModel = "anthropic/claude-opus-4-7"
       
-      // when category has a built-in model (gpt-5.6-sol for ultrabrain)
+      // when category has a built-in model (gpt-6-astra for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
       // then category's built-in model should be used, NOT inheritedModel
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.model).toBe("openai/gpt-5.6-sol")
+      expect(category.model).toBe("openai/gpt-6-astra")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
@@ -3958,7 +3975,7 @@ describe("sisyphus-task", () => {
       
       // then should use category's built-in model (Opus 5 high for visual-engineering)
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.model).toBe("anthropic/claude-opus-5")
+      expect(category.model).toBe("anthropic/claude-fable-5-1")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {

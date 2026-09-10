@@ -185,6 +185,27 @@ describe("task argument normalization", () => {
     expect(prepared.tasks?.[1]?.task_summary?.endsWith("...")).toBe(true)
   })
 
+  test("#given items that mirror run_in_background #when arguments are prepared #then the item flags survive normalization", () => {
+    // given
+    const tool = createTool()
+    const prepareArguments = tool.prepareArguments
+    if (prepareArguments === undefined) throw new Error("task prepareArguments is missing")
+
+    // when
+    const prepared = prepareArguments({
+      category: "quick",
+      tasks: [
+        { prompt: "TASK: Review the first PR.", run_in_background: true },
+        { prompt: "TASK: Review the second PR.", run_in_background: false },
+        { prompt: "TASK: Review the third PR." },
+      ],
+    })
+
+    // then
+    expect(prepared.run_in_background).toBeUndefined()
+    expect(prepared.tasks?.map((item) => item.run_in_background)).toEqual([true, false, undefined])
+  })
+
   test("#given genuinely meaningful prompt and tasks #when arguments are prepared #then semantic ambiguity remains a hard error", () => {
     // given
     const tool = createTool()

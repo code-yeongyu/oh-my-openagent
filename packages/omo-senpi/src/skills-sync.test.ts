@@ -170,6 +170,13 @@ describe("OMO Senpi scoped skill sync", () => {
     }
   })
 
+  test("#given ulw-research skill #when synced #then the X / social lane bullet is shipped", () => {
+    const skillFile = join(skillsRoot, "ulw-research", "SKILL.md")
+    const content = readFileSync(skillFile, "utf8")
+
+    expect(content.includes("X / social (`x_search`"), "ulw-research must ship the X / social lane role protocol").toBe(true)
+  })
+
   test("#given ulw-execute skill #when inspected #then session ids reference senpi, not codex", () => {
     const skillFile = join(skillsRoot, "ulw-execute", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
@@ -213,6 +220,15 @@ describe("OMO Senpi scoped skill sync", () => {
     }
 
     expect(leaks).toEqual([])
+  })
+
+  test("#given the synced review-work skill #when its body task targets are scanned #then it dispatches exactly one gate reviewer", () => {
+    const content = readFileSync(join(skillsRoot, "review-work", "SKILL.md"), "utf8")
+    // Skip the frontmatter and the Senpi compatibility banner: only the skill body dispatches reviewers.
+    const body = content.slice(content.indexOf("\n# "))
+    const targets = [...body.matchAll(taskTargetPattern)].map(([, kind, name]) => `${kind}=${name}`)
+
+    expect(targets).toEqual(["subagent_type=omo-senpi-gate-reviewer"])
   })
 
   test("#given shipped task examples #when targets are scanned #then every agent and category exists in Senpi", () => {

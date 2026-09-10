@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
 import type { TaskRunStats } from "@oh-my-opencode/senpi-task"
 
-import { taskRecord } from "./event-bridge.test-fixtures"
+import { fakeTaskRpcTimers, taskRecord } from "./event-bridge.test-fixtures"
 import { wireHarness } from "./event-bridge.test-harness"
 
 describe("event-bridge native task telemetry and controls", () => {
@@ -77,9 +77,11 @@ describe("event-bridge native task telemetry and controls", () => {
 
   it("#given a live child subscription #when tool progress arrives #then RPC emits one updated live_progress snapshot", async () => {
     const running = taskRecord({ task_id: "st_live", status: "running" })
+    const clock = fakeTaskRpcTimers()
     const { pi, emitChildEvent } = wireHarness("parent-session", {
       records: { [running.task_id]: running },
       withRpc: true,
+      taskRpcTimers: clock.timers,
     })
     await pi.dispatch("session_start", {}, {})
     const initialCount = pi.rpcEvents.length
@@ -89,6 +91,8 @@ describe("event-bridge native task telemetry and controls", () => {
       toolName: "read",
       args: { path: "src/task.ts" },
     })
+    // Progress pushes are coalesced on a trailing edge; the snapshot lands when the window closes.
+    clock.advance()
 
     expect(pi.rpcEvents).toHaveLength(initialCount + 1)
     expect(pi.rpcEvents.at(-1)).toMatchObject({

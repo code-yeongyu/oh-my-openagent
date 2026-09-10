@@ -11,6 +11,8 @@ import type { DagRunEventType } from "./events"
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
 const LOCK_WAIT_TIMEOUT_MS = 1_000
+const WINDOWS_CLEANUP_RETRIES = 8
+const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
 const TERMINAL_STATUSES = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
 const sleeper = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
@@ -126,6 +128,18 @@ type RetentionCheckpoint = {
 
 export function dagKeyHash(parentSessionId: string, runKey: string): string {
   return sha256(`${parentSessionId}\0${runKey}`)
+}
+
+// The state directory can vanish under a live session (git clean, rm -rf .omo, worktree teardown).
+// Every listing reads a missing directory as empty: it holds no runs, and the next write recreates it.
+// Only a present-but-unreadable directory is an error worth raising.
+export function readDagDirectory(directory: string): readonly fs.Dirent[] {
+  try {
+    return fs.readdirSync(directory, { withFileTypes: true })
+  } catch (error) {
+    if (hasCode(error, "ENOENT")) return []
+    throw error
+  }
 }
 
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
@@ -263,7 +277,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
     pruneExpired(pruneNow = now()) {
       const cutoff = pruneNow - retentionDays * 24 * 60 * 60 * 1000
       const pruned: DagRunId[] = []
-      for (const entry of fs.readdirSync(paths.runs, { withFileTypes: true })) {
+      for (const entry of readDagDirectory(paths.runs)) {
         if (!entry.isFile() || !entry.name.endsWith(".json")) continue
         const path = join(paths.runs, entry.name)
         const value = readJsonFile(path, entry.name.slice(0, -5) as DagRunId, now)
@@ -330,7 +344,7 @@ function writeCheckpointWithinSessionLimit(
       return
     }
     let runCount = 0
-    for (const entry of fs.readdirSync(paths.runs, { withFileTypes: true })) {
+    for (const entry of readDagDirectory(paths.runs)) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue
       const existingRunId = entry.name.slice(0, -5) as DagRunId
       const existingPath = join(paths.runs, entry.name)
@@ -395,7 +409,7 @@ function inspectExistingEventLogs(
   recoveredPaths: Set<string>,
   now: () => number,
 ): void {
-  for (const entry of fs.readdirSync(paths.events, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.events)) {
     if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue
     const runId = entry.name.slice(0, -6) as DagRunId
     inspectEventLog(join(paths.events, entry.name), runId, diagnostics, recoveredPaths, now)
@@ -537,7 +551,11 @@ function withLock<T>(
   fsyncWrites: boolean,
 ): T {
   assertSafeSegment(basename(path), "lock name")
-  const startedAt = now()
+  // LOCK_WAIT_TIMEOUT_MS bounds how long we sit behind ONE unchanged holder, not wall clock: a holder
+  // that changes or vanishes is the system making progress, and our own reclaim I/O on a slow host is
+  // work, not waiting. Charging either to the deadline made a free lock look like a timeout.
+  let stalledSince = now()
+  let stalledBehind: LockHolder | undefined
   let acquiredHolder: LockHolder | undefined
   for (;;) {
     const content = JSON.stringify({
@@ -552,17 +570,19 @@ function withLock<T>(
     }
     const observedHolder = readLockHolder(path)
     if (observedHolder === undefined) continue
+    if (stalledBehind === undefined || !sameLockHolder(stalledBehind, observedHolder)) {
+      stalledBehind = observedHolder
+      stalledSince = now()
+    }
     if (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid)) {
-      const reclaimedHolder = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
-      if (reclaimedHolder !== undefined) {
-        acquiredHolder = reclaimedHolder
+      const outcome = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
+      if (outcome.kind === "acquired") {
+        acquiredHolder = outcome.holder
         break
       }
-      if (now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
-      Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
-      continue
+      if (outcome.kind === "holder_changed") continue
     }
-    if (now() - startedAt >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
+    if (now() - stalledSince >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
     Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
   }
   if (acquiredHolder === undefined) throw new Error(`Failed to acquire DAG lock: ${path}`)
@@ -619,7 +639,7 @@ function publishLockExclusively(path: string, content: string, fsyncWrites: bool
   }
 }
 
-function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boolean {
+function tryCreateLock(path: string, content: string, fsyncWrites: boolean, recreateMissingDirectory = true): boolean {
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`
   let fd: number | undefined
   try {
@@ -632,6 +652,12 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
     return true
   } catch (error) {
     if (hasCode(error, "EEXIST")) return false
+    if (hasCode(error, "ENOENT") && recreateMissingDirectory) {
+      // The locks directory vanished under a live session: recreate it and retry exactly once, so a
+      // directory that keeps disappearing still surfaces as the ENOENT it is.
+      fs.mkdirSync(dirname(path), { recursive: true })
+      return tryCreateLock(path, content, fsyncWrites, false)
+    }
     if (hasCode(error, "EPERM") || hasCode(error, "EACCES")) {
       return publishLockExclusively(path, content, fsyncWrites)
     }
@@ -642,6 +668,16 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean): boo
   }
 }
 
+/**
+ * Why a dead-holder reclaim did not hand us the lock. `reclaim_busy`: a live peer holds the reclaim
+ * mutex, so we are genuinely waiting on it. `holder_changed`: the canonical lock was released or
+ * taken by someone else while we worked, so the next attempt should start over immediately.
+ */
+type ReclaimOutcome =
+  | { readonly kind: "acquired"; readonly holder: LockHolder }
+  | { readonly kind: "reclaim_busy" }
+  | { readonly kind: "holder_changed" }
+
 function reclaimObservedLock(
   path: string,
   observedHolder: LockHolder,
@@ -649,10 +685,10 @@ function reclaimObservedLock(
   runId: DagRunId | undefined,
   now: () => number,
   fsyncWrites: boolean,
-): LockHolder | undefined {
+): ReclaimOutcome {
   const reclaimPath = `${path}.reclaim`
   const reclaimHolder = tryAcquireReclaimMutex(reclaimPath, isProcessAlive, now, fsyncWrites)
-  if (reclaimHolder === undefined) return undefined
+  if (reclaimHolder === undefined) return { kind: "reclaim_busy" }
   const content = JSON.stringify({
     hostPid: process.pid,
     runId,
@@ -670,10 +706,10 @@ function reclaimObservedLock(
     const currentHolder = readLockHolder(path)
     if (currentHolder === undefined || !sameLockHolder(observedHolder, currentHolder) ||
       (currentHolder.pid !== undefined && isProcessAlive(currentHolder.pid))) {
-      return undefined
+      return { kind: "holder_changed" }
     }
     fs.renameSync(successorPath, path)
-    return { pid: process.pid, content }
+    return { kind: "acquired", holder: { pid: process.pid, content } }
   } finally {
     if (fd !== undefined) fs.closeSync(fd)
     fs.rmSync(successorPath, { force: true })
@@ -723,8 +759,24 @@ function removeObservedLock(
     restoreQuarantinedLock(path, quarantinePath)
     return false
   }
-  fs.rmSync(quarantinePath, { force: true })
+  removeWindowsContendedFile(quarantinePath)
   return true
+}
+
+// Windows may keep a just-closed lock handle briefly. The lock is already exclusively owned by
+// this process at this point; retry only this cleanup, rather than turning a successful start into
+// a failure (POSIX unlink does not have this sharing violation).
+function removeWindowsContendedFile(path: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.rmSync(path, { force: true })
+      return
+    } catch (error) {
+      if (process.platform !== "win32" || attempt >= WINDOWS_CLEANUP_RETRIES ||
+        (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))) throw error
+      Atomics.wait(sleeper, 0, 0, WINDOWS_CLEANUP_RETRY_MS)
+    }
+  }
 }
 
 function restoreQuarantinedLock(path: string, quarantinePath: string): void {
@@ -741,7 +793,7 @@ function pruneRunArtifacts(paths: DagStorePaths, checkpoint: RetentionCheckpoint
   fs.rmSync(join(paths.results, runId), { recursive: true, force: true })
   fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
   fs.rmSync(paths.runLock(runId), { force: true })
-  for (const entry of fs.readdirSync(paths.keys, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.keys)) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue
     const keyPath = join(paths.keys, entry.name)
     const value = readJsonFile(keyPath)
@@ -752,7 +804,7 @@ function pruneRunArtifacts(paths: DagStorePaths, checkpoint: RetentionCheckpoint
   for (const node of checkpoint.nodes ?? []) {
     if (node.taskId !== undefined) fs.rmSync(paths.taskOwnerLock(node.taskId), { force: true })
   }
-  for (const entry of fs.readdirSync(paths.locks, { withFileTypes: true })) {
+  for (const entry of readDagDirectory(paths.locks)) {
     if (!entry.isFile() || !entry.name.endsWith(".lock")) continue
     const lockPath = join(paths.locks, entry.name)
     try {

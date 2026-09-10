@@ -1,0 +1,11 @@
+ISOLATED_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.Pm19Ad32dz/home
+codex-cli 0.144.1
+QA_DRIVER_AND_MOCK_BYTE_IDENTITY=PASS
+COMMAND: scripts/install-verify.sh --self-test
+INSTALL_SELF_TEST_EXIT=0
+COMMAND: scripts/install-verify.sh --keep
+INSTALL_REAL_EXIT=0
+REAL_CODEX_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REAL_CODEX_SHA_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REMOVAL_RECEIPT: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.Pm19Ad32dz REMOVED
+QA_EXIT=1

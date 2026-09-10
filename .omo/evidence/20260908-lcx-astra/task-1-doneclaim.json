@@ -1,0 +1,72 @@
+{
+  "task": "1 rules-engine gpt-6 Hephaestus variant",
+  "task_id": "st_01a080fe",
+  "status": "done",
+  "outcome": "Replaced the forbidden non-null assertion in the Hephaestus model variant test with an explicit narrowing guard; Biome and TypeScript checks both pass.",
+  "worktree": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models",
+  "branch": "lcx/astra-default-models",
+  "changed_files": [
+    "packages/rules-engine/src/engine/finder.ts",
+    "packages/rules-engine/src/engine/finder.test.ts",
+    "packages/rules-engine/src/engine/truncator.ts",
+    "packages/rules-engine/src/engine/truncator.test.ts",
+    "packages/omo-codex/plugin/components/rules/bundled-rules/hephaestus/gpt-6.md",
+    "packages/omo-codex/plugin/components/rules/test/hephaestus-model-variant.test.ts"
+  ],
+  "repair_changed_files": [
+    "packages/omo-codex/plugin/components/rules/test/hephaestus-model-variant.test.ts",
+    ".omo/evidence/20260908-lcx-astra/task-1-hephaestus-gpt6.log",
+    ".omo/evidence/20260908-lcx-astra/task-1-doneclaim.json",
+    "packages/omo-codex/plugin/components/rules/bundled-rules/hephaestus/gpt-6.md",
+    ".omo/evidence/20260908-lcx-astra/task-1-preset-mapping.md",
+    ".omo/evidence/20260908-lcx-astra/task-1-session-start-qa.mjs",
+    ".omo/evidence/20260908-lcx-astra/task-1-hephaestus-gpt6.log",
+    ".omo/evidence/20260908-lcx-astra/task-1-doneclaim.json"
+  ],
+  "preset_source": {
+    "revision": "2702cc70a49ecbdd5ece5264451ca8f1cede6ebb",
+    "path": "packages/coding-agent/src/core/extensions/builtin/prompt-preset/gpt-6-astra.ts",
+    "lines": 353,
+    "rule_entries": 30,
+    "capture": ".omo/evidence/20260908-lcx-astra/task-1-hephaestus-gpt6.log:661",
+    "mapping": ".omo/evidence/20260908-lcx-astra/task-1-preset-mapping.md",
+    "decision": "A section-by-section port was chosen over patching the incomplete 28-item summary. It maps all 30 actual rule entries and the imported test-discipline/file-operation guidance while retaining concrete Codex mechanics. The plan's source path was incorrect."
+  },
+  "red_proof": "Historical raw RED remains in task-1-hephaestus-gpt6.log: finder selected gpt-5.5.md for Astra and truncator rejected gpt-6 exemption, producing 6 failures across the two rules-engine files. This repair changes prose only and adds no prose-pinning test or new RED claim.",
+  "remote": {
+    "machine": "mengmotaMac",
+    "baseline": "602f72192af4cd58628a353d0be9142b84a8339d",
+    "preparation": "listMachines() first; shallow dev clone into /tmp/lcx-fix1-20260908/omo; bun install --frozen-lockfile -> PREP_EXIT=0.",
+    "overlays": "pushTree copied worktree packages/rules-engine/src (47 files) and the rules component (80 files), excluding dependencies/build output. Remote rule bytes matched local bytes.",
+    "rule_sha256": "bcb7198f31b38d05ee7e20742e4a5cd60acf7cbae5e4df6a34b449d4a76bf729"
+  },
+  "tests": [
+    "bun --cwd packages/omo-codex/plugin/components/rules test -> TEST_EXIT=0; Vitest 4.1.11, 30 files passed, 171 tests passed. Required build completed. First canonical run; capture task-1-hephaestus-gpt6.log:1220-1269.",
+    "The Vitest output explicitly includes hephaestus-model-variant.test.ts (9 tests), bundled-rules.test.ts (7 tests), and bundled-rules-priority.test.ts (4 tests), all passing.",
+    "bun test ./packages/rules-engine -> TEST_EXIT=0; 42 pass, 0 fail, 85 assertions across 8 files. First run; capture task-1-hephaestus-gpt6.log:1148-1214.",
+    "Both remote commands used bash pipelines with 2>&1 | tail -150; echo TEST_EXIT=${PIPESTATUS[0]} and also returned SHELL_EXIT=0."
+  ],
+  "manual_qa": [
+    "Executed task-1-session-start-qa.mjs against the rebuilt remote rules CLI with isolated HOME, CODEX_HOME, XDG directories, project and PLUGIN_DATA; no model or agent was invoked.",
+    "Exact SessionStart payloads for gpt-6-astra and gpt-6-astra-fast each selected only gpt-6.md and injected its full 18771-byte body. The gpt-5.5 payload selected only gpt-5.5.md and injected its full 9998-byte body. All CLI exits were 0 and strict hook JSON shape checks passed.",
+    "Raw payloads/stdout/stderr and shipped-copy equality results are in task-1-hephaestus-gpt6.log:1279-1292; SESSION_START_QA=PASS. Captured output: 51586 bytes, SHA256 894efa3377820bee6644b0c07cdb687f2aed00f10aba3131e53080432b218ac6."
+  ],
+  "acceptance": [
+    "Bun.YAML parsed frontmatter as {description: OMO Hephaestus Astra discipline for Codex, alwaysApply: true}.",
+    "Prohibited-name search returned exit 1 with no gate-reviewer, eval, or monitor matches in gpt-6.md.",
+    "Concrete multi_agent_v1/multi_agent_v2 spawn payloads retain task_name, fork_context:false, fork_turns:none, GOAL/STOP WHEN/EVIDENCE, and wait_agent's timeout_ms-only contract; $omo: skills remain advertised.",
+    "Scoped source diff check passed. gpt-5.5.md, gpt-5.6.md and packages/shared-skills diffs were empty.",
+    "QA script diagnostics returned No diagnostics found. Markdown diagnostics were attempted but unavailable because no .md LSP server is configured; frontmatter parsing and source-to-port review supplied the applicable checks."
+  ],
+  "cleanup": [
+    "Remote rm -rf /tmp/lcx-fix1-20260908 completed; ls -d returned 'ls: /tmp/lcx-fix1-20260908: No such file or directory', LS_EXIT=1, CLEANUP_EXIT=0. Capture task-1-hephaestus-gpt6.log:1294-1300.",
+    "No commit, push, checkout, stash, local bun test, agentic probe, main-checkout edit, or hand edit of generated files was performed in this repair. Concurrent edits belonging to other todos were left untouched."
+  ],
+  "corrections": [
+    "The earlier component failures were not proven pre-existing defects. That characterization is withdrawn; the complete suite passes under its canonical Vitest runner. Historical raw output remains intact."
+  ],
+  "risks": [
+    "This proves rule content mapping, selection and full CLI injection, not a model's adherence to the prose or PR-wide installer behavior; agentic probes are prohibited and the wider gate belongs to the parent.",
+    "The new mapping and executable QA evidence live in the ignored evidence directory; the gate node must explicitly include them when staging task evidence."
+  ]
+}

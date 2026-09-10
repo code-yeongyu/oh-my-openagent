@@ -24,12 +24,12 @@ describe("loadOmoConfig resolution", () => {
     writeJsonc(
       join(fixture.homeDir, ".omo", "omo.jsonc"),
       `{
-        "codegraph": { "enabled": false, "daemon": true },
-        "[senpi]": { "codegraph": { "auto_provision": false, "daemon": false } },
+        "task": { "max_depth": 4, "default_concurrency": 2 },
+        "[senpi]": { "task": { "ttl_ms": 111000, "default_concurrency": 3 } },
         "profiles": {
           "opus": {
-            "codegraph": { "daemon": true, "telemetry": true },
-            "[senpi]": { "codegraph": { "daemon": false, "excluded_roots": ["/tmp/opus"] } }
+            "task": { "default_concurrency": 6, "resume_children": false },
+            "[senpi]": { "task": { "default_concurrency": 9, "state_dir": "/tmp/opus" } }
           }
         }
       }`,
@@ -46,12 +46,12 @@ describe("loadOmoConfig resolution", () => {
     // then
     expect(result.diagnostics).toEqual([])
     expect(result.profile).toBe("opus")
-    expect(result.config.codegraph).toMatchObject({
-      enabled: false,
-      auto_provision: false,
-      daemon: false,
-      telemetry: true,
-      excluded_roots: ["/tmp/opus"],
+    expect(result.config.task).toMatchObject({
+      max_depth: 4,
+      ttl_ms: 111_000,
+      resume_children: false,
+      default_concurrency: 9,
+      state_dir: "/tmp/opus",
     })
     expect(result.config.profiles).toBeUndefined()
     expect(result.config["[senpi]"]).toBeUndefined()
@@ -62,11 +62,11 @@ describe("loadOmoConfig resolution", () => {
     const fixture = makeFixture()
     writeJsonc(
       join(fixture.homeDir, ".omo", "omo.jsonc"),
-      `{"codegraph":{"enabled":false},"profiles":{"opus":{"codegraph":{"telemetry":true}}}}`,
+      `{"task":{"max_depth":4},"profiles":{"opus":{"task":{"ttl_ms":111000}}}}`,
     )
     writeJsonc(
       join(fixture.projectDir, ".omo", "omo.jsonc"),
-      `{"[senpi]":{"codegraph":{"auto_provision":false}},"profiles":{"opus":{"[senpi]":{"codegraph":{"daemon":false}}}}}`,
+      `{"[senpi]":{"task":{"default_concurrency":3}},"profiles":{"opus":{"[senpi]":{"task":{"resume_children":false}}}}}`,
     )
 
     // when
@@ -78,16 +78,16 @@ describe("loadOmoConfig resolution", () => {
     })
 
     // then
-    expect(result.config.codegraph).toMatchObject({
-      enabled: false,
-      auto_provision: false,
-      daemon: false,
-      telemetry: true,
+    expect(result.config.task).toMatchObject({
+      max_depth: 4,
+      ttl_ms: 111_000,
+      default_concurrency: 3,
+      resume_children: false,
     })
     expect(result.layers.map((layer) => layer.source.scope)).toEqual(["user", "project"])
     expect(result.layers.map((layer) => layer.config)).toEqual([
-      { codegraph: { enabled: false }, profiles: { opus: { codegraph: { telemetry: true } } } },
-      { "[senpi]": { codegraph: { auto_provision: false } }, profiles: { opus: { "[senpi]": { codegraph: { daemon: false } } } } },
+      { task: { max_depth: 4 }, profiles: { opus: { task: { ttl_ms: 111_000 } } } },
+      { "[senpi]": { task: { default_concurrency: 3 } }, profiles: { opus: { "[senpi]": { task: { resume_children: false } } } } },
     ])
   })
 
@@ -96,7 +96,7 @@ describe("loadOmoConfig resolution", () => {
     const fixture = makeFixture()
     writeJsonc(
       join(fixture.homeDir, ".omo", "omo.jsonc"),
-      `{"codegraph":{"telemetry":true},"[codex]":{"codegraph":{}}}`,
+      `{"telemetry":{"enabled":false},"[codex]":{"telemetry":{}}}`,
     )
 
     // when
@@ -109,32 +109,7 @@ describe("loadOmoConfig resolution", () => {
 
     // then
     expect(result.diagnostics).toEqual([])
-    expect(result.config.codegraph?.telemetry).toBe(true)
-  })
-
-  test("#given user roots and overlapping codex project roots #when loading the codex view #then roots retain their ordered unique union", () => {
-    // given
-    const fixture = makeFixture()
-    writeJsonc(
-      join(fixture.homeDir, ".omo", "omo.jsonc"),
-      `{"codegraph":{"excluded_roots":["/tmp/omo-a","/tmp/omo-b"]}}`,
-    )
-    writeJsonc(
-      join(fixture.projectDir, ".omo", "omo.jsonc"),
-      `{"[codex]":{"codegraph":{"excluded_roots":["/tmp/omo-b","/tmp/omo-c"]}}}`,
-    )
-
-    // when
-    const result = loadOmoConfig({
-      cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir },
-      harness: "codex",
-      platform: "linux",
-    })
-
-    // then
-    expect(result.diagnostics).toEqual([])
-    expect(result.config.codegraph?.excluded_roots).toEqual(["/tmp/omo-a", "/tmp/omo-b", "/tmp/omo-c"])
+    expect(result.config.telemetry?.enabled).toBe(false)
   })
 
   test("#given an unknown activated profile #when loading a harness view #then a profile diagnostic is emitted and no profile overlay is applied", () => {
@@ -142,7 +117,7 @@ describe("loadOmoConfig resolution", () => {
     const fixture = makeFixture()
     writeJsonc(
       join(fixture.homeDir, ".omo", "omo.jsonc"),
-      `{"codegraph":{"enabled":false},"[senpi]":{"codegraph":{"daemon":false}},"profiles":{"opus":{"codegraph":{"telemetry":true}}}}`,
+      `{"task":{"max_depth":4},"[senpi]":{"task":{"default_concurrency":3}},"profiles":{"opus":{"task":{"ttl_ms":111000}}}}`,
     )
 
     // when
@@ -155,7 +130,7 @@ describe("loadOmoConfig resolution", () => {
 
     // then
     expect(result.profile).toBeUndefined()
-    expect(result.config.codegraph).toMatchObject({ enabled: false, daemon: false, telemetry: false })
+    expect(result.config.task).toMatchObject({ max_depth: 4, default_concurrency: 3, ttl_ms: 86_400_000 })
     expect(result.diagnostics).toHaveLength(1)
     expect(result.diagnostics[0]).toMatchObject({ kind: "profile", path: "profiles.ghost" })
   })

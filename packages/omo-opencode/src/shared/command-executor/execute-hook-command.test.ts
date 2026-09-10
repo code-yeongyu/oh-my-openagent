@@ -1,13 +1,15 @@
 const { afterEach, beforeEach, describe, expect, test } = require("bun:test")
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 
 const { executeHookCommand } = await import("./execute-hook-command")
 const timeoutAssertionMs = process.platform === "win32" ? 5_000 : 1_000
 
-function nodeCommand(script: string): string {
-  return `"${process.execPath}" -e ${JSON.stringify(script)}`
+function nodeCommand(directory: string, script: string, args: string[] = []): string {
+  const scriptPath = join(directory, "hook-fixture.js")
+  writeFileSync(scriptPath, script)
+  return [`"${process.execPath}"`, `"${scriptPath}"`, ...args.map(arg => `"${arg}"`)].join(" ")
 }
 
 describe("executeHookCommand", () => {
@@ -28,7 +30,7 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      nodeCommand("console.log(process.env.__OMO_TEST_ALLOWED_VAR || '', process.env.__OMO_TEST_SECRET_VAR || '')"),
+      nodeCommand(tempDirectory, "console.log(process.env.__OMO_TEST_ALLOWED_VAR || '', process.env.__OMO_TEST_SECRET_VAR || '')"),
       "",
       tempDirectory,
       { allowedEnvVars: ["__OMO_TEST_ALLOWED_VAR"] },
@@ -50,7 +52,7 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      nodeCommand("console.log(process.env.__OMO_TEST_FULL_ENV_VAR || '')"),
+      nodeCommand(tempDirectory, "console.log(process.env.__OMO_TEST_FULL_ENV_VAR || '')"),
       "",
       tempDirectory,
     )
@@ -65,7 +67,7 @@ describe("executeHookCommand", () => {
 
   test("#given command ignores normal completion #when timeout expires #then returns timeout instead of hanging", async () => {
     // given
-    const command = nodeCommand("setTimeout(() => {}, 1000)")
+    const command = nodeCommand(tempDirectory, "setTimeout(() => {}, 1000)")
 
     // when
     const startedAt = Date.now()
@@ -87,7 +89,7 @@ describe("executeHookCommand", () => {
   test("#given pluginRoot option #when executing command #then CLAUDE_PLUGIN_ROOT is exported into env", async () => {
     // when
     const result = await executeHookCommand(
-      "echo plugin-root=$CLAUDE_PLUGIN_ROOT",
+      nodeCommand(tempDirectory, "console.log('plugin-root=' + process.env.CLAUDE_PLUGIN_ROOT)"),
       "",
       tempDirectory,
       { pluginRoot: "/tmp/plugin-x" },
@@ -101,7 +103,7 @@ describe("executeHookCommand", () => {
   test("#given pluginRoot option with allowedEnvVars #when executing command #then CLAUDE_PLUGIN_ROOT survives the env scrub", async () => {
     // when
     const result = await executeHookCommand(
-      "echo plugin-root=$CLAUDE_PLUGIN_ROOT",
+      nodeCommand(tempDirectory, "console.log('plugin-root=' + process.env.CLAUDE_PLUGIN_ROOT)"),
       "",
       tempDirectory,
       { pluginRoot: "/tmp/plugin-y", allowedEnvVars: [] },
@@ -119,7 +121,7 @@ describe("executeHookCommand", () => {
     // we substitute earlier so the form works even in commands that disable
     // shell variable expansion downstream.
     const result = await executeHookCommand(
-      'echo "rooted=${CLAUDE_PLUGIN_ROOT}/scripts/foo.sh"',
+      nodeCommand(tempDirectory, "console.log('rooted=' + process.argv[2])", ["${CLAUDE_PLUGIN_ROOT}/scripts/foo.sh"]),
       "",
       tempDirectory,
       { pluginRoot: "/tmp/plugin-z" },

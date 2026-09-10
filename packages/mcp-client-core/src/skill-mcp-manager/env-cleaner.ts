@@ -1,12 +1,11 @@
 // Filters npm/pnpm/yarn config env vars that break MCP servers in pnpm projects (#456)
 // Also filters secret-containing env vars to prevent exposure to malicious stdio MCP servers (#B-02)
 export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
-  // npm/pnpm/yarn config patterns (original)
+  // npm/pnpm/yarn config patterns
   /^NPM_CONFIG_/i,
-  /^npm_config_/,
-  /^YARN_/,
-  /^PNPM_/,
-  /^NO_UPDATE_NOTIFIER$/,
+  /^YARN_/i,
+  /^PNPM_/i,
+  /^NO_UPDATE_NOTIFIER$/i,
 
   // Specific high-risk secret env vars (explicit blocks)
   /^ANTHROPIC_API_KEY$/i,

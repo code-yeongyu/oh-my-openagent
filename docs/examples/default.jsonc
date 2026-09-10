@@ -52,10 +52,10 @@
       "quick": { "model": "opencode/gpt-5-nano" },
       "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
       "unspecified-high": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
-      "writing": { "model": "kimi-for-coding/kimi-k3", "reasoning": "low" },
-      "visual-engineering": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
-      "deep": { "model": "openai/gpt-5.6-sol", "reasoning": "medium" },
-      "ultrabrain": { "model": "openai/gpt-5.6-sol", "reasoning": "xhigh" },
+      "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" },
+      "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+      "deep": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+      "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
     },
 
     // Conservative concurrency for cost control

@@ -34,15 +34,21 @@ export const CATEGORY_PROMPT_APPENDS: Readonly<Record<string, string>> = Object.
 
 function hasRequiresModel(
   definition: BuiltinCategoryDefinition,
-): definition is BuiltinCategoryDefinition & { readonly requiresModel: string } {
+): definition is BuiltinCategoryDefinition & { readonly requiresModel: string | readonly string[] } {
   return definition.requiresModel !== undefined
 }
 
-export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, string>> = Object.fromEntries(
-  BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [definition.name, definition.requiresModel]),
+// A gate lists every model id that opens the category; one present id is enough. ultrabrain and deep
+// gate on gpt-6-astra OR gpt-5.6-sol so a registry carrying either GPT flagship keeps them, while a
+// registry with neither never falls through to a cross-family model.
+export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+  BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [
+    definition.name,
+    typeof definition.requiresModel === "string" ? [definition.requiresModel] : definition.requiresModel,
+  ]),
 )
 
-export function categoryGateModel(categoryName: string): string | undefined {
+export function categoryGateModels(categoryName: string): readonly string[] | undefined {
   return Object.hasOwn(BUILTIN_CATEGORY_REQUIRES_MODEL, categoryName)
     ? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
     : undefined
@@ -53,9 +59,9 @@ export function isCategoryGateSatisfied(
   hasExplicitUserConfig: boolean,
   availableModelIds: ReadonlySet<string>,
 ): boolean {
-  const gateModel = categoryGateModel(categoryName)
-  if (gateModel === undefined || hasExplicitUserConfig) return true
-  return availableModelIds.has(gateModel)
+  const gateModels = categoryGateModels(categoryName)
+  if (gateModels === undefined || hasExplicitUserConfig) return true
+  return gateModels.some((gateModel) => availableModelIds.has(gateModel))
 }
 
 // Mirrors the kimi transform from model-core provider-model-id-transform.ts (kimi-k3 -> k3); the

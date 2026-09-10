@@ -76,6 +76,8 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
       rpcRespawnRunner: { start: async () => handle },
     })
 
+    store.save(record)
+
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
 
@@ -141,6 +143,8 @@ describe("TaskManager respawn launch trust boundary", () => {
         },
       },
     })
+
+    store.save(maliciousRecord)
 
     // when
     const result = await manager.respawn(maliciousRecord, "/tmp/session.jsonl")
@@ -211,6 +215,7 @@ describe("TaskManager team-member respawn", () => {
       trustedRespawnLaunch: async () => trustedLaunch,
     }
     const manager = createTaskManager(options)
+    store.save(record)
 
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
@@ -272,6 +277,8 @@ describe("TaskManager respawn variant", () => {
         },
       },
     })
+
+    store.save(record)
 
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
@@ -379,6 +386,8 @@ describe("TaskManager in-process respawn", () => {
       cwd: project,
     })
 
+    store.save(record)
+
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
 
@@ -482,6 +491,7 @@ describe("TaskManager guarded reattach", () => {
     expect(store.load(record.task_id)).toMatchObject({
       status: "running",
       notification: { run_epoch: 5, notified_epoch: 3 },
+      child_session_id: `sess-${record.task_id}`,
     })
     expect(store.load(record.task_id)?.error_message).toBeUndefined()
     expect(store.load(record.task_id)?.final_response).toBeUndefined()
@@ -560,6 +570,7 @@ describe("TaskManager respawn continuation", () => {
       cwd: project,
       rpcRespawnRunner: { start: async () => handle },
     })
+    store.save(respawnRecord())
     return { manager, followUpCalls }
   }
 

@@ -1,0 +1,5 @@
+throwaway_worktree=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-qa-main-parent/worktree
+removed=true
+pruned=true
+official_qa_cleanup=all scenario cleanup assertions passed with survivor_pids=[] socket_holders=[] scratch_present=false
+ambient_processes=listed via pgrep -af 'omo|senpi'; pre-existing user processes left untouched

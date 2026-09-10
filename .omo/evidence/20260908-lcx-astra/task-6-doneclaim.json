@@ -1,0 +1,52 @@
+{
+  "task": "6 docs Astra mentions",
+  "changed_files": [
+    "packages/omo-codex/AGENTS.md",
+    "packages/omo-codex/README.md",
+    "packages/omo-codex/plugin/README.md",
+    "packages/omo-codex/plugin/components/rules/README.md",
+    "packages/omo-codex/plugin/components/ultrawork/README.md"
+  ],
+  "red_proof": "Executed prose-only acceptance greps in task-6-red.log (st_01a08154, mengmotaMac; no new prose-pinning tests). RED source is pristine dev 8bd0c35b3ba532ab0cb0df49ea71467303aa92ba, with all five documents byte-verified against local git show origin/dev:<file>: docs.no-forced-1000-cap-guidance and docs.astra-mentioned for all five files fail, TEST_EXIT=1. There are no Sol-default lines in those dev docs; the gpt-5.6-sol grep honestly returns no matches. Same checks at pushed branch b97e0acdf4264d0d4c989dbb8a41a3808147f3dd pass, TEST_EXIT=0: Astra in all five files, Sol mentions legacy-only, no obsolete cap-write or literal = 16 matches. Exact script, raw output hashes, and /tmp/lcx-reda-20260908 dir REMOVED / CLEANUP_EXIT=0 are captured. No product/test edits or local bun test. This literal acceptance evidence does not resolve the separate V2 exception wording objection; other fields retain historical results.",
+  "tests": [
+    "none changed: todo 6 is prose-only and names no test files; the plan's Verification strategy claims no RED test for prose -> n/a"
+  ],
+  "manual_qa": [
+    "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models/.omo/evidence/20260908-lcx-astra/task-6-docs.log -> RED section shows AGENTS.md:73 with the 16/1000 cap wording and gpt-6-astra count=0; GREEN section shows cap-pattern count=0, '= 16\\b' count=0, rg -c gpt-6-astra = 1 in each of the five files, 3 gpt-5.6-sol lines all containing 'legacy', em/en dash count in added lines = 0, shasum ~/.codex/config.toml b012e531f5aa9fb1bce9003593c3eadf07081fcd before and after"
+  ],
+  "acceptance": [
+    "rg -n 'gpt-5.6-sol' packages/omo-codex/AGENTS.md packages/omo-codex/README.md packages/omo-codex/plugin/README.md packages/omo-codex/plugin/components/rules/README.md packages/omo-codex/plugin/components/ultrawork/README.md -> 3 lines (plugin/README.md:20, README.md:42, AGENTS.md:77), each describing the legacy.gpt-5.6-sol-650k-high managed profile; `| rg -c legacy` -> 3",
+    "rg -n 'max_threads = 1000|1000 threads' <five files> -> count=0",
+    "rg -c 'gpt-6-astra' <five files> -> AGENTS.md:1 README.md:1 plugin/README.md:1 rules/README.md:1 ultrawork/README.md:1",
+    "rg -n '= 16\\b' <five files> -> count=0",
+    "git diff --stat -- <five files> -> 5 files changed, 19 insertions(+), 3 deletions(-); git status shows only these five files modified by this todo",
+    "rg -n \"left as is|left alone\" <five docs> -> 3 lines (plugin/README.md:20, README.md:38, AGENTS.md:68), every one naming the multi_agent_v2 agents.max_threads removal exception (verify-a4 fix, st_01a08167)"
+  ],
+  "cleanup": [
+    "no temp dirs, processes, or isolated CODEX_HOME created (grep-only QA); shasum ~/.codex/config.toml identical before/after: b012e531f5aa9fb1bce9003593c3eadf07081fcd; no git commit/checkout/stash run"
+  ],
+  "risks": [
+    "AGENTS.md line 3 still says 'Generated: 2026-08-24 / f3642fcda (refresh pass)'; left untouched as outside the todo's stated edits.",
+    "Docs now describe the todo 2/4/5 target state; catalog/legacy-profile names must be re-synced if any lane renames them before todo 7 ships."
+  ],
+  "verify_a4_fix": {
+    "task": "st_01a08167",
+    "head_before_edit": "38718c52acf9987d59dc48281b7777f283475760",
+    "defect": "README.md:38 and plugin/README.md:20 promised every user-set thread cap is preserved; under multi_agent_v2 (Astra default) agents.max_threads is removed whatever its value (src/install/codex-multi-agent-v2-config.ts:142 v2Preferred pattern /^\\s*max_threads\\s*=/; plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs:33).",
+    "changed_files": [
+      "packages/omo-codex/README.md",
+      "packages/omo-codex/plugin/README.md"
+    ],
+    "unchanged_files_reason": "AGENTS.md:68 and :73 already stated the V2 removal; rules/README.md and ultrawork/README.md contain no thread-cap promise (rg -n \"left as is|left alone|never overwrit\" matched neither).",
+    "rule_now_stated": [
+      "never writes or raises thread caps",
+      "removes only previously written 1000 / 16",
+      "under multi_agent_v2 also drops the V1-only agents.max_threads key whatever its value",
+      "every other user value preserved"
+    ],
+    "before": "rg -n \"left as is|left alone\" <five docs> -> plugin/README.md:20, README.md:38, AGENTS.md:68 (3 lines); README lines lacked the V2 exception",
+    "after": "rg -n \"left as is|left alone\" <five docs> -> same 3 lines; each contains agents.max_threads AND V2/multi_agent_v2 AND remov (rg -v filters each exit 1 = no line lacks them); cap-write grep exit 1, literal \"= 16\" exit 1, gpt-6-astra count >=1 in all five files, non-legacy Sol mentions 0, em/en dash count in added lines 0, git diff --stat 2 files / 2 insertions / 2 deletions",
+    "evidence_log": ".omo/evidence/20260908-lcx-astra/task-6-red.log (appended section VERIFY-A4 FIX)",
+    "not_done": "no git commit/push/checkout/stash; no bun test; ~/.codex untouched (grep and edit only)"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "files": [
+    "packages/omo-codex/src/install/codex-multi-agent-v2-config.ts",
+    "packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts",
+    "packages/omo-codex/plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs",
+    "packages/omo-codex/scripts/install-dist/install-local.mjs",
+    ".omo/evidence/20260909-lcx-v2-alignment/task-d1-doneclaim.json"
+  ],
+  "commit": "b6eead2038ed5984eacc7348a9e829866ecffc9e",
+  "acceptance": [
+    "TypeScript installer now treats V2 as active when the resolved model is V2 or the existing [features.multi_agent_v2] table has enabled = true.",
+    "The enabled-V2 path removes agents.max_threads regardless of its value, while max_concurrent_threads_per_session still removes only LazyCodex-written 1000/16 values and preserves user values such as 4.",
+    "Added t1 enabled=true plus unknown model plus agents.max_threads=6 removal coverage, t2 non-enabled plus unknown model plus agents.max_threads=6 preservation coverage, and t3 enabled=true plus max_concurrent_threads_per_session=4 preservation coverage.",
+    "Direct updateCodexConfig execution passed t1, t2, and t3 without invoking a test runner.",
+    "bun run build:codex-install completed successfully and regenerated the committed installer bundle.",
+    "bunx tsc --noEmit -p packages/omo-codex completed successfully.",
+    "bunx biome check packages/omo-codex/src/install completed successfully.",
+    "git diff --check completed successfully; final status contained only the four intended tracked changes before this evidence file was written.",
+    "Commit b6eead203 has the requested subject and Plan footer."
+  ],
+  "rationale": "On the old TypeScript path, t1 resolved the unknown root model to null, set v2Preferred only from multiAgentVersion === v2, and therefore called removeAgentsMaxThreads with the non-V2 rule that removes only the literal 1000. The user agents.max_threads = 6 remained, unlike the migration guard, so t1 was necessarily RED. The fix extends only the V2-active decision with the existing enabled=true table condition; model heuristics, V2 enable/disable behavior, and managed/user cap handling remain unchanged. The migration guard received one cross-reference comment and the TypeScript rule received the reciprocal comment to prevent future mirror drift. Local bun test, vitest, and node --test were not run per task hard rule; the requested CI-parity checks and direct runtime exercise were run instead."
+}

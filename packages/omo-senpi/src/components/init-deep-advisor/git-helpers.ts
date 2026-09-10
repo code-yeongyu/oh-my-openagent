@@ -10,8 +10,13 @@ const DRIFT_EXCLUDES = [
   ":(exclude).omo/init-deep.json",
 ]
 
-function run(root: string, args: readonly string[]): string {
-  return execFileSync("git", [...args], { cwd: root, encoding: "utf8" })
+export function run(root: string, args: readonly string[]): string {
+  return execFileSync("git", [...args], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 5000,
+  })
 }
 
 function countNul(output: string): number {
@@ -28,6 +33,16 @@ export function gitIsRepo(root: string): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+export function gitToplevel(cwd: string): string | null {
+  try {
+    const output = run(cwd, ["rev-parse", "--show-toplevel"]).trim()
+    // git prints forward slashes even on Windows; callers join and compare with node:path.
+    return output.length === 0 ? null : resolve(output)
+  } catch {
+    return null
   }
 }
 

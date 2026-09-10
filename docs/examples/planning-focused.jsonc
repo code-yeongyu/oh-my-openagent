@@ -70,21 +70,21 @@
 
       // High-effort planning tasks: maximum reasoning
       "unspecified-high": {
-        "model": "openai/gpt-5.6-sol",
+        "model": "openai/gpt-6-astra",
         "reasoning": "xhigh",
       },
 
       // Documentation from plans
-      "writing": { "model": "kimi-for-coding/kimi-k3", "reasoning": "low" },
+      "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" },
 
       // Visual architecture
-      "visual-engineering": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
+      "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
       // Deep research and analysis
-      "deep": { "model": "openai/gpt-5.6-sol", "reasoning": "medium" },
+      "deep": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
       // Strategic reasoning
-      "ultrabrain": { "model": "openai/gpt-5.6-sol", "reasoning": "xhigh" },
+      "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
 
       // Creative approaches to problems
       "artistry": { "model": "google/gemini-3.1-pro", "reasoning": "high" },
@@ -101,6 +101,7 @@
       "modelConcurrency": {
         "anthropic/claude-opus-5": 2,
         "openai/gpt-5.6-sol": 2,
+        "openai/gpt-6-astra": 2,
       },
     },
 

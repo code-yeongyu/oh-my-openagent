@@ -14,11 +14,15 @@ function createTemporaryDirectory(prefix: string): string {
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+    // Windows can transiently report EBUSY while the OS releases the fake bash.exe image of
+    // the just-exited child; retrying the removal is a no-op on POSIX platforms.
+    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
 describe("Git Bash runner", () => {
+  // Windows CI compiles a fake bash.exe via Bun.build and then spawns it; both
+  // steps are much slower than the 5 s Bun default on the shared runners.
   it("#given fake bash executable #when command runs #then invokes bash with -lc and command payload", async () => {
     const directory = createTemporaryDirectory("omo-git-bash-runner-");
     const argvPath = join(directory, "argv.txt");
@@ -69,5 +73,5 @@ describe("Git Bash runner", () => {
       stderr: `fake stderr${expectedLineEnding}`,
       timedOut: false,
     });
-  });
+  }, { timeout: 30_000 });
 });

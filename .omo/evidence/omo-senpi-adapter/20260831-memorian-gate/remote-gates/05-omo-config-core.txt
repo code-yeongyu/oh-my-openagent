@@ -1,0 +1,276 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-config-core/src/models/model-reference-resolution.test.ts:
+(pass) resolveModelReferences > #given catalog references in agent and category model chains #when resolved #then ids and unset tuning come from the catalog without mutating the view [2.96ms]
+(pass) resolveModelReferences > #given site-local tuning beside catalog references #when resolved #then site tuning wins [0.88ms]
+(pass) resolveModelReferences > #given model names outside the catalog #when resolved #then every name passes through verbatim [0.16ms]
+(pass) resolveModelReferences > #given a self-referential catalog entry #when resolved #then a cycle diagnostic is returned without hanging [0.14ms]
+
+packages/omo-config-core/src/schema/memory-overrides.test.ts:
+(pass) OmoMemorySettingsSchema per-agent overrides > #given per-agent overrides #when parsed #then they stay default-free deep-partials [0.98ms]
+(pass) OmoMemorySettingsSchema per-agent overrides > #given an unknown key inside an agent override #when parsed #then validation fails [0.42ms]
+(pass) OmoMemorySettingsSchema per-agent overrides > #given per-agent dream override #when parsed #then it overrides the base dream block [0.25ms]
+(pass) OmoMemorySettingsSchema per-agent overrides > #given per-agent nudge override #when parsed #then it overrides the base nudge block [0.16ms]
+(pass) OmoMemorySettingsLayerSchema > #given a partial layer block #when parsed #then it remains a default-free deep-partial [0.43ms]
+(pass) OmoMemorySettingsLayerSchema > #given an unknown layer key #when parsed #then the strict layer schema rejects it [0.14ms]
+(pass) OmoMemorySettingsLayerSchema > #given v2 block layer keys #when parsed #then they are accepted as deep-partials [0.32ms]
+
+packages/omo-config-core/src/schema/unified-config-schema.test.ts:
+(pass) unified omo config schema > #given a VSCode-style config with every unified key #when parsed #then all supported sections are preserved [1.57ms]
+(pass) unified omo config schema > #given partial model catalog entries in harness and profile overlays #when parsed #then they remain default-free deep-partials [0.20ms]
+(pass) unified omo config schema > #given unknown root and profile overlay keys #when parsed #then the strict schema rejects both [0.17ms]
+(pass) unified omo config schema > #given an array opencode block #when parsed #then rejection identifies the block path [0.17ms]
+(pass) unified omo config schema > #given the complete legacy codegraph setting set #when parsed #then values parse and legacy defaults are preserved [0.15ms]
+(pass) unified omo config schema > #given base telemetry and an empty codex block #when parsed #then the block stays default-free [0.13ms]
+
+packages/omo-config-core/src/schema/model-ref.test.ts:
+(pass) OmoModelRefSchema > #given canonical levels, auto, and a native preset #when parsed #then every reasoning token is accepted [0.13ms]
+(pass) OmoModelRefSchema > #given string and object model references #when parsed #then both canonical forms survive [0.45ms]
+(pass) OmoModelRefSchema > #given out of range tuning and unknown keys #when parsed #then the strict object rejects them [0.26ms]
+
+packages/omo-config-core/src/schema/telemetry.test.ts:
+(pass) telemetry harness applicability > #given the telemetry enabled setting #when checking harness support #then senpi is explicitly supported [0.13ms]
+
+packages/omo-config-core/src/schema/memory-v2-blocks.test.ts:
+(pass) OmoMemorySettingsSchema v2 block defaults > #given nudge defaults #when parsing empty #then nudge is enabled with every_user_turns 10 [0.12ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given nudge every_user_turns below 1 #when parsed #then validation fails [0.28ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given facts defaults #when parsing empty #then facts is enabled with debounce_settles 4 [0.30ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given facts with a category field #when parsed #then the strict schema rejects it [0.30ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given facts debounce_settles below 1 #when parsed #then validation fails [0.15ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given dream defaults #when parsing empty #then dream is fully populated [0.10ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given dream idle_minutes 0 #when parsed #then 0 is allowed (disables idle trigger) [0.25ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given dream min_hours_between below 1 #when parsed #then validation fails [0.12ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given dream auto_select_max outside 1..10 #when parsed #then validation fails [0.13ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given dream auto_select_max_chars below 10000 #when parsed #then validation fails [0.10ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given people defaults #when parsing empty #then people is enabled with limits [0.09ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given people max_entries outside 1..100 #when parsed #then validation fails [0.22ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given people max_entry_chars outside 50..500 #when parsed #then validation fails [0.14ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given soul defaults #when parsing empty #then edit_notice is true [0.09ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given soul with an unknown key #when parsed #then the strict schema rejects it [0.15ms]
+(pass) OmoMemorySettingsSchema v2 block defaults > #given an unknown key inside any v2 block #when parsed #then the strict schema rejects it [0.17ms]
+
+packages/omo-config-core/src/schema/agent-schema.test.ts:
+(pass) agent model entries > #given an agent whose models carry per-entry reasoning effort #when parsed #then the effort becomes canonical reasoning [0.20ms]
+(pass) agent model entries > #given an agent whose models mix strings and objects #when parsed #then both forms are accepted [0.13ms]
+(pass) agent model entries > #given an agent carrying top level variant and reasoning effort #when parsed #then effort wins as canonical reasoning [0.10ms]
+(pass) agent model entries > #given plain string models #when parsed #then the legacy form still parses unchanged [0.09ms]
+(pass) agent model entries > #given a harness-native preset in reasoning effort #when parsed #then it passes through as canonical reasoning [0.09ms]
+(pass) agent model entries > #given a model entry object without a model field #when parsed #then the schema rejects it [0.21ms]
+(pass) agent model entries > #given a model entry carrying an unknown key #when parsed #then the strict entry rejects it [0.20ms]
+
+packages/omo-config-core/src/schema/config-schema.test.ts:
+(pass) omo config schema > #given an empty formatOnMutation config #when parsed #then formatter defaults are available [0.25ms]
+(pass) omo config schema > #given formatOnMutation overrides #when parsed #then mode limits and language map survive [0.13ms]
+(pass) omo config schema > #given a full omo config #when parsed #then task defaults and deprecated category keys normalize [1.19ms]
+(pass) omo config schema > #given an empty codegraph config #when parsed #then daemon defaults on [0.10ms]
+(pass) omo config schema > #given an unknown root key #when parsed #then the schema rejects the config [0.10ms]
+(pass) omo config schema > #given a wrong typed codegraph daemon setting #when parsed #then the issue path identifies the bad field [0.16ms]
+(pass) omo config schema > #given a wrong typed task setting #when parsed #then the issue path identifies the bad field [0.15ms]
+
+packages/omo-config-core/src/schema/git-master.test.ts:
+(pass) omo config git_master section > #given an empty git_master section #when parsed #then attribution defaults are enabled [0.20ms]
+(pass) omo config git_master section > #given explicit overrides #when parsed #then a custom footer string and a disabled co-author are preserved [0.09ms]
+(pass) omo config git_master section > #given a [senpi] harness override #when parsed #then the git_master layer is accepted [0.37ms]
+(pass) omo config git_master section > #given a profile override #when parsed #then the git_master layer is accepted [0.23ms]
+(pass) omo config git_master section > #given a git_master layer without values #when parsed as a layer #then no defaults are injected [0.44ms]
+(pass) omo config git_master section > #given an unknown key inside git_master #when parsed #then the config is rejected [0.11ms]
+
+packages/omo-config-core/src/schema/task.test.ts:
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given global concurrency values #when task settings parse #then zero, one, and eight are accepted [0.12ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given invalid global concurrency values #when task settings parse #then they are rejected [0.18ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given no global concurrency layer override #when layer parses #then no default is injected [0.13ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given generated schema #when global concurrency values validate #then zero and four pass and negative one fails [0.91ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given zero concurrency caps #when task settings parse #then zero is preserved as the unbounded sentinel [0.17ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given zero concurrency caps #when the layer schema parses #then zero survives layer merging [0.18ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given parallelism 14 #when settings resolve without a residency override #then the bounded default resolves to 16 [0.18ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given an explicit zero residency cap #when settings resolve #then the parallelism default never overrides it [0.11ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given "unlimited" on a concurrency field #when task settings parse #then only numbers are accepted [0.21ms]
+(pass) OmoTaskSettingsSchema zero-as-unlimited concurrency > #given negative or fractional concurrency caps #when task settings parse #then each field is rejected [0.46ms]
+(pass) OmoTaskSettingsSchema warnings > #given no warning suppression override #when task settings parse #then unavailable categories warnings default on [0.09ms]
+(pass) OmoTaskSettingsSchema warnings > #given an explicit warning suppression override #when task settings parse #then the false override is preserved [0.17ms]
+(pass) OmoTaskSettingsSchema warnings > #given a non-boolean warning suppression override #when task settings parse #then validation fails at the nested path [0.11ms]
+(pass) OmoTaskSettingsSchema reattach >  w2reattach #given no reconcile override #when task settings parse #then reattach remains enabled by absence [0.09ms]
+(pass) OmoTaskSettingsSchema reattach >  w2reattach #given reattach is disabled #when task settings parse #then the false override is preserved [0.08ms]
+(pass) OmoTaskSettingsSchema resume_children > #given no resume_children key #when task settings parse #then resume_children defaults to true [0.07ms]
+(pass) OmoTaskSettingsSchema resume_children > #given resume_children explicitly false #when task settings parse #then the false override is preserved [0.07ms]
+(pass) OmoTaskSettingsSchema resume_children > #given resume_children explicitly true #when task settings parse #then true is preserved [0.07ms]
+(pass) OmoTaskSettingsSchema resume_children > #given resume_children with non-boolean value #when task settings parse #then validation fails [0.09ms]
+(pass) OmoTaskSettingsSchema dag block > #given no dag overrides #when task settings parse #then the dag block fills every documented default [0.28ms]
+(pass) OmoTaskSettingsSchema dag block > #given the dag block is omitted entirely #when task settings parse #then dag stays absent rather than materializing [0.07ms]
+(pass) OmoTaskSettingsSchema dag block > #given a partial dag override #when task settings parse #then the override wins and siblings keep defaults [0.08ms]
+(pass) OmoTaskSettingsSchema dag block > #given an unknown key inside the dag block #when task settings parse #then the strict schema rejects it [0.12ms]
+(pass) OmoTaskSettingsSchema dag block > #given a non-positive dag bound #when task settings parse #then validation fails at the nested path [0.10ms]
+(pass) OmoTaskSettingsLayerSchema dag block > #given a partial dag layer #when the layer parses #then no defaults are injected [0.23ms]
+(pass) OmoTaskSettingsLayerSchema dag block > #given an unknown key inside a dag layer #when the layer parses #then the strict schema rejects it [0.10ms]
+
+packages/omo-config-core/src/schema/fallback-models.test.ts:
+(pass) normalizeLegacyModelEntry > #given each deprecated reasoning spelling #when normalized #then reasoning is canonical and effort wins conflicts [0.17ms]
+(pass) normalizeLegacyModelEntry > #given enabled thinking and text verbosity #when normalized #then wire settings move under provider_options verbatim [0.10ms]
+(pass) normalizeLegacyModelEntry > #given camelCase tuning and legacy model suffixes #when normalized #then casing and suffixes are canonical [0.13ms]
+(pass) normalizeLegacyModelEntry > #given existing canonical provider options #when aliases normalize #then options merge without discarding canonical values [0.08ms]
+
+packages/omo-config-core/src/schema/memory.test.ts:
+(pass) OmoMemorySettingsSchema defaults > #given an empty memory block #when parsed #then the pinned v2 defaults apply [0.13ms]
+(pass) OmoMemorySettingsSchema defaults > #given a fully specified memory block #when parsed #then every explicit value is preserved [0.69ms]
+(pass) OmoMemorySettingsSchema defaults > #given step_count default #when parsing empty #then reflection step_count defaults to 25 [0.08ms]
+(pass) OmoMemorySettingsSchema defaults > #given an explicit step_count of 0 #when parsed #then 0 is preserved (disables trigger) [0.08ms]
+(pass) OmoMemorySettingsSchema defaults > #given a negative reflection step count #when parsed #then validation fails at the trigger path [0.15ms]
+(pass) OmoMemorySettingsSchema defaults > #given a non-boolean compaction trigger #when parsed #then validation fails at the trigger path [0.11ms]
+(pass) OmoMemorySettingsSchema defaults > #given write_notice defaults #when parsing empty #then the tool-result notice is enabled [0.07ms]
+(pass) OmoMemorySettingsSchema defaults > #given write_notice disabled #when parsed #then the explicit value is preserved [0.08ms]
+(pass) OmoMemorySettingsSchema defaults > #given write_notice with an unknown key #when parsed #then the strict schema rejects it [0.09ms]
+(pass) OmoMemorySettingsSchema defaults > #given a per-agent write_notice override #when parsed #then the layer accepts it as a deep-partial [0.13ms]
+(pass) OmoMemorySettingsSchema defaults > #given unknown keys inside the memory block #when parsed #then the strict schema rejects them [0.11ms]
+(pass) OmoMemorySettingsSchema defaults > #given recall omitted #when parsing empty #then the gate defaults apply [0.09ms]
+(pass) OmoMemorySettingsSchema defaults > #given an empty recall block #when parsed #then nested defaults still materialize [0.12ms]
+(pass) OmoMemorySettingsSchema defaults > #given an explicit recall override #when parsed #then the explicit values win [0.08ms]
+(pass) OmoMemorySettingsSchema defaults > #given recall max_items outside 1..5 #when parsed #then validation fails [0.12ms]
+(pass) OmoMemorySettingsSchema defaults > #given invalid recall field types #when parsed #then validation fails [0.12ms]
+(pass) OmoMemorySettingsSchema defaults > #given a recall mode field #when parsed #then the strict schema rejects it [0.08ms]
+(pass) OmoMemorySettingsSchema defaults > #given the removed recall knobs #when parsed on the block or its layer #then the strict schemas reject them [0.29ms]
+(pass) OmoMemorySettingsSchema defaults > #given a per-agent recall override #when parsed #then the layer accepts it as a deep-partial [0.08ms]
+
+packages/omo-config-core/src/schema/memory-config-wiring.test.ts:
+(pass) memory config wiring > #given a root memory block #when the config parses #then defaults materialize once [0.13ms]
+(pass) memory config wiring > #given memory blocks in harness and profile overlays #when parsed #then they stay default-free [0.14ms]
+(pass) memory config wiring > #given an unknown key inside a profile memory block #when parsed #then the config rejects it [0.09ms]
+(pass) memory profile and harness deep-merge > #given base and senpi memory blocks #when folding the harness view #then memory deep-merges [0.25ms]
+(pass) memory profile and harness deep-merge > #given base harness and profile memory blocks #when folding the profile view #then later layers win per leaf [0.11ms]
+
+packages/omo-config-core/src/schema/category.test.ts:
+(pass) OmoCategoryConfigSchema warn_unavailable > #given no category warning override #when category parses #then suppression remains absent [0.10ms]
+(pass) OmoCategoryConfigSchema warn_unavailable > #given a boolean category warning override #when category parses #then the override is preserved [0.07ms]
+(pass) OmoCategoryConfigSchema warn_unavailable > #given a non-boolean category warning override #when category parses #then validation fails at the field path [0.10ms]
+
+packages/omo-config-core/src/writer/writer.test.ts:
+(pass) updateOmoConfig > #given commented project config #when editing twice #then comments survive backup is created and second write sees first content [4.30ms]
+(pass) updateOmoConfig > #given fixed backup timestamp #when editing existing config twice immediately #then backup paths stay distinct [2.09ms]
+(pass) updateOmoConfig > #given missing user config #when editing #then file is created with header and parsed value [1.09ms]
+(pass) updateOmoConfig > #given existing project omo json #when editing #then writer preserves json path and loaded settings [2.10ms]
+(pass) updateOmoConfig > #given existing user omo json #when editing #then writer preserves json path and loaded settings [1.52ms]
+(pass) updateOmoConfig > #given writer cannot create temp file #when editing #then typed error surfaces and no partial remains [1.04ms]
+(pass) updateOmoConfig > #given malformed existing project config #when editing #then typed error surfaces and original bytes remain [1.16ms]
+(pass) updateOmoConfig > #given legacy dirs and env vars present #when editing user scope #then the write target never leaves ~/.omo [2.42ms]
+
+packages/omo-config-core/src/writer/writer-security.test.ts:
+(pass) updateOmoConfig filesystem safety > #given preexisting temp symlink #when editing project config #then victim remains unchanged [1.47ms]
+(pass) updateOmoConfig filesystem safety > #given symlinked existing project jsonc #when editing #then target is rejected and backup does not copy victim [0.84ms]
+(pass) updateOmoConfig filesystem safety > #given symlinked existing project json #when editing #then target is rejected and backup does not copy victim [0.74ms]
+(pass) updateOmoConfig filesystem safety > #given symlinked project omo directory #when editing project config #then global target is rejected without backup [0.78ms]
+
+packages/omo-config-core/src/loader/merge.test.ts:
+(pass) mergeOmoConfigRecords > #given nested unsafe keys under newly assigned objects #when merging #then unsafe keys are removed and prototypes stay clean [0.30ms]
+
+packages/omo-config-core/src/loader/legacy-user-config-purge.test.ts:
+(pass) legacy user config purge > #given the loader and writer sources #when scanned #then no XDG, APPDATA, or .config user-config branch remains [0.72ms]
+
+packages/omo-config-core/src/loader/telemetry-resolution.test.ts:
+(pass) loadOmoConfig telemetry resolution > #given base telemetry is disabled #when loading the senpi view #then the typed accessor returns false [1.51ms]
+(pass) loadOmoConfig telemetry resolution > #given base telemetry is disabled and the senpi block enables it #when loading the senpi view #then the senpi override wins [1.25ms]
+(pass) loadOmoConfig telemetry resolution > #given base telemetry is enabled and the active profile disables it #when loading the senpi view #then the profile layer wins [1.25ms]
+(pass) loadOmoConfig telemetry resolution > #given telemetry is absent from every layer #when loading the senpi view #then telemetry defaults to enabled [1.27ms]
+(pass) loadOmoConfig telemetry resolution > #given an unknown sibling inside telemetry #when loading the senpi view #then the strict block is rejected [1.44ms]
+(pass) loadOmoConfig telemetry resolution > #given telemetry enabled is a string #when loading the senpi view #then the malformed value is rejected [1.30ms]
+(pass) loadOmoConfig telemetry resolution > #given telemetry enabled is number #when loading the senpi view #then malformed input is rejected [1.25ms]
+(pass) loadOmoConfig telemetry resolution > #given telemetry enabled is null #when loading the senpi view #then malformed input is rejected [1.26ms]
+(pass) loadOmoConfig telemetry resolution > #given telemetry enabled is deeply nested garbage #when loading the senpi view #then malformed input is rejected [1.02ms]
+
+packages/omo-config-core/src/loader/project-config-path-discovery.test.ts:
+(pass) findProjectConfigPathsFarthestFirst > #given cwd outside HOME and a grandparent config #when resolving project paths #then it is discovered [0.18ms]
+(pass) findProjectConfigPathsFarthestFirst > #given nested project configs inside HOME #when resolving project paths #then they are farthest-first [0.10ms]
+(pass) findProjectConfigPathsFarthestFirst > #given HOME has a user config #when resolving project paths #then HOME is excluded [0.09ms]
+(pass) findProjectConfigPathsFarthestFirst > #given overridden HOME outside the account home #when resolving project paths #then the account user config is excluded [0.08ms]
+(pass) findProjectConfigPathsFarthestFirst > #given a symlinked project .omo directory #when resolving project paths #then it is refused [0.08ms]
+(pass) findProjectConfigPathsFarthestFirst > #given no project configs #when resolving project paths #then it returns an empty list [0.09ms]
+(pass) findProjectConfigPathsFarthestFirst > #given cwd exceeds the maximum walk depth #when resolving project paths #then the walk is bounded [2.69ms]
+
+packages/omo-config-core/src/loader/harness-fold.test.ts:
+(pass) resolveOmoConfigView codegraph harness folding > #given overlapping base and codex excluded roots #when folding the codex block #then roots retain their ordered unique union [0.24ms]
+
+packages/omo-config-core/src/loader/resolution.test.ts:
+(pass) resolveOmoProfileName > #given an explicit profile and every environment source #when resolving activation #then the explicit option wins [0.09ms]
+(pass) resolveOmoProfileName > #given OMO_PROFILE and lower-precedence environment sources #when resolving activation #then OMO_PROFILE wins [0.07ms]
+(pass) resolveOmoProfileName > #given OCX_PROFILE and OPENCODE_CONFIG_DIR #when resolving activation #then OCX_PROFILE wins [0.07ms]
+(pass) resolveOmoProfileName > #given an OPENCODE_CONFIG_DIR ending in profiles/kimi #when resolving activation #then kimi is derived lexically without filesystem access [0.11ms]
+(pass) resolveOmoProfileName > #given an OPENCODE_CONFIG_DIR without a profiles tail #when resolving activation #then no profile is derived [0.06ms]
+(pass) resolveOmoProfileName > #given no profile option or environment source #when resolving activation #then no profile is active [0.06ms]
+(pass) resolveOmoConfigView > #given base, harness, profile-base, and profile-harness layers #when resolving a harness profile #then later layers win and control keys are removed [0.14ms]
+(pass) resolveOmoConfigView > #given an absent activated profile #when resolving a harness view #then a diagnostic is emitted and the no-profile view is used [0.09ms]
+
+packages/omo-config-core/src/loader/loader-resolution.test.ts:
+(pass) loadOmoConfig resolution > #given base, harness, profile-base, and profile-harness layers #when loading the active senpi profile #then each layer contributes in precedence order [1.36ms]
+(pass) loadOmoConfig resolution > #given user and project profile layers #when loading a resolved view #then raw layers retain user and project provenance [1.25ms]
+(pass) loadOmoConfig resolution > #given base telemetry and an empty codex block #when loading the codex view #then defaults do not overwrite the base value [1.13ms]
+(pass) loadOmoConfig resolution > #given user roots and overlapping codex project roots #when loading the codex view #then roots retain their ordered unique union [1.03ms]
+(pass) loadOmoConfig resolution > #given an unknown activated profile #when loading a harness view #then a profile diagnostic is emitted and no profile overlay is applied [1.13ms]
+
+packages/omo-config-core/src/loader/paths.test.ts:
+(pass) resolveHomeDir > #given an absolute POSIX HOME #when resolving on any host #then its filesystem root is preserved [0.13ms]
+(pass) resolveUserOmoConfigDirectory > #given a HOME #when resolving the user config directory #then it is ~/.omo [0.49ms]
+(pass) resolveUserOmoConfigDirectory > #given XDG_CONFIG_HOME is set #when resolving the user config directory #then it is ignored in favour of ~/.omo [0.38ms]
+(pass) resolveUserOmoConfigDirectory > #given APPDATA set #when resolving the user config directory #then it is ignored in favour of ~/.omo [0.36ms]
+(pass) resolveUserOmoConfigDirectory > #given USERPROFILE instead of HOME #when resolving the user config directory #then it is <USERPROFILE>/.omo [0.41ms]
+(pass) resolveUserOmoConfigPath > #given a HOME #when resolving the user config path #then it is ~/.omo/omo.jsonc [0.44ms]
+(pass) resolveOmoConfigPaths user candidate > #given ~/.omo/omo.jsonc exists #when resolving candidates #then the user candidate is that file [0.60ms]
+(pass) resolveOmoConfigPaths user candidate > #given only ~/.omo/omo.json exists #when resolving candidates #then the json fallback is selected [0.85ms]
+(pass) resolveOmoConfigPaths user candidate > #given a legacy ~/.config/omo/omo.jsonc and no ~/.omo config #when resolving candidates #then the legacy file is never selected [0.92ms]
+(pass) resolveOmoConfigPaths user candidate > #given a project .omo config #when resolving candidates #then the user candidate stays first and project layers follow [1.04ms]
+
+packages/omo-config-core/src/loader/loader.test.ts:
+(pass) loadOmoConfig > #given user and walked project omo configs #when loading #then nearest project wins and keyed sections deep-merge [2.41ms]
+(pass) loadOmoConfig > #given same-key partial team layers #when loading #then final team merges members and description [1.53ms]
+(pass) loadOmoConfig > #given symlinked project omo directory #when loading #then target config is ignored [4.42ms]
+(pass) loadOmoConfig > #given symlinked project omo jsonc file #when loading #then target config is ignored [1.26ms]
+(pass) loadOmoConfig > #given symlinked project omo json file #when loading #then target config is ignored [1.17ms]
+(pass) loadOmoConfig > #given malformed and unreadable configs #when loading #then defaults survive and typed diagnostics identify paths [1.24ms]
+(pass) loadOmoConfig > #given only user omo json #when loading #then user json is read and jsonc takes precedence when both exist [1.86ms]
+(pass) loadOmoConfig > #given an omo config carrying a $schema key #when loading #then the key is tolerated with no diagnostics and does not disturb the real config sections [1.00ms]
+(pass) #given cwd outside home #when loading #then ancestor project configs are read [1.84ms]
+
+packages/omo-config-core/src/loader/top-level-senpi-config-characterization.test.ts:
+(pass) loadOmoConfig top-level Senpi configuration characterization > #given the current top-level-only user config shape #when resolving the senpi view #then category and agent settings are preserved exactly [1.32ms]
+
+packages/omo-config-core/src/migration/transaction.test.ts:
+(pass) runMigration transaction ownership > #given two callers overlap #when one holds the exclusive lock #then one migration commits and the other observes completed state on retry [1.84ms]
+(pass) runMigration transaction ownership > #given a live owner whose lease is fresh #when another caller attempts takeover #then the lock is not stolen [0.23ms]
+(pass) runMigration transaction ownership > #given a migration lasts beyond its initial lease #when it renews at transaction boundaries #then fresh ownership is never stolen [0.50ms]
+(pass) runMigration transaction ownership > #given a false predicate and no journal #when entering the transaction #then no target or source is written [0.29ms]
+
+packages/omo-config-core/src/migration/in-place.test.ts:
+(pass) runMigration replace-target mode > #given a crash after journaling an in-place rewrite #when migration resumes #then deletions, additions, and the marker are replayed exactly [0.74ms]
+
+packages/omo-config-core/src/migration/merge-commit.test.ts:
+(pass) runMigration > #given a legacy value collides with a target value #when migrating #then the target value wins with a skipped diagnostic [0.31ms]
+(pass) runMigration > #given a user target marker #when a project target is discovered later #then the project target migrates independently [0.28ms]
+(pass) runMigration > #given distinct migration ids for one target #when each group has a source #then each id runs once without suppressing the other [0.47ms]
+(pass) runMigration > #given a transformed document rejected by OmoConfigSchema #when migrating #then target and sources are untouched [0.22ms]
+
+packages/omo-config-core/src/migration/lock.test.ts:
+(pass) acquireMigrationLock > #given an expired lock owned by a dead process #when acquiring #then compare-and-remove takeover creates a new owner lease [0.16ms]
+(pass) acquireMigrationLock > #given a fresh lock owned by a live process #when acquiring #then the active owner is not displaced [0.11ms]
+(pass) acquireMigrationLock > #given a live owner whose lease only just expired #when acquiring #then the safety margin prevents premature takeover [0.11ms]
+(pass) acquireMigrationLock > #given a lock owner #when the lease is renewed #then its timestamp is replaced before release [0.11ms]
+(pass) acquireMigrationLock > #given transient mutation guard contention #when the owner releases #then it retries and removes the lock [10.27ms]
+(pass) acquireMigrationLock > #given persistent mutation guard contention #when release retries are exhausted #then the ownership-matched fallback removes the lock [156.90ms]
+(pass) acquireMigrationLock > #given a stale mutation guard owned by a live process #when taking over and releasing #then the guard cannot wedge either mutation [20.31ms]
+
+packages/omo-config-core/src/migration/predicate.test.ts:
+(pass) shouldRunMigration > #given no legacy sources #when evaluating a target without a marker #then migration is not triggered [2.90ms]
+(pass) shouldRunMigration > #given a target marker for this migration #when legacy sources exist #then migration is not triggered [0.09ms]
+(pass) shouldRunMigration > #given legacy sources and no target marker #when evaluating a distinct target migration pair #then migration is triggered [0.12ms]
+
+packages/omo-config-core/src/migration/recovery.test.ts:
+(pass) runMigration recovery > #given a crash after journal-written #when the next entrypoint runs #then it resumes before predicate evaluation [0.58ms]
+(pass) runMigration recovery > #given a crash after target-written #when the next entrypoint runs #then it resumes before predicate evaluation [0.31ms]
+(pass) runMigration recovery > #given a crash after target-recorded #when the next entrypoint runs #then it resumes before predicate evaluation [0.32ms]
+(pass) runMigration recovery > #given a crash after source-moved #when the next entrypoint runs #then it resumes before predicate evaluation [0.28ms]
+(pass) runMigration recovery > #given a crash after source-recorded #when the next entrypoint runs #then it resumes before predicate evaluation [0.22ms]
+
+packages/omo-config-core/src/migration/batch.test.ts:
+(pass) runMigrations > #given a long-expired lock owned by a live process #when the next batch starts #then it reclaims the stale lease and completes [0.39ms]
+(pass) runMigrations > #given a pending journal #when plans are discovered #then recovery finishes before discovery and dry run creates no new migration writes [0.27ms]
+
+ 204 pass
+ 0 fail
+ 513 expect() calls
+Ran 204 tests across 33 files. [1068.00ms]

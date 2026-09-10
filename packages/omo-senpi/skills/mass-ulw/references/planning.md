@@ -80,7 +80,7 @@ dag.node({ id: "synthesize", category: "unspecified-high", prompt: "...", depend
 const run = await sdk.start(dag)
 ```
 
-**Multi-run composition - the cell is the glue between runs.** `dependsOn` never passes data inside a run, but the cell passes data BETWEEN runs: wait for run 1, read its node outputs, and paste the relevant facts into run 2's prompts. Branching on results is plain JavaScript, so arbitrary conditional workflows fall out naturally:
+**Multi-run composition - the cell is the glue between runs.** This is the per-phase shape: one run per phase, with the next phase's graph built from the settled run's verified outputs. `dependsOn` never passes data inside a run, but the cell passes data BETWEEN runs: wait for run 1, read its node outputs, and paste the relevant facts into run 2's prompts. Branching on results is plain JavaScript, so arbitrary conditional workflows fall out naturally:
 
 ```js
 const probe = await sdk.wait((await sdk.start(probeDag)).run_id)
@@ -98,12 +98,11 @@ if (findings.includes("critical")) {
 
 **Adaptive retries.** Read `result.nodes[id].error`, then recover IN PLACE on the same run: `retry` re-runs the failed nodes, and `amend` re-runs them with an edited definition. A new key is never the retry mechanism - it starts a different run. Re-issuing the SAME definition under the old key returns the existing run untouched (`reused: true`), so it never retries anything on its own.
 
-**Progressive snapshots.** Between waits, `snapshot(run_id)` reports per-node states; use it to prepare downstream work while lanes finish. Never spin an empty poll loop - `wait()` is the default.
+**Completion wakes drive the cell.** Call `start` and return; node completions and settle wake the session, and the wake handler builds the next run. `snapshot(run_id)` is a one-off read for a midpoint decision. Use `wait()` only inside a detached cell.
 
-Two caveats:
+One caveat:
 
 - Node outputs are stored and returned IN FULL, with no truncation - when embedding an output into a later prompt, quote or summarize the relevant part. Pasting an unbounded output into a prompt drowns it.
-- `wait()` blocks the cell until the run settles. Do independent cell work BEFORE awaiting, or run the cell detached.
 
 ## Dag or team
 

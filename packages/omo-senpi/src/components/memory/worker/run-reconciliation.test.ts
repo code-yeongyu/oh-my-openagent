@@ -1,111 +1,71 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
-  GitMemoryRepo,
-  ReflectionReservationStore,
-  TranscriptJournal,
-  buildIdentityPaths,
   createLockRecord,
-  createReflectionWorktree,
+  parseLockRecord,
   reflectionSchedulerLockPath,
   withLock,
-  type MemoryIdentity,
 } from "@oh-my-opencode/memory-core"
 
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
-import { existsSync, realpathSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { rmEfaultTolerant } from "../teardown.test-support"
+import {
+  cleanupReconciliationFixtures,
+  commitOrphanWorktree,
+  contendedReservation,
+  reconciliationFixture as fixture,
+  retireRunGeneration,
+  queuePendingReservation,
+  withinPhase,
+} from "./run-reconciliation.test-support"
 
-const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
-
-async function fixture(trigger: "step-count" | "dream" = "step-count") {
-  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-")))
-  roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
-  const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
-  await repo.init({ seedFiles: [{ relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" }] })
-  const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
-  await journal.reconcile([
-    { kind: "user", messageId: "user-1", text: "remember" },
-    { kind: "assistant", messageId: "assistant-1", textBlocks: ["noted"] },
-  ])
-  const store = new ReflectionReservationStore({
-    identity,
-    config: { stepCount: 1, onCompaction: true },
-    getJournal: async () => journal,
-    createRunId: () => "run-orphan",
-    now: () => new Date("2026-08-10T00:00:00.000Z"),
-    launcherIdentity: async () => ({ pid: 111, hostname: "fixture-host", processStart: "launcher-start" }),
-  })
-  const snapshot = await journal.captureReflectionSnapshot()
-  if (snapshot === null) throw new Error("expected snapshot")
-  const reserved = await store.tryReserve({
-    trigger,
-    ...(trigger === "dream" ? { origin: "shutdown" as const } : {}),
-    conversationIds: ["conversation-a"],
-    snapshots: [{ conversationId: "conversation-a", snapshot }],
-  })
-  const worktree = await createReflectionWorktree(repo, reserved.run.runId, identity.paths.worktrees)
-  const runDir = join(identity.paths.reflection, "runs", reserved.run.runId)
-  await mkdir(runDir, { recursive: true, mode: 0o700 })
-  await writeRunJsonAtomic(join(runDir, "prelaunch.json"), {
-    version: 1,
-    runId: reserved.run.runId,
-    worktreeDir: worktree.dir,
-    worktreeBranch: worktree.branch,
-  })
-  const ledger = {
-    version: 1 as const,
-    runId: reserved.run.runId,
-    category: "quick",
-    conversationIds: ["conversation-a"],
-    kind: trigger === "dream" ? "dream" as const : "reflection" as const,
-    trigger,
-    ...(trigger === "dream" ? { origin: "shutdown" as const } : {}),
-    startedAt: "2026-08-10T00:00:00.000Z",
-    hardDeadlineAt: 1_000,
-    terminationGraceMs: 100,
-    deadlineAt: 1_100,
-    mergePolicy: "auto" as const,
-    worktreeDir: worktree.dir,
-    worktreeBranch: worktree.branch,
-    baseSha: worktree.baseSha,
-    gitFilePath: worktree.gitFilePath,
-    gitFileSnapshot: worktree.gitFileSnapshot,
-    commonConfigPath: worktree.commonConfigPath,
-    commonConfigSnapshot: worktree.commonConfigSnapshot,
-  }
-  await writeRunJsonAtomic(join(runDir, "ledger.json"), ledger)
-  return { identity, repo, journal, store, worktree, runDir, ledger }
-}
-
-async function commitOrphanWorktree(item: Awaited<ReturnType<typeof fixture>>): Promise<void> {
-  await mkdir(join(item.worktree.dir, "system"), { recursive: true })
-  await writeFile(join(item.worktree.dir, "system", "orphan.md"), "---\ndescription: Orphan\n---\nrecovered\n")
-  await item.worktree.exec.run(["add", "system/orphan.md"], { cwd: item.worktree.dir, timeoutMs: 30_000 })
-  await item.worktree.exec.run(["commit", "-m", "reflection orphan"], { cwd: item.worktree.dir, timeoutMs: 30_000 })
-}
+afterEach(cleanupReconciliationFixtures)
 
 describe("reflection and dream run reconciliation", () => {
+  test("#given the scheduler owner is unreadable on Windows #when reconciliation defers #then reservation state is not mutated", async () => {
+    const item = await fixture()
+    const initialState = await item.store.readState()
+    const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
+
+    const result = await withinPhase("defer", () => reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: contendedReservation(lockPath, null),
+      deferOnSchedulerContention: true,
+    }))
+
+    expect(result).toEqual([])
+    expect(await item.store.readState()).toEqual(initialState)
+  })
+
   test("#given the scheduler lock is held by a sibling bind #when reconciliation starts #then it defers without surfacing contention", async () => {
     const item = await fixture()
     const record = await createLockRecord("bind contention test")
     const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
+    const activePath = join(item.identity.paths.reflection, "active.lock")
+    const initialReservation = await readFile(activePath, "utf8")
 
-    const result = await withLock(lockPath, record, async () => {
-      return reconcileReflectionRuns({
-        identity: item.identity,
-        reservation: item.store,
-        deferOnSchedulerContention: true,
+    const result = await withinPhase("scheduler-lock-held", () =>
+      withLock(lockPath, record, async () => {
+        const deferred = await withinPhase("defer", () => reconcileReflectionRuns({
+          identity: item.identity,
+          reservation: contendedReservation(lockPath, record),
+          deferOnSchedulerContention: true,
+        }))
+        expect(await readFile(activePath, "utf8")).toBe(initialReservation)
+        expect(parseLockRecord(await readFile(lockPath, "utf8"))).toEqual(record)
+        return deferred
       })
-    })
+    )
 
     expect(result).toEqual([])
+    expect(await withinPhase("post-release-reconcile", () => reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+    }))).toEqual([{ runId: "run-orphan", outcome: "failed" }])
   })
 
   test("#given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final", async () => {
@@ -313,6 +273,93 @@ describe("reflection and dream run reconciliation", () => {
     expect(untouched).toEqual([])
     expect(reused).toEqual([{ runId: "run-orphan", outcome: "failed" }])
     expect((await unknown.journal.getState()).reflected_completed_steps).toBe(0)
+  }, 30_000)
+
+  test.each([
+    ["final", true], ["final", false], ["abandoned", true], ["abandoned", false],
+  ] as const)("#given a retired %s run dir with prelaunch=%s shadowing a newer dead-launcher reservation #when reconciled #then pending is promoted", async (terminal, hasPrelaunch) => {
+    // given: the terminal directory predates the reservation holding the same run id.
+    // Abandonment writes abandonedAt and leaves the ledger without finalization fields.
+    const item = await fixture()
+    await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
+    if (!hasPrelaunch) await rm(join(item.runDir, "prelaunch.json"))
+    const terminalPath = join(item.runDir, `${terminal}.json`)
+    const terminalBefore = await readFile(terminalPath, "utf8")
+    const ledgerBefore = await readFile(join(item.runDir, "ledger.json"), "utf8")
+    await queuePendingReservation(item)
+
+    // when
+    const launched: string[] = []
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      launch: (run) => { launched.push(run.runId) },
+      hostname: () => "fixture-host",
+      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+      getPidLiveness: () => "dead",
+    })
+
+    // then
+    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect(launched).toEqual(["run-pending"])
+    expect(await readFile(terminalPath, "utf8")).toBe(terminalBefore)
+    expect(await readFile(join(item.runDir, "ledger.json"), "utf8")).toBe(ledgerBefore)
+    expect(existsSync(item.worktree.dir)).toBe(true)
+    expect((await item.store.readState()).active?.runId).toBe("run-pending")
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
+  }, 30_000)
+
+  test.each([
+    ["final", "2026-08-10T00:00:00.000Z"], ["final", "2026-08-10T00:00:30.000Z"],
+    ["abandoned", "2026-08-10T00:00:00.000Z"], ["abandoned", "2026-08-10T00:00:30.000Z"],
+  ] as const)("#given a %s run dir terminated at %s in its own generation #when reconciled #then it is left untouched", async (terminal, finishedAt) => {
+    // given: the same shape as the reclaim case except the run directory belongs to THIS
+    // reservation - it was finalized after reservedAt - so it must never be reclaimed.
+    const item = await fixture()
+    await retireRunGeneration(item, finishedAt, terminal)
+    const before = await item.store.readState()
+
+    // when
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      hostname: () => "fixture-host",
+      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+      getPidLiveness: () => "dead",
+    })
+
+    // then
+    expect(results).toEqual([])
+    expect(await item.store.readState()).toEqual(before)
+  }, 30_000)
+
+  test.each([
+    ["final", undefined], ["final", "invalid"], ["final", 123], ["final", null],
+    ["abandoned", undefined], ["abandoned", "invalid"], ["abandoned", 123], ["abandoned", null],
+  ] as const)("#given %s has invalid terminal timestamp %s #when reconciled #then corruption is reported without mutating state", async (terminal, timestamp) => {
+    const item = await fixture()
+    await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
+    const path = join(item.runDir, `${terminal}.json`)
+    const artifact = JSON.parse(await readFile(path, "utf8"))
+    await writeRunJsonAtomic(path, {
+      ...artifact,
+      [terminal === "final" ? "finishedAt" : "abandonedAt"]: timestamp,
+    })
+    await queuePendingReservation(item)
+    const before = await item.store.readState()
+    const terminalBefore = await readFile(path, "utf8")
+
+    await expect(reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      launch: () => { throw new Error("unexpected launch") },
+      hostname: () => "fixture-host",
+      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+      getPidLiveness: () => "dead",
+    })).rejects.toThrow(TypeError)
+
+    expect(await item.store.readState()).toEqual(before)
+    expect(await readFile(path, "utf8")).toBe(terminalBefore)
   }, 30_000)
 
   test("#given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released", async () => {

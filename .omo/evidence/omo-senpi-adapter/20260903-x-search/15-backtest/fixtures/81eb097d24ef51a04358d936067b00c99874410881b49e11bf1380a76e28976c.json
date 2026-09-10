@@ -1,0 +1,281 @@
+{
+  "queryId": "q08",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"네이버 실적 외국인 수급 since:2026-08-28 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-28",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421846,
+    "completed_at": 1788421846,
+    "id": "1c4d3286-5792-99f0-b57e-7112b607da68",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_1c4d3286-5792-99f0-b57e-7112b607da68_call-6c56969c-fbb2-4d57-8cc5-79f891a6ebf2-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "네이버 실적 외국인 수급",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202608071528399765"
+            },
+            {
+              "type": "url",
+              "url": "https://ng.investing.com/news/transcripts/earnings-call-transcript-naver-q2-2026-revenue-beats-forecast-as-stock-slips-93CH-2646410"
+            },
+            {
+              "type": "url",
+              "url": "https://finance.naver.com/item/main.naver?code=035420"
+            },
+            {
+              "type": "url",
+              "url": "https://www.imaeil.com/page/view/2026051309401687022"
+            },
+            {
+              "type": "url",
+              "url": "https://www.sedaily.com/NewsView/2GWMHFRNF3"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankyung.com/article/202509092531i"
+            },
+            {
+              "type": "url",
+              "url": "https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?pGB=1&gicode=A035420"
+            },
+            {
+              "type": "url",
+              "url": "https://weekly.donga.com/economy/article/all/11/5296975/1"
+            },
+            {
+              "type": "url",
+              "url": "https://marketinsight.hankyung.com/article/2024122226581"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankyung.com/article/202502041330L"
+            },
+            {
+              "type": "url",
+              "url": "https://dealsite.co.kr/articles/150875"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/news/stock/11232614"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankyung.com/article/2024120165876"
+            },
+            {
+              "type": "url",
+              "url": "https://cm.asiae.co.kr/en/article/2024112815494059011"
+            },
+            {
+              "type": "url",
+              "url": "https://weekly.donga.com/economy/article/all/11/5774311/1"
+            },
+            {
+              "type": "url",
+              "url": "https://finance.naver.com/sise/sise_deal_rank_iframe.naver?sosok=01&investor_gubun=9000&type=buy&page=3"
+            },
+            {
+              "type": "url",
+              "url": "https://comp.wisereport.co.kr/bsfn/company/c1010001.aspx?cmp_cd=035420"
+            },
+            {
+              "type": "url",
+              "url": "https://www.businesspost.co.kr/BP?command=article_view&num=373851"
+            },
+            {
+              "type": "url",
+              "url": "https://www.youtube.com/watch?v=Qxi07QRpbbg"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/news/stock/11423303"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_1c4d3286-5792-99f0-b57e-7112b607da68_call-6c56969c-fbb2-4d57-8cc5-79f891a6ebf2-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**네이버(Naver, 035420) 최근 실적과 외국인 수급 동향** (2026년 9월 기준 주요 정보)\n\n### 최근 실적 요약 (2026년 2분기)\n- **매출액**: 3조 3,888억 원 (전년 동기 대비 **+16.2%**, 분기 기준 역대 최대)\n- **영업이익**: 5,203억 원 (전년 동기 대비 **-0.2%**, 시장 컨센서스 하회)\n- **당기순이익**: 7,043억 원 (전년 동기 대비 **+41.6%**)\n\n주요 성장 동력은 **커머스**, **금융 플랫폼**, **글로벌 C2C** 사업(24.4% 성장)이며, AI 인프라(데이터센터·클라우드) 투자 확대와 ‘피지컬 AI’ 관련 지출이 영업이익을 압박한 것으로 분석됩니다.[[1]](https://ng.investing.com/news/transcripts/earnings-call-transcript-naver-q2-2026-revenue-beats-forecast-as-stock-slips-93CH-2646410)\n\n증권사 컨센서스(2026년 연간 전망)는 매출 약 13.7~13.8조 원, 영업이익 2.2조 원대 수준으로, AI 데이터센터 매출 본격화는 2027년부터 기대하는 분위기입니다.[[2]](https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?pGB=1&gicode=A035420)\n\n### 외국인 수급 동향 (최근)\n- **2026년 8월~9월 초**: 외국인이 네이버를 **순매수** 전환. 8월 들어 346억 원, 특히 7거래일 연속 순매수(총 1,406억 원) 기록.[[3]](https://www.fnnews.com/news/202608071528399765)\n- **최근 일별** (네이버 금융 기준, 2026.9.2 기준):\n  - 9/2: 외국인 **+76,335주** (기관은 대량 매도)\n  - 9/1: **+13,113주**\n  - 8/31: **-729주** (소폭 매도)\n  - 이전 기간에는 매도 우위인 날도 있었으나, 최근 AI·신사업 기대감으로 저가 매수 유입.[[4]](https://finance.naver.com/item/main.naver?code=035420)\n\n외국인 보유비율은 현재 **약 36.0%** 수준(최근 35.93~36.02%)입니다.[[4]](https://finance.naver.com/item/main.naver?code=035420)\n\n### 시장 해석 및 증권가 전망\n- **긍정적 요인**: AI 데이터센터·클라우드·가상자산 등 **신사업 본격화 기대**. 실적 모멘텀은 당분간 제한적이지만, 2027년부터 AI 인프라 매출 인식이 시작될 것으로 보는 시각이 많습니다.[[3]](https://www.fnnews.com/news/202608071528399765)\n- **부정적 요인**: 영업이익이 시장 기대치를 하회하고, 대규모 AI 투자로 마진 압박이 지속.\n- 과거(2024~2025년)에는 실적 호조에도 외국인이 네이버를 매도하고 카카오를 사는 경우가 잦았으나, 2026년 들어 AI 기대감이 다시 외국인 매수로 이어지는 모습입니다.\n\n### 참고: 최신 주가 및 지표 (2026.9.2 기준)\n- 주가: 약 **209,000원** (최근 -2.79%)\n- 시가총액: 약 **31.6조 원**\n- 52주 범위: 181,100원 ~ 304,000원\n\n더 구체적인 날짜(예: 특정 월·분기)나 추가 자료(차트, 목표주가 등)가 필요하시면 알려주세요. 실시간 정보는 네이버증권(finance.naver.com)이나 한국거래소에서 확인하는 것을 추천합니다.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://ng.investing.com/news/transcripts/earnings-call-transcript-naver-q2-2026-revenue-beats-forecast-as-stock-slips-93CH-2646410",
+                "start_index": 364,
+                "end_index": 502,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://comp.fnguide.com/SVO2/asp/SVD_Consensus.asp?pGB=1&gicode=A035420",
+                "start_index": 602,
+                "end_index": 681,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.fnnews.com/news/202608071528399765",
+                "start_index": 789,
+                "end_index": 842,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://finance.naver.com/item/main.naver?code=035420",
+                "start_index": 1022,
+                "end_index": 1082,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://finance.naver.com/item/main.naver?code=035420",
+                "start_index": 1132,
+                "end_index": 1192,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.fnnews.com/news/202608071528399765",
+                "start_index": 1326,
+                "end_index": 1379,
+                "title": "3"
+              }
+            ]
+          }
+        ],
+        "id": "msg_1c4d3286-5792-99f0-b57e-7112b607da68",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 255340500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 255340500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:50:46.497Z"
+}

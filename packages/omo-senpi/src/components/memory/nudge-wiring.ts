@@ -4,9 +4,6 @@ import type { GitMemoryRepo, MemoryToolProvenance } from "@oh-my-opencode/memory
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import {
-  MEMORY_APPLY_PATCH_TOOL_NAME,
-  MEMORY_MCP_APPLY_PATCH_TOOL_NAME,
-  MEMORY_MCP_TOOL_NAME,
   MEMORY_TOOL_NAME,
 } from "./tool-metadata"
 import { joinFields, noticeComponent } from "./worker/entry-renderers"
@@ -211,9 +208,6 @@ function isMemoryToolName(value: unknown): boolean {
   // The MCP surface exposes the same tools under senpi's catalog names (mcp_<server>_<tool>);
   // matching only the bare names would skip provenance injection on the search exposure.
   return value === MEMORY_TOOL_NAME
-    || value === MEMORY_APPLY_PATCH_TOOL_NAME
-    || value === MEMORY_MCP_TOOL_NAME
-    || value === MEMORY_MCP_APPLY_PATCH_TOOL_NAME
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

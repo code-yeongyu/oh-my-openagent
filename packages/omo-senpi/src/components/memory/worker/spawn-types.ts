@@ -1,6 +1,4 @@
-import type { FactsPayload, ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
-
-import type { FactsQueuedKey } from "../facts-failure-recording"
+import type { ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
 import type { RunAttempt } from "./run-artifacts"
 
 export interface ReflectionSpawnPaths {
@@ -65,43 +63,6 @@ export interface ReflectionChildResult {
   readonly timedOut: boolean
 }
 
-export interface FactsSpawnArgs {
-  readonly runId: string
-  readonly attempt: number
-  readonly hardDeadlineAt: number
-  readonly model: string
-  readonly thinking?: string
-  readonly nextAttempt?: RunAttempt
-  readonly command: string
-  readonly args: readonly string[]
-  readonly cwd: string
-  readonly env: NodeJS.ProcessEnv
-  readonly detached: true
-  readonly paths: {
-    readonly runDir: string
-    readonly payload: string
-    readonly extraction: string
-  }
-}
-
-export interface FactsRunLedgerEnvelope {
-  readonly version: 1
-  readonly runId: string
-  readonly attempt: number
-  readonly model: string
-  readonly thinking?: string
-  readonly kind: "facts"
-  readonly startedAt: string
-  readonly hardDeadlineAt: number
-  readonly terminationGraceMs: number
-  readonly deadlineAt: number
-  readonly batchId: string
-  readonly queued: readonly FactsQueuedKey[]
-  readonly headBeforeApply?: string
-}
-
-export type FactsSandbox = (spawnArgs: FactsSpawnArgs) => FactsSpawnArgs | Promise<FactsSpawnArgs>
-
 export interface PrepareReflectionSpawnInput {
   /** Fork mode: the live parent session file to fork, and the parent's cwd for prefix identity. */
   readonly parentSessionFile?: string
@@ -123,21 +84,6 @@ export interface PrepareReflectionSpawnInput {
   readonly peoplePolicy: DreamPeoplePolicy
   readonly systemTokenBudget?: number
   readonly systemTokenTarget?: number
-  readonly senpiCommand?: string
-  readonly senpiPrefixArgs?: readonly string[]
-  readonly chmodFile?: (path: string, mode: number) => Promise<void>
-}
-
-export interface PrepareFactsSpawnInput {
-  readonly runId: string
-  readonly runDir: string
-  readonly payload: FactsPayload
-  readonly model: string
-  readonly thinking?: string
-  readonly attempt?: number
-  readonly hardDeadlineAt?: number
-  readonly nextAttempt?: RunAttempt
-  readonly env: NodeJS.ProcessEnv
   readonly senpiCommand?: string
   readonly senpiPrefixArgs?: readonly string[]
   readonly chmodFile?: (path: string, mode: number) => Promise<void>

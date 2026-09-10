@@ -1,0 +1,16 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/auth.test.ts:
+(pass) xAI auth > stored credential uses registry bearer [0.60ms]
+(pass) xAI auth > stored credential failure fails closed [0.20ms]
+(pass) xAI auth > no stored credential uses trimmed env [0.15ms]
+(pass) xAI auth > neither source is undefined [1.84ms]
+(pass) xAI auth > credential gate recognizes oauth and api_key [0.54ms]
+(pass) xAI auth > gate handles missing, invalid, and unknown entries [0.34ms]
+(pass) xAI auth > env gates missing file [0.06ms]
+
+ 7 pass
+ 0 fail
+ 10 expect() calls
+Ran 7 tests across 1 file. [495.00ms]
+EXIT:0

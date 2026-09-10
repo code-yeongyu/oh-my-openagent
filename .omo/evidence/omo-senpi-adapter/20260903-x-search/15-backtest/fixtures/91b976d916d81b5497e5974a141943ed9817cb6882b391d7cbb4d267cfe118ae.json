@@ -1,0 +1,231 @@
+{
+  "queryId": "q02",
+  "lane": "omo-tool",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421675,
+    "completed_at": 1788421675,
+    "id": "0ac149ae-8160-95dc-b9e6-c5501145dddb",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_0ac149ae-8160-95dc-b9e6-c5501145dddb",
+        "summary": [
+          {
+            "text": "The user wants me to use the x_search tool with x_keyword_search only, mode=Latest. The query is exactly: \"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-e1c70810-d4fc-43cd-8c8c-25bf5a115f2b-0",
+        "input": "{\"query\":\"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_0ac149ae-8160-95dc-b9e6-c5501145dddb_call-e1c70810-d4fc-43cd-8c8c-25bf5a115f2b-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_0ac149ae-8160-95dc-b9e6-c5501145dddb_call-e1c70810-d4fc-43cd-8c8c-25bf5a115f2b-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/gptkims11/status/2095094704589422989 - Foreigners sold nearly 200T won of KOSPI stocks by July while individuals net-bought 140T leading the rally; record individual outflow in Aug 2026. (@gptkims11, 2026-09-02)\nhttps://x.com/PeterLeejoa/status/2095051682317275196 - Sep 2 KOSPI close briefing: index -3.99% at 6562.72, foreigners net sold 1.909T won, institutions 2.043T, individuals bought 2.302T. (@PeterLeejoa, 2026-09-02)\nhttps://x.com/superrichj/status/2095043325741207962 - Samsung Securities KOSPI close 6562.72 (-3.99%), foreigners net sold 19094억, individuals bought 23024억. (@superrichj, 2026-09-02)\nhttps://x.com/Special_Ledger/status/2095040134546919487 - Sep 2 KOSPI/KOSDAQ down; foreigners and institutions sold nearly 4T, individuals bought over 2T, Samsung Elec/Hynix down 4%. (@Special_Ledger, 2026-09-02)\nhttps://x.com/young8e2/status/2094942106716717209 - Wednesday market watch: KOSPI 7060 line and foreign net buying after 7000 breakthrough, USD/KRW 1368.90. (@young8e2, 2026-09-02)\nhttps://x.com/kkaoppa9671/status/2094800470460248348 - Foreigners sold 170T on KOSPI but ownership ratio rose due to semiconductor stock valuation gains. (@kkaoppa9671, 2026-09-01)\nhttps://x.com/Archive869/status/2094719619844227144 - Sep 1 investor flows: individuals/foreigners/institutions all net sold but other corps bought, KOSPI +0.23%. (@Archive869, 2026-09-01)\nhttps://x.com/korea_growth/status/2094704180984500565 - Individuals net-bought 2T on KOSDAQ in August after selling in July, while KOSPI individual buying decreased. (@korea_growth, 2026-09-01)\nhttps://x.com/gptkims11/status/2094656971903533305 - Foreigners not returning to KOSPI; only two months of net buying this year, 169T sold already, 36x last year. (@gptkims11, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095051682317275196",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095051682317275196"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094704180984500565",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094704180984500565"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094719619844227144",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094719619844227144"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094656971903533305",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094656971903533305"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095094704589422989",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095094704589422989"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094800470460248348",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094800470460248348"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095040134546919487",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095040134546919487"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095043325741207962",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095043325741207962"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094942106716717209",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094942106716717209"
+              }
+            ]
+          }
+        ],
+        "id": "msg_0ac149ae-8160-95dc-b9e6-c5501145dddb",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 107160800,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 107160800,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:47:55.745Z"
+}

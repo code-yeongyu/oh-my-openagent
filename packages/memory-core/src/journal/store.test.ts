@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
+import { Buffer } from "node:buffer"
 import { spawn } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
@@ -56,6 +57,7 @@ describe("transcript journal store", () => {
       total_completed_steps: 3,
       reflected_completed_steps: 0,
       steps_since_last_successful_reflection: 3,
+      unreflected_bytes: Buffer.byteLength(transcript, "utf8"),
     })
   })
 

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.ts";
-import { ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE } from "../src/goal-status.js";
+import { aggregateCodexObjectiveForScope } from "../src/goal-status.js";
+import { CLI_TEST_SCOPE, CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 import { qualityGateJson } from "./fixtures/quality-gate-builder.js";
 
 let testDir: string;
@@ -27,6 +28,7 @@ beforeEach(async () => {
 	delete process.env["CODEX_THREAD_ID"];
 	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
 	delete process.env["PI_SESSION_ID"];
+	process.env["PI_SESSION_ID"] = CLI_TEST_SESSION_ID;
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -61,7 +63,7 @@ function stdoutJson(): Record<string, unknown> {
 }
 
 function codexSnapshot(status: "active" | "complete" = "active"): string {
-	return JSON.stringify({ goal: { objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE, status } });
+	return JSON.stringify({ goal: { objective: aggregateCodexObjectiveForScope(CLI_TEST_SCOPE), status } });
 }
 
 async function qualityGate(): Promise<string> {
@@ -101,9 +103,9 @@ describe("ulwLoopCommand create-goals", () => {
 		const parsed = stdoutJson();
 		expect(parsed).toMatchObject({ ok: true });
 		expect(parsed).toHaveProperty("plan.goals.0.successCriteria.0.id", "C001");
-		expect(await readFile(join(testDir, ".omo/ulw-loop/brief.md"), "utf8")).toContain("Goal A");
-		expect(await readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).toContain("successCriteria");
-		expect(await readFile(join(testDir, ".omo/ulw-loop/ledger.jsonl"), "utf8")).toContain("plan_created");
+		expect(await readFile(join(testDir, ".omo/ulw-loop/cli-test/brief.md"), "utf8")).toContain("Goal A");
+		expect(await readFile(join(testDir, ".omo/ulw-loop/cli-test/goals.json"), "utf8")).toContain("successCriteria");
+		expect(await readFile(join(testDir, ".omo/ulw-loop/cli-test/ledger.jsonl"), "utf8")).toContain("plan_created");
 	});
 
 	it("#given completed default aggregate #when creating another default plan #then guides to a fresh session", async () => {
@@ -142,7 +144,7 @@ describe("ulwLoopCommand create-goals", () => {
 
 		expect(await ulwLoopCommand(["status", "--json"])).toBe(0);
 
-		expect(stdoutJson()).toMatchObject({ currentAttemptDir: ".omo/evidence/ulw/session/G001-goal-a/a1" });
+		expect(stdoutJson()).toMatchObject({ currentAttemptDir: ".omo/evidence/ulw/cli-test/G001-goal-a/a1" });
 	});
 
 	it("#given two session ids #when creating goals #then writes isolated session-scoped plans", async () => {
@@ -212,7 +214,7 @@ describe("ulwLoopCommand create-goals", () => {
 
 		expect(code).toBe(1);
 		expect(err.join("")).toContain("--session-id requires a non-empty value");
-		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
+		await expect(readFile(join(testDir, ".omo/ulw-loop/cli-test/goals.json"), "utf8")).rejects.toThrow();
 	});
 
 	it("#given an empty --session-id= #when creating goals #then it fails and writes no plan", async () => {
@@ -220,6 +222,6 @@ describe("ulwLoopCommand create-goals", () => {
 
 		expect(code).toBe(1);
 		expect(err.join("")).toContain("--session-id requires a non-empty value");
-		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
+		await expect(readFile(join(testDir, ".omo/ulw-loop/cli-test/goals.json"), "utf8")).rejects.toThrow();
 	});
 });

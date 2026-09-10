@@ -1,0 +1,104 @@
+bun test v1.4.0 (34cbb9a40)
+
+script/omob-refresh.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+(pass) omob refresh integration > #given an ordinary managed install #when ordinary install repeats #then auto-refresh remains installed [3699.51ms]
+(pass) omob refresh integration > #given an installed build #when same refresh runs #then only the authoritative pair can launch [4051.26ms]
+(pass) omob refresh integration > #given an installed build #when changed refresh runs #then only the authoritative pair can launch [5037.19ms]
+(pass) omob refresh integration > #given an installed build #when failure refresh runs #then only the authoritative pair can launch [33375.11ms]
+(pass) omob refresh integration > #given an installed build #when network refresh runs #then only the authoritative pair can launch [13504.10ms]
+(pass) omob refresh integration > #given an installed build #when feature refresh runs #then only the authoritative pair can launch [9815.63ms]
+(pass) omob refresh integration > #given an installed build #when locked refresh runs #then only the authoritative pair can launch [8542.71ms]
+
+script/omob-launcher.test.ts:
+(pass) omob mainline launcher > #given ordinary installation #when defaults are parsed #then the managed launcher is retained [0.40ms]
+(pass) omob mainline launcher > #given mainline refresh flags #when parsed #then startup refresh is supported [0.18ms]
+(pass) omob mainline launcher > #given explicit feature refs #when building directly #then only explicit launcher installation rejects them [0.16ms]
+(pass) omob mainline launcher > #given an incompletely written cache claim #when another updater starts #then it cannot steal the lock [1.60ms]
+(pass) omob mainline launcher > #given a same SHA pair #when cache is checked #then rebuild is false [350.13ms]
+(pass) omob mainline launcher > #given a changed SHA pair #when cache is checked #then rebuild is true [276.63ms]
+(pass) omob mainline launcher > #given a signaled executable #when launched #then the launcher preserves the signal [734.24ms]
+(pass) omob mainline launcher > #given successful refresh #when launched #then args and exit status reach the refreshed executable [1282.78ms]
+(pass) omob mainline launcher > #given failed refresh #when launched #then the previous binary survives without launching [672.39ms]
+
+script/build-omob.test.ts:
+(pass) parseOmobArgs > defaults to the latest tracked refs and the host target [0.57ms]
+(pass) parseOmobArgs > accepts ref overrides and keep counts [0.47ms]
+(pass) parseOmobArgs > rejects unknown flags [0.26ms]
+(pass) parseOmobArgs > maps host platforms onto release targets [0.18ms]
+(pass) deriveOmobAiVersion > embeds both short shas in the dev version [0.20ms]
+(pass) acquireCacheLock > #given a free cache #when the lock is taken #then it records this pid and releases [7.58ms]
+(pass) acquireCacheLock > #given a live holder #when a second build starts #then it fails fast naming the holder and lock [8.00ms]
+(pass) acquireCacheLock > #given a lock left by a dead process #when a build starts #then the stale lock is reclaimed [29.48ms]
+(pass) acquireCacheLock > #given a released lock #when release is called again #then it stays a no-op [5.55ms]
+(pass) packSoleSenpiTarball > #given a decoy tarball from a previous version #when packing #then the decoy is gone and the fresh one is returned [4.40ms]
+(pass) packSoleSenpiTarball > #given a pack that produces nothing #when packing #then it throws [24.17ms]
+(pass) packSoleSenpiTarball > #given a pack that produces two tarballs #when packing #then it throws naming both [16.70ms]
+(pass) packSoleSenpiTarball > #given non-tarball residue #when packing #then only .tgz files are considered [8.98ms]
+Cloning into '/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omob-submodule-XVjhVd/cache/omo'...
+Submodule 'upstreams/skill' (file:///var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omob-submodule-XVjhVd/sub.git) registered for path 'upstreams/skill'
+Cloning into '/private/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omob-submodule-XVjhVd/cache/omo/upstreams/skill'...
+Submodule path 'upstreams/skill': checked out '9b88a460334eb2b875419c2c88625e87e5115248'
+Note: switching to 'origin/dev'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 15d9408 bump submodule to v2
+HEAD is now at 15d9408 bump submodule to v2
+Submodule path 'upstreams/skill': checked out '9b88a460334eb2b875419c2c88625e87e5115248'
+Previous HEAD position was 15d9408 bump submodule to v2
+HEAD is now at 9261138 pin submodule at v1
+HEAD is now at 9261138 pin submodule at v1
+From file:///var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omob-submodule-XVjhVd/sub
+ * branch            7b6421b2536976a30748709f77ac112a074a1a77 -> FETCH_HEAD
+Submodule path 'upstreams/skill': checked out '7b6421b2536976a30748709f77ac112a074a1a77'
+Previous HEAD position was 9261138 pin submodule at v1
+HEAD is now at 15d9408 bump submodule to v2
+HEAD is now at 15d9408 bump submodule to v2
+Submodule path 'upstreams/skill': checked out '9b88a460334eb2b875419c2c88625e87e5115248'
+Previous HEAD position was 15d9408 bump submodule to v2
+HEAD is now at 9261138 pin submodule at v1
+HEAD is now at 9261138 pin submodule at v1
+From file:///var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omob-submodule-XVjhVd/sub
+ * branch            7b6421b2536976a30748709f77ac112a074a1a77 -> FETCH_HEAD
+Submodule path 'upstreams/skill': checked out '7b6421b2536976a30748709f77ac112a074a1a77'
+(pass) ensureCacheClone submodule ordering > #given a ref whose submodule pointer moved #when the cache checks it out #then submodule content matches that ref [14075.73ms]
+
+script/omob-runtime-prune.test.ts:
+(pass) selectPruneEntries > keeps the newest dev runtimes and never touches release runtimes [0.31ms]
+(pass) selectPruneEntries > keeps everything below the budget [0.16ms]
+(pass) planRuntimePrune > reserves a slot for the version being built and prunes the rest oldest-first [0.15ms]
+(pass) planRuntimePrune > never counts the current version against the budget even when its dir is absent [6.46ms]
+(pass) planRuntimePrune > keep=1 leaves only the version being built [0.32ms]
+(pass) planRuntimePrune > never prunes a runtime a live process executes, without charging it to the budget [0.14ms]
+(pass) runtimesInUse > marks a runtime in use when a process command starts with its provisioned executable [0.23ms]
+(pass) runtimesInUse > matches whole directory names, not string prefixes [0.11ms]
+(pass) runtimesInUse > reports nothing when no process runs from the runtime root [0.11ms]
+(pass) listProcessCommands > includes a live child spawned by absolute executable path [915.66ms]
+pruned dev runtime 0.0.0-omob.mid0000.mid0000
+pruned dev runtime 0.0.0-omob.new0000.new0000
+kept in-use dev runtime 0.0.0-omob.old0000.old0000
+(pass) pruneOmobRuntimes > deletes idle runtimes beyond the budget but keeps one a live process executes [56.54ms]
+(pass) pruneOmobRuntimes > is a no-op when the runtime root does not exist [6.35ms]
+
+ 42 pass
+ 0 fail
+ 125 expect() calls
+Ran 42 tests across 4 files. [103.03s]

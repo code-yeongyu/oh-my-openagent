@@ -1,0 +1,62 @@
+Issue 7392 surface-aware generic gate quota
+===========================================
+
+Failing first
+-------------
+Command:
+  npm test -- test/spawn-guard.test.ts -t 'staged Senpi surface'
+
+Observed:
+  1 failed, 19 skipped.
+  The fourth alternating generic/explicit gate spawn returned no denial because
+  the generic form used the LazyCodex counter while the explicit form used the
+  Senpi counter.
+
+Green
+-----
+- Identical focused command: 1 pass, 0 fail.
+- Complete spawn-guard file: 20 pass, 0 fail.
+- Complete ulw-loop component: 448 pass, 0 fail across 41 files.
+- Component TypeScript, Biome, and build: pass.
+- Root Bun 1.4.0 typecheck and build: pass.
+- Bun 1.4.0 Senpi gate: 2461 pass, one Windows-only skip, 0 fail,
+  7906 assertions across 327 files; evidence resolver 10 pass, 0 fail.
+
+Built Senpi surface
+-------------------
+The staged `omo-agent-toolkit` bundle was driven with
+`OMO_AGENT_TOOLKIT_SURFACE=omo-senpi` baked into `surface.json`.
+
+- generic attempt 1: allowed;
+- explicit `omo-senpi-gate-reviewer` attempt 2: allowed;
+- generic attempt 3: allowed;
+- explicit attempt 4: denied as `omo-senpi-gate-reviewer 4/3`;
+- persisted counter: `omo-senpi-gate-reviewer:g1:a1 = 3`;
+- LazyCodex gate counter: absent.
+
+Live harnesses
+--------------
+- Codex QA common self-check and bare app-server self-test: pass.
+- Isolated local-plugin Codex app-server: completed; `sessionStart`,
+  `userPromptSubmit`, and `stop` started and completed; the real
+  `~/.codex/config.toml` hash was unchanged.
+- The current PR already carries first-party `preToolUse` started/completed
+  proof for the same hook matcher in `app-server-pre-tool-use-spawn.txt`.
+- Senpi adapter driver self-test: pass.
+- Real isolated Senpi adapter: `result=PASS`; ultrawork injected; comment
+  checker passed; caller agent-dir override ignored; protected Senpi/OMO paths,
+  credential digest, and observed real-home paths unchanged.
+
+Known gate gap
+--------------
+The exact Bun 1.4.0 `test:codex` gate again reached the existing dry-run pack
+setup failure after all changed-component tests passed. `npm pack --dry-run`
+removed workspace development dependencies before the prepare build, and the
+ulw-loop build could not resolve Node types. This is the same previously
+recorded branch-level packaging gap; no changed assertion, typecheck, lint, or
+direct build failed.
+
+Omissions
+---------
+Temporary paths, raw environment values, credentials, authentication data, and
+private configuration contents are omitted.

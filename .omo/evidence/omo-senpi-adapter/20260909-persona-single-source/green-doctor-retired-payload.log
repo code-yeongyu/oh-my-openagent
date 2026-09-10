@@ -1,0 +1,35 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/doctor-stale-engines.test.ts:
+(pass) omo doctor stale engine detection > #given a process list containing every engine shape > #when the engines are classified > #then only reparented interactive engines count as stale [1.45ms]
+(pass) omo doctor stale engine detection > #given a process list containing every engine shape > #when the engines are classified > #then the launcher's own descendants are never reported as stale [0.20ms]
+(pass) omo doctor stale engine detection > #given stale engines were found > #when the report is rendered > #then each line carries pid, age, tty and the explicit reap command [0.23ms]
+(pass) omo doctor stale engine detection > #given stale engines were found > #when the report is rendered > #then no stale engines render no lines at all [0.13ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is a reparented interactive engine > #then exactly that pid is signaled [0.51ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is an attached or managed engine > #then an rpc engine is refused and nothing is signaled [0.21ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is an attached or managed engine > #then an app-server engine is refused and nothing is signaled [0.12ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is an attached or managed engine > #then a live attached engine is refused and nothing is signaled [0.10ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is not an omo engine at all > #then it is refused rather than killed [0.31ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when no pid is given > #then nothing is signaled and the explicit form is explained [0.23ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the real launcher is asked to reap a live non-engine pid > #then it refuses, exits non-zero, and leaves the process alone [188.08ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when several pids are named and one is unsafe > #then the safe pid is still reaped and the unsafe one is refused [0.54ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "0" is refused before any process lookup [0.11ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "-1" is refused before any process lookup [0.05ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "abc" is refused before any process lookup [0.04ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "12.5" is refused before any process lookup [0.06ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "" is refused before any process lookup [0.06ms]
+
+packages/omo-native/test/doctor-retired-payload.test.ts:
+(pass) parseElapsedSeconds > #given ps etime spellings #when parsed #then minutes, hours and days are all accepted [0.35ms]
+(pass) parseElapsedSeconds > #given an unparsable etime #when parsed #then it yields undefined instead of a wrong number [0.08ms]
+(pass) classifyRetiredPayloadEngines > #given an engine older than the payload it loads #when classified #then it is reported as retired [0.29ms]
+(pass) classifyRetiredPayloadEngines > #given an engine started after its payload was written #when classified #then it is left alone [0.14ms]
+(pass) classifyRetiredPayloadEngines > #given two installs on one machine #when classified #then each engine is judged against its own payload [0.17ms]
+(pass) classifyRetiredPayloadEngines > #given an unparsable age, a non-engine process, no payload flag or an unreadable payload #when classified #then none is reported [0.14ms]
+(pass) formatRetiredPayloadLines > #given no retired engine #when formatted #then the report stays silent [0.11ms]
+(pass) formatRetiredPayloadLines > #given a retired engine #when formatted #then the pid is named with a restart instruction and no reap hint [0.18ms]
+
+ 25 pass
+ 0 fail
+ 62 expect() calls
+Ran 25 tests across 2 files. [1197.00ms]

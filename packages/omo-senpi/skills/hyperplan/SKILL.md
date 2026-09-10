@@ -1,6 +1,6 @@
 ---
 name: hyperplan
-description: "Adversarial multi-agent planning skill for omo-senpi. Self-orchestrates a 5-member hostile team (categories unspecified-low, unspecified-high, deep, ultrabrain, artistry) via the native lead team tools for ruthless cross-critique debate, distills only the insights that survive the attacks, then MANDATORILY hands the distilled bundle to a planner task (load_skills ulw-plan) for executable plan formalization. Use when planning needs maximum rigor and surfacing of weak assumptions, blind spots, and over-engineering. Triggers: 'hyperplan', 'hpp', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'."
+description: "Adversarial multi-agent planning: a hostile team cross-critiques a plan before it is formalized. Use when planning needs maximum rigor or the user asks for a hyperplan / adversarial or cross-critique plan."
 metadata:
   short-description: Adversarial 5-member cross-critique planning, then a planner formalizes the survivors
 ---

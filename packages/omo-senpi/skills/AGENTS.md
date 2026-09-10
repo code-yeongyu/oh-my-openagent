@@ -15,7 +15,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |
 | `dag-library/` | Store a dag definition once and re-run it by name; loads through `plugin/runtime/dag/library.js`. |
 | `onboarding/` | First-run onboarding; `qa-validator.sh` pins the skill contract (front matter `name: onboarding`), `qa-savings-fixture.sh` expects `qa-savings-fixture: OK`. |
-| `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip); queries `senpi --list-tips` first, checks what THIS user can see, verifies feature code before explaining. |
+| `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip and the kibitzer `Aha moment!` recall notice); queries `senpi --list-tips` first, checks what THIS user can see, verifies feature code before explaining. |
 
 ## CONVENTIONS
 

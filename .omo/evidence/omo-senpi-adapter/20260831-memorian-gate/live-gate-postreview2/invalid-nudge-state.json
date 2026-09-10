@@ -1,0 +1,93 @@
+{
+  "sessionFiles": [
+    "2026-09-01T07-49-42-449Z_01a05b6d-0000-7000-8000-00000000000d.jsonl"
+  ],
+  "userTurnCount": 2,
+  "recall": [],
+  "stubInvocations": [
+    {
+      "at": "2026-09-01T07:49:43.286Z",
+      "argv": [
+        "-p",
+        "--system-prompt",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/memorian-persona.md",
+        "--tools",
+        "nudge,read",
+        "-e",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/nudge-extension.ts",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--session-dir",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400",
+        "--model",
+        "omo-mock/mock-1",
+        "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/transcript-window.txt, then follow the system prompt."
+      ],
+      "nudgePath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/nudges.ndjson",
+      "candidatesPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/candidates.json",
+      "transcriptPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/59902fa1-cc08-441d-9498-c0598b432400/transcript-window.txt",
+      "memorianSentinel": "1",
+      "candidates": {
+        "version": 1,
+        "maxItems": 2,
+        "candidates": [
+          {
+            "path": "reference/project/test-note.md",
+            "description": "Project rebase ordering rule captured for memorian gate QA",
+            "excerpt": "The zebra-quokka rebase ordering rule says: rebase the oldest reviewed branch first, then replay the dependent branches in merge order so the stack never inverts.",
+            "score": 6.9
+          }
+        ],
+        "surfaced": []
+      },
+      "transcript": "user: remind me about the zebra-quokka rebase ordering rule before I restack the branches\n\nassistant: ok\n",
+      "persona": "# Memorian — memory nudge agent\n\nYou watch a conversation that already happened and decide whether a stored memory would materially change what the primary agent does next. You are not the primary agent and you never address the user. Your only output channel is the `nudge` tool; any text you write outside tool calls is discarded.\n\n## Inputs\n\nRead both files before deciding.\n\n- `$MEMORIAN_TRANSCRI"
+    },
+    {
+      "at": "2026-09-01T07:49:44.385Z",
+      "argv": [
+        "-p",
+        "--system-prompt",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/memorian-persona.md",
+        "--tools",
+        "nudge,read",
+        "-e",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/nudge-extension.ts",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--session-dir",
+        "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d",
+        "--model",
+        "omo-mock/mock-1",
+        "Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/transcript-window.txt, then follow the system prompt."
+      ],
+      "nudgePath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/nudges.ndjson",
+      "candidatesPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/candidates.json",
+      "transcriptPath": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/runs/a5d6de68-eae6-4981-89c6-1af1f5e8115d/transcript-window.txt",
+      "memorianSentinel": "1",
+      "candidates": {
+        "version": 1,
+        "maxItems": 2,
+        "candidates": [
+          {
+            "path": "skills/memory-discipline/SKILL.md",
+            "description": "This skill should be used when deciding whether and where to save memory. It routes knowledge between memory notes, skills, and people records, specifies the card and observation formats, and explains when to reach for /reflect, /dream, /search, and /people.",
+            "excerpt": "or reference/, or a system/ block when it must always be in context | | A repeatable procedure: steps you would follow again in a similar situation | A skill: skills/<name>/SKILL.md, with a descripti",
+            "score": 603
+          }
+        ],
+        "surfaced": []
+      },
+      "transcript": "user: remind me about the zebra-quokka rebase ordering rule before I restack the branches\n\nassistant: ok\n\nuser: now walk me through the restack steps one by one\n\nassistant: ok\n",
+      "persona": "# Memorian — memory nudge agent\n\nYou watch a conversation that already happened and decide whether a stored memory would materially change what the primary agent does next. You are not the primary agent and you never address the user. Your only output channel is the `nudge` tool; any text you write outside tool calls is discarded.\n\n## Inputs\n\nRead both files before deciding.\n\n- `$MEMORIAN_TRANSCRI"
+    }
+  ],
+  "pending": {
+    "dir": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BbnuNl/memory/agents/project-8fd46e89/runtime/recall/pending",
+    "files": []
+  }
+}

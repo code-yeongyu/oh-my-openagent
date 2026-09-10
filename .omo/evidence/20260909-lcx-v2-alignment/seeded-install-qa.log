@@ -1,0 +1,21 @@
+--- D1 resulting config ---
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+enabled = true
+max_concurrent_threads_per_session = 4
+enabled = true
+enabled = true
+enabled = false
+D1_CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.t1NNDm53Ad/codex
+--- control resulting config ---
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+max_threads = 6
+enabled = true
+enabled = true
+enabled = false
+CONTROL_CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.lFE1D5uU39/codex
+SOURCE_MANIFEST_HOOK_COUNT=21
+AGENT_TOML_COUNT=36
+PASS: real ~/.codex/config.toml unchanged (5ba341ba17ef6709651a43d2dbf9ba6c14b2b58c)
+SEEDED_INSTALL_QA_EXIT=0

@@ -1,0 +1,20 @@
+Remote bunshin GREEN (mengmotaMac; final branch 5aa6a3e2c)
+
+bun test packages/model-core
+
+380 pass
+0 fail
+Ran 34 files.
+
+bun test packages/omo-opencode/src/agents packages/omo-opencode/src/cli/doctor packages/omo-opencode/src/tools/delegate-task packages/omo-opencode/src/hooks/no-sisyphus-gpt
+
+988 pass
+0 fail
+2461 expect() calls
+Ran 988 tests across 101 files.
+
+bun run typecheck:packages
+
+MODEL_CORE_EXIT=0 OMO_SUITES_EXIT=0 TYPECHECK_EXIT=0
+
+Remote temp directory `/tmp/astra-b1-20260905` was removed by the verification command before completion.

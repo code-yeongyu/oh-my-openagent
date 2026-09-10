@@ -1,0 +1,11 @@
+Command:
+bun test script/windows-flake-soak-workflow.test.ts
+
+Exit code: 0
+
+bun test v1.3.14 (0d9b296a)
+
+ 10 pass
+ 0 fail
+ 88 expect() calls
+Ran 10 tests across 1 file. [634.00ms]

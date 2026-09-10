@@ -39,7 +39,7 @@ describe("omo-senpi ultrawork component", () => {
       "/skill:frontend ulw polish",
       "/skill:myulw run it",
       "(ulw) [ultrawork] {ulw}",
-      ".*+?^${}()|[]\\ ulw",
+      [".*+?^", String.fromCharCode(36), "{}()|[]\\ ulw"].join(""),
       "울트라워크",
       "nulw-plan",
       "ulw--plan",
@@ -61,7 +61,7 @@ describe("omo-senpi ultrawork component", () => {
 
   it("#given overlapping and repeated variants #when classified #then one shipped global pattern determines variants and occurrence count", () => {
     const cases = [
-      { text: "ulwultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 2 },
+      { text: "ulwultrawork", matchedUlw: false, matchedUltrawork: false, occurrenceCount: 0 },
       { text: "ULW ulw Ultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 3 },
       { text: "ulw-plan", matchedUlw: true, matchedUltrawork: false, occurrenceCount: 1 },
     ] as const
@@ -96,7 +96,7 @@ describe("omo-senpi ultrawork component", () => {
         input: { text: "/skill:myulw run it", source: "interactive" as const },
         effective: false,
         route: "none",
-        suppressionReason: "skill_name_only",
+        suppressionReason: "no_keyword",
         stage: "none",
       },
       {
@@ -140,7 +140,7 @@ describe("omo-senpi ultrawork component", () => {
 
   it("#given trigger words #when user input dispatches #then arms via one hidden custom message", async () => {
     // given
-    const prompts = ["please ultrawork this", "하이ulw", "refactor ulw_helper.ts"] as const
+    const prompts = ["please ultrawork this", "\uD558\uC774ulw", "refactor the ulw-loop helper"] as const
 
     for (const prompt of prompts) {
       const pi = new FakeExtensionAPI()
@@ -232,6 +232,33 @@ describe("omo-senpi ultrawork component", () => {
     // then
     expect(pi.messages).toHaveLength(0)
     expect(result).toMatchObject({ action: "transform" })
+  })
+
+  it("#given a word embedded trigger #when user input dispatches #then injects nothing", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    const result = await dispatchInput(pi, "ulwfoo should not arm")
+
+    expectNoInjection(pi, result)
+  })
+
+  it("#given a trigger inside inline code #when user input dispatches #then injects nothing", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    const result = await dispatchInput(pi, "explain `ulw` without running it")
+
+    expectNoInjection(pi, result)
+  })
+
+  it("#given a spaced trigger #when user input dispatches #then arms ultrawork", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    const result = await dispatchInput(pi, "run ulw loop")
+
+    expectHiddenInjection(pi, result)
   })
 
   it("#given non-trigger input #when user input dispatches #then injects nothing", async () => {
@@ -431,6 +458,18 @@ describe("omo-senpi ultrawork component", () => {
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("create_goal")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("`todo`")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("team_create")
+  })
+
+  it("#given an eval session #when the shipped directive is inspected #then it names the subscription form the session can call", () => {
+    // then: bash and monitor leave the direct tool list whenever eval exists, so the
+    // only callable form of a subscription is tool.monitor(...) inside a cell.
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("tool.monitor(")
+  })
+
+  it("#given the eval guidance #when the shipped directive is inspected #then it defers Bun skill availability to the runtime signal", () => {
+    expect(SENPI_ULTRAWORK_DIRECTIVE).not.toContain("kernel is Bun 1.4")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/If the\s+eval tool reports a Bun kernel/)
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/the `bun-1-4` skill is listed/)
   })
 
   it("#given generated directive #when embed script runs check #then passes without drift", () => {

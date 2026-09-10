@@ -62,12 +62,13 @@ export const config = {
     /*
      * Match everything except:
      * - api routes
+     * - /design (dev-only, non-localized primitive showcase; see app/design/page.tsx)
      * - Next.js internals (_next, _vercel)
      * - Next.js file-based metadata routes (opengraph-image, twitter-image, icon, apple-icon, manifest, robots, sitemap)
      *   These serve images / JSON / XML directly and must NOT be redirected by i18n.
      * - Any path containing a dot (favicon.ico, *.webp, *.png, etc.)
      */
-    "/((?!api|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
+    "/((?!api|design|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
     "/installation.md",
     "/:locale(en|ko|ja|zh)/installation.md",
     "/docs/installation.md",

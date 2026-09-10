@@ -18,7 +18,11 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     the engine spawn - it is rebuilt by a detached, unref'd refresh child (`setup-detect-refresh.js`, the only
     writer) while the launch answers from the cached or empty value. `omo setup` and `omo doctor` always run
     full live detection and never read the cache.
-  - `bun-runtime.js` / `child-process.js` — `maybeReexecUnderBun`, `findBunBinary`, `spawnNode`/`runChild`.
+  - `bun-runtime.js` / `child-process.js` — `maybeReexecUnderBun`, `findBunBinary`, `probeBunVersion`,
+    `spawnNode`/`runChild`. Runtime policy: a machine with bun runs omo on bun, no config needed - a
+    bun-global install trusts the bun that installed it, every other install (npm, project-local,
+    bunx) probes the discovered bun once per node boot and hands over when it is >= `BUN_MIN_VERSION`
+    (1.4.0); `OMO_RUNTIME=node` always stays on node, `OMO_RUNTIME=bun` always re-execs (no floor).
     Both spawn layers are ASYNC on purpose: `spawnSync` blocks the event loop, so a signaled launcher
     dies before any handler runs and orphans the engine. `runChild` forwards `SIGTERM`/`SIGHUP` to the
     child, waits out a bounded grace window (`OMO_SIGNAL_GRACE_MS`, default 10s) and re-raises the
@@ -51,7 +55,7 @@ bun run build:omo-native                 # stage plugin payload (repo root)
 bun test packages/omo-native/test        # package tests (repo root)
 bunx tsc -p packages/omo-native/tsconfig.json --noEmit
 node packages/omo-native/bin/omo.js --version   # entry smoke check
-python3 packages/omo-native/test/pty-signal-qa.py packages/omo-native/bin/omo.js /tmp/qa.txt   # launcher signal QA (add OMO_RUNTIME=bun for the bun chain)
+python3 packages/omo-native/test/pty-signal-qa.py packages/omo-native/bin/omo.js /tmp/qa.txt   # launcher signal QA (bun chain wherever bun is installed; OMO_RUNTIME=node for the node chain)
 ```
 
 Release mechanics and the beta-channel contract: `docs/reference/omo-ai-publishing.md`.

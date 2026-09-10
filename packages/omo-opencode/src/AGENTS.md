@@ -73,10 +73,10 @@ Counts verified from each composer's return object. Numbers in brackets show cou
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 24: preemptiveCompaction,
+  │   ├─ createSessionHooks()     # 23: preemptiveCompaction,
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
-  │   │                             codegraphBootstrap, astGrepSgProvision,
+  │   │                             astGrepSgProvision,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
   │   │                             goal, editErrorRecovery, delegateTaskRetry, ulwExecute,
   │   │                             prometheusMdOnly, sisyphusJuniorNotepad, noSisyphusGpt,
@@ -121,7 +121,7 @@ Total: 54 base, 61 with team-mode, 62 with monitor enabled. Authoritative per-ti
 | `plugin-handlers/` | 6-phase config loading pipeline | yes |
 | `openclaw/` | Bidirectional Discord/Telegram/HTTP integration | yes |
 | `__tests__/` | Plugin-level integration tests + perf fixtures | yes |
-| `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + codegraph) | yes |
+| `mcp/` | 4 built-in MCPs (3 remote + local stdio lsp) | yes |
 | `testing/` | Test utilities + `create-plugin-module.ts` | yes |
 | `config-migration/` | Legacy config discovery + transform plans (consumed by senpi config-startup + codex startup) | yes |
 | `types/` | Ambient `.d.ts` declarations (markdown modules) | no |

@@ -1,0 +1,9 @@
+Command:
+bash .agents/skills/opencode-qa/scripts/tui-smoke.sh --self-test
+
+Observed:
+PASS: TUI rendered under tmux (marker found; version 1.18.26)
+PASS: send-keys reached the TUI composer (sentinel echoed)
+PASS: tmux session torn down (has-session false)
+PASS: real DB untouched (session count 8046 unchanged)
+PASS: tui-smoke

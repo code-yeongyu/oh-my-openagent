@@ -27,24 +27,27 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
   test("#given the mirrored fallback table #when compared with the independent transcription #then every provider model variant and order is pinned", () => {
     expect(CATEGORY_FALLBACK_CHAINS).toEqual({
       "visual-engineering": [
+        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" },
-        { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.2", variant: "max" },
-        { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" }
       ],
       architect: [
-        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5", variant: "xhigh" }
+        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" }
       ],
       ultrabrain: [
+        { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "max" },
+        { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
+        { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "max" },
         { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "max" },
         { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
         { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "max" }
       ],
       deep: [
+        { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "high" },
         { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" }
       ],
       artistry: [
-        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5", variant: "xhigh" },
+        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" },
         { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5", variant: "xhigh" }
       ],
@@ -67,14 +70,14 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "max" }
       ],
       "unspecified-high": [
+        { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "high" },
         { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5", variant: "xhigh" },
         { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
       ],
       writing: [
-        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "low" },
-        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5", variant: "low" },
-        { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" }
+        { providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "medium" },
+        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
       ]
     })
   })

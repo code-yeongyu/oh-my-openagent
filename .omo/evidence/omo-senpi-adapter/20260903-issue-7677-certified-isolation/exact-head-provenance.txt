@@ -1,0 +1,25 @@
+Reviewed exact head: d2489baeeb51973d456d0f6ea06b758a75961a81
+Original source fix commit: a0aff6422546ac1267b88dd1b0ff8144421e5483
+Certified source head: 509929c8266467ce1a8a07f4ea5a027461436149
+Reviewed-head source identity: d2489baeeb51973d456d0f6ea06b758a75961a81 is evidence-only relative to a0aff6422546ac1267b88dd1b0ff8144421e5483 for all source-bearing paths.
+
+Exact-head provenance for issue #7677
+
+Actual origin/dev ancestor: 05a1fbcc7ce310734d6646cdee2d80855bdb3506
+Reviewed exact head: d2489baeeb51973d456d0f6ea06b758a75961a81
+Original source fix commit: a0aff6422546ac1267b88dd1b0ff8144421e5483
+Final source remediation commit: 509929c8266467ce1a8a07f4ea5a027461436149
+
+The reviewed exact head d2489baeeb51973d456d0f6ea06b758a75961a81 is evidence-only relative to a0aff6422546ac1267b88dd1b0ff8144421e5483 for every source-bearing path covered by packages, script, scripts, package.json, bun.lock, patches, and .github/workflows. The final source remediation is committed separately at 509929c8266467ce1a8a07f4ea5a027461436149 and is the source tree certified by the refreshed execution receipts.
+
+Source-only identity command:
+  git diff --name-only a0aff6422546ac1267b88dd1b0ff8144421e5483 d2489baeeb51973d456d0f6ea06b758a75961a81 -- packages script scripts package.json bun.lock patches .github/workflows
+Observed stdout: (empty)
+Exit: 0
+
+Ancestry commands:
+  git merge-base d2489baeeb51973d456d0f6ea06b758a75961a81 origin/dev
+Observed stdout: 05a1fbcc7ce310734d6646cdee2d80855bdb3506
+
+  git merge-base --is-ancestor 05a1fbcc7ce310734d6646cdee2d80855bdb3506 d2489baeeb51973d456d0f6ea06b758a75961a81
+Exit: 0

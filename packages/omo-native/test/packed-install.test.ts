@@ -7,7 +7,7 @@ import { join, sep } from "node:path"
 const packageRoot = join(import.meta.dir, "..")
 
 describe("omo-ai packed install", () => {
-  test("ships and applies the Senpi patch installer from the packed artifact", () => {
+  test("ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-ai-packed-install-"))
     try {
       const pack = Bun.spawnSync(["bun", "pm", "pack", "--ignore-scripts", "--destination", root], { cwd: packageRoot, stdout: "pipe", stderr: "pipe" })
@@ -26,14 +26,14 @@ describe("omo-ai packed install", () => {
       expect(install.exitCode).toBe(0)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
       const installedScript = join(installedPackageRoot, "bin", "senpi-patch.mjs")
-      expect(readFileSync(installedScript, "utf8")).toContain("describeUnclaimedResult")
+      expect(readFileSync(installedScript, "utf8")).toContain("claudeCodeVersionFloor")
 
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
       const searchPaths = consumerRequire.resolve.paths("@code-yeongyu/senpi") ?? []
       const senpiRoot = searchPaths.map((searchPath) => join(searchPath, "@code-yeongyu", "senpi")).find((candidate) => existsSync(join(candidate, "package.json")))
       expect(senpiRoot).toBeDefined()
       const sessionRegistryPump = readFileSync(join(senpiRoot!, "dist/core/extensions/builtin/claude-sdk-oauth/session-registry-pump.js"), "utf8")
-      expect(sessionRegistryPump).toContain("describeUnclaimedResult")
+      expect(sessionRegistryPump).toContain("sdkResultFailure(message)")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

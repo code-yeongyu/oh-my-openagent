@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
@@ -119,6 +119,51 @@ export function formatStaleEngineLines(stale) {
   return lines
 }
 
+// ps `etime` is the portable start-time signal on macOS and Linux alike; an unparsable value must
+// leave the process unclassified rather than fail a diagnostic.
+export function parseElapsedSeconds(elapsed) {
+  const match = /^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/.exec(elapsed)
+  if (!match) return undefined
+  return Number(match[1] ?? 0) * 86_400 + Number(match[2] ?? 0) * 3_600 + Number(match[3]) * 60 + Number(match[4])
+}
+
+function payloadDirFromCommand(command) {
+  return /--extension\s+(\S+)/.exec(command)?.[1]
+}
+
+/**
+ * An engine that started before ITS OWN payload was last written is executing a retired copy of it:
+ * the bundle is loaded once per process while its skills and persona assets are read from that tree
+ * later, so an in-place upgrade leaves the process reaching for files the tree no longer has. Each
+ * engine is compared against the payload named on its own command line, because one machine runs
+ * several (a global install, a compiled runtime dir, a dev staging tree) and only the one a process
+ * actually loads can retire under it. Restarting the session is the only repair and it belongs to
+ * whoever owns the session - nothing here may signal such a process.
+ */
+export function classifyRetiredPayloadEngines(entries, input) {
+  const retired = []
+  for (const entry of entries) {
+    if (!isEngine(entry)) continue
+    const elapsedSeconds = parseElapsedSeconds(entry.elapsed)
+    if (elapsedSeconds === undefined) continue
+    const payloadDir = payloadDirFromCommand(entry.command)
+    if (payloadDir === undefined) continue
+    const payloadMtimeMs = input.payloadMtimeMs(payloadDir)
+    if (payloadMtimeMs === undefined) continue
+    if (input.nowMs - elapsedSeconds * 1_000 < payloadMtimeMs) retired.push(entry)
+  }
+  return retired
+}
+
+export function formatRetiredPayloadLines(retired) {
+  if (retired.length === 0) return []
+  const lines = retired.map((entry) =>
+    `WARN engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) started before this payload was installed; it still runs the previous plugin copy`
+  )
+  lines.push("INFO restart those sessions to pick up the installed payload; a running engine is never rewritten in place")
+  return lines
+}
+
 function parsePid(value) {
   return /^[1-9]\d*$/.test(value) ? Number(value) : undefined
 }
@@ -186,6 +231,19 @@ function staleEngineReport(options) {
   return formatStaleEngineLines(classifyEngineProcesses(list()).stale)
 }
 
+function retiredPayloadReport(options) {
+  const list = options.list ?? listProcesses
+  const now = options.now ?? Date.now
+  const payloadMtimeMs = options.payloadMtimeMs ?? ((payloadDir) => {
+    try {
+      return statSync(join(payloadDir, "extensions", "omo.js")).mtimeMs
+    } catch {
+      return undefined
+    }
+  })
+  return formatRetiredPayloadLines(classifyRetiredPayloadEngines(list(), { payloadMtimeMs, nowMs: now() }))
+}
+
 export function runDoctor(inventory, args = [], options = {}) {
   if (args[0] === "--reap") {
     const result = reapStaleEngines(args.slice(1), options)
@@ -234,6 +292,7 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(`INFO omo ${packageManifest().version} (engine: senpi ${engineVersionOrUnresolved(senpi)})`)
   lines.push(...warningsForSettings())
   lines.push(...staleEngineReport(options))
+  lines.push(...retiredPayloadReport(options))
   if (needsSetupSuggestion(inventory)) {
     lines.push("INFO no credentials found; run omo setup to review sibling stores")
   }

@@ -1,9 +1,18 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
-import { dirname, isAbsolute, join, relative, sep } from "node:path"
+import { delimiter, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-import { buildChildArgs, buildRpcSpawn, detectBunBinary, resolveChildSessionDir, resolveSenpiExecutable } from "./spawn"
+import {
+  buildChildArgs,
+  buildRpcSpawn,
+  detectBunBinary,
+  readEngineVersionFromResolvePaths,
+  readRunningEngineVersion,
+  resolveChildSessionDir,
+  resolveSenpiExecutable,
+} from "./spawn"
 
 const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 
@@ -122,6 +131,161 @@ describe("resolveSenpiExecutable", () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  const installSenpiPackage = (version: string) => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-engine-parity-"))
+    const pkgDir = join(root, "node_modules", "@code-yeongyu", "senpi")
+    const cliPath = join(pkgDir, "dist", "cli.js")
+    const binDir = join(root, "node_modules", ".bin")
+    mkdirSync(join(pkgDir, "dist"), { recursive: true })
+    mkdirSync(binDir, { recursive: true })
+    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "@code-yeongyu/senpi", version }))
+    writeFileSync(cliPath, "")
+    symlinkSync(cliPath, join(binDir, "senpi"))
+    return { root, binDir, cliPath }
+  }
+
+  test("#given a PATH senpi whose package version differs from the engine #when resolving #then it is rejected", () => {
+    const install = installSenpiPackage("2026.8.27")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: install.binDir },
+      })
+      expect(resolved).toBeNull()
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain("2026.8.27")
+      expect(warnings[0]).toContain("2026.9.4")
+    } finally {
+      rmSync(install.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a PATH senpi whose package version matches the engine #when resolving #then that path is used", () => {
+    const install = installSenpiPackage("2026.9.4")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: install.binDir },
+      })
+      expect(resolved).toBe(realpathSync.native(install.cliPath))
+      expect(warnings).toHaveLength(0)
+    } finally {
+      rmSync(install.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a PATH senpi with no package manifest #when resolving #then it is accepted", () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-engine-parity-bare-"))
+    const executable = join(root, "senpi")
+    writeFileSync(executable, "")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: root },
+      })
+      expect(resolved).toBe(realpathSync.native(executable))
+      expect(warnings).toHaveLength(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a stale PATH senpi then a matching one #when resolving #then the matching executable wins", () => {
+    const stale = installSenpiPackage("2026.8.27")
+    const matching = installSenpiPackage("2026.9.4")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { PATH: [stale.binDir, matching.binDir].join(delimiter) },
+      })
+      expect(resolved).toBe(realpathSync.native(matching.cliPath))
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain("2026.8.27")
+    } finally {
+      rmSync(stale.root, { recursive: true, force: true })
+      rmSync(matching.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given SENPI_BIN pointing at a stale-version cli #when resolving #then the override is used verbatim", () => {
+    const install = installSenpiPackage("2026.8.27")
+    const warnings: string[] = []
+    try {
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        engineVersion: "2026.9.4",
+        onWarning: (message) => warnings.push(message),
+        parentEnv: { SENPI_BIN: install.cliPath },
+      })
+      expect(resolved).toBe(realpathSync.native(install.cliPath))
+      expect(warnings).toHaveLength(0)
+    } finally {
+      rmSync(install.root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("readEngineVersionFromResolvePaths", () => {
+  test("#given a later path with the senpi manifest #when reading #then it returns that version", () => {
+    const tmpA = mkdtempSync(join(tmpdir(), "senpi-engine-version-empty-"))
+    const tmpB = mkdtempSync(join(tmpdir(), "senpi-engine-version-hit-"))
+    mkdirSync(join(tmpB, "@code-yeongyu", "senpi"), { recursive: true })
+    writeFileSync(
+      join(tmpB, "@code-yeongyu", "senpi", "package.json"),
+      JSON.stringify({ name: "@code-yeongyu/senpi", version: "1.2.3" }),
+    )
+    try {
+      expect(readEngineVersionFromResolvePaths([tmpA, tmpB])).toBe("1.2.3")
+    } finally {
+      rmSync(tmpA, { recursive: true, force: true })
+      rmSync(tmpB, { recursive: true, force: true })
+    }
+  })
+
+  test("#given only a different-name manifest #when reading #then it returns undefined", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "senpi-engine-version-other-"))
+    mkdirSync(join(tmp, "@code-yeongyu", "senpi"), { recursive: true })
+    writeFileSync(
+      join(tmp, "@code-yeongyu", "senpi", "package.json"),
+      JSON.stringify({ name: "not-senpi", version: "9.9.9" }),
+    )
+    try {
+      expect(readEngineVersionFromResolvePaths([tmp])).toBeUndefined()
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("readRunningEngineVersion", () => {
+  test("#given the installed engine manifest #when reading #then it matches the package version", () => {
+    const require = createRequire(import.meta.url)
+    let expected: string | undefined
+    for (const dir of require.resolve.paths("@code-yeongyu/senpi") ?? []) {
+      const manifest = join(dir, "@code-yeongyu", "senpi", "package.json")
+      if (!existsSync(manifest)) continue
+      const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { version?: unknown }
+      if (typeof pkg.version === "string" && pkg.version.length > 0) {
+        expected = pkg.version
+        break
+      }
+    }
+    expect(expected).toBeDefined()
+    expect(readRunningEngineVersion()).toBe(expected)
   })
 })
 

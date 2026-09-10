@@ -1,0 +1,13 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/runners/rpc/terminate.test.ts:
+(pass) terminateRpcChild > #given a cooperating child #when terminating #then SIGTERM ends it without escalation [2.99ms]
+(pass) terminateRpcChild > #given a TERM-ignoring child #when terminating #then it escalates to SIGKILL within the budget [171.76ms]
+(pass) terminateRpcChild > #given a non-group-leader child #when terminating #then direct escalation remains available [174.03ms]
+(pass) terminateRpcChild > #given an already-exited child #when terminating #then it resolves without throwing [2.51ms]
+(pass) terminateRpcChild > #given an immediately exiting parent with a TERM-ignoring descendant #when terminating #then the immediate assertion exposes the race [24.62ms]
+
+ 5 pass
+ 0 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [1062.00ms]

@@ -26,7 +26,7 @@ builtin-skills/
 │   ├── debugging.ts                   # Debugging methodology
 │   ├── visual-qa.ts                   # Visual QA
 │   ├── frontend.ts              # Design-first UI guidance
-│   ├── review-work.ts                 # 5-agent post-implementation review
+│   ├── review-work.ts                 # Gate-review post-implementation review (manual QA + one reviewer)
 │   ├── remove-ai-slops.ts             # Shared skill loader for remove-ai-slops
 │   ├── init-deep.ts                   # Shared skill loader for init-deep
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
@@ -50,7 +50,7 @@ builtin-skills/
 | `agent-browser` | — | Browser via `agent-browser:*` Bash commands (own module now) |
 | `dev-browser` | — | Persistent page state browser for dev work |
 | `frontend` | — | Design-first UI development guidance |
-| `review-work` | — | Post-implementation review orchestrator (5 parallel agents) |
+| `review-work` | — | Post-implementation gate review (orchestrator manual QA + one gate reviewer) |
 | `debugging` | — | Debugging methodology |
 | `visual-qa` | — | Visual QA |
 | `$omo:remove-ai-slops` | — | Remove AI-generated code smells |

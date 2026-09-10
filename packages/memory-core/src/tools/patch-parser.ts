@@ -33,7 +33,7 @@ const MAX_FAILED_HUNK_PREVIEW_CHARS = 2_000
 const MAX_CURRENT_FILE_PREVIEW_CHARS = 4_000
 
 function failure(message: string): MemoryPatchParseError {
-  return new MemoryPatchParseError(`memory_apply_patch: ${message}`)
+  return new MemoryPatchParseError(`memory apply_patch: ${message}`)
 }
 
 function directivePath(line: string, directive: string, lineNumber: number): string {
@@ -142,7 +142,7 @@ export function parseMemoryPatch(input: string): PatchOperation[] {
 export function applyMemoryPatchHunk(content: string, hunk: PatchHunk, filePath: string): string {
   const { oldChunk, newChunk } = buildOldNewChunks(hunk.lines)
   if (oldChunk.length === 0) {
-    throw new Error(`memory_apply_patch: failed to apply hunk to ${filePath}: hunk has no anchor/context`)
+    throw new Error(`memory apply_patch: failed to apply hunk to ${filePath}: hunk has no anchor/context`)
   }
   const exactIndex = content.indexOf(oldChunk)
   if (exactIndex !== -1) return replaceAt(content, exactIndex, oldChunk.length, newChunk)
@@ -186,7 +186,7 @@ function formatHunkContextNotFoundError(filePath: string, oldChunk: string, cont
   const current = truncateForDiagnostic(content, MAX_CURRENT_FILE_PREVIEW_CHARS)
   const fence = markdownFenceFor(failed, current)
   return [
-    `memory_apply_patch: failed to apply hunk to ${filePath}: context not found`,
+    `memory apply_patch: failed to apply hunk to ${filePath}: context not found`,
     "",
     "The patch old/context lines did not match the current memory file exactly.",
     "Read the current memory file and retry with exact context.",

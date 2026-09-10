@@ -142,6 +142,9 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       p.log.warn(`Codex install failed (OpenCode install remains successful): ${message}`)
+      p.log.info(
+        "The Codex harness is NOT installed. Fix the error above, then re-run: bunx oh-my-openagent install --platform=codex",
+      )
     }
   }
 

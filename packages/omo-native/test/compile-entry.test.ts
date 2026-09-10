@@ -4,12 +4,14 @@ import { createHash } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import {
+  compiledBannerLines,
   answerCompiledFastPath,
   buildSenpiArgs,
   remapSenpiEnvironment,
   runCompiledLauncher,
   shouldPrintCompiledBanner,
   updateLine,
+  updateHint,
   versionLine,
 } from "../compile-entry"
 import { loadOpenAICodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
@@ -58,6 +60,28 @@ describe("compiled omo entry launcher parity", () => {
     expect(runningExecutablePath("/runtime/omo", "/usr/local/bin/bun", "darwin")).toBe("/usr/local/bin/bun")
     expect(shouldReexecAfterProvisioning("win32")).toBe(false)
     expect(shouldReexecAfterProvisioning("darwin")).toBe(true)
+  })
+
+  test("strips Linux procfs deleted suffix but preserves it on other platforms", () => {
+    const deletedPath = "/runtime/omo (deleted)"
+    expect(runningExecutablePath("/runtime/omo", deletedPath, "linux")).toBe("/runtime/omo")
+    // Only Linux procfs produces this exact suffix; other platforms leave it untouched.
+    expect(runningExecutablePath("/runtime/omo", deletedPath, "darwin")).toBe(deletedPath)
+    expect(runningExecutablePath("/runtime/omo", deletedPath, "win32")).toBe(deletedPath)
+  })
+
+  test("recognizes a deleted Linux executable as the provisioned path", () => {
+    const root = temp()
+    const expected = join(root, "omo")
+    writeFileSync(expected, "binary")
+
+    expect(isProvisionedExecutable(runningExecutablePath(expected, `${expected} (deleted)`, "linux"), expected)).toBe(true)
+  })
+
+  test("re-exec source contract uses signal-aware child execution", () => {
+    const source = readFileSync(new URL("../compile-entry.ts", import.meta.url), "utf8")
+    expect(source).toContain('import { propagateResult, runChild } from "./bin/lib/child-process.js"')
+    expect(source).not.toContain("spawn(expected")
   })
 
   test("pins the engine package dir to the provisioned root", () => {
@@ -242,6 +266,26 @@ describe("embedded runtime provisioning", () => {
     expect(existsSync(`${destination}.tmp-${process.pid}`)).toBe(false)
   })
 
+  test("keeps an existing destination when the deleted Linux source cannot be read", () => {
+    const root = temp()
+    const source = join(root, "missing-source (deleted)")
+    const destination = join(root, "runtime", "omo")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+    writeFileSync(destination, "already-provisioned")
+
+    expect(() => materializeProvisionedExecutable(source, destination, "linux")).not.toThrow()
+    expect(readFileSync(destination, "utf8")).toBe("already-provisioned")
+  })
+
+  test("still throws when the deleted Linux source and destination are both absent", () => {
+    const root = temp()
+    const source = join(root, "missing-source (deleted)")
+    const destination = join(root, "runtime", "omo")
+    mkdirSync(join(root, "runtime"), { recursive: true })
+
+    expect(() => materializeProvisionedExecutable(source, destination, "linux")).toThrow()
+  })
+
   test("selects the omo manifest when senpi also embeds an unrelated manifest", async () => {
     const senpiManifest = { name: "runtime/lsp-daemon/dist/.omo-runtime-manifest.json", text: async () => JSON.stringify({ files: [] }) }
     const omoManifest = { name: "omo-runtime/runtime-manifest.json", text: async () => JSON.stringify({ omoAiVersion: "9.2.1", enginePin: "2026.8.28" }) }
@@ -333,5 +377,117 @@ describe("embedded runtime provisioning", () => {
     writeFileSync(join(runtime, "package.json"), "changed\n")
     await provisionEmbeddedRuntime(manifest, embedded, runtime)
     expect(readFileSync(join(runtime, "package.json"), "utf8")).toBe("changed\n")
+  })
+})
+
+describe("omob branded build labels", () => {
+  const buildInfo = {
+    command: "omob",
+    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
+    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+  }
+
+  test("versionLine prints full shas and commit dates for dev builds", () => {
+    const line = versionLine({ version: "0.0.0-omob.c6e7dd7.7fd18df", omoBuild: buildInfo }, "2026.8.26-2")
+    expect(line).toContain("c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc")
+    expect(line).toContain("2026-09-04T10:17:49+09:00")
+    expect(line).toContain("7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7")
+    expect(line).toContain("(dev)")
+    expect(line).toContain("(main)")
+  })
+
+  test("remapSenpiEnvironment brands dev builds with the label and command", () => {
+    const root = temp()
+    const execDir = join(root, "runtime")
+    mkdirSync(execDir, { recursive: true })
+    writeFileSync(
+      join(execDir, "package.json"),
+      JSON.stringify({ name: "omo", version: "0.0.0-omob.c6e7dd7.7fd18df", omoBuild: buildInfo }),
+    )
+    const env = remapSenpiEnvironment({}, execDir)
+    const brand = JSON.parse(env.SENPI_BRAND ?? "{}") as { command?: string; displayVersion?: string; update?: { command?: string } }
+    expect(brand.command).toBe("omob")
+    expect(brand.displayVersion).toBe("omo@c6e7dd7 2026-09-04 10:17 +09:00 · senpi@7fd18df 2026-09-04 10:49 +09:00")
+    expect(brand.update?.command).toContain("omob")
+  })
+})
+
+describe("omob provenance degrades sanely", () => {
+  const malformed = { command: "omob", omo: { commit: "not-a-sha", committedAt: "nope", branch: "" }, engine: {} }
+
+  test("remapSenpiEnvironment falls back to the plain version and omo command for malformed build info", () => {
+    const root = temp()
+    const execDir = join(root, "runtime")
+    mkdirSync(execDir, { recursive: true })
+    writeFileSync(join(execDir, "package.json"), JSON.stringify({ name: "omo", version: "5.0.0-beta.40", omoBuild: malformed }))
+
+    const env = remapSenpiEnvironment({}, execDir)
+    const brand = JSON.parse(env.SENPI_BRAND ?? "{}") as { command?: string; displayVersion?: string }
+
+    expect(brand.displayVersion).toBe("5.0.0-beta.40")
+    expect(brand.command).toBe("omo")
+  })
+
+  test("versionLine falls back to the release one-liner for malformed build info", () => {
+    expect(versionLine({ version: "5.0.0-beta.40", omoBuild: malformed }, "2026.9.4")).toBe(
+      "omo 5.0.0-beta.40 (engine: senpi 2026.9.4)",
+    )
+  })
+
+  test("updateHint tells dev builds to rebuild and release builds to curl", () => {
+    const info = {
+      command: "omob",
+      omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
+      engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+    }
+
+    expect(updateHint(info)).toBe("rebuild with: bun run omob")
+    expect(updateHint(malformed, "darwin", "arm64")).toBe(updateLine("darwin", "arm64"))
+    expect(updateHint(undefined, "darwin", "arm64")).toBe(updateLine("darwin", "arm64"))
+  })
+})
+
+describe("compiledBannerLines", () => {
+  const stampedInfo = {
+    command: "omob",
+    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
+    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+  }
+
+  test("#given a stamped dev build #when the banner renders #then it prints the same provenance as --version", () => {
+    const lines = compiledBannerLines({ omoAiVersion: "0.0.0-omob.c6e7dd7.7fd18df", buildInfo: stampedInfo })
+
+    // The requirement: banner, --version and doctor all show full SHAs, ISO dates and branches.
+    expect(lines).toEqual([
+      "omob dev build",
+      "omo   c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc 2026-09-04T10:17:49+09:00 (dev)",
+      "senpi 7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7 2026-09-04T10:49:12+09:00 (main)",
+    ])
+    // guards against a regression to short SHAs / a missing date or branch
+    expect(lines.join("\n")).toContain("c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc")
+    expect(lines.some((line) => line.includes("c6e7dd7 "))).toBe(false)
+  })
+
+  test("#given a release build with no build info #when the banner renders #then it keeps the release one-liner", () => {
+    expect(compiledBannerLines({ omoAiVersion: "5.0.0-beta.40", buildInfo: undefined })).toEqual([
+      "omo (omo-ai beta 5.0.0-beta.40)",
+    ])
+  })
+
+  test("#given malformed build info #when the banner renders #then it degrades to the release one-liner", () => {
+    const malformed = { command: "omob", omo: { commit: "nope", committedAt: "", branch: "" }, engine: {} }
+
+    expect(compiledBannerLines({ omoAiVersion: "5.0.0-beta.40", buildInfo: malformed })).toEqual([
+      "omo (omo-ai beta 5.0.0-beta.40)",
+    ])
+  })
+
+  test("#given a build stamped with another command name #when the banner renders #then it uses that name", () => {
+    const lines = compiledBannerLines({
+      omoAiVersion: "0.0.0-omob.c6e7dd7.7fd18df",
+      buildInfo: { ...stampedInfo, command: "omoq" },
+    })
+
+    expect(lines[0]).toBe("omoq dev build")
   })
 })

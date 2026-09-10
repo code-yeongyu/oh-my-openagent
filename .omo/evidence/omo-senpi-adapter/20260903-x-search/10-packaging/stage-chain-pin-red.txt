@@ -1,0 +1,25 @@
+bun test v1.4.0 (34cbb9a40)
+
+script/senpi-test-script.test.ts:
+72 |     expect(
+73 |       shipsPluginTree,
+74 |       "root npm files must NOT ship packages/omo-senpi/plugin while the senpi platform flag is disabled for release",
+75 |     ).toBe(false)
+76 |     expect(hasStandaloneBuildScript, "standalone Senpi build must build the shared daemon once before staging").toBe(true)
+77 |     expect(hasStageScript, "root scripts must expose a stage-only Senpi artifact build").toBe(true)
+                                                                                              ^
+error: root scripts must expose a stage-only Senpi artifact build
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/script/senpi-test-script.test.ts:77:90)
+(fail) Senpi compatibility test script > #given published root package #when payload contract is inspected #then senpi payload is contained while local build stays available [0.96ms]
+(pass) Senpi compatibility test script > #given a packed-layout root with only senpi plugin artifacts #when installer runs #then settings points at that shipped plugin tree [21.32ms]
+(pass) Senpi compatibility test script > #given root scripts #when test:senpi is inspected #then it runs the hermetic adapter gate in order [0.31ms]
+(pass) Senpi compatibility test script > #given CI workflow #when inspected #then senpi compatibility is a merge-blocking matrix job [0.36ms]
+
+ 3 pass
+ 1 fail
+ 18 expect() calls
+Ran 4 tests across 1 file. [1.74s]

@@ -12,7 +12,6 @@ function paths(candidates: readonly RecallCandidate[]): string[] {
 
 const BASE_OPTS = {
   maxItems: 5,
-  excerptChars: 200,
   surfaced: new Set<string>(),
 }
 
@@ -75,36 +74,50 @@ describe("selectRecallCandidates", () => {
     expect(paths(candidates)).toEqual(["reference/d.md"])
   })
 
-  it("#given exclude patterns #when candidates are selected #then prefix globs and exact paths drop", () => {
+  it("#given transcript-visible paths #when candidates are selected #then excluded paths do not consume the cap", () => {
     // given
     const documents = [
-      doc("notes/deploy.md", "Deploy notes", "ingress and kubernetes"),
-      doc("notes/other.md", "Other notes", "ingress and kubernetes"),
-      doc("people/alice.md", "Alice", "ingress and kubernetes"),
-      doc("reference/keep.md", "Keep", "ingress and kubernetes"),
+      doc("reference/a.md", "Kubernetes", "ingress review"),
+      doc("reference/b.md", "Kubernetes", "rollout review"),
     ]
-    const opts = { ...BASE_OPTS, exclude: ["notes/deploy*", "people/alice.md"] }
+    const excludePaths: ReadonlySet<string> = new Set(["reference/a.md"])
+    const options = { ...BASE_OPTS, maxItems: 1, excludePaths }
 
     // when
-    const candidates = selectRecallCandidates(documents, ["kubernetes"], opts)
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], options)
 
-    // then ("keep" has the shortest description, so its term index is smallest)
-    expect(paths(candidates)).toEqual(["reference/keep.md", "notes/other.md"])
+    // then
+    expect(paths(candidates)).toEqual(["reference/b.md"])
+    expect(excludePaths).toEqual(new Set(["reference/a.md"]))
   })
 
-  it("#given a minScore ceiling #when candidates are selected #then scores above the ceiling drop", () => {
-    // given (lower score is better, so minScore is a ceiling: score <= minScore keeps)
-    const documents = [
-      doc("reference/a.md", "Deploy", "the kubernetes ingress gateway is flaky"),
-      doc("notes/b.md", "Kubernetes notes", "kubernetes kubernetes everywhere"),
-    ]
-    const opts = { ...BASE_OPTS, minScore: 45 }
+  it("#given surfaced and transcript-visible paths #when candidates are selected #then both exclusions apply", () => {
+    // given
+    const documents = ["a", "b", "c"].map((name) => doc(`reference/${name}.md`, "Kubernetes", "review"))
+    const options = {
+      ...BASE_OPTS,
+      surfaced: new Set(["reference/a.md"]),
+      excludePaths: new Set(["reference/b.md"]),
+    }
 
     // when
-    const candidates = selectRecallCandidates(documents, ["kubernetes"], opts)
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], options)
 
-    // then (a scores 51 and drops; b scores 40 and stays)
-    expect(paths(candidates)).toEqual(["notes/b.md"])
+    // then
+    expect(paths(candidates)).toEqual(["reference/c.md"])
+  })
+
+  it("#given an empty exclusion set #when candidates are selected #then omitted and empty options are equivalent", () => {
+    // given
+    const documents = [doc("reference/a.md", "Kubernetes", "ingress review")]
+    const options = { ...BASE_OPTS, excludePaths: new Set<string>() }
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], options)
+
+    // then
+    expect(candidates).toEqual(selectRecallCandidates(documents, ["kubernetes"], BASE_OPTS))
+    expect(paths(candidates)).toEqual(["reference/a.md"])
   })
 
   it("#given more matches than maxItems #when candidates are selected #then only the best capped set returns", () => {
@@ -143,16 +156,27 @@ describe("selectRecallCandidates", () => {
     const documents = [doc("reference/a.md", "Deploy", body)]
 
     // when
-    const candidates = selectRecallCandidates(documents, ["kubernetes"], {
-      ...BASE_OPTS,
-      excerptChars: 40,
-    })
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], BASE_OPTS)
 
     // then
     const excerpt = candidates[0]?.excerpt ?? ""
     expect(excerpt).toContain("kubernetes")
-    expect(excerpt.length).toBeLessThanOrEqual(40)
     expect(excerpt).not.toMatch(/\s{2,}|\n/)
+  })
+
+  it("#given a body longer than the internal excerpt length #when the excerpt is built #then it is capped at 200 characters", () => {
+    // given: excerpt length is an internal constant, not a config knob
+    const body = `${"filler word ".repeat(40)}kubernetes rollout ${"trailing word ".repeat(40)}`
+    const documents = [doc("reference/a.md", "Deploy", body)]
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["kubernetes"], BASE_OPTS)
+
+    // then
+    const excerpt = candidates[0]?.excerpt ?? ""
+    expect(excerpt).toContain("kubernetes")
+    expect(excerpt.length).toBeLessThanOrEqual(200)
+    expect(excerpt.length).toBeGreaterThan(150)
   })
 
   it("#given a match only in the description #when the excerpt is built #then the body head is used", () => {

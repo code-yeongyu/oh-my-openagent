@@ -6,7 +6,6 @@ import { dirname, join } from "node:path"
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { renderMemoryFile } from "../memfs/frontmatter"
 import { MEMORY_SOUL_EDIT_RESULT_TOKEN } from "../soul"
-import { runMemoryApplyPatch } from "./memory-apply-patch"
 import { runMemoryTool, type MemoryToolLock } from "./memory"
 import { realpathSync } from "node:fs"
 
@@ -21,7 +20,6 @@ const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 :
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
-
 async function fixture(): Promise<{ repo: GitMemoryRepo; lock: MemoryToolLock }> {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-soul-edit-")))
   roots.push(root)
@@ -138,65 +136,5 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["notes/facts/2026-08.md"])
     expect(result.commit?.subject).toBe("record a fact")
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
-})
-
-describe("runMemoryApplyPatch soul-edit result", () => {
-  it("#given a patch updating system/persona.md #when applied #then the result carries the soul-edit directive and commit metadata", async () => {
-    // given
-    const setup = await fixture()
-    await seed(setup, "system/persona.md", "version one\n")
-
-    // when
-    const result = await runMemoryApplyPatch({
-      repo: setup.repo,
-      lock: setup.lock,
-      params: {
-        reason: "evolve persona",
-        input: [
-          "*** Begin Patch",
-          "*** Update File: system/persona.md",
-          "@@",
-          "-version one",
-          "+version two",
-          "*** End Patch",
-        ].join("\n"),
-        author: AUTHOR,
-      },
-    })
-
-    // then
-    expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
-    expect(result.commit?.affectedPaths).toEqual(["system/persona.md"])
-    expect(result.commit?.subject).toBe("evolve persona")
-    expect(result.commit?.sha).toBe((await setup.repo.head()) ?? undefined)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
-
-  it("#given a patch adding a non-soul file #when applied #then no soul-edit directive appears", async () => {
-    // given
-    const setup = await fixture()
-
-    // when
-    const result = await runMemoryApplyPatch({
-      repo: setup.repo,
-      lock: setup.lock,
-      params: {
-        reason: "add reference note",
-        input: [
-          "*** Begin Patch",
-          "*** Add File: reference/note.md",
-          "+---",
-          "+description: Note",
-          "+---",
-          "+plain note",
-          "*** End Patch",
-        ].join("\n"),
-        author: AUTHOR,
-      },
-    })
-
-    // then
-    expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
-    expect(result.commit?.affectedPaths).toEqual(["reference/note.md"])
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 })

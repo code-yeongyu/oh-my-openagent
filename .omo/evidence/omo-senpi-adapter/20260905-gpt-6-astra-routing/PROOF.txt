@@ -1,0 +1,7 @@
+Remote bunshin proof (mengmotaMac; final branch b893cfee1):
+
+{"name":"ultrabrain","astra":{"model":"openai-codex/gpt-6-astra","source":"provider-fallback","variant":"max"},"sol":{"model":"openai-codex/gpt-5.6-sol","source":"provider-fallback","variant":"max"}}
+{"name":"deep","astra":{"model":"openai-codex/gpt-6-astra","source":"provider-fallback","variant":"high"},"sol":{"model":"openai-codex/gpt-5.6-sol","source":"provider-fallback","variant":"medium"}}
+{"name":"unspecified-high","astra":{"model":"openai-codex/gpt-6-astra","source":"provider-fallback","variant":"high"},"sol":{"model":"system/default","source":"system-default"}}
+
+The unspecified-high result intentionally has no Sol fallback because its exact requested chain is Astra high, Opus xhigh, GLM max, Kimi max. The two categories with requested Sol fallback rungs resolve to Sol when Astra is absent.

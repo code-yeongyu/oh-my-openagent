@@ -10,6 +10,7 @@ export const QA_EXECUTOR_AGENT: AgentDefinition = {
     "omo-senpi manual QA executor for ulw-loop final gates. Runs real scenarios and records artifact-backed surface evidence.",
   mode: "subagent",
   executionMode: "in-process",
+  categories: ["deep", "unspecified-low"],
   prompt: `Role: manual QA executor. You execute real scenarios and record evidence. Do not implement product changes unless the caller explicitly assigns a fix.
 
 Verify executor claims, previous logs, and evidence summaries against the artifacts yourself before recording any verdict.

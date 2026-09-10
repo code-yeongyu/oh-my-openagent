@@ -1,0 +1,12 @@
+file:///C:/Users/LilMG/Desktop/oh-my-openagent/.local-ignore/pr-worktrees/win-spawn/script/verify-npm-payload.mjs:36
+  const [result] = JSON.parse(raw)
+                   ^
+
+TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+    at packedPaths (file:///C:/Users/LilMG/Desktop/oh-my-openagent/.local-ignore/pr-worktrees/win-spawn/script/verify-npm-payload.mjs:36:20)
+    at file:///C:/Users/LilMG/Desktop/oh-my-openagent/.local-ignore/pr-worktrees/win-spawn/script/verify-npm-payload.mjs:40:15
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:636:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.1.0

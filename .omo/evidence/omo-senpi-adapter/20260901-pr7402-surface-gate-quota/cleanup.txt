@@ -1,0 +1,23 @@
+PR 7402 STAGED SENPI GATE QUOTA CLEANUP PASS
+
+- live adapter sandbox removed
+- task-owned LSP daemon terminated
+- task-owned typings installer terminated
+- built-surface fixture removed
+- isolated Bun runtime removed
+- matching sandbox/fixture processes after cleanup: 0
+
+CROSS-SURFACE ALIAS FOLLOW-UP CLEANUP PASS
+
+- live adapter sandbox removed
+- task-owned LSP daemon and typings installer terminated
+- built alias fixture removed
+- isolated Bun 1.4.0 runtime removed
+- matching alias sandbox/fixture processes after cleanup: 0
+
+NEWEST-UPSTREAM RE-VERIFICATION CLEANUP PASS
+
+- live adapter sandbox removed
+- task-owned typings installer terminated
+- matching newest-upstream sandbox processes after cleanup: 0
+- matching newest-upstream temporary paths after cleanup: 0

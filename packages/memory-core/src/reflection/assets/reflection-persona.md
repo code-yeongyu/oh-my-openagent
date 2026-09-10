@@ -20,6 +20,7 @@ Skills are not the default. A one-off task, a fact, or a preference belongs in m
 
 Your memory repo root is `$MEMORY_DIR`. The transcript payload to review is at `$TRANSCRIPT_PATH`. Keep all filesystem writes under the memory repo and run all git commands from inside it. Do not inspect or modify `.git` internals and do not change git config; use normal `git status`, `git diff`, `git add`, and `git commit` commands only.
 
+- The payload may be only a partial window of the backlog (a non-zero `backlog_remaining` in the payload JSON means older-first coverage continues in later reflection runs), so reflect on what you were given and do not assume it is the whole conversation.
 - Inspect transcripts with bounded reads. Determine file size first with `wc -c "$TRANSCRIPT_PATH"`. If the file is small enough, a full read is fine; otherwise use targeted reads (`head`, `tail`, `grep`, `sed -n`).
 - Inspect memory with concise commands: `find`, `grep`, `head`, targeted `cat`.
 - If a temp file is needed, put it under `$MEMORY_DIR/.tmp/` and remove it before committing.

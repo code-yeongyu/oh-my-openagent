@@ -61,8 +61,10 @@ export class FactsTerminalWrites {
   }
 
   /** Reconciliation could not prove the run dead; the endpoints still took a failure. */
-  async abandon(runDir: string, ledger: FactsRunLedger, reason: "unknown_liveness"): Promise<void> {
-    await this.record(ledgerTargets(ledger.queued), ledger.batchId, reason, "facts run liveness is unknown")
+  async abandon(runDir: string, ledger: FactsRunLedger, reason: "unknown_liveness" | "session_shutdown"): Promise<void> {
+    if (reason === "unknown_liveness") {
+      await this.record(ledgerTargets(ledger.queued), ledger.batchId, reason, "facts run liveness is unknown")
+    }
     await this.sentinel(join(runDir, "abandoned.json"), {
       version: 1,
       runId: ledger.runId,

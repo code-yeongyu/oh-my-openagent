@@ -35,21 +35,21 @@ The orchestration system uses a three-layer architecture that solves context ove
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>claude-fable-5 / kimi-k3"]
+        Prometheus[" Prometheus<br/>(Planner)<br/>claude-fable-5-1 / kimi-k3"]
         Metis[" Metis<br/>(Consultant)<br/>claude-opus-5 / kimi-k3"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.6-sol / claude-opus-5 / gemini-3.1-pro / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-6-astra / claude-opus-5 / gemini-3.1-pro / glm-5.2"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
+        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / MiniMax-M3 / minimax-m2.7"]
     end
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / MiniMax-M3 / minimax-m2.7 / big-pickle"]
         Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-5 / glm-5.2"]
-        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m2.7-highspeed / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
-        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m2.7-highspeed / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / glm-5.2 / gpt-5.6-sol"]
+        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
+        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-fable-5-1 / claude-opus-5 / kimi-k3"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -66,8 +66,8 @@ flowchart TB
 
     Orchestrator -->|"task(category=deep/quick/unspecified-*)"| Junior
     Orchestrator -->|"task(subagent_type=oracle)"| Oracle
-    Orchestrator -->|"call_omo_agent(subagent_type=explore)"| Explore
-    Orchestrator -->|"call_omo_agent(subagent_type=librarian)"| Librarian
+    Orchestrator -->|"task(subagent_type=explore)"| Explore
+    Orchestrator -->|"task(subagent_type=librarian)"| Librarian
     Orchestrator -->|"task(category=visual-engineering, load_skills=[frontend])"| Frontend
 
     Junior -->|"Results + Learnings"| Orchestrator
@@ -103,7 +103,7 @@ Three names can appear together in logs or the TUI:
 
 - **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
 - **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
-- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.2`
+- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-6-astra`, `gpt-5.6-sol`, `glm-5.2`
 
 The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k3`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
 
@@ -121,7 +121,7 @@ When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instructio
 
 ### Prometheus: Your Strategic Consultant
 
-Prometheus is not just a planner, it's an intelligent interviewer that helps you think through what you actually need. The `prometheus-md-only` hook restricts its Write/Edit to `.omo/*.md`; Bash and read/search tools remain allowed, and it must not implement, including via subagents.
+Prometheus is not just a planner, it's an intelligent interviewer that helps you think through what you actually need. The `prometheus-md-only` hook restricts Write/Edit to `.omo/*.md`. Prometheus `bash` / `interactive_bash` are denied at the permission layer; read/search tools remain allowed, and it must not implement, including via subagents.
 
 **The Interview Process (via `ulw-plan`):** Prometheus explores first. On CLEAR intent it interviews only the surviving owner-decisions; on UNCLEAR intent it adopts defaults. It waits for your explicit approval before writing the plan.
 
@@ -290,7 +290,7 @@ Junior is the workhorse that actually writes code. Key characteristics:
 
 Junior doesn't need to be the smartest - it needs to be reliable. With:
 
-1. Detailed prompts from Atlas (50-200 lines)
+1. Detailed prompts from Atlas
 2. Accumulated wisdom passed forward
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
@@ -302,9 +302,14 @@ Even a mid-tier execution model works when the harness is strict. The current fa
 The hook system ensures Junior never stops halfway:
 
 ```
-[SYSTEM REMINDER - TODO CONTINUATION]
+[SYSTEM DIRECTIVE: OH-MY-OPENCODE - TODO CONTINUATION]
 
-Incomplete tasks remain in your todo list. Continue working on the next pending task — without asking, and re-examining any false completion claims.
+Incomplete tasks remain in your todo list. Continue working on the next pending task.
+
+- Proceed without asking for permission
+- Mark each task complete when finished
+- Do not stop until all tasks are done
+- If you believe all work is already complete, the system is questioning your completion claim. Critically re-examine each todo item from a skeptical perspective, verify the work was actually done correctly, and update the todo list accordingly.
 ```
 
 This "boulder pushing" mechanism is why the system is named after Sisyphus.
@@ -327,7 +332,7 @@ task({ agent: "claude-opus-5", prompt: "..." }); // Different self-perception
 
 ```typescript
 // NEW: Category describes INTENT, not implementation
-task({ category: "ultrabrain", prompt: "..." }); // "Think strategically"
+task({ category: "ultrabrain", prompt: "..." }); // "Think strategically" (GPT-6 Astra max, then GPT-5.6 Sol)
 task({ category: "visual-engineering", prompt: "..." }); // "Design beautifully"
 task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 ```
@@ -491,7 +496,7 @@ Atlas is automatically activated when you run `/ulw-execute`. You don't need to 
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) by default, GPT-only chain; `gpt-6-astra` as a manual override | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Executes Prometheus plans via `/ulw-execute` (Atlas), not by typing `ulw` |
@@ -514,7 +519,7 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
 4. **You specifically want GPT-native autonomous reasoning**
-   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.6 Sol as the broad fallback
+   - Hephaestus defaults to GPT-5.6 Sol through OpenAI, OpenAI Codex, GitHub Copilot, or OpenCode; pin `openai/gpt-6-astra` to run him on OpenAI's most capable model
 
 **When to Use Sisyphus + `ulw`:**
 

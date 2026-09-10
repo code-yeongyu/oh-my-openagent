@@ -1,0 +1,1 @@
+Cleanup: F3 positive and child sandboxes were removed; seeded xAI auth copies were overwritten with random bytes and removed; no live QA processes remain. Real credential storage was untouched. Both reports use peer-dependency senpi 2026.9.2-4. No commit was created.

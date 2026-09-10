@@ -640,7 +640,7 @@
       "cache_write": 0
     },
     "limit": {
-      "context": 1048576,
+      "context": 262144,
       "output": 131072
     }
   },

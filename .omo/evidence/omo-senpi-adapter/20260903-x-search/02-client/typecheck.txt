@@ -1,0 +1,2 @@
+$ bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json | rg "components/x-search"
+x-search diagnostics: none (rg exit=1)

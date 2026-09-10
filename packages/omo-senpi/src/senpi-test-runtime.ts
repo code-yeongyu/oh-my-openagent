@@ -19,6 +19,11 @@ const modelRuntimeModule = await import(
   pathToFileURL(join(senpiDistDir, "core", "model-runtime.js")).href
 ) as Pick<typeof import("@code-yeongyu/senpi"), "ModelRuntime">
 
+const sdkModule = await import(
+  pathToFileURL(join(senpiDistDir, "core", "sdk.js")).href
+) as Pick<typeof import("@code-yeongyu/senpi"), "createAgentSession">
+
 export const { Theme } = themeModule
 export const { ModelRegistry } = modelRegistryModule
 export const { ModelRuntime } = modelRuntimeModule
+export const { createAgentSession } = sdkModule

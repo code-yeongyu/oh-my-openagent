@@ -1,0 +1,61 @@
+# GREEN: origin/dev 3bd08b366 + sweep edits, mengmotaMac /tmp/astra-async-20260905-2/omo
+# 2026-09-05T07:22:45.217Z
+      17
+bun test exit=1
+ 1062 pass
+ 1 fail
+ 2499 expect() calls
+Ran 1063 tests across 107 files. [28.36s]
+(fail) createDelegateTask schema > #given task schema #when describing async mode #then it names background task ids explicitly [1.41ms]
+(fail) createDelegateTask schema > #given task schema #when describing async mode #then it names background task ids explicitly [1.41ms]
+tsgo omo-opencode exit=0
+tsgo delegate-core exit=0
+tsgo prompts-core exit=0
+=== render dump ===
+sisyphus-gpt-5-5 expects "`true` is the standard spawn": PASS
+sisyphus-gpt-5-5 expects "Run it in the background and continue": PASS
+sisyphus-gpt-5-5 expects "run_in_background=true,": PASS
+sisyphus-gpt-5-5 forbids "`false` for synchronous work where the next step depends": PASS
+sisyphus-gpt-5-5 forbids "Synchronous (`run_in_background=false`)": PASS
+sisyphus-gpt-5-5 forbids "run_in_background=false,\n  prompt": PASS
+sisyphus-gpt-5-5 chars=33710
+sisyphus-junior-gpt-5-5 expects "Run it in the background; continue": PASS
+sisyphus-junior-gpt-5-5 forbids "`run_in_background=false` when their answer blocks": PASS
+sisyphus-junior-gpt-5-5 chars=19922
+delegate-task-description expects "true is the standard spawn": PASS
+delegate-task-description expects "run_in_background=true)": PASS
+delegate-task-description forbids "ONLY for parallel exploration": PASS
+delegate-task-description forbids "Defaults to false (sync, waits)": PASS
+delegate-task-description forbids "run_in_background=false, prompt=\"Task 1": PASS
+delegate-task-description chars=3660
+delegate-task-schema-run_in_background expects "true is the standard spawn": PASS
+delegate-task-schema-run_in_background expects "Omitted counts as false": PASS
+delegate-task-schema-run_in_background forbids "Use true ONLY for parallel exploration": PASS
+delegate-task-schema-run_in_background chars=274
+atlas-gpt expects "the completion notification wakes you to verify": FAIL
+atlas-gpt expects "run_in_background=true, prompt=\"...task A...\"": FAIL
+atlas-gpt forbids "blocks for verification": PASS
+atlas-gpt forbids "run_in_background=false": PASS
+atlas-gpt chars=0
+ultrawork-gpt expects "subagent_type=\"oracle\", load_skills=[], run_in_background=true": PASS
+ultrawork-gpt forbids "run_in_background=false": PASS
+ultrawork-gpt chars=15021
+retry-fix-hint expects "run_in_background=true (the standard spawn)": PASS
+retry-fix-hint forbids "run_in_background=false (for delegation)": PASS
+retry-fix-hint chars=131
+task-resume-info exports: createTaskResumeInfoHook
+
+# rerun after restoring the background_output sentinel in the schema text, 2026-09-05T07:24:52.640Z
+bun test exit=0
+ 505 pass
+ 0 fail
+ 1191 expect() calls
+Ran 505 tests across 44 files. [14.01s]
+=== render dump ===
+sisyphus-gpt-5-5 chars=33710
+sisyphus-junior-gpt-5-5 chars=19922
+delegate-task-description chars=3660
+delegate-task-schema-run_in_background chars=302
+atlas-gpt chars=18063
+ultrawork-gpt chars=15021
+retry-fix-hint chars=131

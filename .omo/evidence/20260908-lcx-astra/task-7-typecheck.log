@@ -1,0 +1,2 @@
+COMMAND: tsgo --noEmit -p packages/omo-codex/tsconfig.json
+TYPECHECK_EXIT=0

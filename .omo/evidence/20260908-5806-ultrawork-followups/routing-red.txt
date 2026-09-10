@@ -1,0 +1,102 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/plugin-interface.test.ts:
+✓ createPluginInterface - command.execute.before > executes ulw-execute side effects for native command execution [18.50ms]
+✓ createPluginInterface - command.execute.before > does not run ulw-execute side effects for other native commands with session context [1.60ms]
+✓ createPluginInterface - command.execute.before > switches native ulw-execute to Atlas when Atlas is registered in config [2.90ms]
+✓ createPluginInterface - goal native command smoke > starts the goal from the native command flow with parsed arguments intact [2.19ms]
+308 |       guidanceStable: firstResumeSystem.system.at(-1) === guidance && secondResumeSystem.system.at(-1) === guidance,
+309 |       runtimeModelSelected: changedModelSystem.system.at(-1) === getUltraworkMessage("sisyphus", "gemini-3-pro"),
+310 |       durableMessageRestored: durableMessage.parts[0].text.includes("<ultrawork-mode>"),
+311 |       systemRestorationCleared: restoredSystem.system.every((part) => !part.includes("<ultrawork-mode>")),
+312 |       followingMessageCompact: followingMessage.parts.some((part) => part.synthetic === true),
+313 |     }).toEqual({
+             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "durableMessageRestored": true,
+    "followingMessageCompact": true,
+    "guidanceStable": true,
+-   "runtimeModelSelected": true,
++   "runtimeModelSelected": false,
+    "systemRestorationCleared": true,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/plugin-interface.test.ts:313:8)
+✗ createPluginInterface - post-compaction ULW restoration > keeps runtime guidance in system transforms until a real message restores it [3.47ms]
+✓ createPluginInterface - backward compatibility > strips legacy ZWSP-prefixed agent names from persisted chat.message session state (GH-3259) [0.27ms]
+✓ createPluginInterface - chat.params variant injection > injects variant from agent config into chat.params message [0.64ms]
+✓ createPluginInterface - chat.params variant injection > does not overwrite existing variant in chat.params message [0.24ms]
+
+packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:
+47 |   test.each(["prometheus", "builder"])("#given pending restoration #when switching to %s #then its agent guard still applies", async (agent) => {
+48 |     await send("ulw initial")
+49 |     hook.event({ event: { type: "session.compacted", properties: { sessionID: "main-session" } } })
+50 |     updateSessionAgent("main-session", agent)
+51 |     await send("continue", "main-session", agent)
+52 |     expect(hook.getSystemTransformGuidance("main-session") === undefined).toBe(true)
+                                                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:52:75)
+✗ explicit ULW session follow-ups > #given pending restoration #when switching to prometheus #then its agent guard still applies [0.61ms]
+47 |   test.each(["prometheus", "builder"])("#given pending restoration #when switching to %s #then its agent guard still applies", async (agent) => {
+48 |     await send("ulw initial")
+49 |     hook.event({ event: { type: "session.compacted", properties: { sessionID: "main-session" } } })
+50 |     updateSessionAgent("main-session", agent)
+51 |     await send("continue", "main-session", agent)
+52 |     expect(hook.getSystemTransformGuidance("main-session") === undefined).toBe(true)
+                                                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:52:75)
+✗ explicit ULW session follow-ups > #given pending restoration #when switching to builder #then its agent guard still applies [0.17ms]
+62 |     await hook["chat.message"](input, output)
+63 |     const expected = getUltraworkMessage("sisyphus", "gemini-3-pro")
+64 |     expect({
+65 |       fullGuidance: output.parts.length === 1,
+66 |       selectedSource: output.parts[0].text.slice(-expected.length) === expected,
+67 |     }).toEqual({ fullGuidance: true, selectedSource: true })
+            ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "fullGuidance": true,
+-   "selectedSource": true,
++   "fullGuidance": false,
++   "selectedSource": false,
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:67:8)
+✗ explicit ULW session follow-ups > #given active GPT mode #when fallback selects Gemini #then its output model refreshes guidance [0.20ms]
+✓ explicit ULW session follow-ups > #given active mode #when a plain follow-up is processed twice #then only one compact marker is added [0.50ms]
+✓ explicit ULW session follow-ups > #given active mode #when compaction finishes #then full guidance is restored once [0.22ms]
+✓ explicit ULW session follow-ups > #given combo-only expansions #when ULW state replays #then the marker and model selection persist [0.20ms]
+✓ explicit ULW session follow-ups > #given active mode #when an attachment-only follow-up arrives #then it receives a durable ULW marker [0.16ms]
+✓ explicit ULW session follow-ups > #given restoration is pending #when an image follows a model change #then full guidance persists before compact markers resume [0.21ms]
+✓ explicit ULW session follow-ups > #given active mode #when model family changes #then its full guidance is refreshed [0.99ms]
+✓ explicit ULW session follow-ups > #given explicit activation #when a follow-up has no keyword #then injection and model selection persist only in that session [0.18ms]
+✓ explicit ULW session follow-ups > #given activation #when cleared by command #then follow-ups are ordinary [0.20ms]
+✓ explicit ULW session follow-ups > #given activation #when cleared by owner #then follow-ups are ordinary [0.56ms]
+✓ explicit ULW session follow-ups > #given activation #when cleared by deleted #then follow-ups are ordinary [0.13ms]
+✓ explicit ULW session follow-ups > #given activation #when cleared by disposed #then follow-ups are ordinary [0.12ms]
+✓ explicit ULW session follow-ups > #given activation #when a follow-up is guarded #then no ULW is injected [0.20ms]
+✓ explicit ULW session follow-ups > #given more than the session cap #when checking follow-ups #then oldest activation is evicted [7.54ms]
+
+ 20 pass
+ 4 fail
+ 51 expect() calls
+Ran 24 tests across 2 files. [2.40s]

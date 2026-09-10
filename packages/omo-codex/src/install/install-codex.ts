@@ -17,10 +17,8 @@ import { reapLspDaemons } from "./lsp-daemon-reaper"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
 import { writeInstalledCodexBinDir } from "./codex-installed-bin-dir"
 import { removeGitBashHooksOffWindows } from "./codex-git-bash-hooks"
-import { seedAndMigrateOmoSot } from "./omo-sot-migration"
 import { installAstGrepForCodex } from "./install-ast-grep-sg"
 import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
-import { resolveCodegraphNodeSupport } from "@oh-my-opencode/utils"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -194,14 +192,12 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceSource: codexMarketplaceSource(marketplaceRoot),
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     platform,
-    codegraphMcpEnabled: options.codegraphMcpEnabled ?? resolveCodegraphNodeSupport({ env }).supported,
     gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false,
     ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
   })
-  await seedAndMigrateOmoSot({ env, log, repoRoot, runCommand })
 
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
     startDirectory: projectDirectory,

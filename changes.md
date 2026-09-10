@@ -1,3 +1,185 @@
+## 2026-09-09 — Preserve Windows omob executable suffixes
+
+Windows omob builds now retain the `.exe` suffix through installation, cache/provenance lookup, and direct refresh. The test fixtures use native compiled executables and platform-native paths while preserving the POSIX launcher contract and all refresh assertions.
+
+## 2026-09-08 — Persist child_session_id on senpi-task records
+
+Spawned senpi-task children now persist `child_session_id` (the child's own session id from the spawn handle) on their `st_*.json` record. Reattach/resume rewrites keep the field. `packages/team-core/AGENTS.md` documents the on-disk `st_*.json` identity fields so external readers can join a grandchild session (`parent_session_id`) back to its parent task.
+
+## 2026-09-08 — Expose team runtime layout and member linkage
+
+Team member task records now carry durable team identity fields, and `packages/team-core/AGENTS.md` documents the runtime state, tasklist, and mailbox paths and JSON shapes consumed by external readers.
+
+## 2026-09-07 — Make the two Windows-flaky tests from #7898 deterministic
+
+Both tests raced the wall clock and lost on the slowest CI runner. The team-mode case
+`inbox stays intact when live delivery fails so the fallback path still works` ran the production
+prompt-gate schedule in real time: the failed live delivery placed a 2 s post-dispatch hold on the
+recipient, then each refused fallback wake waited `max(postDispatchHoldMs, 250*2^n)` = 2 s, 2 s, 2 s
+before the fifth `promptAsync` was allowed, so the test needed ~8.6 s on Linux against a 12 s event
+budget and exceeded it on Windows. Five neighbouring cases each spent ~2.5 s because the queue re-arms
+after a *cancelled* wake with that same 2 s hold. `TeamSendMessageToolDeps` now carries an optional
+`dispatchTiming` (`postDispatchHoldMs`, `queueRetryMs`, `fallbackWakeSettleMs`) that
+`deliverLive` threads into the live dispatch and into `enqueueFallbackMailboxWake`; every field
+falls back to the gate default when omitted, so production behaviour is unchanged and only tests set
+it. The six tests inject near-zero timing through `createImmediateTeamSendMessageTool` and wait on
+their deferred event with the file's default 3 s circuit breaker; the Windows-only 15 s budgets are
+gone. Captured on gorky (bun 1.4.0): tightened test RED on unchanged production code ("timed out
+waiting for fallback wake after pre-send transport failure" at 3 s), GREEN at ~100 ms after plumbing;
+the whole file dropped from 25.9 s to 8.0 s with no test above 0.6 s.
+
+The hooks-state case `recovers a trusted snapshot at a synchronized legacy truncate/write boundary`
+spawned a detached legacy writer that completed its write only after an `fs.watch` notification of
+a release file, while senpi's `FileHookStateStorage.read` retries `lockSync` 10 x 20 ms before
+returning the fail-closed empty state; cross-process watch latency on Windows exceeded that window and
+the reader returned `{ version: 1, hooks: {} }`. `script/fixtures/senpi-hooks-state-legacy-reader.ts`
+now simulates the writer in-process: the lock dir is held and the snapshot truncated before the reader
+starts, the reader's first `lockSync` is refused by the real `proper-lockfile` (the fixture mocks the
+nested copy senpi resolves, capturing the real function before `mock.module` rewires the live
+binding), and the writer's remaining work runs inside that refusal, so the boundary is crossed at the
+same instruction on every run. The fixture reports `truncatedReads` and `lockAttempts` and the
+test pins them at exactly 1 and 2, proving the contention path ran. Two mutations fail the test
+(writer never releases -> empty state; snapshot already complete -> no truncated read, one lock
+attempt). The detached writer fixture and the `taskkill`/`SIGTERM` timed-out-writer cleanup helper
+with its three unit tests are removed because nothing spawns a writer any more. Future syncs must keep
+the counters exact and must not reintroduce a second process or a real-time wait into this fixture.
+
+## 2026-09-05 — Sweep the remaining task examples and the delegate schema to background-by-default
+
+The gate review of #7795 found model-facing text that still prescribed `run_in_background=false`: the
+delegate tool's own parameter schema (`packages/omo-opencode/src/tools/delegate-task/tools.ts`, "Use true
+ONLY for parallel exploration; otherwise omit or pass false"), the category/skills delegation guide that
+the GPT-5.5/5.6/6 Sisyphus prompt embeds, the Sisyphus default/gemini and execution examples, the Atlas
+section builder and system-reminder template, the wave-plan template in `delegate-task/constants.ts`
+("IN PARALLEL" waves with `false`), the task-resume-info continuation line, delegate-core's retry
+guidance and its `missing_run_in_background` fix hint, and the GPT Atlas and ultrawork prompts in
+`packages/prompts-core` (Atlas said task execution "blocks for verification"; ultrawork spawned oracle
+and plan synchronously). Every example now shows `run_in_background=true`; the Atlas rule reads "the
+completion notification wakes you to verify; `false` only for a short child whose result gates your very
+next call"; the schema and fix hint carry the same rule as the tool description. Left as they are, on
+purpose: the anti-examples that already say "never wait synchronously for explore/librarian", the
+ralph-loop Oracle review (its continuation flow reads the verdict in the same turn), the refactor
+command template that states it needs the result synchronously, and runtime messages that describe a
+sync call factually.
+
+## 2026-09-05 — Make background the standard spawn in every task-tool prompt surface
+
+The text the model reads about `run_in_background` now says the same thing on both editions: `true` is the
+standard spawn (the call returns at once and the child's result arrives as a message or completion
+notification), `false` blocks the turn and is reserved for a short child whose result gates the very next
+call. Before this, `packages/senpi-task/src/tools/task/description.ts` said "only for parallel independent
+work; the default waits", `params.ts` labelled `false` as the default, `packages/omo-opencode/src/agents/sisyphus/gpt-5-5.ts`
+and `sisyphus-junior/gpt-5-5.ts` prescribed `false` "for synchronous work where the next step depends on
+the result" and a synchronous Oracle even though the same prompt said Oracle runs in the background, and
+`packages/omo-opencode/src/tools/delegate-task/tool-description.ts` allowed `true` "ONLY for parallel
+exploration with 5+ independent queries". Each line is rewritten at its source; runtime defaults are
+unchanged. This is the omo half of the GPT-6 Astra async-first change (senpi #1381 rewrote the preset's
+`## Asynchronous Work` section); a live backtest against gpt-6-astra with the old text showed 6/6
+single-dependent delegations spawned in the foreground, and 1/3 still foreground with the new preset but
+the old tool text. The delegate-task `AGENTS.md` mode table follows.
+
+## 2026-09-05 — Replace momus's GPT-5.6 rungs with GPT-6 Astra
+
+Momus is the reviewer, so it gets Astra's deepest practical tier instead of the GPT-5.6 pair it used to
+lead with. Its chain now opens on `openai|openai-codex/gpt-6-astra (xhigh)`, then
+`github-copilot/gpt-6-astra (high)` because GitHub Copilot serves every Copilot GPT reasoning model
+through a backend that hangs above `high`, then `openai|openai-codex|opencode/gpt-6-astra (high)` so an
+opencode-only account still lands on Astra. The two Terra rungs and the two Sol rungs are gone rather
+than demoted — the request was a replacement — and the non-GPT tail (`claude-opus-5 (max)` →
+`gemini-3.1-pro (high)` → `glm-5.2`) is untouched and in the same order. Both independent chain
+transcriptions move together: model-core's `AGENT_MODEL_REQUIREMENTS` and senpi-task's hand-mirrored
+`AGENT_FALLBACK_CHAINS`, whose pinned length for momus drops from 7 to 6.
+
+No prompt gating change was needed: `createMomusAgent` already routes GPT-6 through `isGpt6Model` to the
+GPT-5.6-tuned prompt at high reasoning effort and high text verbosity, and the chain's `xhigh` arrives
+separately as the resolved variant. The installer's generated config follows the chain, so an
+OpenAI-only setup now writes `openai/gpt-6-astra` xhigh with `openai/gpt-6-astra` high beneath it, and a
+Copilot-only setup writes `github-copilot/gpt-6-astra` high with the Opus and Gemini rungs beneath.
+
+## 2026-09-05 — Give ultrabrain, deep, and unspecified-high GPT-6 Astra prompt appends and make Astra their real default
+
+The three category prompt appends now have GPT-6 Astra variants in both editions
+(`packages/senpi-task/src/category/openai-categories.ts` and
+`packages/omo-opencode/src/tools/delegate-task/openai-categories.ts`), selected by `isGpt6Model` through
+the existing `resolvePromptAppend` hook. Each append is a delta over senpi's `gpt-6-astra` core preset
+rather than a restatement of it: ultrabrain states the success criteria of a max-effort hard-logic
+answer (evidence cited from this turn, executable claims executed, a self-falsification pass, rejected
+alternatives and open assumptions named, one decision-complete recommendation); deep keeps one goal and
+one deliverable with a generous exploration budget, the goal as authorization, numbered steps as one
+atomic task, fixes trace at least two levels above the symptom to the root cause, and the harness fact that a question ends the turn unfinished; unspecified-high asks for a
+survey of the whole affected surface (callers, sibling modules, tests, docs, schemas, config, CI, git
+history), at least two weighed approaches, and delivery across every surface found. The previous
+ultrabrain append prescribed a "Bottom line" response format that the Astra preset bans as a stock
+phrase; deep on Astra fell through to the generic append because `isGpt5_5OrLaterModel` never matched
+`gpt-6`.
+
+The prompts only reach Astra when the category resolves to it, and `resolveModelForDelegateTask` picks
+the builtin `config.model` before the fallback chain, so the chain-only routing change in #7790 left
+`gpt-5.6-sol` as the effective default wherever Sol was available. The builtin defaults now read
+`ultrabrain` = `openai/gpt-6-astra` max, `deep` and `unspecified-high` = `openai/gpt-6-astra` high, and
+`unspecified-high` moved from the anthropic category file into the openai one in both editions
+(`anthropic-categories.ts` is deleted from omo-opencode). senpi-task's independent chain transcription
+(`fallback-chains.ts`) mirrors the #7790 model-core chains for visual-engineering, ultrabrain, deep, and
+unspecified-high. `requiresModel` accepts a list: `ultrabrain` and `deep` (senpi-task) and `deep`
+(omo-opencode) open on `gpt-6-astra` OR `gpt-5.6-sol`, so a registry with either flagship keeps them and
+one with neither still never falls through to a cross-family model. The task tool description renders a
+list gate as `(requires gpt-6-astra or gpt-5.6-sol)`.
+
+omo-senpi telemetry adds `gpt-6-astra` to the exportable model vocabulary for the providers that ship an
+Astra rung, since a shipped rung must never mask to `custom`, and `docs/reference/senpi-telemetry.md`
+carries the regenerated schema block.
+
+## 2026-09-05 — Route GPT-6 Astra through model-core and frontier agent families
+
+GPT-6 Astra is now the high-effort top rung for the visual-engineering, ultrabrain, deep, and unspecified-high category routes, with the existing GPT-5.6 Sol lanes retained as fallbacks. Model-core recognizes Astra's capability limits and canonicalizes OpenAI fast-tier IDs, while omo-opencode treats Astra as a GPT-5.6-class frontier model for prompts, reasoning, tool-schema protection, delegation, and native Sisyphus routing.
+
+## 2026-09-04 — Ship the conditional x-search skill and stop the startup log line
+
+The published omo-ai payload never contained `plugin/skills-conditional/x-search/SKILL.md`. The
+plugin's own `files` allowlist shipped that directory, but the payload copy lists in
+`script/build-omo-native.ts` and `script/build-omo-binary.ts` did not, and
+`stage-x-search-skill.mjs` wrote its copy into the source plugin dir even when the staging build
+redirected every other artifact through `OMO_SENPI_PLUGIN_OUTPUT`. With no packaged copy, the
+bundled component advertised `plugin/extensions/skill/SKILL.md`, and senpi reported a startup skill
+conflict: "skill path does not exist". The staged skill is now copied into the staging plugin root,
+is part of both payload allowlists, and is required by the native, installer, and npm payload
+checks; `resolveXSearchSkillPath` returns nothing when neither copy exists, so a broken payload
+keeps `x_search` working, contributes no skill path, and warns once instead of tripping the
+conflict banner.
+
+The `x-search registered` and `x-search skipped: no xAI credential` lines also no longer greet
+every startup. Components register before the TUI takes over stdout and the default component
+logger writes `info` to `console.info`, so both expected outcomes moved to the optional `debug`
+channel.
+
+## 2026-09-03 — Add the credential-gated x_search tool and skill
+
+Senpi can now search X (Twitter) posts through xAI when an xAI account is connected, and stays silent when it is not.
+
+`packages/omo-senpi` gained an `x-search` component that registers the `x_search` tool at extension load (so `tool_search` sees it in the same session) only if `<agentDir>/auth.json` has an `xai` `oauth`/`api_key` entry, or `XAI_API_KEY` when that file is absent. The matching `x-search` skill is staged into `plugin/skills-conditional/` rather than `plugin/skills/` and is contributed via `resources_discover` only when the same gate passes, so machines without xAI never pay for the skill in the index. There is no `omo.json` key.
+
+In-process task children inherit the tool with `exposure` remapped to `direct` (`CHILD_DIRECT_EXPOSURE_TOOL_NAMES`) because they have no `tool_search` builtin; curated `explore` stays on its existing allowlist (no `x_search`), while `librarian` documents the X/social lane. Query recipes and live QA live under `packages/omo-senpi/scripts/qa/x-search-backtest.mjs` and `x-search-live-e2e.mjs`.
+
+## 2026-09-02 — Build missing prebuilt inputs in the omo-native release staging
+
+The omo-native plugin staging now builds `packages/lsp-daemon/dist` and
+`packages/ast-grep-mcp/dist/cli.js` through the canonical root scripts
+(`build:lsp-daemon`, `build:ast-grep-mcp`) whenever they are absent before
+consuming them. The publish-platform workflow installs dependencies with
+`--ignore-scripts`, so the root prepare build never produced these artifacts
+there and every beta.32 platform build failed with ENOENT on the lsp-daemon
+dist. Prebuilt artifacts are still reused untouched when present, and the
+staged payload checks are unchanged.
+
+## 2026-09-02 — Give the legacy daemon fixture a cold-Windows readiness budget
+
+The Codex installer test fixture's event-driven readiness wait now allows 30
+seconds on Windows, matching the platform-specific execution budgets the
+installer integration tests already use. Assertions and event-driven behavior
+remain unchanged; only the fixture's failure deadline is widened past the flat
+5-second bound that a cold Windows runner exceeded while spawning the fixture
+daemon.
+
 ## 2026-09-01 — Defer bind-time reflection reconciliation on scheduler contention
 
 Session-start reflection reconciliation now uses a zero-wait scheduler lock and defers when a sibling session is already scheduling the same memory identity. Normal reflection reservation and completion paths retain their existing serialized wait budget.
@@ -517,3 +699,6 @@ budget a test grants a subprocess or timed promise; `test/test-timeout-budget.te
 reads both the configured value and the real budgets out of the test sources and
 fails if that ordering is ever reintroduced. Keep the bound proportionate: it
 exists to survive a cold Windows process spawn, not to hide a genuine hang.
+## 2026-09-06 — Keep lead polling alive through runtime access windows
+
+Lead polling now suppresses repeated `EPERM` and `EACCES` runtime-directory errors, reports the first unavailable transition and the subsequent recovery, and leaves mailbox state untouched while the runtime directory cannot be enumerated. Mailbox reads and missing-directory handling remain unchanged.

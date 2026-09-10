@@ -1,0 +1,23 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/skills-sync.test.ts:
+172 | 
+173 |   test("#given ulw-research skill #when synced #then the X / social lane bullet is shipped", () => {
+174 |     const skillFile = join(skillsRoot, "ulw-research", "SKILL.md")
+175 |     const content = readFileSync(skillFile, "utf8")
+176 | 
+177 |     expect(content.includes("X / social (`x_search`"), "ulw-research must ship the X / social lane role protocol").toBe(true)
+                                                                                                                         ^
+error: ulw-research must ship the X / social lane role protocol
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/skills-sync.test.ts:177:116)
+(fail) OMO Senpi scoped skill sync > #given ulw-research skill #when synced #then the X / social lane bullet is shipped [0.98ms]
+
+ 0 pass
+ 11 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1.95s]

@@ -162,7 +162,7 @@ function spawnTarget(item: Record<string, unknown>, parent: Record<string, unkno
 function featureForTool(toolName: string): "goal_tool" | "team_create" | "memory_tool" | undefined {
   if (matchesToolName(toolName, "create_goal")) return "goal_tool"
   if (matchesToolName(toolName, "team_create")) return "team_create"
-  if (matchesToolName(toolName, "memory_apply_patch") || matchesToolName(toolName, "memory")) return "memory_tool"
+  if (matchesToolName(toolName, "memory")) return "memory_tool"
   return undefined
 }
 

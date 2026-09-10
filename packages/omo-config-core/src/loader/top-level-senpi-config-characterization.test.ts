@@ -73,12 +73,6 @@ const EXPECTED_CONFIG = {
       reasoning: "xhigh",
     },
   },
-  codegraph: {
-    auto_provision: true,
-    daemon: true,
-    enabled: true,
-    telemetry: false,
-  },
   task: {
     default_concurrency: 5,
     global_concurrency: Math.max(8, availableParallelism() * 2),

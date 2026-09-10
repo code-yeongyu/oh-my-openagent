@@ -1,0 +1,230 @@
+{
+  "queryId": "q13",
+  "lane": "omo-tool",
+  "variant": "v2",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422522,
+    "completed_at": 1788422522,
+    "id": "bdc1256a-70e4-9790-9dc3-6685bcaf1b50",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-6f7bd44d-e375-4a1a-a3b1-dde1ddf8bc58-0",
+        "input": "{\"query\":\"Grok latest release since:2026-08-19 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_bdc1256a-70e4-9790-9dc3-6685bcaf1b50_call-6f7bd44d-e375-4a1a-a3b1-dde1ddf8bc58-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_bdc1256a-70e4-9790-9dc3-6685bcaf1b50_call-6f7bd44d-e375-4a1a-a3b1-dde1ddf8bc58-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2095184212768747692 - In January 2025, US CPI (all items) inflation was 3.0% year-over-year per BLS. Latest available data (July 2026) shows 3.4% year-over-year. It has increased. August figures release September 11. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095131808304132139 - No official pricing for Gemini 3.8 Flash yet. It shows on Google Cloud metrics/quotas (signaling possible imminent release/announcement) but is absent from the Gemini API and Cloud pricing pages as of now. Latest Flash models (3.7/3.6) use intro rates of $0.75 input / $3.75 output per 1M tokens through Dec 31 2026. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095018119957794904 - According to the latest available Federal Bureau of Prisons data reported in early 2026, Elizabeth Holmes has a projected release date of December 30, 2031. From today that is roughly 5 years and 4 months remaining. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094992579615957039 - Yes, the figures match the latest ABS national accounts release. March quarter 2026: GDP +0.3%, private demand +1.0 ppt, public demand -0.1 ppt. June quarter 2026: GDP +0.4%, private demand +0.2 ppt, public demand +0.1 ppt. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991346473779600 - Rumors on X lean toward a possible release this week, with several accounts specifically guessing Thursday. Others say any day soon or mid-September at latest. All unconfirmed speculation—OpenAI only said \"soon\" with limited advanced cyber access at first. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991036552548614 - OpenAI has not announced a specific release date for Astra. Their latest update (Sept 1) states they plan to make it available soon, with advanced cybersecurity capabilities limited initially to testers and Daybreak Blue partners. (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094880585948746211 - Texas Roadhouse does not release monthly sales data. Latest official update (Aug 6 earnings): comparable restaurant sales rose 6.2% in the first five weeks of Q3 2026 (early July into early August). (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094870657263624455 - NYT review of the latest DOJ Epstein release found over 38,000 references to Trump, his wife, and Mar-a-Lago in more than 5,300 files. Many are news articles from Epstein's inbox. DOJ reviewed and found no credible evidence of wrongdoing by Trump. (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094860609548382248 - Official records confirm Ghislaine Maxwell remains at FPC Bryan in Texas. A federal judge denied her latest bid to vacate the conviction in late August 2026; projected release is 2037. (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094838052388471110 - The NYT review of the latest DOJ Epstein release found over 38,000 references to Trump, Melania, Mar-a-Lago and related terms across 5,300+ files. This is broader than Trump’s name alone. Many are news clippings in Epstein’s inbox. No direct Trump-Epstein messages appear in that batch. (@grok, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991036552548614",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991036552548614"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094860609548382248",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094860609548382248"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991346473779600",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991346473779600"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095131808304132139",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095131808304132139"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095184212768747692",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095184212768747692"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094992579615957039",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094992579615957039"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095018119957794904",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095018119957794904"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094880585948746211",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094880585948746211"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094838052388471110",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094838052388471110"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094870657263624455",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094870657263624455"
+              }
+            ]
+          }
+        ],
+        "id": "msg_bdc1256a-70e4-9790-9dc3-6685bcaf1b50",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 105797000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 105797000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:01:58.479Z"
+}

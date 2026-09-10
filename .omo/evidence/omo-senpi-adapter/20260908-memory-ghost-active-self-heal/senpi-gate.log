@@ -1,0 +1,60 @@
+(pass) run finalization publication races > #given publication is scheduled after every unknown-liveness read #when abandonment writes #then the matching publisher wins atomically [212.11ms]
+(pass) run finalization publication races > #given attempt two and a stale attempt-one outcome #when current attempt is confirmed dead #then stale outcome is ignored [545.34ms]
+
+32 tests skipped:
+(skip) #given a native Linux runtime #when directory identity is checked #then secure traversal support is active
+(skip) #given bounded observation root enumeration fails #when snapshotDirectory runs #then inaccessible IO is structured and incomplete while absence is empty-complete
+(skip) #given persistent entries exceed maxEntries #when the directory is enumerated #then readSync stops after bounded lookahead
+(skip) #given a persistent file appears after enumeration #when final directory metadata is checked #then the snapshot fails closed
+(skip) #given root ENOENT hides a regular parent #when snapshotDirectory diagnoses the boundary #then it remains incomplete
+(skip) #given pre-open metadata changed and current-path diagnostic stat fails #when public readers report the race #then the established replacement error wins
+(skip) #given a primary read error and failing shrink diagnostic #when an observed file is hashed #then the primary read error is preserved
+(skip) #given a primary read error and a successful shrink diagnostic #when an observed file is hashed #then the primary read error is preserved
+(skip) #given directory traversal and close both fail #when the tree is snapshotted #then the traversal error remains primary
+(skip) #given post-open directory replacement and failing closes #when setup aborts #then both handles close and replacement remains primary
+(skip) #given successful raw directory traversal and descriptor close failure #when the tree is snapshotted #then the close error surfaces
+(skip) #given successful directory traversal and close failure #when the tree is snapshotted #then the close error surfaces
+(skip) #given a regular file uses a volatile directory name #when the tree is snapshotted #then it remains observable and persistent
+(skip) #given a regular file becomes a symlink after reading #when final identity is checked #then the symlink target is never dereferenced
+(skip) #given a regular file is replaced by a symlink before hashing #when the tree is snapshotted #then the symlink target is never dereferenced
+(skip) task 13 senpi QA scripts > #given settings.json changes only its interactive stamps #when the complete-tree snapshot is compared #then the home is untouched
+(skip) #given nested nonvolatile files within bounds #when scanned #then the relevant observation domain is complete
+(skip) #given volatile root entries precede one persistent file #when scanned at exact budgets #then volatility consumes no budget
+(skip) #given a volatile log precedes one persistent file #when scanned at the entry limit #then the log consumes no entry budget
+(skip) #given a missing root and empty directories #when snapshots are compared #then persistent directory creation and deletion are observed
+(skip) #given a tree beyond the file bound #when observed #then truncation is explicit and never complete
+(skip) #given files exceed the byte budget #when observed #then descriptor reads never exceed maxBytes
+(skip) #given a file shrinks after traversal #when observed #then short read is explicit and incomplete
+(skip) #given a file grows while hashing #when observed #then growth is explicit and incomplete
+(skip) #given a path is replaced after open #when observed #then replacement is explicit and incomplete
+(skip) #given one file exceeds the byte budget #when observed #then truncation occurs without reading or BYTE_LIMIT errors
+(skip) #given the production task driver #when process mode runs on Windows #then it reaches a real RPC child
+(skip) #given a persistent symlink is created and retargeted #when snapshots are compared #then both changes are observed without following targets
+(skip) #given a symlink escapes the observation root #when its target contents change #then the link digest stays stable
+(skip) #given an enumerated directory is replaced by an external symlink before recursive open #when observed #then traversal fails closed without dereferencing
+(skip) #given an incomplete broad real-home observation and complete controlled roots #when verdicts are built #then broad certification fails closed while the scoped lane certifies
+(skip) #given a persistent write in one controlled root #when the scoped verdict is built #then the lane reports the qualified path and fails closed
+
+ 2908 pass
+ 32 skip
+ 0 fail
+ 9132 expect() calls
+Ran 2940 tests across 387 files. [169.56s]
+bun test v1.4.0 (34cbb9a40)
+
+.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs:
+(pass) resolveEvidenceDir > #given a git worktree and a safe slug #when resolved #then it returns the canonical adapter evidence directory [2.79ms]
+(pass) resolveEvidenceDir > #given a relative git worktree path #when resolved #then it still returns an absolute evidence directory [0.42ms]
+(pass) resolveEvidenceDir > #given a resolved evidence path #when the resolver returns #then it has created no directory [0.27ms]
+(pass) resolveEvidenceDir > #given the adapter evidence root #when it is the declared relative root #then it stays under .omo/evidence [0.08ms]
+(pass) resolveEvidenceDir > #given an unsafe slug #when resolved #then it is rejected before any path is produced [0.38ms]
+(pass) resolveEvidenceDir > #given a directory that is not a git worktree #when resolved #then it is rejected [0.22ms]
+(pass) resolveEvidenceDir > #given a rejected slug #when the error surfaces #then it names the offending slug for the operator [0.28ms]
+(pass) resolveEvidenceDir > #given the documented Node CLI #when valid and invalid slugs run #then stdout and exit codes enforce the contract [64.39ms]
+(pass) resolveEvidenceDir > #given a symlink to the documented Node CLI #when invoked #then the entrypoint still enforces the contract [29.13ms]
+(pass) resolveEvidenceDir > #given an embedding runner with a missing argv path #when the module is imported #then exports still load [28.54ms]
+
+ 10 pass
+ 0 fail
+ 31 expect() calls
+Ran 10 tests across 1 file. [1229.00ms]

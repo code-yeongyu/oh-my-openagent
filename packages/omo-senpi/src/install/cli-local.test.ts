@@ -27,6 +27,7 @@ async function makePackagedPlugin(): Promise<string> {
   await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "kibitzer-persona.md"), "# kibitzer persona fixture\n")
   const requiredSkillNames = [
     "ast-grep",
     "coding-agent-sessions",
@@ -50,6 +51,8 @@ async function makePackagedPlugin(): Promise<string> {
   for (const skillName of requiredSkillNames) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
+  await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
   const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
   await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
   await chmod(astGrepRuntime, 0o755)
@@ -118,6 +121,7 @@ async function runCliLocal(
     cwd: repoRoot,
     env: {
       ...process.env,
+      HOME: join(agentDir, "home"),
       OMO_CODING_AGENT_DIR: agentDir,
       SENPI_CODING_AGENT_DIR: agentDir,
       PI_CODING_AGENT_DIR: agentDir,
@@ -151,14 +155,16 @@ describe("cli-local", () => {
 
     // then
     expect(install.exitCode).toBe(0)
-    const installResult = JSON.parse(install.stdout) as { readonly pluginPath: string }
+    const installResult = JSON.parse(install.stdout) as { readonly pluginPath: string; readonly launcherPath?: string }
     expect(installResult).toMatchObject({ ok: true, action: "install" })
     expect(install.stdout.trim().split("\n")).toHaveLength(1)
     expect(installedSettings.packages).toEqual([installResult.pluginPath])
+    expect(installResult.launcherPath).toBe(join(agentDir, "home", ".local", "bin", "omo"))
     expect(uninstall.exitCode).toBe(0)
     expect(JSON.parse(uninstall.stdout)).toMatchObject({ ok: true, action: "uninstall" })
     expect(uninstall.stdout.trim().split("\n")).toHaveLength(1)
     expect(uninstalledSettings.packages).toEqual([])
+    await expect(readFile(join(agentDir, "home", ".local", "bin", "omo"), "utf8")).rejects.toThrow()
     expect(install.stderr).toBe("")
   })
 

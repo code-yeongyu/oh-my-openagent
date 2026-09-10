@@ -1,0 +1,77 @@
+Task: task-10-rebase-onto-dev
+Branch: feat/memorian-trigger-coverage
+Operation: git rebase origin/dev
+
+Base before/after:
+- Requested branch base before rebase: 192f5bfb75a0d7a18c87c5990a83b2dfb3525959
+- Rebase base after fetch: 767069606bcd36a2eb311f6a9ac14ab17b1f41b6 (origin/dev, PR #7899)
+- Final HEAD: c42539e0bdc73f4cfc07510b39fbea93cac44b39
+- Final commits in origin/dev..HEAD: 13 (the pre-rebase range 192f5bfb7..152accead also contained 13 commits; no commits were skipped)
+- Rebase completed; fallback merge was not used.
+
+Conflict files per round:
+1. Rebase commit 05ff508f5 (salvage memorian nudges):
+   - packages/omo-senpi/src/components/memory/memorian-judge-run.ts
+   - Kept the upstream child-event listener and upstream-failure race; merged deadline salvage behavior.
+2. Rebase commit c0c08abdd (run retention):
+   - packages/omo-senpi/src/components/memory/memorian-judge-run.ts
+   - Hoisted runDir and retained record() for every terminal branch, including the upstream-failure branch.
+3. Rebase commit 0edab030c (zero-accept deadline):
+   - packages/omo-senpi/src/components/memory/memorian-judge-run.ts
+   - packages/omo-senpi/src/components/memory/memorian-runner.ts
+   - Merged dropped deadline outcomes, removed deadline from MemorianGateFailureCause, and retained child_failed_upstream.
+4. Rebase commit dd4fcee3d (live harvesting test bundle):
+   - packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+   - packages/omo-senpi/plugin/extensions/omo-task.js
+   - packages/omo-senpi/plugin/extensions/omo.js
+   - Took the rebased commit's generated bundle versions verbatim; no bundle rebuild was run.
+
+Resolved memorian-judge-run.ts deadline + upstream branches:
+
+Setup-phase deadline branch:
+    if (settled === "deadline" || settled === undefined) {
+      const handle = host.handle
+      if (handle !== undefined) await abortAndDispose(handle, host.options.logger, runId)
+      if (state.cancelled && settled === undefined) {
+        return await record({ status: "dropped", cause: "cancelled", runId, candidateCount: input.candidates.length })
+      }
+      host.options.logger?.warn("memorian gate deadline exceeded", { runId, salvaged: accepted.length })
+      if (accepted.length > 0) return await record({ status: "completed", partial: true })
+      state.cancelled = true
+      return await record({ status: "dropped", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId })
+    }
+
+Turn-phase race and deadline branch:
+    const unsubscribeHandle = settled.subscribe(observeChildEvent)
+    const raced = await Promise.race([
+      settled.waitForIdle().then((outcome) => ({ kind: "turn-settled" as const, outcome })),
+      deadline,
+      upstreamFailure,
+    ])
+    unsubscribeHandle()
+    if (raced === "deadline") {
+      host.options.logger?.warn("memorian gate deadline exceeded", { runId, salvaged: accepted.length })
+      await abortAndDispose(settled, host.options.logger, runId)
+      if (accepted.length > 0) return await record({ status: "completed", partial: true })
+      state.cancelled = true
+      return await record({ status: "dropped", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId })
+    }
+
+Upstream-failure branch:
+    if (raced.kind === "upstream-failure") {
+      const reason = normalizeGateReason(upstreamReason)
+      host.options.logger?.warn("memorian gate child failed", { runId, cause: "child_failed_upstream", reason })
+      await abortAndDispose(settled, host.options.logger, runId)
+      return await record({ status: "failed", cause: "child_failed_upstream", reason, runId, model: resolution.model, candidateCount: input.candidates.length })
+    }
+
+Runner cause union:
+export type MemorianGateFailureCause = "session_create_failed" | "child_failed" | "child_failed_upstream" | "launch_failed"
+
+Validation results:
+- bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json: exit 0
+- bunx tsgo --noEmit -p packages/memory-core/tsconfig.json: exit 0
+- rg conflict-marker scan over packages/omo-senpi/src and packages/memory-core/src: NO_CONFLICT_MARKERS
+- git diff --check: clean
+- git status --porcelain=v1 after rebase and evidence write: clean
+- bun test: not run, per task instruction; remote orchestrator runs suites.

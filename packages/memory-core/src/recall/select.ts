@@ -13,18 +13,15 @@ export interface RecallCandidate {
   readonly score: number
 }
 
+/** Excerpt window length. Internal, deliberately not a config knob. */
+const EXCERPT_CHARS = 200
+
 export interface SelectRecallOptions {
   readonly maxItems: number
-  readonly excerptChars: number
-  /**
-   * Score ceiling, not a floor: matchScore is ascending-better (it sums first-match
-   * positions), so a candidate is kept only when its score is <= minScore.
-   */
-  readonly minScore?: number
-  /** Excluded paths; a trailing "*" matches by prefix, otherwise the path must equal the pattern. */
-  readonly exclude?: readonly string[]
   /** Paths already surfaced earlier in the session; they never repeat. */
   readonly surfaced: ReadonlySet<string>
+  /** Additional paths to skip, such as memories already visible in the transcript. Empty when omitted. */
+  readonly excludePaths?: ReadonlySet<string>
 }
 
 export function selectRecallCandidates(
@@ -39,8 +36,7 @@ export function selectRecallCandidates(
   const queryTerms = collectQueryTerms(parsedQueries)
   const scored: RecallCandidate[] = []
   for (const document of documents) {
-    if (options.surfaced.has(document.path)) continue
-    if (isExcluded(document.path, options.exclude ?? [])) continue
+    if (options.surfaced.has(document.path) || options.excludePaths?.has(document.path)) continue
 
     const haystack = `${document.description}\n${document.body}`
     let best: number | null = null
@@ -50,12 +46,11 @@ export function selectRecallCandidates(
       if (best === null || score < best) best = score
     }
     if (best === null) continue
-    if (options.minScore !== undefined && best > options.minScore) continue
 
     scored.push({
       path: document.path,
       description: document.description,
-      excerpt: buildExcerpt(document.body, queryTerms, options.excerptChars),
+      excerpt: buildExcerpt(document.body, queryTerms),
       score: best,
     })
   }
@@ -76,24 +71,12 @@ function collectQueryTerms(
   return terms
 }
 
-function isExcluded(path: string, patterns: readonly string[]): boolean {
-  for (const pattern of patterns) {
-    if (pattern.endsWith("*")) {
-      if (path.startsWith(pattern.slice(0, -1))) return true
-    } else if (path === pattern) {
-      return true
-    }
-  }
-  return false
-}
-
 /**
  * Excerpt is a body region centered on the first query-term match, or the body
  * head when no query term matches the body. Whitespace is collapsed to single
- * spaces and the result never exceeds excerptChars.
+ * spaces and the result never exceeds EXCERPT_CHARS.
  */
-function buildExcerpt(body: string, terms: readonly string[], excerptChars: number): string {
-  if (excerptChars <= 0) return ""
+function buildExcerpt(body: string, terms: readonly string[]): string {
   const normalized = body.replace(/\s+/g, " ").trim()
   if (normalized === "") return ""
 
@@ -109,10 +92,10 @@ function buildExcerpt(body: string, terms: readonly string[], excerptChars: numb
       matchLength = needle.length
     }
   }
-  if (matchIndex < 0) return normalized.slice(0, excerptChars)
+  if (matchIndex < 0) return normalized.slice(0, EXCERPT_CHARS)
 
-  const start = Math.max(0, matchIndex - Math.floor((excerptChars - matchLength) / 2))
-  const end = Math.min(normalized.length, start + excerptChars)
-  const clampedStart = Math.max(0, end - excerptChars)
+  const start = Math.max(0, matchIndex - Math.floor((EXCERPT_CHARS - matchLength) / 2))
+  const end = Math.min(normalized.length, start + EXCERPT_CHARS)
+  const clampedStart = Math.max(0, end - EXCERPT_CHARS)
   return normalized.slice(clampedStart, end).trim()
 }

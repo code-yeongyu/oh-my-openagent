@@ -45,6 +45,8 @@ import { createTaskSkillLoader } from "./task-skill-loader"
 const TASK_ENABLED_FLAG = "omo-task"
 
 export { wireEventBridge } from "./event-bridge"
+export { createInProcessJudgeRunner, findModelReference } from "./judge-runner"
+export type { InProcessRunnerLike } from "./judge-runner"
 
 export interface TaskComponentOptions {
   // Project root the task engine anchors its state dir + omo.json load to. Defaults to the cwd the
@@ -256,7 +258,7 @@ export function wireDagLifecycle(
 ): void {
   pi.on("session_shutdown", () => runtime.pauseForShutdown())
   wireTaskLifecycle()
-  pi.on("session_start", () => runtime.attach())
+  pi.on("session_start", (event) => runtime.attach(event))
   pi.on("session_before_switch", () => runtime.detach())
   pi.on("session_shutdown", () => runtime.dispose())
 }

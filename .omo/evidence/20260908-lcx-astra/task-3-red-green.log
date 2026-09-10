@@ -1,0 +1,267 @@
+EXECUTED RED/GREEN EVIDENCE - TODO 3
+Task: st_01a08154
+Session start: 2026-09-08T14:05:52.245Z
+Session finish: 2026-09-08T14:10:34.564Z
+Machine: mengmotaMac macos/aarch64
+RED source: pristine origin/dev 8bd0c35b3ba532ab0cb0df49ea71467303aa92ba
+GREEN source: pushed lcx/astra-default-models b97e0acdf4264d0d4c989dbb8a41a3808147f3dd
+Remote directory: /tmp/lcx-reda-20260908
+Toolchain: Bun 1.4.0; Node v26.7.0; Darwin arm64
+
+WHAT WAS TESTED
+The exact requested commands below ran once per phase in one SDK session. RED used a fresh dev Git clone after frozen install, plugin dependency install, and generated-skills preparation. Only the branch's changed test files/test support were overlaid (47 files, SHA256-verified). Production files remained dev. GREEN used a forced checkout of the exact pushed branch HEAD in the same disposable clone; test bytes were unchanged. Temporary fixture directories were scoped under the remote directory through TMPDIR.
+
+WHAT WAS OBSERVED
+Vitest RED: 11 passed / 2 failed; both gpt-6-astra and gpt-6-astra-fast budget cases expected 12000 maxRuleChars but received 500 from the 200k fallback. GREEN: 13 passed. RED TEST_EXIT=1; GREEN TEST_EXIT=0.
+
+WHY IT IS ENOUGH
+The captured failing assertion names and assertion differences demonstrate executable RED, not source comparisons or setup failure. The same commands then passed against the branch without edits to tests or product files. Full raw output is retained alongside the requested tail-120 capture, with byte count and SHA256 per command. The shell saves PIPESTATUS[0] before any later command can replace it. Remote read() bytes/artifact streams were decoded to UTF-8 and all retained full-output hashes were verified locally.
+
+WHAT WAS OMITTED
+This is an executed failing-first reconstruction after the branch was authored, not a claim about original implementation-time test order. No local bun test, new tests, product edits, full test:codex rerun, installer/manual hook QA, or fixes for other verify-a3 objections. Existing DoneClaim fields outside red_proof retain their historical results and are not re-certified by this scoped capture. No git commit or push was created.
+
+METHOD DECISION
+Using a pristine dev checkout plus a tests-only overlay was selected over reverting product files in the feature branch: it avoids accidentally running RED against already-modified sources. GREEN checks out the exact pushed branch rather than copying a partial source selection, and git diff --exit-code confirms no tracked mutations after the run.
+
+SETUP AND SOURCE PROVENANCE
+STAGE: frozen-install-dev
+COMMAND: bun install --frozen-lockfile
+STAGE_EXIT=0
+OUTPUT_BYTES=15765 OUTPUT_SHA256=f7c5b386ba58fbf1e20e312566203b3b9992e4fa02ed1c75e7ccabeabc76f6a6
+STAGE: plugin-dependencies-dev
+COMMAND: npm --prefix packages/omo-codex/plugin ci
+STAGE_EXIT=0
+OUTPUT_BYTES=547 OUTPUT_SHA256=fef328c57586a242562ba636fe773d052b8f4d901a329d6a71d32f6b986b1d63
+STAGE: generated-skills-dev
+COMMAND: cd packages/omo-codex/plugin && node scripts/sync-skills.mjs
+STAGE_EXIT=0
+OUTPUT_BYTES=0 OUTPUT_SHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+STAGE: test-only-overlay
+COMMAND: tar -xf '/tmp/lcx-reda-20260908/branch-tests.tar' && node --input-type=module -e 'import {readFileSync} from '\''node:fs'\''; import {createHash} from '\''node:crypto'\''; const rows=JSON.parse(readFileSync('\''/tmp/lcx-reda-20260908/test-manifest.json'\'','\''utf8'\'')); for (const row of rows) { const sha=createHash('\''sha256'\'').update(readFileSync(row.path)).digest('\''hex'\''); if(sha!==row.sha256) throw new Error(row.path); } console.log('\''BRANCH_TEST_BYTES_MATCH='\''+rows.length);' && git status --porcelain && git diff --name-only
+STAGE_EXIT=0
+OUTPUT_BYTES=6097 OUTPUT_SHA256=4eaca4ac60fb854f9576fab104e7144149992189cbc4b4519582461422f9ca1c
+STAGE: verify-docs-baseline
+COMMAND: node --input-type=module -e 'import {readFileSync} from '\''node:fs'\''; const baseline=JSON.parse(readFileSync('\''/tmp/lcx-reda-20260908/origin-dev-docs.json'\'','\''utf8'\'')); for (const file of baseline.files) { if(readFileSync(file.path,'\''utf8'\'')!==file.content) throw new Error('\''Remote pristine dev docs differ from local git show origin/dev:'\''+file.path); } console.log('\''ALL_FIVE_DOCS_BYTE_IDENTICAL_TO_LOCAL_GIT_SHOW_ORIGIN_DEV='\''+baseline.revision);'
+STAGE_EXIT=0
+OUTPUT_BYTES=99 OUTPUT_SHA256=3864506f27a8dd284948b769656991fbfefe9dbfb6baf4ee758dd259a028ec5b
+STAGE: checkout-pushed-branch
+COMMAND: git fetch --depth 1 origin lcx/astra-default-models && git checkout -f -B lcx/astra-default-models 'b97e0acdf4264d0d4c989dbb8a41a3808147f3dd' && test "$(git rev-parse HEAD)" = 'b97e0acdf4264d0d4c989dbb8a41a3808147f3dd' && git status --porcelain && git rev-parse HEAD
+STAGE_EXIT=0
+OUTPUT_BYTES=206 OUTPUT_SHA256=3a6c25d3edfd79d597d8463e43873a5b946afa822227ad0bb83aecefa6e6dcd1
+STAGE: generated-skills-branch
+COMMAND: cd packages/omo-codex/plugin && node scripts/sync-skills.mjs
+STAGE_EXIT=0
+OUTPUT_BYTES=0 OUTPUT_SHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+STAGE: verify-source-and-tests-unchanged
+COMMAND: git diff --exit-code && node --input-type=module -e 'import {readFileSync} from '\''node:fs'\''; import {createHash} from '\''node:crypto'\''; const rows=JSON.parse(readFileSync('\''/tmp/lcx-reda-20260908/test-manifest.json'\'','\''utf8'\'')); for (const row of rows) { const sha=createHash('\''sha256'\'').update(readFileSync(row.path)).digest('\''hex'\''); if(sha!==row.sha256) throw new Error(row.path); } console.log('\''BRANCH_TEST_BYTES_UNCHANGED='\''+rows.length);'
+STAGE_EXIT=0
+OUTPUT_BYTES=31 OUTPUT_SHA256=846514b087b8d48347d5e04465e40c71556ac78ea355dfedabd4f086fff18eb6
+
+===== RED: TODO 3 / budget-vitest =====
+COMMAND: bun --cwd packages/omo-codex/plugin/components/rules test test/post-compact-budget.test.ts
+CWD: /tmp/lcx-reda-20260908/omo
+CAPTURE: command 2>&1 | tee <full-log> | tail -120; rc=${PIPESTATUS[0]}; echo TEST_EXIT=$rc
+FULL OUTPUT BEGIN (5293 bytes; sha256=19182f32d88730b7bee51cda3700c893c280806c80b0fa2e607ee8ef8c062d0a)
+$ bun run build --silent && vitest --run --no-file-parallelism test/post-compact-budget.test.ts
+$ node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js --silent
+Bundled 51 modules in 21ms
+
+  cli.js  155.86 KB  (entry point)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/components/rules[39m
+
+ [31m❯[39m test/post-compact-budget.test.ts [2m([22m[2m13 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 249[2mms[22m[39m
+     [32m✓[39m #given known model near its context window #when resolving post-compact budget #then shrinks projected rule injection[32m 93[2mms[22m[39m
+     [32m✓[39m #given unknown model near its context window #when resolving post-compact budget #then shrinks projected rule injection conservatively[32m 3[2mms[22m[39m
+     [32m✓[39m #given known roomy model #when resolving post-compact budget #then keeps configured post-compact cap[32m 1[2mms[22m[39m
+     [32m✓[39m #given pure GPT-5.4 model near the fallback context window #when resolving post-compact budget #then treats it as non-preset metadata[32m 4[2mms[22m[39m
+[31m     [31m×[31m #given gpt-6-astra within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap[39m[32m 71[2mms[22m[39m
+[31m     [31m×[31m #given gpt-6-astra-fast within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap[39m[32m 2[2mms[22m[39m
+     [32m✓[39m #given gpt-5.6-sol within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 57[2mms[22m[39m
+     [32m✓[39m #given gpt-5.6-terra within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 3[2mms[22m[39m
+     [32m✓[39m #given gpt-5.6-luna within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 3[2mms[22m[39m
+     [32m✓[39m #given provider-prefixed gpt-5.6 variant within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 7[2mms[22m[39m
+     [32m✓[39m #given unknown model with the same transcript #when resolving post-compact budget #then keeps the 200k fallback floor[32m 3[2mms[22m[39m
+     [32m✓[39m #given context pressure marker after compaction #when resolving post-compact budget #then shrinks projected rule injection[32m 1[2mms[22m[39m
+     [32m✓[39m #given Codex canonical context-window marker after compaction #when resolving post-compact budget #then shrinks projected rule injection[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/post-compact-budget.test.ts[2m > [22mpost-compact context budget[2m > [22m#given gpt-6-astra within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap
+[31m[1mAssertionError[22m: expected 500 to be 12000 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 12000[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m test/post-compact-budget.test.ts:[2m86:31[22m[39m
+    [90m 84|[39m
+    [90m 85|[39m   [90m// then[39m
+    [90m 86|[39m   [34mexpect[39m(budget[33m.[39mmaxRuleChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxRuleChars)[33m;[39m
+    [90m   |[39m                               [31m^[39m
+    [90m 87|[39m   [34mexpect[39m(budget[33m.[39mmaxResultChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxResultChars)[33m;[39m
+    [90m 88|[39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/post-compact-budget.test.ts[2m > [22mpost-compact context budget[2m > [22m#given gpt-6-astra-fast within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap
+[31m[1mAssertionError[22m: expected 500 to be 12000 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 12000[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m test/post-compact-budget.test.ts:[2m98:31[22m[39m
+    [90m 96|[39m
+    [90m 97|[39m   [90m// then[39m
+    [90m 98|[39m   [34mexpect[39m(budget[33m.[39mmaxRuleChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxRuleChars)[33m;[39m
+    [90m   |[39m                               [31m^[39m
+    [90m 99|[39m   [34mexpect[39m(budget[33m.[39mmaxResultChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxResultChars)[33m;[39m
+    [90m100|[39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m11 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 23:08:10
+[2m   Duration [22m 1.53s[2m (transform 81ms, setup 0ms, import 120ms, tests 249ms, environment 0ms)[22m
+
+error: script "test" exited with code 1
+
+FULL OUTPUT END
+LAST 120 LINES / ACTUAL COMMAND EXIT:
+$ bun run build --silent && vitest --run --no-file-parallelism test/post-compact-budget.test.ts
+$ node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js --silent
+Bundled 51 modules in 21ms
+
+  cli.js  155.86 KB  (entry point)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/components/rules[39m
+
+ [31m❯[39m test/post-compact-budget.test.ts [2m([22m[2m13 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 249[2mms[22m[39m
+     [32m✓[39m #given known model near its context window #when resolving post-compact budget #then shrinks projected rule injection[32m 93[2mms[22m[39m
+     [32m✓[39m #given unknown model near its context window #when resolving post-compact budget #then shrinks projected rule injection conservatively[32m 3[2mms[22m[39m
+     [32m✓[39m #given known roomy model #when resolving post-compact budget #then keeps configured post-compact cap[32m 1[2mms[22m[39m
+     [32m✓[39m #given pure GPT-5.4 model near the fallback context window #when resolving post-compact budget #then treats it as non-preset metadata[32m 4[2mms[22m[39m
+[31m     [31m×[31m #given gpt-6-astra within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap[39m[32m 71[2mms[22m[39m
+[31m     [31m×[31m #given gpt-6-astra-fast within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap[39m[32m 2[2mms[22m[39m
+     [32m✓[39m #given gpt-5.6-sol within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 57[2mms[22m[39m
+     [32m✓[39m #given gpt-5.6-terra within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 3[2mms[22m[39m
+     [32m✓[39m #given gpt-5.6-luna within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 3[2mms[22m[39m
+     [32m✓[39m #given provider-prefixed gpt-5.6 variant within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap[32m 7[2mms[22m[39m
+     [32m✓[39m #given unknown model with the same transcript #when resolving post-compact budget #then keeps the 200k fallback floor[32m 3[2mms[22m[39m
+     [32m✓[39m #given context pressure marker after compaction #when resolving post-compact budget #then shrinks projected rule injection[32m 1[2mms[22m[39m
+     [32m✓[39m #given Codex canonical context-window marker after compaction #when resolving post-compact budget #then shrinks projected rule injection[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/post-compact-budget.test.ts[2m > [22mpost-compact context budget[2m > [22m#given gpt-6-astra within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap
+[31m[1mAssertionError[22m: expected 500 to be 12000 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 12000[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m test/post-compact-budget.test.ts:[2m86:31[22m[39m
+    [90m 84|[39m
+    [90m 85|[39m   [90m// then[39m
+    [90m 86|[39m   [34mexpect[39m(budget[33m.[39mmaxRuleChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxRuleChars)[33m;[39m
+    [90m   |[39m                               [31m^[39m
+    [90m 87|[39m   [34mexpect[39m(budget[33m.[39mmaxResultChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxResultChars)[33m;[39m
+    [90m 88|[39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/post-compact-budget.test.ts[2m > [22mpost-compact context budget[2m > [22m#given gpt-6-astra-fast within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap
+[31m[1mAssertionError[22m: expected 500 to be 12000 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 12000[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m test/post-compact-budget.test.ts:[2m98:31[22m[39m
+    [90m 96|[39m
+    [90m 97|[39m   [90m// then[39m
+    [90m 98|[39m   [34mexpect[39m(budget[33m.[39mmaxRuleChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxRuleChars)[33m;[39m
+    [90m   |[39m                               [31m^[39m
+    [90m 99|[39m   [34mexpect[39m(budget[33m.[39mmaxResultChars)[33m.[39m[34mtoBe[39m([33mCONFIG[39m[33m.[39mpostCompactMaxResultChars)[33m;[39m
+    [90m100|[39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m11 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 23:08:10
+[2m   Duration [22m 1.53s[2m (transform 81ms, setup 0ms, import 120ms, tests 249ms, environment 0ms)[22m
+
+error: script "test" exited with code 1
+TEST_EXIT=1
+
+TEST_EXIT=1
+
+===== GREEN: TODO 3 / budget-vitest =====
+COMMAND: bun --cwd packages/omo-codex/plugin/components/rules test test/post-compact-budget.test.ts
+CWD: /tmp/lcx-reda-20260908/omo
+CAPTURE: command 2>&1 | tee <full-log> | tail -120; rc=${PIPESTATUS[0]}; echo TEST_EXIT=$rc
+FULL OUTPUT BEGIN (839 bytes; sha256=3304edad8fae55cbe774e7f9df6bf723fd36b8fcc08458b5df3f908883868b96)
+$ bun run build --silent && vitest --run --no-file-parallelism test/post-compact-budget.test.ts
+$ node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js --silent
+Bundled 51 modules in 12ms
+
+  cli.js  156.16 KB  (entry point)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/components/rules[39m
+
+ [32m✓[39m test/post-compact-budget.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 23:09:19
+[2m   Duration [22m 167ms[2m (transform 38ms, setup 0ms, import 49ms, tests 30ms, environment 0ms)[22m
+
+
+FULL OUTPUT END
+LAST 120 LINES / ACTUAL COMMAND EXIT:
+$ bun run build --silent && vitest --run --no-file-parallelism test/post-compact-budget.test.ts
+$ node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js --silent
+Bundled 51 modules in 12ms
+
+  cli.js  156.16 KB  (entry point)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/private/tmp/lcx-reda-20260908/omo/packages/omo-codex/plugin/components/rules[39m
+
+ [32m✓[39m test/post-compact-budget.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 23:09:19
+[2m   Duration [22m 167ms[2m (transform 38ms, setup 0ms, import 49ms, tests 30ms, environment 0ms)[22m
+
+TEST_EXIT=0
+
+TEST_EXIT=0
+
+FINAL BRANCH SOURCE/TEST CHECK
+BRANCH_TEST_BYTES_UNCHANGED=47
+
+REMOTE CLEANUP RECEIPT
+COMMAND: rm -rf /tmp/lcx-reda-20260908
+dir REMOVED: /tmp/lcx-reda-20260908
+CLEANUP_EXIT=0
+
+PER-TODO EXIT SUMMARY
+{"cleanup_exit": 0, "green": [0], "red": [1], "todo": 3}

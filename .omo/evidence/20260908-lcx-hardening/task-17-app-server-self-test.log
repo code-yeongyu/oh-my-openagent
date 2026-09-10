@@ -1,0 +1,25 @@
+CONFIG_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+QA-only adaptation: disposable skill copy; mock startup uses FIFO read -t 15, not polling.
+BYTE_IDENTICAL=app-server-drive.sh SHA256=45967e49d06a26889a629bc05e33a77614441e5ed7cef147d6bd0f9c70c5e26b
+BYTE_IDENTICAL=lib/app-server-client.mjs SHA256=4976a02402a3b7044e2ec721299d3874f364a1fffe2eda67646a5c4fe528c5a1
+BYTE_IDENTICAL=lib/mock-model.mjs SHA256=53b4dda5f6099dc7747b3457445759da47adb8710e321da43395962060b29904
+COMMAND: ["bash", "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-1w87iu0q/codex-qa/scripts/app-server-drive.sh", "--self-test"]
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "01a08425-af10-79d1-ab93-1e7498a6046c",
+  "turnId": "01a08425-b09a-7e93-93ff-4e261a82720e",
+  "expectHook": [],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [],
+  "stderrTail": "\u001b[2m2026-09-09T03:10:57.211658Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Project-local config, hooks, and exec policies are disabled in the following folders until the project is trusted, but skills still load.\n    1. /Users/yeongyu/lcx-inboard-20260909/omo/.codex\n       To load project-local config, hooks, and exec policies, add /Users/yeongyu/lcx-inboard-20260909/omo as a trusted project in /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.QPRKGT94HM/codex/config.toml.\n\n\u001b[2m2026-09-09T03:10:57.659421Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_skills_extension::loader::host\u001b[0m\u001b[2m:\u001b[0m failed to scan skill path file:///Users/yeongyu/.agents/skills/omowright: Operation not permitted (os error 1)\n"
+}
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+PASS: app-server turn completed; assistant text: Hello from the codex-qa mock model.
+STDERR: /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-1w87iu0q/codex-qa/scripts/lib/common.sh: line 130: 81471 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$fifo" 2> "$CQA_HOME_ROOT/mock.stderr"
+
+EXIT=0
+PASS: parsed real JSON summary, mock assistant text, and paired hook events
+CONFIG_SHA_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml

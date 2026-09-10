@@ -46,7 +46,7 @@ Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
 ${categoryRows.join("\n")}
 
 \`\`\`typescript
-task(category="[category-name]", load_skills=[...], run_in_background=false, prompt="...")
+task(category="[category-name]", load_skills=[...], run_in_background=true, prompt="...")
 \`\`\``
 }
 
@@ -73,7 +73,7 @@ Read each skill's description in the section below and ask: "Does this skill's d
 
 **Usage:**
 \`\`\`typescript
-task(category="[category]", load_skills=["skill-1", "skill-2"], run_in_background=false, prompt="...")
+task(category="[category]", load_skills=["skill-1", "skill-2"], run_in_background=true, prompt="...")
 \`\`\`
 
 **IMPORTANT:**

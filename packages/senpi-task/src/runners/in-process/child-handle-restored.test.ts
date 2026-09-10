@@ -48,6 +48,14 @@ function createFakeSession(sessionId = "restored-session-1"): FakeSessionControl
 }
 
 describe("createRestoredChildHandle", () => {
+  test('#given completion "turn" and a restored session without assistant output #when waitForIdle is awaited #then it settles completed with empty text instead of child-turn-failed', async () => {
+    const fake = createFakeSession()
+    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session, completion: "turn" })
+
+    expect(await handle.waitForIdle()).toEqual({ status: "completed", finalResponse: "" })
+    expect(fake.promptCalls()).toBe(0)
+  })
+
   test("#given a restored session with prior assistant output #when the handle is created #then no prompt is replayed and waitForIdle drains the transcript outcome", async () => {
     // given a session whose persisted transcript ended with assistant text
     const fake = createFakeSession()

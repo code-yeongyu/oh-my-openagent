@@ -1,0 +1,268 @@
+{
+  "queryId": "q02",
+  "lane": "web",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 외국인 순매수 since:2026-08-29 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-29",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422740,
+    "completed_at": 1788422740,
+    "id": "e4c70b91-418d-9e90-b3eb-4b30a729592d",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_e4c70b91-418d-9e90-b3eb-4b30a729592d_call-1348acc8-8bf4-4065-8920-1594370befc4-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "코스피 외국인 순매수",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://github.com/james-brand/korea-market-data"
+            },
+            {
+              "type": "url",
+              "url": "https://news.sbs.co.kr/english/article.do?news_id=N1008732190"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202608271453185780"
+            },
+            {
+              "type": "url",
+              "url": "https://en.yna.co.kr/view/AEN20260820003100320"
+            },
+            {
+              "type": "url",
+              "url": "https://dealsite.co.kr/articles/167443"
+            },
+            {
+              "type": "url",
+              "url": "http://www.naewaynews.com/324132"
+            },
+            {
+              "type": "url",
+              "url": "https://v.daum.net/v/20260818060218283"
+            },
+            {
+              "type": "url",
+              "url": "https://www.hankookilbo.com/news/article/A2026032711280000300"
+            },
+            {
+              "type": "url",
+              "url": "https://www.joongang.co.kr/article/25407676"
+            },
+            {
+              "type": "url",
+              "url": "https://finance.daum.net/news/20260828160331328"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202603101440539001"
+            },
+            {
+              "type": "url",
+              "url": "https://www.news1.kr/amp/finance/market-exr/5945233"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202605081624317675"
+            },
+            {
+              "type": "url",
+              "url": "https://www.sportalkorea.com/news/articleView.html?idxno=2025052909552772122"
+            },
+            {
+              "type": "url",
+              "url": "https://www.ebn.co.kr/news/articleView.html?idxno=1709267"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_e4c70b91-418d-9e90-b3eb-4b30a729592d_call-1348acc8-8bf4-4065-8920-1594370befc4-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**코스피 외국인 순매수(매도) 최신 동향 (2026년 9월 기준)**\n\n2026년 들어 외국인 투자자들은 코스피 시장에서 **대규모 순매도**를 이어가고 있습니다. 연초부터 9월 1일까지 **약 16.97조 원** 순매도한 것으로 집계됐으며, 이는 전년(약 4.65조 원 순매도)의 약 36배 규모입니다.[[1]](https://news.sbs.co.kr/english/article.do?news_id=N1008732190)\n\n### 월별 주요 추이\n- **1월**: +1,186억 원 (순매수, 유일한 플러스 달 중 하나)\n- **2월**: –21조 원 이상\n- **3월**: –35조 원 이상\n- **4월**: +1.1283조 원 (순매수)\n- **5월**: –44.7조 원\n- **6월**: –48.6조 원\n- **7월**: –9.9조 원\n- **8월**: –10.2조 원 (대체로 순매도 지속)\n- **9월 1일 현재**: 당일 –5,419억 원 (순매도)[[1]](https://news.sbs.co.kr/english/article.do?news_id=N1008732190)\n\n올해 순매수 달은 1월과 4월뿐이며, 5~8월에는 4개월 연속 대규모 매도가 이어졌습니다. 8월 둘째 주(10~14일)에는 일시적으로 **6.57조 원** 순매수(주간 기준 역대 최대)를 기록하며 반전 조짐을 보이기도 했으나, 전체적으로는 매도 우위가 강합니다.[[2]](https://v.daum.net/v/20260818060218283)\n\n### 최근 시장 상황\n- 8월 말~9월 초: 외국인 매도세가 지속되면서 코스피 지수가 6,800~7,000선에서 등락을 반복했습니다. 예를 들어 8월 28일에는 외국인이 1.76조 원 순매도하며 지수가 1.79% 하락했습니다.[[3]](https://finance.daum.net/news/20260828160331328)\n- 반면 개인과 기관(특히 퇴직연금·ETF 자금)이 외국인 매도 물량을 상당 부분 받아내며 지수를 방어하고 있다는 분석이 많습니다.[[4]](https://dealsite.co.kr/articles/167443)\n\n### 추가 참고\n- 외국인 보유 잔고는 주가 상승으로 인해 2,000조 원을 넘는 **역대 최대** 수준을 기록하기도 했습니다. (2026년 2월 기준 약 2,025조 원)[[5]](https://www.hankookilbo.com/news/article/A2026032711280000300)\n- 실시간·일별 상세 데이터는 한국거래소(KRX), 코스콤 CHECK, 또는 GitHub의 오픈 데이터셋(매일 업데이트)에서 확인할 수 있습니다.[[6]](https://github.com/james-brand/korea-market-data)\n\n더 구체적인 날짜(예: 최근 1주일, 특정 종목별)나 기간의 데이터를 원하시면 추가로 말씀해주세요!",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://news.sbs.co.kr/english/article.do?news_id=N1008732190",
+                "start_index": 171,
+                "end_index": 239,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://news.sbs.co.kr/english/article.do?news_id=N1008732190",
+                "start_index": 485,
+                "end_index": 553,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://v.daum.net/v/20260818060218283",
+                "start_index": 701,
+                "end_index": 746,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://finance.daum.net/news/20260828160331328",
+                "start_index": 875,
+                "end_index": 929,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://dealsite.co.kr/articles/167443",
+                "start_index": 1003,
+                "end_index": 1048,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.hankookilbo.com/news/article/A2026032711280000300",
+                "start_index": 1147,
+                "end_index": 1215,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://github.com/james-brand/korea-market-data",
+                "start_index": 1297,
+                "end_index": 1352,
+                "title": "6"
+              }
+            ]
+          }
+        ],
+        "id": "msg_e4c70b91-418d-9e90-b3eb-4b30a729592d",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 183640500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 183640500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:05:36.702Z"
+}

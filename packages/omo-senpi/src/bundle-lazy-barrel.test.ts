@@ -13,7 +13,6 @@ const BUNDLE_FILES = [
   "omo.js",
   "omo-task.js",
   "omo-member.js",
-  "omo-memory-mcp.js",
   "memory-run-supervisor.mjs",
   "omo-init-deep-advisor.js",
 ] as const

@@ -1,0 +1,20 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/skills-sync.test.ts:
+(pass) OMO Senpi scoped skill sync > #given the telemetry builtin skill allowlist #when compared with packaged skills #then it stays exact and frozen [1.84ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill output #when inspected #then exactly 24 roots exist with valid names [0.34ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values [3.01ms]
+(pass) OMO Senpi scoped skill sync > #given codex-derived and native skill roots #when scanned #then no Codex or multi-agent harness guidance survives [1.75ms]
+(pass) OMO Senpi scoped skill sync > #given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization [1.24ms]
+(pass) OMO Senpi scoped skill sync > #given ulw-research skill #when synced #then the X / social lane bullet is shipped [0.12ms]
+(pass) OMO Senpi scoped skill sync > #given ulw-execute skill #when inspected #then session ids reference senpi, not codex [0.10ms]
+(pass) OMO Senpi scoped skill sync > #given ulw-execute skill #when inspected #then the senpi banner advertises senpi watcher tools, not a codex wait idiom [0.12ms]
+(pass) OMO Senpi scoped skill sync > #given synced skill tree #when inspected #then no codex-only display metadata is packaged [2.89ms]
+(pass) OMO Senpi scoped skill sync > #given ported orchestration skills #when scanned #then no foreign-harness delegation guidance survives [0.99ms]
+(pass) OMO Senpi scoped skill sync > #given shipped task examples #when targets are scanned #then every agent and category exists in Senpi [35.77ms]
+(pass) OMO Senpi scoped skill sync > #given frontend skill #when inspected #then materialized design references exist [0.11ms]
+
+ 12 pass
+ 0 fail
+ 201 expect() calls
+Ran 12 tests across 1 file. [1.91s]

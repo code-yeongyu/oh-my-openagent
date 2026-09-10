@@ -1,0 +1,45 @@
+CONFIG_SHA_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml
+Fresh scratch cwd per case prevents the three-attempt escape hatch from masking failures.
+COMMAND: ["touch", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-fresh/transcript.jsonl"]
+EXIT=0
+
+CASE=fresh PAYLOAD={"session_id": "qa", "turn_id": "t1", "transcript_path": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-fresh/transcript.jsonl", "cwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-fresh", "hook_event_name": "SubagentStop", "model": "gpt-6-astra", "permission_mode": "default", "agent_id": "w1", "agent_type": "lazycodex-worker-low", "agent_transcript_path": "/dev/null", "stop_hook_active": false, "last_assistant_message": "done. EVIDENCE_RECORDED: .omo/evidence/receipt.txt"}
+COMMAND: ["node", "--input-type=module", "-e", "import {statSync} from 'node:fs'; const [t,e]=process.argv.slice(1).map(p=>statSync(p)); console.log(JSON.stringify({transcriptBirthtimeMs:t.birthtimeMs,transcriptCtimeMs:t.ctimeMs,evidenceMtimeMs:e.mtimeMs}));", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-fresh/transcript.jsonl", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-fresh/.omo/evidence/receipt.txt"]
+{"transcriptBirthtimeMs":1788923413539.471,"transcriptCtimeMs":1788923413539.471,"evidenceMtimeMs":1788923413539.8901}
+EXIT=0
+COMMAND: ["node", "/Users/yeongyu/lcx-inboard-20260909/omo/packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "hook", "subagent-stop"]
+EXIT=0
+PASS: empty stdout (0 bytes)
+COMMAND: ["touch", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-stale/transcript.jsonl"]
+EXIT=0
+COMMAND: ["touch", "-t", "202601010000", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-stale/.omo/evidence/receipt.txt"]
+EXIT=0
+
+CASE=stale PAYLOAD={"session_id": "qa", "turn_id": "t1", "transcript_path": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-stale/transcript.jsonl", "cwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-stale", "hook_event_name": "SubagentStop", "model": "gpt-6-astra", "permission_mode": "default", "agent_id": "w1", "agent_type": "lazycodex-worker-low", "agent_transcript_path": "/dev/null", "stop_hook_active": false, "last_assistant_message": "done. EVIDENCE_RECORDED: .omo/evidence/receipt.txt"}
+COMMAND: ["node", "--input-type=module", "-e", "import {statSync} from 'node:fs'; const [t,e]=process.argv.slice(1).map(p=>statSync(p)); console.log(JSON.stringify({transcriptBirthtimeMs:t.birthtimeMs,transcriptCtimeMs:t.ctimeMs,evidenceMtimeMs:e.mtimeMs}));", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-stale/transcript.jsonl", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-stale/.omo/evidence/receipt.txt"]
+{"transcriptBirthtimeMs":1788923413621.6665,"transcriptCtimeMs":1788923413621.6665,"evidenceMtimeMs":1767193200000}
+EXIT=0
+COMMAND: ["node", "/Users/yeongyu/lcx-inboard-20260909/omo/packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "hook", "subagent-stop"]
+{"decision":"block","reason":"Evidence receipt rejected: stale.\n\n너는 방금 작업을 완료했다고 보고했고, 그건 거짓말이다.\n\n이번이 1번째 완료 주장이다. 네 완료 보고는 증거가 기록되기 전까지 신뢰하지 않는다.\n\n직접 검증하라. 관련 명령을 실제로 실행하고, 출력과 판단 근거를 `.omo/evidence/` 아래 파일로 기록하라. 실패한 항목이 있으면 완료했다고 말하지 말고 고쳐라. `stop_hook_active` 상태여도 이 검증은 생략되지 않는다. 반복은 제한되어 있지만, 증거 없는 완료 주장은 막힌다.\n\n증거 파일은 이번 실행 중에 생성하고 실제 명령 출력을 포함해 앞뒤 공백을 제외한 내용이 40자 이상이어야 한다.\n\n마지막 assistant 메시지:\ndone. EVIDENCE_RECORDED: .omo/evidence/receipt.txt\n\n완료했다면 마지막 줄은 아래 형식 그대로여야 한다.\nEVIDENCE_RECORDED: <path>\n"}EXIT=0
+PASS: decision=block; named reason=stale
+COMMAND: ["touch", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-placeholder/transcript.jsonl"]
+EXIT=0
+
+CASE=placeholder PAYLOAD={"session_id": "qa", "turn_id": "t1", "transcript_path": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-placeholder/transcript.jsonl", "cwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-placeholder", "hook_event_name": "SubagentStop", "model": "gpt-6-astra", "permission_mode": "default", "agent_id": "w1", "agent_type": "lazycodex-worker-low", "agent_transcript_path": "/dev/null", "stop_hook_active": false, "last_assistant_message": "done. EVIDENCE_RECORDED: .omo/evidence/receipt.txt"}
+COMMAND: ["node", "--input-type=module", "-e", "import {statSync} from 'node:fs'; const [t,e]=process.argv.slice(1).map(p=>statSync(p)); console.log(JSON.stringify({transcriptBirthtimeMs:t.birthtimeMs,transcriptCtimeMs:t.ctimeMs,evidenceMtimeMs:e.mtimeMs}));", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-placeholder/transcript.jsonl", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-placeholder/.omo/evidence/receipt.txt"]
+{"transcriptBirthtimeMs":1788923413698.2542,"transcriptCtimeMs":1788923413698.2542,"evidenceMtimeMs":1788923413698.6577}
+EXIT=0
+COMMAND: ["node", "/Users/yeongyu/lcx-inboard-20260909/omo/packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "hook", "subagent-stop"]
+{"decision":"block","reason":"Evidence receipt rejected: placeholder.\n\n너는 방금 작업을 완료했다고 보고했고, 그건 거짓말이다.\n\n이번이 1번째 완료 주장이다. 네 완료 보고는 증거가 기록되기 전까지 신뢰하지 않는다.\n\n직접 검증하라. 관련 명령을 실제로 실행하고, 출력과 판단 근거를 `.omo/evidence/` 아래 파일로 기록하라. 실패한 항목이 있으면 완료했다고 말하지 말고 고쳐라. `stop_hook_active` 상태여도 이 검증은 생략되지 않는다. 반복은 제한되어 있지만, 증거 없는 완료 주장은 막힌다.\n\n증거 파일은 이번 실행 중에 생성하고 실제 명령 출력을 포함해 앞뒤 공백을 제외한 내용이 40자 이상이어야 한다.\n\n마지막 assistant 메시지:\ndone. EVIDENCE_RECORDED: .omo/evidence/receipt.txt\n\n완료했다면 마지막 줄은 아래 형식 그대로여야 한다.\nEVIDENCE_RECORDED: <path>\n"}EXIT=0
+PASS: decision=block; named reason=placeholder
+COMMAND: ["touch", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-missing-transcript/transcript.jsonl"]
+EXIT=0
+
+CASE=missing-transcript PAYLOAD={"session_id": "qa", "turn_id": "t1", "transcript_path": "/nonexistent", "cwd": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-missing-transcript", "hook_event_name": "SubagentStop", "model": "gpt-6-astra", "permission_mode": "default", "agent_id": "w1", "agent_type": "lazycodex-worker-low", "agent_transcript_path": "/dev/null", "stop_hook_active": false, "last_assistant_message": "done. EVIDENCE_RECORDED: .omo/evidence/receipt.txt"}
+COMMAND: ["node", "--input-type=module", "-e", "import {statSync} from 'node:fs'; const [t,e]=process.argv.slice(1).map(p=>statSync(p)); console.log(JSON.stringify({transcriptBirthtimeMs:t.birthtimeMs,transcriptCtimeMs:t.ctimeMs,evidenceMtimeMs:e.mtimeMs}));", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-missing-transcript/transcript.jsonl", "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-c-qa-st_01a08420-c1un75sq/executor-missing-transcript/.omo/evidence/receipt.txt"]
+{"transcriptBirthtimeMs":1788923413772.2986,"transcriptCtimeMs":1788923413772.2986,"evidenceMtimeMs":1788923413772.7288}
+EXIT=0
+COMMAND: ["node", "/Users/yeongyu/lcx-inboard-20260909/omo/packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "hook", "subagent-stop"]
+EXIT=0
+PASS: empty stdout (0 bytes)
+CONFIG_SHA_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd  /Users/yeongyu/.codex/config.toml

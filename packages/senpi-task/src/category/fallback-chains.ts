@@ -8,6 +8,11 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   "visual-engineering": [
     {
       providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "max",
+    },
+    {
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "max",
     },
@@ -15,27 +20,29 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: "kimi-k3",
       variant: "max",
-    },
-    { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.2", variant: "max" },
-    {
-      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
     }
   ],
   architect: [
     {
       providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-fable-5",
-      variant: "xhigh",
+      model: "claude-fable-5-1",
+      variant: "max",
     }
   ],
   ultrabrain: [
+    { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "max" },
+    { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
+    { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "max" },
     { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "max" },
     { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
     { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "max" }
   ],
   deep: [
+    {
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      model: "gpt-6-astra",
+      variant: "high",
+    },
     {
       providers: ["openai", "openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
@@ -45,8 +52,8 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   artistry: [
     {
       providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-fable-5",
-      variant: "xhigh",
+      model: "claude-fable-5-1",
+      variant: "max",
     },
     {
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
@@ -99,6 +106,11 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ],
   "unspecified-high": [
     {
+      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      model: "gpt-6-astra",
+      variant: "high",
+    },
+    {
       providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "xhigh",
@@ -112,15 +124,14 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ],
   writing: [
     {
-      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
-      model: "kimi-k3",
-      variant: "low",
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "medium",
     },
     {
-      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-opus-5",
-      variant: "low",
-    },
-    { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" }
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
+      variant: "max",
+    }
   ],
 }

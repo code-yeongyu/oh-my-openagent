@@ -12,10 +12,12 @@ import {
 import { logBindReconcileFailure } from "./bind-reconcile-log"
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
+import { primeMemoryPersonaAssets } from "./persona-prime"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { shutdownDeadlineAt, type ShutdownReason } from "./shutdown-drain"
 import { resolveMemorySettings } from "./identity-runtime"
 import { memoryModuleSupervisor } from "./supervisor"
+import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
 const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
@@ -73,6 +75,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         return
       }
 
+      primeMemoryPersonaAssets({ logger: ctx.logger })
+
       const wiring = createMemoryWiring({
         sessions,
         loadConfig,
@@ -84,9 +88,16 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         ...(options.refreshStatus === undefined ? {} : { refreshStatus: options.refreshStatus }),
         // Reuse the boot snapshot: registration must not add a loadConfig() call, because the
         // enablement latch depends on the ORDER of reads across boot -> session_start -> reload.
-        toolExposure: bootConfig.tool_exposure,
       })
       wiring.registerStatic(pi, ctx)
+      const unregisterReadClassifier = registerMemoryReadClassifier(pi, {
+        resolveRepos: function* () {
+          for (const state of sessions.values()) {
+            if (state.context !== undefined) yield state.context.identityPaths.repo
+          }
+        },
+        logger: ctx.logger,
+      })
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
@@ -150,6 +161,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         wiring.clearStatus(eventCtx)
         releaseSession(sessions.get(sessionId))
         sessions.delete(sessionId)
+        if (sessions.size === 0) unregisterReadClassifier?.()
         unsubscribeReload?.()
       })
     },
@@ -160,10 +172,7 @@ export function resolveMemoryConfig(loaded: SenpiOmoConfigResult): ResolvedMemor
   return resolveMemorySettings(loaded.config.memory)
 }
 
-// A memory child carries one of these sentinels. Today the child also runs --no-extensions, so omo
-// never loads there; a fork-mode child cannot pass --no-extensions (its request prefix must match
-// the parent for the provider cache to hit), so the sentinel is the only thing standing between a
-// forked reflection and unbounded self-triggering recursion.
+// Detached memory workers carry sentinels so their own settles do not recursively trigger memory.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
 
 export function isMemoryChildProcess(env: Record<string, string | undefined>): boolean {

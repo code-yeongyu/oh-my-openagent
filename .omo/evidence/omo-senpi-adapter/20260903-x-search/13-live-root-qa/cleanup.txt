@@ -1,0 +1,1 @@
+Cleanup: all sandbox roots were removed by the driver; seeded xAI auth copies were overwritten with random bytes and removed; no live QA processes remain. Real ~/.senpi/agent credential digest remained unchanged and reports have realSenpiChangedPaths=[]. All reports use peer-dependency senpi 2026.9.2-4.

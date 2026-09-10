@@ -1,0 +1,186 @@
+### MUTATION PROOF - todo 10 packaging (2026-09-03T06:01:32Z)
+Four seams, broken one at a time, restored after each.
+
+== MUTATION 1: component-list.ts drops createXSearchComponent() from the registration array ==
+0
+$ bun test packages/omo-senpi/src/extension/component-list.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/extension/component-list.test.ts:
+19 | 
+20 |     // when
+21 |     const occurrences = names.filter((name) => name === "x-search")
+22 | 
+23 |     // then
+24 |     expect(occurrences).toEqual(["x-search"])
+                             ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "x-search",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/extension/component-list.test.ts:24:25)
+(fail) createOmoSenpiComponents > #given the production registration array #when x-search is looked up #then it is present exactly once [3.00ms]
+32 |     const lspIndex = names.indexOf("lsp")
+33 |     const xSearchIndex = names.indexOf("x-search")
+34 |     const taskIndex = names.indexOf("task")
+35 | 
+36 |     // then
+37 |     expect(xSearchIndex).toBe(lspIndex + 1)
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 14
+Received: -1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/extension/component-list.test.ts:37:26)
+(fail) createOmoSenpiComponents > #given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture [0.17ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [2.09s]
+exit=1
+-- restored; re-run --
+(pass) createOmoSenpiComponents > #given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture [0.09ms]
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [773.00ms]
+
+== MUTATION 2: task-skill-loader.ts drops the bundled-runtime ../skills-conditional candidate ==
+2
+$ bun test packages/omo-senpi/src/components/task/task-skill-loader.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/task/task-skill-loader.test.ts:
+(pass) packagedSkillDirs > #given the source-tree layout #when packaged dirs resolve #then load_skills ["x-search"] resolves from plugin/skills-conditional [6.60ms]
+73 |       loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+74 |     })
+75 |     const resolution = loader(["x-search"], tempDir())
+76 | 
+77 |     // then
+78 |     expect(dirs).toContain(conditionalDir)
+                      ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-task-skill-loader-2eYQ4L/plugin/skills-conditional"
+Received: []
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/task/task-skill-loader.test.ts:78:18)
+(fail) packagedSkillDirs > #given the bundled runtime layout #when packaged dirs resolve #then load_skills ["x-search"] resolves from ../skills-conditional [1.14ms]
+(pass) createTaskSkillLoader > #given canonical and packaged skill roots #when the loader resolves a collision #then canonical wins [0.94ms]
+(pass) createTaskSkillLoader > #given default attribution settings #when the git-master skill is loaded #then the co-author directive rides the skill block [0.89ms]
+(pass) createTaskSkillLoader > #given attribution disabled #when the git-master skill is loaded #then the skill block stays untouched [1.15ms]
+(pass) createTaskSkillLoader > #given default attribution settings #when a non-git-master skill is loaded #then no directive is injected [0.80ms]
+
+ 5 pass
+ 1 fail
+ 15 expect() calls
+Ran 6 tests across 1 file. [600.00ms]
+exit=1
+-- restored; re-run --
+(pass) createTaskSkillLoader > #given default attribution settings #when a non-git-master skill is loaded #then no directive is injected [0.72ms]
+
+ 6 pass
+ 0 fail
+ 17 expect() calls
+Ran 6 tests across 1 file. [650.00ms]
+
+== MUTATION 3: stage-x-search-skill.mjs --check stops comparing source vs staged bytes ==
+53:  if (false && sourceBody !== stagedBody) {
+$ bun test packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:
+(pass) x-search conditional skill staging > #given no staged copy #when --check runs #then it fails as missing [4.24ms]
+(pass) x-search conditional skill staging > #given a staged copy #when --check runs #then it passes and the bytes match the source [1.45ms]
+45 |   test("#given a stale staged copy #when --check runs #then it fails as stale", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+46 |     const fixture = await makeFixture()
+47 |     await stageXSearchSkill(fixture)
+48 |     await writeFile(fixture.targetSkill, "---\nname: x-search\ndescription: stale copy\n---\nOLD BODY\n", "utf8")
+49 | 
+50 |     await assert.rejects(checkXSearchSkillStaged(fixture), /stale/)
+                      ^
+AssertionError: Missing expected rejection.
+ generatedMessage: false,
+     actual: undefined,
+   expected: /stale/,
+   operator: "rejects",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at innerFail (node:assert:48:27)
+      at expectsError (node:assert:383:14)
+      at assert.rejects (node:assert:432:17)
+      at /Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs:50:18
+      at node:test:1445:26
+      at executeTestNode (node:test:1448:63)
+(fail) x-search conditional skill staging > #given a stale staged copy #when --check runs #then it fails as stale [1.88ms]
+(pass) x-search conditional skill staging > #given a missing source skill #when staged #then it fails loudly instead of writing a partial copy [0.64ms]
+
+ 3 pass
+ 1 fail
+Ran 4 tests across 1 file. [529.00ms]
+exit=1
+-- restored; re-run --
+(pass) x-search conditional skill staging > #given a stale staged copy #when --check runs #then it fails as stale [1.22ms]
+(pass) x-search conditional skill staging > #given a missing source skill #when staged #then it fails loudly instead of writing a partial copy [0.57ms]
+
+ 4 pass
+ 0 fail
+Ran 4 tests across 1 file. [532.00ms]
+
+== MUTATION 4: plugin/package.json files array drops "skills-conditional" ==
+0
+$ bun test packages/omo-senpi/src/plugin-manifest.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/plugin-manifest.test.ts:
+(pass) OMO Senpi plugin manifest > #given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory [1.39ms]
+(pass) OMO Senpi plugin manifest > #given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent [0.11ms]
+77 |     expect(manifest.keywords).toContain("pi-package")
+78 |     expect(manifest.keywords).toContain("senpi")
+79 |     expect(manifest.keywords).toContain("omo")
+80 |     expect(manifest.keywords).toContain("oh-my-openagent")
+81 |     expect(manifest.keywords).toContain("pi")
+82 |     expect(manifest.files).toEqual([
+                                ^
+error: expect(received).toEqual(expected)
+
+  [
+    "extensions",
+    "skills",
+-   "skills-conditional",
+    "runtime",
+    "scripts/install.mjs",
+    "README.md",
+    "NOTICE",
+    "LICENSE",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/plugin-manifest.test.ts:82:28)
+(fail) OMO Senpi plugin manifest > #given package metadata #when loaded #then Pi discoverability and shipped files are pinned [2.01ms]
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.23ms]
+
+ 3 pass
+ 1 fail
+ 16 expect() calls
+Ran 4 tests across 1 file. [509.00ms]
+exit=1
+-- restored; re-run --
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.22ms]
+
+ 4 pass
+ 0 fail
+ 16 expect() calls
+Ran 4 tests across 1 file. [476.00ms]

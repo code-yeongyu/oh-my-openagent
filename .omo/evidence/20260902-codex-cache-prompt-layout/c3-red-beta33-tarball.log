@@ -1,0 +1,27 @@
+
+added 18 packages in 26s
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @sisyphuslabs/omo-codex-plugin@5.0.0-beta.33 sync:skills
+> node scripts/sync-skills.mjs
+
+node:internal/fs/promises:1360
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: ENOENT: no such file or directory, open '/private/tmp/omo-beta34-c3-mengmotaMac/codex/plugins/cache/packages/prompts-core/prompts/ultrawork/codex.md'
+    at async open (node:internal/fs/promises:1360:25)
+    at async readFile (node:internal/fs/promises:2149:14)
+    at async syncSkills (file:///private/tmp/omo-beta34-c3-mengmotaMac/codex/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.33-65289-1788331890909/scripts/sync-skills.mjs:278:38)
+    at async file:///private/tmp/omo-beta34-c3-mengmotaMac/codex/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.33-65289-1788331890909/scripts/sync-skills.mjs:303:2 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/private/tmp/omo-beta34-c3-mengmotaMac/codex/plugins/cache/packages/prompts-core/prompts/ultrawork/codex.md'
+}
+
+Node.js v26.7.0
+npm run sync:skills failed in /tmp/omo-beta34-c3-mengmotaMac/codex/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.33-65289-1788331890909 with exit code 1

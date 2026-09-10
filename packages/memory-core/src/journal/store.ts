@@ -3,10 +3,12 @@ import { appendFile, mkdir, readFile, rename, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
+  REFLECTION_SNAPSHOT_MAX_BYTES,
   captureCursorSnapshot,
   deriveState,
   finalizeCursor,
   initialReflectionState,
+  reflectedThroughByteOffset,
   type ReflectionSnapshot, type ReflectionTranscriptState,
 } from "./cursor"
 import {
@@ -23,6 +25,8 @@ export type TranscriptJournalOptions = {
   readonly journalDir: string
   readonly now?: () => Date
   readonly lock?: JournalLock
+  /** Byte budget for one reflection payload; the remainder is carried into later captures. */
+  readonly snapshotMaxBytes?: number
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -56,15 +60,23 @@ function nonNegativeInteger(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0
 }
 
+function optionalNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined
+}
+
 function parseState(raw: string | null): ReflectionTranscriptState {
   if (raw === null) return initialReflectionState()
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== "object") return initialReflectionState()
     const state = parsed as Record<string, unknown>
+    const reflectedThroughByteOffset = optionalNonNegativeInteger(state.reflected_through_byte_offset)
+    const unreflectedBytes = optionalNonNegativeInteger(state.unreflected_bytes)
     return {
+      ...(unreflectedBytes === undefined ? {} : { unreflected_bytes: unreflectedBytes }),
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
+      ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
       total_completed_steps: nonNegativeInteger(state.total_completed_steps),
       reflected_completed_steps: nonNegativeInteger(state.reflected_completed_steps),
       steps_since_last_successful_reflection: nonNegativeInteger(
@@ -86,8 +98,10 @@ export class TranscriptJournal {
   readonly lockPath: string
   private readonly now: () => Date
   private readonly lock: JournalLock
+  private readonly snapshotMaxBytes: number
 
   constructor(readonly options: TranscriptJournalOptions) {
+    this.snapshotMaxBytes = options.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
     this.transcriptPath = join(options.journalDir, "transcript.jsonl")
     this.statePath = join(options.journalDir, "state.json")
     this.lockPath = join(options.journalDir, "state.lock")
@@ -129,11 +143,16 @@ export class TranscriptJournal {
     })
   }
 
-  async captureReflectionSnapshot(signal?: AbortSignal): Promise<ReflectionSnapshot | null> {
+  async captureReflectionSnapshot(
+    signal?: AbortSignal,
+    options: { readonly maxBytes?: number } = {},
+  ): Promise<ReflectionSnapshot | null> {
     return this.locked(async () => {
       const entries = await this.readEntriesUnlocked()
       const state = deriveState(await this.readStateUnlocked(), entries)
-      const snapshot = captureCursorSnapshot(entries, state)
+      const snapshot = captureCursorSnapshot(entries, state, {
+        maxBytes: options.maxBytes ?? this.snapshotMaxBytes,
+      })
       if (snapshot === null) return null
       signal?.throwIfAborted()
       await this.writeStateUnlocked(
@@ -191,6 +210,18 @@ export class TranscriptJournal {
       if (isTranscriptEntry(parsed)) entries.push(parsed)
     }
     return entries
+  }
+
+  async backfillReflectionByteOffset(entries: readonly TranscriptEntry[]): Promise<ReflectionTranscriptState> {
+    const state = await this.readStateUnlocked()
+    await this.writeStateUnlocked({
+      ...state,
+      reflected_through_byte_offset: state.reflected_through_byte_offset
+        ?? (state.reflected_through_message_id === undefined
+          ? 0
+          : reflectedThroughByteOffset(entries, state.reflected_through_message_id)),
+    }, entries)
+    return this.readStateUnlocked()
   }
 
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {
@@ -267,7 +298,12 @@ export class TranscriptJournal {
     state: ReflectionTranscriptState,
     entries: readonly TranscriptEntry[],
   ): Promise<void> {
-    const derived = deriveState(state, entries)
+    const derived = deriveState({
+      ...state,
+      ...(state.reflected_through_message_id !== undefined && state.reflected_through_byte_offset === undefined
+        ? { reflected_through_byte_offset: reflectedThroughByteOffset(entries, state.reflected_through_message_id) }
+        : {}),
+    }, entries)
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
     await rename(temporaryPath, this.statePath)
