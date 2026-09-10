@@ -50,6 +50,9 @@ type ModelIdentifier = {
   modelID: string
 }
 
+// Byte-stability contract (prefix-stability scenarios S1/S2): this order is
+// the request prefix contract. Any reorder changes prefix bytes and must fail
+// messages-transform-chain-order.test.ts first. Do not reorder without review.
 const MESSAGES_TRANSFORM_HOOKS = [
   {
     key: "btwSideContextInjector",
@@ -63,6 +66,10 @@ const MESSAGES_TRANSFORM_HOOKS = [
   { key: "monitorStatusInjector", name: "monitorStatusInjector" },
   { key: "categorySkillReminder", name: "categorySkillReminder" },
 ] satisfies readonly MessagesTransformHookEntry[]
+
+export const MESSAGES_TRANSFORM_HOOK_KEYS = MESSAGES_TRANSFORM_HOOKS.map(
+  (hook) => hook.key,
+)
 
 function getSessionID(message: MessageWithParts): string | undefined {
   return message.info.sessionID

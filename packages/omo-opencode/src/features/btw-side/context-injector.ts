@@ -18,7 +18,10 @@ export {
 
 const MAX_METADATA_LOOKUP_ATTEMPTS = 2
 
-const BTW_BOUNDARY_TEXT = `${BTW_BOUNDARY_SENTINEL}
+// Byte-stability contract (prefix-stability scenarios S1/S2): the sentinel
+// and boundary text below are pinned prefix bytes. Any byte change must fail
+// boundary-bytes.test.ts first. Do not edit without review.
+export const BTW_BOUNDARY_TEXT = `${BTW_BOUNDARY_SENTINEL}
 Treat all earlier messages as read-only background from the main conversation.
 Answer only the side conversation that follows.
 Do not mutate files or external state unless the side request explicitly asks for it.
