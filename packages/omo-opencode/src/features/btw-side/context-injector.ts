@@ -18,9 +18,12 @@ export {
 
 const MAX_METADATA_LOOKUP_ATTEMPTS = 2
 
-// Byte-stability contract (prefix-stability scenarios S1/S2): the sentinel
-// and boundary text below are pinned prefix bytes. Any byte change must fail
+// Byte-stability contract (prefix-stability scenarios S1/S2): the sentinel,
+// boundary text, and metadata key below are pinned prefix bytes. The boundary
+// travels as the leading payload message so later transforms reproduce the
+// same bytes at the same position. Any byte change must fail
 // boundary-bytes.test.ts first. Do not edit without review.
+export const BTW_BOUNDARY_METADATA_KEY = "btw-side-boundary"
 export const BTW_BOUNDARY_TEXT = `${BTW_BOUNDARY_SENTINEL}
 Treat all earlier messages as read-only background from the main conversation.
 Answer only the side conversation that follows.
@@ -45,23 +48,63 @@ function cloneMessages(messages: MessageWithParts[]): MessageWithParts[] {
   }))
 }
 
-function prependBoundaryPart(message: MessageWithParts): void {
-  if (
-    message.parts.some(
-      (part) => part.type === "text" && part.text.includes(BTW_BOUNDARY_SENTINEL),
-    )
-  ) {
-    return
-  }
+export function btwBoundaryMessageID(sideSessionID: string): string {
+  return `${sideSessionID}_btw_boundary`
+}
 
-  message.parts.unshift({
-    id: `${message.info.id}_btw_boundary`,
-    messageID: message.info.id,
-    sessionID: message.info.sessionID,
-    type: "text",
-    text: BTW_BOUNDARY_TEXT,
-    synthetic: true,
-  })
+function createPinnedBoundaryMessage(
+  sideSessionID: string,
+  source: MessageWithParts,
+): MessageWithParts {
+  const messageID = btwBoundaryMessageID(sideSessionID)
+  const fields = source.info as unknown as Record<string, unknown>
+  const agent = typeof fields["agent"] === "string" ? fields["agent"] : "sisyphus"
+  const model = fields["model"]
+  const modelFields =
+    model && typeof model === "object" && !Array.isArray(model)
+      ? (model as Record<string, unknown>)
+      : undefined
+  const providerID =
+    typeof modelFields?.["providerID"] === "string"
+      ? modelFields["providerID"]
+      : "internal"
+  const modelID =
+    typeof modelFields?.["modelID"] === "string"
+      ? modelFields["modelID"]
+      : "btw-boundary"
+  return {
+    info: {
+      id: messageID,
+      sessionID: sideSessionID,
+      role: "user",
+      time: { created: 0 },
+      agent,
+      model: { providerID, modelID },
+    },
+    parts: [
+      {
+        id: `${messageID}_text`,
+        messageID,
+        sessionID: sideSessionID,
+        type: "text",
+        text: BTW_BOUNDARY_TEXT,
+        synthetic: true,
+        metadata: { [BTW_BOUNDARY_METADATA_KEY]: true },
+      },
+    ],
+  }
+}
+
+function frontLoadBoundaryMessage(
+  messages: MessageWithParts[],
+  boundary: MessageWithParts,
+): void {
+  const existingIndex = messages.findIndex(
+    (message) => message.info.id === boundary.info.id,
+  )
+  if (existingIndex === 0) return
+  if (existingIndex > 0) messages.splice(existingIndex, 1)
+  messages.unshift(boundary)
 }
 
 export function createBtwSideContextInjectorHook(args: {
@@ -201,10 +244,13 @@ export function createBtwSideContextInjectorHook(args: {
       if (!firstSideUserMessage) return
 
       const parentContext = await loadParentContext(sideSessionID, metadata)
-      prependBoundaryPart(firstSideUserMessage)
       if (parentContext) {
         output.messages.unshift(...parentContext)
       }
+      frontLoadBoundaryMessage(
+        output.messages,
+        createPinnedBoundaryMessage(sideSessionID, firstSideUserMessage),
+      )
     },
   }
 }

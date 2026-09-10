@@ -5,6 +5,7 @@ import {
   BTW_BOUNDARY_SENTINEL,
   BTW_PARENT_CONTEXT_MAX_BYTES,
   BTW_PARENT_CONTEXT_MAX_MESSAGES,
+  btwBoundaryMessageID,
   createBtwSideContextInjectorHook,
 } from "./context-injector"
 import {
@@ -202,6 +203,7 @@ describe("createBtwSideContextInjectorHook", () => {
 
     // then
     expect(output.messages.map((message: TestMessage) => message.info.id)).toEqual([
+      btwBoundaryMessageID(sideSessionID),
       "msg_parent_1",
       "msg_parent_2",
       "msg_side_1",
@@ -275,7 +277,7 @@ describe("createBtwSideContextInjectorHook", () => {
     await hook["experimental.chat.messages.transform"]!({}, secondTurn)
 
     // then
-    expect(secondTurn.messages[0].info.id).toBe("msg_parent_1")
+    expect(secondTurn.messages[0].info.id).toBe(btwBoundaryMessageID(sideSessionID))
     const boundaryParts = secondTurn.messages.flatMap((message: TestMessage) =>
       message.parts.filter((part) => part.text.includes(BTW_BOUNDARY_SENTINEL)),
     )
@@ -348,15 +350,15 @@ describe("createBtwSideContextInjectorHook", () => {
     })
     await hook["experimental.chat.messages.transform"]!({}, firstOutput)
     expect(isTrackedBtwSideSession(sideSessionID)).toBe(true)
-    expect(firstOutput.messages[0].info.id).toBe("msg_parent_1")
+    expect(firstOutput.messages[0].info.id).toBe(btwBoundaryMessageID(sideSessionID))
     expect(metadataAttempts).toBe(2)
 
     // when
     await hook["experimental.chat.messages.transform"]!({}, secondOutput)
 
     // then
-    expect(firstOutput.messages).toHaveLength(2)
-    expect(secondOutput.messages[0].info.id).toBe("msg_parent_1")
+    expect(firstOutput.messages).toHaveLength(3)
+    expect(secondOutput.messages[0].info.id).toBe(btwBoundaryMessageID(sideSessionID))
     expect(metadataAttempts).toBe(2)
     expect(isTrackedBtwSideSession(sideSessionID)).toBe(true)
   })
@@ -497,11 +499,13 @@ describe("createBtwSideContextInjectorHook", () => {
     await hook["experimental.chat.messages.transform"]!({}, output)
 
     // then
-    expect(output.messages).toEqual(sideMessages)
+    expect(output.messages).toHaveLength(2)
+    expect(output.messages[0].info.id).toBe(btwBoundaryMessageID(sideSessionID))
     expect(output.messages[0].parts[0].text).toContain(
       BTW_BOUNDARY_SENTINEL,
     )
-    expect(output.messages[0].parts[1].text).toBe(
+    expect(output.messages[1].info.id).toBe("msg_side_1")
+    expect(output.messages[1].parts[0].text).toBe(
       "answer without inherited context",
     )
   })
