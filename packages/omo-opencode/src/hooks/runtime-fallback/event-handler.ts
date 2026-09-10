@@ -18,6 +18,10 @@ import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import {
+  applyGitHubCopilotRateLimit,
+  getGitHubCopilotRateLimitState,
+} from "./copilot-rate-limit"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -198,9 +202,10 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       return
     }
 
-    const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+    const eventModel = resolveEventModel(props)
 
     if (isAbortError(error)) {
+      const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
       // If we triggered this abort to swap in a fallback model, consume the
       // flag and preserve state — wiping attemptCount here is what causes
       // the infinite retry loop (issue #4006).
@@ -225,7 +230,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     if (sessionAwaitingFallbackResult.has(sessionID)) {
       const pendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
-      const eventModel = resolveEventModel(props)
       if (!pendingFallbackModel || eventModel !== pendingFallbackModel) {
         log(`[${HOOK_NAME}] session.error skipped - awaiting fallback result`, {
           sessionID,
@@ -235,6 +239,15 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
         return
       }
     }
+
+    applyGitHubCopilotRateLimit(getGitHubCopilotRateLimitState(deps), {
+      error,
+      model: eventModel ?? sessionStates.get(sessionID)?.currentModel,
+      now: Date.now(),
+      random: Math.random,
+    })
+
+    const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
 
     sessionAwaitingFallbackResult.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
@@ -269,9 +282,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     if (!state) {
       const initialModel = resolveFallbackBootstrapModel({
-        sessionID,
-        source: "session.error",
-        eventModel: resolveEventModel(props),
+          sessionID,
+          source: "session.error",
+          eventModel,
         resolvedAgent,
         pluginConfig,
       })

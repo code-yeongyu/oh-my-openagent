@@ -5,6 +5,11 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import {
+  filterGitHubCopilotModelsInCooldown,
+  getGitHubCopilotRateLimitState,
+  waitForGitHubCopilotRetry,
+} from "./copilot-rate-limit"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -83,7 +88,11 @@ export function createFallbackTimeoutHelpers(
       state.pendingFallbackPromptMayHaveBeenAccepted = false
       const stateSnapshot = snapshotFallbackState(state)
 
-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+      const fallbackModels = filterGitHubCopilotModelsInCooldown(
+        getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig),
+        getGitHubCopilotRateLimitState(deps),
+        Date.now(),
+      )
       if (fallbackModels.length === 0) return
 
       log(`[${HOOK_NAME}] Session fallback timeout reached`, {
@@ -94,6 +103,18 @@ export function createFallbackTimeoutHelpers(
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)
       if (result.success && result.newModel) {
+        const retryWindowAvailable = await waitForGitHubCopilotRetry({
+          state: getGitHubCopilotRateLimitState(deps),
+          model: result.newModel,
+          sessionID,
+          sessionRetryInFlight,
+        })
+        if (!retryWindowAvailable || sessionStates.get(sessionID) !== state) {
+          if (sessionStates.get(sessionID) === state) {
+            restoreFallbackState(state, stateSnapshot)
+          }
+          return
+        }
         const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
         if (!dispatchOutcome.accepted) {
           restoreFallbackState(state, stateSnapshot)
