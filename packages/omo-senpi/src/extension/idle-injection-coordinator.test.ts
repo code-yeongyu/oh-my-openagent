@@ -268,6 +268,77 @@ describe("IdleInjectionCoordinator", () => {
     expect(coordinator.pendingCount()).toBe(1)
   })
 
+  it("#given a deferred flush pending #when the coordinator is retired before the scheduler runs it #then the flush no-ops and nothing is delivered", () => {
+    // given a stale-generation delivery behind a manual scheduler
+    let deliveries = 0
+    const scheduled: Array<() => void> = []
+    const failures: unknown[] = []
+    const coordinator = new IdleInjectionCoordinator(
+      () => {
+        deliveries += 1
+        throw new Error("stale extension generation after reload")
+      },
+      { scheduleFlush: (flush) => scheduled.push(flush) },
+    )
+    coordinator.enqueue({
+      key: "ulw",
+      source: "ulw-continuation",
+      content: "continue",
+      onDeliveryFailed: (error) => failures.push(error),
+    })
+    coordinator.scheduleFlush()
+
+    // when the session shuts down before the deferred pass runs
+    coordinator.retire()
+
+    // then the armed callback is a no-op instead of throwing into the timer queue
+    expect(scheduled).toHaveLength(1)
+    for (const flush of scheduled) expect(flush).not.toThrow()
+    expect(deliveries).toBe(0)
+    expect(failures).toHaveLength(0)
+    expect(coordinator.pendingCount()).toBe(0)
+  })
+
+  it("#given a flushSoon microtask pending #when the coordinator is retired before the microtask runs #then nothing is delivered", async () => {
+    // given
+    const { coordinator, calls } = createCoordinator()
+    coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
+    coordinator.flushSoon()
+
+    // when
+    coordinator.retire()
+    await Promise.resolve()
+
+    // then
+    expect(calls).toHaveLength(0)
+    expect(coordinator.pendingCount()).toBe(0)
+  })
+
+  it("#given a retired coordinator #when a late producer enqueues and schedules #then no flush is scheduled and the queue stays empty", async () => {
+    // given
+    let scheduledCount = 0
+    const calls: DeliveredCall[] = []
+    const coordinator = new IdleInjectionCoordinator((message, options) => calls.push({ content: message.content, options }), {
+      scheduleFlush: (flush) => {
+        scheduledCount += 1
+        flush()
+      },
+    })
+    coordinator.retire()
+
+    // when
+    coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
+    coordinator.scheduleFlush()
+    coordinator.flushSoon()
+    await Promise.resolve()
+
+    // then
+    expect(scheduledCount).toBe(0)
+    expect(coordinator.pendingCount()).toBe(0)
+    expect(coordinator.flushOnIdle()).toBe(0)
+    expect(calls).toHaveLength(0)
+  })
+
   it("#given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns", () => {
     // given
     const order: string[] = []

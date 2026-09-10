@@ -9,6 +9,7 @@ import { checkTelemetry } from "./telemetry"
 import { checkTeamMode } from "./team-mode"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
 import { checkCodex, gatherCodexSummary } from "./codex"
+import { gatherEditionDistTags, resolveLatestVersion } from "./latest-version"
 import { CODEX_COMPONENTS_CHECK_ID, CODEX_COMPONENTS_CHECK_NAME, checkCodexComponents } from "./codex-components"
 import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
 
@@ -16,6 +17,7 @@ export type { CheckDefinition }
 export * from "./model-resolution-types"
 export { gatherSystemInfo, gatherToolsSummary }
 export { gatherCodexSummary }
+export { gatherEditionDistTags, resolveLatestVersion }
 
 export function getAllCheckDefinitions(): CheckDefinition[] {
   return [

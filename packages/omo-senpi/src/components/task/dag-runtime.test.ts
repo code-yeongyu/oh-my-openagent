@@ -846,7 +846,7 @@ describe("assembled DAG runtime", () => {
     runtime.dispose()
   })
 
-  test("#given a paused adapter DAG whose lease holder PID is still live #when another adapter starts #then it never claims or resumes the run", async () => {
+  test("#given a paused adapter DAG whose lease holder is a live FOREIGN pid #when another adapter starts in this process #then it never claims or resumes the run", async () => {
     // given
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-live-lease-"))
     cleanupRoots.push(cwd)
@@ -864,6 +864,12 @@ describe("assembled DAG runtime", () => {
     const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: logger() })
     pauseForShutdown(firstRuntime)
 
+    // given the pause is held by ANOTHER host process the probe reports alive (our own pid is never a
+    // fence: the same process reopening the session must claim, see dag-runtime-lease-recovery.test.ts)
+    const pausedStore = dagStore(cwd)
+    const paused = pausedStore.readCheckpoint<DagRunRecordV1>(runId)
+    if (paused === null) throw new Error("expected paused adapter run")
+    pausedStore.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
     const secondPi = new FakeExtensionAPI()
     const secondEngine = composeTaskEngine({
       pi: secondPi,
@@ -872,7 +878,12 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
     })
     secondEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
-    const secondRuntime = createDagRuntime({ pi: secondPi, engine: secondEngine, logger: logger() })
+    const secondRuntime = createDagRuntime({
+      pi: secondPi,
+      engine: secondEngine,
+      logger: logger(),
+      leaseWatch: { isProcessAlive: () => true },
+    })
 
     // when
     await secondRuntime.attach()

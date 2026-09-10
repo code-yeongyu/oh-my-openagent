@@ -58,6 +58,22 @@ describe("category activation gating", () => {
       expect(result.availableCategories).toContain("architect")
     })
 
+    test("#when only Copilot carries claude-fable-5.1 under its dotted engine id #then the gate is satisfied and architect resolves on the copilot rung", () => {
+      // given — the senpi github-copilot catalog spells Claude ids with a dot (claude-fable-5.1); omo chains use a hyphen
+      const models = registry([model("github-copilot", "claude-fable-5.1")])
+
+      // when
+      const result = resolveCategory("architect", {}, models)
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind !== "resolved") throw new Error("Expected resolved")
+      expect(result.spec.provider).toBe("github-copilot")
+      expect(result.spec.modelId).toBe("claude-fable-5.1")
+      expect(result.spec.variant).toBe("max")
+      expect(result.availableCategories).toContain("architect")
+    })
+
     test("#when the gate model is absent but omo.json configures the category #then the explicit entry bypasses the gate", () => {
       // given
       const models = registry([model("kimi-coding", "k3")])

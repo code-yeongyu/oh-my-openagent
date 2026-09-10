@@ -94,6 +94,23 @@ describe("dead-chain category disabling", () => {
     })
   })
 
+  describe("#given a Copilot-only registry whose Claude ids use the engine's dotted spelling", () => {
+    test("#when the quick chain's copilot rung is claude-haiku-4-5 #then the transformed id keeps the category alive", () => {
+      // given
+      const copilotOnly = registry([model("github-copilot", "claude-haiku-4.5")])
+
+      // when
+      const result = resolveCategory("quick", {}, copilotOnly)
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind !== "resolved") throw new Error("Expected resolved")
+      expect(result.spec.provider).toBe("github-copilot")
+      expect(result.spec.modelId).toBe("claude-haiku-4.5")
+      expect(result.availableCategories).toContain("quick")
+    })
+  })
+
   describe("#given a gateway-prefixed registry id", () => {
     test("#when the unwrapped id matches a rung #then the category stays available", () => {
       // given

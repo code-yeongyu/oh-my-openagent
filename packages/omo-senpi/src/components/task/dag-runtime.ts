@@ -424,6 +424,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     taskManager,
     ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
+    // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
+    // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
+    // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
+    isRunHeldInProcess: (runId) => schedulers.has(runId),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     stopAdmission: (runId) => stoppedAdmissions.add(runId),
@@ -453,6 +457,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   // session_start, so without this watch that skip was final and the run stayed paused forever.
   const watchLiveLease = (scope: RecoveryScope, outcome: DagRecoveryOutcome & { readonly holderPid: number }): void => {
     if (leaseWatches.has(outcome.runId)) return
+    // A live_lease naming our own pid means a scheduler in this runtime still holds the run (same-runtime
+    // pause + re-attach). A watch on our own pid could only fire once this process is gone, and the
+    // "resuming once that pid is gone" it would log could never come true.
+    if (outcome.holderPid === process.pid) return
     deps.logger.warn("omo-senpi DAG run stays paused while its previous host exits; resuming once that pid is gone", {
       runId: outcome.runId,
       holderPid: outcome.holderPid,

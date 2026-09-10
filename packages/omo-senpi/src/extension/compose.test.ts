@@ -1,10 +1,33 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it, spyOn } from "bun:test"
+import { afterEach, describe, expect, it, jest, spyOn } from "bun:test"
 
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
 import type { ComponentLogger, OmoSenpiComponent } from "./types"
+
+// Mirrors senpi's reload: after `session_shutdown {reason: "reload"}` the old generation's API throws
+// from every call instead of delivering.
+class ReloadingFakeExtensionAPI extends FakeExtensionAPI {
+  sendMessageCalls = 0
+  #stale = false
+
+  override sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void {
+    this.sendMessageCalls += 1
+    if (this.#stale) throw new Error("stale extension generation after reload")
+    super.sendMessage(message, options)
+  }
+
+  override async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {
+    const results = await super.dispatch(event, payload, ctx)
+    if (event === "session_shutdown") this.#stale = true
+    return results
+  }
+}
+
+afterEach(() => {
+  jest.useRealTimers()
+})
 
 function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
@@ -253,6 +276,33 @@ describe("composeOmoSenpiExtension", () => {
         },
       },
     ])
+  })
+
+  it("#given a deferred idle-injection flush armed inside the batch window #when session_shutdown(reload) invalidates the API before the timer fires #then the flush neither throws nor calls sendMessage", async () => {
+    // given a component that schedules a batched steer on agent_end
+    const pi = new ReloadingFakeExtensionAPI()
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "ulw-like",
+        register(api, ctx) {
+          api.on("agent_end", () => {
+            ctx.idleCoordinator?.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue the run" })
+            ctx.idleCoordinator?.scheduleFlush()
+          })
+        },
+      },
+    ]
+    await composeOmoSenpiExtension(components, { logger: createRecordingLogger() })(pi)
+    jest.useFakeTimers()
+
+    // when the 200ms flush is armed, then the session reloads before it fires
+    await pi.dispatch("agent_end", { type: "agent_end" })
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" })
+
+    // then the stale timer is a no-op rather than an uncaught exception
+    expect(() => jest.advanceTimersByTime(200)).not.toThrow()
+    expect(pi.sendMessageCalls).toBe(0)
+    expect(pi.messages).toHaveLength(0)
   })
 
   it("#given the default logger #when a component logs without details #then console receives only the message", async () => {

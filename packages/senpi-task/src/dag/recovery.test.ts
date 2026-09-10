@@ -325,6 +325,54 @@ describe("DAG crash recovery", () => {
     expect(manager.startOwnedCalls).toEqual(["only"])
   })
 
+  test("#given a paused own-session run whose previous holder is THIS host pid and no in-process holder is registered #when the same host resumes the session #then it is claimed and resumed instead of waiting on itself", async () => {
+    // given - the probe says EVERY pid is alive: a signal-0 probe on our own pid is always true, so the
+    // claim must be decided by identity, not liveness (#8006 saved-session reopen in one host process)
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const manager = new RecoveryTaskManager()
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("only")]), {
+      only: { state: "scheduled" },
+    }, { previousLeaseHolderPid: 101 }))
+
+    // when
+    const outcomes = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => true })
+      .resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcomes).toHaveLength(1)
+    expect(outcomes[0]).toMatchObject({ runId, kind: "resumed" })
+    expect(manager.startOwnedCalls).toEqual(["only"])
+    expect(events(store).some((event) => event.type === "dag.run.resumed")).toBe(true)
+    const settled = store.readCheckpoint<DagRunRecordV1 & { readonly leaseHolderPid?: number }>(runId)
+    expect(settled?.status).toBe("completed")
+    expect(settled?.leaseHolderPid).toBeUndefined()
+  })
+
+  test("#given a paused own-session run whose previous holder is THIS host pid #when this process still schedules the run #then it is skipped as live_lease naming our own pid", async () => {
+    // given - the same-runtime pause + re-attach: the original scheduler is still registered in this
+    // process, and a recovery-built second scheduler would fold the same children twice
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const manager = new RecoveryTaskManager()
+    store.writeCheckpoint(runId, recoverableRecord(definition([node("only")]), {
+      only: { state: "scheduled" },
+    }, { previousLeaseHolderPid: 101 }))
+
+    // when
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => true,
+      isRunHeldInProcess: () => true,
+    }).resumePausedRuns(parentSessionId)
+
+    // then
+    expect(outcomes).toEqual([{ runId, kind: "skipped", reason: "live_lease", holderPid: 101 }])
+    expect(manager.startOwnedCalls).toEqual([])
+    expect(events(store).some((event) => event.type === "dag.run.resumed")).toBe(false)
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("paused")
+  })
+
   test("#given scheduled nodes with and without durable owners #when resumed #then the owner is attached and only never-dispatched work starts", async () => {
     // given
     const projectDir = tempProject()

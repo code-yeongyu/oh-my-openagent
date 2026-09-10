@@ -105,6 +105,10 @@ export function composeOmoSenpiExtension(
         pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
       { scheduleFlush: (flush) => void setTimeout(flush, 200) },
     )
+    // senpi emits session_shutdown on the old runner before it invalidates that generation; retire the
+    // shared queue there so a 200ms flush armed before a reload cannot call pi.sendMessage on a stale
+    // API and throw out of the timer queue (uncaughtException -> exit 1).
+    pi.on("session_shutdown", () => idleCoordinator.retire())
 
     // Warm the pi-tui lazy boundary once for the whole extension, before any component registers.
     // Renderers across several components (fallback-architect notices, memory worker entries, task
