@@ -1,0 +1,15 @@
+{
+  "sisyphus_model": "anthropic/claude-opus-5",
+  "sisyphus_prompt_append": "QA-OVERRIDE-MARKER",
+  "oracle_dropped": true,
+  "diagnostics": [
+    {
+      "kind": "validation",
+      "message": "Dropped invalid agents.oracle leaf: agents.oracle: Unrecognized key: \"bogus_key\"",
+      "path": "agents.oracle",
+      "issuePaths": [
+        "agents.oracle"
+      ]
+    }
+  ]
+}
