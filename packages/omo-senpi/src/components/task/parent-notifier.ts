@@ -5,6 +5,31 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 
 // The senpi-task completion custom-message type; the component registers a renderer for it.
 export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
+export const RESTART_CONTINUATION_MESSAGE_TYPE = "omo-senpi:restart-continuation"
+
+export function enqueueRestartContinuation(
+  pi: SenpiExtensionAPI,
+  coordinator: IdleInjectionCoordinator | undefined,
+  sessionId: string,
+  content: string,
+): void {
+  if (coordinator === undefined) {
+    pi.sendMessage(
+      { customType: RESTART_CONTINUATION_MESSAGE_TYPE, content, display: false, details: {} },
+      { triggerTurn: true, deliverAs: "steer" },
+    )
+    return
+  }
+  coordinator.enqueue({
+    key: `restart-continuation:${sessionId}`,
+    source: "restart-continuation",
+    customType: RESTART_CONTINUATION_MESSAGE_TYPE,
+    content,
+    display: false,
+    details: {},
+  })
+  coordinator.flushSoon()
+}
 
 /**
  * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. EVERY delivered

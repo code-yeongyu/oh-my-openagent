@@ -9,6 +9,7 @@ import type {
 } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { wireEventBridge } from "./event-bridge"
 import { fakeSummary } from "./event-bridge.test-fixtures"
@@ -26,6 +27,9 @@ type HarnessOptions = {
   readonly withRpc?: boolean | "emit-only"
   // Drives the task RPC bridge's progress-coalescing timer deterministically (no wall-clock waits).
   readonly taskRpcTimers?: TaskRpcTimers
+  readonly stateDir?: string
+  readonly sessionFile?: string
+  readonly idleCoordinator?: IdleInjectionCoordinator
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -52,7 +56,8 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   const warnings: Array<{ message: string; details?: unknown }> = []
   const infos: Array<{ message: string; details?: unknown }> = []
   const reconcileCalls: Array<string | undefined> = []
-  const notifyCalls: Array<{ sessionId: string; parentState: unknown }> = []
+  const notifyCalls: Array<{ sessionId: string; parentState: unknown; parentTailInterrupted?: boolean }> = []
+  const markConsumedCalls: string[] = []
   const livenessCalls: string[] = []
   const resumptionCalls: number[] = []
 
@@ -66,6 +71,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         order.push("clearUi")
       },
       parentState: () => ({ kind: "idle" as const }),
+      sessionFile: () => options.sessionFile,
     },
     lifecycle: {
       suspendOnSessionShutdown: async (input: SuspendInput) => {
@@ -138,16 +144,20 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       },
     } as unknown as TaskEngine["manager"],
     notifier: {
-      reconcileUnnotifiedNotifications: (input: { sessionId: string; parentState: unknown }) => {
+      reconcileUnnotifiedNotifications: (input: { sessionId: string; parentState: unknown; parentTailInterrupted?: boolean }) => {
         notifyCalls.push(input)
         order.push("notify")
+      },
+      markConsumed: (input: { sessionId: string }) => {
+        markConsumedCalls.push(input.sessionId)
+        order.push("markConsumed")
       },
     } as unknown as TaskEngine["notifier"],
     planner: {} as TaskEngine["planner"],
     agents: {},
     omoConfig: {} as TaskEngine["omoConfig"],
     settings: {} as TaskEngine["settings"],
-    stateDir: "",
+    stateDir: options.stateDir ?? "",
     memberLiveness: { acknowledgePersisted: async () => {} } as unknown as TaskEngine["memberLiveness"],
     notifyOwnedMemberLiveness: async (record: TaskRecord) => {
       livenessCalls.push(record.task_id)
@@ -208,6 +218,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   } as unknown as Parameters<typeof wireEventBridge>[5]
 
   const ctx = {
+    idleCoordinator: options.idleCoordinator,
     logger: {
       info: (message: string, details?: unknown) => {
         infos.push({ message, details })
@@ -232,6 +243,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     infos,
     reconcileCalls,
     notifyCalls,
+    markConsumedCalls,
     livenessCalls,
     resumptionCalls,
     rpcHandlers,

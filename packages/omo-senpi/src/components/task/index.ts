@@ -45,6 +45,7 @@ import { createTaskSkillLoader } from "./task-skill-loader"
 const TASK_ENABLED_FLAG = "omo-task"
 
 export { wireEventBridge } from "./event-bridge"
+export { RESTART_CONTINUATION_MESSAGE_TYPE } from "./parent-notifier"
 export { createInProcessJudgeRunner, findModelReference } from "./judge-runner"
 export type { InProcessRunnerLike } from "./judge-runner"
 

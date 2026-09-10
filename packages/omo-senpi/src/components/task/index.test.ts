@@ -41,6 +41,7 @@ const TASK_EVENTS = [
   "model_select",
   "before_agent_start",
   "agent_end",
+  "agent_settled",
 ]
 const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
 const DAG_LIFECYCLE_EVENTS = ["session_start", "session_before_switch", "session_shutdown", "session_shutdown"]

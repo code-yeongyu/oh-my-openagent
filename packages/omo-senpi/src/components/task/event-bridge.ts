@@ -1,5 +1,10 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
 import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import { createHash } from "node:crypto"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+import { sessionTailNeedsContinuation } from "../../../../senpi-task/src/manager/interrupted-turn"
+import { enqueueRestartContinuation } from "./parent-notifier"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -10,6 +15,9 @@ import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
+
+const RESTART_CONTINUATION_TEXT = (at: string): string =>
+  `Your previous turn was interrupted by a host or server restart (session resumed at ${at}). Re-read the transcript tail, act on any task completion notification above, and continue the interrupted work without redoing completed steps.`
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
@@ -71,7 +79,25 @@ export function wireEventBridge(
     await state.resumptionChannels.emitSessionStart()
     await reconcileTeamMailboxBestEffort(ctx, state)
     if (sessionId !== undefined) {
-      engine.notifier.reconcileUnnotifiedNotifications({ sessionId, parentState: engine.runtime.parentState() })
+      const parentSessionFile = eventCtxSessionFile(eventCtx) ?? engine.runtime.sessionFile()
+      const parentTailInterrupted = parentSessionFile === undefined
+        ? false
+        : await sessionTailNeedsContinuation(parentSessionFile)
+      const hasRedeliverableNotification = hasUnnotifiedNotification(engine, sessionId)
+      engine.notifier.reconcileUnnotifiedNotifications({
+        sessionId,
+        parentState: engine.runtime.parentState(),
+        parentTailInterrupted,
+      })
+      if (parentTailInterrupted && (hasRedeliverableNotification || ownsChildRecord(engine, sessionId))) {
+        await enqueueRestartContinuationIfNew({
+          pi,
+          coordinator: ctx.idleCoordinator,
+          stateDir: engine.stateDir,
+          sessionId,
+          sessionFile: parentSessionFile,
+        })
+      }
     }
     const cleanup = await engine.lifecycle.cleanupExpiredRecords()
     if (cleanup.deleted.length > 0) {
@@ -128,6 +154,13 @@ export function wireEventBridge(
     statusUi.scheduleSync()
   })
 
+  pi.on("agent_settled", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const sessionId = engine.runtime.sessionId()
+    if (sessionId === undefined || engine.notifier.markConsumed === undefined) return
+    engine.notifier.markConsumed({ sessionId })
+  })
+
   pi.on("agent_end", async (_payload, eventCtx) => {
     const liveContext = asLiveContext(eventCtx)
     engine.runtime.captureFrom(liveContext)
@@ -177,4 +210,43 @@ function asLiveContext(value: unknown): LiveTaskContext {
 
 function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
+}
+
+function eventCtxSessionFile(value: unknown): string | undefined {
+  if (!isLiveContext(value)) return undefined
+  return value.sessionManager?.getSessionFile?.()
+}
+
+function ownsChildRecord(engine: TaskEngine, sessionId: string): boolean {
+  return engine.manager.list({ scope: "all" }).some((entry) => entry.record.parent_session_id === sessionId)
+}
+
+function hasUnnotifiedNotification(engine: TaskEngine, sessionId: string): boolean {
+  return engine.manager.list({ scope: "all" }).some(({ record }) => {
+    if (record.parent_session_id !== sessionId) return false
+    if (!new Set(["completed", "error", "cancelled", "interrupted", "lost"]).has(record.status)) return false
+    if (!record.notify_on_terminal && record.notification.notification_failed_epoch === undefined) return false
+    return record.notification.notified_epoch < record.notification.run_epoch
+  })
+}
+
+async function enqueueRestartContinuationIfNew(input: {
+  readonly pi: SenpiExtensionAPI
+  readonly coordinator?: ComponentContext["idleCoordinator"]
+  readonly stateDir: string
+  readonly sessionId: string
+  readonly sessionFile: string | undefined
+}): Promise<void> {
+  if (input.sessionFile === undefined || input.stateDir.length === 0) return
+  const raw = await readFile(input.sessionFile, "utf8").catch(() => "")
+  const finalRecord = raw.split(/\r?\n/u).filter((line) => line.trim().length > 0).at(-1)
+  if (finalRecord === undefined) return
+  const tailFingerprint = createHash("sha1").update(finalRecord).digest("hex")
+  const markerPath = join(input.stateDir, "restart-continuation", `${input.sessionId}.json`)
+  const marker = await readFile(markerPath, "utf8").then((value) => JSON.parse(value) as { tailFingerprint?: unknown }).catch(() => undefined)
+  if (marker?.tailFingerprint === tailFingerprint) return
+  const at = new Date().toISOString()
+  await mkdir(join(input.stateDir, "restart-continuation"), { recursive: true })
+  await writeFile(markerPath, `${JSON.stringify({ tailFingerprint, at })}\n`, "utf8")
+  enqueueRestartContinuation(input.pi, input.coordinator, input.sessionId, RESTART_CONTINUATION_TEXT(at))
 }

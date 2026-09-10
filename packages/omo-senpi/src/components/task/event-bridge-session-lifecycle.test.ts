@@ -1,9 +1,14 @@
 import { describe, expect, it } from "bun:test"
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 
+import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
 import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
 import type { TaskRecord } from "@oh-my-opencode/senpi-task"
 import { wireHarness } from "./event-bridge.test-harness"
+import { taskRecord } from "./event-bridge.test-fixtures"
 
 describe("event-bridge session_start recovery chain", () => {
   it("#given a resumed session with a revived record #when session_start fires #then the chain runs in the planned order with the session id threaded", async () => {
@@ -33,7 +38,7 @@ describe("event-bridge session_start recovery chain", () => {
       "statusSync",
     ])
     expect(reconcileCalls).toEqual(["parent-session"])
-    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" } }])
+    expect(notifyCalls).toEqual([{ sessionId: "parent-session", parentState: { kind: "idle" }, parentTailInterrupted: false }])
     expect(livenessCalls).toEqual(["task-revived"])
     expect(resumptionCalls).toEqual([2])
   })
@@ -108,7 +113,7 @@ describe("event-bridge session_start recovery chain", () => {
       await pi.dispatch("session_start", {}, {})
 
       expect(reconcileCalls).toEqual(["child-session"])
-      expect(notifyCalls).toEqual([{ sessionId: "child-session", parentState: { kind: "idle" } }])
+      expect(notifyCalls).toEqual([{ sessionId: "child-session", parentState: { kind: "idle" }, parentTailInterrupted: false }])
       expect(order).toContain("cleanup:start")
       expect(order).toContain("poll")
       expect(order).toContain("statusSync")
@@ -138,6 +143,63 @@ describe("event-bridge session_start recovery chain", () => {
         process.env[OMO_SENPI_TASK_RPC_CHILD] = previousMarker
       }
     }
+  })
+})
+
+describe("event-bridge agent_settled", () => {
+  it("#given a settled parent turn #when agent_settled fires #then completion epochs are marked consumed for that session", async () => {
+    const { pi, markConsumedCalls } = wireHarness("parent-session")
+
+    await pi.dispatch("agent_settled", {}, {})
+
+    expect(markConsumedCalls).toEqual(["parent-session"])
+  })
+})
+
+describe("event-bridge restart continuation", () => {
+  it("#given an aborted parent tail and an owned child #when session_start fires twice #then one restart continuation is delivered and reconciliation receives the interruption", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-restart-continuation-"))
+    const sessionFile = join(root, "parent.jsonl")
+    writeFileSync(sessionFile, `${JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "aborted", content: [] } })}\n`, "utf8")
+    const stateDir = join(root, "state")
+    const delivered: Array<{ readonly content: string; readonly customType?: string }> = []
+    const coordinator = new IdleInjectionCoordinator((message) => {
+      delivered.push({ content: message.content, customType: message.details[0]?.customType })
+    })
+    const { pi, notifyCalls } = wireHarness("parent-session", {
+      sessionFile,
+      stateDir,
+      records: { child: taskRecord({ task_id: "child", status: "completed" }) },
+      idleCoordinator: coordinator,
+    })
+
+    await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-session", getSessionFile: () => sessionFile } })
+    await Promise.resolve()
+    await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-session", getSessionFile: () => sessionFile } })
+    await Promise.resolve()
+
+    expect(notifyCalls[0]).toMatchObject({ sessionId: "parent-session", parentTailInterrupted: true })
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.customType).toBe("omo-senpi:restart-continuation")
+    expect(delivered[0]?.content).toContain("Your previous turn was interrupted")
+  })
+
+  it("#given a healthy parent tail #when session_start fires #then reconciliation is told the tail is not interrupted and no continuation is delivered", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-restart-healthy-"))
+    const sessionFile = join(root, "parent.jsonl")
+    writeFileSync(sessionFile, `${JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [] } })}\n`, "utf8")
+    const delivered: unknown[] = []
+    const coordinator = new IdleInjectionCoordinator((message) => delivered.push(message))
+    const { pi, notifyCalls } = wireHarness("parent-session", {
+      sessionFile,
+      stateDir: join(root, "state"),
+      idleCoordinator: coordinator,
+    })
+
+    await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-session", getSessionFile: () => sessionFile } })
+
+    expect(notifyCalls[0]).toMatchObject({ sessionId: "parent-session", parentTailInterrupted: false })
+    expect(delivered).toHaveLength(0)
   })
 })
 

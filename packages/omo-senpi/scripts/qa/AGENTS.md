@@ -6,7 +6,7 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 
 | Lane | Drivers |
 |------|---------|
-| Task | `task-e2e.mjs` (single/batch lifecycles), `task-lane-spill-e2e.mjs`, `task-fallback-notification.mjs`, `task-category-unavailable-e2e.mjs`, `task-id-race-qa.mjs`, `task-parent-restart-e2e.mjs`, `task-summary-e2e.mjs`, `task-load-skills-e2e.mjs`, `task-13.test.ts` (engine wiring) |
+| Task | `task-e2e.mjs` (single/batch lifecycles), `task-lane-spill-e2e.mjs`, `task-fallback-notification.mjs`, `task-category-unavailable-e2e.mjs`, `task-id-race-qa.mjs`, `task-parent-restart-e2e.mjs`, `task-restart-redelivery-e2e.mjs`, `task-summary-e2e.mjs`, `task-load-skills-e2e.mjs`, `task-13.test.ts` (engine wiring) |
 | Team | `team-e2e.mjs`, `team-resume-e2e.mjs`, `team-delete-6413-qa.mjs`, `team-e2e-crash.mjs`/`-crash-state.mjs`, support modules `team-e2e-{support,runtime,process,scripts,analysis}.mjs`, `team-e2e-mock-provider.ts` |
 | RPC | `task-rpc-e2e.mjs`, `-helpers.mjs`, `-scenarios.mjs` (+`.test.mjs`), `task-rpc-e2e.windows.test.ts` |
 | Resume | `task-resume-e2e.mjs`, `task-resume-failure-e2e.mjs`, `task-resume-e2e-scenarios.mjs`, `resume-e2e-runtime.mjs` |
@@ -23,6 +23,7 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 - `task-e2e-analysis.mjs`: JSONL event parsing, `jsonlSignature`, ordered-subsequence matching, filesystem snapshot diffing, `classifyRealSenpiChanges`.
 - `resume-e2e-runtime.mjs`: bounded `pollUntil`, task-record readers, kill-group cleanup.
 - `mock-provider/index.ts`: `registerMockProvider`, `selfTest`, `loadMockScript`, `stepToAssistantMessage`, stream/result guards. The `*-mock-provider.ts` files default-export senpi extension registrations and are loaded via `senpi -e`.
+- `task-restart-redelivery-e2e.mjs` (+ its lane-private `task-restart-redelivery-mock-provider.ts`): incident-2026-09-08 proof that a SIGKILLed parent whose child completion wake (`omo-senpi:wake` custom_message) was appended but never answered gets EXACTLY ONE redelivered wake + ONE `omo-senpi:restart-continuation` on resume, `consumed_epoch === notified_epoch` after the resumed turn settles, and nothing more on a second resume; plus a no-kill control (one wake total, zero continuations) and a toolResult-tail twin lane that isolates the interruption predicate. Determinism: the mock provider's CHILD blocks on a driver-written gate file until the parent is idle, the wake-triggered parent turn stalls at the model (`{type:"hang"}` step), every wait gates on JSONL/record content, and `PI_OFFLINE=1` keeps a flaky gateway from wedging senpi startup. A sandbox-local observer extension records the session tail each session_start sees (`crash.sessionStartTails` in the summary) - on resume that tail is a sibling extension's startup entry (e.g. `pi-rules.scan`), not the interrupted turn's last message, which is the field that names the cause when redelivery does not fire.
 - `mock-completions-server.mjs`: local HTTP mock provider. A child in-process MUST ALWAYS exit through a real HTTP client, never an in-process shortcut. Steps are `tool_call`, `text`, and `error` (`{ type: "error", status, body }` writes the status and JSON body instead of a stream, the only way to exercise a provider outage); one step per request off a single global cursor, so a body-routing `steps(body)` must place its step at that index.
 - `thread-tools/lib/harness.mjs`: the ONE harness for the thread lanes - scratch dirs, fake model and child tracking come from the sanctioned `qa-app-server/lib/*` modules, assertions read target state (`get_messages`, `getShellSnapshot()`) rather than logs, and `verifyCleanup` proves no survivor matched this run's own scratch path.
 - Cross-checkout roots are env-overridable, never hard-coded: `THREAD_QA_SENPI_ROOT` and `THREAD_QA_DESKTOP_ROOT` (harness), `THREAD_QA_SENPI_ROOT` and `THREAD_QA_EVIDENCE_ROOT` (`task-14/common.mjs`). Specifiers into another checkout MUST be dynamic `import()` of an env-resolved path, or the suite fails module resolution on every other machine.
@@ -48,6 +49,8 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 node scripts/qa/drive.mjs --self-test
 node scripts/qa/task-rpc-e2e.mjs --self-test
 node scripts/qa/task-load-skills-e2e.mjs --self-test
+node packages/omo-senpi/scripts/qa/task-restart-redelivery-e2e.mjs --self-test
+node packages/omo-senpi/scripts/qa/task-restart-redelivery-e2e.mjs [--evidence-dir <d>] [--keep-sandbox]   # live mode; needs the built bundle
 bun packages/omo-senpi/scripts/qa/memorian-gate-e2e.mjs --self-test
 bun packages/omo-senpi/plugin/scripts/build-extension.mjs && bun packages/omo-senpi/scripts/qa/memorian-gate-e2e.mjs --scenario all   # needs the built bundle
 SENPI_BIN="$(command -v senpi)" node scripts/qa/task-e2e.mjs   # live mode; same for team-e2e.mjs
