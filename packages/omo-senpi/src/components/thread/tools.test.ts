@@ -27,6 +27,28 @@ describe("thread tool registration", () => {
     expect(tools.every((tool) => tool.exposure === "search" && tool.searchGroup === "threads")).toBe(true)
   })
 
+  test("#given live threads in two workspaces #when thread_list runs in the default scope #then only the caller's workspace is listed and all_scope widens it", async () => {
+    // given: non-git directories, so workspace identity is realpath equality
+    const workspaceA = mkdtempSync(join(tmpdir(), "thread-list-scope-a-"))
+    const workspaceB = mkdtempSync(join(tmpdir(), "thread-list-scope-b-"))
+    const inA = { sessionId: "route-a", durableSessionId: "dur-a", cwd: workspaceA, name: "alpha", status: "open" as const }
+    const inB = { sessionId: "route-b", durableSessionId: "dur-b", cwd: workspaceB, name: "beta", status: "open" as const }
+    const f = fixture()
+    const host: ThreadHost = { ...f.host, listSessions: async () => [inA, inB] }
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, callerSessionId: () => "route-a", callerWorkspaceRoot: () => workspaceA })
+    const list = tools[1]
+    const threadsOf = (result: Awaited<ReturnType<typeof list.execute>>) =>
+      (result.details as { result: { threads: Array<{ thread_id: string }>; scope: string } }).result
+
+    // when
+    const scoped = threadsOf(await list.execute("call-1", {}, undefined, undefined, {} as never))
+    const widened = threadsOf(await list.execute("call-2", { all_scope: true }, undefined, undefined, {} as never))
+
+    // then
+    expect({ scope: scoped.scope, ids: scoped.threads.map((thread) => thread.thread_id) }).toEqual({ scope: "workspace", ids: ["dur-a"] })
+    expect({ scope: widened.scope, ids: widened.threads.map((thread) => thread.thread_id).sort() }).toEqual({ scope: "all", ids: ["dur-a", "dur-b"] })
+  })
+
   test("unknown targets return the typed not_found result", async () => {
     const f = fixture()
     const list = createThreadTools({ ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
