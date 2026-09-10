@@ -60,4 +60,36 @@ describe("createToolDefinitionHandler (regression for #3705)", () => {
       })
     })
   })
+
+  describe("#given byte-stable prefix port (apply override once per session)", () => {
+    describe("#when the tool.definition handler fetches todowrite twice", () => {
+      it("#then both fetches return byte-identical output and the hook runs once", async () => {
+        //#given
+        let hookCalls = 0
+        const countingHook = {
+          "tool.definition": async (
+            _input: { toolID: string },
+            output: { description: string; parameters: unknown },
+          ) => {
+            hookCalls += 1
+            output.description = TODOWRITE_DESCRIPTION
+          },
+        }
+        const handler = createToolDefinitionHandler({
+          hooks: buildHooks({ todoDescriptionOverride: countingHook }),
+        })
+        const first = { description: "opencode core default", parameters: {} }
+        const second = { description: "opencode core default", parameters: {} }
+
+        //#when
+        await handler({ toolID: "todowrite" }, first)
+        await handler({ toolID: "todowrite" }, second)
+
+        //#then
+        expect(first.description).toBe(TODOWRITE_DESCRIPTION)
+        expect(second.description).toBe(first.description)
+        expect(hookCalls).toBe(1)
+      })
+    })
+  })
 })
