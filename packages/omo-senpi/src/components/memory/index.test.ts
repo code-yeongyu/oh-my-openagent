@@ -4,8 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
+import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { createMemoryBinding } from "./binding"
 import {
   MEMORY_BINDING_CUSTOM_TYPE,
   createMemoryComponent,
@@ -164,6 +166,113 @@ describe("createMemoryComponent", () => {
     expect(existsSync(memoryHome)).toBe(false)
     expect(notifications).toEqual([])
     memoryModuleSupervisor.release()
+  })
+
+  test("#given a session whose session_start never reached this runner #when before_agent_start fires with a matching recorded binding #then the identity is rebound exactly once", async () => {
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const notifications: Array<{ message: string; level: string }> = []
+    const env = { OMO_MEMORY_HOME: memoryHome }
+    const identity = resolveMemoryIdentity(memorySettings().agent, cwd, env)
+    const recorded = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1 })
+    const before = memoryModuleSupervisor.refCount
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      now: () => 456,
+      resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+    const resumed = sessionContext({
+      entries: [{ type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: recorded }],
+      notifications,
+    })
+
+    await pi.dispatch("before_agent_start", {}, resumed)
+    await pi.dispatch("before_agent_start", {}, resumed)
+
+    expect(pi.entries).toEqual([{
+      customType: MEMORY_BINDING_CUSTOM_TYPE,
+      data: { identity: identity.id, repoPathHash: recorded.repoPathHash, boundAt: 456 },
+    }])
+    expect(memoryModuleSupervisor.refCount).toBe(before + 1)
+    expect(notifications).toEqual([])
+    memoryModuleSupervisor.release()
+  })
+
+  test("#given a recorded binding whose memory repository differs #when before_agent_start fires twice #then the rebind fails closed, notifies once, warns once and binds nothing", async () => {
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const ctx = componentContext()
+    const notifications: Array<{ message: string; level: string }> = []
+    const env = { OMO_MEMORY_HOME: memoryHome }
+    const identity = resolveMemoryIdentity(memorySettings().agent, cwd, env)
+    const before = memoryModuleSupervisor.refCount
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      resolveCwd: () => cwd,
+    }).register(pi, ctx)
+    const resumed = sessionContext({
+      entries: [{
+        type: "custom",
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: { identity: identity.id, repoPathHash: "other-repository", boundAt: 1 },
+      }],
+      notifications,
+    })
+
+    await pi.dispatch("before_agent_start", {}, resumed)
+    await pi.dispatch("before_agent_start", {}, resumed)
+
+    expect(pi.entries).toEqual([])
+    expect(memoryModuleSupervisor.refCount).toBe(before)
+    expect(notifications).toEqual([{ message: expect.stringContaining("memory identity conflict"), level: "error" }])
+    expect(ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(1)
+  })
+
+  test("#given a session bound at session_start #when before_agent_start fires #then no second binding is appended and no second reference is taken", async () => {
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const before = memoryModuleSupervisor.refCount
+    createMemoryComponent({
+      env: { OMO_MEMORY_HOME: memoryHome },
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+    const live = sessionContext()
+
+    await pi.dispatch("session_start", {}, live)
+    await pi.dispatch("before_agent_start", {}, live)
+
+    expect(pi.entries).toHaveLength(1)
+    expect(memoryModuleSupervisor.refCount).toBe(before + 1)
+    memoryModuleSupervisor.release()
+  })
+
+  test("#given enablement latched false at session_start or an event without a session id #when before_agent_start fires #then nothing is bound", async () => {
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const before = memoryModuleSupervisor.refCount
+    let reads = 0
+    createMemoryComponent({
+      env: { OMO_MEMORY_HOME: memoryHome },
+      loadConfig: () => loadedMemoryConfig(memorySettings({ enabled: reads++ === 0 })),
+      resolveCwd: () => cwd,
+    }).register(pi, componentContext())
+    const latched = sessionContext({ sessionId: "latched-disabled" })
+
+    await pi.dispatch("session_start", {}, latched)
+    await pi.dispatch("before_agent_start", {}, latched)
+    await pi.dispatch("before_agent_start", {}, {})
+
+    expect(pi.entries).toEqual([])
+    expect(memoryModuleSupervisor.refCount).toBe(before)
   })
 
   test("#given a resumed session bound to another identity #when session_start resolves fresh config #then it notifies an error and fails closed without rebinding", async () => {

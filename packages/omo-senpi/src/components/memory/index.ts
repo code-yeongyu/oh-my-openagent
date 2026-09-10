@@ -48,6 +48,7 @@ type SessionState = {
   context?: MemoryIdentityContext
   memoryStatusAttempted: boolean
   restartNotified: boolean
+  conflictNotified: boolean
 }
 
 export { MEMORY_BINDING_CUSTOM_TYPE } from "./binding"
@@ -89,7 +90,74 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         // Reuse the boot snapshot: registration must not add a loadConfig() call, because the
         // enablement latch depends on the ORDER of reads across boot -> session_start -> reload.
       })
+      const bindSession = (
+        surface: SessionSurface,
+        eventCtx: unknown,
+        options: { readonly existing: SessionState | undefined; readonly verifyRepository: boolean },
+      ): void => {
+        const sessionConfig = resolveMemoryConfig(loadConfig({ cwd }))
+        const state: SessionState = options.existing ?? {
+          enabled: isEnabled(sessionConfig, ctx, env),
+          memoryStatusAttempted: false,
+          restartNotified: false,
+          conflictNotified: false,
+          ...(surface.ui === undefined ? {} : { ui: surface.ui }),
+        }
+        sessions.set(surface.id, state)
+        if (!state.enabled) return
+
+        const identity = resolveMemoryIdentity(sessionConfig.agent, cwd, env)
+        const previous = findLatestMemoryBinding(surface.entries)
+        const binding = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: now() })
+        // A rebind has no session_start behind it, so the recorded entry is the only evidence of what
+        // this session was: it must agree on the memory repository too, not only on the identity.
+        const conflict = previous !== undefined
+          && (previous.identity !== identity.id || (options.verifyRepository && previous.repoPathHash !== binding.repoPathHash))
+        if (conflict) {
+          if (!state.conflictNotified) {
+            state.conflictNotified = true
+            surface.ui?.notify(
+              `memory identity conflict: session is bound to ${previous.identity}, but config resolved ${identity.id}; restart with the original identity or fork a new session`,
+              "error",
+            )
+            ctx.logger.warn("omo-senpi memory binding failed closed", {
+              sessionId: surface.id,
+              bound: previous.identity,
+              resolved: identity.id,
+            })
+          }
+          return
+        }
+
+        state.context = createMemoryIdentityContext({
+          identity: identity.id,
+          identityPaths: identity.paths,
+          binding,
+        })
+        memoryModuleSupervisor.acquire()
+        pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding)
+        // Bind-time reconcile floats past the bind by design, but its rejection must not
+        // float: an unhandled rejection is attributed to whatever code is running when it lands.
+        void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
+          logBindReconcileFailure(ctx.logger, error)
+        })
+      }
+
       wiring.registerStatic(pi, ctx)
+      // A session that reaches a turn without session_start in this runner generation (a host
+      // restart or reload that resumed an open conversation) is bound here from its own recorded
+      // binding. Registered after the static handlers so their projection-first result order holds:
+      // the memory tool is live on this turn (afterBind marks the session active) and the prompt
+      // block follows on the next one.
+      pi.on("before_agent_start", (_payload, eventCtx) => {
+        const surface = readSessionSurface(eventCtx)
+        if (surface.id === "unknown-session") return undefined
+        const state = sessions.get(surface.id)
+        if (state?.context !== undefined) return undefined
+        if (state !== undefined && !state.enabled) return undefined
+        bindSession(surface, eventCtx, { existing: state, verifyRepository: true })
+        return undefined
+      })
       const unregisterReadClassifier = registerMemoryReadClassifier(pi, {
         resolveRepos: function* () {
           for (const state of sessions.values()) {
@@ -112,41 +180,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       pi.on("session_start", (_payload, eventCtx) => {
         const surface = readSessionSurface(eventCtx)
         wiring.clearStatus(eventCtx)
-        const sessionConfig = resolveMemoryConfig(loadConfig({ cwd }))
-        const enabled = isEnabled(sessionConfig, ctx, env)
         releaseSession(sessions.get(surface.id))
-        const state: SessionState = {
-          enabled,
-          memoryStatusAttempted: false,
-          restartNotified: false,
-          ...(surface.ui === undefined ? {} : { ui: surface.ui }),
-        }
-        sessions.set(surface.id, state)
-        if (!enabled) return
-
-        const identity = resolveMemoryIdentity(sessionConfig.agent, cwd, env)
-        const previous = findLatestMemoryBinding(surface.entries)
-        if (previous !== undefined && previous.identity !== identity.id) {
-          surface.ui?.notify(
-            `memory identity conflict: session is bound to ${previous.identity}, but config resolved ${identity.id}; restart with the original identity or fork a new session`,
-            "error",
-          )
-          return
-        }
-
-        const binding = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: now() })
-        state.context = createMemoryIdentityContext({
-          identity: identity.id,
-          identityPaths: identity.paths,
-          binding,
-        })
-        memoryModuleSupervisor.acquire()
-        pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding)
-        // Bind-time reconcile floats past session_start by design, but its rejection must not
-        // float: an unhandled rejection is attributed to whatever code is running when it lands.
-        void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
-          logBindReconcileFailure(ctx.logger, error)
-        })
+        bindSession(surface, eventCtx, { existing: undefined, verifyRepository: false })
       })
 
       pi.on("session_shutdown", async (payload, eventCtx) => {
