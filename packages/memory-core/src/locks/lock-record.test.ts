@@ -146,6 +146,67 @@ describe("cross-process lock protocol", () => {
     expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(owner)
   })
 
+  test("#given a dead primary owner and a dead recovery-lock owner #when a contender acquires #then both stale files are reclaimed without manual deletion", async () => {
+    // #given
+    const lockPath = await createLockPath()
+    const recoveryPath = `${lockPath}.recovery`
+    const deadOwner = { ...(await createLockRecord("reflection-scheduler")), pid: 2_000_000_000 }
+    const deadRecoverer = { ...(await createLockRecord("reflection-scheduler:recovery")), pid: 1_999_999_999 }
+    await writeFile(lockPath, `${JSON.stringify(deadOwner)}\n`)
+    await writeFile(recoveryPath, `${JSON.stringify(deadRecoverer)}\n`)
+
+    // #when — bind-time shape: a single pass must recover, no retries available
+    const contender = await createLockRecord("reflection-scheduler")
+    await acquireLock(lockPath, contender, { waitTimeoutMs: 0 })
+
+    // #then
+    expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(contender)
+    expect(await isHeld(recoveryPath)).toBe(false)
+    await releaseLock(lockPath, contender)
+  })
+
+  test("#given a dead primary owner and a LIVE recovery-lock owner #when a contender acquires #then the recovery holder is never displaced and contention is raised", async () => {
+    // #given — this process is the live recoverer
+    const lockPath = await createLockPath()
+    const recoveryPath = `${lockPath}.recovery`
+    const deadOwner = { ...(await createLockRecord("reflection-scheduler")), pid: 2_000_000_000 }
+    const liveRecoverer = await createLockRecord("reflection-scheduler:recovery")
+    await writeFile(lockPath, `${JSON.stringify(deadOwner)}\n`)
+    await writeFile(recoveryPath, `${JSON.stringify(liveRecoverer)}\n`)
+
+    // #when
+    const contender = await createLockRecord("reflection-scheduler")
+    const error = await captureError(acquireLock(lockPath, contender, { waitTimeoutMs: 200, retryDelayMs: 10 }))
+
+    // #then
+    expect(error).toBeInstanceOf(LockContentionError)
+    expect(JSON.parse(await readFile(recoveryPath, "utf8"))).toEqual(liveRecoverer)
+    expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(deadOwner)
+  })
+
+  test("#given a dead recovery-lock owner on another host #when a contender acquires #then the recovery lock is not reclaimed", async () => {
+    // #given
+    const lockPath = await createLockPath()
+    const recoveryPath = `${lockPath}.recovery`
+    const deadOwner = { ...(await createLockRecord("reflection-scheduler")), pid: 2_000_000_000 }
+    const foreignRecoverer = {
+      ...(await createLockRecord("reflection-scheduler:recovery")),
+      pid: 1_999_999_999,
+      hostname: "foreign-host.invalid",
+    }
+    await writeFile(lockPath, `${JSON.stringify(deadOwner)}\n`)
+    await writeFile(recoveryPath, `${JSON.stringify(foreignRecoverer)}\n`)
+
+    // #when
+    const contender = await createLockRecord("reflection-scheduler")
+    const error = await captureError(acquireLock(lockPath, contender, { waitTimeoutMs: 200, retryDelayMs: 10 }))
+
+    // #then
+    expect(error).toBeInstanceOf(LockContentionError)
+    expect(JSON.parse(await readFile(recoveryPath, "utf8"))).toEqual(foreignRecoverer)
+    expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(deadOwner)
+  })
+
   test("#given a callback under a lock #when the callback fails #then withLock releases only its own lock", async () => {
     // #given
     const lockPath = await createLockPath()
