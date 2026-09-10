@@ -121,4 +121,51 @@ describe("BackgroundManager session permission", () => {
       ],
     })
   })
+
+  test("prefixes the category in the child session title", async () => {
+    // given
+    const createCalls: Array<Record<string, unknown>> = []
+    const promptStarted = Promise.withResolvers<void>()
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child" } }
+        },
+        promptAsync: async () => {
+          promptStarted.resolve()
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const timeout = Promise.withResolvers<never>()
+    const timeoutID = setTimeout(
+      () => timeout.reject(new Error("waited 1s for categorized child session prompt")),
+      1_000,
+    )
+
+    // when
+    try {
+      await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "explore",
+        parentSessionId: "ses_parent",
+        parentMessageId: "msg_parent",
+        category: "quick",
+      })
+      await Promise.race([promptStarted.promise, timeout.promise])
+
+      // then
+      expect(createCalls).toHaveLength(1)
+      const body = createCalls[0]?.body as Record<string, unknown> | undefined
+      expect(body?.title).toBe("[quick] Test task (@explore subagent)")
+    } finally {
+      clearTimeout(timeoutID)
+      await manager.shutdown()
+    }
+  })
 })
