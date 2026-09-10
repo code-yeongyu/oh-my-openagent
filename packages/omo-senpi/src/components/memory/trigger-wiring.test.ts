@@ -323,4 +323,70 @@ describe("reflection trigger wiring", () => {
     expect(launches).toHaveLength(1)
     expect(launches[0]?.trigger).toBe("step-count")
   })
+
+  test("#given a stale session ctx after replacement #when a run settles #then the error is swallowed and the host handler still resolves", async () => {
+    const base = await fixture({ stepCount: 1 })
+    const staleError = new Error(
+      "This extension ctx is stale after session replacement or reload. Do not use a captured pi or command ctx after ctx.newSession(), ctx.fork(), ctx.switchSession(), or ctx.reload().",
+    )
+    const session: ReflectionTriggerSession = {
+      conversationId: "stale-conversation",
+      ledger: base.ledger,
+      engine: {
+        evaluate: async () => {
+          throw staleError
+        },
+      },
+    }
+    const pi = new FakeExtensionAPI()
+    const logs: Array<{ level: string; message: string; details?: unknown }> = []
+    createReflectionTriggerWiring({
+      resolveSession: () => session,
+      onLaunch: () => {
+        throw new Error("must not launch")
+      },
+      logger: {
+        info: (message, details) => logs.push({ level: "info", message, details }),
+        warn: (message, details) => logs.push({ level: "warn", message, details }),
+        error: (message, details) => logs.push({ level: "error", message, details }),
+      },
+    }).register(pi)
+
+    // Must resolve (not reject): the host awaits this handler before dispatching
+    // the next turn's tools, so a throw here stalls eval/bash/kill_bash.
+    await successfulSettle(pi)
+
+    expect(logs.filter((entry) => entry.level === "warn")).toEqual([])
+    expect(base.launches).toEqual([])
+  })
+
+  test("#given a stale session ctx #when a manual reflection is requested #then no warning is logged", async () => {
+    const staleError = new Error("This extension ctx is stale after session replacement or reload.")
+    const logs: Array<{ level: string; message: string; details?: unknown }> = []
+    const session: ReflectionTriggerSession = {
+      conversationId: "stale-conversation",
+      ledger: { pendingCompaction: false, configRestartNotified: false },
+      engine: {
+        evaluate: async () => {
+          throw staleError
+        },
+      },
+    }
+    const { wiring } = await fixture({ stepCount: 1 })
+    void wiring
+    const pi = new FakeExtensionAPI()
+    const manual = createReflectionTriggerWiring({
+      resolveSession: () => session,
+      logger: {
+        info: () => {},
+        warn: (message, details) => logs.push({ level: "warn", message, details }),
+        error: () => {},
+      },
+    })
+    manual.register(pi)
+    manual.requestManualReflection("stale-focus")
+    await manual.whenIdle()
+
+    expect(logs.filter((entry) => entry.level === "warn")).toEqual([])
+  })
 })

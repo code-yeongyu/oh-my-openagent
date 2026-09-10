@@ -71,7 +71,11 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
   function track(task: () => Promise<void>): void {
     const promise = task()
       .catch((error: unknown) => {
-        options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
+        // Same rationale as the agent_settled handler: a stale ctx is expected
+        // after session replacement, not a failure worth surfacing.
+        if (!isStaleSessionContext(error)) {
+          options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
+        }
       })
       .finally(() => {
         inFlight.delete(promise)
@@ -127,8 +131,15 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
           observer?.phase("reflection.settled.evaluate")
           await evaluateAndLaunch(session, { kind: "settled", success: true }, observer?.signal)
         } catch (error: unknown) {
+          // An aborted observer signal means this settle pass was cancelled,
+          // not failed: return without warning.
           if (observer?.signal.aborted) return
-          options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
+          // A stale session ctx means this turn is already gone (session replaced
+          // or reloaded mid-flight). Swallow it silently: reflection is best-effort
+          // and must never break the host's tool dispatch for subsequent turns.
+          if (!isStaleSessionContext(error)) {
+            options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
+          }
         }
       }, { hookLabel: "reflection.evaluate" })
 
@@ -202,4 +213,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The senpi host throws when an extension uses a ctx captured before a session
+ * replacement or reload ("This extension ctx is stale after session replacement
+ * or reload..."). Reflection is fire-and-forget observability: a stale ctx means
+ * the turn it belonged to is already gone, so the settle is skipped instead of
+ * surfacing an error that can stall the host's tool dispatch chain.
+ */
+export function isStaleSessionContext(error: unknown): boolean {
+  const message = describe(error)
+  return message.includes("stale after session replacement or reload")
 }
