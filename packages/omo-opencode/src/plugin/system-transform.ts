@@ -1,5 +1,6 @@
 import type { DefaultModeConfig } from "../config/schema/default-mode"
 import { reconcileSisyphusRuntimePrompt } from "../agents/sisyphus-runtime-prompt-reconciler"
+import { pinnedUltraworkMessage, readVariantID } from "./model-identity-pin"
 
 const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
 
@@ -34,7 +35,12 @@ export function createSystemTransformHandler(
     // from the *configured* model in .omo/omo.jsonc. This per-request hook
     // is the only seam that knows the model actually selected at runtime, so
     // rebuild the whole body for the runtime model here (issue #5297/#6966).
-    reconcileSisyphusRuntimePrompt(output.system, toCanonicalModel(input.model))
+    // The rebuild is pinned per (sessionID, modelID, variantID) so repeats
+    // return byte-identical output.
+    reconcileSisyphusRuntimePrompt(output.system, toCanonicalModel(input.model), {
+      sessionID: input.sessionID,
+      variantID: readVariantID(input.model),
+    })
 
     const restoredGuidance = input.sessionID
       ? ultraworkRestoration?.getSystemTransformGuidance?.(input.sessionID, input.model?.id)
@@ -53,7 +59,11 @@ export function createSystemTransformHandler(
     if (output.system.some((part) => part.includes(ULTRAWORK_MODE_TAG))) return
 
     const modelID = input.model?.id
-    const ultraworkMessage = getUltraworkMessage("sisyphus", modelID)
+    const variantID = readVariantID(input.model)
+    const ultraworkMessage = pinnedUltraworkMessage(
+      { sessionID: input.sessionID ?? "", agentName: "sisyphus", modelID: modelID ?? "", variantID },
+      () => getUltraworkMessage("sisyphus", modelID),
+    )
     if (!ultraworkMessage) return
 
     output.system.push(ultraworkMessage)

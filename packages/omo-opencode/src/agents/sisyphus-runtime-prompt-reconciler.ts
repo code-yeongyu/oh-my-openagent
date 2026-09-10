@@ -11,10 +11,17 @@
  * - `rebuildPromptForModel` re-runs the same registration pipeline with a
  *   different model, so overrides / prompt_append / env context are preserved.
  */
+import { pinnedRebuildPrompt } from "../plugin/model-identity-pin"
+
 export type SisyphusRuntimePromptContext = {
   configuredModel: string;
   bakedPrompt: string;
   rebuildPromptForModel: (runtimeModel: string) => string;
+};
+
+export type ReconcilePromptOptions = {
+  sessionID?: string;
+  variantID?: string;
 };
 
 let context: SisyphusRuntimePromptContext | undefined;
@@ -51,6 +58,7 @@ export function clearSisyphusRuntimePromptContext(): void {
 export function reconcileSisyphusRuntimePrompt(
   system: string[],
   runtimeModel: string | undefined,
+  opts?: ReconcilePromptOptions,
 ): boolean {
   if (!runtimeModel || !context) return false
 
@@ -59,7 +67,15 @@ export function reconcileSisyphusRuntimePrompt(
     return false
   }
 
-  const rebuilt = context.rebuildPromptForModel(runtimeModel)
+  const rebuilt = pinnedRebuildPrompt(
+    {
+      sessionID: opts?.sessionID ?? "",
+      configuredModel: context.configuredModel,
+      runtimeModel,
+      variantID: opts?.variantID ?? "",
+    },
+    context.rebuildPromptForModel,
+  )
   if (rebuilt === context.bakedPrompt) return false
 
   // Substring replace rather than exact-equality: opencode core may concatenate
