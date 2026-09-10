@@ -43,7 +43,14 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // reader, receipts, mailbox and metadata seams into the entry for the first time. First-party code only -
 // bundle-purity stays green with no new third-party dependency inlined. Measured 1,068,655 bytes after
 // minification on top of dev's 1,031,755; 1,100,000 keeps ~2.9% headroom rather than the failing value.
-const BUDGET_BYTES = 1_100_000
+// Raised 1,100,000 -> 1,150,000 for the opt-in `side-panel` component: the right-hand column lands
+// the host surface, the pure section builders, the row store and the shared formatters. First-party
+// code only - no new third-party dependency is inlined, verified against dev's package manifests.
+// The task-record read that feeds the agents section goes through `#omo-task-runtime` (external in
+// this build) rather than a static `@oh-my-opencode/senpi-task` import; doing that lazy-load first
+// took the artifact from 1,120,188 down to 1,104,048, so the component's own cost is 13,484 bytes on
+// top of dev's 1,090,564. 1,150,000 keeps ~4% headroom rather than the failing value.
+const BUDGET_BYTES = 1_150_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

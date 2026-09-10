@@ -1,0 +1,21 @@
+CLI flag behaviour, senpi 2026.9.9-2, isolated sandbox /tmp/omo-panel-smoke-g7jb97zo
+Command shape: senpi -e <mock-provider> --provider omo-mock --model mock-1 <flag>
+
+  --omo-side-panel          -> exit 0, flag accepted
+  --no-omo-side-panel       -> exit 1, "Error: Unknown option: --no-omo-side-panel"
+  --no-omo-task             -> exit 1, "Error: Unknown option: --no-omo-task"   (pre-existing: the
+                               omo-task flag's own description advertises this form)
+  --omo-side-panel=false    -> exit 0, and the panel is still ON
+  --omo-side-panel false    -> exit 0, and the panel is still ON
+
+Source of that behaviour, node_modules/@code-yeongyu/senpi/dist:
+  cli/args.js               every unrecognised --x lands in `unknownFlags`; `--x=v` and `--x v`
+                            carry a string, a bare `--x` carries true.
+  core/agent-session-services.js  applyExtensionFlagValues(): for a registered flag whose
+                            type is "boolean" it does `flagValues.set(name, true)` and ignores the
+                            parsed value entirely; a name that matches no registered flag becomes a
+                            fatal "Unknown option" diagnostic.
+
+Conclusion: a boolean extension flag can only be forced ON from the CLI. The persistent switch is
+`side_panel.enabled` in omo.json. The component still honours a `false` reaching `getFlag`, because
+the SDK carries flag values across session reloads (core/agent-session.js: options.flagValues).
