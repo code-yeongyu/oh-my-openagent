@@ -1,0 +1,9 @@
+missing dependency: sqlite3
+FAIL: missing dependencies
+FAIL: oqa_db_path returned ''
+PASS: oqa_sql_escape quotes single quotes
+PASS: oqa_free_port -> 55925
+PASS: isolated XDG sandbox auto-removed on exit (/tmp/oqa-xdg.Fd30yp)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+common.sh self-check had 2 failure(s)

@@ -1,0 +1,18 @@
+# Isolation proof (20260910-byte-stable, worktree wt-byte-stable)
+
+* Mechanism: opencode-qa scripts build an isolated XDG sandbox (own
+  XDG_DATA_HOME, XDG_CONFIG_HOME, XDG_STATE_HOME, XDG_CACHE_HOME under a
+  mktemp dir) and remove it on exit. `common-selfcheck-output.txt` shows
+  `PASS: isolated XDG sandbox auto-removed on exit` and
+  `PASS: isolated HOME points inside sandbox`.
+* Fact: no live server started in this run. `sse-selftest-output.txt`
+  (`FAIL: server did not start`) and `server-smoke-output.txt`
+  (`FAIL: server did not become ready`) both fail before serving, caused by
+  the broken `opencode` shim on PATH (node-24 ESM `require` crash).
+* Consequence: zero session operations (no run, prompt, resume, or DB
+  write) were issued against the real DB. Session count unchanged by
+  construction; numeric count query unavailable (`sqlite3` absent, see
+  `04-omitted.md`).
+* Scope guard: all writes stayed inside the worktree
+  (`packages/omo-opencode/src/plugin/prefix-stability.md` plus
+  `.omo/evidence/20260910-byte-stable/`). Main checkout untouched.
