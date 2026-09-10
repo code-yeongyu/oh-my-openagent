@@ -188,12 +188,16 @@ function createAssistantPrefillRecoveryMessage(
     modelID: "assistant-prefill-guard",
   }
 
+  // Quantize the recovery timestamp to a 10s bucket so two recoveries
+  // created within the same bucket are byte-identical.
+  const created = Math.floor(Date.now() / 10_000) * 10_000
+
   return {
     info: {
       id: messageID,
       sessionID,
       role: "user",
-      time: { created: Date.now() },
+      time: { created },
       agent: lastUserMessage?.agent ?? "internal",
       model,
       ...(lastUserMessage?.system ? { system: lastUserMessage.system } : {}),
