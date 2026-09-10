@@ -120,11 +120,13 @@ export function parseOptionalResolvedModelArray(
 export function parseNotification(record: Record<string, unknown>): TaskNotification {
   const notification = record["notification"]
   if (!isRecord(notification)) throw new Error("notification is not an object")
+  const consumedEpoch = readOptionalNumber(notification, "consumed_epoch")
   const failedEpoch = readOptionalNumber(notification, "notification_failed_epoch")
   const livenessNotifiedEpoch = readOptionalNumber(notification, "liveness_notified_epoch")
   return {
     run_epoch: readNumber(notification, "run_epoch"),
     notified_epoch: readNumber(notification, "notified_epoch"),
+    ...(consumedEpoch === undefined ? {} : { consumed_epoch: consumedEpoch }),
     ...(failedEpoch === undefined ? {} : { notification_failed_epoch: failedEpoch }),
     ...(livenessNotifiedEpoch === undefined ? {} : { liveness_notified_epoch: livenessNotifiedEpoch }),
   }

@@ -96,6 +96,7 @@ export type TaskRunStats = {
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
+  readonly consumed_epoch?: number
   readonly notification_failed_epoch?: number
   readonly liveness_notified_epoch?: number
 }

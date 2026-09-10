@@ -162,15 +162,35 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     for (const record of listed.records) {
       const epoch = record.notification.run_epoch
       if (record.parent_session_id !== input.sessionId) continue
-      if (record.notification.notified_epoch >= epoch) continue
       if (!TERMINAL_STATUSES.has(record.status)) continue
       if (!shouldNotifyStatus(record.status)) continue
-      if (!owesNotification(record)) continue
+      const unnotified = record.notification.notified_epoch < epoch && owesNotification(record)
+      const interruptedParentTail =
+        input.parentTailInterrupted === true &&
+        record.notify_on_terminal &&
+        record.notification.notified_epoch >= epoch &&
+        (record.notification.consumed_epoch ?? -1) < epoch
+      if (!unnotified && !interruptedParentTail) continue
       // A LIVE in-memory buffered entry already owns delivery of this (task_id, run_epoch) - the
       // next flush delivers it. Reconcile only recovers notifications whose buffer died with the
       // process; delivering here too would double-notify (chaos inv1).
       if (hasBuffered(buffered, record.parent_session_id, record.task_id, epoch)) continue
       deliverRecord(record, buildDetails(record), input.parentState)
+    }
+  }
+
+  function markConsumed(input: { readonly sessionId: string }): void {
+    for (const record of deps.store.list().records) {
+      if (record.parent_session_id !== input.sessionId) continue
+      deps.store.mutate(record.task_id, (fresh) => {
+        const consumedEpoch = fresh.notification.consumed_epoch ?? -1
+        return fresh.parent_session_id !== input.sessionId || fresh.notification.notified_epoch <= consumedEpoch
+          ? fresh
+          : {
+              ...fresh,
+              notification: { ...fresh.notification, consumed_epoch: fresh.notification.notified_epoch },
+            }
+      })
     }
   }
 
@@ -190,6 +210,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     flushBuffered,
     reconcileUnnotifiedNotifications,
     reconcileFailedNotifications: reconcileUnnotifiedNotifications,
+    markConsumed,
     bufferedCount,
   }
 }

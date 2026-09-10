@@ -104,6 +104,7 @@ export type FlushInput = {
 export type ReconcileUnnotifiedNotificationsInput = {
   readonly sessionId: string
   readonly parentState: ParentState
+  readonly parentTailInterrupted?: boolean
 }
 
 /** @deprecated Pre-rename alias kept for the omo-senpi caller until todo 18 updates it. */
@@ -118,6 +119,8 @@ export type FlushResult =
 export type CompletionNotifier = {
   notifyTerminal(request: CompletionRequest): NotifyResult
   flushBuffered(input: FlushInput): FlushResult
+  /** Marks delivered completion epochs observed by the parent; optional for legacy test instrumentation wrappers. */
+  markConsumed?: (input: { readonly sessionId: string }) => void
   reconcileUnnotifiedNotifications(input: ReconcileUnnotifiedNotificationsInput): void
   /** Thin alias of reconcileUnnotifiedNotifications for the pre-rename omo-senpi caller (todo 18). */
   reconcileFailedNotifications(input: ReconcileUnnotifiedNotificationsInput): void

@@ -103,6 +103,89 @@ describe("createCompletionNotifier - reconcile unnotified terminal completions",
     expect(records.get(record.task_id)?.notification.notified_epoch).toBe(0)
   })
 
+  test("#given a delivered-but-unconsumed terminal epoch w4notif #when the interrupted parent session reconciles #then it is redelivered exactly once", () => {
+    // given
+    const record = baseRecord({ notification: { run_epoch: 2, notified_epoch: 2, consumed_epoch: 1 } })
+    const { store, records } = fakeStore([record])
+    const parent = capturingNotifier()
+    const completion = createCompletionNotifier({ notifier: parent.notifier, store })
+
+    // when
+    completion.reconcileUnnotifiedNotifications({
+      sessionId: "session-a",
+      parentState: { kind: "idle" },
+      parentTailInterrupted: true,
+    })
+
+    // then
+    expect(parent.calls).toHaveLength(1)
+    expect(records.get(record.task_id)?.notification.notified_epoch).toBe(2)
+  })
+
+  test("#given a delivered-but-unconsumed terminal epoch w4notif #when a non-interrupted parent session reconciles #then the record is not redelivered", () => {
+    // given
+    const record = baseRecord({ notification: { run_epoch: 2, notified_epoch: 2, consumed_epoch: 1 } })
+    const { store } = fakeStore([record])
+    const parent = capturingNotifier()
+    const completion = createCompletionNotifier({ notifier: parent.notifier, store })
+
+    // when
+    completion.reconcileUnnotifiedNotifications({ sessionId: "session-a", parentState: { kind: "idle" } })
+
+    // then
+    expect(parent.calls).toHaveLength(0)
+  })
+
+  test("#given a delivered-and-consumed terminal epoch w4notif #when an interrupted parent session reconciles #then the record is not redelivered", () => {
+    // given
+    const record = baseRecord({ notification: { run_epoch: 2, notified_epoch: 2, consumed_epoch: 2 } })
+    const { store } = fakeStore([record])
+    const parent = capturingNotifier()
+    const completion = createCompletionNotifier({ notifier: parent.notifier, store })
+
+    // when
+    completion.reconcileUnnotifiedNotifications({
+      sessionId: "session-a",
+      parentState: { kind: "idle" },
+      parentTailInterrupted: true,
+    })
+
+    // then
+    expect(parent.calls).toHaveLength(0)
+  })
+
+  test("#given a legacy delivered terminal epoch without consumed_epoch w4notif #when the parent session reconciles with an interrupted tail #then it is redelivered", () => {
+    // given
+    const record = baseRecord({ notification: { run_epoch: 2, notified_epoch: 2 } })
+    const { store } = fakeStore([record])
+    const parent = capturingNotifier()
+    const completion = createCompletionNotifier({ notifier: parent.notifier, store })
+
+    // when
+    completion.reconcileUnnotifiedNotifications({
+      sessionId: "session-a",
+      parentState: { kind: "idle" },
+      parentTailInterrupted: true,
+    })
+
+    // then
+    expect(parent.calls).toHaveLength(1)
+  })
+
+  test("#given a legacy delivered terminal epoch without consumed_epoch w4notif #when the parent session reconciles without an interrupted tail #then it is not redelivered", () => {
+    // given
+    const record = baseRecord({ notification: { run_epoch: 2, notified_epoch: 2 } })
+    const { store } = fakeStore([record])
+    const parent = capturingNotifier()
+    const completion = createCompletionNotifier({ notifier: parent.notifier, store })
+
+    // when
+    completion.reconcileUnnotifiedNotifications({ sessionId: "session-a", parentState: { kind: "idle" } })
+
+    // then
+    expect(parent.calls).toHaveLength(0)
+  })
+
   test("#given an already-notified epoch w4notif #when the session reconciles #then the record is skipped", () => {
     // given
     const record = baseRecord({ notification: { run_epoch: 0, notified_epoch: 0 } })
@@ -204,6 +287,30 @@ describe("createCompletionNotifier - reconcile unnotified terminal completions",
     expect(flushed).toEqual({ kind: "flushed", count: 1 })
     expect(parent.calls).toHaveLength(1)
     expect(records.get(record.task_id)?.notification.notified_epoch).toBe(0)
+  })
+
+  test("#given delivered notifications for multiple sessions w4notif #when the matching session marks consumed #then only its notifications are stamped and all other fields survive", () => {
+    // given
+    const matching = baseRecord({ task_id: "st_matching", notification: { run_epoch: 2, notified_epoch: 2, consumed_epoch: 1 } })
+    const other = baseRecord({
+      task_id: "st_other",
+      parent_session_id: "session-b",
+      host_pid: 8080,
+      notification: { run_epoch: 3, notified_epoch: 3, consumed_epoch: 1 },
+    })
+    const { store, records, mutated } = fakeStore([matching, other])
+    const parent = capturingNotifier()
+    const completion = createCompletionNotifier({ notifier: parent.notifier, store })
+
+    // when
+    completion.markConsumed!({ sessionId: "session-a" })
+
+    // then
+    expect(records.get(matching.task_id)?.notification.consumed_epoch).toBe(2)
+    expect(records.get(other.task_id)?.notification.consumed_epoch).toBe(1)
+    expect(records.get(other.task_id)?.host_pid).toBe(8080)
+    expect(mutated).toHaveLength(1)
+    expect(parent.calls).toHaveLength(0)
   })
 
   test("#given a residency claim lands between read and notified-epoch persist w4notif #when the epoch is stamped #then the claim survives", () => {
