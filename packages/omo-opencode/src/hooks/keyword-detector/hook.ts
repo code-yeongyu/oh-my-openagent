@@ -23,6 +23,7 @@ import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 import { getUltraworkMessageForSource } from "./ultrawork"
 import { getUltraworkSource, type UltraworkSource } from "./ultrawork/source-detector"
+import { pinnedUltraworkMessage } from "../../plugin/model-identity-pin"
 
 const defaultModeUltraworkInjectedSessions = new Set<string>()
 const DEFAULT_MODE_ULTRAWORK_SESSION_CAP = 256
@@ -54,6 +55,24 @@ function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
   if (!hasCombo) return detected
   return detected.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
+}
+
+function getPinnedUltraworkMessageForSession(
+  sessionID: string,
+  agentName: string | undefined,
+  modelID: string | undefined,
+  variantID: string | undefined,
+  source: UltraworkSource,
+): string {
+  return pinnedUltraworkMessage(
+    {
+      sessionID,
+      agentName: agentName ?? "",
+      modelID: modelID ?? "",
+      variantID: variantID ?? "",
+    },
+    () => getUltraworkMessageForSource(source),
+  )
 }
 
 function filterAlreadyInjectedKeywords(
@@ -130,12 +149,35 @@ export function createKeywordDetectorHook(
         : input.model?.modelID
       const promptSource = getUltraworkSource(currentAgent, modelID)
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords, enabledExpansions)
+      const injectionVariant = getRuntimeVariant(input, output.message)
+      detectedKeywords = detectedKeywords.map((k) => {
+        if (k.type !== "ultrawork") return k
+        return {
+          ...k,
+          message: getPinnedUltraworkMessageForSession(
+            input.sessionID,
+            currentAgent,
+            modelID,
+            injectionVariant,
+            promptSource,
+          ),
+        }
+      })
       const explicitUltrawork = detectedKeywords.some((k) => k.type === "ultrawork" || k.type === "hyperplan-ultrawork")
       const activeUltrawork = explicitUltraworkSessions.get(input.sessionID)
       const replayUltrawork = !explicitUltrawork && activeUltrawork !== undefined
       const compactUltrawork = activeUltrawork !== undefined && !activeUltrawork.needsRestoration && activeUltrawork.source === promptSource
       if (replayUltrawork) {
-        detectedKeywords.push({ type: "ultrawork", message: getUltraworkMessageForSource(promptSource) })
+        detectedKeywords.push({
+          type: "ultrawork",
+          message: getPinnedUltraworkMessageForSession(
+            input.sessionID,
+            currentAgent,
+            modelID,
+            injectionVariant,
+            promptSource,
+          ),
+        })
       }
       detectedKeywords = suppressComboStandalones(detectedKeywords)
 
@@ -328,9 +370,9 @@ export function createKeywordDetectorHook(
       const agent = getSessionAgent(sessionID)
       if (!activeUltrawork?.needsRestoration || isPlannerAgent(agent)
         || isNonOmoAgent(agent) || subagentSessions.has(sessionID)) return undefined
-      return getUltraworkMessageForSource(
-        modelID === undefined ? activeUltrawork.source : getUltraworkSource(agent, modelID),
-      )
+      const restoreSource =
+        modelID === undefined ? activeUltrawork.source : getUltraworkSource(agent, modelID)
+      return getPinnedUltraworkMessageForSession(sessionID, agent, modelID, undefined, restoreSource)
     },
     event: ({ event }: { event: { type: string; properties?: unknown } }): void => {
       if (event.type !== "session.deleted" && event.type !== "session.compacted") return
