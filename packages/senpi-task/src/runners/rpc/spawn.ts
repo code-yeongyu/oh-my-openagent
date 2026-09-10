@@ -210,9 +210,10 @@ export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | 
 }
 
 /**
- * The child-facing argv tail shared by both spawn strategies: `--no-extensions` so the detached child
- * does NOT auto-load the parent's whole package set, then ONLY the threaded `-e` extensions, then the
- * threaded `--model` so the separate process resolves the requested provider/modelId.
+ * The child-facing argv tail shared by both spawn strategies: extensions remain auto-loaded so custom
+ * providers/endpoints (e.g., freeinference.org with custom baseUrl) are visible to the child, plus
+ * any threaded `-e` extensions and the threaded `--model` so the separate process resolves the
+ * requested provider/modelId. DAG-owned tasks still drop the OMO launcher extension.
  */
 function isDagOwnedChild(spec: RpcRunnerSpec): boolean {
   if (basename(dirname(spec.state_dir)) !== "children" || basename(spec.state_dir) !== spec.task_id) return false
@@ -224,7 +225,7 @@ function isDagOwnedChild(spec: RpcRunnerSpec): boolean {
 }
 
 export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
-  const args: string[] = ["--no-extensions"]
+  const args: string[] = []
   // The OMO launcher prepends its own extension before user/provider entries. DAG-owned tasks drop
   // that first entry so the detached child cannot boot a task engine, while provider extensions
   // and every non-DAG child's extension list remain unchanged.
@@ -243,7 +244,7 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
 }
 
 export function buildModelCatalogArgs(spec: RpcRunnerSpec): readonly string[] {
-  const args: string[] = ["--no-extensions"]
+  const args: string[] = []
   for (const entry of spec.extensions ?? []) {
     if (entry.length > 0) args.push("--extension", entry)
   }
