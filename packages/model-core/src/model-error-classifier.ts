@@ -1,6 +1,7 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { ProviderCache } from "./provider-cache"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { isExplicitUserAbortSignal } from "./model-abort-signal"
 
 /**
  * Error names that indicate a retryable model error.
@@ -33,6 +34,12 @@ const NON_RETRYABLE_ERROR_NAMES = new Set([
   "syntaxerror",
   "usererror",
 ])
+
+const ABORT_FAMILY_NAME_MARKERS = ["messageabortederror", "aborterror", "responseaborted"] as const
+
+function isAbortFamilyErrorName(errorNameLower: string): boolean {
+  return ABORT_FAMILY_NAME_MARKERS.some((marker) => errorNameLower.includes(marker))
+}
 
 /**
  * Message patterns that indicate a retryable error even without a known error name.
@@ -151,6 +158,11 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   // If we have an error name, check against known lists
   if (error.name) {
     const errorNameLower = error.name.toLowerCase()
+    // Mid-stream connection failures surface as MessageAbortedError/AbortError but are NOT
+    // user cancellations; only an explicit user/transport abort message stays non-retryable (issue #6424).
+    if (isAbortFamilyErrorName(errorNameLower)) {
+      return isExplicitUserAbortSignal(error.message ?? "") ? false : true
+    }
     // Explicit non-retryable takes precedence
     if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
       return false

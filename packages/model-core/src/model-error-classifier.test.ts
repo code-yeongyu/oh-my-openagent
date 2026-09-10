@@ -475,4 +475,127 @@ describe("model-error-classifier", () => {
   })
 })
 
+describe("mid-stream MessageAbortedError (issue #6424)", () => {
+  test("treats MessageAbortedError with technical mid-stream message as retryable", () => {
+    //#given
+    const error = { name: "MessageAbortedError", message: "Connection terminated unexpectedly" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats MessageAbortedError with 'stream ended mid-response' message as retryable", () => {
+    //#given
+    const error = { name: "MessageAbortedError", message: "stream ended mid-response" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats AbortError with technical connection message as retryable", () => {
+    //#given
+    const error = { name: "AbortError", message: "Connection closed" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats ResponseAborted with no message as retryable", () => {
+    //#given
+    const error = { name: "ResponseAborted" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats MessageAbortedError with undefined message as retryable (no user-cancel signal)", () => {
+    //#given
+    const error = { name: "MessageAbortedError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("keeps MessageAbortedError with explicit user abort message non-retryable", () => {
+    //#given
+    const error = { name: "MessageAbortedError", message: "The user aborted this request." }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("keeps AbortError with 'aborted by user' message non-retryable", () => {
+    //#given
+    const error = { name: "AbortError", message: "aborted by user" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("keeps MessageAbortedError with 'Request was aborted.' message non-retryable (transport-cancel preserved)", () => {
+    //#given
+    const error = { name: "MessageAbortedError", message: "Request was aborted." }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("keeps quotaexceedederror non-retryable (regression pin)", () => {
+    //#given
+    const error = { name: "quotaexceedederror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("keeps validationerror non-retryable (regression pin)", () => {
+    //#given
+    const error = { name: "validationerror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("keeps message-only user abort non-retryable (no error name)", () => {
+    //#given
+    const error = { message: "The user aborted this request." }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+})
+
 export {}
