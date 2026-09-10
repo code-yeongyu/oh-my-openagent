@@ -23,7 +23,8 @@ export function getMessageSessionID(message: TransformMessageInfo): string | und
 function readStartTime(state: Record<string, unknown>): number {
   const time = toRecord(state["time"])
   const start = time?.["start"]
-  return typeof start === "number" ? start : Date.now()
+  // Quantize fallback to a 10s bucket so repeated settlement is byte-identical.
+  return typeof start === "number" ? start : Math.floor(Date.now() / 10_000) * 10_000
 }
 
 function settleToolPart(part: TransformPart): boolean {
@@ -38,7 +39,8 @@ function settleToolPart(part: TransformPart): boolean {
   state["status"] = "error"
   state["error"] = INTERRUPTED_TOOL_ERROR
   state["input"] = input ?? {}
-  state["time"] = { start, end: Date.now() }
+  // Quantize end to a 10s bucket so repeated settlement is byte-identical.
+  state["time"] = { start, end: Math.floor(Date.now() / 10_000) * 10_000 }
   delete state["raw"]
 
   return true
