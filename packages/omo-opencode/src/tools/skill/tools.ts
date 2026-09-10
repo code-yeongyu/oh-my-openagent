@@ -27,6 +27,15 @@ import {
 
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
+  let descriptionFrozen = false
+
+  const compareByName = (left: { name: string }, right: { name: string }): number => {
+    const leftName = left.name.toLowerCase()
+    const rightName = right.name.toLowerCase()
+    if (leftName < rightName) return -1
+    if (leftName > rightName) return 1
+    return 0
+  }
 
   const getBaseSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
     if (shouldInvalidateSkillCacheForSession(context?.sessionID)) {
@@ -73,25 +82,28 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     }) ?? []
   }
 
-  const buildDescription = async (force = false): Promise<string> => {
-    if (!force && cachedDescription) return cachedDescription
-    const commands = getCommands()
+  // Description bytes are frozen per session: the first completed build wins and
+  // later calls (including execute) must not rewrite the cached value.
+  const buildDescription = async (): Promise<string> => {
+    if (descriptionFrozen && cachedDescription) return cachedDescription
+    const commands = [...getCommands()].sort(compareByName)
     const skills = await getSkills()
     // Exclude agent-restricted skills from the description: they must not be
     // visible to agents that are not their designated owner.  The execute-time
     // check already enforces the restriction at call time.
     const publicSkills = skills.filter((s) => !s.definition.agent)
-    const skillInfos = publicSkills.map(loadedSkillToInfo)
+    const skillInfos = publicSkills.map(loadedSkillToInfo).sort(compareByName)
     cachedDescription = formatCombinedDescription(skillInfos, commands, {
       includeSkills: options.includeSkillsInDescription,
     })
+    descriptionFrozen = true
     return cachedDescription
   }
 
   if (options.skills !== undefined) {
     const publicSkills = options.skills.filter((s) => !s.definition.agent)
     const skillInfos = publicSkills.map(loadedSkillToInfo)
-    const commandsForDescription = options.commands ?? []
+    const commandsForDescription = [...(options.commands ?? [])]
     let needsAsyncRefresh = false
 
     if (options.nativeSkills) {
@@ -107,16 +119,21 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       }
     }
 
+    skillInfos.sort(compareByName)
+    commandsForDescription.sort(compareByName)
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription, {
       includeSkills: options.includeSkillsInDescription,
     })
     if (needsAsyncRefresh) {
-      void buildDescription(true)
+      void buildDescription()
+    } else {
+      descriptionFrozen = true
     }
   } else if (options.commands !== undefined) {
-    cachedDescription = formatCombinedDescription([], options.commands, {
+    cachedDescription = formatCombinedDescription([], [...options.commands].sort(compareByName), {
       includeSkills: options.includeSkillsInDescription,
     })
+    descriptionFrozen = true
   }
 
   return tool({
@@ -144,10 +161,6 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         await mergeNativeSkillsInto(skills)
         matchedSkill = matchSkillByName(skills, requestedName)
       }
-
-      cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands, {
-        includeSkills: options.includeSkillsInDescription,
-      })
 
       if (matchedSkill) {
         await ctx?.ask({

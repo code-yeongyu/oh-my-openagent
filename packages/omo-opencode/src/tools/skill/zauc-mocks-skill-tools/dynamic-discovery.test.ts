@@ -113,6 +113,14 @@ describe("skill tool - dynamic description cache invalidation", () => {
       })
 
       const refreshedResult = await refreshedTool.execute({ name: "second-skill" }, mockContext)
+      expect(refreshedResult).toContain("second-skill")
+
+      // Description bytes are frozen per session: execute no longer rewrites
+      // them, so await the lazy initial build instead of the execute side effect.
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        if (refreshedTool.description.includes("second-skill")) break
+        await new Promise<void>((resolve) => setTimeout(resolve, 50))
+      }
 
       expect(refreshedTool.description).toContain("second-skill")
     } finally {
