@@ -83,6 +83,65 @@ describe("background-agent spawner resume guard", () => {
   })
 })
 
+describe("background-agent spawner cwd routing", () => {
+  afterEach(() => {
+    clearSessionPromptParams("session-worktree")
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("uses explicit cwd for child session creation and prompt routing", async () => {
+    //#given
+    const createCalls: Array<Record<string, unknown>> = []
+    const promptCalls: PromptRequest[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "session-worktree" } }
+        },
+        promptAsync: async (input: PromptRequest) => {
+          promptCalls.push(input)
+          return { data: {} }
+        },
+      },
+    } as never
+    const task = createTask({
+      description: "Worktree task",
+      prompt: "Do work",
+      agent: "explore",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+      cwd: "/worktree",
+    })
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
+        cwd: task.cwd,
+      },
+    }
+
+    //#when
+    await startTask(item as never, {
+      client,
+      directory: "/host",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    } as never)
+    await waitForCondition(() => promptCalls.length === 1)
+
+    //#then
+    expect(createCalls[0]?.query).toEqual({ directory: "/worktree" })
+    expect(promptCalls[0]?.query).toEqual({ directory: "/worktree" })
+  })
+})
+
 describe("background-agent spawner agent-not-found fallback", () => {
   afterEach(() => {
     clearSessionPromptParams("session-fallback")

@@ -48,6 +48,8 @@ export interface BackgroundTask {
   parentSessionId: string
   parentMessageId: string
   teamRunId?: string
+  /** Optional working directory override for the child session. */
+  cwd?: string
   description: string
   prompt: string
   agent: string
@@ -116,6 +118,8 @@ export interface LaunchInput {
   parentSessionId: string
   parentMessageId: string
   teamRunId?: string
+  /** Optional working directory override for the child session. */
+  cwd?: string
   suppressTmuxSpawn?: boolean
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string

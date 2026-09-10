@@ -218,6 +218,7 @@ export async function tryFallbackRetry(args: {
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
     teamRunId: task.teamRunId,
+    cwd: task.cwd,
     model: nextModel,
     fallbackChain: task.fallbackChain,
     skillContent: task.skillContent,

@@ -11,6 +11,7 @@ export function buildTaskRecord(input: LaunchInput, id: string, queuedAt: Date):
     parentSessionId: input.parentSessionId,
     parentMessageId: input.parentMessageId,
     teamRunId: input.teamRunId,
+    cwd: input.cwd,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
     parentTools: input.parentTools,
