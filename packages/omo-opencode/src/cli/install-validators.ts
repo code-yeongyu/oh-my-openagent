@@ -51,6 +51,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "GLM fallbacks"))
+  lines.push(formatProvider("Zhipu Coding Plan (bigmodel.cn)", config.hasZhipuaiCodingPlan, "GLM fallbacks"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
   lines.push(formatProvider("Bailian Coding Plan", config.hasBailianCodingPlan, "Qwen/GLM/Kimi fallback"))
   lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, "MiniMax-M3 fallback"))
@@ -64,7 +65,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
-  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai/Zhipu > Kimi > Bailian > MiniMax > Vercel`)
 
   return lines.join("\n")
 }
@@ -168,6 +169,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --zai-coding-plan value: ${args.zaiCodingPlan} (expected: no, yes)`)
   }
 
+  if (args.zhipuaiCodingPlan !== undefined && !["no", "yes"].includes(args.zhipuaiCodingPlan)) {
+    errors.push(`Invalid --zhipuai-coding-plan value: ${args.zhipuaiCodingPlan} (expected: no, yes)`)
+  }
+
   if (args.kimiForCoding !== undefined && !["no", "yes"].includes(args.kimiForCoding)) {
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
@@ -208,6 +213,7 @@ function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
   if (args.copilot !== undefined) errors.push("--copilot cannot be used with --platform=codex")
   if (args.opencodeZen !== undefined) errors.push("--opencode-zen cannot be used with --platform=codex")
   if (args.zaiCodingPlan !== undefined) errors.push("--zai-coding-plan cannot be used with --platform=codex")
+  if (args.zhipuaiCodingPlan !== undefined) errors.push("--zhipuai-coding-plan cannot be used with --platform=codex")
   if (args.kimiForCoding !== undefined) errors.push("--kimi-for-coding cannot be used with --platform=codex")
   if (args.opencodeGo !== undefined) errors.push("--opencode-go cannot be used with --platform=codex")
   if (args.bailianCodingPlan !== undefined) errors.push("--bailian-coding-plan cannot be used with --platform=codex")
@@ -235,6 +241,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasSenpi,
     hasOpencodeZen: hasOpenCode && args.opencodeZen === "yes",
     hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
+    hasZhipuaiCodingPlan: hasOpenCode && args.zhipuaiCodingPlan === "yes",
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",
     hasOpencodeGo: hasOpenCode && args.opencodeGo === "yes",
     hasBailianCodingPlan: hasOpenCode && args.bailianCodingPlan === "yes",
@@ -252,6 +259,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   copilot: BooleanArg
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
+  zhipuaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
   bailianCodingPlan: BooleanArg
@@ -271,6 +279,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
+    zhipuaiCodingPlan: detected.hasZhipuaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
     bailianCodingPlan: detected.hasBailianCodingPlan ? "yes" : "no",

@@ -162,6 +162,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.opencodeZen ||
     avail.copilot ||
     avail.zai ||
+    avail.zhipuaiCodingPlan ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
     avail.bailianCodingPlan ||

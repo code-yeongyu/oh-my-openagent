@@ -27,6 +27,7 @@ type InstallCommandOptions = {
   readonly platform?: InstallArgs["platform"]
   readonly opencodeZen?: InstallArgs["opencodeZen"]
   readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
+  readonly zhipuaiCodingPlan?: InstallArgs["zhipuaiCodingPlan"]
   readonly kimiForCoding?: InstallArgs["kimiForCoding"]
   readonly opencodeGo?: InstallArgs["opencodeGo"]
   readonly bailianCodingPlan?: InstallArgs["bailianCodingPlan"]
@@ -75,6 +76,7 @@ export function resolveInstallArgs(
     platform,
     opencodeZen: options.opencodeZen,
     zaiCodingPlan: options.zaiCodingPlan,
+    zhipuaiCodingPlan: options.zhipuaiCodingPlan,
     kimiForCoding: options.kimiForCoding,
     opencodeGo: options.opencodeGo,
     bailianCodingPlan: options.bailianCodingPlan,
@@ -108,6 +110,7 @@ program
   .addOption(new Option("--platform <platform>", `Install target platform: ${availableInstallPlatforms().join(", ")}`).choices(availableInstallPlatforms()))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
+  .option("--zhipuai-coding-plan <value>", "Zhipu GLM Coding Plan (bigmodel.cn) subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
   .option("--bailian-coding-plan <value>", "Bailian Coding Plan subscription: no, yes (default: no)")
@@ -125,13 +128,14 @@ Examples:
   $ omo-agent-toolkit install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai/Zhipu > Kimi > Bailian > MiniMax > Vercel):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.6 Sol for Oracle)
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-5, etc.)
   Z.ai          zai-coding-plan/glm-5.2 (visual-engineering fallback)
+  Zhipu         zhipuai-coding-plan/glm-5.2 (GLM fallback, bigmodel.cn)
   Kimi          kimi-for-coding/kimi-k3 (Sisyphus/Prometheus fallback)
   Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)
   MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)
