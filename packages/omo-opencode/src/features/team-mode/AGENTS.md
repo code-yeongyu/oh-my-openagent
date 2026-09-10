@@ -98,6 +98,7 @@ team-mode/
 ├── team-tasklist/              # adapter shim over team-core CRUD + claiming + dependencies
 ├── team-worktree/              # adapter shim over team-core git worktree primitives
 ├── team-layout-tmux/           # adapter shim over team-core optional pane layout
+├── test-support/               # shared fixtures and doubles for team-mode tests
 └── tools/                      # 12 team_* tool implementations + tests
 ```
 

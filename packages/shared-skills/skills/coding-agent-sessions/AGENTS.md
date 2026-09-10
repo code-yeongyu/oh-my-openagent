@@ -1,10 +1,10 @@
 # coding-agent-sessions — Cross-Platform Session Finder (Python)
 
-**Generated:** 2026-08-24 (f3642fcda)
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 
-The only shared skill besides `ultimate-browsing` carrying a real sub-project: a Python package + CLI that finds, lists, searches, and reads local coding-agent session transcripts across ~25 platforms (Codex, Claude, OpenCode, OMO/Senpi/pi, and a long tail), normalizing them into one `Session` model. Earned this file: 33 files, 23 Python modules, own test suite, own `pyrightconfig.json`, own `.npmignore` (ships in the npm package minus tests/caches).
+The only shared skill besides `ultimate-browsing` carrying a real sub-project: a Python package + CLI that finds, lists, searches, and reads local coding-agent session transcripts across ~25 platforms (Codex, Claude, OpenCode, OMO/Senpi/pi, and a long tail), normalizing them into one `Session` model. Earned this file: 34 files including this guide, 23 Python modules, own test suite, own `pyrightconfig.json`, own `.npmignore` (ships in the npm package minus tests/caches).
 
 ## STRUCTURE
 
@@ -27,7 +27,7 @@ coding-agent-sessions/
 | `scanners.py` | `scan`, `DEFAULT_PLATFORMS`, `PLATFORM_SCANNERS`, per-platform `scan_*` (codex, claude, opencode, senpi, oh_my_pi, gajae_code, …) |
 | `types.py` | `Session`, `Options`, `Json`, `JsonMap` — imported by nearly every module and test |
 | `transcript.py` | parallel file reads, normalization, timestamps, session ids; `recent`, `MAX_PLATFORM_FILES` |
-| `cli.py` | command parsing, filtering, payload construction, JSON emission (283 LOC — behavioral hotspot) |
+| `cli.py` | command parsing, filtering, payload construction, JSON emission (284 LOC — behavioral hotspot) |
 | platform adapters | `file_scanners.py` (file-backed providers), `opencode.py` (CLI/SQLite/storage fallbacks), `sqlite_scanners.py`, `sqlite_optional_scanners.py`, `pi_family.py`, `aside_scanner.py`, `kiro_scanner.py` |
 
 ## CLI CONTRACT

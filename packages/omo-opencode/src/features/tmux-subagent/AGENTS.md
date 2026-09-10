@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-This module provides state-first tmux integration for background agent sessions (~48 files incl. colocated tests). It handles split decisions, grid planning, polling, and lifecycle events. Reusable tmux command, layout, and pane primitives are extracted to [`packages/tmux-core/`](../../../../../packages/tmux-core); this directory is the OpenCode session adapter.
+This module provides state-first tmux integration for background agent sessions (49 files including colocated tests and this guidance). It handles split decisions, grid planning, polling, and lifecycle events. Reusable tmux command, layout, and pane primitives are extracted to [`packages/tmux-core/`](../../../../../packages/tmux-core); this directory is the OpenCode session adapter.
 
 ## CORE ARCHITECTURE
 

@@ -9,9 +9,9 @@ Source root of the Senpi adapter package. The package barrel (`index.ts`) export
 | Extension entry / composition | `extension/` | `index.ts` (source entry, eager task), `bundled-index.ts` (built entry, lazy task runtime). Own AGENTS.md. |
 | Install / uninstall | `install/` | `runSenpiInstaller` / `runSenpiUninstaller`, local launcher, atomic settings writes. |
 | Real host modules for tests | `senpi-test-runtime.ts` | Resolves the installed `@code-yeongyu/senpi` dist and imports real theme/ModelRegistry/ModelRuntime at load time. |
-| Deep components | `components/{task,memory,lsp,telemetry,init-deep-advisor}/` | Each has its own AGENTS.md; `memory/` additionally documents `worker/`, `commands/`, `palace/`. |
+| Deep components | `components/{task,memory,lsp,telemetry,thread,ultrawork,ulw-loop,init-deep-advisor}/` | Each has its own AGENTS.md; `memory/` additionally documents `worker/`, `commands/`, `palace/`. |
 | X search | `components/x-search/` | Credential-gated `x_search` tool and conditional skill (files, gating, contract, error codes, backtest pointer). Own AGENTS.md. |
-| Small components | `components/*` | Single-purpose factories (ulw-loop, config-watch, onboarding, fallback-architect, ...) documented in `../AGENTS.md`. |
+| Small components | `components/*` | Single-purpose factories (config-watch, onboarding, fallback-architect, skill-pointers, ...) documented in `../AGENTS.md`. `agent-home`, `config-resolution`, `formatter`, and `post-mutation` are helper modules, not registered components. |
 
 ## Root audit gates
 
@@ -19,6 +19,7 @@ Colocated at `src/` root. These are executable package-contract tests, not docum
 
 - `bundle-purity.test.ts` - import allowlist for the extension bundle; keep aligned with `SENPI_LOADER_ALIASES` in `plugin/scripts/build-extension.mjs` (peer-external rule in `../AGENTS.md`).
 - `bundle-size.test.ts` - bundle size budget.
+- `bundle-lazy-barrel.test.ts` - the five emitted bundles keep their lazy-module loaders; minification must not collapse an accessor into an unconditional throw (beta.20 `omo-task.js` regression, #7339/#7340/#7351).
 - `package-shape.test.ts` - adapter manifest contract; license/notice files must ship with generated artifacts.
 - `plugin-manifest.test.ts` - packaged plugin manifest.
 - `runtime-dependency-resolution.test.ts` - a symlinked plugin without host hoisting still resolves runtime deps from the real path.

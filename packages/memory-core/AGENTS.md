@@ -11,6 +11,7 @@ The public API is the barrel at `src/index.ts`.
 
 | Directory | Responsibility |
 |-----------|----------------|
+| `src/fs/` | EINTR-resilient Node `fs` boundary; every memory domain imports filesystem calls from here. |
 | `src/git/` | Git command boundary, clean-tree checks, commits, merges, remotes, and typed git errors. |
 | `src/identity/` | Memory identity resolution and the `OMO_MEMORY_HOME` directory layout. |
 | `src/locks/` | Cross-process locks for memory writes, reflection scheduling, and transcript state. |
@@ -23,6 +24,8 @@ The public API is the barrel at `src/index.ts`.
 | `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, and merge outcomes. |
 | `src/compile/` | Compile committed memory revisions into marked system-prompt blocks and cache them by template hash. |
 | `src/search/` | Query parsing, transcript providers, and ranked memory/session search. |
+| `src/recall/` | Kibitzer recall: corpus loading, query planning, candidate selection, nudge rendering, ledger, and the epoch-guarded pending-nudge gate. |
+| `src/personas/` | Persona asset manifest and the process-cached asset loader shared by recall/reflection/facts. |
 | `src/sync/` | Remote mirror synchronization and secret redaction. |
 | `src/reminders/` | Reflection and memory-maintenance reminder generation. |
 | `src/seeds/` | Default memory blocks and first-run repository seeding. |
@@ -46,6 +49,11 @@ The public API is the barrel at `src/index.ts`.
 - **Keep reflection transitions deterministic.** Manual triggers outrank
   compaction, which outranks step-count triggers. Only one active run and one
   merged pending reservation may exist.
+- **Filesystem access goes through `src/fs/resilient.ts`.** Memory-stack code must
+  not import `node:fs` / `node:fs/promises` directly; `src/fs/no-direct-node-fs.test.ts`
+  enforces it. EINTR retry is whole-call where replay is safe: writes track
+  offsets, exclusive (`x`) creates are never retried, close EINTR counts as
+  closed, and file-handle retries are limited to idempotent methods.
 - **Keep locks domain-specific.** Use `memory-write`,
   `reflection-scheduler`, or the transcript-specific lock. Do not replace them
   with one global lock or add timing-based tests.
@@ -64,7 +72,7 @@ The public API is the barrel at `src/index.ts`.
 ## PUBLIC SURFACES
 
 - `runMemoryTool()` implements `create`, `str_replace`, `insert`, `delete`,
-  `rename`, and `update_description`.
+  `rename`, `update_description`, and `apply_patch`.
 - `runMemoryApplyPatch()` applies multi-file Codex-style patches inside the
   memory repository.
 - `GitMemoryRepo` owns repository initialization, clean checks, commits,

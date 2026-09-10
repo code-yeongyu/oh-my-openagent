@@ -113,9 +113,9 @@ Total: 54 base, 61 with team-mode, 62 with monitor enabled. Authoritative per-ti
 | `agents/` | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
 | `hooks/` | 54-62 lifecycle hooks across 62 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, todo-continuation-enforcer) |
 | `tools/` | 14 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
-| `features/` | 24 feature modules (including `btw-side`, `opengateway-provider`; some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 16 sub-AGENTS.md including team-mode, background-agent, btw-side, claude-code-*) |
+| `features/` | 23 feature modules (including `btw-side`, `opengateway-provider`; some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ per-module files for the larger domains: team-mode, background-agent, btw-side, monitor, mcp-oauth, claude-code-*) |
 | `shared/` | Cross-cutting adapter utilities plus shims over extracted Core packages, barrel-exported | yes |
-| `cli/` | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
+| `cli/` | Commander.js CLI: install, run, doctor, mcp-oauth, boulder, worktree-sweep | yes (+ boulder, config-manager, doctor, install-codex, mcp-oauth, run, worktree-sweep) |
 | `plugin/` | 12 OpenCode hook handlers + hook composition | yes |
 | `config/` | Zod v4 schema files | yes |
 | `plugin-handlers/` | 6-phase config loading pipeline | yes |

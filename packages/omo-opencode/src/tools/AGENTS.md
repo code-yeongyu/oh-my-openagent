@@ -18,7 +18,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | **Delegation** (2) | `task` (delegate, full skill+category support), `call_omo_agent` (named agent only: explore, librarian) |
 | **Skills/MCP** (2) | `skill` (load skill or invoke command), `skill_mcp` (call skill-embedded MCP tool/resource/prompt) |
 
-> LSP tools are provided by the built-in `lsp` MCP (Tier-1 stdio), backed by `packages/lsp-tools-mcp/`. AST-aware code search and rewrite is available through the `ast-grep` skill using `sg`.
+> LSP tools come from the built-in `lsp` MCP (Tier-1 stdio), backed by `packages/lsp-tools-mcp/`.
 
 ### Conditional (up to +26 native tools)
 
@@ -83,6 +83,7 @@ tools/
 ├── skill/                # skill — load skill or run command
 ├── skill-mcp/            # skill_mcp — call skill-embedded MCP servers
 ├── slashcommand/         # discoverCommandsSync — feeds skill tool with /-command list
+├── shared/               # Semaphore + spawned-search output collection shared by grep/glob
 ├── task/                 # 4 task_* tools (Sisyphus task system)
 └── index.ts              # barrel exports
 ```
@@ -93,7 +94,5 @@ tools/
 2. Add `types.ts` for parameter Zod schemas
 3. Add `tools.ts` (or single index.ts) for implementation
 4. Export factory from `src/tools/index.ts`
-5. Register in `src/plugin/tool-registry.ts`:
-   - Always-on: spread into `allTools` directly
-   - Conditional: build a `Record<string, ToolDefinition>` and gate-spread
+5. Register in `src/plugin/tool-registry.ts`: always-on tools spread into `allTools`; conditional tools build a gated `Record<string, ToolDefinition>`
 6. If the tool needs disabling, ensure it appears in `filterDisabledTools` allow-list (its name will be matched against `disabled_tools`)

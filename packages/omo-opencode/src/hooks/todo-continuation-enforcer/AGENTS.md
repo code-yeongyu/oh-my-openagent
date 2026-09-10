@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-~35 files (~6.7k LOC incl. tests). The "boulder" Continuation Tier hook: forces Sisyphus to keep rolling when incomplete todos remain. Fires on `session.idle`, injects a continuation prompt after a 2s countdown toast.
+36 files (18 implementation + 17 tests, ~6.7k LOC). The "boulder" Continuation Tier hook: forces Sisyphus to keep rolling when incomplete todos remain. Fires on `session.idle`, injects a continuation prompt after a 2s countdown toast.
 
 ## HOW IT WORKS
 
@@ -12,8 +12,11 @@
 session.idle
   → Is main session (not prometheus/compaction/plan)? (DEFAULT_SKIP_AGENTS)
   → No abort detected recently? (ABORT_WINDOW_MS = 3s)
+  → Not already handed back / recovering / token-limited / unrecoverable?
+  → No pending question and no pending internal continuation response?
+  → Compaction guard disarmed? (compaction-guard.ts, COMPACTION_GUARD_MS = 60s)
   → Todos still incomplete? (todo.ts)
-  → No background tasks running?
+  → No background tasks running (incl. pending parent wake)?
   → Cooldown passed? (CONTINUATION_COOLDOWN_MS = 5s, exponential backoff)
   → Failure count < max? (MAX_CONSECUTIVE_FAILURES = 5)
   → Not paused at turn boundary? (continuationBlockReason)
@@ -45,6 +48,9 @@ While `continuationBlockReason` is set, `handleSessionIdle` and `continuation-in
 | `todo.ts` | Check todo completion status via session store |
 | `countdown.ts` | 2s countdown toast before injection |
 | `abort-detection.ts` | Detect MessageAbortedError / AbortError |
+| `compaction-guard.ts` / `stagnation-detection.ts` | Post-compaction epoch guard; stop after `MAX_STAGNATION_COUNT` idle turns |
+| `pending-question-detection.ts` / `resolve-message-info.ts` | Skip on an unanswered Question; resolve latest agent/model + compaction markers |
+| `token-limit-detection.ts` / `unrecoverable-request-error.ts` | Classify non-retryable session errors |
 | `continuation-injection.ts` | Build + inject CONTINUATION_PROMPT into session |
 | `message-directory.ts` | Temp dir for message injection exchange |
 | `constants.ts` | Timing constants, CONTINUATION_PROMPT, skip agents |
@@ -59,30 +65,15 @@ MAX_CONSECUTIVE_FAILURES = 5          // Then 5min pause (exponential backoff)
 FAILURE_RESET_WINDOW_MS = 5 * 60_000  // 5min window for failure reset
 COUNTDOWN_SECONDS = 2
 ABORT_WINDOW_MS = 3000                // Grace after abort signal
+COMPACTION_GUARD_MS = 60_000          // Guard window after a compaction
+MAX_STAGNATION_COUNT = 3              // Turns without progress before stopping
 ```
 
-## STATE PER SESSION
+## STATE PER SESSION (`types.ts` `SessionState`)
 
-```typescript
-interface SessionState {
-  stagnationCount: number                       // Turns without todo progress
-  consecutiveFailures: number                   // Resets after FAILURE_RESET_WINDOW_MS
-  lastInjectedAt?: number                       // Cooldown base (exponential backoff)
-  abortDetectedAt?: number                      // Cleared after ABORT_WINDOW_MS
-  wasCancelled?: boolean                        // Abort/cancel flag
-  tokenLimitDetected?: boolean                  // Skip retry on context overflow
-  awaitingPostInjectionProgressCheck?: boolean  // Injected, awaiting next turn
-  continuationResponseObserved?: boolean       // Assistant replied to injection
-  continuationBlockReason?: "directive-response" | "user-interruption"
-  pendingUserMessageID?: string                // Deferred user msg pending part classification
-  countdownStartedAt?: number
-  inFlight?: boolean                           // Injection in progress
-  allTodosCompletedAt?: number
-}
-```
-
-## RELATIONSHIP TO ATLAS
-
-`todoContinuationEnforcer` handles **main Sisyphus sessions** only.
-`atlasHook` handles **boulder/ralph/subagent sessions** with a different decision gate.
-Both fire on `session.idle` but check session type first.
+- Progress: `stagnationCount`, `lastIncompleteCount`, `allTodosCompletedAt`
+- Suppression: `isRecovering`, `wasCancelled`, `tokenLimitDetected`, `unrecoverableErrorDetected`, `abortDetectedAt` (cleared after `ABORT_WINDOW_MS`)
+- Compaction guard: `recentCompactionAt`, `recentCompactionEpoch`, `acknowledgedCompactionEpoch`
+- Retry budget: `consecutiveFailures`, `lastInjectedAt` (cooldown base for exponential backoff)
+- Turn-boundary pause: `awaitingPostInjectionProgressCheck`, `continuationResponseObserved`, `continuationBlockReason`, `pendingUserMessageID`
+- In-flight: `countdownTimer`/`countdownInterval`, `countdownStartedAt`, `inFlight`

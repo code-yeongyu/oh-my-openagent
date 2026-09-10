@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-27 files. The `call_omo_agent` tool — direct invocation of named agents (explore, librarian only). Distinct from `delegate-task`: no category system, no skill loading, no model selection. Fixed agent set, same execution modes (background/sync).
+26 files. The `call_omo_agent` tool directly invokes named agents (explore, librarian only). Distinct from `delegate-task`: no category system or skill loading. It supports background launch and synchronous execution; session continuation is synchronous only.
 
 ## DISTINCTION FROM delegate-task
 
@@ -25,7 +25,7 @@ Same two modes as delegate-task, routed by `tools.ts`:
 
 | Mode | File | Description |
 |------|------|-------------|
-| **Background** | `background-executor.ts` | Async via `BackgroundManager` |
+| **Background** | `background-executor.ts` | Async via `BackgroundManager`; a returned notification identifies completion |
 | **Sync** | `sync-executor.ts` | Create session → wait for idle → return result |
 
 ## KEY FILES
@@ -35,16 +35,13 @@ Same two modes as delegate-task, routed by `tools.ts`:
 | `tools.ts` | `createCallOmoAgent()` factory — validates agent, routes to executor |
 | `background-executor.ts` | Launch background work via `BackgroundManager.launch()` |
 | `sync-executor.ts` | Synchronous session: create → send prompt → poll → fetch result |
-| `session-creator.ts` | Create OpenCode session for sync execution |
-| `subagent-session-creator.ts` | Create session with agent-specific config |
-| `subagent-session-prompter.ts` | Inject prompt into session |
-| `completion-poller.ts` | Poll until session idle |
-| `session-completion-poller.ts` | Session-specific completion check |
-| `session-message-output-extractor.ts` | Extract last assistant message as result |
-| `message-processor.ts` | Process raw message content |
-| `message-dir.ts` + `message-storage-directory.ts` | Temp storage for message exchange |
+| `session-creator.ts` | Create or reuse the sync session |
+| `subagent-session-creator.ts` | Resolve/create an agent-specific session ID |
+| `completion-poller.ts` | Poll until messages stabilize or timeout |
+| `message-processor.ts` | Process raw message content and extract output |
+| `message-dir.ts` | Resolve temporary message-exchange storage |
 | `types.ts` | `CallOmoAgentArgs`, `AllowedAgentType`, `ToolContextWithMetadata` |
 
 ## SESSION CONTINUATION
 
-Pass `session_id` to resume an existing session rather than create a new one — handled in both executors.
+Pass `session_id` to resume an existing session rather than create a new one in synchronous mode. Background mode rejects `session_id`.

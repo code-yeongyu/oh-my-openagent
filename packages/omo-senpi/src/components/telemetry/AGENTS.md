@@ -10,6 +10,8 @@ Senpi telemetry adapter over `@oh-my-opencode/telemetry-core` PostHog primitives
 | `product-identity.ts` | `omo-native` product config, PostHog write key constant, `KNOWN_MODELS`/provider allowlists, `OMO_NATIVE_EVENT_SCHEMAS` + property allowlists, salted `hashSessionId` (sha256 over a persisted 32-byte 0600 salt), `maskProviderAndModel`. |
 | `omo-native-component.ts` | Composition root: shared transport factory, capture fan-in gated by `isOmoNativeEventName`, wires session/prompt/tools/turns/notice/parallel-summary registrations. Registration order is load-bearing (see parallel-summary). |
 | `omo-native-session.ts` | `session_started` event: reason, os/arch/cpu/memory bucket, provider and model inventory (masked to known lists or `custom`). Also chains the legacy `recordSenpiDailyActive`. |
+| `session-inventory.ts` | Reads `models.json` + `settings.json` from the agent home into counts plus the masked default pair; only known provider ids ship. A missing or malformed inventory reports one diagnostic and yields zeroes. |
+| `session-model-registry.ts` | Structurally adapts the host `modelRegistry` for `session_started`/category snapshots; an untyped host yields `undefined` so no snapshot guesses model availability. |
 | `omo-native-notice.ts` | Once-per-machine `notice-shown` marker + visible one-line disclosure with docs URL and `DO_NOT_TRACK=1` opt-out. |
 | `omo-native-prompt.ts` | `prompt_submitted`: ultrawork classification, buckets for length and ordinal, suppression reasons. Raw prompt text never leaves the process. |
 | `omo-native-tools.ts` | `skill_loaded` (builtin skills only, path-checked against the shipped skills root), `delegation_started`, `feature_used` (deduped per session). |

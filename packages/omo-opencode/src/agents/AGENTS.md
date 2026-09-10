@@ -63,7 +63,9 @@ Read-only agents are rejected at TeamSpec parse time. For those, the lead delega
 agents/
 ├── sisyphus.ts                                # Main orchestrator router
 ├── sisyphus/                                  # Model-specific variant prompts
-│   ├── default.ts, gemini.ts, gpt-5-4.ts, gpt-5-5.ts
+│   ├── default.ts, claude-opus-4-7/-4-8/-5.ts, claude-fable-5.ts, gemini.ts,
+│   ├── gpt-5-4.ts, gpt-5-5.ts, gpt-task-system-guide.ts, grok-4.ts, glm-5-2.ts,
+│   ├── kimi-k2-6.ts, kimi-k2-7.ts, kimi-k3.ts
 ├── hephaestus.ts                              # Routes to model variant
 ├── hephaestus/                                # gpt.ts, gpt-5-4.ts, gpt-5-5.ts, gpt-5-6.ts
 ├── oracle.ts                                  # Read-only consultant

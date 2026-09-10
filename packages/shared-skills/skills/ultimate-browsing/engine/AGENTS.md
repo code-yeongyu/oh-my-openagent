@@ -1,6 +1,6 @@
 # ultimate-browsing/engine — Generic WAF-Profile Fetch Chain (Python)
 
-**Generated:** 2026-08-10 / 38d268995
+**Generated:** 2026-09-10 (bee8c2ba4; prior 2026-08-10 38d268995)
 
 ## UPSTREAM BASELINE AND VERSION POLICY
 
@@ -114,7 +114,7 @@ Any future upstream sync preserves BOTH sides. Concretely:
 
 ## OVERVIEW
 
-A 17-module Python package embedded in the `ultimate-browsing` skill: a site-agnostic fetch chain that escalates from a cheap curl probe to a real browser, with declarative WAF and surrogate registries. Not "optional scripts" — it has its own CLI entry (`python3 -m engine URL`), two YAML config schemas, a 4-file test suite, and a standalone CI guard. Package exports (`__init__.py`): `fetch`, `FetchResult`, `Attempt`, `Verdict`, `ValidationResult`, `validate`, `CHALLENGE_MARKERS`, `detect`, `TRANSFORMS`, `apply_transform`.
+A 13-module Python package embedded in the `ultimate-browsing` skill: a site-agnostic fetch chain that escalates from a cheap curl probe to a real browser, with declarative WAF and surrogate registries. Not "optional scripts" — it has its own CLI entry (`python3 -m engine URL`), two YAML config schemas, a 4-file test suite, and a standalone CI guard. Package exports (`__init__.py`): `fetch`, `FetchResult`, `Attempt`, `Verdict`, `ValidationResult`, `validate`, `CHALLENGE_MARKERS`, `detect`, `TRANSFORMS`, `apply_transform`.
 
 ## THE NO-SITE-NAME RULE (enforced in CI)
 

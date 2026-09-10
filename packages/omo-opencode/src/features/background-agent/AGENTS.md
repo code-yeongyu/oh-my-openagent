@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-50 non-test files (~110 `.ts` total incl. tests + `spawner/`). Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
+109 TypeScript files in this direct scope, plus the `spawner/` subtree. Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency is limited per model/provider (default 5). Central to multi-agent orchestration.
 
 ## TASK LIFECYCLE
 
@@ -41,9 +41,9 @@ LaunchInput → pending → [ConcurrencyManager queue] → running → polling �
 
 | File | Purpose |
 |------|---------|
-| `spawner-context.ts` | `SpawnerContext` interface composing all spawner deps |
-| `background-session-creator.ts` | Create OpenCode session for background task |
-| `concurrency-key-from-launch-input.ts` | Derive concurrency key from model/provider |
+| `task-record.ts` | `buildTaskRecord` — assemble the task record used at launch |
+| `task-prompt-body.ts` | `buildTaskPromptBody` — compose the prompt body delivered to the spawned session |
+| `fallback-agent.ts` | `FALLBACK_AGENT`, `isAgentNotFoundError`, `buildFallbackBody` — recovery when the requested agent is missing |
 | `tmux-callback-invoker.ts` | Notify TmuxSessionManager on session creation |
 
 ## COMPLETION DETECTION

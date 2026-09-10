@@ -1,10 +1,10 @@
 # src/features/opencode-skill-loader/ — Multi-Source Skill Discovery
 
-**Generated:** 2026-08-24 (f3642fcda)
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 
-55 files (~6.2k LOC). Discovers, parses, merges, and resolves SKILL.md files
+56 files including this guide (~6.2k TypeScript LOC). Discovers, parses, merges, and resolves SKILL.md files
 from 7 `discover*` sources (5 scope families) with priority deduplication by
 name. Maintains both sync and async loader implementations (async uses
 bounded concurrency and lazy content loading).
@@ -35,6 +35,7 @@ Same-named skill at higher priority replaces the lower; disabled names never loa
 |------|---------|
 | `loader.ts` | `discoverSkills()` / `discoverAllSkills()` / scope-specific `discover*` — orchestrates discovery → parse → merge |
 | `async-loader.ts` | Async traversal, bounded concurrency, lazy content loading |
+| `blocking.ts` + `discover-worker.ts` | `discoverAllSkillsBlocking()` — worker-thread adapter that runs async discovery synchronously with a bounded timeout |
 | `merger.ts` + `merger/scope-priority.ts` | Priority-based deduplication across sources |
 | `skill-content.ts` | YAML frontmatter parsing from SKILL.md |
 | `skill-discovery.ts` | Find SKILL.md files in directory trees |

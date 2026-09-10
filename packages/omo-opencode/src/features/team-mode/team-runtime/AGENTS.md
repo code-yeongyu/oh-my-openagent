@@ -2,7 +2,7 @@
 
 **Generated:** 2026-08-24
 
-**Score:** 12 (22 files, 3.3k LOC, distinct domain; one line in `team-mode/AGENTS.md`)
+**Score:** 12 (22 TypeScript files, 3.3k LOC, distinct lifecycle domain; one line in `team-mode/AGENTS.md`)
 
 ## OVERVIEW
 

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-24 files. Implements hash-anchored file editing where every line reference includes a content hash (`LINE#ID`). Validates hashes before applying edits, rejecting stale references. Registered as the `edit` tool (only when `hashline_edit: true`), replacing OpenCode's line-number edit.
+24 files. Implements hash-anchored file editing where every line reference includes a content hash (`LINE#ID`). Validates hashes before applying edits, rejecting stale references. Registered as the `edit` tool only when `hashline_edit: true`; formatter execution and file I/O remain adapter responsibilities while core edit operations stay local.
 
 ## THREE-OP MODEL
 
@@ -36,7 +36,7 @@ hashline-edit-executor.ts
 | File | Purpose |
 |------|---------|
 | `tools.ts` | `createHashlineEditTool()` factory — tool schema + entry point |
-| `hashline-edit-executor.ts` | Main execution: normalize → validate → order → apply → diff |
+| `hashline-edit-executor.ts` | Main execution: canonicalize → normalize → validate/apply → format → metadata |
 | `normalize-edits.ts` | Parse `RawHashlineEdit[]` (allows string `op` variants) → typed `HashlineEdit[]` |
 | `validation.ts` | Validate LINE#ID: parse hash, verify line content matches stored hash |
 | `hash-computation.ts` | `computeLineHash(line)` → 2-char CID from set `ZPMQVRWSNKTXJBYH` |

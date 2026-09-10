@@ -54,7 +54,7 @@ keyword-detector/
 | Team mode | [`packages/prompts-core/prompts/mode/team.md`](../../../../prompts-core/prompts/mode/team.md) |
 | Hyperplan mode | [`packages/prompts-core/prompts/mode/hyperplan.md`](../../../../prompts-core/prompts/mode/hyperplan.md) |
 
-The `src/hooks/keyword-detector/{team,hyperplan}/default.ts` files keep the regex triggers in the hook layer and import the markdown-backed constants from `@oh-my-opencode/prompts-core`. The ultrawork files import markdown with Bun's `.md` text loader so the exact prompt bytes are bundled into `dist/index.js`.
+The `src/hooks/keyword-detector/{team,hyperplan}/default.ts` files keep regex triggers in the hook layer and import prompt constants from `@oh-my-opencode/prompts-core`. The ultrawork files likewise import prompt-core content; prompt ownership stays outside this hook.
 
 ## ULTRAWORK VARIANT ROUTING
 

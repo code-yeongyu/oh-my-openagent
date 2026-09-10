@@ -37,11 +37,13 @@
 
 ```
 background_output(task_id, block=false)  → check current status/result
-background_output(task_id, block=true)   → wait until complete (timeout default: 120s)
+background_output(task_id, block=true)   → wait until complete (timeout default: 60s, max 600s)
 background_output(task_id, full_session=true) → return full session transcript
 background_output(task_id, message_limit=N) → last N messages only
 background_output(task_id, include_thinking=true) → include thinking blocks
 ```
+
+`background_output` performs short polling while blocking; it does not subscribe to completion events. Normal callers should wait for the system notification before requesting output.
 
 ## RELATIONSHIP TO BACKGROUND ENGINE
 
@@ -50,4 +52,4 @@ tools/background-task/  ← LLM tool interface
 features/background-agent/  ← execution engine (BackgroundManager)
 ```
 
-`createBackgroundOutput` queries `BackgroundManager.getTask(task_id)` — it does not manage task state.
+`createBackgroundOutput` queries `BackgroundManager.getTask(task_id)` and formats status/session data — it does not manage task state. `createBackgroundTask` owns launch-time context and metadata publication.

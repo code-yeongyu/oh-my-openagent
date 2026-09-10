@@ -1,6 +1,6 @@
 # visual-qa — Bundled Visual-Evidence CLI
 
-**Generated:** 2026-08-24 (f3642fcda)
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 

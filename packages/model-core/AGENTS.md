@@ -41,7 +41,7 @@ resolveModelPipeline(request, providerCache)
 - **ProviderCache is injected**, not imported. `omo-opencode` implements it with runtime cache state; `model-core` stays pure.
 - **Two resolution APIs:** `resolveModel()` for simple 3-tier fallback; `resolveModelWithFallback()` for full pipeline with `ExtendedModelResolutionInput`.
 - **`connected-providers-cache.ts`** exports no-op defaults. Adapters override via the `ProviderCache` parameter.
-- **40 source files** (73 TS incl. co-located tests). Barrel `index.ts` re-exports ~27 public modules. Tests co-located as `*.test.ts`.
+- **41 source files** (76 TS incl. 35 co-located tests). Barrel `index.ts` re-exports 30 public modules. Tests co-located as `*.test.ts`.
 - **Capability lookup is suffix-tolerant.** Each model ID expands to up to 4 candidate forms (full, provider-prefix-stripped, variant-suffix-stripped, both), tried most-specific first, so `:high` / `(high)` requests still hit a provider's bare model entry.
 - **Snapshot lookup prefers provider-specific keys.** `anthropic/claude-opus-4.8` wins over a bare `claude-opus-4.8` entry when both exist.
 - **Metadata beats family caps.** In `resolveCompatibleModelSettings()`, family `reasoningEffortAliases` are applied first, then explicit `capabilities.*` metadata, then heuristic family caps; an unknown family drops the value with `unknown-model-family`.

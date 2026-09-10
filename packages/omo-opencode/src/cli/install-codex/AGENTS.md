@@ -1,4 +1,4 @@
-# src/cli/install-codex/ — Codex Light Edition Installer (39 Files)
+# src/cli/install-codex/ — Codex Light Edition Installer (43 Files)
 
 **Generated:** 2026-06-06
 

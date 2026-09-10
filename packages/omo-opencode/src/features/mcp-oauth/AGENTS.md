@@ -6,6 +6,8 @@
 
 Full OAuth 2.0 authorization flow for MCP servers requiring authentication. Implements PKCE (RFC 7636) and Dynamic Client Registration (DCR, RFC 7591). Used by `bunx oh-my-opencode mcp-oauth login`.
 
+This directory is the stable OpenCode adapter path: every non-test module is a one-line `export *` shim over [`@oh-my-opencode/mcp-client-core/mcp-oauth`](../../../../../packages/mcp-client-core/src/mcp-oauth). Implementation changes belong there; keep these import paths stable for consumers and colocated tests.
+
 ## AUTHORIZATION FLOW
 
 ```
@@ -31,6 +33,9 @@ Full OAuth 2.0 authorization flow for MCP servers requiring authentication. Impl
 | `dcr.ts` | Dynamic Client Registration — register this app with OAuth server |
 | `step-up.ts` | Handle step-up authentication challenges |
 | `storage.ts` | Persist tokens to `~/.config/opencode/mcp-oauth/{server-hash}.json` |
+| `refresh-mutex.ts` | Serialize concurrent token refreshes |
+| `resource-indicator.ts` | RFC 8707 resource indicators |
+| `schema.ts` | Token/metadata schemas |
 
 ## PKCE IMPLEMENTATION
 
@@ -46,7 +51,7 @@ Fields: `access_token`, `refresh_token`, `expires_at`, `client_id`.
 ## CLI COMMANDS
 
 ```bash
-bunx oh-my-opencode mcp-oauth login <server-url>   # Full PKCE flow
-bunx oh-my-opencode mcp-oauth logout <server-url>  # Revoke + delete token
-bunx oh-my-opencode mcp-oauth status               # List stored tokens
+bunx oh-my-opencode mcp oauth login <server-name>   # Full PKCE flow
+bunx oh-my-opencode mcp oauth logout <server-name>  # Revoke + delete token
+bunx oh-my-opencode mcp oauth status [server-name]  # List stored tokens
 ```

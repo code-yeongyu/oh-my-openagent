@@ -16,7 +16,7 @@ Conventions for human contributors and AI agents working on this component.
 - `src/codex-hook.ts`: `runSessionStartHook` — the single hook handler.
 - `src/posthog.ts`: client construction/capture/shutdown; `DEFAULT_POSTHOG_API_KEY`, `DEFAULT_POSTHOG_HOST`, `getComponentVersion`.
 - `src/product-identity.ts`: the constants that must stay byte-equivalent with `packages/omo-codex/src/telemetry/product-identity.ts`.
-- `hooks/hooks.json`: component-local wiring (twin of the aggregate hook JSON).
+- `hooks/hooks.json`: component-local wiring (twin of the aggregate `plugin/hooks/session-start-recording-session-telemetry.json`).
 
 ## Commands
 
@@ -30,7 +30,7 @@ Conventions for human contributors and AI agents working on this component.
 ## Constraints
 
 - No Bun APIs. Runtime is Node only because Codex launches plugin hooks with Node.
-- The single hook handler is `runSessionStartHook`. Do not add new hook handlers without also wiring them in `hooks/hooks.json` and `plugin/hooks/hooks.json`.
+- The single hook handler is `runSessionStartHook`. Do not add new hook handlers without also wiring them in `hooks/hooks.json`, a per-event file under `plugin/hooks/`, and the `plugin/.codex-plugin/plugin.json` `hooks` array.
 - Telemetry MUST be silent on every failure path. The CLI MUST exit 0 with empty stdout even when PostHog construction, capture, or shutdown throws.
 - Telemetry MUST be daily-deduplicated. Adding a new event type requires a new state file slot, not removal of the existing dedup.
 - Hook output MUST stay empty (no `additionalContext`, no `systemMessage`). This component is observability-only and MUST NOT inject context into the Codex conversation.

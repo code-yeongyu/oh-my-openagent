@@ -13,7 +13,7 @@ The lowest-level core package: JSON-RPC 2.0 transport over stdio (line-mode and 
 | `types.ts` | `./types` | `JsonRpcId/Error/Result/Response`, `McpToolDescriptor`, `TextContent`, `McpLifecycleLog` |
 | `record.ts` | `./record` | `isPlainRecord(value)` type guard |
 | `responses.ts` | `./responses` | `successResponse`, `errorResponse`, `jsonRpcId`, `messageFromError` |
-| `server.ts` | `./server` | `runJsonRpcStdioServer(config)`: async-generator loop, idle timeout, `McpRequestHandler`, exits on terminal output errors |
+| `server.ts` | `./server` | `runJsonRpcStdioServer(config)`: async-generator loop, idle timeout, opt-in parent watchdog, `McpRequestHandler`, exits on terminal output errors |
 | `transport.ts` | `./transport` | `readStdioJsonRpcMessages` (async gen), `writeStdioJsonRpcResponse`, dual framing |
 
 ## CONSUMERS
@@ -27,6 +27,7 @@ The lowest-level core package: JSON-RPC 2.0 transport over stdio (line-mode and 
 
 - **Two framing modes:** `"line"` (`\n`-delimited) and `"framed"` (`Content-Length:` header per MCP spec); auto-detected by scanning the buffer prefix for `content-length:`.
 - **Idle timeout uses `timer.unref()`**: the timeout never keeps the process alive.
+- **Parent watchdog is opt-in and must never throw.** Omit `parentWatchdog` and no timer is created at all - deliberately so for servers that outlive their parent (the daemon server is detached). `isProcessAlive()` treats only `ESRCH` as dead and assumes alive on any other error, because a throw inside its unref'd interval would wedge the host; never swap it for a `ppid === 1` reparenting check (invalid on win32).
 - **Handler contract:** return `undefined` to skip silently; `onHandlerError` catches exceptions; `parseErrorResponse` customizes JSON parse errors.
 - **Output writes are awaited; closed output stops the loop:** `writeStdioJsonRpcResponse` is async and `writeChunk` removes its one-shot `error` listener after settle. `writeResponse` catches terminal output errors (`EPIPE`, `ERR_STREAM_DESTROYED`, `ERR_STREAM_WRITE_AFTER_END`), logs `output_error`, and returns false so the read loop exits; non-terminal write errors still propagate.
 - **Keep zero dependencies.** `.js` suffix on relative imports (ESM). This is the floor of the package layering; it must stay leaf.

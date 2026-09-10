@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE long-lived LSP process per user and fans many short-lived agent sessions into it over a unix socket (Windows named pipe). The runtime contract is harness-neutral so Codex, OpenCode, and Senpi can converge on the same authenticated daemon. Sessions launch a thin stdio MCP **proxy** that forwards to the warm **daemon**. Reuses [`@code-yeongyu/lsp-tools-mcp`](../lsp-tools-mcp) for the actual LSP manager + MCP request handler - this package only adds the daemon/proxy/transport layer. Built with `npm` + vitest + biome (NOT Bun); `engines.node >= 20`.
+Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE long-lived LSP process per user and fans many short-lived agent sessions into it over a unix socket (Windows named pipe). The runtime contract is harness-neutral so Codex, OpenCode, and Senpi can converge on the same authenticated daemon. Sessions launch a thin stdio MCP **proxy** that forwards to the warm **daemon**. Reuses [`@oh-my-opencode/lsp-core`](../lsp-core/AGENTS.md) directly for the actual LSP manager + MCP request handler (`lsp/manager`, `mcp`, `request-context`, `tools`) - this package only adds the daemon/proxy/transport/ownership layer. It does NOT import `lsp-tools-mcp`. Built with `npm` + vitest + biome (NOT Bun); `engines.node >= 20`.
 
 ## KEY FILES
 
@@ -19,6 +19,9 @@ Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE
 | `runtime-contract.ts` | Exact three-variable runtime override contract + typed validation errors |
 | `paths.ts` | OMO-owned versioned socket/lock/pid/log path resolution |
 | `lock.ts` | Single-flight file lock + `unlinkQuietly` |
+| `ownership.ts` | Startup lease, daemon owner/endpoint identity, pid/metadata files; `DaemonAlreadyRunningError` / `DaemonStartupDeferredError` |
+| `ipc-protocol.ts` | Authenticated request envelopes (`authEnvelope`/`authenticateMessage`) + private file-mode enforcement |
+| `version-reap.ts` | Attested staged termination/removal of stale older-version daemon runtimes at startup |
 | `socket-jsonrpc.ts` | Newline-delimited JSON-RPC framing over the socket |
 | `run-daemon.ts` | `daemon` subcommand entry (boots the server) |
 | `index.ts` | Barrel: `runMcpStdioProxy`, `ensureDaemonRunning`, `callToolViaDaemon`, `callDiagnosticsViaDaemon`, `daemonPaths`, `disposeDefaultLspManager` |
@@ -31,7 +34,7 @@ session → omo-lsp-daemon (mcp proxy, stdio)
    │     ├─ reachable → reuse
    │     └─ down → tryAcquireLock → spawn detached `cli.js daemon` → poll until reachable
    ├─ tools/call (+ _context {cwd,env}) → daemon-client → unix socket
-   │     └─ daemon: handleDaemonMessage → runWithRequestContext(cwd/env) → lsp-tools-mcp handler
+   │     └─ daemon: handleDaemonMessage → runWithRequestContext(cwd/env) → lsp-core handleLspMcpRequest
    └─ non tool-call LSP MCP request → handled locally in the proxy
 ```
 

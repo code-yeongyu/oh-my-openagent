@@ -1,6 +1,6 @@
 # memory commands
 
-The thirteen memory slash commands, registered once by the memory component through `register.ts` (`registerMemoryCommands(pi, deps)`). `MEMORY_COMMAND_NAMES`: `/memory /memfs /remember /init /doctor /recompile /memory-repository /sleeptime /reflect /dream /search /people /facts`. Score ~24 (53 files, DI surface, central registration).
+The thirteen memory slash commands, registered once by the memory component through `register.ts` (`registerMemoryCommands(pi, deps)`). `MEMORY_COMMAND_NAMES`: `/memory /memfs /remember /init /doctor /recompile /memory-repository /sleeptime /reflect /dream /search /people /facts`. `/palace` is NOT in this list - `wiring-static.ts` registers it straight from `../palace/command`. Score ~24 (55 TypeScript files, DI surface, central registration).
 
 ## Anatomy
 
@@ -25,6 +25,7 @@ The thirteen memory slash commands, registered once by the memory component thro
 - Handlers return `Promise<string>` command output; user notifications go only through the injected `respond` seam.
 - Read-only command output never enters model context.
 - Commands are centrally registered, not auto-discovered: adding one means `register.ts` + `MEMORY_COMMAND_NAMES` + a colocated test.
+- `registerPeopleCommand` runs unconditionally and enforces `people.enabled` inside the handler: reading settings at registration would consume a config resolution the enablement latch counts.
 - Tests use deterministic fixtures, temporary repositories, and `#given/#when/#then` names.
 
 ## Commands

@@ -1,10 +1,10 @@
 # ast-grep — Vendored Structural-Search Skill
 
-**Generated:** 2026-08-24 (f3642fcda)
+**Generated:** 2026-09-10 (bee8c2ba4)
 
 ## OVERVIEW
 
-Vendored skill teaching agents ast-grep (`sg`) structural search/rewrite, plus a stdlib-Python helper CLI that wraps the `sg` binary. Vendoring pin in `SOURCE`: upstream `code-yeongyu/ast-grep-skill @ 3148c69` (ast-grep 0.45.0), "vendored as a sync; do not fork-drift". Earned this file: own executable surface (749-LOC helper + installers + smoke tests) and a no-fork-drift upstream contract that has no analogue elsewhere in `shared-skills`.
+Vendored skill teaching agents ast-grep (`sg`) structural search/rewrite, plus a stdlib-Python helper CLI that wraps the `sg` binary. Vendoring pin in `SOURCE`: upstream `code-yeongyu/ast-grep-skill @ 3148c69` (ast-grep 0.45.0), "vendored as a sync; do not fork-drift". Earned this file: own executable surface (748-LOC helper + installers + smoke tests) and a no-fork-drift upstream contract that has no analogue elsewhere in `shared-skills`.
 
 ## STRUCTURE
 
@@ -14,7 +14,7 @@ ast-grep/
 ├── SOURCE                        # upstream pin — the no-fork-drift contract
 ├── scripts/ast_grep_helper.py    # 749-LOC stdlib CLI (argparse; no deps)
 ├── install.sh / install.ps1      # macOS/Linux + Windows installers
-├── references/                   # cli, install, patterns, pitfalls, recipes, yaml-rules (510 LOC), sgconfig
+├── references/                   # cli, install, patterns, pitfalls, recipes, yaml-rules (509 LOC), sgconfig
 └── tests/smoke.{sh,ps1}          # POSIX + PowerShell smoke (also shell syntax + content checks)
 ```
 

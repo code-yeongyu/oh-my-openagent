@@ -10,9 +10,9 @@ Cross-cutting adapter utilities used throughout the plugin. Barrel-exported from
 
 | Category | Files | Key Exports |
 |----------|-------|-------------|
-| **Model Resolution** | ~22 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
+| **Model Resolution** | model resolver/pipeline, availability, requirements, capabilities | `resolveModel()`, `resolveModelPipeline()`, `isModelAvailable()`, `AGENT_MODEL_REQUIREMENTS` |
 | **Tmux Integration** | 8 + `tmux/tmux-utils/` | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health; pane/session/layout/sweep primitives live in [`tmux/tmux-utils/`](tmux/tmux-utils/AGENTS.md) (33 files, runner/injectable-spawn pattern) |
-| **Configuration & Paths** | 10 | `resolveOpenCodeConfigDir()`, `getDataPath()`, `parseJSONC()` |
+| **Configuration & Paths** | config dirs, data/cache paths, JSONC and storage adapters | `getOpenCodeConfigDir()`, `getDataDir()`, `parseJSONC()` |
 | **Session Management** | 8 | `SessionCursor`, `trackInjectedPath()`, `SessionToolsStore` |
 | **Git Worktree** | 7 | `parseGitStatusPorcelain()`, `collectGitDiffStats()`, `formatFileChanges()` |
 | **Command Execution** | 7 | `executeCommand()`, `executeHookCommand()`, embedded command registry |
@@ -25,20 +25,14 @@ Cross-cutting adapter utilities used throughout the plugin. Barrel-exported from
 
 ## MODEL RESOLUTION PIPELINE
 
-```
-resolveModel(input)
-  1. Override: UI-selected model (primary agents only)
-  2. Category default: From category config
-  3. Provider fallback: AGENT_MODEL_REQUIREMENTS chains
-  4. System default: Ultimate fallback
-```
+Model resolution is split between the local adapter pipeline and `@oh-my-opencode/model-core`; availability checks use provider/model caches and SDK fallback. Preserve local module paths because callers use them as compatibility shims.
 
-Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (orchestration), `model-requirements.ts` (fallback chains), `model-availability.ts` (fuzzy matching).
+Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (core adapter), `model-requirements.ts` (fallback chains), `model-availability.ts` (fuzzy matching).
 
 ## MIGRATION SYSTEM
 
 Automatically transforms legacy config on load:
-- `agent-names.ts`: Old agent names → new (e.g., `junior` → `sisyphus-junior`)
+- `agent-names.ts`: Old agent names → new (for example, `junior` → `sisyphus-junior`)
 - `hook-names.ts`: Old hook names → new
 - `model-versions.ts`: Old model IDs → current
 - `agent-category.ts`: Legacy agent configs → category system

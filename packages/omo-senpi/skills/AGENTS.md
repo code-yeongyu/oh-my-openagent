@@ -1,6 +1,6 @@
 # skills
 
-Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 10 skill dirs with their own authoring contract.
+Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time, and the native `init-deep`/`ulw-plan`/`ulw-research` names shadow their shared-pool copies. Earned by score: 10 skill dirs with their own authoring contract.
 
 ## WHERE TO LOOK
 
@@ -9,7 +9,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | `mass-ulw/` | Chained-dag orchestration at repo scale (multi-run composition, size formula, node categories). `references/planning.md` is REQUIRED reading before building any dag: wave doctrine, node prompt contract, failure playbook. |
 | `ultrawork/` | Senpi-native ultrawork directive source; its body is embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). |
 | `ulw-plan/` | Read-only planning lifecycle: draft -> plan with explicit approval; `scripts/scaffold-plan.mjs` scaffolds guarded `.omo` artifacts. |
-| `ulw-loop/` | Goal/QA lifecycle loop; component-owned native source, shipped verbatim. |
+| `ulw-loop/` | Goal/QA lifecycle loop (`references/{define-goal,full-workflow}.md`). Synced through `sync-skills.mjs`'s standalone `skillSources` entry rather than `native-skill-sources.mjs`, so adding a skill here does NOT ship it - the native registry is the other list. |
 | `ulw-research/` | Claim-graph research orchestration: claims enter `claim-graph.md` as `verified-claims`; unsupported claims stay unresolved/refuted. |
 | `hyperplan/` | Adversarial cross-critique planning; debate rounds and planner handoff must not be skipped. |
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |

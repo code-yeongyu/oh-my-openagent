@@ -2,7 +2,7 @@
 
 **Generated:** 2026-08-24
 
-**Score:** 16 (32 files, ~6k LOC, distinct domain; parent `features/AGENTS.md` carries one line)
+**Score:** 16 (33 files, ~6.9k LOC, distinct domain; parent `features/AGENTS.md` carries one line)
 
 ## OVERVIEW
 

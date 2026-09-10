@@ -1,6 +1,6 @@
 # src/telemetry — CLI-side telemetry (source of truth)
 
-**Score 8** (17 files, ~1.5k LOC; distinct domain: install/CLI-side half of the telemetry pair).
+**Score 8** (17 TypeScript files, ~1.5k LOC; distinct domain: install/CLI-side half of the telemetry pair).
 
 ## OVERVIEW
 

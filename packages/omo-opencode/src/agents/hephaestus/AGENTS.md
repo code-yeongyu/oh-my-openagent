@@ -9,7 +9,7 @@ description: Developer reference for the Hephaestus autonomous deep worker agent
 
 ## OVERVIEW
 
-6 source files (+4 co-located tests). Hephaestus agent -- autonomous deep worker with GPT-5.4, GPT-5.5, GPT-5.6, and base-prompt variants. Goal-oriented: give it objectives, not step-by-step instructions. "The Legitimate Craftsman."
+10 TypeScript files plus guidance, including the factory, four prompt variants, and co-located tests. Hephaestus is an autonomous deep worker with GPT-5.4, GPT-5.5, GPT-5.6, and base-prompt variants. Goal-oriented: give it objectives, not step-by-step instructions. "The Legitimate Craftsman."
 
 ## FILES
 

@@ -37,6 +37,9 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
   - `package-paths.js`, `provider-map.json`, `legacy-bun-global-migration.js`
 - **agent state lives in ONE canonical directory: `~/.omo/agent`.** `bin/lib/agent-dir.js` owns that answer (`canonicalAgentDir`), and the launcher, `omo doctor`, `omo setup` and the locally installed launcher (`packages/omo-senpi/src/install/local-launcher.ts`) all resolve it from there - never by composing their own default. An explicit `OMO_CODING_AGENT_DIR` (or legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins, and `adoptLegacyFlatState` carries state left in the pre-unification flat `~/.omo` layout forward once, so unifying the location never reads as another reset.
 - `bin/omo-agent-toolkit.js` - internal delegate to the staged toolkit runtime, NOT an npm bin
+- `compile-entry.ts` - compiled launcher entry: provisioning, brand/environment remapping, fast paths, doctor/setup dispatch, and literal engine loading
+- `compile-runtime.ts` - embedded runtime manifest selection, SHA/size verification, executable materialization, and POSIX re-exec policy
+- `build-info.ts` - stamped build metadata parsing and version/banner rendering used by the launcher and compiled entry
 - `test/` - package-contract and launcher tests; `pty-signal-qa.py` is the real-surface QA harness
   (boots the real chain on a pty whose session leader outlives the launcher, SIGTERMs the launcher,
   asserts the engine ran its own graceful shutdown and left no survivor)
@@ -47,6 +50,8 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
 - Runtime requires Node >= 24; tests run under Bun.
 - Paths derive from `import.meta.url` + the agent-dir helpers — never recompose home-directory defaults elsewhere.
 - Setup is plan/classify/consent/write oriented; SQLite stores are read-only inputs.
+- Compiled binaries provision the embedded runtime before informational fast paths; the manifest marker makes repeated provisioning idempotent and integrity failures are fatal.
+- The engine dynamic-import argument in `compile-entry.ts` must remain a literal for Bun bundling; provisioning pins `OMO_PACKAGE_DIR`/`SENPI_PACKAGE_DIR` to the payload root.
 
 ## COMMANDS
 

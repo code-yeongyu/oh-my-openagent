@@ -18,13 +18,15 @@ The `task` tool implementation delegates work to subagents via background or syn
 | File | Purpose |
 |------|---------|
 | `tools.ts` | `createDelegateTask()` factory — main entry point |
-| `executor.ts` | Route to background or sync execution |
+| `executor.ts` | Barrel of execution entry points; the actual background/sync routing lives in `tools.ts` |
 | `types.ts` | `DelegateTaskArgs`, `DelegateTaskToolOptions`, `ToolContextWithMetadata` |
 | `category-resolver.ts` | Map category name → model + config |
 | `subagent-resolver.ts` | Map subagent_type → agent + model |
 | `model-selection.ts` | Model availability checking + fallback |
 | `skill-resolver.ts` | Resolve `load_skills[]` → skill content for injection |
 | `prompt-builder.ts` | Build system/user prompt with skill content, categories |
+| `token-limiter.ts` | Token budget estimation/truncation for system content |
+| `timing.ts` | Poll intervals and sync timeout defaults (with test hooks) |
 
 ## SYNC EXECUTION CHAIN
 
@@ -51,7 +53,7 @@ background-task.ts → BackgroundManager.launch() → (async polling) → backgr
 
 ## MODEL STRING PARSER
 
-`model-string-parser.ts` handles `"model variant"` format (e.g., `"gpt-5.5 medium"` → model=`gpt-5.5`, variant=`medium`).
+`parseModelString` (in `src/shared/model-string-parser.ts`) handles the `"model variant"` format, for example `"gpt-5.5 medium"` → model=`gpt-5.5`, variant=`medium`.
 
 ## UNSTABLE AGENT TRACKING
 

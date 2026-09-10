@@ -1,10 +1,10 @@
 # utils — Shared Utilities (Core)
 
-**Generated:** 2026-08-24 / f3642fcda
+**Generated:** 2026-09-10 / bee8c2ba4
 
 ## OVERVIEW
 
-Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed by both adapters (`packages/omo-opencode`, `packages/omo-codex`) and the other Core packages. Barrel-exports runtime shims, config tooling, file utilities, prompt gating, git parsing, and migration maps.
+Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed by both adapters (`packages/omo-opencode`, `packages/omo-codex`) and the other Core packages. Barrel-exports runtime shims, config tooling, file/archive utilities, prompt gating, git parsing, migration maps, ast-grep provisioning, and process cleanup.
 
 ## CATEGORY MAP
 
@@ -24,7 +24,7 @@ Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed
 | **Logging** | `logging/*.ts` | Buffered logger (flush/rotation) + product identity |
 | **Zip Listing** | `zip-entry-listing/*.ts` | tar / zipinfo / Python / PowerShell adapters + symlink target reading |
 | **Ports** | `port-utils.ts` | `findAvailablePort()`, `DEFAULT_SERVER_PORT` |
-| **Misc** | `snake-case.ts`, `jsonc-parser.ts`, `record-type-guard.ts`, `logger.ts` | Key transformation, safe JSONC parse, type guards, injectable shared logger stub |
+| **Config / Misc** | `config-merge.ts`, `config-section-parser.ts`, `snake-case.ts`, `jsonc-parser.ts`, `record-type-guard.ts`, `logger.ts` | Config composition, section parsing, key transformation, safe JSONC parse, type guards, injectable shared logger stub |
 
 ## NOTES
 
@@ -34,3 +34,13 @@ Harness-neutral pure-TypeScript core package (`@oh-my-opencode/utils`). Consumed
 - **Side effects:** `package.json` `sideEffects` pins `src/prompt-async-gate/queue.ts`; tree-shaking must keep the queue module.
 - **Process-sweep invariant:** the LSP daemon *server* shape (`cli.js daemon`, no `mcp`) is NEVER a proxy candidate — only the proxy shape is swept (`process-sweep/lsp-proxy-family.ts`, pinned by tests).
 - **Prompt-async-gate is critical infrastructure:** every internal prompt dispatch across the plugin must route through `dispatchInternalPrompt()` to prevent duplicate injections and race conditions. See the root [`AGENTS.md`](../../AGENTS.md) "Internal message injection is dangerous" section.
+- **Subtree guidance:** ast-grep provisioning/resolution, process sweeping, and runtime portability have separate guidance where their invariants are concentrated.
+
+## COMMANDS
+
+```bash
+bun run typecheck
+bun run test
+```
+
+Tests are colocated under `src/`; the package uses strict TypeScript with `moduleResolution: bundler` and explicit subpath exports.
