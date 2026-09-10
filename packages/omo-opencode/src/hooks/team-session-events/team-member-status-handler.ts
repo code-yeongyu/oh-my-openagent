@@ -10,7 +10,7 @@ export type HookImpl = (input: HookInput) => Promise<void>
 
 type MemberStatus = RuntimeStateMember["status"]
 
-const IDLE_TRANSITION_SOURCE_STATUSES: ReadonlySet<MemberStatus> = new Set(["running"])
+const IDLE_TRANSITION_SOURCE_STATUSES: ReadonlySet<MemberStatus> = new Set(["running", "idle"])
 const COMPLETED_TRANSITION_SOURCE_STATUSES: ReadonlySet<MemberStatus> = new Set(["running", "idle", "pending"])
 
 function getSessionIDFromIdleEvent(properties: unknown): string | undefined {
@@ -38,7 +38,7 @@ async function transitionMemberStatus(
     ...currentRuntimeState,
     members: currentRuntimeState.members.map((member) => (
       member.name === runtimeMember.memberName
-        ? { ...member, status: nextStatus }
+        ? { ...member, status: nextStatus, lastActiveAt: Date.now() }
         : member
     )),
   }), config)

@@ -166,6 +166,46 @@ describe("createTeamToolGating", () => {
     await expect(result).resolves.toBeUndefined()
   })
 
+  test("rejects delegate-task from a read-only member", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    const readOnlyState: RuntimeState = {
+      ...createRuntimeState(),
+      members: [
+        { name: "m1", sessionId: "member-session-1", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [], readOnly: true },
+        { name: "m2", sessionId: "member-session-2", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [] },
+      ],
+    }
+    await seedTeams(baseDir, readOnlyState)
+
+    // when
+    const result = runHook("delegate-task", "member-session-1", {}, undefined, baseDir)
+
+    // then
+    await expect(result).rejects.toThrow("read-only team members must not spawn child agents")
+  })
+
+  test("rejects delegate-task from a strict read-only member", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    const strictReadOnlyState: RuntimeState = {
+      ...createRuntimeState(),
+      members: [
+        { name: "m1", sessionId: "member-session-1", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [], readOnly: "strict" },
+        { name: "m2", sessionId: "member-session-2", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [] },
+      ],
+    }
+    await seedTeams(baseDir, strictReadOnlyState)
+
+    // when
+    const result = runHook("delegate-task", "member-session-1", {}, undefined, baseDir)
+
+    // then
+    await expect(result).rejects.toThrow("read-only team members must not spawn child agents")
+  })
+
   test("allows team_delete for the lead of the target team", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
