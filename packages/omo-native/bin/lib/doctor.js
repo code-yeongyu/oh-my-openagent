@@ -2,8 +2,67 @@ import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
-import { packageManifest, packageRoot, readJson, resolveSenpi } from "./package-paths.js"
+import { packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
+
+const NPM_DIST_TAGS_URL = "https://registry.npmjs.org/-/package/omo-ai/dist-tags"
+const NPM_FETCH_TIMEOUT_MS = 5000
+
+// Doctor is called without await from the launcher and the compiled entry, so the
+// registry lookup has to finish before we print. A bounded child fetch keeps that
+// synchronous and turns any network failure into "could not check".
+
+export function installedDistTag(version) {
+  return typeof version === "string" && version.includes("beta") ? "beta" : "latest"
+}
+
+export function latestFromDistTags(distTags, version) {
+  if (distTags === null || distTags === undefined || typeof distTags !== "object") return "could not check"
+  const value = distTags[installedDistTag(version)]
+  return typeof value === "string" && value.length > 0 ? value : "could not check"
+}
+
+function distTagsFetchScript(url, timeoutMs) {
+  return `
+const url = ${JSON.stringify(url)};
+const timeout = ${Number(timeoutMs)};
+const ac = new AbortController();
+const timer = setTimeout(() => ac.abort(), timeout);
+fetch(url, { signal: ac.signal, headers: { accept: "application/json" } })
+  .then((res) => { if (!res.ok) throw new Error(String(res.status)); return res.text(); })
+  .then((text) => { JSON.parse(text); process.stdout.write(text); })
+  .catch(() => { process.exitCode = 1; })
+  .finally(() => { clearTimeout(timer); });
+`
+}
+
+export function fetchNpmDistTagsSync(options = {}) {
+  const spawn = options.spawn ?? spawnSync
+  const url = options.url ?? NPM_DIST_TAGS_URL
+  const timeoutMs = options.timeoutMs ?? NPM_FETCH_TIMEOUT_MS
+  try {
+    const result = spawn(process.execPath, ["-e", distTagsFetchScript(url, timeoutMs)], {
+      encoding: "utf8",
+      timeout: timeoutMs + 500,
+      windowsHide: true,
+      env: process.env,
+    })
+    if (result.error || result.status !== 0 || typeof result.stdout !== "string" || result.stdout.trim() === "") return null
+    const parsed = JSON.parse(result.stdout)
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function readDistTags(options) {
+  try {
+    if (Object.hasOwn(options, "fetchDistTags")) return options.fetchDistTags()
+    return fetchNpmDistTagsSync()
+  } catch {
+    return null
+  }
+}
 
 const artifacts = [
   ["plugin manifest", "plugin/package.json"],
@@ -289,7 +348,10 @@ export function runDoctor(inventory, args = [], options = {}) {
     }
   }
 
-  lines.push(`INFO omo ${packageManifest().version} (engine: senpi ${engineVersionOrUnresolved(senpi)})`)
+  const version = packageManifest().version
+  const latest = latestFromDistTags(readDistTags(options), version)
+  lines.push(`INFO omo · Edition: Native · Installed: ${version} (engine: senpi ${engineVersionOrUnresolved(senpi)}) · Latest: ${latest}`)
+  lines.push(`INFO Update: ${updateTarget().command}`)
   lines.push(...warningsForSettings())
   lines.push(...staleEngineReport(options))
   lines.push(...retiredPayloadReport(options))

@@ -24,6 +24,18 @@ describe("createOmoSenpiComponents", () => {
     expect(occurrences).toEqual(["x-search"])
   })
 
+  test("#given the production registration array #when builtin-mcps is looked up #then it registers exactly once right after ast-grep", () => {
+    // given
+    const names = createOmoSenpiComponents(taskComponent).map(({ name }) => name)
+
+    // when
+    const occurrences = names.filter((name) => name === "builtin-mcps")
+
+    // then
+    expect(occurrences).toEqual(["builtin-mcps"])
+    expect(names.indexOf("builtin-mcps")).toBe(names.indexOf("ast-grep") + 1)
+  })
+
   test("#given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture", () => {
     // given
     const names = createOmoSenpiComponents(taskComponent).map(({ name }) => name)

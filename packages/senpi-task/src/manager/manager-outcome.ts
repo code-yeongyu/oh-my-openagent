@@ -1,6 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
-import type { TaskRecord, TaskRunStats } from "../state"
+import type { TaskRecord, TaskRunStats, TaskTransition } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import { nowIso } from "./manager-helpers"
@@ -27,7 +27,10 @@ export type OutcomeTrackerPorts = {
   readonly tryLoad: (taskId: string) => TaskRecord | null
   readonly runStatsSnapshot: (taskId: string) => TaskRunStats | undefined
   readonly releaseSlot: (taskId: string, model: string, epoch: number) => void
-  readonly settleWaiters: (taskId: string) => void
+  readonly forget: (taskId: string) => void
+  // `terminal` is supplied only when the store could not persist the terminal state: the on-disk
+  // record is then guaranteed non-terminal, so the waiters must be settled from this record instead.
+  readonly settleWaiters: (taskId: string, terminal?: TaskRecord) => void
   readonly tryRuntimeFallback: (input: ErrorOutcomeInput) => Promise<boolean>
 }
 
@@ -49,44 +52,83 @@ export type OutcomeTracker = {
 // transition residency (disposed/evicted) while leaving status running, and the late outcome is
 // the contracted path that terminalizes such a record - blocking it would strand a running record
 // nobody can settle (chaos invariant 3 pins this drain behavior).
-function ownsOutcome(
+// Returns the fresh record when the outcome is owned, null otherwise. The record is handed on so a
+// failed terminal write can still synthesize the terminal the waiters are owed.
+function ownedRecord(
   ports: OutcomeTrackerPorts,
   taskId: string,
   handle: ManagedChildHandle,
   epoch: number,
-): boolean {
-  if (ports.liveHandle(taskId) !== handle) return false
+): TaskRecord | null {
+  if (ports.liveHandle(taskId) !== handle) return null
   const fresh = ports.tryLoad(taskId)
-  return (
-    fresh !== null &&
-    fresh.residency_state !== "persisted_only" &&
-    fresh.residency_state !== "rpc_detached" &&
-    fresh.notification.run_epoch === epoch
-  )
+  if (
+    fresh === null ||
+    fresh.residency_state === "persisted_only" ||
+    fresh.residency_state === "rpc_detached" ||
+    fresh.notification.run_epoch !== epoch
+  ) return null
+  return fresh
+}
+
+function errnoField(error: unknown, key: "code" | "syscall" | "path"): string | undefined {
+  if (!(error instanceof Error) || !(key in error)) return undefined
+  const value = (error as Error & Record<typeof key, unknown>)[key]
+  return typeof value === "string" ? value : undefined
 }
 
 export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker {
+  // A terminal outcome is never lost to a persistence fault (#8050). When the store cannot write the
+  // terminal record (Windows EPERM on the rename after the store's own retries), the run is still
+  // settled: the residency is released through forget() and every waiter receives a synthesized
+  // error terminal naming the failure, so waitFor resolves and a DAG node folds as failed/retryable
+  // instead of pinning its dependents forever. The on-disk record stays non-terminal by necessity.
+  function persistTerminal(taskId: string, owned: TaskRecord, timestamp: string, transition: TaskTransition): void {
+    try {
+      ports.store.transition(taskId, transition)
+    } catch (error) {
+      log("senpi-task manager terminal record write failed", {
+        taskId,
+        code: errnoField(error, "code"),
+        syscall: errnoField(error, "syscall"),
+        path: errnoField(error, "path"),
+        error: String(error),
+      })
+      ports.forget(taskId)
+      ports.settleWaiters(taskId, {
+        ...owned,
+        status: "error",
+        error_message: `terminal state could not be persisted: ${error instanceof Error ? error.message : String(error)}`,
+        updated_at: timestamp,
+        terminal_at: timestamp,
+      })
+      return
+    }
+    ports.settleWaiters(taskId)
+  }
+
   async function settleErrorOutcome(input: ErrorOutcomeInput): Promise<void> {
     if (await ports.tryRuntimeFallback(input)) return
     // Re-checked after the fallback await: ownership may have moved on while it ran.
-    if (!ownsOutcome(ports, input.taskId, input.handle, input.epoch)) return
+    const owned = ownedRecord(ports, input.taskId, input.handle, input.epoch)
+    if (owned === null) return
 
     ports.releaseSlot(input.taskId, input.model, input.epoch)
-    ports.store.transition(input.taskId, {
+    persistTerminal(input.taskId, owned, input.timestamp, {
       type: "fail",
       timestamp: input.timestamp,
       error_message: input.outcome.failure.message,
       ...(input.outcome.killed === true ? { killed: true } : {}),
       ...(input.runStats === undefined ? {} : { run_stats: input.runStats }),
     })
-    ports.settleWaiters(input.taskId)
   }
 
   function trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
     handle
       .waitForOutcome()
       .then((outcome) => {
-        if (!ownsOutcome(ports, taskId, handle, epoch)) return
+        const owned = ownedRecord(ports, taskId, handle, epoch)
+        if (owned === null) return
         const timestamp = nowIso(ports.now)
         const runStats = ports.runStatsSnapshot(taskId)
         if (outcome.status === "error") {
@@ -110,21 +152,20 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         ports.releaseSlot(taskId, model, epoch)
         const runStatsField = runStats === undefined ? {} : { run_stats: runStats }
         if (outcome.status === "completed" && outcome.finalResponse.length > 0) {
-          ports.store.transition(taskId, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })
+          persistTerminal(taskId, owned, timestamp, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })
         } else if (outcome.status === "completed") {
           // A clean runner exit is not evidence that the child actually started. A session with
           // only its initiating user prompt can be reported as an empty completion; never publish
           // that as success because the parent would treat the missing work as result-ready.
-          ports.store.transition(taskId, {
+          persistTerminal(taskId, owned, timestamp, {
             type: "fail",
             timestamp,
             error_message: "child turn produced no assistant output",
             ...runStatsField,
           })
         } else {
-          ports.store.transition(taskId, { type: "cancel", timestamp, ...runStatsField })
+          persistTerminal(taskId, owned, timestamp, { type: "cancel", timestamp, ...runStatsField })
         }
-        ports.settleWaiters(taskId)
       })
       .catch((error: unknown) => log("senpi-task manager outcome tracking failed", { taskId, error: String(error) }))
   }

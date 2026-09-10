@@ -1,0 +1,177 @@
+$ bun test packages/omo-senpi/src/components/builtin-mcps packages/omo-senpi/src/extension
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/extension-node-runtime-audit.test.ts:
+(pass) #given shipped extension sources #when scanned for Bun-only module-location APIs #then none appear [64.77ms]
+
+packages/omo-senpi/src/extension/component-list.test.ts:
+(pass) createOmoSenpiComponents > #given the production registration array #when x-search is looked up #then it is present exactly once [0.29ms]
+(pass) createOmoSenpiComponents > #given the production registration array #when builtin-mcps is looked up #then it registers exactly once right after ast-grep [0.09ms]
+(pass) createOmoSenpiComponents > #given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture [0.09ms]
+
+packages/omo-senpi/src/extension/thread-policy.test.ts:
+(pass) host policy true overrides ambient env 0 [0.84ms]
+(pass) host policy false overrides ambient env 1 [0.22ms]
+(pass) host policy $policyoverrides ambient env 1 [0.21ms]
+(pass) host policy true overrides ambient env $env [0.47ms]
+
+packages/omo-senpi/src/extension/idle-injection-coordinator.test.ts:
+(pass) IdleInjectionCoordinator > #given hidden metadata #when flushed #then one merged custom message preserves it [0.19ms]
+(pass) IdleInjectionCoordinator > #given a completion and a continuation on one idle edge #when flushed #then exactly one injection is delivered in deterministic order [0.09ms]
+(pass) IdleInjectionCoordinator > #given one task completion on an idle edge #when flushed #then it steers immediately [0.07ms]
+(pass) IdleInjectionCoordinator > #given two task completions on one idle edge #when flushed #then one steer carries both [0.10ms]
+(pass) IdleInjectionCoordinator > #given repeated continuation enqueues #when flushed #then they collapse to one keyed injection [0.07ms]
+(pass) IdleInjectionCoordinator > #given a queued injection #when removed by key #then the flush no-ops and removal reports true only once [0.07ms]
+(pass) IdleInjectionCoordinator > #given an empty queue #when flushed #then nothing is delivered [0.07ms]
+(pass) IdleInjectionCoordinator > #given a deferred scheduleFlush #when the scheduler runs it #then delivery happens on the idle tick, not synchronously [0.09ms]
+(pass) IdleInjectionCoordinator > #given a deferred continuation #when a synchronous wake flushOnIdle drains first #then the deferred pass no-ops [0.12ms]
+(pass) IdleInjectionCoordinator > #given repeated scheduleFlush requests before the deferred pass #when scheduled #then they coalesce to one flush [0.09ms]
+(pass) IdleInjectionCoordinator > #given an async delivery rejection #when the queue flushes #then the producer receives a failure receipt and onFlushed does not run [0.15ms]
+(pass) IdleInjectionCoordinator > #given only a passive kibitzer entry #when flushOnIdle runs #then nothing is delivered and the entry stays queued [0.07ms]
+(pass) IdleInjectionCoordinator > #given a passive kibitzer entry and a task-completion entry #when flushOnIdle runs #then one delivery carries both contents with kibitzer last and the passive onFlushed fires [0.07ms]
+(pass) IdleInjectionCoordinator > #given a passive entry #when scheduleFlush's deferred pass runs #then nothing is delivered [0.06ms]
+(pass) IdleInjectionCoordinator > #given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns [0.07ms]
+
+packages/omo-senpi/src/extension/toolkit-path-provisioning.test.ts:
+(pass) toolkit path provisioning > #given the toolkit directory exists > #when provisioning runs with a bare PATH and no preset toolkit bin > #then prepends the dir as the leading PATH entry and sets OMO_AGENT_TOOLKIT_BIN to cli.js [0.87ms]
+(pass) toolkit path provisioning > #given the toolkit directory exists > #when OMO_AGENT_TOOLKIT_BIN is already set > #then keeps the preset value and still prepends the toolkit dir to PATH [0.37ms]
+(pass) toolkit path provisioning > #given the toolkit directory exists > #when OMO_AGENT_TOOLKIT_BIN is set to an empty string > #then treats it as unset and points it at cli.js [0.45ms]
+(pass) toolkit path provisioning > #given the toolkit directory exists > #when provisioning runs twice > #then PATH holds exactly one toolkit entry and it stays leading [0.52ms]
+(pass) toolkit path provisioning > #given the toolkit directory is absent > #when provisioning runs > #then leaves the environment byte-identical [0.27ms]
+
+packages/omo-senpi/src/extension/index.test.ts:
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/src/components/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing
+(pass) omo-senpi extension entry > #given the real extension entry #when registered with a fake API #then configured components are wired [5.92ms]
+omo-senpi ast-grep skipped: staged MCP runtime is missing {
+  component: "ast-grep",
+  entry: "/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/src/components/runtime/ast-grep-mcp/cli.js",
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing
+(pass) omo-senpi extension entry > #given open todo state #when ordinary input arrives #then the extension does not inject continuity guidance [3.12ms]
+(pass) omo-senpi extension entry > #given config-watch disabled by flag #when composed #then it emits no registration and no warning [0.15ms]
+
+packages/omo-senpi/src/extension/types.test.ts:
+(pass) SenpiExtensionAPI appendEntry > appendEntry is an optional member of SenpiExtensionAPI [0.09ms]
+
+packages/omo-senpi/src/extension/compose-cold-pi-tui.test.ts:
+(pass) composeOmoSenpiExtension pi-tui warm-up > #given a cold process with the task component disabled #when compose runs #then other components' notice renderers still render [277.65ms]
+
+packages/omo-senpi/src/extension/idle-injection-wiring.test.ts:
+(pass) idle-injection wiring: real producers on one idle edge > #given a ulw continuation then a task-completion wake on one idle edge #when both fire #then exactly one injection is delivered [0.47ms]
+
+packages/omo-senpi/src/extension/dag-sdk.test.ts:
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when a cell defines three nodes, starts the run, then waits > #then each call maps to the matching dag tool action in order and wait returns the run result [1.16ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when a shipped attach handle waits and cancels > #then it exposes done and cancel and dispatches the matching dag tool actions [0.23ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when start is called with a whole definition object > #then it forwards the definition verbatim under action=start [0.16ms]
+(pass) dag eval sdk > #given a stubbed globalThis.tool and an eval-shaped run > #when define receives only the documented required key > #then start emits a definition accepted by the shipped dag tool schema [0.58ms]
+(pass) dag eval sdk > #when retry is called with node ids and a prompt override > #then it emits action=retry with run_id, node_ids, and prompt [0.15ms]
+(pass) dag eval sdk > #when retry is called with a single node id > #then it emits action=retry with run_id and node_id [0.16ms]
+(pass) dag eval sdk > #when retry is called with no node ids > #then it emits action=retry with only run_id [0.18ms]
+(pass) dag eval sdk > #when send is called > #then it emits action=send with run_id, node_id, and message [0.14ms]
+(pass) dag eval sdk > #when amend is called > #then it emits action=amend with run_id and the new definition [0.13ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when start receives a definition_conflict > #then it throws the tool's own code and human message instead of hiding them behind run_id [0.20ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when wait receives the same error envelope > #then the non-start actions surface the code and message too [0.14ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when attach receives the same error envelope > #then it rejects rather than handing back a handle for a run that was never attached [0.16ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries no code or message > #then it falls back to the first content text so the operator still sees the tool's words [0.16ms]
+(pass) dag eval sdk > #given the dag tool refuses a call with a details.kind=error envelope > #when the error envelope carries neither error fields nor content text > #then it still names the failing action rather than throwing something unreadable [0.14ms]
+(pass) dag eval sdk > #given a well-formed non-error response that still lacks a run_id > #when start reads it > #then the existing run_id diagnostic is preserved [0.14ms]
+(pass) dag eval sdk > #given a builder that already holds a node id > #when the same id is added again > #then it throws locally and the tool stub is never called [0.14ms]
+(pass) dag eval sdk > #given the shipped sdk artifact > #when it is loaded as a module > #then it imports nothing, so an eval worker without node_modules can run it [0.17ms]
+(pass) dag sdk root provisioning > #given the runtime dag directory exists > #when provisioning runs > #then OMO_DAG_SDK_ROOT holds that absolute directory [0.58ms]
+(pass) dag sdk root provisioning > #given the runtime dag directory is absent > #when provisioning runs > #then the env stays untouched rather than pointing at a missing path [0.24ms]
+(pass) dag sdk root provisioning > #given the real extension entry > #when the default provisioning runs > #then OMO_DAG_SDK_ROOT resolves to an existing directory containing sdk.js [0.37ms]
+
+packages/omo-senpi/src/extension/dag-library.test.ts:
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load rotates the key with an explicit suffix and fills {{key}} and {{date}} placeholders [2.07ms]
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load without a suffix stamps a fresh utc datetime suffix so every call is a new run [1.69ms]
+(pass) dag definition library > #given a stored definition in OMO_DAG_LIBRARY > #then load with an empty suffix keeps the stored key so the run stays idempotent [1.71ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then OMO_DAG_LIBRARY shadows $PWD/.omo/dags which shadows $HOME/.omo/dags [2.27ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then on win32 the library env splits on semicolons so drive-letter paths survive [1.86ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then a missing name fails listing the searched dirs [1.26ms]
+(pass) dag definition library > #given definitions scattered across the search dirs > #then a definition without a nodes array fails before any host round-trip [1.57ms]
+(pass) dag definition library > #given a stubbed tool.workflow > #then start loads, rotates, and starts the run in one call and the handle wires done/cancel [1.50ms]
+(pass) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then start throws the tool's own code and human message [1.40ms]
+(pass) dag definition library > #given the dag tool refuses the start with a details.kind=error envelope > #then an error envelope without error fields still falls back to the tool's content text [1.24ms]
+(pass) dag definition library > #given a well-formed non-error start response that still lacks a run_id > #then the existing run_id diagnostic is preserved [1.46ms]
+
+packages/omo-senpi/src/extension/tool-capture-registry.test.ts:
+(pass) tool capture registry > #given components register tools #when captured #then every injected tool exposes a callable execute [0.10ms]
+(pass) tool capture registry > #given captured tools #when filtered for a child #then lsp tools remain but the task/team family is excluded [0.08ms]
+(pass) tool capture registry > #given a non-tool value #when registered #then it is not captured but still forwarded [0.06ms]
+
+packages/omo-senpi/src/extension/compose.test.ts:
+(pass) composeOmoSenpiExtension > #given enabled components #when composed and an event dispatches #then registers flags components and drives fake handlers [0.18ms]
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+(pass) composeOmoSenpiExtension > #given one component disabled by flag #when composed #then skips exactly that component [0.11ms]
+(pass) composeOmoSenpiExtension > #given a component throws #when composed #then logs the error and registers later components [0.16ms]
+(pass) composeOmoSenpiExtension > #given a component using optional registerMcpServer on an old API #when composed #then skips that component and registers later components [0.09ms]
+(pass) composeOmoSenpiExtension > #given a fake missing sendMessage #when composed #then logs one version mismatch and registers nothing [0.08ms]
+(pass) composeOmoSenpiExtension > #given the default logger #when a component logs without details #then console receives only the message [0.12ms]
+
+packages/omo-senpi/src/extension/session-start-ordering.test.ts:
+(pass) session_start component ordering > #given the production component list #when startup handlers are ordered #then onboarding immediately precedes the advisor after native badge [0.09ms]
+(pass) session_start component ordering > #given real onboarding state and an active ulw loop #when startup then agent_end fire #then onboarding is preserved and the first-session advisor stays detached and suppressed [81.35ms]
+
+packages/omo-senpi/src/components/builtin-mcps/index.test.ts:
+(pass) createBuiltinMcpsComponent > #given no CONTEXT7_API_KEY #when registered #then declares the anonymous lazy context7 and grep_app HTTP servers [0.10ms]
+(pass) createBuiltinMcpsComponent > #given a real CONTEXT7_API_KEY #when registered #then context7 authenticates through bearerTokenEnv without inlining the token [0.12ms]
+(pass) createBuiltinMcpsComponent > #given a empty placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous [0.07ms]
+(pass) createBuiltinMcpsComponent > #given a whitespace placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous [0.06ms]
+(pass) createBuiltinMcpsComponent > #given a angle-bracketed placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous [0.06ms]
+(pass) createBuiltinMcpsComponent > #given a hyphenated placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous [0.05ms]
+(pass) createBuiltinMcpsComponent > #given a spaced and quoted placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous [0.05ms]
+(pass) createBuiltinMcpsComponent > #given a host without registerMcpServer #when registered #then skips cleanly and logs once [0.07ms]
+(pass) createBuiltinMcpsComponent > #given omo-senpi-builtin-mcps-disabled #when composed #then no builtin MCP server is declared [0.13ms]
+
+packages/omo-senpi/src/components/builtin-mcps/host-declaration-contract.test.ts:
+(pass) builtin-mcps host declaration contract > #given the anonymous declarations #when the installed senpi validator runs #then every declaration is accepted [0.28ms]
+(pass) builtin-mcps host declaration contract > #given the bearer declarations #when the installed senpi validator runs #then every declaration is accepted [0.06ms]
+
+ 87 pass
+ 0 fail
+ 209 expect() calls
+Ran 87 tests across 16 files. [1346.00ms]
+
+$ bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+typecheck exit=0
+
+$ bun test packages/omo-senpi/src/bundle-purity.test.ts packages/omo-senpi/src/bundle-size.test.ts packages/omo-senpi/src/package-shape.test.ts packages/omo-senpi/src/plugin-manifest.test.ts packages/omo-senpi/src/extension-node-runtime-audit.test.ts
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/package-shape.test.ts:
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [2.80ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.39ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.27ms]
+
+packages/omo-senpi/src/bundle-size.test.ts:
+(pass) omo-senpi bundle size budget > #given the built extension #when its byte size is measured #then it stays within the documented byte budget [0.28ms]
+
+packages/omo-senpi/src/plugin-manifest.test.ts:
+(pass) OMO Senpi plugin manifest > #given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory [0.25ms]
+(pass) OMO Senpi plugin manifest > #given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent [0.12ms]
+(pass) OMO Senpi plugin manifest > #given package metadata #when loaded #then Pi discoverability and shipped files are pinned [0.11ms]
+(pass) OMO Senpi plugin manifest > #given root and adapter versions #when compared #then the plugin manifest stays in lockstep [0.21ms]
+
+packages/omo-senpi/src/bundle-purity.test.ts:
+(pass) omo-senpi bundle purity > #given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers [0.15ms]
+(pass) omo-senpi bundle purity > #given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external [4.62ms]
+
+packages/omo-senpi/src/extension-node-runtime-audit.test.ts:
+(pass) #given shipped extension sources #when scanned for Bun-only module-location APIs #then none appear [36.32ms]
+
+ 11 pass
+ 0 fail
+ 46 expect() calls
+Ran 11 tests across 5 files. [677.00ms]

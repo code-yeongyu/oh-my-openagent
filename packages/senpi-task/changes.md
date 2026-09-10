@@ -1,4 +1,20 @@
 
+## 2026-09-10 — Survive a Windows EPERM on the task-record rename and never strand a terminal outcome
+
+On Windows a task-record rename under `tasks/` can be refused with `EPERM` (a sharing violation from Defender,
+an indexer, or another senpi process). When that hit the terminal transition the record stayed `running`,
+`waitFor` never settled, and a mass-ulw / DAG run stopped dequeuing dependents (#8050). Two layers now hold:
+
+- `store/record-write.ts` (extracted from `record-store.ts`) retries `renameSync` on `EPERM`/`EBUSY`/`EACCES`
+  on win32 only - 8 attempts with a 5 ms synchronous backoff, matching `dag/store.ts` - and rethrows every
+  other platform, errno, or the final attempt unchanged. The temp file carries a random segment and is removed
+  in a `finally`. `createTaskRecordStore(config, { platform })` is the test seam for the win32 branch.
+- `manager/manager-outcome.ts` no longer lets a throwing terminal `store.transition` skip settlement. It logs
+  the failure once with `taskId`, `code`, `syscall`, and `path`, calls `forget(taskId)` so the residency slot
+  is released, and settles the waiters with a synthesized `error` record naming the persistence failure.
+  `#settleWaiters(taskId, terminal?)` accepts that record instead of re-reading the store, which is guaranteed
+  stale in this scenario. The DAG node folds as failed and `retry` can re-run it.
+
 ## 2026-09-08 — Persist child_session_id on spawned task records
 
 `#recordSpawnFacts` now writes the spawned child's own session id from the handle onto `st_*.json` as `child_session_id`, for both in-process and process children. Reattach rewrites keep or refresh the field from the live handle so resume paths cannot drop it. The parser already treated the field as optional; a legacy record without it still loads. External readers (omo-desktop) join a grandchild session's `parent_session_id` back to this field.

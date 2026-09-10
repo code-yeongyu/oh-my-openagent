@@ -32,6 +32,7 @@
     "packages/omo-native/test/bun-bin-shim.test.ts: /bin/omo x8",
     "packages/omo-native/test/bun-runtime-decision.test.ts: /bin/omo",
     "packages/omo-native/test/bun-runtime.test.ts: /bin/omo",
+    "packages/omo-native/test/doctor-edition.test.ts: omo doctor",
     "packages/omo-native/test/doctor-stale-engines.test.ts: omo doctor x3",
     "packages/omo-native/test/doctor.test.ts: omo doctor x2",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts: omo doctor",

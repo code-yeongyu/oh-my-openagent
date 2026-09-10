@@ -197,7 +197,8 @@ class TaskManagerImpl implements TaskManager {
       tryLoad: (taskId) => this.#tryLoad(taskId),
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       releaseSlot: (taskId, model, epoch) => this.#releaseSlot(taskId, model, epoch),
-      settleWaiters: (taskId) => this.#settleWaiters(taskId),
+      forget: (taskId) => this.forget(taskId),
+      settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
     })
     registerLifecycleReattachPorts(options.store, {
@@ -982,8 +983,10 @@ class TaskManagerImpl implements TaskManager {
     this.#concurrency.remove(record.model, taskId)
   }
 
-  #settleWaiters(taskId: string): void {
-    const record = this.#tryLoad(taskId)
+  // `terminal` overrides the store read for the one case where the on-disk record cannot be terminal:
+  // the terminal write itself failed (#8050) and the tracker synthesized the record the waiters are owed.
+  #settleWaiters(taskId: string, terminal?: TaskRecord): void {
+    const record = terminal ?? this.#tryLoad(taskId)
     if (record === null || record === undefined || !isTerminalRecord(record)) return
     const waiters = this.#waiters.get(taskId)
     if (waiters === undefined) return

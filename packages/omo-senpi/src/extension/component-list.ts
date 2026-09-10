@@ -1,4 +1,5 @@
 import { createAstGrepComponent } from "../components/ast-grep"
+import { createBuiltinMcpsComponent } from "../components/builtin-mcps"
 import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
@@ -34,6 +35,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createAstGrepComponent(),
+    createBuiltinMcpsComponent(),
     createLspComponent(),
     createXSearchComponent(),
     createCommentCheckerComponent(),
