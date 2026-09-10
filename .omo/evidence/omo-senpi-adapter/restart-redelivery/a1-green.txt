@@ -1,0 +1,39 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/completion/notifier-reconcile-unnotified.test.ts:
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a terminal notify_on_terminal record with an unnotified epoch w4notif #when the session reconciles twice #then exactly one notification is delivered [1.26ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a delivered-but-unconsumed terminal epoch w4notif #when the interrupted parent session reconciles #then it is redelivered exactly once [0.11ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a delivered-but-unconsumed terminal epoch w4notif #when a non-interrupted parent session reconciles #then the record is not redelivered [0.07ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a delivered-and-consumed terminal epoch w4notif #when an interrupted parent session reconciles #then the record is not redelivered [0.06ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a legacy delivered terminal epoch without consumed_epoch w4notif #when the parent session reconciles with an interrupted tail #then it is redelivered [0.09ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a legacy delivered terminal epoch without consumed_epoch w4notif #when the parent session reconciles without an interrupted tail #then it is not redelivered [0.07ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given an already-notified epoch w4notif #when the session reconciles #then the record is skipped [0.06ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a terminal unnotified record of another session w4notif #when this session reconciles #then the record is skipped [0.07ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a terminal unnotified record without opt-in or failed delivery w4notif #when the session reconciles #then the record is skipped [0.06ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a legacy failed-delivery record without notify_on_terminal w4notif #when the session reconciles #then the in-flight retry is preserved [0.11ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given delivery fails during reconcile w4notif #when the enqueue throws #then notification_failed_epoch is recorded and the retry is scheduled [0.21ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a completion buffered behind a transient parent state w4notif #when the session reconciles before the flush #then reconcile skips it and the flush delivers exactly once [0.14ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given delivered notifications for multiple sessions w4notif #when the matching session marks consumed #then only its notifications are stamped and all other fields survive [0.07ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a residency claim lands between read and notified-epoch persist w4notif #when the epoch is stamped #then the claim survives [0.07ms]
+(pass) createCompletionNotifier - reconcile unnotified terminal completions > #given a residency claim lands before a failed-delivery persist w4notif #when the failure epoch is stamped #then the claim survives [0.08ms]
+
+packages/senpi-task/src/store/record-parse.test.ts:
+(pass) record-parse notification consumption > #given a persisted record with consumed_epoch #when parsed #then the consumption stamp round-trips [0.27ms]
+(pass) record-parse notification consumption > #given a legacy record without consumed_epoch #when parsed #then it remains valid without a consumption stamp [0.09ms]
+(pass) record-parse launch evidence > #given a lost record with started_at #when persisted JSON is parsed #then the task-level launch evidence round-trips [0.09ms]
+(pass) record-parse launch evidence > #given a legacy pending record without started_at #when parsed #then it stays readable without inventing launch evidence [0.07ms]
+(pass) record-parse launch evidence > #given a legacy running record without started_at #when parsed #then it stays readable without inventing launch evidence [0.07ms]
+(pass) record-parse launch evidence > #given a legacy lost record without started_at #when parsed #then it stays readable without inventing launch evidence [0.06ms]
+(pass) record-parse launch evidence > #given malformed started_at %s #when parsed #then the persisted record is rejected [0.08ms]
+(pass) record-parse launch evidence > #given malformed started_at %s #when parsed #then the persisted record is rejected [0.05ms]
+(pass) record-parse run_stats token totals > #given a persisted run_stats without the new token fields #when parsed #then the record round-trips and the new fields stay undefined [0.08ms]
+(pass) record-parse run_stats token totals > #given a run_stats with all four token totals and status fields #when parsed #then every value round-trips exactly [0.07ms]
+(pass) record-parse run_stats token totals > #given a run_stats carrying an unknown token_status #when parsed #then the record is rejected [0.08ms]
+(pass) record-parse run_stats token totals > #given a run_stats carrying non-numeric token totals #when parsed #then the record is rejected [0.06ms]
+(pass) record-parse task ordinals and background mode > #given a persisted record with task_seq, config_generation and background_mode #when parsed #then all three round-trip exactly [0.06ms]
+(pass) record-parse task ordinals and background mode > #given a persisted record with an unknown background_mode #when parsed #then the record is rejected [0.06ms]
+
+ 29 pass
+ 0 fail
+ 64 expect() calls
+Ran 29 tests across 2 files. [1.76s]

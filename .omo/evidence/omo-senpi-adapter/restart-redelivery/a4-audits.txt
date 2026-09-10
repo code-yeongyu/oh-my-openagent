@@ -1,0 +1,19 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/package-shape.test.ts:
+(pass) omo-senpi package shape > #given the senpi adapter manifest #when audited #then it declares the package contract [1.12ms]
+(pass) omo-senpi package shape > #given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts [0.31ms]
+(pass) omo-senpi package shape > #given root workspace metadata #when audited #then the senpi adapter is registered [0.23ms]
+
+packages/omo-senpi/src/bundle-size.test.ts:
+(pass) omo-senpi bundle size budget > #given the built extension #when its byte size is measured #then it stays within the documented byte budget [0.20ms]
+
+packages/omo-senpi/src/bundle-purity.test.ts:
+(pass) omo-senpi bundle purity > #given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers [0.12ms]
+(pass) omo-senpi bundle purity > #given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external [4.21ms]
+
+ 6 pass
+ 0 fail
+ 29 expect() calls
+Ran 6 tests across 3 files. [1.94s]
+EXIT_CODE=0

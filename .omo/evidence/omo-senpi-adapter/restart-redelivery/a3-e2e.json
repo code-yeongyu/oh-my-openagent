@@ -1,0 +1,108 @@
+{
+  "result": "FAIL",
+  "checks": {
+    "tool_tail_redelivers_one_wake": "FAIL",
+    "tool_tail_emits_one_continuation": "FAIL",
+    "crash_child_spawned": "PASS",
+    "crash_wake_landed_before_kill": "PASS",
+    "crash_killed_before_next_assistant": "PASS",
+    "resume_ran_same_session": "PASS",
+    "resume_redelivers_exactly_one_wake": "FAIL",
+    "resume_emits_exactly_one_continuation": "FAIL",
+    "resume_stamps_consumed_epoch": "PASS",
+    "second_resume_adds_no_wake": "PASS",
+    "second_resume_adds_no_continuation": "PASS",
+    "control_single_wake_no_kill": "PASS",
+    "control_no_continuation": "PASS",
+    "no_leaked_pids": "PASS"
+  },
+  "crash": {
+    "taskId": "st_01a08a0e",
+    "parentWentIdleBeforeChildRelease": true,
+    "wakeBeforeKill": 1,
+    "killedBySignal": true,
+    "assistantAfterWakeBeforeKill": false,
+    "tailEntryTypeAtKill": "custom_message",
+    "tailCustomTypeAtKill": "omo-senpi:wake",
+    "recordAtKill": {
+      "run_epoch": 0,
+      "notified_epoch": 0
+    },
+    "sessionId": "01a08a0e-1184-77b4-97a5-55cf80e3f805",
+    "resumeExit": 0,
+    "recordAfterResume": {
+      "run_epoch": 0,
+      "notified_epoch": 0,
+      "consumed_epoch": 0
+    },
+    "resumeMarkerFound": true,
+    "resumeWakes": 0,
+    "resumeContinuations": 0,
+    "resumeSettled": true,
+    "sessionStartTails": [
+      {
+        "hasSessionFile": true
+      },
+      {
+        "hasSessionFile": true,
+        "tailType": "custom",
+        "tailCustomType": "pi-rules.scan"
+      }
+    ],
+    "secondResumeExit": 0,
+    "secondResumeStderrTail": "omo-senpi thread tools use lazy shared-host availability undefined | omo-senpi ulw-execute-continuation skipped { reason: 'not-continuable' } | omo-senpi ulw-loop continuation skipped { reason: 'inactive' }",
+    "secondResumeMarkerFound": true,
+    "secondResumeWakes": 0,
+    "secondResumeContinuations": 0,
+    "recordAfterSecondResume": {
+      "run_epoch": 0,
+      "notified_epoch": 0,
+      "consumed_epoch": 0
+    }
+  },
+  "toolTail": {
+    "taskId": "st_01a08a0e",
+    "wakeBeforeKill": 1,
+    "killedBySignal": true,
+    "tailEntryTypeAtKill": "message",
+    "tailRoleAtKill": "toolResult",
+    "sessionId": "01a08a0e-2e33-748d-9d03-19bb8faed8d1",
+    "resumeExit": 0,
+    "resumeStderrTail": "omo-senpi thread tools use lazy shared-host availability undefined | omo-senpi ulw-execute-continuation skipped { reason: 'not-continuable' } | omo-senpi ulw-loop continuation skipped { reason: 'inactive' }",
+    "resumeWakes": 0,
+    "resumeContinuations": 0,
+    "recordAfterResume": {
+      "run_epoch": 0,
+      "notified_epoch": 0,
+      "consumed_epoch": 0
+    }
+  },
+  "control": {
+    "taskId": "st_01a08a0e",
+    "exit": 0,
+    "wakes": 1,
+    "continuations": 0,
+    "settled": true,
+    "record": {
+      "run_epoch": 0,
+      "notified_epoch": 0,
+      "consumed_epoch": 0
+    }
+  },
+  "leakedPids": [],
+  "spawnedPids": [
+    77508,
+    78419,
+    78971,
+    79625,
+    80970,
+    81639
+  ],
+  "sandboxesRemoved": true,
+  "sandboxRoots": [
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-mB6o60",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-J5m3z7",
+    "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-45i4jt"
+  ],
+  "senpiBin": "senpi"
+}

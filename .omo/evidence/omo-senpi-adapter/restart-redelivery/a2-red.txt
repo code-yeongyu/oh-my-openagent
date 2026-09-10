@@ -1,0 +1,81 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts:
+(pass) event-bridge session_start recovery chain > #given a resumed session with a revived record #when session_start fires #then the chain runs in the planned order with the session id threaded [1.21ms]
+(pass) event-bridge session_start recovery chain > #given no captured session id #when session_start fires #then the legacy sweep still runs with undefined while the scoped notification branch is skipped [0.15ms]
+(pass) event-bridge session_start recovery chain > #given a terminal child persisted before restart #when reconcile returns no outcome #then session_start still re-observes it for liveness [0.14ms]
+(pass) event-bridge session_start recovery chain > #given expired records #when session_start fires #then the awaited ttl cleanup runs after notification reconcile and logs deletions [0.15ms]
+(pass) event-bridge session_start recovery chain > #given only a child session-dir override #when session_start fires #then parent recovery still reconciles [0.15ms]
+(pass) event-bridge session_start recovery chain > #given the dedicated marker and a captured child session #when session_start fires #then child recovery still reconciles and redelivers notifications [0.15ms]
+(pass) event-bridge session_start recovery chain > #given the dedicated marker and no captured session #when session_start fires #then parent recovery is skipped [0.13ms]
+150 |   it("#given a settled parent turn #when agent_settled fires #then completion epochs are marked consumed for that session", async () => {
+151 |     const { pi, markConsumedCalls } = wireHarness("parent-session")
+152 | 
+153 |     await pi.dispatch("agent_settled", {}, {})
+154 | 
+155 |     expect(markConsumedCalls).toEqual(["parent-session"])
+                                    ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "parent-session",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/restart-wake-redelivery/packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts:155:31)
+(fail) event-bridge agent_settled > #given a settled parent turn #when agent_settled fires #then completion epochs are marked consumed for that session [21.81ms]
+176 |     await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-session", getSessionFile: () => sessionFile } })
+177 |     await Promise.resolve()
+178 |     await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-session", getSessionFile: () => sessionFile } })
+179 |     await Promise.resolve()
+180 | 
+181 |     expect(notifyCalls[0]).toMatchObject({ sessionId: "parent-session", parentTailInterrupted: true })
+                                 ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "parentTailInterrupted": true,
++   "parentState": {
++     "kind": "idle",
++   },
+    "sessionId": "parent-session",
+  }
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/restart-wake-redelivery/packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts:181:28)
+(fail) event-bridge restart continuation > #given an aborted parent tail and an owned child #when session_start fires twice #then one restart continuation is delivered and reconciliation receives the interruption [0.84ms]
+196 |       idleCoordinator: coordinator,
+197 |     })
+198 | 
+199 |     await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-session", getSessionFile: () => sessionFile } })
+200 | 
+201 |     expect(notifyCalls[0]).toMatchObject({ sessionId: "parent-session", parentTailInterrupted: false })
+                                 ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "parentTailInterrupted": false,
++   "parentState": {
++     "kind": "idle",
++   },
+    "sessionId": "parent-session",
+  }
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/restart-wake-redelivery/packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts:201:28)
+(fail) event-bridge restart continuation > #given a healthy parent tail #when session_start fires #then reconciliation is told the tail is not interrupted and no continuation is delivered [0.42ms]
+(pass) event-bridge session_shutdown > #given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason [0.28ms]
+(pass) event-bridge session_shutdown > #given a session_shutdown with no captured session id #when the event fires #then it warns and does not suspend [0.13ms]
+(pass) event-bridge session_shutdown > #given a session_shutdown with a missing reason #when the event fires #then it warns and does not suspend [0.11ms]
+
+ 10 pass
+ 3 fail
+ 34 expect() calls
+Ran 13 tests across 1 file. [16.32s]

@@ -1,0 +1,21 @@
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo-task.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M packages/omo-senpi/scripts/qa/AGENTS.md
+ M packages/omo-senpi/src/components/task/AGENTS.md
+ M packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts
+ M packages/omo-senpi/src/components/task/event-bridge.test-harness.ts
+ M packages/omo-senpi/src/components/task/event-bridge.ts
+ M packages/omo-senpi/src/components/task/index.test.ts
+ M packages/omo-senpi/src/components/task/index.ts
+ M packages/omo-senpi/src/components/task/parent-notifier.ts
+ M packages/omo-senpi/src/extension/idle-injection-coordinator.ts
+ M packages/senpi-task/AGENTS.md
+ M packages/senpi-task/src/completion/notifier-reconcile-unnotified.test.ts
+ M packages/senpi-task/src/completion/notifier.ts
+ M packages/senpi-task/src/completion/types.ts
+ M packages/senpi-task/src/state/types.ts
+ M packages/senpi-task/src/store/record-blocks-parse.ts
+ M packages/senpi-task/src/store/record-parse.test.ts
+?? packages/omo-senpi/scripts/qa/task-restart-redelivery-e2e.mjs
+?? packages/omo-senpi/scripts/qa/task-restart-redelivery-mock-provider.ts

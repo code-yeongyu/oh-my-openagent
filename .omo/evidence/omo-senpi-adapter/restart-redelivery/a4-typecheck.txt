@@ -1,0 +1,3 @@
+EXIT_CODE_senpi_task=0
+====
+EXIT_CODE_omo_senpi=0

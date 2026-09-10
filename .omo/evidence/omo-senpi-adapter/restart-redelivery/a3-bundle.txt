@@ -1,0 +1,11 @@
+=== BEFORE build ===
+-rw-r--r--  1 yeongyu  staff  1083673 Sep  8 18:34 packages/omo-senpi/plugin/extensions/omo.js
+d981931e3c0bb77ded13b3d3df3f68be566d3c68989a6d7d69e768a11e2e54b9  packages/omo-senpi/plugin/extensions/omo.js
+
+=== AFTER build (node packages/omo-senpi/plugin/scripts/build-extension.mjs) ===
+-rw-r--r--  1 yeongyu  staff  1073895 Sep 10 15:11 packages/omo-senpi/plugin/extensions/omo.js
+5e92692a36c793fbd1b6b6cdd90665ccec96fe8f5835d34ed3b2ed6a98d06109  packages/omo-senpi/plugin/extensions/omo.js
+
+=== AFTER final rebuild ===
+-rw-r--r--  1 yeongyu  staff  1073895 Sep 10 15:43 packages/omo-senpi/plugin/extensions/omo.js
+5e92692a36c793fbd1b6b6cdd90665ccec96fe8f5835d34ed3b2ed6a98d06109  packages/omo-senpi/plugin/extensions/omo.js
