@@ -81,13 +81,13 @@ function unrecognizedKeyIssues(issues: readonly z.core.$ZodIssue[]): readonly Un
  * A layer carrying `__proto__`, `prototype`, or `constructor` is hostile input, not a stale key, so it
  * stays fail-closed (whole layer rejected) instead of being stripped and partially loaded.
  *
- * The unrecognized key alone is not the signal: a JSON `"__proto__"` member is written THROUGH the
- * prototype rather than becoming an own property, so the parsed record reports only the injected
- * payload's inner keys (`polluted`) and never `__proto__` itself. Detect the tampering directly.
+ * `prototype` and `constructor` arrive as own properties and surface here as unrecognized keys. A
+ * JSON `"__proto__"` member does not: it is written THROUGH the prototype, so the schema sees only the
+ * injected payload's inner keys, or nothing at all when a sub-schema rebuilds the object first. That
+ * case is caught by `hasTamperedPrototype`, which runs on every layer before validation.
  */
-function hasUnsafeUnrecognizedKey(parsed: unknown, issues: readonly UnrecognizedKeyIssue[]): boolean {
-  if (issues.some((issue) => issue.keys.some((key) => isUnsafeObjectKey(key)))) return true
-  return hasTamperedPrototype(parsed)
+function hasUnsafeUnrecognizedKey(issues: readonly UnrecognizedKeyIssue[]): boolean {
+  return issues.some((issue) => issue.keys.some((key) => isUnsafeObjectKey(key)))
 }
 
 function hasTamperedPrototype(value: unknown): boolean {
@@ -175,13 +175,21 @@ function readConfigSource(
     }
   }
 
+  // The guard runs before validation and reads `parsed.data` directly: `toRecord` rebuilds only the
+  // root from its own enumerable properties, nested objects keep their prototype, and a valid layer
+  // (nothing for zod to report) would otherwise hand a tampered sub-object to every consumer of it.
+  if (hasTamperedPrototype(parsed.data)) {
+    return {
+      diagnostic: { kind: "validation", message: `Invalid omo config at ${path}: "__proto__" member is not allowed`, path },
+      source: { exists: true, loaded: false, path, scope },
+    }
+  }
+
   const parsedRecord = toRecord(parsed.data)
   const validation = OmoConfigLayerSchema.safeParse(parsed.data)
   if (!validation.success) {
-    // NOTE: the guard reads `parsed.data` directly. `toRecord` rebuilds the object from its own
-    // enumerable properties, which silently discards the tampered prototype this guard looks for.
     const unrecognized = unrecognizedKeyIssues(validation.error.issues)
-    if (unrecognized.length > 0 && hasUnsafeUnrecognizedKey(parsed.data, unrecognized)) {
+    if (hasUnsafeUnrecognizedKey(unrecognized)) {
       return {
         diagnostic: validationDiagnostic(path, validation.error.issues),
         source: { exists: true, loaded: false, path, scope },

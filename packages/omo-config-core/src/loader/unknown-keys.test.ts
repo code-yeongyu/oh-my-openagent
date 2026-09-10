@@ -99,6 +99,34 @@ describe("loadOmoConfig unknown-key tolerance", () => {
     }
   })
 
+  test("#given a prototype-pollution key nested under an otherwise valid agent #when loading the senpi view #then the whole layer is rejected instead of loaded", () => {
+    // given: every schema-visible value is valid, so no zod issue is raised; only the nested prototype is hostile
+    const fixture = makeFixture()
+    writeUserConfig(
+      fixture.homeDir,
+      '{"agents":{"evil":{"__proto__":{"polluted":true},"model":"user-model"}},"categories":{"quick":{"model":"user-model"}}}',
+    )
+
+    try {
+      // when
+      const result = loadSenpi(fixture)
+
+      // then
+      expect(result.sources.map((source) => source.loaded)).toEqual([false])
+      expect(result.config.agents?.evil).toBeUndefined()
+      expect(result.config.categories?.quick).toBeUndefined()
+      expect(result.diagnostics).toHaveLength(1)
+      expect(result.diagnostics[0]).toMatchObject({ kind: "validation" })
+      for (const layer of result.layers) {
+        const evil = (layer.config as { agents?: Record<string, object> }).agents?.evil
+        expect(evil === undefined || Object.getPrototypeOf(evil) === Object.prototype).toBe(true)
+      }
+      expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined()
+    } finally {
+      rmSync(fixture.root, { force: true, recursive: true })
+    }
+  })
+
   test("#given a malformed known value #when loading the senpi view #then the layer is rejected with a validation diagnostic", () => {
     // given
     const fixture = makeFixture()
