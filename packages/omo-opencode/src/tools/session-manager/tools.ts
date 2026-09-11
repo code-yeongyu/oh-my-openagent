@@ -77,12 +77,17 @@ export function createSessionManagerTools(
       from_date: tool.schema.string().optional().describe("Filter sessions from this date (ISO 8601 format)"),
       to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
       project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current working directory)"),
+      include_archived: tool.schema.boolean().optional().describe("Include archived sessions (default: false). Archived sessions are marked [archived]."),
     },
     execute: async (args: SessionListArgs, _context) => {
       try {
         const directory = args.project_path ?? ctx.directory
-        let sessions = await resolvedDeps.getMainSessions({ directory })
+        const sessions = await resolvedDeps.getMainSessions({
+          directory,
+          includeArchived: args.include_archived ?? false,
+        })
         let sessionIDs = sessions.map((s) => s.id)
+        const archivedIds = new Set(sessions.filter((s) => s.time?.archived).map((s) => s.id))
 
         if (args.from_date || args.to_date) {
           sessionIDs = await resolvedDeps.filterSessionsByDate(sessionIDs, args.from_date, args.to_date)
@@ -92,7 +97,7 @@ export function createSessionManagerTools(
           sessionIDs = sessionIDs.slice(0, args.limit)
         }
 
-        return await resolvedDeps.formatSessionList(sessionIDs)
+        return await resolvedDeps.formatSessionList(sessionIDs, archivedIds)
       } catch (e) {
         return `Error: ${e instanceof Error ? e.message : String(e)}`
       }
@@ -142,6 +147,7 @@ export function createSessionManagerTools(
       session_id: tool.schema.string().optional().describe("Search within specific session only (default: all sessions)"),
       case_sensitive: tool.schema.boolean().optional().describe("Case-sensitive search (default: false)"),
       limit: tool.schema.number().optional().describe("Maximum number of results to return (default: 20)"),
+      include_archived: tool.schema.boolean().optional().describe("Include archived sessions in the scan (default: true). Matches from archived sessions are marked [archived]."),
     },
     execute: async (args: SessionSearchArgs, _context) => {
       try {
@@ -152,8 +158,10 @@ export function createSessionManagerTools(
             return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
           }
 
-          const allSessions = await resolvedDeps.getAllSessions()
-          const sessionsToScan = allSessions.slice(0, MAX_SESSIONS_TO_SCAN)
+          const { ids, archivedIds } = await resolvedDeps.getAllSessions({
+            includeArchived: args.include_archived ?? true,
+          })
+          const sessionsToScan = ids.slice(0, MAX_SESSIONS_TO_SCAN)
 
           const allResults: SearchResult[] = []
           for (const sid of sessionsToScan) {
@@ -161,7 +169,12 @@ export function createSessionManagerTools(
 
             const remaining = resultLimit - allResults.length
             const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining)
-            allResults.push(...sessionResults)
+            for (const result of sessionResults) {
+              if (archivedIds.has(result.session_id)) {
+                result.archived = true
+              }
+              allResults.push(result)
+            }
           }
 
           return allResults.slice(0, resultLimit)
