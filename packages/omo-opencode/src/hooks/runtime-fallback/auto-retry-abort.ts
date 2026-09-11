@@ -11,7 +11,8 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "session.status.retry-signal" ||
       source === "message.updated.retry-signal" ||
       source === "message.updated.quota-fallback" ||
-      source === "session.timeout"
+      source === "session.timeout" ||
+      source === "first-prompt-watchdog"
     ) {
       deps.internallyAbortedSessions.add(sessionID)
       deps.sessionLastAccess.set(sessionID, Date.now())

@@ -114,4 +114,17 @@ describe("createAbortSessionRequest reservation release", () => {
     // then
     expect(getPromptReservation(sessionID)?.source).toBe("user-prompt")
   })
+
+  test("#given the first-prompt watchdog aborts a silent session #when the abort request completes #then the abort is marked as OMO-internal", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog-abort"
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    // when
+    await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
 })
