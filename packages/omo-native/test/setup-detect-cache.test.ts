@@ -11,6 +11,7 @@ import {
   readSetupSuggestionCache,
   setupDetectInputStats,
 } from "../bin/lib/setup-detect-cache.js"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 
 // The launcher answers the interactive banner's sibling-credential hint from a small cache instead
 // of blocking on live detection. These tests pin that contract through the real surfaces: the
@@ -64,10 +65,7 @@ writeFileSync(process.env.CAPTURE_FILE, "spawned")
 process.exit(0)
 `)
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  for (const artifact of [
-    "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
-    "plugin/runtime/agent-toolkit/cli.js",
-  ]) write(join(packageRoot, artifact), "fixture\n")
+  for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) write(join(packageRoot, artifact), "fixture\n")
   const env = { HOME: home, SENPI_CODING_AGENT_DIR: agentDir, XDG_DATA_HOME: xdg }
   return {
     root,

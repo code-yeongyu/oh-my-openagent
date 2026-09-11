@@ -19,7 +19,7 @@ import { buildLabel, parseBuildInfo, versionLines } from "./build-info"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
-import { runDoctor } from "./bin/lib/doctor.js"
+import { DOCTOR_PLUGIN_ARTIFACTS, runDoctor } from "./bin/lib/doctor.js"
 import { detectHarnesses, needsSetupSuggestion } from "./bin/lib/setup-detect.js"
 import { printSetupReport } from "./bin/lib/setup-report.js"
 import { delimiter } from "node:path"
@@ -44,12 +44,6 @@ registerBunOAuthFlows()
 const earlyCommands = new Set(["install", "remove", "list", "config", "auth", "app-server"])
 const selfUpdateTargets = new Set(["self", "senpi", "omo"])
 const engineUpdateTargets = new Set(["--extensions", "--models"])
-const doctorArtifacts = [
-  ["plugin manifest", "plugin/package.json"],
-  ["extension", "plugin/extensions/omo.js"],
-  ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-  ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
-] as const
 
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
   const command = args[0]
@@ -134,7 +128,7 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
 function runCompiledDoctor(inventory: Awaited<ReturnType<typeof detectHarnesses>>, execDir: string, enginePin: string): void {
   let failed = false
   const lines: string[] = []
-  for (const [label, artifact] of doctorArtifacts) {
+  for (const [label, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
     if (existsSync(join(execDir, artifact))) lines.push(`PASS ${label}: ${artifact}`)
     else {
       lines.push(`FAIL ${label}: missing ${artifact}`)

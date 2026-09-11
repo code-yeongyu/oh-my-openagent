@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import {
+  DOCTOR_PLUGIN_ARTIFACTS,
   fetchNpmDistTagsSync,
   latestFromDistTags,
   runDoctor,
@@ -13,12 +14,7 @@ import { packageManifest, updateTarget } from "../bin/lib/package-paths.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
-const artifacts = [
-  ["plugin manifest", "plugin/package.json"],
-  ["extension", "plugin/extensions/omo.js"],
-  ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-  ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
-] as const
+const artifacts = DOCTOR_PLUGIN_ARTIFACTS as ReadonlyArray<readonly [string, string]>
 
 type Fixture = { root: string; packageRoot: string; launcher: string; agentDir: string }
 type InstallLayout = "bun" | "npm"

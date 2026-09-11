@@ -1,3 +1,11 @@
+## 2026-09-11 — omo doctor requires the published x-search skill (#7774)
+
+`omo doctor` (npm launcher and compiled binary) now fails when
+`plugin/skills-conditional/x-search/SKILL.md` is missing from the installed payload. The
+credential-gated skill already ships in omo-ai, but doctor previously only checked the
+manifest, extension, and two runtimes, so a stripped install still passed while sessions
+with an xAI credential opened with a Skill conflict.
+
 ## 2026-09-09 - Suspend native DAG runs on committed session switches (#8020)
 
 OMO no longer cancels DAG nodes from the vetoable `session_before_switch` hook. Committed shutdown first retires scheduler admission and settlement, awaits in-flight admission and journal delivery, then persists the pause before task-child suspension. Returning in the same process can reclaim an explicitly released own lease; active self claims and live foreign holders remain protected. Completed output is reused, running children reconcile through their durable task owners, and pending dependents are admitted once. Deliberate workflow cancellation remains destructive. `/session` information and `/resume` selector cancellation are unchanged. External terminal-hosted controllers are outside this native DAG lifecycle fix.

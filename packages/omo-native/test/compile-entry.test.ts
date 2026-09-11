@@ -14,6 +14,7 @@ import {
   updateHint,
   versionLine,
 } from "../compile-entry"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 import { loadOpenAICodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
 import { openaiCodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js"
 import { openaiCodexProvider } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js"
@@ -304,7 +305,7 @@ describe("embedded runtime provisioning", () => {
   test("compiled doctor resolves package artifacts from the provided execDir", async () => {
     const root = temp()
     writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
-    for (const artifact of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js", "plugin/runtime/agent-toolkit/cli.js"]) {
+    for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
       const path = join(root, artifact)
       mkdirSync(join(path, ".."), { recursive: true })
       writeFileSync(path, "fixture\n")
@@ -312,16 +313,20 @@ describe("embedded runtime provisioning", () => {
     const output: string[] = []
     const originalLog = console.log
     const originalExitCode = process.exitCode
+    let doctorExitCode: string | number | undefined
     console.log = (value?: unknown) => { output.push(String(value)) }
     process.exitCode = undefined
     try {
       await runCompiledLauncher(["doctor"], root, "2026.8.28", root)
+      doctorExitCode = process.exitCode as string | number | undefined
     } finally {
       console.log = originalLog
       process.exitCode = originalExitCode
     }
     expect(output.join("\n")).toContain("PASS plugin manifest: plugin/package.json")
+    expect(output.join("\n")).toContain("PASS x-search skill: plugin/skills-conditional/x-search/SKILL.md")
     expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28)")
+    expect(doctorExitCode).toBe(0)
   })
 
   test("version uses the manifest engine pin without a provisioned senpi package", async () => {

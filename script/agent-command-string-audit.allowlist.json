@@ -23,7 +23,7 @@
     ".github/workflows/publish.yml: /bin/omo",
     "AGENTS.md: omo doctor",
     "CLAUDE.md: omo doctor",
-    "changes.md: omo doctor x2",
+    "changes.md: omo doctor x4",
     "packages/omo-codex/README.md: omo get-local-version",
     "packages/omo-native/AGENTS.md: /bin/omo x2",
     "packages/omo-native/AGENTS.md: omo doctor x2",

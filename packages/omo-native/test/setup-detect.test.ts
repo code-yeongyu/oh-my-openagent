@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { detectHarnesses, needsSetupSuggestion } from "../bin/lib/setup-detect.js"
 import { formatSetupReport } from "../bin/lib/setup-report.js"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 
 function sqlLiteral(value: string | null): string {
   return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`
@@ -143,10 +144,7 @@ function createLauncherFixture(fixture: Fixture): string {
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   write(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  for (const artifact of [
-    "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
-    "plugin/runtime/agent-toolkit/cli.js",
-  ]) write(join(packageRoot, artifact), "fixture\n")
+  for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) write(join(packageRoot, artifact), "fixture\n")
   return join(packageRoot, "bin", "omo.js")
 }
 

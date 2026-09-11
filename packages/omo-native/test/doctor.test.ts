@@ -4,15 +4,11 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
-const artifacts = [
-  ["plugin manifest", "plugin/package.json"],
-  ["extension", "plugin/extensions/omo.js"],
-  ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-  ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
-] as const
+const artifacts = DOCTOR_PLUGIN_ARTIFACTS as ReadonlyArray<readonly [string, string]>
 
 type Fixture = { root: string; packageRoot: string; launcher: string; agentDir: string }
 
@@ -61,6 +57,12 @@ afterEach(() => {
 })
 
 describe("omo doctor", () => {
+  describe("#given the plugin diagnostic checklist", () => {
+    test("#when inspected #then it requires the published x-search skill", () => {
+      expect(artifacts.map(([, path]) => path)).toContain("plugin/skills-conditional/x-search/SKILL.md")
+    })
+  })
+
   describe("#given a complete packaged installation", () => {
     describe("#when diagnostics run", () => {
       test("#then every required check passes", () => {

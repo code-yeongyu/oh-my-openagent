@@ -65,11 +65,17 @@ function readDistTags(options) {
   }
 }
 
-const artifacts = [
+// Shared with compiled-binary doctor. Keep this list short: identity of a valid
+// payload, not every skill. x-search is the exception because it is credential-gated
+// (not under plugin/skills) and a missing copy used to pass doctor while senpi
+// reported a Skill conflict on every xAI session (#7774).
+/** @type {ReadonlyArray<readonly [string, string]>} */
+export const DOCTOR_PLUGIN_ARTIFACTS = [
   ["plugin manifest", "plugin/package.json"],
   ["extension", "plugin/extensions/omo.js"],
   ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
   ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
+  ["x-search skill", "plugin/skills-conditional/x-search/SKILL.md"],
 ]
 
 function pass(lines, message) {
@@ -374,7 +380,7 @@ export function runDoctor(inventory, args = [], options = {}) {
 
   let failed = false
   const lines = []
-  for (const [label, artifact] of artifacts) {
+  for (const [label, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
     const path = join(packageRoot, artifact)
     if (existsSync(path)) pass(lines, `${label}: ${artifact}`)
     else {
