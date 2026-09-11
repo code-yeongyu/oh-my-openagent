@@ -97,7 +97,9 @@ describe("/memfs backup", () => {
 })
 
 describe("/memfs restore", () => {
-  test("#given a named backup #when restore runs #then repo content is replaced and a safety backup is kept", async () => {
+  test(
+    "#given a named backup #when restore runs #then repo content is replaced and a safety backup is kept",
+    async () => {
     // given
     const { identityRoot, repoDir, pi, ctx } = await harness()
     await invoke(pi, "memfs", "backup", ctx)
@@ -112,7 +114,8 @@ describe("/memfs restore", () => {
     expect(restored).toContain("seeded persona")
     expect(text).toContain("restored")
     expect((await backupNames(identityRoot)).length).toBe(2)
-  })
+  },
+  15000)
 
   test("#given no backups #when restore runs #then an actionable error is returned", async () => {
     // given

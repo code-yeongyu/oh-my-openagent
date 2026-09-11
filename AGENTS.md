@@ -333,6 +333,12 @@ Digest-verified centrality (refs unmeasured unless noted):
 - Rule blocks in AGENTS.md / SKILL.md use emphatic all-caps imperatives deliberately (QA mandate, merge policy, prompt gate); they are binding contracts, not style noise.
 - Skill precedence is numeric, not directory order: `opencode-project(6) > project(5) > opencode(4) > user(3) > config(2) > builtin=shared(1)` across 7 discover* sources.
 
+## CI GUARDRAILS (2026-08-27 — prevent recurring CI failures)
+
+- **Markdown local-link audit must ignore machine output:** `packages/omo-opencode/src/shared/markdown-link-audit.test.ts` `collectMarkdownFiles()` must filter `git ls-files` to exclude `.omo/` and `.opencode/` (evidence dirs contain `/home/...` absolute paths that trip `maintainer-local path` audit). If you add new machine-output dirs, extend the filter. Fix: `8e0d7f30b fix(test): exclude .omo and .opencode from markdown link audit` resolved `ubuntu 1/2 failure after 3m` (8981 pass 1 fail).
+- **Senpi plugin bundle must be refreshed on Senpi source change:** Any edit under `packages/omo-senpi/`, `packages/senpi-task/`, or `packages/omo-codex/plugin/components/codegraph` must be followed by `bun install && bun run build:senpi-plugin:stage` and commit of `packages/omo-senpi/plugin/extensions/*.js` + `packages/omo-codex/plugin/components/codegraph/dist/*` + `packages/omo-codex/scripts/install-dist/*`. CI job `Verify committed Senpi plugin bundle is current` fails in 39s if stale — this was `senpi-compatibility (ubuntu-latest) failure after 39s` for `7359/7364` fixed by `9bd60f089` / `1e8575f7a`.
+- **Sharded ubuntu CI:** `origin/dev c6b1d190` splits `test (ubuntu-latest)` into `1/2` + `2/2`. Old singular `CANCELLED after 6m` is gone — required checks are now `ubuntu 1/2` + `2/2`. When you sync `origin/dev` into PRs, push the new heads so GitHub re-queues sharded jobs.
+
 ## ANTI-PATTERNS (BLOCKING)
 
 - Never `as any`, `@ts-ignore`, `@ts-expect-error`.
