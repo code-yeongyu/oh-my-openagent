@@ -1,0 +1,17 @@
+SANDBOX=/tmp/pr6669-srv-mqtbTm
+PROVIDER_PORT=44777
+--- server up ---
+CONFIG_OK
+SESSION_ID=ses_fa239542cffeZEAIqql8Ej6Lbb
+--- prompting the silent provider ---
+PROMPT_CURL_EXIT=0
+--- waiting for the timeout lifecycle to run (bounded) ---
+--- provider call log ---
+[2026-09-01T16:21:29.898Z] START port=44777
+[2026-09-01T16:21:38.291Z] QUOTA_429 call=1 url=/v1/responses
+[2026-09-01T16:21:40.442Z] HANG_REQUEST call=2 url=/v1/responses
+--- runtime-fallback lifecycle lines ---
+no runtime-fallback lines
+--- prompt-async-gate lines ---
+--- isolated session count ---
+1
