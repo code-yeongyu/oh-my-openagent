@@ -1,7 +1,7 @@
 import { SenpiShutdownError, TEAM_LEAD_SENTINEL } from "../../team"
 import { isMissingStateError } from "../team/classify-error"
 import type { TeamToolsService } from "../team/types"
-import { toolResult } from "./tool-result"
+import { toolErrorResult, toolResult } from "./tool-result"
 import { invalidArguments } from "./send-results"
 import type { StructuredMessageInput, TaskSendInput } from "./send-schema"
 import type { SendResultDetails, SendToolResult } from "./types"
@@ -104,7 +104,7 @@ function shutdownFailure(error: unknown, context: ShutdownFailureContext): SendT
   else if (isMissingStateError(error)) code = "team_state_missing"
   else throw error
   const reason = shutdownFailureReason(code)
-  return toolResult(`Shutdown ${context.operation} failed for ${context.member}: ${reason}`, {
+  return toolErrorResult(`Shutdown ${context.operation} failed for ${context.member}: ${reason}`, {
     kind: "shutdown_failed",
     ...context,
     code,

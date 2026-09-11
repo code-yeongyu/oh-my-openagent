@@ -63,6 +63,7 @@ describe("runTaskCancel", () => {
     const result = await runTaskCancel(manager, { task_id: "st_deadbeef" })
 
     expect(result.details.kind).toBe("not_found")
+    expect(result.isError).toBe(true)
   })
 
   test("#given no identifier #when cancelled #then invalid_arguments is returned", async () => {
@@ -71,6 +72,7 @@ describe("runTaskCancel", () => {
     const result = await runTaskCancel(manager, {})
 
     expect(result.details.kind).toBe("invalid_arguments")
+    expect(result.isError).toBe(true)
   })
 
   test("#given the task_cancel tool #when reading its description #then it names the terminal contract without stale revive wording", () => {

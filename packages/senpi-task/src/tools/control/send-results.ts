@@ -1,13 +1,13 @@
 import type { SendManager, SendToolResult } from "./types"
-import { toolResult } from "./tool-result"
+import { toolErrorResult, toolResult } from "./tool-result"
 
 export function invalidArguments(reason: string): SendToolResult {
-  return toolResult(reason, { kind: "invalid_arguments", reason })
+  return toolErrorResult(reason, { kind: "invalid_arguments", reason })
 }
 export function notFound(manager: SendManager, reason: string, callerSessionId: string | undefined): SendToolResult {
   const known = knownTaskNames(manager, callerSessionId)
   const listText = known.length > 0 ? ` Known tasks in this session: ${known.join(", ")}.` : ""
-  return toolResult(`${reason}${listText}`, { kind: "not_found", reason, known_tasks: known })
+  return toolErrorResult(`${reason}${listText}`, { kind: "not_found", reason, known_tasks: known })
 }
 
 function knownTaskNames(manager: SendManager, callerSessionId: string | undefined): readonly string[] {
@@ -24,7 +24,7 @@ export function scopeDenied(manager: SendManager, to: string, callerSessionId: s
   const record = resolveListedTask(manager, to)
   if (record === undefined) return undefined
   if (callerSessionId === record.parent_session_id || callerSessionId === record.root_session_id) return undefined
-  return toolResult(`Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`, {
+  return toolErrorResult(`Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`, {
     kind: "scope_denied",
     task_id: record.task_id,
     owning_session_id: record.parent_session_id,
@@ -57,7 +57,7 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         run_epoch: outcome.run_epoch,
       })
     case "delivery_uncertain":
-      return toolResult(`${outcome.reason} ${outcome.suggestion}`, {
+      return toolErrorResult(`${outcome.reason} ${outcome.suggestion}`, {
         kind: "delivery_uncertain",
         task_id: outcome.task_id,
         run_epoch: outcome.run_epoch,
@@ -73,27 +73,27 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
         queue_position: outcome.queue_position,
       })
     case "not_continuable":
-      return toolResult(`${outcome.reason} ${outcome.suggestion}`, {
+      return toolErrorResult(`${outcome.reason} ${outcome.suggestion}`, {
         kind: "not_continuable",
         task_id: outcome.task_id,
         reason: outcome.reason,
         suggestion: outcome.suggestion,
       })
     case "one_shot_agent":
-      return toolResult(outcome.message, {
+      return toolErrorResult(outcome.message, {
         kind: "one_shot_agent",
         task_id: outcome.task_id,
         agent: outcome.agent,
         message: outcome.message,
       })
     case "scope_denied":
-      return toolResult(outcome.reason, {
+      return toolErrorResult(outcome.reason, {
         kind: "scope_denied",
         task_id: outcome.task_id,
         owning_session_id: outcome.owning_session_id,
         reason: outcome.reason,
       })
     case "not_found":
-      return toolResult(outcome.reason, { kind: "not_found", reason: outcome.reason, known_tasks: [] })
+      return toolErrorResult(outcome.reason, { kind: "not_found", reason: outcome.reason, known_tasks: [] })
   }
 }
