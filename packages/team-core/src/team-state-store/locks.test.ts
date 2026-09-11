@@ -95,6 +95,164 @@ test("atomicWrite leaves no partial file when rename fails", async () => {
   await rm(rootDirectory, { recursive: true, force: true })
 })
 
+test("atomicWrite retries a transient Windows EPERM on rename and then lands the new content", async () => {
+  // given
+  const rootDirectory = await createTempDirectory("locks-atomic-win-retry-")
+  const targetPath = join(rootDirectory, "state.json")
+  await writeFile(targetPath, "old content")
+  const delayCalls: number[] = []
+  let renameCalls = 0
+
+  const { atomicWrite } = await import("./locks")
+
+  // when
+  await atomicWrite(targetPath, "new content", {
+    platform: "win32",
+    delay: async (ms: number) => {
+      delayCalls.push(ms)
+    },
+    rename: async (from: PathLike, to: PathLike) => {
+      renameCalls += 1
+      if (renameCalls <= 2) {
+        throw createErrnoError("EPERM")
+      }
+      await rename(from, to)
+    },
+  })
+
+  // then
+  expect(await readFile(targetPath, "utf8")).toBe("new content")
+  expect(renameCalls).toBe(3)
+  expect(delayCalls).toEqual([50, 100])
+  const directoryEntries = await readdir(rootDirectory)
+  expect(directoryEntries.some((entry) => entry.startsWith("state.json.tmp."))).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("atomicWrite stops retrying a Windows rename after the bounded attempts and leaves no partial file", async () => {
+  // given
+  const rootDirectory = await createTempDirectory("locks-atomic-win-exhaust-")
+  const targetPath = join(rootDirectory, "state.json")
+  await writeFile(targetPath, "old content")
+  const delayCalls: number[] = []
+  let renameCalls = 0
+
+  const { atomicWrite } = await import("./locks")
+
+  // when
+  const result = atomicWrite(targetPath, "new content", {
+    platform: "win32",
+    delay: async (ms: number) => {
+      delayCalls.push(ms)
+    },
+    rename: async () => {
+      renameCalls += 1
+      throw createErrnoError("EBUSY")
+    },
+  })
+
+  // then
+  await expect(result).rejects.toThrow("EBUSY")
+  expect(renameCalls).toBe(5)
+  expect(delayCalls).toEqual([50, 100, 150, 200])
+  expect(await readFile(targetPath, "utf8")).toBe("old content")
+  const directoryEntries = await readdir(rootDirectory)
+  expect(directoryEntries.some((entry) => entry.startsWith("state.json.tmp."))).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("atomicWrite does not retry rename EPERM on POSIX platforms", async () => {
+  // given
+  const rootDirectory = await createTempDirectory("locks-atomic-posix-noretry-")
+  const targetPath = join(rootDirectory, "state.json")
+  await writeFile(targetPath, "old content")
+  const delayCalls: number[] = []
+  let renameCalls = 0
+
+  const { atomicWrite } = await import("./locks")
+
+  // when
+  const result = atomicWrite(targetPath, "new content", {
+    platform: "linux",
+    delay: async (ms: number) => {
+      delayCalls.push(ms)
+    },
+    rename: async () => {
+      renameCalls += 1
+      throw createErrnoError("EPERM")
+    },
+  })
+
+  // then
+  await expect(result).rejects.toThrow("EPERM")
+  expect(renameCalls).toBe(1)
+  expect(delayCalls).toEqual([])
+  expect(await readFile(targetPath, "utf8")).toBe("old content")
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("atomicWrite does not retry a Windows rename that fails for a non-contention reason", async () => {
+  // given
+  const rootDirectory = await createTempDirectory("locks-atomic-win-noretry-")
+  const targetPath = join(rootDirectory, "state.json")
+  const delayCalls: number[] = []
+  let renameCalls = 0
+
+  const { atomicWrite } = await import("./locks")
+
+  // when
+  const result = atomicWrite(targetPath, "new content", {
+    platform: "win32",
+    delay: async (ms: number) => {
+      delayCalls.push(ms)
+    },
+    rename: async () => {
+      renameCalls += 1
+      throw createErrnoError("ENOENT")
+    },
+  })
+
+  // then
+  await expect(result).rejects.toThrow("ENOENT")
+  expect(renameCalls).toBe(1)
+  expect(delayCalls).toEqual([])
+  const directoryEntries = await readdir(rootDirectory)
+  expect(directoryEntries).toEqual([])
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("atomicWrite does not retry a Windows EACCES rename because only EPERM and EBUSY are contention codes", async () => {
+  // given
+  const rootDirectory = await createTempDirectory("locks-atomic-win-eacces-noretry-")
+  const targetPath = join(rootDirectory, "state.json")
+  await writeFile(targetPath, "old content")
+  const delayCalls: number[] = []
+  let renameCalls = 0
+
+  const { atomicWrite } = await import("./locks")
+
+  // when
+  const result = atomicWrite(targetPath, "new content", {
+    platform: "win32",
+    delay: async (ms: number) => {
+      delayCalls.push(ms)
+    },
+    rename: async () => {
+      renameCalls += 1
+      throw createErrnoError("EACCES")
+    },
+  })
+
+  // then
+  await expect(result).rejects.toThrow("EACCES")
+  expect(renameCalls).toBe(1)
+  expect(delayCalls).toEqual([])
+  expect(await readFile(targetPath, "utf8")).toBe("old content")
+  const directoryEntries = await readdir(rootDirectory)
+  expect(directoryEntries.some((entry) => entry.startsWith("state.json.tmp."))).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
 test("lock open treats EPERM as contention when the lock path exists", async () => {
   // given
   const { assertRetryableLockOpenError } = await import("./locks")

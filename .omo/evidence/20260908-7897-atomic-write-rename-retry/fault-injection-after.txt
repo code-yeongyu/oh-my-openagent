@@ -1,0 +1,12 @@
+### host
+Linux 7.0.0-31-generic x86_64
+bun 1.4.0
+### repo HEAD
+11d5155a8 Merge pull request #7954 from code-yeongyu/feat/web-redesign-og-20260908
+
+### AFTER (patched atomicWrite)
+{"scenario":"win32 EPERM twice then success","platform":"win32","injectedCode":"EPERM","failuresBeforeSuccess":2,"renameCalls":3,"outcome":"resolved","errorCode":null,"elapsedMs":153,"finalStatus":"new","leftoverTempFiles":[]}
+{"scenario":"win32 EBUSY four times then success","platform":"win32","injectedCode":"EBUSY","failuresBeforeSuccess":4,"renameCalls":5,"outcome":"resolved","errorCode":null,"elapsedMs":507,"finalStatus":"new","leftoverTempFiles":[]}
+{"scenario":"win32 EPERM persistent (never succeeds)","platform":"win32","injectedCode":"EPERM","failuresBeforeSuccess":999,"renameCalls":5,"outcome":"rejected","errorCode":"EPERM","elapsedMs":512,"finalStatus":"old","leftoverTempFiles":[]}
+{"scenario":"linux EPERM once (must not retry)","platform":"linux","injectedCode":"EPERM","failuresBeforeSuccess":1,"renameCalls":1,"outcome":"rejected","errorCode":"EPERM","elapsedMs":9,"finalStatus":"old","leftoverTempFiles":[]}
+{"scenario":"concurrent burst of 8 writers, every 3rd rename fails once with EPERM","platform":"win32","writers":8,"renameCalls":11,"injectedFailures":3,"fulfilled":8,"rejected":0,"elapsedMs":153,"finalWriterIsValidJson":true,"finalWriter":"hook-6","leftoverTempFiles":[]}

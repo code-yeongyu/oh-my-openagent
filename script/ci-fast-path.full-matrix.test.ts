@@ -158,6 +158,7 @@ describe("full-matrix classification", () => {
       ["windows shard bunfig", "bunfig.win2.parallel.toml"],
       ["shared serial quarantine", "script/root-test-serial-quarantine.ts"],
       ["reply-listener process identity (win32 branch)", "packages/openclaw-core/src/reply-listener-process.ts"],
+      ["team state atomic write (win32 rename retry branch)", "packages/team-core/src/team-state-store/locks.ts"],
     ])("#then %s forces the full matrix", (_name, changedPath) => {
       // given / when
       const mode = classify({

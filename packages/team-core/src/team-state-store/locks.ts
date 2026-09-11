@@ -13,6 +13,8 @@ type AtomicWriteDeps = {
   open?: typeof open
   rename?: typeof rename
   rm?: typeof rm
+  delay?: typeof delay
+  platform?: NodeJS.Platform
 }
 
 type LockOpenErrorDeps = {
@@ -29,6 +31,8 @@ const LOCK_RETRY_MS = 50
 const LOCK_WAIT_TIMEOUT_MS = 15_000
 const LOCK_RELEASE_RETRY_ATTEMPTS = 3
 const LOCK_RELEASE_RETRY_MS = 25
+const ATOMIC_RENAME_RETRY_ATTEMPTS = 5
+const ATOMIC_RENAME_RETRY_MS = 50
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -62,7 +66,7 @@ function isPathAbsenceError(error: unknown): boolean {
   return code === "ENOENT" || code === "ENOTDIR"
 }
 
-function isRetryableLockReleaseError(error: unknown): boolean {
+function isTransientFileContentionError(error: unknown): boolean {
   const code = errorCode(error)
   return code === "EPERM" || code === "EBUSY"
 }
@@ -178,8 +182,32 @@ export async function reapStaleLock(lockPath: string, deps: LockReleaseDeps = {}
     } catch (error) {
       if (!(error instanceof Error)) return
       if (isPathAbsenceError(error)) return
-      if (!isRetryableLockReleaseError(error) || attempt === LOCK_RELEASE_RETRY_ATTEMPTS) return
+      if (!isTransientFileContentionError(error) || attempt === LOCK_RELEASE_RETRY_ATTEMPTS) return
       await wait(LOCK_RELEASE_RETRY_MS)
+    }
+  }
+}
+
+// Windows-only: libuv maps ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION on a briefly held
+// handle (antivirus scan, concurrent reader) to EPERM / EBUSY; on POSIX the same codes are permanent.
+async function renameWithContentionRetry(
+  tmpPath: string,
+  filePath: string,
+  deps: AtomicWriteDeps,
+): Promise<void> {
+  const renameFile = deps.rename ?? rename
+  const wait = deps.delay ?? delay
+  const retryEnabled = (deps.platform ?? process.platform) === "win32"
+
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await renameFile(tmpPath, filePath)
+      return
+    } catch (error) {
+      if (!retryEnabled || !isTransientFileContentionError(error) || attempt >= ATOMIC_RENAME_RETRY_ATTEMPTS) {
+        throw error
+      }
+      await wait(ATOMIC_RENAME_RETRY_MS * attempt)
     }
   }
 }
@@ -191,7 +219,6 @@ export async function atomicWrite(
 ): Promise<void> {
   const tmpPath = `${filePath}.tmp.${randomUUID()}`
   const openFile = deps.open ?? open
-  const renameFile = deps.rename ?? rename
   const removeFile = deps.rm ?? rm
 
   try {
@@ -202,7 +229,7 @@ export async function atomicWrite(
     } finally {
       await fileHandle.close()
     }
-    await renameFile(tmpPath, filePath)
+    await renameWithContentionRetry(tmpPath, filePath, deps)
   } catch (error) {
     await removeFile(tmpPath, { force: true })
     throw error
