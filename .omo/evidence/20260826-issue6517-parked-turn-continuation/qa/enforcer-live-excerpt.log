@@ -1,0 +1,14 @@
+[2026-08-26T02:44:44.258Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:44.315Z] [todo-continuation-enforcer] Agent check {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","agentName":"Sisyphus - ultraworker","skipAgents":["prometheus","compaction","plan"],"compactionGuardActive":false,"acknowledgedCompaction":false}
+[2026-08-26T02:44:44.315Z] [todo-continuation-enforcer] Countdown started {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","seconds":2,"incompleteCount":1}
+[2026-08-26T02:44:46.382Z] [todo-continuation-enforcer] Injecting continuation {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","agent":"Sisyphus - ultraworker","model":{"providerID":"opencode","modelID":"big-pickle"},"incompleteCount":1}
+[2026-08-26T02:44:46.507Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer"}
+[2026-08-26T02:44:46.507Z] [live-server-route] dispatch via live listener {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer"}
+[2026-08-26T02:44:46.572Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer","holdMs":5000}
+[2026-08-26T02:44:46.572Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","source":"todo-continuation-enforcer"}
+[2026-08-26T02:44:46.572Z] [todo-continuation-enforcer] Injection successful {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","status":"dispatched"}
+[2026-08-26T02:44:46.671Z] [todo-continuation-enforcer] Deferred user interruption classification until message part {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","messageID":"msg_03bf4af50001y6n6aSyLvQ7M7o"}
+[2026-08-26T02:44:52.823Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS"}
+[2026-08-26T02:44:52.841Z] [todo-continuation-enforcer] Deferred user interruption classification until message part {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","messageID":"msg_03bf4af50001y6n6aSyLvQ7M7o"}
+[2026-08-26T02:44:52.892Z] [todo-continuation-enforcer] Agent check {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","agentName":"Sisyphus - ultraworker","skipAgents":["prometheus","compaction","plan"],"compactionGuardActive":false,"acknowledgedCompaction":false}
+[2026-08-26T02:44:52.892Z] [todo-continuation-enforcer] Skipped: continuation paused at turn boundary {"sessionID":"ses_fc40b8666ffe2dRyTxhRwQxeyS","reason":"directive-response","hasProgressed":false}
