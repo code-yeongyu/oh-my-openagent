@@ -1,3 +1,5 @@
+import { join } from "node:path"
+
 import { tokenizeCommand } from "../../tools/interactive-bash/tools"
 import { spawn as runtimeSpawn } from "../../shared/bun-spawn-shim"
 
@@ -5,6 +7,8 @@ export type TimerHandle = ReturnType<typeof setTimeout> | number
 
 export interface SpawnDeps {
   spawn?: SpawnFunction
+  killProcessTree?: (pid: number) => void
+  platform?: NodeJS.Platform
   setTimer: (fn: () => void, ms: number) => TimerHandle
   clearTimer: (handle: TimerHandle) => void
 }
@@ -36,8 +40,31 @@ type SpawnFunction = (argv: readonly string[], options: {
 
 const KILL_GRACE_MS = 5_000
 
-function killProcessGroup(pid: number, signal: NodeJS.Signals | 0): void {
+// Windows has no process groups, so process.kill(-pid) is rejected and the empty catch turns every
+// kill into a no-op. The child is spawned detached, so nothing else reaps it: a watchdog timeout
+// reports SIGALRM while the process keeps running. taskkill /T is what takes the tree down, the way
+// execute-hook-command already does it, addressed through SystemRoot because PATH can lack
+// System32 (#6738).
+function killWindowsProcessTree(pid: number): void {
+  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows"
+  const taskkill = join(systemRoot, "System32", "taskkill.exe")
+  runtimeSpawn([taskkill, "/PID", String(pid), "/T", "/F"], {
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  })
+}
+
+function killProcessGroup(pid: number, signal: NodeJS.Signals | 0, platform: NodeJS.Platform, killTree: (pid: number) => void): void {
   try {
+    if (platform === "win32") {
+      if (signal === 0) {
+        process.kill(pid, 0)
+        return
+      }
+      killTree(pid)
+      return
+    }
     process.kill(-pid, signal)
   } catch (error) {
     void error
@@ -103,13 +130,13 @@ export function spawnMonitoredProcess(
     if (actualExited) return
 
     if (subprocess.pid !== undefined) {
-      killProcessGroup(subprocess.pid, signal)
+      killProcessGroup(subprocess.pid, signal, deps.platform ?? process.platform, deps.killProcessTree ?? killWindowsProcessTree)
     }
     if (graceTimer === undefined) {
       graceTimer = deps.setTimer(() => {
         if (!actualExited) {
           if (subprocess.pid !== undefined) {
-            killProcessGroup(subprocess.pid, "SIGKILL")
+            killProcessGroup(subprocess.pid, "SIGKILL", deps.platform ?? process.platform, deps.killProcessTree ?? killWindowsProcessTree)
           }
         }
       }, KILL_GRACE_MS)

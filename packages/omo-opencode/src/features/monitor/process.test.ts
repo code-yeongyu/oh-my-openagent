@@ -135,7 +135,7 @@ describe("spawnMonitoredProcess", () => {
 
       const monitored = spawnMonitoredProcess(
         { command: "bun test", maxRuntimeMs: 60_000 },
-        { spawn: createFakeSpawn([subprocess], spawnCalls), ...clock.deps },
+        { spawn: createFakeSpawn([subprocess], spawnCalls), platform: "linux", ...clock.deps },
       )
 
       // when
@@ -150,6 +150,40 @@ describe("spawnMonitoredProcess", () => {
     })
   })
 
+  describe("#given windows, where a negative pid is rejected", () => {
+    test("#when kill runs #then it takes the process tree down instead of doing nothing", () => {
+      // given
+      const pendingExit = new Promise<number>(() => {})
+      const subprocess = createFakeSubprocess({ pid: 4321, exited: pendingExit })
+      const spawnCalls: SpawnCall[] = []
+      const clock = createFakeClock()
+      const killCalls: Array<{ pid: number; signal: string | number | undefined }> = []
+      const treeKills: number[] = []
+      process.kill = ((pid: number, signal?: string | number) => {
+        killCalls.push({ pid, signal })
+        return true
+      }) satisfies typeof process.kill
+
+      const monitored = spawnMonitoredProcess(
+        { command: "bun test", maxRuntimeMs: 60_000 },
+        {
+          spawn: createFakeSpawn([subprocess], spawnCalls),
+          platform: "win32",
+          killProcessTree: (pid) => treeKills.push(pid),
+          ...clock.deps,
+        },
+      )
+
+      // when
+      monitored.kill("SIGTERM")
+      clock.fireByMs(5_000)
+
+      // then
+      expect(treeKills).toEqual([4321, 4321])
+      expect(killCalls).toEqual([])
+    })
+  })
+
   describe("#given a subprocess exits immediately", () => {
     test("#when awaiting exited #then it resolves with the exit code and signal data", async () => {
       // given
@@ -160,7 +194,7 @@ describe("spawnMonitoredProcess", () => {
       // when
       const monitored = spawnMonitoredProcess(
         { command: "missing-command", maxRuntimeMs: 60_000 },
-        { spawn: createFakeSpawn([subprocess], spawnCalls), ...clock.deps },
+        { spawn: createFakeSpawn([subprocess], spawnCalls), platform: "linux", ...clock.deps },
       )
       const result = await monitored.exited
 
@@ -185,7 +219,7 @@ describe("spawnMonitoredProcess", () => {
 
       const monitored = spawnMonitoredProcess(
         { command: "bun test", maxRuntimeMs: 1234 },
-        { spawn: createFakeSpawn([subprocess], spawnCalls), ...clock.deps },
+        { spawn: createFakeSpawn([subprocess], spawnCalls), platform: "linux", ...clock.deps },
       )
 
       // when
@@ -213,7 +247,7 @@ describe("spawnMonitoredProcess", () => {
       // when
       spawnMonitoredProcess(
         { command: "printf 'ok'", cwd: "/tmp", env: { OMO_TEST: "1" }, maxRuntimeMs: 60_000 },
-        { spawn: createFakeSpawn([subprocess], spawnCalls), ...clock.deps },
+        { spawn: createFakeSpawn([subprocess], spawnCalls), platform: "linux", ...clock.deps },
       )
 
       // then
