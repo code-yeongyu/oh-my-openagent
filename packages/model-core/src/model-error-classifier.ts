@@ -172,6 +172,10 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
     return false
   }
 
+  if (error.name?.toLowerCase() === "unknownerror") {
+    return true
+  }
+
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }

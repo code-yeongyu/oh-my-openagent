@@ -473,6 +473,36 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  describe("UnknownError name as retryable catch-all", () => {
+    test("treats UnknownError (PascalCase) name as retryable so opaque SDK failures advance the chain", () => {
+      //#given: SDKs occasionally fall back to name="UnknownError" when they
+      // cannot classify a provider response. Without retry, the first opaque
+      // failure tears down the task even when a healthy fallback exists.
+      const error = { name: "UnknownError", message: "<no detail>" }
+      expect(shouldRetryError(error)).toBe(true)
+    })
+
+    test("treats unknownerror (lowercase) name as retryable", () => {
+      const error = { name: "unknownerror" }
+      expect(shouldRetryError(error)).toBe(true)
+    })
+
+    test("a NON_RETRYABLE name still wins over UnknownError so user-initiated aborts are honored", () => {
+      //#given: ordering inside the name lookup is non-retryable → STOP → retryable,
+      // so MessageAbortedError cannot be re-promoted to retryable by also being
+      // sent with an UnknownError-style name in some unusual call shape.
+      const error = { name: "messageabortederror" }
+      expect(shouldRetryError(error)).toBe(false)
+    })
+
+    test("treats UnknownError plus STOP quota message as non-retryable", () => {
+      //#given: UnknownError is an opaque wrapper, not a named retry class.
+      // Quota text must still terminate instead of advancing fallback.
+      const error = { name: "UnknownError", message: "quota exceeded for this billing period" }
+      expect(isRetryableModelError(error)).toBe(false)
+    })
+  })
 })
 
 export {}
