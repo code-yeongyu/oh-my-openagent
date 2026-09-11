@@ -1,6 +1,7 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 import { __setTimingConfig, __resetTimingConfig, getTimingConfig } from "./timing"
+import { withAdvancingClock } from "../../../../../test-support/advancing-clock"
 
 function createMockCtx(aborted = false) {
   const controller = new AbortController()
@@ -27,23 +28,6 @@ function createNeverCompleteClient(sessionID: string, onAbort?: () => void) {
   }
 }
 
-async function withMockedDateNow(stepMs: number, run: () => Promise<void>) {
-  const originalDateNow = Date.now
-  let now = 0
-
-  Date.now = () => {
-    const current = now
-    now += stepMs
-    return current
-  }
-
-  try {
-    await run()
-  } finally {
-    Date.now = originalDateNow
-  }
-}
-
 describe("syncPollTimeoutMs threading", () => {
   beforeEach(() => {
     __setTimingConfig({
@@ -67,12 +51,13 @@ describe("syncPollTimeoutMs threading", () => {
           abortCount++
         })
 
-        await withMockedDateNow(60_000, async () => {
+        await withAdvancingClock(60_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_custom",
             agentToUse: "test-agent",
             toastManager: null,
             taskId: undefined,
+            ...clock,
           }, 120_000)
 
           expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_custom")
@@ -114,12 +99,13 @@ describe("syncPollTimeoutMs threading", () => {
           },
         }
 
-        await withMockedDateNow(60_000, async () => {
+        await withAdvancingClock(60_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_active",
             agentToUse: "oracle",
             toastManager: null,
             taskId: undefined,
+            ...clock,
           }, 120_000)
 
           expect(result).toBeNull()
@@ -150,12 +136,13 @@ describe("syncPollTimeoutMs threading", () => {
           },
         }
 
-        await withMockedDateNow(1_000, async () => {
+        await withAdvancingClock(1_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_busy_complete",
             agentToUse: "oracle",
             toastManager: null,
             taskId: undefined,
+            ...clock,
           }, 120_000)
 
           expect(result).toBeNull()
@@ -191,13 +178,14 @@ describe("syncPollTimeoutMs threading", () => {
           },
         }
 
-        await withMockedDateNow(1_000, async () => {
+        await withAdvancingClock(1_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_progress",
             agentToUse: "oracle",
             toastManager: null,
             taskId: undefined,
             maxAssistantTurns: 1_000,
+            ...clock,
           }, 120_000)
 
           expect(result).toBeNull()
@@ -228,13 +216,14 @@ describe("syncPollTimeoutMs threading", () => {
           },
         }
 
-        await withMockedDateNow(1_000, async () => {
+        await withAdvancingClock(1_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_loop",
             agentToUse: "oracle",
             toastManager: null,
             taskId: undefined,
             maxAssistantTurns: 3,
+            ...clock,
           }, 120_000)
 
           expect(result).toContain("exceeded 3 assistant turns")
@@ -249,12 +238,13 @@ describe("syncPollTimeoutMs threading", () => {
         const mockClient = createNeverCompleteClient("ses_default")
         const { MAX_POLL_TIME_MS } = getTimingConfig()
 
-        await withMockedDateNow(300_000, async () => {
+        await withAdvancingClock(300_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_default",
             agentToUse: "test-agent",
             toastManager: null,
             taskId: undefined,
+            ...clock,
           })
 
           expect(result).toBe(`Poll inactivity timeout reached after ${MAX_POLL_TIME_MS}ms without active OpenCode status for session ses_default`)
@@ -267,12 +257,13 @@ describe("syncPollTimeoutMs threading", () => {
 
         __setTimingConfig({ MAX_POLL_TIME_MS: 120_000 })
 
-        await withMockedDateNow(60_000, async () => {
+        await withAdvancingClock(60_000, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_legacy",
             agentToUse: "test-agent",
             toastManager: null,
             taskId: undefined,
+            ...clock,
           })
 
           expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_legacy")
@@ -285,12 +276,13 @@ describe("syncPollTimeoutMs threading", () => {
         const { pollSyncSession } = require("./sync-session-poller")
         const mockClient = createNeverCompleteClient("ses_guard")
 
-        await withMockedDateNow(25, async () => {
+        await withAdvancingClock(25, async (clock) => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
             sessionID: "ses_guard",
             agentToUse: "test-agent",
             toastManager: null,
             taskId: undefined,
+            ...clock,
           }, 10)
 
           expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_guard")
