@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, mkdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -9,6 +10,7 @@ import path from "node:path"
 import { TeamModeConfigSchema } from "../config"
 import type { TeamModeConfig } from "../config"
 import type { ActiveTeamSummary, RuntimeState, TeamSpec } from "../types"
+import { withLock } from "./locks"
 import {
   InvalidTransitionError,
   RuntimeStateError,
@@ -22,6 +24,23 @@ import {
 
 async function createTemporaryBaseDir(): Promise<string> {
   return await mkdtemp(path.join(tmpdir(), "team-mode-store-"))
+}
+
+function createSignal(): { readonly promise: Promise<void>; readonly resolve: () => void } {
+  let resolveSignal: (() => void) | undefined
+  const promise = new Promise<void>((resolve) => {
+    resolveSignal = resolve
+  })
+
+  if (resolveSignal === undefined) {
+    throw new Error("signal resolver was not initialized")
+  }
+
+  return { promise, resolve: resolveSignal }
+}
+
+function getStateLockPath(baseDir: string, teamRunId: string): string {
+  return path.join(baseDir, "runtime", teamRunId, "state.lock")
 }
 
 function createConfig(baseDir: string): TeamModeConfig {
@@ -174,6 +193,115 @@ describe("runtime state store", () => {
     // then
     expect(result).rejects.toBeInstanceOf(InvalidTransitionError)
     expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("deleted")
+  })
+
+  test("transitionRuntimeState rejects creating -> deleting without force", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const createdState = await createRuntimeState(createSpec(), undefined, "user", config)
+
+    // when
+    const result = transitionRuntimeState(
+      createdState.teamRunId,
+      (currentRuntimeState) => ({ ...currentRuntimeState, status: "deleting" }),
+      config,
+    )
+
+    // then
+    await expect(result).rejects.toBeInstanceOf(InvalidTransitionError)
+    expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("creating")
+  })
+
+  test("transitionRuntimeState with force writes creating -> deleting while holding state.lock", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const createdState = await createRuntimeState(createSpec(), undefined, "user", config)
+    const lockPath = getStateLockPath(baseDir, createdState.teamRunId)
+    let lockOwnerDuringTransition: string[] | undefined
+
+    // when
+    const runtimeState = await transitionRuntimeState(
+      createdState.teamRunId,
+      (currentRuntimeState) => {
+        lockOwnerDuringTransition = existsSync(lockPath)
+          ? readFileSync(lockPath, "utf8").split("\n").slice(0, 2)
+          : undefined
+        return { ...currentRuntimeState, status: "deleting" }
+      },
+      config,
+      { force: true },
+    )
+
+    // then
+    expect(runtimeState.status).toBe("deleting")
+    expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("deleting")
+    expect(lockOwnerDuringTransition).toEqual(["team-state-store", String(process.pid)])
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
+  test("transitionRuntimeState with force still rejects schema-invalid state", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const createdState = await createRuntimeState(createSpec(), undefined, "user", config)
+
+    // when
+    const result = transitionRuntimeState(
+      createdState.teamRunId,
+      (currentRuntimeState) => ({ ...currentRuntimeState, status: "deleting", createdAt: -1 }),
+      config,
+      { force: true },
+    )
+
+    // then
+    await expect(result).rejects.toBeInstanceOf(RuntimeStateError)
+    expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("creating")
+  })
+
+  test("transitionRuntimeState with force waits for a concurrent state.lock holder before writing", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const createdState = await createRuntimeState(createSpec(), undefined, "user", config)
+    const lockPath = getStateLockPath(baseDir, createdState.teamRunId)
+    const holderAcquired = createSignal()
+    const releaseHolder = createSignal()
+    let holderHoldsLock = false
+    const holder = withLock(lockPath, async () => {
+      holderHoldsLock = true
+      holderAcquired.resolve()
+      await releaseHolder.promise
+      holderHoldsLock = false
+    })
+    await holderAcquired.promise
+    let holderHeldLockDuringForcedTransition: boolean | undefined
+
+    // when
+    const forcedTransition = transitionRuntimeState(
+      createdState.teamRunId,
+      (currentRuntimeState) => {
+        holderHeldLockDuringForcedTransition = holderHoldsLock
+        return { ...currentRuntimeState, status: "deleting" }
+      },
+      config,
+      { force: true },
+    )
+    const statusWhileHolderHeldLock = (await loadRuntimeState(createdState.teamRunId, config)).status
+    releaseHolder.resolve()
+    await holder
+    const runtimeState = await forcedTransition
+
+    // then
+    expect(statusWhileHolderHeldLock).toBe("creating")
+    expect(holderHeldLockDuringForcedTransition).toBe(false)
+    expect(runtimeState.status).toBe("deleting")
+    expect((await loadRuntimeState(createdState.teamRunId, config)).status).toBe("deleting")
   })
 
   test("loadRuntimeState ignores crash-left tmp files and keeps valid persisted state", async () => {
