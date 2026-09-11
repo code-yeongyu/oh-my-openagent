@@ -27,6 +27,7 @@ describe("createChatParamsHandler", () => {
   afterEach(() => {
     clearSessionPromptParams("ses_chat_params")
     clearSessionPromptParams("ses_chat_params_temperature")
+    clearSessionPromptParams("ses_chat_params_variant_reasoning")
     sharedModule.writeProviderModelsCache({ connected: [], models: {} })
     getCacheDirSpy?.mockRestore()
     if (tempCacheRoot) {
@@ -106,6 +107,56 @@ describe("createChatParamsHandler", () => {
         thinking: { type: "disabled" },
       },
     })
+  })
+
+  test("clears stale provider reasoningEffort when session reasoning rides the variant channel (#6614)", async () => {
+    //#given - explicit user reasoning was routed to the xhigh variant preset, while
+    // OpenCode pre-populated its own default effort into the outgoing options
+    sharedModule.writeProviderModelsCache({
+      connected: ["openai"],
+      models: {
+        openai: [
+          {
+            id: "gpt-5.4",
+            name: "GPT-5.4",
+            temperature: true,
+            reasoning: true,
+            variants: {
+              low: {},
+              medium: {},
+              high: {},
+              xhigh: {},
+            },
+            limit: { output: 128_000 },
+          },
+        ],
+      },
+    })
+    setSessionPromptParams("ses_chat_params_variant_reasoning", {
+      reasoningViaVariant: true,
+    })
+
+    const handler = createChatParamsHandler()
+
+    const input = {
+      sessionID: "ses_chat_params_variant_reasoning",
+      agent: { name: "oracle" },
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+      provider: { id: "openai" },
+      message: { variant: "xhigh" },
+    }
+
+    const output: ChatParamsOutput = {
+      options: { reasoningEffort: "medium" },
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then - the requested xhigh variant reaches the provider without the lingering
+    // medium effort clobbering it
+    expect(output.options).toEqual({})
+    expect(input.message.variant).toBe("xhigh")
   })
 
   test("drops gpt-5.4 temperature and clamps maxOutputTokens from bundled model capabilities", async () => {
