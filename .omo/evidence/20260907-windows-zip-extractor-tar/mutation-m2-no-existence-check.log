@@ -1,0 +1,24 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\utils\src\zip-entry-listing\windows-system-tar.test.ts:
+(pass) windows system tar > #given a non-Windows platform #when the zip tar command is resolved #then it stays the bare name [17.91ms]
+(pass) windows system tar > #given a PATH that cannot resolve tar #when the zip tar command runs #then it is still the Windows bsdtar [22.77ms]
+54 | 		}
+55 | 		const emptyRoot = mkdtempSync(join(tmpdir(), "zip-tar-no-system32-"))
+56 | 
+57 | 		try {
+58 | 			// when / then
+59 | 			expect(windowsSystemTarPath({ SystemRoot: emptyRoot })).toBeNull()
+                                                                ^
+error: expect(received).toBeNull()
+
+Received: "C:\\Users\\LilMG\\AppData\\Local\\Temp\\zip-tar-no-system32-9nT1oV\\System32\\tar.exe"
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\utils\src\zip-entry-listing\windows-system-tar.test.ts:59:60)
+(fail) windows system tar > #given a SystemRoot without a System32 tar #when the zip tar command is resolved #then it falls back to the bare name [3.08ms]
+
+ 2 pass
+ 1 fail
+ 2 expect() calls
+Ran 3 tests across 1 file. [2.18s]
+EXIT=1

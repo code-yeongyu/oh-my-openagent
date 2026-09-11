@@ -1,0 +1,5 @@
+tarball = oh-my-openagent-5.0.0-beta.45.tgz
+grep of the published dist for the two bare-tar spawn sites:
+package/dist\index.js:7812:  const proc = spawn(["tar", "-tvf", archivePath], {
+package/dist\index.js:27659:        proc = spawn(["tar", "-xf", archivePath, "-C", destDir], {
+EXIT=0

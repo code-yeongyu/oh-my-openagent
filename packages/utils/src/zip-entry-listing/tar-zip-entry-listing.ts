@@ -3,6 +3,7 @@ import { spawn } from "../runtime"
 import type { ArchiveEntry } from "../archive-entry-validator"
 import { log } from "../logger"
 import { readProcessStream } from "../process-stream-reader"
+import { zipTarCommand } from "./windows-system-tar"
 
 
 
@@ -78,7 +79,7 @@ export function parseTarListingOutput(stdout: string): ArchiveEntry[] {
 export async function listZipEntriesWithTar(
 	archivePath: string
 ): Promise<ArchiveEntry[]> {
-	const proc = spawn(["tar", "-tvf", archivePath], {
+	const proc = spawn([zipTarCommand(), "-tvf", archivePath], {
 		stdout: "pipe",
 		stderr: "pipe",
 	})

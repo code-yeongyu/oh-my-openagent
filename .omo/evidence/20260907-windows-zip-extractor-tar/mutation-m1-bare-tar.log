@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\utils\src\zip-entry-listing\windows-system-tar.test.ts:
+(pass) windows system tar > #given a non-Windows platform #when the zip tar command is resolved #then it stays the bare name [58.05ms]
+33 | 		}
+34 | 		const emptyDirectory = mkdtempSync(join(tmpdir(), "zip-tar-no-path-"))
+35 | 
+36 | 		try {
+37 | 			// when
+38 | 			const version = execFileSync(zipTarCommand(), ["--version"], {
+                        ^
+error: Executable not found in $PATH: "tar"
+      at execFileSync (node:child_process:271:14)
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\utils\src\zip-entry-listing\windows-system-tar.test.ts:38:20)
+(fail) windows system tar > #given a PATH that cannot resolve tar #when the zip tar command runs #then it is still the Windows bsdtar [13.32ms]
+(pass) windows system tar > #given a SystemRoot without a System32 tar #when the zip tar command is resolved #then it falls back to the bare name [9.85ms]
+
+ 2 pass
+ 1 fail
+ 2 expect() calls
+Ran 3 tests across 1 file. [2.97s]
+EXIT=1

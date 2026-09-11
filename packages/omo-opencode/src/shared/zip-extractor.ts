@@ -11,6 +11,8 @@ import {
 	listZipEntriesWithPython,
 	listZipEntriesWithTar,
 	listZipEntriesWithZipInfo,
+	windowsSystemTarPath,
+	zipTarCommand,
 } from "./zip-entry-listing"
 
 const WINDOWS_BUILD_WITH_TAR = 17134
@@ -39,7 +41,7 @@ function escapePowerShellPath(path: string): string {
 function getWindowsZipExtractor(): "tar" | PowerShellZipExtractor {
   const buildNumber = getWindowsBuildNumber()
   
-  if (buildNumber !== null && buildNumber >= WINDOWS_BUILD_WITH_TAR) {
+  if (buildNumber !== null && buildNumber >= WINDOWS_BUILD_WITH_TAR && windowsSystemTarPath() !== null) {
     return "tar"
   }
   
@@ -61,7 +63,7 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
     
     switch (extractor) {
       case "tar":
-        proc = spawn(["tar", "-xf", archivePath, "-C", destDir], {
+        proc = spawn([zipTarCommand(), "-xf", archivePath, "-C", destDir], {
           stdout: "ignore",
           stderr: "pipe",
         })

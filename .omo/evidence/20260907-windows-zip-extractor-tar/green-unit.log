@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-opencode\src\shared\archive-entry-validator.test.ts:
+(pass) validateArchiveEntries > rejects absolute paths and traversal entries [2.59ms]
+(pass) validateArchiveEntries > rejects symlink targets that escape the extraction directory [2.58ms]
+(pass) validateArchiveEntries > rejects hard-link targets that escape the extraction directory [1.06ms]
+(pass) validateArchiveEntries > accepts contained files, directories, and symlinks [1.23ms]
+
+packages\utils\src\zip-entry-listing\powershell-zip-entry-listing.test.ts:
+(pass) parsePowerShellZipEntryLine > #given a json entry line with tab characters in the file name > #when parsing and validating the entry #then preserves the full path for traversal checks [4.22ms]
+
+packages\utils\src\zip-entry-listing\tar-zip-entry-listing.test.ts:
+(pass) parseTarListingOutput > #given a tar listing line with trailing filename whitespace > #when parsing the line #then preserves the original trailing whitespace [7.09ms]
+(pass) parseTarListingOutput > #given tar output with any unparsed lines > #when parsing the output #then throws immediately (fail-closed) [3.26ms]
+(pass) parseTarListingOutput > #given tar output with multiple unparsed lines > #when parsing the output #then throws with count details [3.01ms]
+(pass) parseTarListingOutput > #given tar output where every non-empty line is unparsed > #when parsing the output #then rejects the listing [2.96ms]
+
+packages\utils\src\zip-entry-listing\windows-system-tar.test.ts:
+(pass) windows system tar > #given a non-Windows platform #when the zip tar command is resolved #then it stays the bare name [2.27ms]
+(pass) windows system tar > #given a PATH that cannot resolve tar #when the zip tar command runs #then it is still the Windows bsdtar [30.53ms]
+(pass) windows system tar > #given a SystemRoot without a System32 tar #when the zip tar command is resolved #then it falls back to the bare name [1.64ms]
+
+packages\utils\src\zip-entry-listing\zipinfo-zip-entry-listing.test.ts:
+(pass) parseZipInfoListedEntry > #given a zipinfo listing line with trailing filename whitespace > #when parsing the line #then preserves the original trailing whitespace [1.53ms]
+
+ 13 pass
+ 0 fail
+ 18 expect() calls
+Ran 13 tests across 5 files. [2.26s]
+EXIT=0

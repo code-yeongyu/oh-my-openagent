@@ -1,0 +1,15 @@
+GNU: tar (GNU tar) 1.35
+BSD: bsdtar 3.8.4 - libarchive 3.8.4 zlib/1.2.13.1-motley liblzma/5.8.1 bz2lib/1.0.8 libzstd/1.5.7 cng/2.0 libb2/bundled 
+zip built: true
+
+--- shipped shape on the win32 branch: spawn(['tar','-xf',archivePath,'-C',destDir]) ---
+bsdtar   (what the code assumes)       -> exit 0 | dest=["payload"]
+GNU tar  (what Git Bash puts on PATH)  -> exit 128, /usr/bin/tar: Cannot connect to C: resolve failed | dest=[]
+
+--- listZipEntriesWithTar shape: tar -tf archive ---
+bsdtar  -tf zip -> exit 0 | dest=[]
+GNU tar -tf zip -> exit 128, /usr/bin/tar: Cannot connect to C: resolve failed | dest=[]
+
+--- does GNU tar fail on the zip format itself, or only on the drive letter? ---
+GNU tar -xf RELATIVE zip from its dir -> exit 2, /usr/bin/tar: This does not look like a tar archive | dest=[]
+EXIT=0
