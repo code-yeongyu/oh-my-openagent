@@ -3,7 +3,7 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
-import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
+import type { ResolvedModelRecord, RetainTranscriptMark, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type {
   CancelOptions,
   CancelOutcome,
@@ -76,6 +76,9 @@ export type ManagerStartSpec = {
   readonly instructions?: string
   readonly allowed_subagents?: readonly string[]
   readonly run_in_background?: boolean
+  // Durable per-task transcript-retention mark from the task tool's `retain_transcript` param:
+  // true (full), "metadata" (manifest only), false (never).
+  readonly retain_transcript?: RetainTranscriptMark
   readonly memberScopedTools?: readonly ToolDefinition[]
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>

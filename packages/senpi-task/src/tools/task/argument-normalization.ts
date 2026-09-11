@@ -1,4 +1,5 @@
 import { clampTaskSummary } from "../../task-summary"
+import type { RetainTranscriptMark } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
 type TaskItem = NonNullable<TaskToolParamsStatic["tasks"]>[number]
@@ -45,6 +46,7 @@ function taskItem(value: unknown): TaskItem | undefined {
   const model = identifier(value.model)
   const loadSkills = stringList(value.load_skills)
   const runInBackground = booleanFlag(value.run_in_background)
+  const retainTranscript = retainMark(value.retain_transcript)
 
   return {
     prompt,
@@ -56,11 +58,19 @@ function taskItem(value: unknown): TaskItem | undefined {
     ...(model === undefined ? {} : { model }),
     ...(loadSkills === undefined ? {} : { load_skills: loadSkills }),
     ...(runInBackground === undefined ? {} : { run_in_background: runInBackground }),
+    ...(retainTranscript === undefined ? {} : { retain_transcript: retainTranscript }),
   }
 }
 
 function booleanFlag(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined
+}
+
+// Retention marks are `true` / `false` / "metadata"; anything else (including "full", numbers)
+// normalizes away so the strict TypeBox schema stays the single rejection surface.
+function retainMark(value: unknown): RetainTranscriptMark | undefined {
+  if (value === true || value === false || value === "metadata") return value
+  return undefined
 }
 
 function taskItems(value: unknown): TaskItem[] | undefined {
@@ -94,6 +104,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
   const model = identifier(raw.model)
   const loadSkills = stringList(raw.load_skills)
   const runInBackground = booleanFlag(raw.run_in_background)
+  const retainTranscript = retainMark(raw.retain_transcript)
 
   return {
     ...(prompt === undefined ? {} : { prompt }),
@@ -102,6 +113,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
     ...(category === undefined ? {} : { category }),
     ...(subagentType === undefined ? {} : { subagent_type: subagentType }),
     ...(runInBackground === undefined ? {} : { run_in_background: runInBackground }),
+    ...(retainTranscript === undefined ? {} : { retain_transcript: retainTranscript }),
     ...(name === undefined ? {} : { name }),
     ...(model === undefined ? {} : { model }),
     ...(loadSkills === undefined ? {} : { load_skills: loadSkills }),

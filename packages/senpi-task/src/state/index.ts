@@ -18,6 +18,7 @@ export type {
   ResidencyState,
   ResolvedModelRecord,
   ResolvedModelSource,
+  RetainTranscriptMark,
   SpawnSpecV1,
   TaskNotification,
   TaskRecord,

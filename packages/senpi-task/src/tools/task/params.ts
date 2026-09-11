@@ -26,6 +26,11 @@ export const TaskToolParams = Type.Object({
   run_in_background: Type.Optional(
     Type.Boolean({ description: "true (the standard spawn) returns the task id now and delivers the child's result later as a message; false blocks this turn until the child finishes. Omitted counts as false." }),
   ),
+  retain_transcript: Type.Optional(
+    Type.Union([Type.Boolean(), Type.Literal("metadata")], {
+      description: "Opt this task into the bounded local retention archive (only effective when the user enabled task.transcript_retention in omo.json). true: archive the compressed visible transcript when the task record expires. \"metadata\": archive the metadata manifest only - never transcript content - the mode for protected work such as clinical content. false: never archive, even under a retention category rule. Omitted: the configured category rule decides (and metadata_only_paths may still downgrade to metadata-only).",
+    }),
+  ),
   name: Type.Optional(Type.String({ description: "Optional stable name for this task within the current session; must be unique within the session." })),
   model: Type.Optional(Type.String({ description: "Explicit model override, e.g. anthropic/claude-opus-4. Only valid with subagent_type; mutually exclusive with category — category-routed tasks take their model from omo.json (categories.<name>.models)." })),
   load_skills: Type.Optional(
@@ -52,6 +57,11 @@ export const TaskToolParams = Type.Object({
         run_in_background: Type.Optional(
           Type.Boolean({
             description: "Mirror of the batch-wide run_in_background flag. Every item that sets it must agree with the top-level value and with each other; prefer setting run_in_background once at the top level.",
+          }),
+        ),
+        retain_transcript: Type.Optional(
+          Type.Union([Type.Boolean(), Type.Literal("metadata")], {
+            description: "Per-item transcript-retention mark; an item that sets it wins over the top-level value.",
           }),
         ),
       }),

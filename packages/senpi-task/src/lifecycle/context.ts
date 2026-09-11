@@ -2,6 +2,7 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecordStore } from "../store"
+import { createTranscriptArchiveWriter, type TranscriptArchiveWriter } from "../retention/writer"
 import { injectedLifecycleReattachPorts } from "./port"
 import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
 import type { BatchAdmissionOptions } from "./residency"
@@ -25,6 +26,7 @@ export type LifecycleContext = {
   readonly reattachPorts: LifecycleReattachPorts | undefined
   readonly reconcileAdmission: BatchAdmissionOptions
   readonly idleReclaimerScheduler: IdleReclaimerScheduler
+  readonly transcriptArchive: TranscriptArchiveWriter | undefined
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
@@ -49,11 +51,13 @@ export const defaultSignaller: ProcessSignaller = {
 }
 
 export function resolveContext(deps: LifecycleDeps): LifecycleContext {
+  const now = deps.now ?? Date.now
+  const retentionSettings = deps.config.transcript_retention
   return {
     store: deps.store,
     registry: deps.registry,
     config: deps.config,
-    now: deps.now ?? Date.now,
+    now,
     signaller: deps.signaller ?? defaultSignaller,
     orphanKillDelayMs: deps.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS,
     hostPid: deps.hostPid ?? process.pid,
@@ -61,6 +65,15 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     reattachPorts: injectedLifecycleReattachPorts(deps),
     reconcileAdmission: deps.reconcileAdmission ?? {},
     idleReclaimerScheduler: deps.idleReclaimerScheduler ?? defaultIdleReclaimerScheduler,
+    transcriptArchive:
+      deps.transcriptArchiveDir !== undefined && retentionSettings?.enabled === true
+        ? createTranscriptArchiveWriter({
+            stateDir: deps.store.stateDir,
+            archiveDir: deps.transcriptArchiveDir,
+            settings: retentionSettings,
+            now,
+          })
+        : undefined,
   }
 }
 

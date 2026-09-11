@@ -180,7 +180,17 @@ export type TaskRecordInput = {
   // background, or promoted to background mid-run. `notify_on_terminal` alone cannot tell the
   // last two apart. Absent on records persisted before the mode shipped.
   readonly background_mode?: BackgroundMode
+  // Durable per-task transcript-retention mark set at spawn (task tool `retain_transcript`).
+  // true: archive the visible transcript when the TTL sweep expunges the record (explicit
+  // opt-in). "metadata": archive the metadata manifest only - never transcript content - the
+  // mode a protected task (e.g. clinical content) uses to keep an audit trail without retaining
+  // sensitive text. false: never archive, even when a retention category rule would select it.
+  // Absent: the config category rule decides (and metadata_only_paths may still downgrade it).
+  readonly retain_transcript?: RetainTranscriptMark
 }
+
+// Per-task transcript-retention mark: full opt-in, metadata-only opt-in, or hard exclusion.
+export type RetainTranscriptMark = boolean | "metadata"
 
 export type TaskRecord = TaskRecordInput & {
   readonly task_id: string
