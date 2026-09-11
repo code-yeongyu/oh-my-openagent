@@ -1,0 +1,33 @@
+# End-to-end execution of BOTH release steps, taken VERBATIM from the workflow.
+# The step bodies were extracted with Bun.YAML.parse(publish.yml).jobs.release.steps (never
+# hand-copied), written to disk, and run with `bash` against a stubbed `gh` plus the REAL
+# script/release-latest-flag.ts. mengmotaMac via bunshin; bun by absolute path; dir swept.
+#
+# Purpose: prove the added `set -euo pipefail` is safe for these exact bodies. `set -u` is the
+# real risk - an unset variable would now abort a release - so each step ran with ONLY the
+# variables it declares in `env:` (omo: VERSION, GH_TOKEN / lazycodex: + PREVIOUS_LAZYCODEX_VERSION).
+
+declared env per step:
+  Create GitHub release          -> ["VERSION","GH_TOKEN"]
+  Create LazyCodex GitHub release -> ["VERSION","PREVIOUS_LAZYCODEX_VERSION","GH_TOKEN"]
+
+omo step, healthy, VERSION=4.19.5 (older line than the published beta.40):
+  OMO_OLD_EXIT=0
+  CREATED release create v4.19.5 --latest=false --title v4.19.5 --notes-file /tmp/changelog.md
+  -> an older-line hotfix does NOT take the Latest badge. This is the defect this PR fixes.
+
+omo step, healthy, VERSION=5.0.0-beta.41 (highest):
+  OMO_NEW_EXIT=0
+  CREATED release create v5.0.0-beta.41 --latest --title v5.0.0-beta.41 --notes-file /tmp/changelog.md
+
+omo step, `gh release list` fails:
+  OMO_FAIL_EXIT=1   MARKER=[]   -> aborts, creates nothing (no silent wrong badge)
+
+lazycodex step, healthy, VERSION=5.0.0 PREVIOUS_LAZYCODEX_VERSION=4.19.4:
+  LAZY_EXIT=0
+  CREATED release create v5.0.0 --latest --repo code-yeongyu/lazycodex --target main --title v5.0.0 --notes-file /tmp/lazycodex-release-notes.md
+
+# Conclusions: `set -u` does not break either body with its declared env; the
+# `gh release view ... || gh release create ...` idiom still works under `set -e`; the flag is
+# placed correctly in both command lines; and the LazyCodex step resolves against its own repo.
+workspace swept: CLEANED=yes

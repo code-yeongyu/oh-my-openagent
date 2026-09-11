@@ -1,0 +1,71 @@
+{
+  "task": 4,
+  "task_id": "st_01a08166",
+  "status": "done; uncommitted fix ready for gate-a5",
+  "outcome": "Fixed verify-a4's quoted agents.max_threads migration defect and the installer mirror's inline-commented managed-cap removal defect.",
+  "baseline_head": "38718c52acf9987d59dc48281b7777f283475760",
+  "changed_files": [
+    "packages/omo-codex/plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs",
+    "packages/omo-codex/plugin/scripts/migrate-codex-config/toml-section-editor.mjs",
+    "packages/omo-codex/src/install/codex-multi-agent-v2-config.ts",
+    "packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts",
+    "packages/omo-codex/plugin/test/subagent-limit-migration.test.mjs",
+    "packages/omo-codex/scripts/install-dist/install-local.mjs"
+  ],
+  "decision": "Reused the migration's existing semantic TOML remover instead of adding quote-specific regexes or reserializing TOML. Its one-line helper change permits value-independent removal only for the retained V2 incompatible-key exception. Installer key matching is separated from trimmed value matching, fixing inline comments while preserving formatting and unrelated settings.",
+  "assumption": "Retained the binding plan and verify-a4's existing V2 exception: incompatible agents.max_threads is removed under V2. Outside that exception, removal matches only 1000 for agents and 1000/16 for max_concurrent; other values are preserved, never raised.",
+  "red_proof": {
+    "machine": "mengmotaMac macos/aarch64",
+    "setup": "Resolved bunshin SDK via resolve-repo.sh, called listMachines(), cloned the pushed branch, overlaid only the two new test files, and ran bun install --frozen-lockfile successfully before production edits.",
+    "installer": "bun test ./packages/omo-codex/src/install -> TEST_EXIT=1; 330 pass, 1 existing Windows-only skip, 4 new failures for inline-commented managed caps.",
+    "migration": "cd packages/omo-codex/plugin && node --test test/subagent-limit-migration.test.mjs test/migrate-codex-config.test.mjs -> TEST_EXIT=1; 77 pass, 4 new failures for double/single/escaped quoted V2 agents caps and the exact verify-a4 file input.",
+    "installer_output_sha256": "44cbb6920a89e34793aa77faa61987e2b5d579659972368cdd40b86678627690",
+    "migration_output_sha256": "3071ac5d64cb01349d5710b9bc55d0b27d77980b02b7366c8360002eb424919a",
+    "driver_note": "The driver expected installer RED exit 0 based on previous verifier evidence, then reported an expectation error after capturing both genuine failing suites. No RED rerun was needed; the newly exposed installer bug was fixed. Tests were unchanged between RED and GREEN."
+  },
+  "green_proof": {
+    "machine": "mengmotaMac macos/aarch64",
+    "installer": "bun test ./packages/omo-codex/src/install -> TEST_EXIT=0; 334 pass, 1 existing Windows-only skip, 0 fail.",
+    "migration": "cd packages/omo-codex/plugin && node --test test/subagent-limit-migration.test.mjs test/migrate-codex-config.test.mjs -> TEST_EXIT=0; 81 pass, 0 fail.",
+    "freshness": "bun test ./script/codex-install-bundle-freshness.test.ts -> TEST_EXIT=0; 2 pass, 0 fail. Uploaded rebuilt bundle was staged only in the disposable remote index; no commit was created.",
+    "installer_output_sha256": "f6f7cb652ab240030f14026417db4e164393a4a4e34bd4a3ac81fb7d63671744",
+    "migration_output_sha256": "c6bc1e7fb6edc5628159da2a809978f6a7f19bce4db93dd45ee3205644ef539c",
+    "freshness_output_sha256": "255e60dfa2a55b5cbff28a26cf88c26d9a7d2df39e17f1f83d6e857cef91685a",
+    "single_run": true
+  },
+  "local_validation": {
+    "typecheck": "./node_modules/.bin/tsgo --noEmit -p packages/omo-codex/tsconfig.json -> TSGO_EXIT=0",
+    "diagnostics": "All six changed code/test/generated files: No diagnostics found.",
+    "syntax": "node --check on both migration production files and the migration test -> NODE_CHECK_EXIT=0",
+    "source_diff": "Scoped git diff --check on code/tests/bundle -> SOURCE_DIFF_CHECK_EXIT=0",
+    "evidence_validation": "Python JSON parsing and independent rehashing passed: ALL_9_REMOTE_OUTPUT_HASHES_MATCH; BUNDLE_SHA256_MATCH.",
+    "json_diagnostics": "DoneClaim JSON LSP unavailable because biome is not installed; JSON syntax validated with Python instead. No dependency changes made."
+  },
+  "bundle": {
+    "build": "bun run build:codex-install -> BUILD_EXIT=0; regenerated, never hand-edited; bundle diff is 5 insertions and 6 deletions.",
+    "validation": "SOURCE_AND_BODY_MATCH",
+    "source_digest": "dd6a563800e30ce8e45f73e631a566e5e525285c2e2049577b5f004bf9d9710a",
+    "body_digest": "010968b6b9a972f6d2e1f7d6c4c784d43c54190839385b3ad6eaf734a1d6fef0",
+    "sha256": "a9948ca62e555cf073f8f00c4fa317259360c2d5c41e135c975c2e1dff74f16a"
+  },
+  "manual_qa": {
+    "surface": "codex-qa common.sh isolated homes, real installer wrapper using the rebuilt bundle, and migration CLI; installed Codex reports 0.147.0.",
+    "managed": "Quoted agents 1000 and quoted V2 16 with inline comments removed by both migration and installer; max_depth=4 and plugin enablement preserved.",
+    "custom": "Quoted V1 agents 16 and V2 cap 8 preserved by both migration and installer; explicit enabled=false retained.",
+    "result": "Both migrations and both installs exited 0; all parsed-config assertions passed; MANUAL_QA_EXIT=0.",
+    "real_config_sha1_before": "b012e531f5aa9fb1bce9003593c3eadf07081fcd",
+    "real_config_sha1_after": "b012e531f5aa9fb1bce9003593c3eadf07081fcd"
+  },
+  "evidence": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-astra-default-models/.omo/evidence/20260908-lcx-astra/task-4-red-green.log",
+  "evidence_contract": "Appended full remote stdout decoded from SDK read() bytes, verified SHA256 receipts, commands with tail -150 and PIPESTATUS, RED/GREEN summaries, local outputs, seeded manual QA outputs, and the executed QA driver. Earlier sections remain historical.",
+  "cleanup": [
+    "mengmotaMac: dir REMOVED: /tmp/lcx-fix4b-20260908; CLEANUP_EXIT=0",
+    "Both isolated codex-qa homes removed with receipts.",
+    "Local index unchanged and HEAD remains baseline; no commit, push, checkout or stash performed.",
+    "No main-checkout or shared-skills edits; protected shared-skills status is empty. Concurrent todo-3/todo-6 changes were left untouched."
+  ],
+  "limitations": [
+    "No local bun test, bun run test:*, agentic probes, live model turns, or full test:codex run; broader gates and committing the rebuilt bundle belong to gate-a5.",
+    "Raw Node RED output retains trailing whitespace for byte-exact evidence. Unfiltered git diff --check reports that evidence whitespace, plus another worker's log; scoped product/test/bundle whitespace validation passes."
+  ]
+}

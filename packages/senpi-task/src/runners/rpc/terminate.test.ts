@@ -93,6 +93,7 @@ describe("terminateRpcChild", () => {
       await terminateRpcChild(child, { sigkillDelayMs: 150 })
 
       // then
+      await waitUntilStopped(descendantPid)
       expect(isRunning(descendantPid)).toBe(false)
     } finally {
       if (isRunning(descendantPid)) {
@@ -101,6 +102,13 @@ describe("terminateRpcChild", () => {
     }
   })
 })
+
+async function waitUntilStopped(pid: number): Promise<void> {
+  const deadline = Date.now() + 2_000
+  while (isRunning(pid) && Date.now() < deadline) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 10))
+  }
+}
 
 function isRunning(pid: number): boolean {
   if (!isWin32) {

@@ -62,7 +62,8 @@ function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: num
   if (context.registry.get(record.task_id) !== undefined) return true
   if (hasLiveHostClaim(context, record)) return true
   if (!TERMINAL_STATUSES.has(record.status)) return true
-  if (Date.parse(record.updated_at) > cutoff) return true
+  const retainedAt = record.terminal_at ?? record.updated_at
+  if (Date.parse(retainedAt) > cutoff) return true
   if (hasUndeliveredTerminalNotification(record)) return true
   if (record.status === "lost" && record.execution_mode === "process") {
     // The lost-record pid-dead proof rule: breadcrumbs are kept until the process is proven dead.

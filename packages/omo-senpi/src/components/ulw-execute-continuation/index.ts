@@ -1,6 +1,7 @@
 import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { readAgentEndOutcome } from "./agent-end-eligibility"
 import { findContinuableBoulderWork } from "./boulder-eligibility"
 
 export interface UlwExecuteContinuationComponentOptions {
@@ -11,7 +12,7 @@ const CONTINUATION_LIMIT = 8
 
 const ULW_EXECUTE_STEERING_REMINDER = [
   "<omo-senpi-ulw-execute>",
-  "An active Prometheus ulw-execute plan is present in this working directory.",
+  "An active ulw-execute work plan is present in this working directory.",
   "Before continuing, read `.omo/boulder.json` and the active plan file to determine what remains; use the ledger and plan as the source of truth.",
   "Continue the current work with evidence-bound execution; do not start unrelated work until every top-level checkbox is `- [x]`.",
   "</omo-senpi-ulw-execute>",
@@ -37,6 +38,8 @@ export function createUlwExecuteContinuationComponent(
       const state = {
         consecutiveContinuations: 0,
         lastSignature: undefined as string | undefined,
+        // This run's agent_end payload and session identity. The decision runs on agent_settled.
+        pendingRun: undefined as { payload: unknown; sessionId: string | undefined; cwd: string | undefined } | undefined,
       }
 
       pi.on("input", async (payload, eventCtx) => {
@@ -45,6 +48,7 @@ export function createUlwExecuteContinuationComponent(
 
         state.consecutiveContinuations = 0
         state.lastSignature = undefined
+        state.pendingRun = undefined
         if (payload.streamingBehavior === undefined) return { action: "continue" }
 
         const sessionId = extractSessionId(eventCtx)
@@ -61,7 +65,29 @@ export function createUlwExecuteContinuationComponent(
         }
       })
 
-      pi.on("agent_end", async (_payload, eventCtx) => {
+      // Record only: the outcome is decided on agent_settled, the host edge that guarantees no
+      // automatic retry, compaction or queued continuation will run, and the last point at which a
+      // late user abort can still have mutated this payload.
+      pi.on("agent_end", (payload, eventCtx) => {
+        state.pendingRun = { payload, sessionId: extractSessionId(eventCtx), cwd: extractCwd(eventCtx) }
+      })
+
+      pi.on("agent_settled", () => {
+        const run = state.pendingRun
+        state.pendingRun = undefined
+        if (run === undefined) return
+
+        const outcome = readAgentEndOutcome(run.payload)
+        if (outcome.blockedBy !== null) {
+          ctx.logger.info("omo-senpi ulw-execute-continuation skipped", {
+            reason: "terminal-outcome",
+            blockedBy: outcome.blockedBy,
+            stopReason: outcome.stopReason,
+            aborted: outcome.aborted,
+            willRetry: outcome.willRetry,
+          })
+          return
+        }
         if (state.consecutiveContinuations >= CONTINUATION_LIMIT) {
           ctx.logger.info("omo-senpi ulw-execute-continuation skipped", {
             reason: "continuation-cap-reached",
@@ -70,8 +96,7 @@ export function createUlwExecuteContinuationComponent(
           return
         }
 
-        const sessionId = extractSessionId(eventCtx)
-        const cwd = extractCwd(eventCtx)
+        const { sessionId, cwd } = run
         if (!sessionId || !cwd) {
           ctx.logger.info("omo-senpi ulw-execute-continuation skipped", { reason: "missing-context" })
           return
@@ -114,13 +139,19 @@ const ULW_EXECUTE_CONTINUATION_INJECTION_KEY = "omo-senpi-ulw-execute-continuati
 
 function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext, content: string): void {
   if (ctx.idleCoordinator !== undefined) {
-    ctx.idleCoordinator.enqueue({
+    const accepted = ctx.idleCoordinator.enqueue({
       key: ULW_EXECUTE_CONTINUATION_INJECTION_KEY,
       source: "boulder-continuation",
       customType: "omo-senpi:ulw-execute-continuation",
       content,
       display: false,
     })
+    // Refused = the coordinator retired with the session. The continuation is derived state, not a
+    // durable notification: the next boulder edge re-derives it. Log rather than drop in silence.
+    if (accepted === false) {
+      ctx.logger.warn("omo-senpi ulw execute continuation skipped: idle-injection coordinator retired")
+      return
+    }
     ctx.idleCoordinator.scheduleFlush()
     return
   }
@@ -157,7 +188,7 @@ function renderDirective(state: DirectiveState): string {
 
   return [
     "<omo-senpi-ulw-execute-continuation>",
-    "You are mid-flight on a Prometheus work plan; this turn is an automatic continuation. Do NOT ask whether to continue — the contract is auto-continue until every top-level checkbox is `- [x]`.",
+    "You are mid-flight on a ulw-execute work plan; this turn is an automatic continuation. Do NOT ask whether to continue — the contract is auto-continue until every top-level checkbox is `- [x]`.",
     "",
     "# State",
     "",

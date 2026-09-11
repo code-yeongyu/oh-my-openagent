@@ -1,0 +1,24 @@
+Content guardrail checks at HEAD 4ed7714fd (2026-09-10T07:43:22.326Z)
+
+--- history of touched files (last 6) ---
+4ed7714fd feat(shared-skills): route ambience and typographic motion to ambience-skill
+14fa65e1c feat(shared-skills): add a react-bits-anchored ambience reference
+279017261 refactor(skills): rewrite shipped skill descriptions as situation-led routing text
+e3cb1486d refactor(shared-skills): rename start-work skill to ulw-execute
+090b0d918 feat(frontend): route paged output to a print media reference
+2ff7f7da7 fix(frontend): route layout mechanics beside the pattern catalog
+--- precedent commits ---
+cdec4d8bc docs(web): rewrite DESIGN.md as the Phosphor Ledger redesign contract
+2ff7f7da7 fix(frontend): route layout mechanics beside the pattern catalog
+aa576072f fix(frontend): make routed references binding instead of advisory
+b280c3f6a feat(frontend): add StyleGallery spatial-structure reference
+6b57dc116 docs(shared-skills): index interaction-skill in the design reference directory
+--- guardrail: no emoji/hangul/code in new reference ---
+       0
+0
+--- guardrail: no YC/Gemini/MiniMax in touched files ---
+0
+--- mirror ---
+MIRROR-IDENTICAL
+--- pure LOC of new files ---
+      33

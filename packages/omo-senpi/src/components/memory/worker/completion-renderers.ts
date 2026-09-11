@@ -11,6 +11,7 @@ import {
   type ReflectionCompletionSummary,
   type ReflectionLaunchedEntry,
 } from "./completion-contracts"
+import { childFailureCause } from "./failure-detail"
 import { reflectionRemediation } from "./remediation"
 import {
   detailExcerpt,
@@ -72,7 +73,7 @@ export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletion
   const record = entry.data
   if (!record) return undefined
   const reason = optionalRendererText(record.reason)
-  const detail = optionalRendererText(record.detail)
+  const detail = optionalRendererText(childFailureCause(record.detail))
   const model = optionalRendererText(record.model)
   const thinking = optionalRendererText(record.thinking)
   const budgetRemediation = record.reason === "budget_not_met"

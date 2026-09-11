@@ -1,0 +1,73 @@
+{
+  "rollup": {
+    "variant": "new",
+    "request": "r1",
+    "samples": 3,
+    "background": 3,
+    "foreground_or_mixed": 0,
+    "no_task_call": 0,
+    "http_errors": 0,
+    "note": "reclassified offline with batch hoisting: a batch whose items all carry run_in_background=true and no top-level flag is hoisted to true by senpi-task validation (resolveRunInBackground)",
+    "reclassified_at": "2026-09-05T07:04:12.658027Z"
+  },
+  "rows": [
+    {
+      "sample": 1,
+      "http": 200,
+      "verdict": "background",
+      "task_calls": [
+        {
+          "run_in_background": true,
+          "top_level": "absent",
+          "item_flags": [
+            true,
+            true,
+            true
+          ],
+          "batch_size": 3,
+          "target": "deep+deep+deep"
+        }
+      ],
+      "other_tool_calls": []
+    },
+    {
+      "sample": 2,
+      "http": 200,
+      "verdict": "background",
+      "task_calls": [
+        {
+          "run_in_background": true,
+          "top_level": "absent",
+          "item_flags": [
+            true,
+            true,
+            true
+          ],
+          "batch_size": 3,
+          "target": "deep+deep+deep"
+        }
+      ],
+      "other_tool_calls": []
+    },
+    {
+      "sample": 3,
+      "http": 200,
+      "verdict": "background",
+      "task_calls": [
+        {
+          "run_in_background": true,
+          "top_level": "absent",
+          "item_flags": [
+            true,
+            true,
+            true
+          ],
+          "batch_size": 3,
+          "target": "deep+deep+deep"
+        }
+      ],
+      "other_tool_calls": []
+    }
+  ],
+  "request_text": "We are in the oh-my-openagent monorepo (packages/senpi-task, packages/omo-senpi, packages/omo-opencode). Three independent research tracks, then a combined report: (1) find every test file under packages/senpi-task that uses fixed sleeps or timers to wait for async behavior and list them with line numbers; (2) explain how packages/omo-opencode delivers background task completions to the parent session, citing files; (3) list every changes.md and CHANGELOG.md tracker in the repo with the path each one covers. Hand each track to a subagent, then write the combined report. Also: I want the ultrabrain category to review the combined report before you finish."
+}

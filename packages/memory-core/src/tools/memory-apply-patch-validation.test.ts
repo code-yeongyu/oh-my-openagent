@@ -95,7 +95,7 @@ describe("memoryApplyPatch validation failures", () => {
 
     // #then
     expect(error.message).toBe([
-      "memory_apply_patch: failed to apply hunk to system/fenced.md: context not found",
+      "memory apply_patch: failed to apply hunk to system/fenced.md: context not found",
       "",
       "The patch old/context lines did not match the current memory file exactly.",
       "Read the current memory file and retry with exact context.",

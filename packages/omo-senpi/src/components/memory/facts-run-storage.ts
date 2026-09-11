@@ -17,7 +17,7 @@ import { cleanupTerminalFactsRun, type RemoveRunArtifact } from "./facts-run-cle
 import type { FactsQueuedKey } from "./facts-failure-recording"
 import type { FactsFinalRecord, FactsLaunchResult, FactsRunLedger } from "./facts-runner-types"
 
-const DEFAULT_DEADLINE_MS = 15 * 60_000
+export const FACTS_DEADLINE_MS = 15 * 60_000
 const DEFAULT_GRACE_MS = 5_000
 const RUNS_LOCK_WAIT_MS = 2_000
 
@@ -62,7 +62,7 @@ async function claimFactsRunDir(options: {
     const runDir = join(runsDir, `facts-${digest}-${attempt}`)
     try {
       await mkdir(runDir, { mode: 0o700 })
-      const deadlineMs = options.deadlineMs ?? DEFAULT_DEADLINE_MS
+      const deadlineMs = options.deadlineMs ?? FACTS_DEADLINE_MS
       const terminationGraceMs = options.terminationGraceMs ?? DEFAULT_GRACE_MS
       try {
         await writeRunJsonAtomic(join(runDir, "ledger.json"), {

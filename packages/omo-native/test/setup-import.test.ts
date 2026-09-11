@@ -10,6 +10,10 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { teardownRoots, withDatabase } from "./teardown.test-support"
 
+function sqlLiteral(value: string | null): string {
+  return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`
+}
+
 // Older Bun runtimes ship no node:sqlite at all, so the module loads lazily and the fixtures that
 // need a real database skip there. Production degrades the same way: setup-import.js reports the
 // database credentials as not imported when the import throws. The pinned CI runtime is now Bun
@@ -39,6 +43,9 @@ const secrets = [
 ]
 
 type Fixture = { root: string; home: string; agentDir: string; xdg: string; launcher: string }
+type DatabaseHandle = { readonly isOpen: boolean }
+
+const databaseHandles: DatabaseHandle[] = []
 
 function write(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -48,10 +55,12 @@ function write(path: string, content: string): void {
 async function database(path: string, version: number, rows: Array<[string, string, string, string | null]>): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
+  const db = new DatabaseSync(path)
+  databaseHandles.push(db)
   // withDatabase closes the handle on every exit path (including a throwing exec/run) and tracks it
   // for teardown, so no Windows file handle inside the temp root can outlive the fixture.
-  withDatabase(new DatabaseSync(path), (db) => {
-    db.exec(`
+  withDatabase(db, (database) => {
+    database.exec(`
       CREATE TABLE auth_schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL);
       INSERT INTO auth_schema_version VALUES (1, ${version});
       CREATE TABLE auth_credentials (
@@ -59,9 +68,11 @@ async function database(path: string, version: number, rows: Array<[string, stri
         data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
       );
     `)
-    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
+    // exec() with literal values: a prepared INSERT would leave this writer's handle open past
+    // close() under Bun 1.4 (oven-sh/bun#40001), and the reader that opens the same file next
+    // would then block on the Windows file lock.
     for (const [provider, type, key, disabled] of rows) {
-      insert.run(provider, type, JSON.stringify({ key }), disabled)
+      database.exec(`INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, ${sqlLiteral(JSON.stringify({ key }))}, ${sqlLiteral(disabled)})`)
     }
   })
 }
@@ -131,6 +142,7 @@ afterEach(() => {
   } finally {
     // A leaking-secret assertion must not also leak the temp roots for the rest of the run.
     transcripts.length = 0
+    databaseHandles.length = 0
     teardownRoots(roots)
   }
 })
@@ -187,6 +199,7 @@ describe("omo setup credential inheritance", () => {
     expect(unknownResult.status).toBe(0)
     expect(unknownResult.stdout).toContain("auth schema version 99 is unknown")
     expect(existsSync(join(unknown.agentDir, "auth.json"))).toBe(false)
+    expect(databaseHandles.map((database) => database.isOpen)).toEqual([false, false, false])
   })
 
   test("#given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical", () => {

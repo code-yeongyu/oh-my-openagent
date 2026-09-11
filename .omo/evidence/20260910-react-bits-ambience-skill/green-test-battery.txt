@@ -1,0 +1,206 @@
+GREEN — full battery output, run on a fleet compute node (bun 1.4.2, worktree of the repository checkout at branch HEAD, bun install --frozen-lockfile). Paths and machine names sanitized at capture.
+Command: bun test packages/shared-skills packages/skills-loader-core/src/features/builtin-skills packages/omo-opencode/src/shared-skills-package.test.ts
+
+4ed7714fd
+bun test v1.4.2 (744846f84)
+
+packages/shared-skills/materialize-frontend-refs.test.ts:
+[materialize] wrote 148 frontend reference files from submodules
+(pass) materialize-frontend-refs > materializes the full third-party reference set when submodules are present [0.66ms]
+(pass) materialize-frontend-refs > reproduces every brand design file and the ui-ux-db scripts [0.19ms]
+(pass) materialize-frontend-refs > materializes the designpowers reference corpus [0.12ms]
+(pass) materialize-frontend-refs > materialized designpowers skills have YAML-safe frontmatter [4.13ms]
+(pass) materialize-frontend-refs > materializes designpowers skills as references instead of nested skill entrypoints [0.15ms]
+(pass) materialize-frontend-refs > recognizes upstream skill sources across platform path separators [0.05ms]
+(pass) materialize-frontend-refs > materializes every taste-skill artifact byte-identical to its upstream source [0.11ms]
+(pass) materialize-frontend-refs > materialized brand reference is byte-identical to its upstream source [0.10ms]
+(pass) materialize-frontend-refs > missing submodule is a soft skip in non-strict mode [0.06ms]
+
+packages/shared-skills/upstreams.test.ts:
+(pass) frontend upstream provenance submodules > declares all 4 frontend content upstreams [0.08ms]
+(pass) frontend upstream provenance submodules > every submodule path is under packages/shared-skills/upstreams/ [0.05ms]
+(pass) frontend upstream provenance submodules > no submodule path references a skills/ directory [0.07ms]
+
+packages/shared-skills/frontend-ambience-routing.test.ts:
+(pass) #given the frontend skill routes hero atmosphere and typographic motion to the react-bits catalog > #when the manifest is read #then ambience-skill.md is a project-original design file [0.06ms]
+(pass) #given the frontend skill routes hero atmosphere and typographic motion to the react-bits catalog > #when the skill gitignore is read #then ambience-skill.md is un-ignored [0.17ms]
+(pass) #given the frontend skill routes hero atmosphere and typographic motion to the react-bits catalog > #when git lists the design references #then ambience-skill.md is tracked [14.57ms]
+
+packages/shared-skills/frontend-stylegallery-routing.test.ts:
+(pass) #given the frontend skill routes spatial-structure research to StyleGallery > #when the manifest is read #then stylegallery.md is a project-original design file [0.07ms]
+(pass) #given the frontend skill routes spatial-structure research to StyleGallery > #when the skill gitignore is read #then stylegallery.md is un-ignored [0.07ms]
+(pass) #given the frontend skill routes spatial-structure research to StyleGallery > #when git lists the design references #then stylegallery.md is tracked [10.11ms]
+
+packages/shared-skills/skill-source-filter.test.ts:
+(pass) createSkillSourceCopyFilter > #given a cache directory INSIDE the skill tree #when filtered #then it is skipped [0.21ms]
+(pass) createSkillSourceCopyFilter > #given an ignored directory name as an ANCESTOR of the skill root #when filtered #then files are still copied [0.12ms]
+(pass) createSkillSourceCopyFilter > #given the copy root itself #when filtered #then it is copied (fs.cp asks about the root first) [0.06ms]
+(pass) createSkillSourceCopyFilter > #given ignored file names and test files #when filtered #then they are skipped [0.07ms]
+(pass) createSkillSourceCopyFilter > #given scripts/tests #when filtered #then that subtree is skipped but a top-level tests dir is kept [0.06ms]
+(pass) createSkillSourceCopyFilter > #given extra ignored file names #when supplied #then they are honoured alongside the defaults [0.06ms]
+(pass) createSkillSourceCopyFilter > #given Windows separators #when filtered #then segments are still recognised [0.05ms]
+(pass) createSkillSourceCopyFilter > #given a path outside the copy root #when filtered #then it is never copied [0.05ms]
+
+packages/shared-skills/depersonalization-gate.test.ts:
+(pass) #given the vendored shared skills #when the de-personalization gate runs > #then the cleaned ultimate-browsing + ulw-research tree has zero violations [14.76ms]
+(pass) #given the vendored shared skills #when the de-personalization gate runs > #then a planted personal token (jobdori) is caught [0.60ms]
+(pass) #given the vendored shared skills #when the de-personalization gate runs > #then a credential literal and home path are caught but a kept tier name is not [0.39ms]
+
+packages/shared-skills/ultimate-browsing-runtime-pins.test.ts:
+(pass) ultimate-browsing Tier-2 runtime pins > #given the CloakBrowser pin > #then ATTRIBUTION.md pins the expected version [0.15ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the CloakBrowser pin > #then every chrome-stealth.md occurrence uses the same version [0.10ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the agent-browser pin > #then ATTRIBUTION.md pins the expected version [0.07ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the agent-browser pin > #then every chrome-stealth.md occurrence uses the same version [0.07ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the two documents together > #then no stale version string survives anywhere [0.06ms]
+(pass) ultimate-browsing Tier-2 runtime pins > #given the Playwright template manifest > #then the playwright range lower bound is current [0.07ms]
+
+packages/shared-skills/provenance-gate.test.ts:
+(pass) DMCA provenance gate > no third-party-derived reference file is committed [10.37ms]
+[materialize] wrote 148 frontend reference files from submodules
+(pass) DMCA provenance gate > materialization makes every third-party reference exist on disk [14.18ms]
+[materialize] wrote 148 frontend reference files from submodules
+(pass) DMCA provenance gate > designpowers skills match upstream after frontmatter normalization [33.10ms]
+(pass) DMCA provenance gate > each ATTRIBUTION pin equals the live submodule HEAD [43.88ms]
+(pass) DMCA provenance gate > no submodule gitlink lives under any shipped skills/ directory [0.17ms]
+
+packages/shared-skills/frontend-thirdparty-manifest.test.ts:
+(pass) frontend third-party manifest partition > removes every third-party-derived file from the committed tree [0.11ms]
+(pass) frontend third-party manifest partition > keeps every project-original design file tracked [0.06ms]
+(pass) frontend third-party manifest partition > unignores every project-original design file [0.08ms]
+(pass) frontend third-party manifest partition > no ui-ux-db file is committed [0.05ms]
+(pass) frontend third-party manifest partition > no designpowers vendor file is committed [0.05ms]
+(pass) frontend third-party manifest partition > third-party manifest covers design brand, taste-skill, ui-ux-db, and designpowers [0.09ms]
+
+packages/shared-skills/shared-skills-root-path.test.ts:
+(pass) sharedSkillsRootPath > #given the module beside its own skills directory #when the root is resolved #then the sibling directory wins [0.27ms]
+(pass) sharedSkillsRootPath > #given a bundle one level below the skills directory #when the root is resolved #then the parent directory is used [33.17ms]
+(pass) sharedSkillsRootPath > #given the Codex marketplace layout #when the root is resolved #then the skills directory two levels up is used [0.63ms]
+(pass) sharedSkillsRootPath > #given a nearer skills directory than the marketplace one #when the root is resolved #then the nearest wins [0.53ms]
+(pass) sharedSkillsRootPath > #given no skills directory beside or above the module #when the root is resolved #then the sibling path is still returned [0.34ms]
+
+packages/omo-opencode/src/shared-skills-package.test.ts:
+(pass) shared skills package manifest > #given root package metadata #when shared-skills package is required #then workspace and tarball entries include it [0.28ms]
+(pass) shared skills package manifest > #given shared user skills #when copied into the package #then frontmatter and resource directories are preserved [0.51ms]
+(pass) shared skills package manifest > #given coding-agent-sessions skill #when package exclusions are read #then dev fixtures and caches are excluded [0.36ms]
+
+packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts:
+(pass) shared builtin skill extraction > #given extracted builtin skill markdown #when compared to TS sources #then bodies and metadata stay byte-equivalent [1.90ms]
+(pass) shared builtin skill extraction > #given checked-in frontend builtin skill artifact #when compared to shared source #then it stays byte-equivalent [0.34ms]
+(pass) shared builtin skill extraction > #given shared skill frontmatter #when parsed for Codex #then metadata is valid and budgeted [5.24ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skills.test.ts:
+(pass) createBuiltinSkills > returns playwright skill by default [0.31ms]
+(pass) createBuiltinSkills > exports browser skill contracts with stable tool surfaces [0.05ms]
+(pass) createBuiltinSkills > returns playwright skill when browserProvider is 'playwright' [0.06ms]
+(pass) createBuiltinSkills > returns dev-browser skill when browserProvider is 'dev-browser' [0.08ms]
+(pass) createBuiltinSkills > returns agent-browser skill when browserProvider is 'agent-browser' [0.05ms]
+(pass) createBuiltinSkills > always includes frontend, git-master, review-work, shared skills, and runtime security skills [0.08ms]
+(pass) createBuiltinSkills > git-master skill keeps commit workflow phases in order [0.04ms]
+(pass) createBuiltinSkills > returns exactly 10 skills regardless of provider [0.04ms]
+(pass) createBuiltinSkills > should exclude playwright when it is in disabledSkills [0.07ms]
+(pass) createBuiltinSkills > should exclude multiple skills when they are in disabledSkills [0.07ms]
+(pass) createBuiltinSkills > should return an empty array when all skills are disabled [0.05ms]
+(pass) createBuiltinSkills > should return all 10 skills when disabledSkills set is empty [0.04ms]
+(pass) createBuiltinSkills > #given disabled_skills with debugging and visual-qa #when creating builtin skills #then both are filtered out [0.06ms]
+(pass) createBuiltinSkills > init-deep skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > debugging skill is available from shared template [0.04ms]
+(pass) createBuiltinSkills > review-work skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > review-work skill explains Codex tool compatibility before OpenCode orchestration examples [0.07ms]
+(pass) createBuiltinSkills > remove-ai-slops skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > security-research skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > security-review skill remains a runtime alias for security-research [0.05ms]
+(pass) createBuiltinSkills > returns playwright-cli skill when browserProvider is 'playwright-cli' [0.05ms]
+(pass) createBuiltinSkills > #given playwrightMcpArgs option #when creating builtin skills #then extra args are appended to the playwright MCP invocation [0.06ms]
+(pass) createBuiltinSkills > #given no playwrightMcpArgs option #when creating builtin skills #then the default MCP invocation is unchanged [0.05ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skill-file-loader.test.ts:
+(pass) shared builtin skill file loader > #given extracted shared skill files #when builtin skills are created #then templates load from SKILL.md bodies [0.40ms]
+(pass) shared builtin skill file loader > #given repeated loads #when using the same loader #then it reads each shared skill file once [0.08ms]
+(pass) shared builtin skill file loader > #given shared skills root #when loading shared skill templates #then the package root path resolves [0.07ms]
+(pass) shared builtin skill file loader > #given a missing shared skill file #when loading the template #then the loader fails fast [0.11ms]
+
+packages/shared-skills/skills/visual-qa/scripts/png-decode.test.ts:
+(pass) decodePng > #given an encoded RGBA image #when decoded #then dimensions and first pixel round-trip [1.68ms]
+(pass) decodePng > #given a fully opaque image #when decoded #then it has no transparent pixels [0.11ms]
+(pass) decodePng > #given a semi-transparent image #when decoded #then it reports transparent pixels [0.07ms]
+(pass) decodePng > #given a non-PNG buffer #when decoded #then it throws [0.07ms]
+
+packages/shared-skills/skills/visual-qa/scripts/tui-grid.test.ts:
+(pass) checkTui > #given ASCII lines within the width #when checked #then there is no overflow [0.20ms]
+(pass) checkTui > #given a line wider than the expected columns #when checked #then it is flagged as overflow [0.09ms]
+(pass) checkTui > #given CJK text #when checked #then wide characters count as two columns [0.07ms]
+(pass) checkTui > #given a box whose CJK content is wider than its border #when checked #then borders are misaligned [0.06ms]
+(pass) checkTui > #given a well-formed box #when checked #then borders are aligned [0.06ms]
+(pass) checkTui > #given text with ANSI color codes #when checked #then ANSI is detected and ignored for width [0.05ms]
+
+packages/shared-skills/skills/visual-qa/scripts/east-asian-width.test.ts:
+(pass) charWidth > #given an ASCII letter #when measured #then it is one column [0.04ms]
+(pass) charWidth > #given a Hangul syllable #when measured #then it is two columns [0.04ms]
+(pass) charWidth > #given a CJK ideograph #when measured #then it is two columns [0.04ms]
+(pass) charWidth > #given a fullwidth Latin letter #when measured #then it is two columns [0.04ms]
+(pass) charWidth > #given a halfwidth katakana #when measured #then it is one column [0.04ms]
+(pass) charWidth > #given a combining diacritic #when measured #then it is zero columns [0.04ms]
+(pass) charWidth > #given a zero-width space #when measured #then it is zero columns [0.04ms]
+(pass) charWidth > #given an emoji #when measured #then it is two columns [0.04ms]
+(pass) stringWidth > #given an ASCII string #when measured #then width equals character count [0.04ms]
+(pass) stringWidth > #given Hangul text #when measured #then each syllable counts as two [0.04ms]
+(pass) stringWidth > #given CJK text #when measured #then each ideograph counts as two [0.05ms]
+(pass) stringWidth > #given a base letter plus a combining mark #when measured #then it is one column [0.04ms]
+(pass) stringWidth > #given mixed ASCII and CJK #when measured #then widths add up [0.04ms]
+
+packages/shared-skills/skills/visual-qa/scripts/ansi.test.ts:
+(pass) stripAnsi > #given an ANSI-wrapped string #when stripped #then escape codes are removed [0.05ms]
+(pass) stripAnsi > #given a plain string #when stripped #then it is unchanged [0.04ms]
+(pass) hasAnsi > #given a string with ANSI codes #when checked #then it is true [0.04ms]
+(pass) hasAnsi > #given a plain string #when checked #then it is false [0.04ms]
+
+packages/shared-skills/skills/visual-qa/scripts/image-diff.test.ts:
+(pass) diffImages > #given two identical images #when diffed #then similarity is 100 with no hotspots [0.15ms]
+(pass) diffImages > #given two fully different images #when diffed #then similarity is 0 with hotspots [0.07ms]
+(pass) diffImages > #given images of different sizes #when diffed #then dimensionsMatch is false [0.07ms]
+(pass) diffImages > #given a transparent reference and an opaque actual #when diffed #then alpha is flagged [0.06ms]
+(pass) diffImages > #given a single changed pixel #when diffed #then one hotspot marks its grid cell [0.07ms]
+
+packages/shared-skills/skills/visual-qa/scripts/cli.test.ts:
+(pass) runImageDiff > #given two identical PNG files #when diffed #then similarity is 100 [0.39ms]
+(pass) runImageDiff > #given missing arguments #when diffed #then it throws a usage error [0.06ms]
+(pass) runTuiCheck > #given a CJK capture file #when checked #then widths count wide characters [0.19ms]
+(pass) run dispatch > #given an unknown command #when run #then it throws [0.05ms]
+(pass) cli entry > #given the Node bundle is spawned for image-diff without Bun on PATH #when it runs #then it prints JSON and exits zero [29.05ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skills/team-mode.test.ts:
+(pass) teamModeSkill gating > team-mode hidden when disabled [0.10ms]
+(pass) teamModeSkill gating > team-mode visible when enabled [0.07ms]
+(pass) teamModeSkill gating > team-mode skill has no mcpConfig [0.04ms]
+(pass) teamModeSkill gating > team-mode skill exposes the supported team tool identifiers [0.08ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skills/playwright.test.ts:
+(pass) playwright browser skill facade > #given split browser skill modules #when importing through the facade #then it preserves exported skill identity [0.09ms]
+(pass) playwright browser skill facade > #given playwright MCP skill data #when inspected #then metadata and MCP frontmatter markers stay stable [0.06ms]
+(pass) playwright browser skill facade > #given createPlaywrightSkill called with no options #when inspecting mcp args #then result matches the legacy singleton [0.04ms]
+(pass) playwright browser skill facade > #given createPlaywrightSkill with mcp_args override #when inspecting mcp args #then extra args are appended after @playwright/mcp@latest [0.05ms]
+(pass) playwright browser skill facade > #given createPlaywrightSkill with an empty mcp_args array #when inspecting mcp args #then default invocation is preserved [0.04ms]
+(pass) playwright browser skill facade > #given absent or empty custom args #when creating builtin skills #then the legacy singleton is reused [0.06ms]
+(pass) playwright browser skill facade > #given custom MCP args with alternate providers #when creating builtin skills #then the option is ignored [0.08ms]
+(pass) playwright browser skill facade > #given agent-browser source markdown #when exposed through the split skill #then frontmatter is stripped and tool markers stay stable [0.21ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skills/agent-browser-template.test.ts:
+(pass) createAgentBrowserTemplate > #given CRLF frontmatter #when creating the template #then it strips metadata and normalizes dashes [0.07ms]
+
+packages/shared-skills/skills/debugging/references/scripts/dap.test.ts:
+(pass) treats Windows drive-letter paths as executable specs, not host-port specs [1.19ms]
+(pass) DAP framing > parses multiple frames and frames split across chunks [0.19ms]
+(pass) full session emits stop snapshot, stack and capped variables [2089.05ms]
+(pass) byte cap reports dropped bytes [2073.85ms]
+(pass) unverified breakpoint and timeout are classified [2418.29ms]
+
+packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.test.ts:
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project provides typescript #then it resolves the caller's typescript and exits 0 [187.42ms]
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when a checked file violates the rules #then violations are still reported with exit 1 [83.24ms]
+(pass) #given the no-excuse script is executed from an installed ~/.codex-style skill cache > #when the caller project genuinely lacks typescript #then it fails with a clear error and exit 2 [38.66ms]
+
+ 142 pass
+ 0 fail
+ 856 expect() calls
+Ran 142 tests across 25 files. [7.91s]
+

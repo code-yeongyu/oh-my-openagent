@@ -1,0 +1,63 @@
+{
+  "rollup": {
+    "variant": "old",
+    "request": "r2",
+    "samples": 3,
+    "background": 0,
+    "foreground_or_mixed": 3,
+    "no_task_call": 0,
+    "reclassified_offline_at": "2026-09-05T06:34:27.233Z",
+    "parser_fix": "completed.output empty -> response.output_item.done items"
+  },
+  "rows": [
+    {
+      "sample": 1,
+      "http": 200,
+      "verdict": "foreground",
+      "task_calls": [
+        {
+          "run_in_background": false,
+          "batch": false,
+          "target": "deep"
+        }
+      ],
+      "other_tool_calls": [],
+      "message_text": "I read this as a scheduler bug fix - I’ll have the deep agent investigate and patch it, then I’ll run the DAG tests myself and report whether the fix holds. I’ll stop when the patch is applied and the test suite result is verified.",
+      "reasoning": "**Preparing intent line**",
+      "usage": 348
+    },
+    {
+      "sample": 2,
+      "http": 200,
+      "verdict": "foreground",
+      "task_calls": [
+        {
+          "run_in_background": false,
+          "batch": false,
+          "target": "deep"
+        }
+      ],
+      "other_tool_calls": [],
+      "message_text": "I read this as a scheduler bug fix - I'll have the deep agent investigate and implement it, then run the DAG test suite myself and report whether it holds. I'll stop when the fix is applied and the test suite result is verified.",
+      "reasoning": "**Opening routing line**",
+      "usage": 333
+    },
+    {
+      "sample": 3,
+      "http": 200,
+      "verdict": "foreground",
+      "task_calls": [
+        {
+          "run_in_background": false,
+          "batch": false,
+          "target": "deep"
+        }
+      ],
+      "other_tool_calls": [],
+      "message_text": "I read this as a delegated bug fix - I’ll have the deep category investigate and patch the scheduler, then I’ll run the DAG test suite myself and stop when the fix is verified or the test results identify a remaining failure.",
+      "reasoning": "**Delegating investigation and fix**",
+      "usage": 376
+    }
+  ],
+  "request_text": "We are in the oh-my-openagent monorepo. packages/senpi-task/src/dag/scheduler.ts has a flaky admission bug under parallel load (nodes occasionally start before every dependsOn node completed). Hand the investigation and the fix to the deep category as one task. When it reports back, run the dag test suite yourself and tell me whether the fix holds."
+}

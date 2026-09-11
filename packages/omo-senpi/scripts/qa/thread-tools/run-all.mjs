@@ -7,7 +7,7 @@
  *
  * Usage: bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs [--out-dir <dir>]
  */
-import { mkdirSync } from "node:fs"
+import { mkdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -18,6 +18,7 @@ const scenarios = [
   ["desktop-client", "desktop-client.mjs"],
   ["terminal-to-ui", "terminal-to-ui.mjs"],
   ["desktop-to-cli", "desktop-to-cli.mjs"],
+  ["plugin-surface", "plugin-surface.mjs"],
 ]
 
 const outDirIndex = process.argv.indexOf("--out-dir")
@@ -29,15 +30,26 @@ for (const [name, file] of scenarios) {
   process.stdout.write(`\n===== ${name} =====\n`)
   const args = [process.execPath, join(here, file)]
   if (outDir !== undefined) args.push("--out", join(outDir, `${name}.txt`))
+  const outFile = outDir === undefined ? undefined : join(outDir, `${name}.txt`)
   const child = Bun.spawnSync(args, { stdout: "inherit", stderr: "inherit" })
-  results.push({ name, code: child.exitCode })
-  process.stdout.write(`----- ${name} exit=${child.exitCode} -----\n`)
+  let skipped = 0
+  if (outFile !== undefined) {
+    try {
+      skipped = (readFileSync(outFile, "utf8").match(/^SKIP /gm) ?? []).length
+    } catch {
+      // No out file (scenario crashed before writing); leave skipped at 0.
+    }
+  }
+  results.push({ name, code: child.exitCode, skipped })
+  process.stdout.write(`----- ${name} exit=${child.exitCode} skipped=${skipped} -----\n`)
 }
 
 process.stdout.write("\n===== summary =====\n")
 for (const result of results) {
-  process.stdout.write(`${result.code === 0 ? "PASS" : "FAIL"} ${result.name} exit=${result.code}\n`)
+  process.stdout.write(`${result.code === 0 ? "PASS" : "FAIL"} ${result.name} exit=${result.code} skipped=${result.skipped}\n`)
 }
 const failed = results.filter((result) => result.code !== 0)
-process.stdout.write(`${failed.length === 0 ? "PASS" : "FAIL"} run-all failed_scenarios=${failed.length}\n`)
+const skippedTotal = results.reduce((sum, result) => sum + result.skipped, 0)
+process.stdout.write(`${failed.length === 0 ? "PASS" : "FAIL"} run-all failed_scenarios=${failed.length} skipped_checks=${skippedTotal}\n`)
 process.exit(failed.length === 0 ? 0 : 1)
+

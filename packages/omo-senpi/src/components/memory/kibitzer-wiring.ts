@@ -1,0 +1,116 @@
+import type { RecallCandidate } from "@oh-my-opencode/memory-core"
+import type { ChildModelRegistry } from "./model-registry-resolver"
+import type { RecallTranscriptTurn } from "./recall-wiring"
+
+import type { ComponentLogger } from "../../extension/types"
+import { createOncePerSessionGuard } from "../task/usage-guidance"
+import { GATE_ENTRY_TYPE, type KibitzerGateRecord } from "./kibitzer/notice"
+import type { MemoryIdentityContext } from "./context"
+import type { CollectedRecallCandidates } from "./recall-wiring"
+
+const PERSISTENT_FAILURE_THRESHOLD = 3
+const NON_DIAGNOSTIC_SKIP_CAUSES = new Set(["no_candidates", "cooldown", "judge_cap"])
+
+export interface KibitzerGatePort {
+  launch(input: {
+    readonly sessionId: string
+    readonly candidates: readonly RecallCandidate[]
+    readonly surfaced: ReadonlySet<string>
+    readonly maxItems: number
+    readonly transcript: readonly RecallTranscriptTurn[]
+    readonly modelRegistry?: ChildModelRegistry | undefined
+    readonly compactionEpoch?: number
+    readonly currentCompactionEpoch?: () => number
+    readonly deadlineMs?: number
+  }): Promise<unknown>
+  cancel?(): Promise<void>
+  whenIdle?(): Promise<void>
+}
+
+export type KibitzerLaunchOutcome = {
+  readonly status: "active" | "skipped" | "failed" | "dropped" | "nudged" | "empty"
+  readonly cause?: string
+  readonly model?: string
+  readonly candidateCount?: number
+  readonly reason?: string
+  readonly runId?: string
+  readonly nudges?: readonly import("@oh-my-opencode/memory-core").RecallNudge[]
+}
+
+export interface KibitzerGateWiringOptions {
+  readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
+  readonly runnerFor: (context: MemoryIdentityContext) => KibitzerGatePort
+  readonly logger?: ComponentLogger
+}
+
+export interface KibitzerGateWiring {
+  reportOutcome(sessionId: string, outcome: KibitzerLaunchOutcome, collected: CollectedRecallCandidates): void
+  resetFailureStreak(sessionId: string): void
+  attachEntrySink(appendEntry: (customType: string, data?: unknown) => void): void
+  onCompactionAccepted(sessionId: string): void
+  onSessionShutdown(sessionId: string): Promise<void>
+  currentCompactionEpoch(sessionId: string): number
+  whenIdle(): Promise<void>
+}
+
+export function createKibitzerGateWiring(options: KibitzerGateWiringOptions): KibitzerGateWiring {
+  const skippedOnce = createOncePerSessionGuard()
+  const compactionEpochs = new Map<string, number>()
+  const failureStreaks = new Map<string, { count: number; notified: boolean }>()
+  let appendEntry: ((customType: string, data?: unknown) => void) | undefined
+
+  function epochOf(sessionId: string): number {
+    return compactionEpochs.get(sessionId) ?? 0
+  }
+
+  return {
+    attachEntrySink(sink): void {
+      appendEntry = sink
+    },
+    reportOutcome(sessionId, outcome, collected): void {
+      if (outcome.status !== "skipped" && outcome.status !== "failed" && outcome.status !== "dropped") return
+      const cause = outcome.cause ?? "unknown"
+      const isDiagnostic = outcome.status !== "dropped" && !NON_DIAGNOSTIC_SKIP_CAUSES.has(cause)
+      if (outcome.status === "skipped" && !isDiagnostic && !skippedOnce(`${sessionId}:${cause}`)) return
+      const streak = isDiagnostic
+        ? failureStreaks.get(sessionId) ?? { count: 0, notified: false }
+        : undefined
+      if (streak !== undefined) {
+        streak.count += 1
+        failureStreaks.set(sessionId, streak)
+      }
+      const shouldNotify = streak !== undefined
+        && streak.count >= PERSISTENT_FAILURE_THRESHOLD
+        && !streak.notified
+      if (shouldNotify) streak.notified = true
+      appendEntry?.(GATE_ENTRY_TYPE, {
+        version: 1,
+        status: outcome.status,
+        cause,
+        ...(outcome.model === undefined ? {} : { model: outcome.model }),
+        candidateCount: outcome.candidateCount ?? collected.candidates.length,
+        ...(outcome.reason === undefined ? {} : { reason: outcome.reason }),
+        ...(outcome.runId === undefined ? {} : { runId: outcome.runId }),
+        ...(shouldNotify ? { consecutiveFailures: streak.count } : {}),
+      } satisfies KibitzerGateRecord)
+    },
+    resetFailureStreak(sessionId): void {
+      failureStreaks.delete(sessionId)
+    },
+    async onSessionShutdown(sessionId): Promise<void> {
+      compactionEpochs.delete(sessionId)
+      failureStreaks.delete(sessionId)
+      const context = options.resolveContext(sessionId)
+      if (context === undefined) return
+      const runner = options.runnerFor(context)
+      await runner.cancel?.()
+      await runner.whenIdle?.()
+    },
+    onCompactionAccepted(sessionId): void {
+      compactionEpochs.set(sessionId, epochOf(sessionId) + 1)
+    },
+    currentCompactionEpoch: epochOf,
+    async whenIdle(): Promise<void> {},
+
+  }
+}

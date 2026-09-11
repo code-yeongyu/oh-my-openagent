@@ -1,0 +1,26 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/senpi-task/src/runners/in-process/shared-tool-filter.test.ts:
+(pass) shared parent tool family filter > #given task, team, and workflow orchestration names #when classified #then only orchestration names match [0.30ms]
+(pass) shared parent tool family filter > #given shared tools with family and ui-only entries #when filtered #then family and ui-only removed [0.14ms]
+(pass) shared parent tool family filter > #given family tool in shared and in member-scoped #when merged #then only member-scoped family crosses the exclusion [0.11ms]
+(pass) shared parent tool family filter > #given no member-scoped tools #when merged #then result is only the filtered shared set [0.09ms]
+64 |     const xSearch = makeTool("x_search", "search")
+65 |     const threadCreate = makeTool("thread_create", "search")
+66 | 
+67 |     const filtered = filterSharedParentTools([xSearch, threadCreate])
+68 | 
+69 |     expect(filtered[0]?.exposure).toBe("direct")
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "direct"
+Received: "search"
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/senpi-task/src/runners/in-process/shared-tool-filter.test.ts:69:35)
+(fail) shared parent tool family filter > #given x_search and thread_create search-exposed tools #when filtered #then only x_search is direct and copied [0.21ms]
+
+ 4 pass
+ 1 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [553.00ms]

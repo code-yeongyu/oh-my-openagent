@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: "Onboarding tour for first-time omo users"
+description: "Guides a first-time omo user through setup and the core workflow. Use when a new user asks to get started with omo."
 ---
 
 # onboarding - the first conversation with omo

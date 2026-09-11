@@ -159,6 +159,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+      printInfo(
+        `The Codex harness is NOT installed. Fix the error above, then re-run: ${color.cyan("bunx oh-my-openagent install --platform=codex")}`,
+      )
     }
     console.log()
   }

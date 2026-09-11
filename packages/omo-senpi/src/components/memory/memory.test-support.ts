@@ -1,6 +1,18 @@
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+
+// Every memory test that registers the component without its own `env` falls through to
+// process.env, and memory-core resolves the default root from os.homedir(), which Bun fixes at
+// process start - the root harness's hermetic HOME does not reach it. Component registration
+// sweeps the resolved memory root (transient-sweep.ts), so that fallthrough must land in a
+// per-process temp dir and never in the developer's real ~/.omo/memory. Unconditional on purpose:
+// no test here legitimately needs the real root, and a shell-exported OMO_MEMORY_HOME is real.
+process.env.OMO_MEMORY_HOME = join(mkdtempSync(join(tmpdir(), "omo-memory-test-home-")), "memory")
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 
@@ -27,7 +39,6 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
   return {
     enabled: true,
     agent: "auto",
-    tool_exposure: "direct",
     reflection: {
       enabled: true,
       trigger: { step_count: 25, on_compaction: true },
@@ -51,7 +62,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
     write_notice: { enabled: true },
     sync: { enabled: true },
     search: { enabled: true },
-    recall: { enabled: true, max_items: 2 },
+    recall: { enabled: true, max_items: 2, category: "quick", event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }, sidecar_max_tokens: 48000, max_concurrent_wakes: 2, tool_budget: 8 },
     compile_warn_tokens: 30000,
     agents: {},
     ...overrides,

@@ -86,7 +86,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-fable-5",
+        model: "claude-fable-5-1",
         variant: "xhigh",
       },
       {
@@ -112,10 +112,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   momus: {
     fallbackChain: [
-      { providers: ["openai", "openai-codex"], model: "gpt-5.6-terra", variant: "high" },
-      { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
-      { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "xhigh" },
-      { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
+      { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "xhigh" },
+      { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
+      { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "high" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-5",
@@ -127,33 +126,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       { providers: ["opencode-go"], model: "glm-5.2" }
-    ],
-  },
-  "omo-senpi-code-reviewer": {
-    fallbackChain: [
-      { providers: ["openai", "openai-codex"], model: "gpt-5.6-terra", variant: "medium" },
-      { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "medium" },
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-      { providers: ["opencode-go"], model: "glm-5.2" },
-      { providers: ["kimi-for-coding"], model: "kimi-k3" }
-    ],
-  },
-  "omo-senpi-qa-executor": {
-    fallbackChain: [
-      { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna", variant: "high" },
-      { providers: ["github-copilot"], model: "gpt-5.6-luna", variant: "high" },
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-      { providers: ["opencode-go"], model: "glm-5.2" },
-      { providers: ["kimi-for-coding"], model: "kimi-k3" }
-    ],
-  },
-  "omo-senpi-gate-reviewer": {
-    fallbackChain: [
-      { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "low" },
-      { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "low" },
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
-      { providers: ["opencode-go"], model: "glm-5.2" },
-      { providers: ["kimi-for-coding"], model: "kimi-k3" }
     ],
   },
   atlas: {

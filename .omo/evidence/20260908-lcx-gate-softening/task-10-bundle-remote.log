@@ -1,0 +1,1534 @@
+[{"id":"f22a3ec8-44ba-4ff4-8887-7516c7e0df5a","alias":"mengmotaHost","os":"macos","arch":"aarch64","tags":["build","darwin"],"state":"offline"},{"id":"ff303475-2549-45f4-b8a4-9793b080ffe2","alias":"vultr-tokyo","os":"linux","arch":"x86_64","tags":["linux","deploy"],"state":"online"},{"id":"67c3abd0-00f4-4921-9c52-0d4e112fe0f0","alias":"sionicMac","os":"macos","arch":"aarch64","tags":["topology:mengmota-home"],"state":"online"},{"id":"47408d4f-cbbb-4cd2-b968-61962aa741f9","alias":"gorky","os":"linux","arch":"x86_64","tags":["linux","x86_64","tailscale","sandbox"],"state":"online"},{"id":"34a6007a-5b67-4327-9b59-aa0af5913a54","alias":"mengmotaMac","os":"macos","arch":"aarch64","tags":["topology:mengmota-home"],"state":"online"}]
+
+Cloning into '/tmp/lcx-fix10b-20260908/omo'...
+Updating files:  48% (5074/10361)Updating files:  49% (5077/10361)Updating files:  50% (5181/10361)Updating files:  51% (5285/10361)Updating files:  52% (5388/10361)Updating files:  53% (5492/10361)Updating files:  54% (5595/10361)Updating files:  55% (5699/10361)Updating files:  56% (5803/10361)Updating files:  57% (5906/10361)Updating files:  58% (6010/10361)Updating files:  59% (6113/10361)Updating files:  60% (6217/10361)Updating files:  61% (6321/10361)Updating files:  62% (6424/10361)Updating files:  63% (6528/10361)Updating files:  64% (6632/10361)Updating files:  65% (6735/10361)Updating files:  66% (6839/10361)Updating files:  67% (6942/10361)Updating files:  68% (7046/10361)Updating files:  69% (7150/10361)Updating files:  70% (7253/10361)Updating files:  71% (7357/10361)Updating files:  72% (7460/10361)Updating files:  73% (7564/10361)Updating files:  74% (7668/10361)Updating files:  75% (7771/10361)Updating files:  76% (7875/10361)Updating files:  77% (7978/10361)Updating files:  78% (8082/10361)Updating files:  79% (8186/10361)Updating files:  80% (8289/10361)Updating files:  81% (8393/10361)Updating files:  82% (8497/10361)Updating files:  83% (8600/10361)Updating files:  84% (8704/10361)Updating files:  85% (8807/10361)Updating files:  86% (8911/10361)Updating files:  87% (9015/10361)Updating files:  88% (9118/10361)Updating files:  89% (9222/10361)Updating files:  90% (9325/10361)Updating files:  91% (9429/10361)Updating files:  92% (9533/10361)Updating files:  93% (9636/10361)Updating files:  94% (9740/10361)Updating files:  95% (9843/10361)Updating files:  96% (9947/10361)Updating files:  96% (9997/10361)Updating files:  97% (10051/10361)Updating files:  98% (10154/10361)Updating files:  99% (10258/10361)Updating files: 100% (10361/10361)Updating files: 100% (10361/10361), done.
+
+SHELL_EXIT=0
+OVERLAY packages/omo-codex/plugin/components/ulw-loop/package.json
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Submodule 'packages/shared-skills/upstreams/designpowers' (https://github.com/Owl-Listener/designpowers) registered for path 'packages/shared-skills/upstreams/designpowers'
+Submodule 'packages/shared-skills/upstreams/open-design' (https://github.com/nexu-io/open-design) registered for path 'packages/shared-skills/upstreams/open-design'
+Submodule 'packages/shared-skills/upstreams/taste-skill' (https://github.com/Leonxlnx/taste-skill) registered for path 'packages/shared-skills/upstreams/taste-skill'
+Submodule 'packages/shared-skills/upstreams/ui-ux-pro-max' (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) registered for path 'packages/shared-skills/upstreams/ui-ux-pro-max'
+Cloning into '/private/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/designpowers'...
+Cloning into '/private/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/open-design'...
+Cloning into '/private/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/taste-skill'...
+Cloning into '/private/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/ui-ux-pro-max'...
+Submodule path 'packages/shared-skills/upstreams/designpowers': checked out 'cb00757da9d554591fa78d27aa1854d60a05c4f7'
+From https://github.com/nexu-io/open-design
+ * branch              6afe7eae156bfa29251a51fd0636649c257f7444 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/open-design': checked out '6afe7eae156bfa29251a51fd0636649c257f7444'
+From https://github.com/Leonxlnx/taste-skill
+ * branch            b17742737e796305d829b3ad39eda3add0d79060 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/taste-skill': checked out 'b17742737e796305d829b3ad39eda3add0d79060'
+From https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+ * branch            f32d6a61cdf0bfd57404c45854583fd19ff95088 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/ui-ux-pro-max': checked out 'f32d6a61cdf0bfd57404c45854583fd19ff95088'
+[materialize] wrote 148 frontend reference files from submodules
+build:git-bash-mcp
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 187ms
+
+  cli.js  22.68 KB  (entry point)
+
+build:ast-grep-mcp
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 103 modules in 201ms
+
+  cli.js  85.17 KB  (entry point)
+
+build:tui
+Bundled 554 modules in 472ms
+
+  tui.js  2.15 MB  (entry point)
+
+build:codex-install
+$ bun run script/build-codex-install.ts
+build:cli
+Bundled 923 modules in 515ms
+
+  index.js  3.35 MB  (entry point)
+
+build:cli-node
+$ bun run script/build-cli-node.ts
+built dist/cli-node (1 output)
+build:index
+Bundled 2000 modules in 728ms
+
+  index.js  5.87 MB  (entry point)
+
+build:omo-schema
+$ bun run script/build-omo-schema.ts
+Generating omo JSON Schema...
+✓ omo JSON Schema generated: assets/omo.schema.json
+build:node-require-shim
+$ bun run script/patch-node-require-shim.ts
+Patched Node/Electron require shim in dist/index.js
+build:schema
+$ bun run script/build-schema.ts
+Generating JSON Schemas...
+✓ JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+build:shared-skills-assets
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+build:declarations
+build:lsp-tools-mcp
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 52 packages, and audited 55 packages in 5s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 73ms
+
+  cli.js               195.27 KB  (entry point)
+  mcp.js               194.80 KB  (entry point)
+  tools.js             182.91 KB  (entry point)
+  request-context.js   7.47 KB    (entry point)
+  lsp/manager.js       109.46 KB  (entry point)
+
+build:lsp-daemon
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 5s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 58ms
+
+  cli.js     250.54 KB  (entry point)
+  index.js   231.32 KB  (entry point)
+  client.js  229.0 KB   (entry point)
+
+build:codex-plugin
+$ npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build
+
+added 71 packages, and audited 89 packages in 4s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.48 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 70ms
+
+  cli.js  19.25 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 16ms
+
+  cli.js  19.43 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 177ms
+
+  cli.js  155.86 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 20ms
+
+  cli.js  156.1 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 44ms
+
+  cli.js  4.18 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 102ms
+
+  cli.js  8.32 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 33ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 63ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 45ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 45 modules in 38ms
+
+  cli.js  186.85 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 32ms
+
+  cli.js  14.52 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 21ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 45 modules in 120ms
+
+  cli.js  187.83 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 140ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 58ms
+
+  cli.js  14.78 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.48 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 93ms
+
+  cli.js  35.17 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 38ms
+
+  cli.js  35.34 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 build
+> node scripts/build-runtime.mjs
+
+Bundled 10 modules in 34ms
+
+  cli.js  228.00 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.48 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+
+  dist/cli.js  148.2kb
+
+⚡ Done in 26ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 31ms
+
+  cli.js  152.66 KB  (entry point)
+
+build:senpi-plugin
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Staged Senpi LSP runtime: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+Bundled 45 modules in 29ms
+
+  cli.js  189.10 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+  omo-agent-toolkit ulw-loop help
+  omo-agent-toolkit ulw-loop create-goals --brief "..." [--brief-file <path>] [--from-stdin] [--codex-goal-mode aggregate|per_story] [--validation-batch-json <json-or-path>] [--force] [--json]
+  omo-agent-toolkit ulw-loop status [--json]
+  omo-agent-toolkit ulw-loop complete-goals [--retry-failed] [--json]
+  omo-agent-toolkit ulw-loop criteria --goal-id <id> [--json]
+  omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "..." [--notes "..."] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --print-template [--goal-id <id>] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete|failed|blocked --evidence "..." --codex-goal-json <...> [--quality-gate-json <...>] [--no-advance] [--json]
+  omo-agent-toolkit ulw-loop steer --kind <kind> ... --evidence "..." --rationale "..." [--proposals-json <json-or-path>] [--json]
+  omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]
+  omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "..." --objective "..." --evidence "..." --codex-goal-json <...> [--json]
+
+Every state subcommand needs a session scope: [--session-id <id>] or the session env (OMO_ULW_LOOP_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID / PI_SESSION_ID); state lives under .omo/ulw-loop/<id>/ and the unscoped root is never used implicitly. status --json exposes the currentAttemptDir; put all quality-gate artifacts under it.
+Every subcommand accepts --help | -h to print its own usage line.
+Staged Senpi agent-toolkit runtime: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/runtime/agent-toolkit
+Staged x-search conditional skill: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 902 modules in 99ms
+
+  omo.js  1.62 MB  (entry point)
+
+Bundled 679 modules in 91ms
+
+  omo-task.js  0.98 MB  (entry point)
+
+Bundled 212 modules in 39ms
+
+  omo-member.js  176.39 KB  (entry point)
+
+Bundled 139 modules in 39ms
+
+  memory-run-supervisor.mjs  38.64 KB  (entry point)
+
+Bundled 118 modules in 31ms
+
+  omo-init-deep-advisor.js  84.59 KB  (entry point)
+
+Built omo-senpi extensions: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo.js, /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo-task.js, /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo-member.js, /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/skills
+generated directive is current: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 32ms
+
+  install.mjs  20.59 KB  (entry point)
+
+Built omo-senpi installer: /private/tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+595 packages installed [86.02s]
+
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-darwin-arm64
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+
+SHELL_EXIT=0
+Synced OMO Codex manifests to version 5.0.0-beta.48 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 70ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 128ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 149ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 67ms
+
+  cli.js  4.18 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 7ms
+
+  cli.js  8.32 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 90ms
+
+  cli.js  155.86 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 82ms
+
+  cli.js  14.52 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 7ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 15ms
+
+  cli.js  156.1 KB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 11ms
+
+  cli.js  14.78 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 83ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 17ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 285ms
+
+  cli.js  0.27 MB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 build
+> node scripts/build-runtime.mjs
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 45 modules in 19ms
+
+  cli.js  186.85 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.48 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 10ms
+
+  cli.js  35.17 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 45 modules in 19ms
+
+  cli.js  187.83 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 19ms
+
+  cli.js  35.34 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.48 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+
+  dist/cli.js  148.2kb
+
+⚡ Done in 33ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 35ms
+
+  cli.js  152.66 KB  (entry point)
+
+Bundled 45 modules in 23ms
+
+  cli.js  186.85 KB  (entry point)
+
+
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+$ tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+SHELL_EXIT=0
+✔ #given the flattened plugin cache the Codex installer produces #when sync-skills runs inside it #then it resolves shared skills through the linked package and writes the skill tree (11946.258459ms)
+✔ #given synced aggregate Codex skills #when inspected #then component and shared skills are present (57.741791ms)
+✔ #given reference-only designpowers frontend files #when synced for Codex #then nested SKILL.md files are not packaged (7.057708ms)
+✔ #given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package (2.147208ms)
+✖ #given shared skill package source #when aggregate Codex shared skills are inspected #then generated copies have no hand-authored drift (7.347875ms)
+✔ #given a shared skill name collides with a Codex component skill #when aggregate skills are inspected #then the component skill wins (1.667333ms)
+✔ #given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged (375.719917ms)
+✔ #given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift (17.682084ms)
+✔ #given the canonical prompts-core directive #when the aggregate ultrawork skill is inspected #then it wraps the canonical bytes in skill frontmatter (1.675708ms)
+✔ #given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ulw-loop alias (14.279792ms)
+✔ #given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop remains discoverable as an alias (9.537084ms)
+✔ #given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged (2024.16425ms)
+✔ #given synced git-master skill #when inspected #then commits and git history route through it (0.837208ms)
+✔ #given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped (0.731875ms)
+✔ #given LAZYCODEX_RELEASE_VERSION env #when resolving authoritative version #then the env value wins (0.843667ms)
+✔ #given no env override #when resolving authoritative version #then root package.json version is used (24.290625ms)
+✔ #given drifted Codex manifests #when syncing version from root #then all versioned manifests match and version-less files are left alone (65.202625ms)
+✔ #given already coherent manifests #when syncing again #then nothing is rewritten (23.627375ms)
+✔ #given app-thread archival is blocked by an ambiguous id #when archive runs with a note #then team state is archived and keeps the blocker in the log (3988.687792ms)
+✔ #given a bound team #when the member field manual renders #then it names the cross-thread tool and the team.json address book (3486.562708ms)
+✔ #given a member bootstrap trigger #when it is generated #then it names the cross-thread push tool (2153.987916ms)
+✔ #given guide.md is a symlink #when guide is regenerated #then the outside target stays untouched (1554.414042ms)
+✔ #given member A exists #when add-member receives A with trailing space #then state is not partially mutated (1243.89275ms)
+✔ #given two add-member commands run concurrently #then both successful mutations are preserved (1022.846083ms)
+✔ #given another command holds the team lock #when add-member times out #then it fails without mutating team state (872.953875ms)
+✔ #given member focus already exists #when add-member receives same focus with different spacing and case #then state is not partially mutated (712.742834ms)
+✔ #given only one member exists #when bind-thread runs #then member is not activated (1556.395208ms)
+✔ #given persisted paths are mutated outside trusted team dir #when guide is regenerated #then outside file stays untouched (464.588542ms)
+✔ #given team dir is swapped to a symlink #when status reads team state #then command refuses the symlink (278.814458ms)
+✔ #given teams root is a symlink #when delete runs #then outside team state stays untouched (120.667125ms)
+✔ #given a worktree-backed team has bound member threads #when guide and status render #then they include codex thread links (3833.667708ms)
+✔ #given two members with distinct names #when added #then each thread title is per-member and the two never collide (2149.692459ms)
+✔ #given a member added without an explicit name #when state is read #then the title falls back to the focus, never a shared session name (1212.569792ms)
+✔ #given a member name already exists #when add-member receives the same name with different spacing and case #then state is not partially mutated (1241.278333ms)
+✔ #given persisted team.json has duplicate member names #when a command loads the team #then stale state is rejected (1089.962125ms)
+✔ #given persisted team.json has duplicate thread titles with distinct member names #when bind-thread runs #then state is rejected before activation (1243.796584ms)
+✔ #given MultiAgentV2 transport #when members are added and bound #then task names and canonical agent paths form the address book (3976.871625ms)
+✔ #given codex_app transport #when members bind threads #then the existing thread address book and deep links remain (2379.388583ms)
+✔ #given an unsupported transport #when init runs #then it fails before creating team state (146.843458ms)
+✔ #given --transport without a value #when init runs #then it fails before creating team state (165.996542ms)
+✔ #given an existing team #when init re-runs with a conflicting transport #then it fails and state is unchanged (512.5965ms)
+✔ #given a V2 team #when the whole team is archived without a note #then no output claims runtime members were closed (626.010333ms)
+✔ #given a V2 team #when one member is archived #then output scopes the archive to team state, not the runtime agent (702.290792ms)
+✔ #given a codex_app team #when one member is archived #then the existing wording is preserved (869.614875ms)
+✔ #given a transport-specific team #when the wrong bind command runs #then it fails without changing team.json (1513.498875ms)
+✔ #given V2 expected task identity #when bind-agent receives another path #then it fails without activating the member (853.774208ms)
+✔ #given a V2 member has no valid task name #when add-member runs #then state remains unchanged (449.999083ms)
+✔ #given legacy schemaVersion 2 state with existing members #when a mutation succeeds #then it upgrades in place as codex_app (667.16125ms)
+✔ #given a worktree team #when worktree-add A #then a real git worktree on a derived branch is created and recorded (4187.781583ms)
+✔ #given worktree-add ran #when the field manual is regenerated #then it shows the member's derived worktree branch (2757.319458ms)
+✔ #given a team initialized WITHOUT --worktree #when worktree-add is called mid-run #then it auto-enables isolation (conflict-triggered) (1349.794584ms)
+✔ #given an existing member worktree #when worktree-add runs again #then it is a safe no-op that reports the existing worktree (2092.900209ms)
+✔ #given a member worktree #when worktree-remove A #then git drops it and team.json clears the path (1885.726083ms)
+✔ #given a member committed work in its worktree #when integrate --id A #then the base branch gets a NO-FF merge commit (1630.189584ms)
+✔ #given two members edited the same line #when integrate hits the conflict #then it stops, reports the conflicting member, and exits non-zero (1540.119541ms)
+✔ #given a member branch that cannot be merged #when integrate runs #then it surfaces git's real reason, not a fake conflict (980.357875ms)
+✔ #given a member id that is not a safe path segment #when worktree-add runs #then it refuses instead of escaping the team dir (468.510833ms)
+✔ #given synced skills #when the ultrawork skill is inspected #then it carries the full directive body (8.765458ms)
+✔ #given the built ultrawork CLI #when a ulw prompt is submitted #then a compact skill pointer is emitted (602.919666ms)
+✔ #given the built ultrawork and ulw-loop CLIs #when both emit the pointer #then the payloads match byte for byte (1020.537166ms)
+✔ #given shared OpenCode #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest (166.203375ms)
+✔ #given a complete shared OpenCode plan #when a fresh review round starts #then both lanes persist literal workspace and artifact bindings (27.810291ms)
+✔ #given a shared OpenCode review round #when launch, interruption, completion, or compaction occurs #then the durable transition table fails closed (12.55775ms)
+✔ #given shared OpenCode round R2 replaced R1 #when a delayed R1 launch or receipt arrives #then identity-bound CAS leaves R2 unchanged (14.307208ms)
+✔ #given shared OpenCode independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery (10.013959ms)
+✔ #given Codex #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest (2.708125ms)
+✔ #given a complete Codex plan #when a fresh review round starts #then both lanes persist literal workspace and artifact bindings (7.214ms)
+✔ #given a Codex review round #when launch, interruption, completion, or compaction occurs #then the durable transition table fails closed (3.975333ms)
+✔ #given Codex round R2 replaced R1 #when a delayed R1 launch or receipt arrives #then identity-bound CAS leaves R2 unchanged (5.879167ms)
+✔ #given Codex independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery (2.902417ms)
+✔ #given ulw-plan skill copies #when component source and packaged copy are compared #then they are byte-identical and expose the loader-parsed name (10.151ms)
+✔ #given ulw-research skill copies #when frontmatter is inspected #then the loader-parsed name is ulw-research (44.002125ms)
+✔ #given ulw-research skill copies #when scanned for non-English content #then they contain no Hangul (17.128125ms)
+ℹ tests 327
+ℹ suites 0
+ℹ pass 326
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20392.498917
+
+✖ failing tests:
+
+test at test/sync-skills.test.mjs:104:1
+✖ #given shared skill package source #when aggregate Codex shared skills are inspected #then generated copies have no hand-authored drift (7.347875ms)
+  AssertionError [ERR_ASSERTION]: review-work drifted from shared-skills
+  + actual - expected
+  ... Skipped lines
+  
+    '---\n' +
+      'name: review-work\n' +
+      'description: "Post-implementation gate review: run manual QA on the real surface yourself, then launch ONE gate reviewer (never a panel) to audit goal, constraints, code quality, security, missed context, and QA evidence. Use before a PR handoff or when the user explicitly asks to review completed work."\n' +
+      '---\n' +
+      '## Codex Subagent Reliability\n' +
+  ...
+      '\n' +
+  +   'On Codex, use `review-work` only when the user asks for a review or demands\n' +
+  +   'strict, rigorous, or high-accuracy verification, not automatically for a PR or\n' +
+  +   "completion claim. Your own manual QA and the main session's self-review are\n" +
+  +   'the default. Spawn ONE `lazycodex-gate-reviewer` only for an explicit demand\n' +
+  +   'for strict review; otherwise run the review checklist inline and record the\n' +
+  +   "main session's verdict instead of spawning or waiting for a reviewer. These\n" +
+  +   'Codex rules override the mandatory-reviewer instructions in the shared skill.\n' +
+  +   '\n' +
+  +   'When `review-work` is used as a final implementation, PR, or `$ulw-execute`\n' +
+  +   'gate, the selected review is blocking. A timeout, missing deliverable, ack-only response,\n' +
+  +   'explicit `BLOCKED:`, or inconclusive lane is not a pass. Treat that lane as\n' +
+  +   'failed, investigate the underlying uncertainty with the `debugging` skill when\n' +
+  +   'runtime behavior may be wrong, fix with evidence, and rerun the affected lane\n' +
+  +   'before claiming completion, creating or handing off a PR, or merging.\n' +
+  +   '\n' +
+  +   'After each lane reaches PASS, immediately append a durable task-evidence record\n' +
+  +   'to the active ledger with the lane name, exact full commit SHA, PASS verdict,\n' +
+  +   'and report artifact/source. Before reusing coverage after continuation or\n' +
+  +   'compaction, re-read that record and require the exact lane/SHA pair. Memory,\n' +
+  +   'chat history, or an unstamped report is not coverage; a new commit requires\n' +
+  +   'fresh applicable lane records.\n' +
+  +   '\n' +
+  +   'A rejecting lane must name its blockers inline in its final message — each\n' +
+  +   'blocker cites the violated goal criterion or requirement plus an evidence\n' +
+  +   'pointer. A bare REJECT/FAIL token without findings is not a verdict; treat it\n' +
+  +   'as an inconclusive lane (one bounded respawn, then record it inconclusive with\n' +
+  +   'that reason).\n' +
+  +   '\n' +
+  +   'When reviewing a PR or branch, collect diff, file contents, and verification\n' +
+  +   'results from a dedicated review worktree attached to that branch. Never\n' +
+  +   'checkout, test, or edit the review branch in the main worktree.\n' +
+  +   '\n' +
+  +   'Review evidence must be safe to share. Redact or mask secrets and sensitive\n' +
+  +   'user data before including evidence in logs, PR bodies, or handoffs. Never\n' +
+  +   'include raw tokens, credentials, auth headers, cookies, API keys, env dumps,\n' +
+  +   'private logs, or PII; summarize with lengths, hashes, and short non-sensitive\n' +
+  +   'prefixes when identity is needed.\n' +
+  +   '\n' +
+      "One reviewer, not a panel. A single gate reviewer holding the full context (goal, diff, history, QA evidence) catches what a fan-out of narrow reviewers misses between their seams, and it costs one agent instead of five. Never add review lanes; widen the gate reviewer's checklist instead.\n" +
+      '\n' +
+      '| Lane | Who runs it | Question it answers |\n' +
+      '|------|-------------|---------------------|\n' +
+      '| Manual QA | You, the orchestrator, on the real surface | Does it actually work? |\n' +
+  ...
+      '   - HTTP: `curl -i` (or an API request context) - status line, headers, body.\n' +
+  +   '   - CLI / TUI: a real pty - drive the command and keep the transcript; for color or layout evidence render through a browser-based terminal, never a `tmux ca'... 8903 more characters
+  -   '   - CLI / TUI: a real pty - drive the command and keep the transcript; for color or layout evidence render through a browser-based terminal, never a `tmux capture-pane` dump.\n' +
+  -   "   - Web: the real page in a real browser - the harness's in-process surface (a `Bun.WebView` / `playwright-core` code cell, or Codex's Browser plugin) or the agent-browser CLI - action log plus screenshot.\n" +
+  -   '   - Desktop / GUI: OS-level automation against the running app - action log plus screenshot.\n' +
+  -   '   - Library / SDK: a script that imports and exercises the public API - transcript.\n' +
+  -   '   - Data-shaped work (migrations, configs, generated files): the resulting artifact itself, diffed or dumped.\n' +
+  -   '3. **Cover at least**: the happy path the goal names, the riskiest edge (empty, boundary, malformed, or concurrent input), and one regression on adjacent behavior the change could have broken. Add a row for every stated success criterion.\n' +
+  -   '4. **Build the QA matrix** - one row per scenario:\n' +
+  -   '\n' +
+  -   '| # | Scenario | Exact command / action | Expected | Observed | Verdict | Artifact |\n' +
+  -   '|---|----------|------------------------|----------|----------|---------|----------|\n' +
+  -   '\n' +
+  -   'A row without an artifact path is not PASS. If the application cannot even start, that is an immediate FAIL.\n' +
+  -   '\n' +
+  -   'Any FAIL ends the review here: report **REVIEW FAILED** with the failing rows and skip the gate reviewer - reviewing code that does not work wastes the reviewer. Fix first, then re-enter at Phase 0 with the delta.\n' +
+  -   '\n' +
+  -   '---\n' +
+  -   '\n' +
+  -   '## Phase 2: Launch the Gate Reviewer (one agent)\n' +
+  -   '\n' +
+  -   'Launch exactly one reviewer, in the background, then keep doing independent root work (teardown prep, report scaffolding) while it runs.\n' +
+  -   '\n' +
+  -   "`oracle` cannot read files or run commands: it receives everything inline (DIFF + FILE_CONTENTS + CONTEXT_MINING + the QA matrix). If your surface's gate reviewer has read and shell tools, still paste the diff and the QA matrix, and hand it file paths instead of full contents.\n" +
+  -   '\n' +
+  -   '```\n' +
+  -   'task(\n' +
+  -   '  subagent_type="oracle",\n' +
+  -   '  run_in_background=true,\n' +
+  -   '  load_skills=[],\n' +
+  -   '  description="Gate-review the completed work against goal, constraints, and QA evidence",\n' +
+  -   '  prompt="""\n' +
+  -   '<review_type>GATE REVIEW</review_type>\n' +
+  -   '\n' +
+  -   '<original_goal>\n' +
+  -   "{GOAL - paste the user's original request and any clarifications}\n" +
+  -   '</original_goal>\n' +
+  -   '\n' +
+  -   '<constraints>\n' +
+  -   '{CONSTRAINTS - every rule, requirement, or limitation discussed}\n' +
+  -   '</constraints>\n' +
+  -   '\n' +
+  -   '<background>\n' +
+  -   '{BACKGROUND - why this work was needed, broader context}\n' +
+  -   '</background>\n' +
+  -   '\n' +
+  -   '<changed_files>\n' +
+  -   '{CHANGED'... 6601 more characters
+  
+      at TestContext.<anonymous> (file:///private/tmp/lcx-fix10b-20260908/omo/packages/omo-codex/plugin/test/sync-skills.test.mjs:119:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '---\nname: review-work\ndescription: "Post-implementation gate review: run manual QA on the real surface yourself, then launch ONE gate reviewer (never a panel) to audit goal, constraints, code quality, security, missed context, and QA evidence. Use before a PR handoff or when the user explicitly asks to review completed work."\n---\n## Codex Subagent Reliability\n\nEvery `multi_agent_v1.spawn_agent` message must be self-contained. Start with\n`TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and\n`VERIFY`. State that it is an executable assignment, not a context\nhandoff. Role or specialty instructions belong inside `message`.\nUse `fork_context: false` unless full history is truly\nrequired; paste only the review context that worker needs.\n\nReview lanes are leaf agents: a lane does its own reading, running, and\njudging inline and never spawns sub-reviewers of its own. Reviewers are\none-shot: a lane ends at its verdict; a re-review after fixes is a fresh\nspawn scoped to the delta plus current evidence, never a `followup_task`\nto a long-lived reviewer carrying stale context.\n\nPlan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `multi_agent_v1.wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles.\n\nTreat child status as a progress signal, not a timeout counter. For\nwork likely to exceed one wait cycle, require the child to send\n`WORKING: <task> - <current phase>` before long reading, testing, or\nreview passes, and `BLOCKED: <reason>` only when it cannot progress.\nWhile any child is active, keep the parent visibly alive with active\nsubagent count, agent names, latest `WORKING:` phase, and whether the\nparent is waiting for mailbox updates. Track spawned agent names\nlocally. Use `multi_agent_v1.wait_agent` for mailbox signals, not proof of completion.\nA timeout only means no new mailbox update arrived. Treat a running child as alive.\nFallback only when the child is\ncompleted without the deliverable, ack-only after followup, explicitly\n`BLOCKED:`, or no longer running. Then mark that review lane\n`INCONCLUSIVE`, do not count it as PASS or approval, close if safe, and\nrespawn a smaller `fork_context: false` reviewer with the missing\ndeliverable. Preserve completed lane results immediately. If the retry\nbudget is exhausted, keep the lane `INCONCLUSIVE` and still emit a final\naggregate result.\n\n# Review Work - Gate Review Orchestrator\n\nReview completed implementation work through exactly two lanes: your own hands-on manual QA on the real surface, and ONE gate reviewer sub-agent that audits the whole change set against the goal, the constraints, and your QA evidence. The review passes only when the QA matrix has no failing row AND the gate reviewer returns APPROVE.\n\nOn Codex, use `review-work` only when the user asks for a review or demands\nstrict, rigorous, or high-accuracy verification, not automatically for a PR or\ncompletion claim. Your own manual QA and the main session\'s self-review are\nthe default. Spawn ONE `lazycodex-gate-reviewer` only for an explicit demand\nfor strict review; otherwise run the review checklist inline and record the\nmain session\'s verdict instead of spawning or waiting for a reviewer. These\nCodex rules override the mandatory-reviewer instructions in the shared skill.\n\nWhen `review-work` is used as a final implementation, PR, or `$ulw-execute`\ngate, the selected review is blocking. A timeout, missing deliverable, ack-only response,\nexplicit `BLOCKED:`, or inconclusive lane is not a pass. Treat that lane as\nfailed, investigate the underlying uncertainty with the `debugging` skill when\nruntime behavior may be wrong, fix with evidence, and rerun the affected lane\nbefore claiming completion, creating or handing off a PR, or merging.\n\nAfter each lane reaches PASS, immediately append a durable task-evidence record\nto the active ledger with the lane name, exact full commit SHA, PASS verdict,\nand report artifact/source. Before reusing coverage after continuation or\ncompaction, re-read that record and require the exact lane/SHA pair. Memory,\nchat history, or an unstamped report is not coverage; a new commit requires\nfresh applicable lane records.\n\nA rejecting lane must name its blockers inline in its final message — each\nblocker cites the violated goal criterion or requirement plus an evidence\npointer. A bare REJECT/FAIL token without findings is not a verdict; treat it\nas an inconclusive lane (one bounded respawn, then record it inconclusive with\nthat reason).\n\nWhen reviewing a PR or branch, collect diff, file contents, and verification\nresults from a dedicated review worktree attached to that branch. Never\ncheckout, test, or edit the review branch in the main worktree.\n\nReview evidence must be safe to share. Redact or mask secrets and sensitive\nuser data before including evidence in logs, PR bodies, or handoffs. Never\ninclude raw tokens, credentials, auth headers, cookies, API keys, env dumps,\nprivate logs, or PII; summarize with lengths, hashes, and short non-sensitive\nprefixes when identity is needed.\n\nOne reviewer, not a panel. A single gate reviewer holding the full context (goal, diff, history, QA evidence) catches what a fan-out of narrow reviewers misses between their seams, and it costs one agent instead of five. Never add review lanes; widen the gate reviewer\'s checklist instead.\n\n| Lane | Who runs it | Question it answers |\n|------|-------------|---------------------|\n| Manual QA | You, the orchestrator, on the real surface | Does it actually work? |\n| Gate review | One gate reviewer sub-agent (`oracle` on OpenCode; the surface\'s gate-reviewer agent elsewhere) | Did we build what was asked - correctly, safely, well, and without missing context? |\n\n---\n\n## Phase 0: Gather Review Context\n\nBefore running anything, collect these inputs. Extract from conversation history first - the user\'s original request, constraints discussed, and decisions made are usually already in the thread. Only ask if truly missing.\n\n<required_inputs>\n\n- **GOAL**: The original objective. What was the user trying to achieve? Pull from the initial request in this conversation.\n- **CONSTRAINTS**: Rules, requirements, or limitations. Tech stack restrictions, performance targets, API contracts, design patterns to follow, backward compatibility needs.\n- **BACKGROUND**: Why this work was needed. Business context, user stories, related systems, prior decisions that informed the approach.\n- **CHANGED_FILES**: Auto-collect via `git diff --name-only HEAD~1` or against the appropriate base (branch point, specific commit).\n- **DIFF**: Auto-collect via `git diff HEAD~1` or against the appropriate base.\n- **FILE_CONTENTS**: The full content of each changed file plus the neighboring files that show the established patterns. Required verbatim when the reviewer cannot read files (`oracle`); when your surface\'s gate reviewer can read files and run commands, pass the paths and the diff instead of pasting everything.\n- **RUN_COMMAND**: How to start/run the application. Check `package.json` scripts, `Makefile`, `docker-compose.yml`, or ask the user.\n- **CONTEXT_MINING**: What the history and the trackers say about this area (collected below).\n\n</required_inputs>\n\nReview PRs and branches from a dedicated review worktree only: create or attach one with `git worktree add <path> <branch>` before collecting changed files, diff, file contents, or running checks, then immediately lock it with `git worktree lock <path> --reason "review:<pr-or-branch>"`. The main worktree is read-only context; never checkout, test, or edit the review branch there.\n\n**Auto-collection sequence:**\n\n```bash\n# 1. Get changed files\ngit diff --name-only HEAD~1  # or: git diff --name-only main...HEAD\n\n# 2. Get diff\ngit diff HEAD~1  # or: git diff main...HEAD\n\n# 3. Detect run command\n# Check package.json -> "scripts.dev" or "scripts.start"\n# Check Makefile -> default target\n# Check docker-compose.yml -> services\n\n# 4. Mine the context the implementation may have missed (keep the output short)\ngit log --oneline -20 -- <each changed file>            # recent changes and their reasons\ngit log --all --oneline --grep="<keywords from goal>"    # related commits, reverts\ngh issue list --search "<keywords>" --state all           # related issues (when gh is available)\ngh pr list --search "<keywords>" --state all              # related PRs and their review comments\nrg -n "TODO|FIXME|HACK" <changed files>                   # warnings left by previous authors\n# plus: files that import the changed modules, tests touching the same paths,\n# docs and config that reference the changed behavior\n```\n\nRecord CONTEXT_MINING as a short list: source -> finding -> why it matters for this change. Slack, Notion, and Discord searches belong here too when those tools exist.\n\nFor GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The user\'s original message almost always contains the goal. Constraints often emerge during discussion. If anything critical is ambiguous, ask ONE focused question - not a checklist.\n\n---\n\n## Phase 1: Manual QA (you run it)\n\nYou are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrator owns the real-surface proof, exactly as the ulw-loop final gate records `manualQa` under the main session.\n\n1. **Reuse first.** If this session already captured real-surface evidence for the FINAL tree (an ultrawork or ulw-loop evidence directory, a `visual-qa` verdict on this same build), consume it as QA rows instead of re-running. A fix committed after a capture stales that capture: re-run the rows it covered.\n2. **Pick the channel that faithfully exercises the surface** and capture the artifact:\n   - HTTP: `curl -i` (or an API request context) - status line, headers, body.\n   - CLI / TUI: a real pty - drive the command and keep the transcript; for color or layout evidence render through a browser-based terminal, never a `tmux ca'... 8903 more characters,
+    expected: '---\nname: review-work\ndescription: "Post-implementation gate review: run manual QA on the real surface yourself, then launch ONE gate reviewer (never a panel) to audit goal, constraints, code quality, security, missed context, and QA evidence. Use before a PR handoff or when the user explicitly asks to review completed work."\n---\n## Codex Subagent Reliability\n\nEvery `multi_agent_v1.spawn_agent` message must be self-contained. Start with\n`TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and\n`VERIFY`. State that it is an executable assignment, not a context\nhandoff. Role or specialty instructions belong inside `message`.\nUse `fork_context: false` unless full history is truly\nrequired; paste only the review context that worker needs.\n\nReview lanes are leaf agents: a lane does its own reading, running, and\njudging inline and never spawns sub-reviewers of its own. Reviewers are\none-shot: a lane ends at its verdict; a re-review after fixes is a fresh\nspawn scoped to the delta plus current evidence, never a `followup_task`\nto a long-lived reviewer carrying stale context.\n\nPlan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `multi_agent_v1.wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles.\n\nTreat child status as a progress signal, not a timeout counter. For\nwork likely to exceed one wait cycle, require the child to send\n`WORKING: <task> - <current phase>` before long reading, testing, or\nreview passes, and `BLOCKED: <reason>` only when it cannot progress.\nWhile any child is active, keep the parent visibly alive with active\nsubagent count, agent names, latest `WORKING:` phase, and whether the\nparent is waiting for mailbox updates. Track spawned agent names\nlocally. Use `multi_agent_v1.wait_agent` for mailbox signals, not proof of completion.\nA timeout only means no new mailbox update arrived. Treat a running child as alive.\nFallback only when the child is\ncompleted without the deliverable, ack-only after followup, explicitly\n`BLOCKED:`, or no longer running. Then mark that review lane\n`INCONCLUSIVE`, do not count it as PASS or approval, close if safe, and\nrespawn a smaller `fork_context: false` reviewer with the missing\ndeliverable. Preserve completed lane results immediately. If the retry\nbudget is exhausted, keep the lane `INCONCLUSIVE` and still emit a final\naggregate result.\n\n# Review Work - Gate Review Orchestrator\n\nReview completed implementation work through exactly two lanes: your own hands-on manual QA on the real surface, and ONE gate reviewer sub-agent that audits the whole change set against the goal, the constraints, and your QA evidence. The review passes only when the QA matrix has no failing row AND the gate reviewer returns APPROVE.\n\nOne reviewer, not a panel. A single gate reviewer holding the full context (goal, diff, history, QA evidence) catches what a fan-out of narrow reviewers misses between their seams, and it costs one agent instead of five. Never add review lanes; widen the gate reviewer\'s checklist instead.\n\n| Lane | Who runs it | Question it answers |\n|------|-------------|---------------------|\n| Manual QA | You, the orchestrator, on the real surface | Does it actually work? |\n| Gate review | One gate reviewer sub-agent (`oracle` on OpenCode; the surface\'s gate-reviewer agent elsewhere) | Did we build what was asked - correctly, safely, well, and without missing context? |\n\n---\n\n## Phase 0: Gather Review Context\n\nBefore running anything, collect these inputs. Extract from conversation history first - the user\'s original request, constraints discussed, and decisions made are usually already in the thread. Only ask if truly missing.\n\n<required_inputs>\n\n- **GOAL**: The original objective. What was the user trying to achieve? Pull from the initial request in this conversation.\n- **CONSTRAINTS**: Rules, requirements, or limitations. Tech stack restrictions, performance targets, API contracts, design patterns to follow, backward compatibility needs.\n- **BACKGROUND**: Why this work was needed. Business context, user stories, related systems, prior decisions that informed the approach.\n- **CHANGED_FILES**: Auto-collect via `git diff --name-only HEAD~1` or against the appropriate base (branch point, specific commit).\n- **DIFF**: Auto-collect via `git diff HEAD~1` or against the appropriate base.\n- **FILE_CONTENTS**: The full content of each changed file plus the neighboring files that show the established patterns. Required verbatim when the reviewer cannot read files (`oracle`); when your surface\'s gate reviewer can read files and run commands, pass the paths and the diff instead of pasting everything.\n- **RUN_COMMAND**: How to start/run the application. Check `package.json` scripts, `Makefile`, `docker-compose.yml`, or ask the user.\n- **CONTEXT_MINING**: What the history and the trackers say about this area (collected below).\n\n</required_inputs>\n\nReview PRs and branches from a dedicated review worktree only: create or attach one with `git worktree add <path> <branch>` before collecting changed files, diff, file contents, or running checks, then immediately lock it with `git worktree lock <path> --reason "review:<pr-or-branch>"`. The main worktree is read-only context; never checkout, test, or edit the review branch there.\n\n**Auto-collection sequence:**\n\n```bash\n# 1. Get changed files\ngit diff --name-only HEAD~1  # or: git diff --name-only main...HEAD\n\n# 2. Get diff\ngit diff HEAD~1  # or: git diff main...HEAD\n\n# 3. Detect run command\n# Check package.json -> "scripts.dev" or "scripts.start"\n# Check Makefile -> default target\n# Check docker-compose.yml -> services\n\n# 4. Mine the context the implementation may have missed (keep the output short)\ngit log --oneline -20 -- <each changed file>            # recent changes and their reasons\ngit log --all --oneline --grep="<keywords from goal>"    # related commits, reverts\ngh issue list --search "<keywords>" --state all           # related issues (when gh is available)\ngh pr list --search "<keywords>" --state all              # related PRs and their review comments\nrg -n "TODO|FIXME|HACK" <changed files>                   # warnings left by previous authors\n# plus: files that import the changed modules, tests touching the same paths,\n# docs and config that reference the changed behavior\n```\n\nRecord CONTEXT_MINING as a short list: source -> finding -> why it matters for this change. Slack, Notion, and Discord searches belong here too when those tools exist.\n\nFor GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The user\'s original message almost always contains the goal. Constraints often emerge during discussion. If anything critical is ambiguous, ask ONE focused question - not a checklist.\n\n---\n\n## Phase 1: Manual QA (you run it)\n\nYou are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrator owns the real-surface proof, exactly as the ulw-loop final gate records `manualQa` under the main session.\n\n1. **Reuse first.** If this session already captured real-surface evidence for the FINAL tree (an ultrawork or ulw-loop evidence directory, a `visual-qa` verdict on this same build), consume it as QA rows instead of re-running. A fix committed after a capture stales that capture: re-run the rows it covered.\n2. **Pick the channel that faithfully exercises the surface** and capture the artifact:\n   - HTTP: `curl -i` (or an API request context) - status line, headers, body.\n   - CLI / TUI: a real pty - drive the command and keep the transcript; for color or layout evidence render through a browser-based terminal, never a `tmux capture-pane` dump.\n   - Web: the real page in a real browser - the harness\'s in-process surface (a `Bun.WebView` / `playwright-core` code cell, or Codex\'s Browser plugin) or the agent-browser CLI - action log plus screenshot.\n   - Desktop / GUI: OS-level automation against the running app - action log plus screenshot.\n   - Library / SDK: a script that imports and exercises the public API - transcript.\n   - Data-shaped work (migrations, configs, generated files): the resulting artifact itself, diffed or dumped.\n3. **Cover at least**: the happy path the goal names, the riskiest edge (empty, boundary, malformed, or concurrent input), and one regression on adjacent behavior the change could have broken. Add a row for every stated success criterion.\n4. **Build the QA matrix** - one row per scenario:\n\n| # | Scenario | Exact command / action | Expected | Observed | Verdict | Artifact |\n|---|----------|------------------------|----------|----------|---------|----------|\n\nA row without an artifact path is not PASS. If the application cannot even start, that is an immediate FAIL.\n\nAny FAIL ends the review here: report **REVIEW FAILED** with the failing rows and skip the gate reviewer - reviewing code that does not work wastes the reviewer. Fix first, then re-enter at Phase 0 with the delta.\n\n---\n\n## Phase 2: Launch the Gate Reviewer (one agent)\n\nLaunch exactly one reviewer, in the background, then keep doing independent root work (teardown prep, report scaffolding) while it runs.\n\n`oracle` cannot read files or run commands: it receives everything inline (DIFF + FILE_CONTENTS + CONTEXT_MINING + the QA matrix). If your surface\'s gate reviewer has read and shell tools, still paste the diff and the QA matrix, and hand it file paths instead of full contents.\n\n```\ntask(\n  subagent_type="oracle",\n  run_in_background=true,\n  load_skills=[],\n  description="Gate-review the completed work against goal, constraints, and QA evidence",\n  prompt="""\n<review_type>GATE REVIEW</review_type>\n\n<original_goal>\n{GOAL - paste the user\'s original request and any clarifications}\n</original_goal>\n\n<constraints>\n{CONSTRAINTS - every rule, requirement, or limitation discussed}\n</constraints>\n\n<background>\n{BACKGROUND - why this work was needed, broader context}\n</background>\n\n<changed_files>\n{CHANGED'... 6601 more characters,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+TEST_EXIT=1
+
+
+SHELL_EXIT=1
+
+ls: /tmp/lcx-fix10b-20260908: No such file or directory
+
+SHELL_EXIT=0
+[{"id":"f22a3ec8-44ba-4ff4-8887-7516c7e0df5a","alias":"mengmotaHost","os":"macos","arch":"aarch64","tags":["build","darwin"],"state":"offline"},{"id":"ff303475-2549-45f4-b8a4-9793b080ffe2","alias":"vultr-tokyo","os":"linux","arch":"x86_64","tags":["linux","deploy"],"state":"online"},{"id":"67c3abd0-00f4-4921-9c52-0d4e112fe0f0","alias":"sionicMac","os":"macos","arch":"aarch64","tags":["topology:mengmota-home"],"state":"online"},{"id":"47408d4f-cbbb-4cd2-b968-61962aa741f9","alias":"gorky","os":"linux","arch":"x86_64","tags":["linux","x86_64","tailscale","sandbox"],"state":"online"},{"id":"34a6007a-5b67-4327-9b59-aa0af5913a54","alias":"mengmotaMac","os":"macos","arch":"aarch64","tags":["topology:mengmota-home"],"state":"online"}]
+
+Cloning into '/tmp/lcx-fix10b-20260908/omo'...
+fatal: unable to access 'https://github.com/code-yeongyu/oh-my-openagent/': Recv failure: Connection reset by peer
+
+SHELL_EXIT=128
+
+ls: /tmp/lcx-fix10b-20260908: No such file or directory
+
+SHELL_EXIT=0
+[{"id":"f22a3ec8-44ba-4ff4-8887-7516c7e0df5a","alias":"mengmotaHost","os":"macos","arch":"aarch64","tags":["build","darwin"],"state":"offline"},{"id":"ff303475-2549-45f4-b8a4-9793b080ffe2","alias":"vultr-tokyo","os":"linux","arch":"x86_64","tags":["linux","deploy"],"state":"online"},{"id":"67c3abd0-00f4-4921-9c52-0d4e112fe0f0","alias":"sionicMac","os":"macos","arch":"aarch64","tags":["topology:mengmota-home"],"state":"online"},{"id":"47408d4f-cbbb-4cd2-b968-61962aa741f9","alias":"gorky","os":"linux","arch":"x86_64","tags":["linux","x86_64","tailscale","sandbox"],"state":"online"},{"id":"34a6007a-5b67-4327-9b59-aa0af5913a54","alias":"mengmotaMac","os":"macos","arch":"aarch64","tags":["topology:mengmota-home"],"state":"online"}]
+
+Cloning into '/tmp/lcx-fix10b-20260908/omo'...
+Updating files:  61% (6418/10361)Updating files:  62% (6424/10361)Updating files:  63% (6528/10361)Updating files:  64% (6632/10361)Updating files:  65% (6735/10361)Updating files:  66% (6839/10361)Updating files:  67% (6942/10361)Updating files:  68% (7046/10361)Updating files:  69% (7150/10361)Updating files:  70% (7253/10361)Updating files:  71% (7357/10361)Updating files:  72% (7460/10361)Updating files:  73% (7564/10361)Updating files:  74% (7668/10361)Updating files:  75% (7771/10361)Updating files:  76% (7875/10361)Updating files:  77% (7978/10361)Updating files:  78% (8082/10361)Updating files:  79% (8186/10361)Updating files:  80% (8289/10361)Updating files:  81% (8393/10361)Updating files:  82% (8497/10361)Updating files:  83% (8600/10361)Updating files:  84% (8704/10361)Updating files:  85% (8807/10361)Updating files:  86% (8911/10361)Updating files:  87% (9015/10361)Updating files:  88% (9118/10361)Updating files:  89% (9222/10361)Updating files:  90% (9325/10361)Updating files:  91% (9429/10361)Updating files:  92% (9533/10361)Updating files:  93% (9636/10361)Updating files:  94% (9740/10361)Updating files:  95% (9843/10361)Updating files:  96% (9947/10361)Updating files:  97% (10051/10361)Updating files:  98% (10154/10361)Updating files:  99% (10258/10361)Updating files: 100% (10361/10361)Updating files: 100% (10361/10361), done.
+
+SHELL_EXIT=0
+OVERLAY packages/omo-codex/plugin/components/ulw-loop/package.json
+OVERLAY packages/omo-codex/plugin/test/sync-skills-test-support.mjs
+OVERLAY packages/omo-codex/plugin/test/sync-skills.test.mjs
+bun install v1.4.0 (34cbb9a40)
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Submodule 'packages/shared-skills/upstreams/designpowers' (https://github.com/Owl-Listener/designpowers) registered for path 'packages/shared-skills/upstreams/designpowers'
+Submodule 'packages/shared-skills/upstreams/open-design' (https://github.com/nexu-io/open-design) registered for path 'packages/shared-skills/upstreams/open-design'
+Submodule 'packages/shared-skills/upstreams/taste-skill' (https://github.com/Leonxlnx/taste-skill) registered for path 'packages/shared-skills/upstreams/taste-skill'
+Submodule 'packages/shared-skills/upstreams/ui-ux-pro-max' (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) registered for path 'packages/shared-skills/upstreams/ui-ux-pro-max'
+Cloning into '/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/designpowers'...
+Cloning into '/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/open-design'...
+Cloning into '/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/taste-skill'...
+Cloning into '/tmp/lcx-fix10b-20260908/omo/packages/shared-skills/upstreams/ui-ux-pro-max'...
+Submodule path 'packages/shared-skills/upstreams/designpowers': checked out 'cb00757da9d554591fa78d27aa1854d60a05c4f7'
+From https://github.com/nexu-io/open-design
+ * branch              6afe7eae156bfa29251a51fd0636649c257f7444 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/open-design': checked out '6afe7eae156bfa29251a51fd0636649c257f7444'
+From https://github.com/Leonxlnx/taste-skill
+ * branch            b17742737e796305d829b3ad39eda3add0d79060 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/taste-skill': checked out 'b17742737e796305d829b3ad39eda3add0d79060'
+From https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+ * branch            f32d6a61cdf0bfd57404c45854583fd19ff95088 -> FETCH_HEAD
+Submodule path 'packages/shared-skills/upstreams/ui-ux-pro-max': checked out 'f32d6a61cdf0bfd57404c45854583fd19ff95088'
+[materialize] wrote 148 frontend reference files from submodules
+build:ast-grep-mcp
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 103 modules in 78ms
+
+  cli.js  85.17 KB  (entry point)
+
+build:tui
+Bundled 554 modules in 519ms
+
+  tui.js  2.15 MB  (entry point)
+
+build:cli
+Bundled 923 modules in 563ms
+
+  index.js  3.35 MB  (entry point)
+
+build:git-bash-mcp
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 116ms
+
+  cli.js  22.68 KB  (entry point)
+
+build:index
+Bundled 2000 modules in 729ms
+
+  index.js  5.87 MB  (entry point)
+
+build:codex-install
+$ bun run script/build-codex-install.ts
+build:cli-node
+$ bun run script/build-cli-node.ts
+built dist/cli-node (1 output)
+build:shared-skills-assets
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+build:schema
+$ bun run script/build-schema.ts
+Generating JSON Schemas...
+✓ JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+build:omo-schema
+$ bun run script/build-omo-schema.ts
+Generating omo JSON Schema...
+✓ omo JSON Schema generated: assets/omo.schema.json
+build:node-require-shim
+$ bun run script/patch-node-require-shim.ts
+Patched Node/Electron require shim in dist/index.js
+build:declarations
+build:lsp-tools-mcp
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 51 packages, and audited 54 packages in 3s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 343ms
+
+  cli.js               195.27 KB  (entry point)
+  mcp.js               194.80 KB  (entry point)
+  tools.js             182.91 KB  (entry point)
+  request-context.js   7.47 KB    (entry point)
+  lsp/manager.js       109.46 KB  (entry point)
+
+build:lsp-daemon
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 51 packages, and audited 54 packages in 3s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 232ms
+
+  cli.js     250.54 KB  (entry point)
+  index.js   231.32 KB  (entry point)
+  client.js  229.0 KB   (entry point)
+
+build:codex-plugin
+$ npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build
+
+added 73 packages, and audited 91 packages in 4s
+
+19 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.48 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 338ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 334ms
+
+  cli.js  155.86 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 202ms
+
+  cli.js  4.18 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 164ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 263ms
+
+  cli.js  14.52 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 235ms
+
+  cli.js  8.32 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 137ms
+
+  cli.js  156.1 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 119ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 209ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 123ms
+
+  cli.js  14.78 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 281ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 190ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 build
+> node scripts/build-runtime.mjs
+
+Bundled 10 modules in 118ms
+
+  cli.js  228.00 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 300ms
+
+  cli.js  0.27 MB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.48 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 228ms
+
+  cli.js  35.17 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 45 modules in 117ms
+
+  cli.js  186.85 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 256ms
+
+  cli.js  35.34 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 45 modules in 229ms
+
+  cli.js  187.83 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.48 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+
+  dist/cli.js  148.2kb
+
+⚡ Done in 224ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 275ms
+
+  cli.js  152.66 KB  (entry point)
+
+build:senpi-plugin
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Staged Senpi LSP runtime: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+Bundled 45 modules in 248ms
+
+  cli.js  189.10 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+  omo-agent-toolkit ulw-loop help
+  omo-agent-toolkit ulw-loop create-goals --brief "..." [--brief-file <path>] [--from-stdin] [--codex-goal-mode aggregate|per_story] [--validation-batch-json <json-or-path>] [--force] [--json]
+  omo-agent-toolkit ulw-loop status [--json]
+  omo-agent-toolkit ulw-loop complete-goals [--retry-failed] [--json]
+  omo-agent-toolkit ulw-loop criteria --goal-id <id> [--json]
+  omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "..." [--notes "..."] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --print-template [--goal-id <id>] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete|failed|blocked --evidence "..." --codex-goal-json <...> [--quality-gate-json <...>] [--no-advance] [--json]
+  omo-agent-toolkit ulw-loop steer --kind <kind> ... --evidence "..." --rationale "..." [--proposals-json <json-or-path>] [--json]
+  omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]
+  omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "..." --objective "..." --evidence "..." --codex-goal-json <...> [--json]
+
+Every state subcommand needs a session scope: [--session-id <id>] or the session env (OMO_ULW_LOOP_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID / PI_SESSION_ID); state lives under .omo/ulw-loop/<id>/ and the unscoped root is never used implicitly. status --json exposes the currentAttemptDir; put all quality-gate artifacts under it.
+Every subcommand accepts --help | -h to print its own usage line.
+Staged Senpi agent-toolkit runtime: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/runtime/agent-toolkit
+Staged x-search conditional skill: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 902 modules in 336ms
+
+  omo.js  1.62 MB  (entry point)
+
+Bundled 679 modules in 342ms
+
+  omo-task.js  0.98 MB  (entry point)
+
+Bundled 212 modules in 281ms
+
+  omo-member.js  176.39 KB  (entry point)
+
+Bundled 139 modules in 273ms
+
+  memory-run-supervisor.mjs  38.64 KB  (entry point)
+
+Bundled 118 modules in 239ms
+
+  omo-init-deep-advisor.js  84.59 KB  (entry point)
+
+Built omo-senpi extensions: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo.js, /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo-task.js, /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo-member.js, /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/skills
+generated directive is current: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 279ms
+
+  install.mjs  20.59 KB  (entry point)
+
+Built omo-senpi installer: /tmp/lcx-fix10b-20260908/omo/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed
+
++ @code-yeongyu/senpi@2026.9.7-2
++ @types/js-yaml@4.0.9
++ @types/picomatch@4.0.3
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @xterm/addon-unicode11@0.9.0
++ @xterm/xterm@6.0.0
++ bun-types@1.4.0
++ node-pty@1.1.0
++ puppeteer-core@25.8.0
++ typescript@7.0.2
++ @clack/prompts@1.7.0
++ @code-yeongyu/comment-checker@0.8.0
++ @modelcontextprotocol/sdk@1.30.0
++ @opencode-ai/plugin@1.18.22
++ @opencode-ai/sdk@1.18.22
++ @opentui/core@0.5.8
++ @opentui/keymap@0.5.8
++ @opentui/solid@0.5.8
++ commander@15.0.0
++ detect-libc@2.1.2
++ diff@9.0.0
++ js-yaml@5.3.0
++ jsonc-parser@3.3.1
++ picocolors@1.1.1
++ picomatch@4.0.7
++ posthog-node@5.51.1
++ zod@4.4.3
+
+599 packages installed [81.52s]
+
+
+$ node postinstall.mjs
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-linux-x64, oh-my-opencode-linux-x64-baseline
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+
+SHELL_EXIT=0
+Synced OMO Codex manifests to version 5.0.0-beta.48 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.48 build
+> node scripts/build-runtime.mjs
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 330ms
+
+  cli.js  155.86 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 194ms
+
+  cli.js  14.52 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 249ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 206ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 176ms
+
+  cli.js  14.78 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 202ms
+
+  cli.js  156.1 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 213ms
+
+  cli.js  8.32 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 210ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 226ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 219ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.48 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 229ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 146ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 320ms
+
+  cli.js  0.27 MB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.48 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 296ms
+
+  cli.js  35.17 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.48 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 45 modules in 142ms
+
+  cli.js  186.85 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 45 modules in 249ms
+
+  cli.js  187.83 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 292ms
+
+  cli.js  35.34 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.48 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+
+  dist/cli.js  148.2kb
+
+⚡ Done in 250ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 252ms
+
+  cli.js  152.66 KB  (entry point)
+
+Bundled 45 modules in 264ms
+
+  cli.js  186.85 KB  (entry point)
+
+
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+$ tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+SHELL_EXIT=0
+✔ #given Codex plugin hooks #when plugin metadata is inspected #then hook keys contain human-readable hook slugs (44.29147ms)
+✔ #given Codex plugin skills #when skill metadata is inspected #then every skill has an OmO display name (38.406508ms)
+✔ #given hook status label #when formatting #then prefixes OmO display namespace and version (14.321577ms)
+✔ #given hook status label with blank version #when formatting #then uses local OmO display version (0.492792ms)
+✔ #given loose legacy status label #when normalizing #then removes OMO wording and title-cases label (5.042389ms)
+✔ #given LazyCodex appears inside hook label #when normalizing #then product casing is preserved (3.011799ms)
+✔ #given MCP appears inside hook label #when normalizing #then protocol casing is preserved (1.224832ms)
+✔ #given versioned OmO status label #when normalizing #then it does not duplicate display prefix (0.828651ms)
+✔ #given aggregate comment-checker hook #when status is inspected #then it uses OmO comments label (18.869253ms)
+✔ #given aggregate and component hooks #when status messages are inspected #then all use the OmO formatter (42.249088ms)
+✔ #given aggregate build scripts #when inspected #then component CLIs are bundled with Bun (15.3018ms)
+✔ #given aggregate build scripts #when inspected #then npm subprocesses resolve on Windows (8.246763ms)
+✔ #given bundled MCP runtime builds #when a locked runtime has no node_modules #then npm ci bootstraps it before build (1.303234ms)
+✔ #given lcx skills #when frontmatter is inspected #then each exposes the loader-parsed skill name (34.868167ms)
+✔ #given complete bug-fix evidence #when creating a PR body #then evidence and machine label are emitted (1.845261ms)
+✔ #given missing bug-fix evidence #when creating a PR body #then the script rejects the incomplete payload (7.318149ms)
+✔ #given a JSON payload path #when running the PR body script #then markdown is written to the requested file (117.396792ms)
+✔ #given the installed cache layout #when running build-lsp-tools #then uses the bundled dist and exits 0 (101.745809ms)
+✔ #given the installed cache layout #when running build-lsp-daemon #then uses the bundled dist and exits 0 (97.397035ms)
+lsp-tools-mcp package metadata is missing at /lsp-tools-mcp/package.json; build packages/lsp-tools-mcp before codex-lsp
+probed: /lsp-tools-mcp/package.json, /tmp/lsp-prebuild-none-9nuFsS/components/lsp-tools-mcp/package.json
+✔ #given neither layout #when running build-lsp-tools #then fails listing every probed path (97.558922ms)
+✔ #given the repo sibling layout with fresh outputs #when running build-lsp-tools #then exits 0 without building (84.695418ms)
+✔ #given aggregate MCP config #when inspected #then registers research MCPs without ast-grep MCP (20.916992ms)
+✔ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (1.722685ms)
+✔ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (0.381281ms)
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (34.656477ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (11.770795ms)
+✔ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (3.723966ms)
+✔ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (6.229752ms)
+✔ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (6.723086ms)
+✔ #given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode (4.279564ms)
+✔ #given managed config state is malformed #when migrating #then migration ignores stale state safely (9.106536ms)
+✔ #given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used (2.910448ms)
+✔ #given managed catalog state #when catalog version advances #then only previously managed config is updated (8.987641ms)
+✔ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (10.044473ms)
+✔ #given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy (9.099611ms)
+✔ #given real Context7 API key and placeholder comment #when migrating #then preserves user server settings (11.946553ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then flips the flag to false (0.280694ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then appends a disabled section (0.238002ms)
+✔ #given multi_agent_v2 section without enabled key #when forcing disable #then inserts enabled = false (0.100759ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = true #when forcing disable #then removes it and appends a disabled section (0.174734ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out (0.129505ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then annotates the appended section (0.127323ms)
+✔ #given an annotated managed section #when forcing disable runs again #then does not duplicate the comment (0.114524ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table (136.782515ms)
+✔ #given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged (0.215127ms)
+✔ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (12.251726ms)
+✔ #given global config starts with inline-comment features table #when full migration runs #then managed root settings stay at TOML root (144.378838ms)
+✔ #given queue multi-agent mode #when removing unsupported root key #then deletes root setting (0.296659ms)
+✔ #given proactive multi-agent mode #when removing unsupported root key #then deletes root setting (0.092781ms)
+✔ #given inline-comment features table #when removing unsupported root key #then config stays unchanged (138.636096ms)
+✔ #given indented root proactive mode #when removing unsupported root key #then no root setting remains (0.327697ms)
+✔ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (11.817123ms)
+✔ #given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment (0.416307ms)
+✔ #given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table (0.170574ms)
+✔ #given an already-guarded commented config #when re-running #then output is byte-identical (0.651766ms)
+✔ #given user-disabled with an inline comment #when forcing disable #then returns config unchanged (0.076478ms)
+✔ #given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table (0.17016ms)
+✔ #given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section (0.144859ms)
+✔ #given gpt-5.6-terra with managed disable #when model catalog prefers v2 #then clears enabled=false and managed comments (1.354645ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=false #when clearing #then removes the stale metadata override (0.20055ms)
+✔ #given gpt-5.6 v2 model with hide_spawn_agent_metadata=true #when clearing #then leaves the default-matching value alone (0.15052ms)
+✔ #given v1 model with hide_spawn_agent_metadata=false #when forcing disable #then keeps the metadata override (0.10648ms)
+✔ #given gpt-5.6-sol with no multi_agent_v2 section #when model catalog prefers v2 #then does not append a disable (2.401566ms)
+✔ #given gpt-5.6-terra managed disable #when full migration sees models_cache v2 #then clears disable and drops agents.max_threads (18.541878ms)
+✔ #given config default gpt-5.5 #when SessionStart model is gpt-5.6-terra #then prefers session model and clears disable (0.375732ms)
+✔ #given SessionStart without model #when requireSessionModel is set #then skips legacy force-disable (0.131854ms)
+✔ #given legacy [features] shorthand #when requireSessionModel skips force-disable #then still removes the shorthand (0.093837ms)
+✔ #given legacy [features] shorthand #when session model has no catalog entry #then still removes the shorthand (0.080266ms)
+✔ #given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML (131.223898ms)
+✔ #given SoT migration failure #when hook migration runs #then config.toml repair still happens (40.67902ms)
+✔ #given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model (1.971713ms)
+✔ #given no session model and no root model #when forcing disable #then leaves the enable state untouched (0.201933ms)
+✔ #given no session model and no root model #when config has no multi_agent_v2 section #then does not append a disable (0.080923ms)
+✔ #given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads (4.386542ms)
+✔ #given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads (7.075003ms)
+✔ #given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable (5.85684ms)
+✔ #given relative model_catalog_json declares gpt-5.6 model as v1 #when migrating #then resolves catalog from config directory (30.509145ms)
+✔ #given no SessionStart model and root gpt-5.6 model without catalog #when migrating #then clears stale V2 disable (10.116254ms)
+✔ #given Codex Light install docs #when inspected #then lazycodex is npm-first and Bun-free (7.407855ms)
+✔ payload-equivalence: #given telemetry-core and component shim #when session_start is captured #then payload schema matches telemetry-core (79.330413ms)
+✔ payload-equivalence: #given built telemetry CLI #when inspected #then telemetry-core is bundled without runtime package imports (6.40206ms)
+✔ #given resolveSafeOmoPath #when the target escapes .omo or the workspace #then it is refused (the script never escapes .omo) (5.696963ms)
+✔ #given scaffold #when .omo/plans is a symlink outside the workspace #then it refuses before the plan write escapes (37.68684ms)
+✔ #given scaffold #when .omo/drafts is a symlink outside the workspace #then it refuses before the draft write escapes (1.893412ms)
+✔ #given parseArgs #when the slug is missing or unsafe #then it throws, and valid flags parse (0.81272ms)
+✔ #given an explicit review modifier at startup #when draft-only scaffold runs #then the first durable write contains the complete pending review request (9.140502ms)
+✔ #given automatic review for non-Trivial UNCLEAR intent #when draft-only scaffold runs #then the first durable write contains the complete pending review request (7.666239ms)
+✔ #given Trivial UNCLEAR pre-approval planning #when draft-only scaffold runs #then it creates a review-optional draft without creating a plan (3.253599ms)
+✔ #given an already-scaffolded plan #when the script is re-run plain #then it is a no-op that preserves appended todos (resume-safe, no crash, no clobber) (12.263533ms)
+✔ #given a hand-edited plan #when --reset is used #then it refuses without --force and overwrites with --force (5.196752ms)
+✔ #given SessionStart migration sees an inline-commented V2 cap #when migrating twice #then preserves the line and ordering byte-for-byte (34.748438ms)
+✔ #given SessionStart migration sees equivalent V2 header ["features"."multi_agent_v2"] #when migrating twice #then preserves one valid table and the explicit cap (150.409272ms)
+✔ #given SessionStart migration sees equivalent V2 header [ features . multi_agent_v2 ] #when migrating twice #then preserves one valid table and the explicit cap (183.056192ms)
+✔ #given SessionStart migration sees equivalent V2 header ["features"."multi_agent_v\u0032"] #when migrating twice #then preserves one valid table and the explicit cap (116.743592ms)
+✔ #given SessionStart migration sees a quoted cap key #when migrating twice #then preserves the semantic cap without duplication (124.797493ms)
+✔ #given SessionStart migration sees a escaped quoted cap key #when migrating twice #then preserves the semantic cap without duplication (109.058325ms)
+✔ #given SessionStart migration sees a dotted cap key #when migrating twice #then preserves the semantic cap without duplication (105.35572ms)
+✔ #given SessionStart migration sees a root-qualified dotted cap key #when migrating twice #then preserves the semantic cap without duplication (95.653646ms)
+✔ #given multiline string contains V2 cap lookalikes #when SessionStart migrates #then writes the absent semantic default (144.568253ms)
+✔ #given V2 section multiline value contains a cap lookalike #when SessionStart migrates #then writes the absent default (162.956675ms)
+✔ #given V2 root-dotted disable and cap #when gpt-5.6 SessionStart migrates #then removes disable and V1 agents cap (120.831556ms)
+✔ #given quoted dotted V1 keys under features #when SessionStart migrates #then replaces enabled without a duplicate (69.06863ms)
+✔ #given multiline string closes after an escaped quote #when SessionStart migrates #then preserves the following explicit cap (76.975095ms)
+✔ #given gpt-5.6 session model with no models_cache and an explicit V2 cap #when migrating #then removes agents.max_threads but preserves the cap (7.420314ms)
+✔ #given SessionStart config migration has no V2 cap #when migrating #then writes the conservative managed default (2.488062ms)
+✔ #given config without any model #when migrating #then does not introduce agents.max_threads (3.322421ms)
+✔ #given config without any model but an existing low cap #when migrating #then still raises the existing cap (6.970711ms)
+✔ #given source package versions and component without hooks #when hook status messages sync #then source versions are preserved (66.169479ms)
+✔ #given release version override #when hook status messages sync #then aggregate hooks use release version (2.820125ms)
+✔ #given sentinel OpenCode tool content #when compatibility guidance is inserted #then the production artifact is placed after frontmatter and before the tool token (6.844796ms)
+✔ #given shared skill source anchors #when Codex overlays are applied #then exact anchors transform and match the generated artifacts (26.443046ms)
+✔ #given already transformed sentinel content #when compatibility guidance is inserted again #then the transform is idempotent (0.541175ms)
+✔ #given a stale generated compatibility block #when guidance is inserted #then the production artifact replaces it (0.334565ms)
+✔ #given a custom compatibility block before an OpenCode tool token #when guidance is inserted #then the custom block is preserved (5.382908ms)
+✔ #given an exported template wrapper containing an OpenCode tool token #when guidance is inserted #then wrapper bytes are preserved (0.125458ms)
+✔ #given real shared skills that need Codex translation #when aggregate skills are synced #then each generated skill injects the production compatibility artifact once before any remaining OpenCode tool token (14.157376ms)
+✔ #given the aggregate sync implementation #when its skill adaptation pipeline is inspected #then it still applies compatibility guidance before overlays (0.889182ms)
+✔ #given the flattened plugin cache the Codex installer produces #when sync-skills runs inside it #then it resolves shared skills through the linked package and writes the skill tree (1110.038658ms)
+✔ #given synced aggregate Codex skills #when inspected #then component and shared skills are present (33.807679ms)
+✔ #given reference-only designpowers frontend files #when synced for Codex #then nested SKILL.md files are not packaged (16.755507ms)
+✔ #given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package (1.637159ms)
+✔ #given shared skill package source #when aggregate Codex shared skills are inspected #then generated copies have no hand-authored drift (9.150075ms)
+✔ #given a shared skill name collides with a Codex component skill #when aggregate skills are inspected #then the component skill wins (1.374955ms)
+✔ #given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged (19.670034ms)
+✔ #given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift (9.895073ms)
+✔ #given the canonical prompts-core directive #when the aggregate ultrawork skill is inspected #then it wraps the canonical bytes in skill frontmatter (0.902481ms)
+✔ #given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ulw-loop alias (1.215284ms)
+✔ #given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop remains discoverable as an alias (4.515882ms)
+✔ #given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged (174.48473ms)
+✔ #given synced git-master skill #when inspected #then commits and git history route through it (0.906835ms)
+✔ #given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped (0.862542ms)
+✔ #given LAZYCODEX_RELEASE_VERSION env #when resolving authoritative version #then the env value wins (9.878539ms)
+✔ #given no env override #when resolving authoritative version #then root package.json version is used (69.418824ms)
+✔ #given drifted Codex manifests #when syncing version from root #then all versioned manifests match and version-less files are left alone (16.794333ms)
+✔ #given already coherent manifests #when syncing again #then nothing is rewritten (10.142799ms)
+✔ #given app-thread archival is blocked by an ambiguous id #when archive runs with a note #then team state is archived and keeps the blocker in the log (860.798114ms)
+✔ #given a bound team #when the member field manual renders #then it names the cross-thread tool and the team.json address book (623.780539ms)
+✔ #given a member bootstrap trigger #when it is generated #then it names the cross-thread push tool (693.006055ms)
+✔ #given guide.md is a symlink #when guide is regenerated #then the outside target stays untouched (184.683953ms)
+✔ #given member A exists #when add-member receives A with trailing space #then state is not partially mutated (339.803515ms)
+✔ #given two add-member commands run concurrently #then both successful mutations are preserved (281.921131ms)
+✔ #given another command holds the team lock #when add-member times out #then it fails without mutating team state (243.041098ms)
+✔ #given member focus already exists #when add-member receives same focus with different spacing and case #then state is not partially mutated (367.47246ms)
+✔ #given only one member exists #when bind-thread runs #then member is not activated (709.805696ms)
+✔ #given persisted paths are mutated outside trusted team dir #when guide is regenerated #then outside file stays untouched (251.196386ms)
+✔ #given team dir is swapped to a symlink #when status reads team state #then command refuses the symlink (236.309792ms)
+✔ #given teams root is a symlink #when delete runs #then outside team state stays untouched (106.757995ms)
+✔ #given a worktree-backed team has bound member threads #when guide and status render #then they include codex thread links (994.380578ms)
+✔ #given two members with distinct names #when added #then each thread title is per-member and the two never collide (318.465803ms)
+✔ #given a member added without an explicit name #when state is read #then the title falls back to the focus, never a shared session name (330.691964ms)
+✔ #given a member name already exists #when add-member receives the same name with different spacing and case #then state is not partially mutated (331.339276ms)
+✔ #given persisted team.json has duplicate member names #when a command loads the team #then stale state is rejected (492.728745ms)
+✔ #given persisted team.json has duplicate thread titles with distinct member names #when bind-thread runs #then state is rejected before activation (454.441529ms)
+✔ #given MultiAgentV2 transport #when members are added and bound #then task names and canonical agent paths form the address book (861.36286ms)
+✔ #given codex_app transport #when members bind threads #then the existing thread address book and deep links remain (712.480842ms)
+✔ #given an unsupported transport #when init runs #then it fails before creating team state (101.654917ms)
+✔ #given --transport without a value #when init runs #then it fails before creating team state (94.631575ms)
+✔ #given an existing team #when init re-runs with a conflicting transport #then it fails and state is unchanged (304.354723ms)
+✔ #given a V2 team #when the whole team is archived without a note #then no output claims runtime members were closed (425.233773ms)
+✔ #given a V2 team #when one member is archived #then output scopes the archive to team state, not the runtime agent (420.669499ms)
+✔ #given a codex_app team #when one member is archived #then the existing wording is preserved (434.049649ms)
+✔ #given a transport-specific team #when the wrong bind command runs #then it fails without changing team.json (838.316745ms)
+✔ #given V2 expected task identity #when bind-agent receives another path #then it fails without activating the member (401.183259ms)
+✔ #given a V2 member has no valid task name #when add-member runs #then state remains unchanged (325.951089ms)
+✔ #given legacy schemaVersion 2 state with existing members #when a mutation succeeds #then it upgrades in place as codex_app (481.688279ms)
+✔ #given a worktree team #when worktree-add A #then a real git worktree on a derived branch is created and recorded (542.148153ms)
+✔ #given worktree-add ran #when the field manual is regenerated #then it shows the member's derived worktree branch (537.363079ms)
+✔ #given a team initialized WITHOUT --worktree #when worktree-add is called mid-run #then it auto-enables isolation (conflict-triggered) (571.576865ms)
+✔ #given an existing member worktree #when worktree-add runs again #then it is a safe no-op that reports the existing worktree (600.875597ms)
+✔ #given a member worktree #when worktree-remove A #then git drops it and team.json clears the path (648.228745ms)
+✔ #given a member committed work in its worktree #when integrate --id A #then the base branch gets a NO-FF merge commit (684.193775ms)
+✔ #given two members edited the same line #when integrate hits the conflict #then it stops, reports the conflicting member, and exits non-zero (888.736182ms)
+✔ #given a member branch that cannot be merged #when integrate runs #then it surfaces git's real reason, not a fake conflict (594.325919ms)
+✔ #given a member id that is not a safe path segment #when worktree-add runs #then it refuses instead of escaping the team dir (343.984802ms)
+✔ #given synced skills #when the ultrawork skill is inspected #then it carries the full directive body (2.925817ms)
+✔ #given the built ultrawork CLI #when a ulw prompt is submitted #then a compact skill pointer is emitted (76.798555ms)
+✔ #given the built ultrawork and ulw-loop CLIs #when both emit the pointer #then the payloads match byte for byte (187.816322ms)
+✔ #given shared OpenCode #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest (25.545694ms)
+✔ #given a complete shared OpenCode plan #when a fresh review round starts #then both lanes persist literal workspace and artifact bindings (3.742531ms)
+✔ #given a shared OpenCode review round #when launch, interruption, completion, or compaction occurs #then the durable transition table fails closed (8.74213ms)
+✔ #given shared OpenCode round R2 replaced R1 #when a delayed R1 launch or receipt arrives #then identity-bound CAS leaves R2 unchanged (4.082054ms)
+✔ #given shared OpenCode independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery (5.23653ms)
+✔ #given Codex #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest (0.946741ms)
+✔ #given a complete Codex plan #when a fresh review round starts #then both lanes persist literal workspace and artifact bindings (4.358287ms)
+✔ #given a Codex review round #when launch, interruption, completion, or compaction occurs #then the durable transition table fails closed (1.00335ms)
+✔ #given Codex round R2 replaced R1 #when a delayed R1 launch or receipt arrives #then identity-bound CAS leaves R2 unchanged (1.162341ms)
+✔ #given Codex independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery (1.500723ms)
+✔ #given ulw-plan skill copies #when component source and packaged copy are compared #then they are byte-identical and expose the loader-parsed name (11.940964ms)
+✔ #given ulw-research skill copies #when frontmatter is inspected #then the loader-parsed name is ulw-research (33.956639ms)
+✔ #given ulw-research skill copies #when scanned for non-English content #then they contain no Hangul (3.052968ms)
+ℹ tests 327
+ℹ suites 0
+ℹ pass 327
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8371.868975
+✔ #given built workspace component CLIs #when import specifiers are inspected #then each CLI is self-contained except node builtins (20.738698ms)
+TEST_EXIT=0
+
+
+SHELL_EXIT=0
+
+ls: cannot access '/tmp/lcx-fix10b-20260908': No such file or directory
+
+SHELL_EXIT=0

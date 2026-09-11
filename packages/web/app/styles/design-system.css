@@ -4,77 +4,89 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Phosphor Ledger — design tokens (DESIGN.md §2–§7).
+ * This file and lib/og/palette.ts are the only places a raw color may appear.
+ * app/globals.css imports this file.
+ */
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 
-  /* shadcn / legacy tokens, preserved for component compatibility */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* §2 palette → Tailwind color utilities (bg-ink-1, text-text-mid, border-line, text-accent …) */
+  --color-ink-0: var(--ink-0);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
 
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-text-hi: var(--text-hi);
+  --color-text-mid: var(--text-mid);
+  --color-text-lo: var(--text-lo);
+  --color-text-faint: var(--text-faint);
 
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-line-strong: var(--line-strong);
+  --color-line: var(--line);
+  --color-line-faint: var(--line-faint);
 
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hot: var(--accent-hot);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-4: var(--accent-4);
+  --color-accent-8: var(--accent-8);
+  --color-accent-16: var(--accent-16);
+  --color-accent-32: var(--accent-32);
 
+  --color-status-ok: var(--status-ok);
+  --color-status-busy: var(--status-busy);
+  --color-status-err: var(--status-err);
+
+  --color-code-bg: var(--code-bg);
+  --color-code-fg: var(--code-fg);
+
+  /* Legacy shadcn names, remapped onto the ledger tokens (compat for untouched components) */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  /* §3 role sizes that have no Tailwind default */
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1.4;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.45;
+  --tracking-eyebrow: 0.2em;
+  --tracking-meta: 0.04em;
+  --tracking-nav: 0.12em;
 
-  /*
-   * Design system tokens (DESIGN.md). Use these in new components.
-   * Surfaces stack via luminance, accent is reserved for interactive cyan,
-   * status colors are reserved for actual semantic status.
-   */
-  --color-surface-0: var(--surface-0);
-  --color-surface-1: var(--surface-1);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
-
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-tertiary: var(--text-tertiary);
-
-  --color-accent-primary: var(--accent-primary);
-  --color-accent-primary-soft: var(--accent-primary-soft);
-  --color-accent-primary-border: var(--accent-primary-border);
-
-  --color-border-default: var(--border-default);
-  --color-border-subtle: var(--border-subtle);
-
-  --color-status-success: var(--status-success);
-  --color-status-warning: var(--status-warning);
-  --color-status-error: var(--status-error);
-
+  /* §4 radius scale: 0 for panels, 2px for controls, 50% for dots */
+  --radius-none: 0px;
+  --radius-control: 2px;
   --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: var(--radius);
+  --radius-sm: var(--radius);
+
+  /* §6 easing → ease-standard / ease-out-quart / ease-underline (also usable as var(--ease-*)) */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-underline: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
-  --animate-fade-in-up: fade-in-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulse-dot: pulse-dot var(--dur-pulse) var(--ease-standard) infinite;
 
   @keyframes accordion-down {
     from {
@@ -92,7 +104,7 @@
       height: 0;
     }
   }
-  @keyframes fade-in-up {
+  @keyframes reveal-in {
     from {
       opacity: 0;
       transform: translate3d(0, 16px, 0);
@@ -102,99 +114,112 @@
       transform: translate3d(0, 0, 0);
     }
   }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
 }
 
-/*
-  The default border color has changed to `currentColor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-*/
 @layer base {
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
+    border-color: var(--line);
   }
 }
 
 @layer base {
   :root {
-    /* Dark Theme Only - Terminal/Hacker Aesthetic */
+    /* §2 Ink (elevation is luminance, never shadow) */
+    --ink-0: #09090b;
+    --ink-1: #0e0e11;
+    --ink-2: #14141a;
+    --ink-3: #1b1b22;
 
-    /* shadcn / legacy tokens, preserved */
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* §2 Text */
+    --text-hi: #f5f5f7;
+    --text-mid: #c3c4c9;
+    --text-lo: #8b8c95;
+    --text-faint: #55565e;
 
-    --card: #111111;
-    --card-foreground: #ededed;
+    /* §2 Hairlines */
+    --line-strong: rgba(255, 255, 255, 0.12);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-faint: rgba(255, 255, 255, 0.04);
 
-    --popover: #111111;
-    --popover-foreground: #ededed;
+    /* §2 Accent — cyan means live */
+    --accent: #00d4ff;
+    --accent-hot: #e6fdff;
+    --accent-dim: #0ea5c4;
+    --accent-4: rgba(0, 212, 255, 0.04);
+    --accent-8: rgba(0, 212, 255, 0.08);
+    --accent-16: rgba(0, 212, 255, 0.16);
+    --accent-32: rgba(0, 212, 255, 0.32);
 
-    --primary: #00d4ff;
-    --primary-foreground: #000000;
+    /* §2 Status — dots and 1px indicators only */
+    --status-ok: #10b981;
+    --status-busy: #f5c451;
+    --status-err: #ef4444;
 
-    --secondary: #7c3aed;
-    --secondary-foreground: #ffffff;
+    /* §2 Code */
+    --code-bg: #0b0b0e;
+    --code-fg: #cdd6f4;
 
-    --muted: #1a1a1a;
-    --muted-foreground: #a1a1a1;
+    /* §4 Spacing (4px base) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --space-24: 96px;
+    --space-40: 160px;
 
-    --accent: #1a1a1a;
-    --accent-foreground: #ededed;
+    /* §4 Radius (panel radius; controls use --radius-control from @theme) */
+    --radius: 0px;
 
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
+    /* §6 Motion durations (easings live in @theme) */
+    --dur-micro: 150ms;
+    --dur-underline: 320ms;
+    --dur-reveal: 600ms;
+    --dur-count: 600ms;
+    --dur-type: 40ms;
+    --dur-pulse: 2200ms;
+    --dur-wave: 12s;
 
-    --border: #262626;
-    --input: #262626;
-    --ring: #00d4ff;
+    /* Legacy shadcn variables remapped onto the ledger tokens */
+    --background: var(--ink-0);
+    --foreground: var(--text-hi);
+    --card: var(--ink-1);
+    --card-foreground: var(--text-hi);
+    --popover: var(--ink-3);
+    --popover-foreground: var(--text-hi);
+    --primary: var(--accent);
+    --primary-foreground: var(--ink-0);
+    --secondary: var(--ink-2);
+    --secondary-foreground: var(--text-hi);
+    --muted: var(--ink-2);
+    --muted-foreground: var(--text-lo);
+    --accent-foreground: var(--ink-0);
+    --destructive: var(--status-err);
+    --destructive-foreground: var(--text-hi);
+    --border: var(--line);
+    --input: var(--line-strong);
+    --ring: var(--accent-32);
 
-    /* Charts */
-    --chart-1: #00d4ff;
-    --chart-2: #7c3aed;
-    --chart-3: #10b981;
-    --chart-4: #f59e0b;
-    --chart-5: #ef4444;
-
-    /* Code */
-    --code-bg: #1e1e2e;
-    --code-text: #cdd6f4;
-
-    /*
-     * Design system tokens (DESIGN.md).
-     * Surfaces stack by luminance, not by shadow. Borders are punctuation.
-     * Cyan is the only chromatic brand color.
-     */
-    --surface-0: #0a0a0a;
-    --surface-1: rgba(255, 255, 255, 0.018);
-    --surface-2: rgba(255, 255, 255, 0.035);
-    --surface-3: rgba(255, 255, 255, 0.055);
-
-    --text-primary: #ededed;
-    --text-secondary: #a1a1a1;
-    --text-tertiary: #71717a;
-
-    --accent-primary: #00d4ff;
-    --accent-primary-soft: rgba(0, 212, 255, 0.1);
-    --accent-primary-border: rgba(0, 212, 255, 0.2);
-
-    --border-default: #262626;
-    --border-subtle: rgba(255, 255, 255, 0.06);
-
-    --status-success: #10b981;
-    --status-warning: #f59e0b;
-    --status-error: #ef4444;
-
-    /* Spacing */
-    --radius: 0.5rem;
-
-    /* Typography */
+    /* Typography families */
     --font-geist-sans: var(--font-geist-sans);
     --font-geist-mono: var(--font-geist-mono);
-
     --font-heading: var(--font-geist-sans);
     --font-body: var(--font-geist-sans);
     --font-code: var(--font-geist-mono);
@@ -212,26 +237,6 @@
       "calt" 1;
   }
 
-  /*
-   * Hero background image fades in after first paint so the headline text is
-   * the LCP candidate. The image is decorative (opacity 30%) and is preloaded
-   * with low priority so it doesn't compete with critical resources.
-   */
-  .hero-bg {
-    opacity: 0;
-    animation: hero-bg-fade-in 600ms ease-out 200ms forwards;
-  }
-  @keyframes hero-bg-fade-in {
-    to {
-      opacity: 0.3;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hero-bg {
-      animation: none;
-      opacity: 0.3;
-    }
-  }
   h1,
   h2,
   h3,
@@ -241,6 +246,7 @@
     font-family: var(--font-geist-sans);
   }
 
+  /* §3 CJK base rules */
   [lang|="ko"] h1,
   [lang|="ko"] h2,
   [lang|="ko"] h3,
@@ -284,7 +290,8 @@
   }
 
   ::selection {
-    @apply bg-primary/20 text-primary;
+    background-color: var(--accent-32);
+    color: var(--text-hi);
   }
 
   ::-webkit-scrollbar {
@@ -292,113 +299,425 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-muted;
+    background-color: var(--ink-1);
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-border hover:bg-muted-foreground/50 rounded-full transition-colors;
+    background-color: var(--ink-3);
+    border: 1px solid var(--line);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-faint);
   }
 }
 
 @layer utilities {
-  .glow-cyan {
-    box-shadow: 0 0 15px -5px rgba(0, 212, 255, 0.3);
+  /* §4 Frame — grid-wrapper with 1px side rules at ≥ lg */
+  .frame {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 90rem) 1fr;
   }
-  .glow-purple {
-    box-shadow: 0 0 15px -5px rgba(124, 58, 237, 0.3);
+  .frame > * {
+    grid-column: 2;
+    min-width: 0;
   }
-
-  .text-glow-cyan {
-    text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+  .frame > .frame-bleed {
+    grid-column: 1 / -1;
   }
-
-  /*
-   * Section entrance — fade-in-up with stagger via CSS var.
-   * Set `--reveal-index` on each child (0, 1, 2, ...) to cascade.
-   * Respects prefers-reduced-motion (no-op when reduce is set).
-   */
-  .reveal-on-enter {
-    animation: fade-in-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--reveal-index, 0) * 80ms);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .reveal-on-enter {
-      animation: none;
-      opacity: 1;
-      transform: none;
+  @media (width >= 64rem) {
+    .frame::before,
+    .frame::after {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      width: 1px;
+      background: var(--line);
+      pointer-events: none;
+    }
+    .frame::before {
+      left: max(0px, calc(50% - 45rem));
+    }
+    .frame::after {
+      right: max(0px, calc(50% - 45rem));
     }
   }
 
-  /*
-   * Hairline cyan focus ring. Use on interactive elements that need
-   * a more prominent affordance than the default ring var.
-   */
-  .ring-cyan {
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-    box-shadow:
-      0 0 0 2px var(--background),
-      0 0 0 4px var(--accent-primary);
+  /* §7 hairlines */
+  .hairline-x {
+    border-block-start: 1px solid var(--line);
+  }
+  .hairline-y {
+    border-inline-start: 1px solid var(--line);
+  }
+
+  /* §3 Eyebrow role */
+  .eyebrow {
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+
+  /* §6 Entrance — scroll-driven when supported, IntersectionObserver `.is-visible` otherwise */
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+    transition:
+      opacity var(--dur-reveal) var(--ease-out-quart),
+      transform var(--dur-reveal) var(--ease-out-quart);
+    transition-delay: calc(var(--index, 0) * 60ms);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  @supports (animation-timeline: view()) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+      animation: reveal-in var(--dur-reveal) var(--ease-out-quart) both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+
+  /* §5 Nav / link underline scaleX(0 → 1) */
+  .underline-grow {
+    position: relative;
+  }
+  .underline-grow::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -2px;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--dur-underline) var(--ease-underline);
+  }
+  .underline-grow:hover::after,
+  .underline-grow:focus-visible::after,
+  .underline-grow[aria-current="page"]::after,
+  .underline-grow[data-active="true"]::after {
+    transform: scaleX(1);
+  }
+
+  /* §6 Status dot pulse */
+  .pulse-dot {
+    animation: pulse-dot var(--dur-pulse) var(--ease-standard) infinite;
+  }
+
+  /* §5 Reel — the container owns the scroll */
+  .reel {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 34%);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 32px;
+    overscroll-behavior-x: contain;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      var(--ink-0) 32px,
+      var(--ink-0) calc(100% - 32px),
+      transparent
+    );
+    scrollbar-width: none;
+  }
+  .reel::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* §6 Reduced motion: final states, no pulses, no transitions on the motion utilities */
+  @media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .reveal.is-visible {
+      opacity: 1;
+      transform: none;
+      transition: none;
+      animation: none;
+    }
+    .underline-grow::after {
+      transition: none;
+    }
+    .pulse-dot {
+      animation: none;
+    }
   }
 }
 
 @layer components {
+  /* §4 docs prose: long tokens wrap, wide code/tables scroll inside their own box */
+  .docs-content {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
   .docs-content h1 {
-    @apply mt-8 mb-4 scroll-mt-24 text-4xl font-bold tracking-tight first:mt-0;
+    @apply mt-8 mb-4 scroll-mt-24 text-4xl font-medium tracking-[-0.025em] first:mt-0;
   }
   .docs-content h2 {
-    @apply mt-12 mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight;
+    @apply border-line mt-12 mb-4 scroll-mt-24 border-b pb-3 text-2xl font-medium tracking-[-0.015em];
   }
   .docs-content h3 {
-    @apply mt-8 mb-3 scroll-mt-24 text-xl font-semibold tracking-tight;
+    @apply mt-8 mb-3 scroll-mt-24 text-xl font-medium tracking-[-0.01em];
   }
   .docs-content h4 {
-    @apply mt-6 mb-2 scroll-mt-24 text-lg font-semibold tracking-tight;
+    @apply mt-6 mb-2 scroll-mt-24 text-lg font-medium;
   }
   .docs-content p {
-    @apply text-muted-foreground my-4 leading-7;
+    @apply text-text-mid my-4 leading-7;
   }
   .docs-content a {
-    @apply text-primary font-medium underline underline-offset-4;
+    @apply text-accent font-medium underline underline-offset-4;
   }
   .docs-content ul {
-    @apply text-muted-foreground my-4 ml-6 list-disc space-y-1;
+    @apply text-text-mid my-4 ml-6 list-disc space-y-1;
   }
   .docs-content ol {
-    @apply text-muted-foreground my-4 ml-6 list-decimal space-y-1;
+    @apply text-text-mid my-4 ml-6 list-decimal space-y-1;
   }
   .docs-content li {
     @apply leading-7;
   }
   .docs-content blockquote {
-    @apply border-primary/40 my-6 border-l-4 pl-4 italic;
+    @apply border-line-strong text-text-lo my-6 border-l-2 pl-4;
   }
   .docs-content code:not(pre code) {
-    @apply bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-sm;
+    @apply bg-ink-2 text-text-hi rounded-[2px] px-1.5 py-0.5 font-mono text-sm;
   }
   .docs-content pre {
-    @apply border-border/50 my-4 overflow-x-auto rounded-lg border bg-[#1e1e2e] p-4 font-mono text-sm text-[#cdd6f4] shadow-sm;
-    background-color: var(--code-bg);
-    color: var(--code-text);
+    @apply border-line bg-code-bg text-code-fg my-4 max-w-full overflow-x-auto border p-4 font-mono text-sm;
+    overflow-wrap: normal;
   }
   .docs-content pre code {
     @apply bg-transparent p-0 text-inherit;
   }
+  .docs-content .docs-table {
+    @apply my-6 max-w-full overflow-x-auto;
+  }
   .docs-content table {
-    @apply border-border my-6 w-full border-collapse border text-sm;
+    @apply border-line my-0 w-full border-collapse border text-sm;
+    overflow-wrap: normal;
   }
   .docs-content thead {
-    @apply bg-muted;
+    @apply bg-ink-1;
   }
   .docs-content th {
-    @apply border-border border px-3 py-2 text-left font-semibold;
+    @apply border-line text-text-hi border px-3 py-2 text-left font-medium;
+    white-space: nowrap;
   }
   .docs-content td {
-    @apply border-border text-muted-foreground border px-3 py-2;
+    @apply border-line text-text-mid border px-3 py-2;
   }
   .docs-content hr {
-    @apply border-border my-8;
+    @apply border-line my-8;
   }
   .docs-content strong {
-    @apply text-foreground font-semibold;
+    @apply text-text-hi font-medium;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Landing utilities (appended; tokens above are unchanged). DESIGN.md §3, §5, §7.
+ * ------------------------------------------------------------------------- */
+@layer utilities {
+  /* §3 type roles that repeat across sections */
+  .type-display {
+    font-size: clamp(2.5rem, 1.35rem + 4.4vw, 5.25rem);
+    font-weight: 500;
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  :where([lang|="ko"], [lang|="ja"], [lang|="zh"]) .type-display {
+    font-size: clamp(2.25rem, 1.25rem + 3.6vw, 4.5rem);
+  }
+  .type-title {
+    font-size: clamp(2rem, 1.3rem + 2.4vw, 3.25rem);
+    font-weight: 500;
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .type-numeral {
+    font-size: clamp(2rem, 1.4rem + 2vw, 2.75rem);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* §7 hero wash + dot grid — the only gradient decoration on the site, both static */
+  .hero-wash {
+    background-image: radial-gradient(circle at 70% 45%, var(--accent-16), transparent 46%);
+  }
+  .dot-grid {
+    background-image: radial-gradient(var(--line-faint) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* §5 Terminal cursor block: 1s steps(1) blink on --accent-hot */
+  .cursor-blink {
+    animation: cursor-blink 1s steps(1) infinite;
+  }
+  @keyframes cursor-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  /* §5 CommandBar: the command scrolls inside its cell without a visible scrollbar */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cursor-blink {
+      animation: none;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+   Workflow DAG view (landing port of the desktop app's graph). Ported grammar: node entry
+   cascade, one-shot pop/shake on state change, active-wave underline + stepped ambient,
+   stepped running-edge dash flow. Only transform/opacity/filter/color/stroke-dashoffset move.
+   --------------------------------------------------------------------------------------- */
+@layer components {
+  .dag-card-running {
+    background-color: color-mix(in srgb, var(--accent) 6%, var(--ink-1));
+  }
+  .dag-card-failed {
+    background-color: color-mix(in srgb, var(--status-err) 8%, var(--ink-1));
+  }
+  .dag-edge-light {
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--accent) 90%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 30%, transparent) 45%,
+      transparent 70%
+    );
+    will-change: transform, opacity;
+  }
+  .dag-feed {
+    background-color: color-mix(in srgb, var(--ink-1) 88%, transparent);
+    backdrop-filter: blur(6px);
+  }
+  .dag-node-enter {
+    animation: dag-node-enter 0.26s var(--ease-out-quart) both;
+  }
+  .dag-node-pop {
+    animation: dag-node-pop 0.45s var(--ease-out-quart) both;
+  }
+  .dag-node-shake {
+    animation: dag-node-shake 0.32s ease-out both;
+  }
+  .dag-wave-underline {
+    animation: dag-wave-underline 0.4s var(--ease-out-quart) both;
+  }
+  .dag-wave-ambient {
+    animation: dag-wave-ambient 2.4s infinite;
+  }
+  .dag-edge-flow {
+    animation: dag-edge-flow 1.1s steps(16) infinite;
+  }
+  @keyframes dag-node-enter {
+    from {
+      opacity: 0;
+      scale: 0.94;
+      translate: 0 8px;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+      translate: 0 0;
+    }
+  }
+  @keyframes dag-node-pop {
+    0% {
+      scale: 1;
+      filter: brightness(1);
+    }
+    45% {
+      scale: 1.045;
+      filter: brightness(1.18);
+    }
+    100% {
+      scale: 1;
+      filter: brightness(1);
+    }
+  }
+  @keyframes dag-node-shake {
+    0% {
+      translate: -3px 0;
+    }
+    20% {
+      translate: 3px 0;
+    }
+    40% {
+      translate: -2px 0;
+    }
+    60% {
+      translate: 2px 0;
+    }
+    80% {
+      translate: -1px 0;
+    }
+    100% {
+      translate: 0 0;
+    }
+  }
+  @keyframes dag-wave-underline {
+    from {
+      scale: 0 1;
+      transform-origin: left;
+    }
+    to {
+      scale: 1 1;
+      transform-origin: left;
+    }
+  }
+  @keyframes dag-wave-ambient {
+    0%,
+    42% {
+      opacity: 1;
+      animation-timing-function: steps(6);
+    }
+    50%,
+    92% {
+      opacity: 0.55;
+      animation-timing-function: steps(6);
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes dag-edge-flow {
+    from {
+      stroke-dashoffset: 0;
+    }
+    to {
+      stroke-dashoffset: -16;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dag-node-enter,
+    .dag-node-pop,
+    .dag-node-shake,
+    .dag-wave-underline,
+    .dag-wave-ambient,
+    .dag-edge-flow,
+    .dag-edge-light {
+      animation: none;
+    }
   }
 }

@@ -1,134 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-
-import { createReadToolDefinition, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
-
+import { rmSync } from "node:fs"
 import { InProcessRunner, RunnerError } from "./in-process"
-import type { ChildSession, ChildSessionListener, ChildSpec } from "./in-process"
+import { baseSpec, createFakeSession, makeTool, tmpSessionDirs } from "./in-process-child-spec.test-support"
+import type { CreateAgentSessionOptions } from "./in-process-child-spec.test-support"
+import type { ChildSession } from "./in-process"
 
-const sampleParameters = createReadToolDefinition(process.cwd()).parameters
-
-function makeTool(name: string, onExecute?: () => void): ToolDefinition {
-  return {
-    name,
-    label: name,
-    description: `test tool ${name}`,
-    parameters: sampleParameters,
-    execute: async () => {
-      onExecute?.()
-      return { content: [{ type: "text", text: "ok" }], details: undefined }
-    },
-  }
-}
-
-type FakeSessionControls = {
-  session: ChildSession
-  resolvePrompt: () => void
-  rejectPrompt: (error: unknown) => void
-  emit: (event: { readonly type: string }) => void
-  steerCalls: string[]
-  followUpCalls: string[]
-  abortCalls: number
-  disposeCount: number
-  lastText: { value: string | undefined }
-  promptCalls: number
-}
-
-function createFakeSession(sessionId = "child-session-1"): FakeSessionControls {
-  const listeners = new Set<ChildSessionListener>()
-  const steerCalls: string[] = []
-  const followUpCalls: string[] = []
-  const lastText = { value: undefined as string | undefined }
-  const counters = { abortCalls: 0, disposeCount: 0, promptCalls: 0 }
-  let settle: { resolve: () => void; reject: (error: unknown) => void } | undefined
-  const session: ChildSession = {
-    sessionId,
-    prompt() {
-      counters.promptCalls += 1
-      return new Promise<void>((resolve, reject) => {
-        settle = { resolve, reject }
-      })
-    },
-    async steer(text: string) {
-      steerCalls.push(text)
-    },
-    async followUp(text: string) {
-      followUpCalls.push(text)
-    },
-    async abort() {
-      counters.abortCalls += 1
-    },
-    subscribe(listener: ChildSessionListener) {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    getLastAssistantText() {
-      return lastText.value
-    },
-    dispose() {
-      counters.disposeCount += 1
-    },
-  }
-  return {
-    session,
-    steerCalls,
-    followUpCalls,
-    lastText,
-    get abortCalls() {
-      return counters.abortCalls
-    },
-    get disposeCount() {
-      return counters.disposeCount
-    },
-    get promptCalls() {
-      return counters.promptCalls
-    },
-    resolvePrompt: () => settle?.resolve(),
-    rejectPrompt: (error: unknown) => settle?.reject(error),
-    emit: (event) => {
-      for (const listener of listeners) listener(event)
-    },
-  }
-}
-
-const tmpSessionDirs: string[] = []
-
-function makeSessionDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "senpi-task-in-process-"))
-  tmpSessionDirs.push(dir)
-  return dir
-}
-
-function baseSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
-  return {
-    taskId: "task-1",
-    cwd: process.cwd(),
-    sessionDir: makeSessionDir(),
-    depth: 0,
-    parentSessionId: "parent-1",
-    rootSessionId: "root-1",
-    prompt: "do the work",
-    ...overrides,
-  }
-}
+const unhandled: unknown[] = []
+const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
+afterEach(() => { unhandled.length = 0; while (tmpSessionDirs.length > 0) rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true }) })
 
 describe("InProcessRunner", () => {
-  const unhandled: unknown[] = []
-  const onUnhandled = (reason: unknown): void => {
-    unhandled.push(reason)
-  }
-
-  afterEach(() => {
-    unhandled.length = 0
-    process.off("unhandledRejection", onUnhandled)
-    while (tmpSessionDirs.length > 0) {
-      rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true })
-    }
-  })
-
   test("#given a running child #when steered while the prompt is in flight #then the fake session receives it", async () => {
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
@@ -373,47 +254,4 @@ describe("InProcessRunner", () => {
     await handle.waitForIdle()
 
     expect(seen).toEqual(["agent_start", "agent_end"])
-  })
-})
-
-describe("InProcessRunner thinking level", () => {
-  test("#given a spec carrying a thinking level #when the child session is created #then the level reaches the senpi session options", async () => {
-    // given
-    let captured: CreateAgentSessionOptions | undefined
-    const fake = createFakeSession()
-    const runner = new InProcessRunner({
-      createSession: async (options) => {
-        captured = options
-        return fake.session
-      },
-    })
-
-    // when
-    const handle = await runner.start(baseSpec({ thinkingLevel: "xhigh" }))
-    fake.resolvePrompt()
-    await handle.waitForIdle()
-
-    // then
-    expect(captured?.thinkingLevel).toBe("xhigh")
-  })
-
-  test("#given a spec without a thinking level #when the child session is created #then no level is forced so senpi keeps its default", async () => {
-    // given
-    let captured: CreateAgentSessionOptions | undefined
-    const fake = createFakeSession()
-    const runner = new InProcessRunner({
-      createSession: async (options) => {
-        captured = options
-        return fake.session
-      },
-    })
-
-    // when
-    const handle = await runner.start(baseSpec())
-    fake.resolvePrompt()
-    await handle.waitForIdle()
-
-    // then
-    expect(captured?.thinkingLevel).toBeUndefined()
-  })
-})
+  })})

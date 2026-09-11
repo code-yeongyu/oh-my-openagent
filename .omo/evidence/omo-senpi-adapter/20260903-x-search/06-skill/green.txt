@@ -1,0 +1,11 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/x-search/skill.test.ts:
+(pass) x-search skill front matter > #given the skill file #when parsing front matter #then name is pinned to x-search [2.18ms]
+(pass) x-search skill front matter > #given the skill file #when reading description #then it stays under 1024 chars [0.09ms]
+(pass) x-search skill front matter > #given the skill file #when reading description #then it is ASCII only [0.09ms]
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [477.00ms]

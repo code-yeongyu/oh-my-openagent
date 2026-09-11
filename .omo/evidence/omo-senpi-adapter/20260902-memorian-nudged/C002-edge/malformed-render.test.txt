@@ -1,0 +1,37 @@
+bun test v1.4.0 (34cbb9a40)
+EXIT=0
+
+packages/omo-senpi/src/components/memory/memory-notice-wiring.test.ts:
+(pass) createMemoryNoticeWiring shared receipt consumption > #given a soul commit receipt #when tool_result fires #then the receipt is read exactly once and both notices come from that read [15.57ms]
+(pass) createMemoryNoticeWiring shared receipt consumption > #given a soul commit with the write notice disabled #when tool_result fires #then only the soul notice is emitted [1.83ms]
+(pass) createMemoryNoticeWiring shared receipt consumption > #given a non-soul commit #when tool_result fires #then only the write notice is emitted [1.72ms]
+(pass) createMemoryNoticeWiring shared receipt consumption > #given the soul notice is disabled and the commit is soul-only #when tool_result fires #then only the write notice is emitted [1.99ms]
+(pass) createMemoryNoticeWiring shared receipt consumption > #given both notices are disabled #when tool_result fires #then the receipt is still consumed and nothing is emitted [1.59ms]
+(pass) createMemoryNoticeWiring shared receipt consumption > #given a degraded gather #when tool_result fires #then the soul notice still lands and no write entry is appended [1.42ms]
+(pass) createMemoryNoticeWiring shared receipt consumption > #given registration #when the component registers #then both entry renderers are registered [0.69ms]
+(pass) createMemoryNoticeWiring receipt edge cases > #given a receipt whose embedded toolCallId does not match the event #when tool_result fires #then nothing is emitted and the receipt is consumed [1.89ms]
+(pass) createMemoryNoticeWiring receipt edge cases > #given no receipt on disk #when tool_result fires #then nothing is appended and nothing throws [0.77ms]
+(pass) createMemoryNoticeWiring receipt edge cases > #given a non-memory tool result #when tool_result fires #then receipts are left untouched [1.19ms]
+(pass) createMemoryNoticeWiring direct surface > #given a direct-surface commit #when onCommit fires #then only the soul notice is emitted and no write entry duplicates the tool row [0.49ms]
+(pass) createMemoryNoticeWiring direct surface > #given a direct-surface non-soul commit #when onCommit fires #then no entry is appended [0.47ms]
+(pass) createMemoryNoticeWiring direct surface > #given edit_notice disabled #when a direct-surface soul commit arrives #then no visible entry is appended [0.42ms]
+(pass) createMemoryNoticeWiring direct surface > #given a direct-surface tool_result #when it fires with no receipt on disk #then neither notice is emitted [0.55ms]
+(pass) renderMemoryWriteUpdatedEntry house notice contract > #given a gathered write notice #when it renders collapsed #then it matches the direct-surface tool row [4.05ms]
+(pass) renderMemoryWriteUpdatedEntry house notice contract > #when it renders expanded #then the detail row carries sha7, identity and subject [0.61ms]
+(pass) renderMemoryWriteUpdatedEntry house notice contract > #when rendered with a background theme #then every padded line carries customMessageBg [0.39ms]
+(pass) renderMemoryWriteUpdatedEntry house notice contract > #given no record #when it renders #then it returns undefined [0.14ms]
+
+packages/omo-senpi/src/components/memory/recall-notice.test.ts:
+(pass) renderMemorianNudgedEntry > #given nudges #when rendered #then title and dim paths are shown [0.79ms]
+(pass) renderMemorianNudgedEntry > #given malformed nudges #when rendered #then nothing is drawn [0.10ms]
+(pass) renderMemorianGateEntry > #given a skipped gate #when rendered #then it uses the warning notice [11.07ms]
+(pass) renderMemorianGateEntry > #given a dropped gate #when rendered #then nothing is drawn [0.13ms]
+(pass) renderRecallEntry > #given surfaced recall paths #when the entry renders collapsed #then the compact title names every path [0.47ms]
+(pass) renderRecallEntry > #given a record without paths #when the entry renders #then nothing is drawn [0.07ms]
+(pass) renderRecallEntry > #given the renderer channel #when its custom type is read #then it matches the injected recall message [0.05ms]
+
+ 25 pass
+ 0 fail
+ 47 expect() calls
+Ran 25 tests across 2 files. [1301.00ms]
+

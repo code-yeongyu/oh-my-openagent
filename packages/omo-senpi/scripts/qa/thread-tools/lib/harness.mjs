@@ -36,8 +36,24 @@ const THREAD_COMPONENTS = join(OMO_ROOT, "packages", "omo-senpi", "src", "compon
 const qaEnv = await import(join(SENPI_QA_LIB, "env.mjs"))
 const qaCleanup = await import(join(SENPI_QA_LIB, "cleanup.mjs"))
 
-export const { makeScratch, startFakeModelServer, writeMockModelsJson, hermeticEnv } = qaEnv
+export const { startFakeModelServer, writeMockModelsJson, hermeticEnv } = qaEnv
 export const { installCleanupHooks, cleanupAllAndWait, trackChild, trackCloser, shouldDetachChildren } = qaCleanup
+
+/**
+ * Variables a supervised omo/senpi session (desktop host, `omo --mode rpc` child) carries about
+ * ITS OWN host: the orphan-watch fd, the supervisor pid, the scratch dir, and the public socket.
+ * A QA host that inherits them treats the caller's supervisor as its own - with `WATCH_FD` naming
+ * an fd this child never received, the 2026.9.x watchdog stalls before it answers a single frame -
+ * and the components under test would resolve the caller's live socket instead of the scratch one.
+ */
+const CALLER_HOST_ENV = /^(?:OMO|SENPI|PI)_RPC_(?:HOST_|SOCKET)/
+
+/** Senpi's scratch, minus the caller's host identity, so the run is hermetic from inside a live session too. */
+export function makeScratch(label) {
+  const scratch = qaEnv.makeScratch(label)
+  for (const key of Object.keys(scratch.env)) if (CALLER_HOST_ENV.test(key)) delete scratch.env[key]
+  return scratch
+}
 
 /** Load one thread component module from the omo worktree (no barrel wiring yet). */
 export function threadComponent(name) {
@@ -61,6 +77,7 @@ export function desktopDependency(specifier) {
 export function createReport(label) {
   const lines = []
   let failures = 0
+  let skipped = 0
   return {
     lines,
     log(line) {
@@ -74,8 +91,20 @@ export function createReport(label) {
       this.log(`${status} ${label}/${name}${detail === undefined ? "" : ` ${detail}`}`)
       return ok
     },
+    /**
+     * Records a check whose precondition the current environment cannot satisfy. A skip never
+     * marks the script failed; the summary carries `skipped=N` so a green run never reads as full
+     * coverage. The reason names the unmet precondition so the log stays honest, not silent.
+     */
+    skip(name, reason) {
+      skipped += 1
+      this.log(`SKIP ${label}/${name} ${reason}`)
+    },
     get failures() {
       return failures
+    },
+    get skipped() {
+      return skipped
     },
     write(outPath) {
       if (outPath === undefined) return

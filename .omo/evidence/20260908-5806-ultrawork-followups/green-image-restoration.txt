@@ -1,0 +1,21 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:
+(pass) explicit ULW session follow-ups > #given active mode #when a plain follow-up is processed twice #then only one compact marker is added [2.02ms]
+(pass) explicit ULW session follow-ups > #given active mode #when compaction finishes #then full guidance is restored once [0.60ms]
+(pass) explicit ULW session follow-ups > #given combo-only expansions #when ULW state replays #then the marker and model selection persist [0.24ms]
+(pass) explicit ULW session follow-ups > #given active mode #when an attachment-only follow-up arrives #then it receives a durable ULW marker [0.20ms]
+(pass) explicit ULW session follow-ups > #given restoration is pending #when an image follows a model change #then full guidance persists before compact markers resume [0.34ms]
+(pass) explicit ULW session follow-ups > #given active mode #when model family changes #then its full guidance is refreshed [0.19ms]
+(pass) explicit ULW session follow-ups > #given explicit activation #when a follow-up has no keyword #then injection and model selection persist only in that session [0.20ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by command #then follow-ups are ordinary [0.22ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by owner #then follow-ups are ordinary [0.78ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by deleted #then follow-ups are ordinary [0.17ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by disposed #then follow-ups are ordinary [0.18ms]
+(pass) explicit ULW session follow-ups > #given activation #when a follow-up is guarded #then no ULW is injected [0.29ms]
+(pass) explicit ULW session follow-ups > #given more than the session cap #when checking follow-ups #then oldest activation is evicted [12.75ms]
+
+ 13 pass
+ 0 fail
+ 33 expect() calls
+Ran 13 tests across 1 file. [826.00ms]

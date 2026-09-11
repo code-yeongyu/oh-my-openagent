@@ -14,6 +14,10 @@ import { worktreeSweep } from "./worktree-sweep"
 import type { WorktreeSweepRepoReport } from "./types"
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const GIT_COMMAND_TIMEOUT_MS = 10_000
+// Windows CI runners have much slower git/fs I/O than the 5 s Bun default;
+// give every git-heavy test enough room to avoid flakes.
+const GIT_HEAVY_TEST_TIMEOUT_MS = 30_000
 const temporaryDirectories: string[] = []
 
 afterAll(async () => {
@@ -29,16 +33,62 @@ const GIT_ENV = {
   GIT_TERMINAL_PROMPT: "0",
 }
 
-function git(cwd: string, args: readonly string[]): string {
-  const result = spawnSync("git", ["-C", cwd, ...args], {
-    encoding: "utf8",
-    env: GIT_ENV,
-  })
+interface GitCommandResult {
+  readonly status: number | null
+  readonly stdout: string
+  readonly stderr: string
+  readonly error?: Error
+}
+
+interface GitInvocationOptions {
+  readonly phase?: string
+  readonly run?: () => GitCommandResult
+  readonly now?: () => number
+}
+
+function git(cwd: string, args: readonly string[], options: GitInvocationOptions = {}): string {
+  const now = options.now ?? (() => performance.now())
+  const startedAt = now()
+  const result: GitCommandResult =
+    options.run?.() ??
+    spawnSync("git", ["-C", cwd, ...args], {
+      encoding: "utf8",
+      env: GIT_ENV,
+      timeout: GIT_COMMAND_TIMEOUT_MS,
+    })
+  const elapsedMs = Math.max(0, Math.round(now() - startedAt))
   if (result.status !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${cwd}: ${result.stderr}`)
+    const phase = options.phase ?? `running git ${args.join(" ")}`
+    const detail = result.error?.message || result.stderr.trim() || "no error output"
+    throw new Error(
+      `git setup phase "${phase}" failed after ${elapsedMs}ms: ${detail} (git ${args.join(" ")} in ${cwd})`,
+    )
   }
   return result.stdout
 }
+
+describe("git fixture helper", () => {
+  test("reports the setup phase and elapsed time when a git command times out", () => {
+    let nowMs = 100
+
+    expect(() =>
+      git("/repo", ["worktree", "add"], {
+        phase: "creating external worktree",
+        run: () => ({
+          status: null,
+          stdout: "",
+          stderr: "",
+          error: new Error("timed out"),
+        }),
+        now: () => {
+          const current = nowMs
+          nowMs = 137
+          return current
+        },
+      }),
+    ).toThrow('git setup phase "creating external worktree" failed after 37ms: timed out')
+  })
+})
 
 async function commit(repo: string, message: string): Promise<void> {
   git(repo, [
@@ -85,7 +135,9 @@ async function createFixture(prefix = "wt-sweep-"): Promise<Fixture> {
 async function addMergedWorktree(repo: string, name: string, worktreePath: string): Promise<void> {
   git(repo, ["branch", name])
   git(repo, ["merge", "--ff-only", name])
-  git(repo, ["worktree", "add", worktreePath, name])
+  git(repo, ["worktree", "add", worktreePath, name], {
+    phase: `creating ${name.replace(/-branch$/, "")} worktree`,
+  })
 }
 
 /** Same as addMergedWorktree but leaves the branch unmerged. */
@@ -93,7 +145,9 @@ async function addUnmergedWorktree(repo: string, name: string, worktreePath: str
   git(repo, ["checkout", "-b", name])
   await commit(repo, `${name} commit`)
   git(repo, ["checkout", "main"])
-  git(repo, ["worktree", "add", worktreePath, name])
+  git(repo, ["worktree", "add", worktreePath, name], {
+    phase: `creating ${name.replace(/-branch$/, "")} worktree`,
+  })
 }
 
 function decisionFor(report: WorktreeSweepRepoReport, worktreePath: string) {
@@ -214,7 +268,9 @@ describe("sweepWorktrees classification", () => {
     await addMergedWorktree(repo, "missing-branch", missing)
     await fs.rm(missing, { recursive: true, force: true })
     const mergedTip = git(repo, ["rev-parse", "merged-branch"]).trim()
-    git(repo, ["worktree", "add", "--detach", detached, mergedTip])
+    git(repo, ["worktree", "add", "--detach", detached, mergedTip], {
+      phase: "creating detached worktree",
+    })
 
     const result = await sweepWorktrees({
       repos: [repo],
@@ -257,7 +313,7 @@ describe("sweepWorktrees classification", () => {
     // Dry-run removed nothing.
     expect(await fs.stat(merged)).toBeTruthy()
     expect(git(repo, ["worktree", "list", "--porcelain"])).toContain(toPosix(missing))
-  })
+  }, { timeout: 30_000 })
 
   test("detects the default branch through origin/HEAD when present", async () => {
     const base = await newTmpDir("wt-sweep-origin-")
@@ -348,7 +404,7 @@ describe("sweepWorktrees --older-than", () => {
     })
     expect(result.sweepCount).toBe(1)
     expect(result.keepCount).toBe(2)
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("olderThanDays 0 never sweeps unmerged worktrees regardless of age", async () => {
     const { base, repo } = await createFixture("wt-sweep-age0-")
@@ -387,7 +443,7 @@ describe("sweepWorktrees --apply", () => {
     expect(porcelain).not.toContain(toPosix(missing))
     expect(porcelain).not.toContain(toPosix(merged))
     expect(porcelain).toContain(toPosix(kept))
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("leaves locked and dirty worktrees in place even under --apply", async () => {
     const { base, repo } = await createFixture("wt-sweep-apply2-")
@@ -406,7 +462,7 @@ describe("sweepWorktrees --apply", () => {
     expect(await fs.stat(locked)).toBeTruthy()
     expect(await fs.stat(dirty)).toBeTruthy()
     expect(result.sweepCount).toBe(0)
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 })
 
 describe("worktreeSweep output", () => {
@@ -439,7 +495,7 @@ describe("worktreeSweep output", () => {
     expect(summary).toBe(
       "SUMMARY mode=dry-run repos=1 sweep=1 keep=1 prune=0 removed=0 failed=0",
     )
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("returns exit code 1 and a stderr message for a non-repository path", async () => {
     const base = await newTmpDir("wt-sweep-bad-")

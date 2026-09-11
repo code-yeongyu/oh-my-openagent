@@ -1165,7 +1165,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model is applied
-    expect(agent.model).toBe("anthropic/claude-opus-5")
+    expect(agent.model).toBe("anthropic/claude-fable-5-1")
   })
 
   test("agent with category and existing model keeps existing model", () => {
@@ -1284,8 +1284,8 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model and skills are applied
-    expect(agent.model).toBe("openai/gpt-5.6-sol")
-    expect(agent.variant).toBe("xhigh")
+    expect(agent.model).toBe("openai/gpt-6-astra")
+    expect(agent.variant).toBe("max")
     const prompt = agent.prompt ?? ""
     const skillContent = frontendSkillContent()
     expect(prompt).toContain(skillContent)
@@ -1431,16 +1431,16 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-6-astra, variant=max
     expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
-    expect(agents.oracle.variant).toBe("xhigh")
+    expect(agents.oracle.model).toBe("openai/gpt-6-astra")
+    expect(agents.oracle.variant).toBe("max")
   })
 
   test("standard agent override with category AND direct variant - direct wins", async () => {
-    // #given - ultrabrain has variant=xhigh, but direct override says "max"
+    // #given - ultrabrain has variant=max, but direct override says "high"
     const overrides = {
-      oracle: { category: "ultrabrain", variant: "max" },
+      oracle: { category: "ultrabrain", variant: "high" },
     }
 
     // #when
@@ -1448,7 +1448,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
 
     // #then - direct variant overrides category variant
     expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.variant).toBe("max")
+    expect(agents.oracle.variant).toBe("high")
   })
 
   test("standard agent override with category AND direct reasoningEffort - direct wins", async () => {
@@ -1500,10 +1500,10 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-6-astra, variant=max
     expect(agents.sisyphus).toBeDefined()
-    expect(agents.sisyphus.model).toBe("openai/gpt-5.6-sol")
-    expect(agents.sisyphus.variant).toBe("xhigh")
+    expect(agents.sisyphus.model).toBe("openai/gpt-6-astra")
+    expect(agents.sisyphus.variant).toBe("max")
   })
 
   test("atlas override with category expands category properties", async () => {
@@ -1515,10 +1515,10 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-6-astra, variant=max
     expect(agents.atlas).toBeDefined()
-    expect(agents.atlas.model).toBe("openai/gpt-5.6-sol")
-    expect(agents.atlas.variant).toBe("xhigh")
+    expect(agents.atlas.model).toBe("openai/gpt-6-astra")
+    expect(agents.atlas.variant).toBe("max")
   })
 
   test("override with non-existent category has no effect on config", async () => {

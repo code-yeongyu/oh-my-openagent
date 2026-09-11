@@ -1,0 +1,38 @@
+{
+  "reusedIdenticalRawPipeEvidence": [
+    {
+      "model": "gpt-6-astra",
+      "variant": "gpt-6.md",
+      "sourceLog": "task-1-hephaestus-gpt6.log",
+      "line": 1380,
+      "exit": 0,
+      "currentShippedBodyIdentical": true,
+      "bodySha256": "981d3a595935396f4a34087468a24fb88da9e77d7aaca55d8d04cd9040c2ebd1",
+      "hookEventName": "SessionStart",
+      "intro": "You are Hephaestus, an autonomous deep worker based on GPT-6. You and the user share one workspace. You receive goals, not step-by-step instructions, and carry their intended goal to completion with work indistinguishable from a careful senior engineer's. Done means the requested artifact exists, its behavior is observed through its matching surface, and its acceptance criteria are satisfied."
+    },
+    {
+      "model": "gpt-6-astra-fast",
+      "variant": "gpt-6.md",
+      "sourceLog": "task-1-hephaestus-gpt6.log",
+      "line": 1382,
+      "exit": 0,
+      "currentShippedBodyIdentical": true,
+      "bodySha256": "981d3a595935396f4a34087468a24fb88da9e77d7aaca55d8d04cd9040c2ebd1",
+      "hookEventName": "SessionStart",
+      "intro": "You are Hephaestus, an autonomous deep worker based on GPT-6. You and the user share one workspace. You receive goals, not step-by-step instructions, and carry their intended goal to completion with work indistinguishable from a careful senior engineer's. Done means the requested artifact exists, its behavior is observed through its matching surface, and its acceptance criteria are satisfied."
+    },
+    {
+      "model": "gpt-5.5",
+      "variant": "gpt-5.5.md",
+      "sourceLog": "task-1-hephaestus-gpt6.log",
+      "line": 1384,
+      "exit": 0,
+      "currentShippedBodyIdentical": true,
+      "bodySha256": "9e6f9aac95b494672eceeccb273200715d20e7800868d2158dc8c352c548a837",
+      "hookEventName": "SessionStart",
+      "intro": "You are Hephaestus, an autonomous deep worker based on GPT-5.5. You and the user share one workspace. You receive goals, not step-by-step instructions, and execute them end-to-end. Tone: warm but spare; never invent progress."
+    }
+  ]
+}
+SESSION_START_CURRENT_BODY_REUSE=PASS

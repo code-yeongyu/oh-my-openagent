@@ -13,8 +13,8 @@ import {
   type MemoryIdentityRuntimeDeps,
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
-import { MemorianGateRunner } from "./memorian-runner"
-import type { MemorianGatePort } from "./memorian-wiring"
+import { KibitzerGateRunner } from "./kibitzer-runner"
+import type { KibitzerGatePort } from "./kibitzer-wiring"
 import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
 import {
@@ -26,14 +26,13 @@ import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from ".
 import { isRecord, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { ReflectionLiveSession, ReflectionSessionModel } from "./worker"
-import { buildFactsSandboxTransform, buildMemorianSandboxTransform, type SandboxPolicy } from "./sandbox"
 
 export interface MemoryRuntimeWiring {
   resolveContext(sessionId: string): MemoryIdentityContext | undefined
   resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>
   journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring
   factsWiringFor(identity: MemoryIdentityContext): MemoryFactsWiring
-  memorianRunnerFor(identity: MemoryIdentityContext): MemorianGatePort
+  kibitzerRunnerFor(identity: MemoryIdentityContext): KibitzerGatePort
   runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime
   triggerSessionFor(eventCtx: unknown): ReflectionTriggerSession | undefined
   dreamSessionById(sessionId: string): DreamTriggerSession | undefined
@@ -56,7 +55,7 @@ export function createMemoryRuntimeWiring(
   const runtimes = new Map<string, MemoryIdentityRuntime>()
   const journals = new Map<string, MemoryJournalWiring>()
   const factsWirings = new Map<string, MemoryFactsWiring>()
-  const memorianRunners = new Map<string, MemorianGatePort>()
+  const kibitzerRunners = new Map<string, KibitzerGatePort>()
 
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
@@ -96,8 +95,6 @@ export function createMemoryRuntimeWiring(
     const cached = factsWirings.get(identity.identity)
     if (cached !== undefined) return cached
     const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-    const sandboxPolicy = settings.agents[identity.identity]?.reflection?.sandbox
-      ?? settings.reflection.sandbox
     const createExtractor = options.createFactsExtractor
       ?? ((extractorOptions) => new FactsExtractorRunner(extractorOptions))
     const extractor = createExtractor({
@@ -110,14 +107,6 @@ export function createMemoryRuntimeWiring(
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       resolveModelRegistry,
       env: options.env,
-      sandbox: buildFactsSandboxTransform({
-        policy: sandboxPolicy as SandboxPolicy,
-        onWarning: (warning, spawnArgs) => options.logger?.warn("memory facts sandbox degraded", {
-          identity: identity.identity,
-          runId: spawnArgs.runId,
-          warning,
-        }),
-      }),
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
     const wiring = createMemoryFactsWiring({
@@ -144,28 +133,18 @@ export function createMemoryRuntimeWiring(
    * One gate runner per identity: the runner owns the single-launch latch, so a shared instance is
    * what keeps repeated settles down to one child.
    */
-  function memorianRunnerFor(identity: MemoryIdentityContext): MemorianGatePort {
-    const cached = memorianRunners.get(identity.identity)
+  function kibitzerRunnerFor(identity: MemoryIdentityContext): KibitzerGatePort {
+    const cached = kibitzerRunners.get(identity.identity)
     if (cached !== undefined) return cached
-    const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-    // The gate adds no sandbox knob of its own: it rides the reflection policy the facts child uses.
-    const sandboxPolicy = settings.agents[identity.identity]?.reflection?.sandbox ?? settings.reflection.sandbox
     // No resolveModelRegistry here on purpose: the gate runner consumes ONLY the registry snapshot
     // its settle handler captured, because this runner's launches outlive the senpi ctx.
-    const runner = options.createMemorianRunner?.(identity) ?? new MemorianGateRunner({
+    const runner = options.createKibitzerRunner?.(identity) ?? new KibitzerGateRunner({
       identityPaths: identity.identityPaths,
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       env: options.env,
-      sandbox: buildMemorianSandboxTransform({
-        policy: sandboxPolicy as SandboxPolicy,
-        onWarning: (warning) => options.logger?.warn("memory memorian sandbox degraded", {
-          identity: identity.identity,
-          warning,
-        }),
-      }),
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
-    memorianRunners.set(identity.identity, runner)
+    kibitzerRunners.set(identity.identity, runner)
     return runner
   }
 
@@ -249,7 +228,7 @@ export function createMemoryRuntimeWiring(
     resolveModelRegistry,
     journalWiringFor,
     factsWiringFor,
-    memorianRunnerFor,
+    kibitzerRunnerFor,
     runtimeFor,
     triggerSessionFor,
     dreamSessionById,

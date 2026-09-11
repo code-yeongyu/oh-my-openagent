@@ -3,7 +3,7 @@ import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
 
-// The live parent-session state the completion push routes against (Metis #3 five-state machine).
+// The live parent-session state the completion push routes against (plan-consultant finding #3).
 export type ParentState =
   | { readonly kind: "idle" }
   | { readonly kind: "streaming" }
@@ -53,7 +53,9 @@ export type ParentNotifierMessage = {
 }
 
 // SYNCHRONOUS enqueue seam. senpi pi.sendMessage returns void and swallows async delivery errors, so
-// the only observable failure is a synchronous throw from enqueue. Delivery is fire-and-forget.
+// a synchronous throw from enqueue is the adapter's immediate failure signal. The adapter batches, so
+// a returning enqueue only means QUEUED: a later failure (failed flush, or a batch window dropped by
+// session shutdown) is reported out-of-band through recordDeliveryFailure.
 export type ParentNotifier = {
   enqueue(message: ParentNotifierMessage): void
 }
@@ -106,6 +108,11 @@ export type ReconcileUnnotifiedNotificationsInput = {
   readonly parentState: ParentState
 }
 
+export type RecordDeliveryFailureInput = {
+  readonly taskIds: readonly string[]
+  readonly error: unknown
+}
+
 /** @deprecated Pre-rename alias kept for the omo-senpi caller until todo 18 updates it. */
 export type ReconcileFailedNotificationsInput = ReconcileUnnotifiedNotificationsInput
 
@@ -117,6 +124,15 @@ export type FlushResult =
 
 export type CompletionNotifier = {
   notifyTerminal(request: CompletionRequest): NotifyResult
+  /**
+   * Out-of-band receipt for a notification the adapter accepted but never delivered (its idle-injection
+   * flush failed, or the batch window was dropped when the coordinator retired on session shutdown).
+   * `notified_epoch` was already persisted by the accepting enqueue, so it is rolled back below the
+   * epoch and `notification_failed_epoch` is stamped: without that rollback
+   * `reconcileUnnotifiedNotifications` skips the record forever and the parent never learns its
+   * background task finished.
+   */
+  recordDeliveryFailure(input: RecordDeliveryFailureInput): void
   flushBuffered(input: FlushInput): FlushResult
   reconcileUnnotifiedNotifications(input: ReconcileUnnotifiedNotificationsInput): void
   /** Thin alias of reconcileUnnotifiedNotifications for the pre-rename omo-senpi caller (todo 18). */

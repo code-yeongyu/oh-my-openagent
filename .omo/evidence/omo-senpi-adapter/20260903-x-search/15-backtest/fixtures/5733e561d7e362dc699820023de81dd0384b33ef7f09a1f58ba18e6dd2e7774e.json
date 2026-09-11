@@ -1,0 +1,247 @@
+{
+  "queryId": "q16",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"LG에너지솔루션 실적 외인 반응 since:2026-08-16 until:2026-08-30\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-16",
+        "to_date": "2026-08-30"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422133,
+    "completed_at": 1788422133,
+    "id": "a6ae4258-b300-97ad-b16c-14a791941bc0",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_a6ae4258-b300-97ad-b16c-14a791941bc0_call-2a2ce700-6ce2-4ee3-beae-50faecd8ff2d-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "LG에너지솔루션 실적 외인 반응",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.ebc.com/kr/forex/303157.html"
+            },
+            {
+              "type": "url",
+              "url": "https://biz.heraldcorp.com/article/10711922"
+            },
+            {
+              "type": "url",
+              "url": "https://www.investing.com/news/transcripts/earnings-call-transcript-lg-energy-solution-q2-2026-stock-drops-on-eps-miss-93CH-4822276"
+            },
+            {
+              "type": "url",
+              "url": "https://comp.wisereport.co.kr/bsfn/company/c1010001.aspx?cmp_cd=373220"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/jp/stock/12093035"
+            },
+            {
+              "type": "url",
+              "url": "https://www.fnnews.com/news/202601280957148871"
+            },
+            {
+              "type": "url",
+              "url": "https://www.khan.co.kr/article/202601091529011"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mk.co.kr/news/business/11440491"
+            },
+            {
+              "type": "url",
+              "url": "https://www.newspim.com/news/view/20260708000099"
+            },
+            {
+              "type": "url",
+              "url": "https://alphabiz.co.kr/news/view/1065575544185927"
+            },
+            {
+              "type": "url",
+              "url": "https://www.mt.co.kr/stock/2025/10/31/2025103108474815573"
+            },
+            {
+              "type": "url",
+              "url": "https://www.yna.co.kr/view/AKR20251209026700008?section=economy/finance"
+            },
+            {
+              "type": "url",
+              "url": "https://m.ceoscoredaily.com/page/view/2026010915322486392"
+            },
+            {
+              "type": "url",
+              "url": "https://finance.naver.com/item/main.naver?code=373220"
+            },
+            {
+              "type": "url",
+              "url": "https://newspim.com/news/view/20260106000565"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_a6ae4258-b300-97ad-b16c-14a791941bc0_call-2a2ce700-6ce2-4ee3-beae-50faecd8ff2d-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**LG에너지솔루션(LG엔솔, 373220) 최근 실적과 외국인(외인)·기관·시장 반응 요약** (2026년 9월 기준)\n\n### 2026년 2분기 잠정 실적 (2026.7.7 발표)\n- **매출액**: 7조 5,602억 원 (전년 동기 +24.8%, 전 분기 +15%)\n- **영업이익**: 1,133억 원 (흑자 전환, 전 분기 -2,078억 원 → 흑자)\n- **시장 컨센서스**: 영업이익 약 1,800~2,000억 원 예상 → **37~45% 하회** (대폭 miss)\n- **AMPC(미국 세액공제) 제외 시**: 실질 **-1,277억 원 적자** (본업은 여전히 적자)\n\n**주요 원인**:\n- 북미 ESS(에너지저장장치) 공장 초기 램프업 비용 및 패킹(조립) bottleneck\n- 주요 고객사(북미 OEM) 보상금(수천억 원 규모) 인식 시점 **하반기 이연**\n- EV(전기차) 파우치 물량 감소와 제품 믹스 악화\n\nESS 사업은 전년 대비 4배 이상 성장하며 매출 비중 20%를 상회하고, 상반기 3조 원 이상 신규 수주( AI 데이터센터 포함)를 기록하며 중장기 성장 동력으로 평가받고 있습니다.[[1]](https://www.ebc.com/kr/forex/303157.html)\n\n### 발표 당일 시장·외인 반응\n- **주가**: 발표 당일 **-6% ~ -8%** 급락 (장중 32만 원대까지 하락). 이후 일부 반등했으나 전체적으로 부정적 반응.\n- **이유**: “흑자 전환”이라는 헤드라인은 긍정적이었으나, 시장 기대치(회복 폭)를 크게 밑돌았기 때문. AMPC 제외 실질 적자라는 지적이 나왔습니다.\n- 증권사 대응: NH투자증권·유진투자증권 등 목표주가 15~17% 하향 조정 (평균 목표가 약 55만 원대).[[2]](https://www.mk.co.kr/jp/stock/12093035)\n\n최근 거래 동향(2026.9.2 기준):\n- **외국인**: 최근 거래일 순매수(예: 9/2 +54,939주) 경향을 보이지만, 전체 외국인 지분율은 약 **5.5%**로 낮은 수준.\n- 기관은 혼조세. 최근 주가는 34~36만 원대에서 움직이고 있으며, 52주 최고 52.7만 원 → 현재는 상당히 조정받은 상태입니다.[[3]](https://finance.naver.com/item/main.naver?code=373220)\n\n### 전체적인 시장 컨센서스 및 전망\n- **긍정적 요인**: ESS 사업 고성장 (AI 데이터센터·전력망 수요), 북미 생산 역량, 46시리즈·LFP 등 신규 프로젝트.\n- **부정적 요인**: EV 수요 둔화(북미 보조금 폐지 영향), 초기 비용 부담, 경쟁 심화(중국 업체).\n- 증권사 전망: 상반기 저점 통과 후 ESS 중심 반등 기대. 2026년 연간 실적은 매출 성장 제한적이나 ESS 확대와 비용 효율화로 점차 개선될 것으로 보는 의견이 많습니다. 일부 증권사는 목표가 53~60만 원을 제시하며 “매수” 또는 “홀드” 의견을 유지하고 있습니다.[[4]](https://newspim.com/news/view/20260106000565)\n\n**최근 주가 흐름** (2026.9.2 기준): 약 34.75만 원 (전일 대비 -5.3%대). 1개월 +6%, 3개월 -21% 수준으로 중기적으로는 조정 국면입니다.\n\n더 구체적인 날짜(예: 특정 분기)나 증권사 리포트, 최신 주가·외인 매매동향을 더 자세히 알고 싶으시면 추가로 말씀해주세요!",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.ebc.com/kr/forex/303157.html",
+                "start_index": 571,
+                "end_index": 618,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.mk.co.kr/jp/stock/12093035",
+                "start_index": 867,
+                "end_index": 912,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://finance.naver.com/item/main.naver?code=373220",
+                "start_index": 1093,
+                "end_index": 1153,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://newspim.com/news/view/20260106000565",
+                "start_index": 1469,
+                "end_index": 1520,
+                "title": "4"
+              }
+            ]
+          }
+        ],
+        "id": "msg_a6ae4258-b300-97ad-b16c-14a791941bc0",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 220370000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 220370000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:55:29.413Z"
+}

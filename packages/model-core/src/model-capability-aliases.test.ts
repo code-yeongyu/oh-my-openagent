@@ -138,8 +138,8 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes OpenAI GPT-5.6 fast service-tier aliases", () => {
-    const aliases = ["gpt-5.6-sol-fast", "gpt-5.6-terra-fast", "gpt-5.6-luna-fast"]
+  test("normalizes OpenAI GPT fast service-tier aliases", () => {
+    const aliases = ["gpt-5.6-sol-fast", "gpt-5.6-terra-fast", "gpt-5.6-luna-fast", "gpt-6-astra-fast"]
 
     for (const aliasModelID of aliases) {
       const result = resolveModelIDAlias(aliasModelID, "openai")
@@ -148,7 +148,7 @@ describe("model-capability-aliases", () => {
         requestedModelID: aliasModelID,
         canonicalModelID: aliasModelID.slice(0, -"-fast".length),
         source: "pattern-alias",
-        ruleID: "openai-gpt-5.6-fast-service-tier-alias",
+        ruleID: "openai-gpt-fast-service-tier-alias",
       })
     }
   })

@@ -6,7 +6,6 @@ export const FACTS_FAILURES_VERSION = 1 as const
 
 export const FACTS_FAILURE_REASONS = [
   "quick_category_unavailable",
-  "sandbox_unavailable",
   "child_exit",
   "deadline_exceeded",
   "invalid_extraction",

@@ -89,7 +89,7 @@ function durationMs(record: TaskRecord): number {
 }
 
 function continuationHint(record: TaskRecord): string {
-  const mode = messageability(record.status, record.residency_state)
+  const mode = messageability(record.status, record.residency_state, record.execution_mode, record.killed)
   if (mode === "not-continuable") return ""
   return `Use task_send({ to: "${record.task_id}", message: "..." }) to continue.`
 }

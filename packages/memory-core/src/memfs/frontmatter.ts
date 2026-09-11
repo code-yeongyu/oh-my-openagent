@@ -16,7 +16,7 @@
  *
  * Dual-copy verdict: memory.ts:472-553 and memory-apply-patch.ts:644-714
  * are BEHAVIORALLY IDENTICAL. The only divergence is error-message prefix
- * ("memory:" vs "memory_apply_patch:"). This module uses a neutral prefix
+ * ("memory:" vs "memory apply_patch:"). This module uses a neutral prefix
  * since tool-level distinction is the caller's responsibility (todo 9/10).
  */
 

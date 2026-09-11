@@ -18,6 +18,17 @@ export function planMissingRecovery(existingSessionIds: readonly string[]): Plan
 	return { message: lines.join("\n"), details: { existingSessionIds } };
 }
 
+export function sessionScopeRequiredMessage(flag: string, existingSessionIds: readonly string[]): string {
+	const lines = [
+		"No ulw-loop session scope: neither the session env (OMO_ULW_LOOP_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID / PI_SESSION_ID) nor the flag names this run, and the shared .omo/ulw-loop root is never used implicitly because every session in this directory would read and overwrite it.",
+		`Recovery: pass the scope explicitly: \`${flag} <id>\` (subprocess, eval, and hook contexts do not inherit the session env).`,
+	];
+	if (existingSessionIds.length > 0) {
+		lines.push(`Existing ulw-loop session ids under .omo/ulw-loop/: ${existingSessionIds.join(", ")}.`);
+	}
+	return lines.join("\n");
+}
+
 export function sessionIdRequiredMessage(flag: string): string {
 	return [
 		`${flag} requires a non-empty value.`,

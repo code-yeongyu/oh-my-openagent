@@ -1,0 +1,30 @@
+# MUTATION PROOF: invert the semver comparison in resolveLatestFlag -> suite must go RED; restore -> GREEN
+# (mengmotaMac via bunshin, hermetic /tmp/omo-rls-20260904/mutation)
+# remote exit=0
+### MUTATION: Bun.semver.order(published, target) > 0  ->  < 0
+19:    return published !== null && Bun.semver.order(published, target) < 0
+error: expect(received).toBe(expected)
+
+Expected: "--latest"
+Received: "--latest=false"
+
+      at <anonymous> (/private/tmp/omo-rls-20260904/mutation/script/release-latest-flag.test.ts:59:59)
+(fail) resolveLatestFlag > #given a leading v on the candidate #when resolved #then it is tolerated like the tag list [0.04ms]
+(pass) resolveLatestFlag > #given no published releases yet #when resolved #then the first release is Latest [0.01ms]
+(pass) resolveLatestFlag > #given a candidate that is not a release version #when resolved #then it throws instead of guessing [0.05ms]
+
+ 3 pass
+ 6 fail
+ 10 expect() calls
+Ran 9 tests across 1 file. [6.00ms]
+MUTATED_EXIT=1
+### RESTORE
+19:    return published !== null && Bun.semver.order(published, target) > 0
+(pass) resolveLatestFlag > #given a candidate that is not a release version #when resolved #then it throws instead of guessing [0.15ms]
+
+ 9 pass
+ 0 fail
+ 14 expect() calls
+Ran 9 tests across 1 file. [7.00ms]
+RESTORED_EXIT=0
+

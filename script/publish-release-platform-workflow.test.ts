@@ -266,7 +266,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       buildBinaryStep.includes('--omo-version "$OMO_VERSION"') &&
       buildBinaryStep.includes('--omo-ai-version "$OMO_AI_VERSION"')
     const bunPins = [...workflow.matchAll(/bun-version:\s*"([^"]+)"/g)].map((match) => match[1])
-    const bunPinnedEverywhere = bunPins.length > 0 && bunPins.every((pin) => pin === "1.4.0")
+    const bunPinnedEverywhere = bunPins.length > 0 && bunPins.every((pin) => pin === "1.4.2")
 
     // #then
     expect(declaresInput, "omo_ai_version must be a workflow_call and workflow_dispatch input").toBe(true)
@@ -275,7 +275,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       buildCommand,
       "the build step must invoke build-omo-binary.ts for the matrix leg with both version inputs",
     ).toBe(true)
-    expect(bunPinnedEverywhere, "every setup-bun step (existing and new) must pin bun 1.4.0").toBe(true)
+    expect(bunPinnedEverywhere, "every setup-bun step (existing and new) must pin bun 1.4.2").toBe(true)
   })
 
   test("gates release-binary steps on a release-asset probe, not the npm publish skip", () => {

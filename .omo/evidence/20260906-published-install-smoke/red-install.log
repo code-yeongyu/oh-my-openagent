@@ -1,0 +1,29 @@
+oh-my-openagent-5.0.0-beta.43.tgz
+(node:42064) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smoke] Building omo@5.0.0-beta.43
+
+added 15 packages in 2s
+npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice run @sisyphuslabs/omo-codex-plugin@5.0.0-beta.43 sync:skills
+npm notice run node scripts/sync-skills.mjs
+node:internal/fs/promises:1281
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: ENOENT: no such file or directory, open 'C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-HCyJDO\codex-home\plugins\cache\sisyphuslabs\omo\.tmp-5.0.0-beta.43-42064-1788683262317\packages\prompts-core\prompts\ultrawork\codex.md'
+    at async open (node:internal/fs/promises:1281:25)
+    at async readFile (node:internal/fs/promises:1929:14)
+    at async syncSkills (file:///C:/Users/LilMG/AppData/Local/Temp/omo-published-smoke-HCyJDO/codex-home/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.43-42064-1788683262317/scripts/sync-skills.mjs:259:38)
+    at async file:///C:/Users/LilMG/AppData/Local/Temp/omo-published-smoke-HCyJDO/codex-home/plugins/cache/sisyphuslabs/omo/.tmp-5.0.0-beta.43-42064-1788683262317/scripts/sync-skills.mjs:285:2 {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\LilMG\\AppData\\Local\\Temp\\omo-published-smoke-HCyJDO\\codex-home\\plugins\\cache\\sisyphuslabs\\omo\\.tmp-5.0.0-beta.43-42064-1788683262317\\packages\\prompts-core\\prompts\\ultrawork\\codex.md'
+}
+
+Node.js v26.1.0
+published install smoke failed: npm run sync:skills failed in C:\Users\LilMG\AppData\Local\Temp\omo-published-smoke-HCyJDO\codex-home\plugins\cache\sisyphuslabs\omo\.tmp-5.0.0-beta.43-42064-1788683262317 with exit code 1

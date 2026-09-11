@@ -5,12 +5,12 @@ import { AGENT_FALLBACK_CHAINS } from "./fallback-chains"
 // Coupling guard: this test file must NEVER import @oh-my-opencode/model-core.
 // The chains are a hand transcription; the pins below catch transcription drift.
 
-const CURATED_AGENT_NAMES = ["explore", "librarian", "metis", "momus"] as const
-const REVIEWER_AGENT_NAMES = ["omo-senpi-code-reviewer", "omo-senpi-gate-reviewer", "omo-senpi-qa-executor"] as const
-const ALL_CHAIN_NAMES = [...CURATED_AGENT_NAMES, ...REVIEWER_AGENT_NAMES].sort()
+// The ulw reviewer agents resolve their model through `categories` (resolve-agent-categories.ts),
+// so this table carries the 4 curated agents only.
+const ALL_CHAIN_NAMES = ["explore", "librarian", "plan-consultant", "plan-reviewer"] as const
 
 describe("AGENT_FALLBACK_CHAINS", () => {
-  test("#given the builtin chains #when listing keys #then the 4 curated and 3 reviewer agent names are present", () => {
+  test("#given the builtin chains #when listing keys #then only the 4 curated agent names are present", () => {
     expect(Object.keys(AGENT_FALLBACK_CHAINS).sort()).toEqual([...ALL_CHAIN_NAMES])
   })
 
@@ -33,29 +33,8 @@ describe("AGENT_FALLBACK_CHAINS", () => {
     expect(lengths).toEqual({
       explore: 8,
       librarian: 8,
-      metis: 5,
-      momus: 7,
-      "omo-senpi-code-reviewer": 5,
-      "omo-senpi-qa-executor": 5,
-      "omo-senpi-gate-reviewer": 5,
-    })
-  })
-
-  test("#given the reviewer chains #when inspecting the primary rung #then each mirrors its reviewer contract model", () => {
-    expect(AGENT_FALLBACK_CHAINS["omo-senpi-code-reviewer"]?.[0]).toEqual({
-      providers: ["openai", "openai-codex"],
-      model: "gpt-5.6-terra",
-      variant: "medium",
-    })
-    expect(AGENT_FALLBACK_CHAINS["omo-senpi-qa-executor"]?.[0]).toEqual({
-      providers: ["openai", "openai-codex"],
-      model: "gpt-5.6-luna",
-      variant: "high",
-    })
-    expect(AGENT_FALLBACK_CHAINS["omo-senpi-gate-reviewer"]?.[0]).toEqual({
-      providers: ["openai", "openai-codex"],
-      model: "gpt-5.6-sol",
-      variant: "low",
+      "plan-consultant": 5,
+      "plan-reviewer": 6,
     })
   })
 
@@ -68,7 +47,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["opencode-go"], model: "minimax-m3" },
         { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
-        { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" },
+        { providers: ["claude-sdk-oauth", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
         { providers: ["openai", "openai-codex"], model: "gpt-5.4-nano" }
       ],
       librarian: [
@@ -78,45 +57,23 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["opencode-go"], model: "minimax-m3" },
         { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
-        { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" },
+        { providers: ["claude-sdk-oauth", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
         { providers: ["openai", "openai-codex"], model: "gpt-5.4-nano" }
       ],
-      metis: [
-        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
+      "plan-consultant": [
+        { providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+        { providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
         { providers: ["opencode-go"], model: "glm-5.2" },
         { providers: ["kimi-for-coding"], model: "kimi-k3" }
       ],
-      momus: [
-        { providers: ["openai", "openai-codex"], model: "gpt-5.6-terra", variant: "high" },
-        { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
-        { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "xhigh" },
-        { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
-        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
+      "plan-reviewer": [
+        { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "xhigh" },
+        { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
+        { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "high" },
+        { providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
         { providers: ["opencode-go"], model: "glm-5.2" }
-      ],
-      "omo-senpi-code-reviewer": [
-        { providers: ["openai", "openai-codex"], model: "gpt-5.6-terra", variant: "medium" },
-        { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "medium" },
-        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-        { providers: ["opencode-go"], model: "glm-5.2" },
-        { providers: ["kimi-for-coding"], model: "kimi-k3" }
-      ],
-      "omo-senpi-qa-executor": [
-        { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna", variant: "high" },
-        { providers: ["github-copilot"], model: "gpt-5.6-luna", variant: "high" },
-        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-        { providers: ["opencode-go"], model: "glm-5.2" },
-        { providers: ["kimi-for-coding"], model: "kimi-k3" }
-      ],
-      "omo-senpi-gate-reviewer": [
-        { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "low" },
-        { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "low" },
-        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
-        { providers: ["opencode-go"], model: "glm-5.2" },
-        { providers: ["kimi-for-coding"], model: "kimi-k3" }
       ]
     })
   })

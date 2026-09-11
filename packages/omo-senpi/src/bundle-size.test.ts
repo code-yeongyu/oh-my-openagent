@@ -32,13 +32,24 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,000,377 bytes; 1,050,000 preserves explicit headroom per this comment's own rule (never the failing
 // value). Still no new third-party dependency - bundle-purity green against the merged manifest.
 // Raised 710,000 -> 880,000 for plan letta-memory-parity-port: the new `memory` component ports the
-// full Letta-Code local memory engine (git-backed MemFS, memory/memory_apply_patch tools, prompt
+// full Letta-Code local memory engine (git-backed MemFS, memory tool, prompt
 // compiler, reflection/dreaming worker + state machine, palace viewer, transcript search, git sync
 // mirror) plus the harness-neutral `@oh-my-opencode/memory-core` package. It is a single self-contained
 // user feature wired into the extension entry; the imports span the whole engine (nothing accidental
 // inlined, no new third-party dependency added). Measured 863,893 bytes after minification. Headroom to
 // 880,000 leaves margin for follow-up memory polish without inviting unrelated bloat.
-const BUDGET_BYTES = 1_050_000
+// Raised 1,050,000 -> 1,100,000 for plan omo-thread-tools (PR #7456): registering the six-tool `thread`
+// family (tools, live socket surface, component) pulls the already-shipped addressing, address-book,
+// reader, receipts, mailbox and metadata seams into the entry for the first time. First-party code only -
+// bundle-purity stays green with no new third-party dependency inlined. Measured 1,068,655 bytes after
+// minification on top of dev's 1,031,755; 1,100,000 keeps ~2.9% headroom rather than the failing value.
+// Raised 1,100,000 -> 1,140,000 for plan omo-senpi-role-names (model profiles): the `model-profile`
+// component (builtin profile table, chain resolver, session-apply wiring) enters the entry for the
+// first time. First-party code only - `bundle purity` stays green on both cases and no dependency
+// manifest changed (`git diff origin/dev...HEAD -- package.json packages/omo-senpi/package.json` is
+// empty). Measured 1,105,921 bytes after minification on top of dev's 1,098,205; 1,140,000 keeps ~3%
+// headroom rather than the failing value.
+const BUDGET_BYTES = 1_140_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

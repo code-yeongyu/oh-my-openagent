@@ -1,0 +1,34 @@
+{
+  "task": 8,
+  "task_id": "st_01a08101",
+  "status": "done",
+  "scope": "Todo-8 remaining PR B remote failure: obsolete checkpoint-final lazycodex codeReview-free rejection; no commit or push",
+  "outcome": "checkpoint-final.test.ts now asserts the softened contract: a codeReview-free lazycodex gate completes. The sibling omo-senpi omit-codeReview case still completes; omo-senpi include-codeReview and lazycodex-reviewer cases still reject. No product-source edit.",
+  "changed_files": [
+    "packages/omo-codex/plugin/components/ulw-loop/src/quality-gate.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/src/codex-goal-instruction.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/src/checkpoint-template.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-lazycodex-surface.test.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts"
+  ],
+  "verification": {
+    "remote_machine": "mengmotaMac",
+    "red": "gate-b2 remote test:codex: checkpoint-final.test.ts Expected UlwLoopError at line 62 for codeReview-free lazycodex gate",
+    "green": "Whole ulw-loop component on mengmotaMac: 54 passed, 547 passed, 0 failed, TEST_EXIT=0; checkpoint-final.test.ts 14 tests passed",
+    "tsgo": "tsgo --noEmit -p packages/omo-codex/tsconfig.json: exit 0",
+    "diff_check": "git diff --check packages/omo-codex/plugin/components/ulw-loop/test/checkpoint-final.test.ts: exit 0",
+    "overlay": "clone origin/dev into /tmp/lcx-fixB8b-20260908/omo; bun install --frozen-lockfile INSTALL_EXIT=0; pushTree whole worktree ulw-loop (230 files); write matching prompts-core/prompts/ultrawork/codex.md for directive identity",
+    "real_config_sha256_before_and_after": "06eb6d38ee7b690e997053b26a5194a1fdbf3984e694e31881652e99858106d4"
+  },
+  "evidence": [
+    ".omo/evidence/20260908-lcx-gate-softening/task-8-red-green.log",
+    ".omo/evidence/20260908-lcx-gate-softening/task-8-gate.log"
+  ],
+  "cleanup": {
+    "remote": "ls: /tmp/lcx-fixB8b-20260908: No such file or directory; LS_EXIT=0"
+  },
+  "limitations": [
+    "First overlay of ulw-loop alone onto vanilla dev failed ultrawork-directive.test.ts byte-identity (1 failed / 546 passed) because worktree directive.md diverges from origin/dev prompts-core; not a todo-8 product defect. Second run also wrote the matching prompts-core file.",
+    "No commit or push. Local bun test was not run."
+  ]
+}

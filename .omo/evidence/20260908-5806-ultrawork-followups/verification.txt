@@ -1,0 +1,30 @@
+Source verified: 719e35ab1cd6a9e8add793e6878903c70160ffed
+Final toolchain: Bun 1.4.0 (34cbb9a40), Node 24.18.0
+
+Failing-first observations from the retained local logs:
+- System-transform restoration: 7 pass, 1 fail.
+  Failed: keeps runtime guidance in system transforms until a real message restores it.
+- Image-only restoration: 12 pass, 1 fail.
+  Failed: restoration is pending, an image follows a model change, full guidance persists before compact markers resume.
+
+Final commands, with Bun 1.4.0 first on PATH:
+bun test --timeout 20000 packages/omo-opencode/src/hooks/keyword-detector packages/omo-opencode/src/plugin-interface.test.ts packages/omo-opencode/src/plugin/default-mode-priority.test.ts packages/omo-opencode/src/plugin/sisyphus-runtime-prompt-reconciler.test.ts packages/omo-opencode/src/index.compacting.test.ts packages/omo-opencode/src/plugin/chat-message.test.ts packages/omo-opencode/src/plugin/event.test.ts
+bun run typecheck
+bun run build
+bash .omo/evidence/20260908-5806-ultrawork-followups/commands.sh
+
+Observed:
+201 pass
+0 fail
+typecheck: exit 0
+build: all steps completed
+real OpenCode 1.18.4 replay: PASS
+lossyCompactionSummary: true
+autoResumeGuidance.matchesRuntimeGuidance: true
+autoResumeGuidance.sha256: eb9497ebf95bd60daf71eb8ee051ae4c18b0661afd8b5fde4229b16bca12f7ba
+HOST_DB_SESSIONS_BEFORE=8083
+HOST_DB_SESSIONS_AFTER=8083
+HOST_DB_UNCHANGED
+
+The exact runtime result is result.json. No raw prompts, credentials,
+personal configuration, or machine-local source paths are included here.

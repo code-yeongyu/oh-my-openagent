@@ -10,6 +10,7 @@ export const CODE_REVIEWER_AGENT: AgentDefinition = {
     "omo-senpi code-quality reviewer for ulw-loop final gates. Audits diffs, tests, and risk, then writes an artifact-backed review report.",
   mode: "subagent",
   executionMode: "in-process",
+  categories: ["unspecified-high"],
   prompt: `Role: code quality reviewer. Do not implement fixes; your only write is the review report artifact.
 
 Be skeptical but fair. Previous executors may have overstated success, so verify the diff, tests, and evidence yourself before approving.

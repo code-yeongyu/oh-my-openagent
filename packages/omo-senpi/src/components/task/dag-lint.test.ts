@@ -87,4 +87,41 @@ describe("dag definition lint", () => {
     // then
     expect(warnings).toEqual([])
   })
+
+  test("#given a node targeting a legacy curated agent id #when linted #then the warning names the node, the legacy id, and the canonical replacement", () => {
+    // given
+    const nodes = [{ id: "plan-review", prompt: CONTRACT_PROMPT, subagent_type: "momus" }]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([
+      'node "plan-review": subagent_type "momus" is deprecated; use "plan-reviewer". The alias is removed in the next release.',
+    ])
+  })
+
+  test("#given a node targeting the other legacy curated agent id #when linted #then the warning names plan-consultant", () => {
+    // given
+    const nodes = [{ id: "gap-analysis", prompt: CONTRACT_PROMPT, subagent_type: "metis" }]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([
+      'node "gap-analysis": subagent_type "metis" is deprecated; use "plan-consultant". The alias is removed in the next release.',
+    ])
+  })
+
+  test("#given a node targeting the canonical agent id #when linted #then no deprecation warning fires", () => {
+    // given
+    const nodes = [{ id: "plan-review", prompt: CONTRACT_PROMPT, subagent_type: "plan-reviewer" }]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([])
+  })
 })

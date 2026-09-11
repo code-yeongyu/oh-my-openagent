@@ -1,0 +1,196 @@
+{
+  "queryId": "q10",
+  "lane": "omo-tool",
+  "variant": "v2",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Bun 1.4 javascript since:2026-08-26 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-26",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422449,
+    "completed_at": 1788422449,
+    "id": "4f82e368-4161-910e-9c4d-fb33a3eda10a",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-0a345541-77b5-4d0e-a610-ef2cb1b0c15f-0",
+        "input": "{\"query\":\"Bun 1.4 javascript since:2026-08-26 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_4f82e368-4161-910e-9c4d-fb33a3eda10a_call-0a345541-77b5-4d0e-a610-ef2cb1b0c15f-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_4f82e368-4161-910e-9c4d-fb33a3eda10a_call-0a345541-77b5-4d0e-a610-ef2cb1b0c15f-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2092752140838285546 - Bun is a fast all-in-one toolkit for JavaScript and TypeScript apps. It acts as a drop-in Node.js replacement with a runtime, package manager, bundler, and test runner. Bun 1.4 (rewritten in Rust) cuts CPU/memory use, starts faster, boosts Node compatibility, and adds built-ins like image processing, headless webviews, markdown, cron jobs, and more. (@grok, 2026-08-26)\nhttps://x.com/kokaneka/status/2092663877859151985 - JavaScript does not have a standard library and I think Bun.js is trying to solve that. Bun 1.4 rbrings more capabilities into the runtime, including browser automation, image processing, Markdown parsing, cron jobs, pseudo-terminals, JSON5 support etc. (@kokaneka, 2026-08-26)\nhttps://x.com/grok/status/2092491626815868938 - Bun 1.4 is the latest major release (Aug 20, 2026) of Bun, the fast all-in-one JavaScript/TypeScript toolkit (runtime, package manager, bundler, test runner) that aims to replace Node.js. It’s the first version rewritten from Zig to Rust. Key upgrades: +1,517 Node.js tests passing, 2,900+ issues fixed, 5× lower idle CPU, up to 35% less memory, 50% faster Linux startup. New built-ins include Bun.Image, Bun.WebView, Bun.markdown, Bun.cron, and parallel run/test support. (@grok, 2026-08-26)\nhttps://x.com/codezine/status/2092752140838285546 - JavaScript／TypeScript開発のためのオールインワンツール「Bun 1.4」リリース (@codezine, 2026-08-26)\nhttps://x.com/shikisokukusoku/status/2093142858647957974 - JavaScriptランタイム「Bun 1.4」正式リリース｜53万行のコードをAIが書き換えた舞台裏 (@shikisokukusoku, 2026-08-28)\nhttps://x.com/devhkr0/status/2094475494104404390 - 👋🏻 이번 주 JS Dev Weekly: Bun 1.4와 pnpm 12, Node.js ZIP 지원, 브라우저 native 기능, React/Next.js 구조 전환이 핵심이었습니다. AI 시대엔 더 많이 생성하는 것보다 더 적게 보내고 더 잘 검증하는 게 중요해졌습니다. #JavaScript #React #AI (@devhkr0, 2026-08-31)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092744166618865934",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092744166618865934"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092752140838285546",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092752140838285546"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092663877859151985",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092663877859151985"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2093142858647957974",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2093142858647957974"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2092491626815868938",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2092491626815868938"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094475494104404390",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094475494104404390"
+              }
+            ]
+          }
+        ],
+        "id": "msg_4f82e368-4161-910e-9c4d-fb33a3eda10a",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-26",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 92247000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 92247000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:00:45.739Z"
+}

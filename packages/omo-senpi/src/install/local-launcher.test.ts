@@ -27,6 +27,12 @@ describe("local omo launcher", () => {
           envPrefix: "OMO",
           userAgent: "omo",
           originator: "omo",
+          // A local sibling-store install points at the repo plugin dir and deliberately carries
+          // no version: without one the engine treats the source as read-only and renders no
+          // startup notes, which is what a dev install should do.
+          changelog: {
+            path: "/repo/packages/omo-senpi/plugin/CHANGELOG.md",
+          },
           update: {
             packageName: "omo-ai",
             distTag: "beta",

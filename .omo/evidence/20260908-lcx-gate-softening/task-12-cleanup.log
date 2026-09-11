@@ -1,0 +1,8 @@
+
+COMMAND (mengmotaMac): rm -rf /tmp/lcx-t12-20260908-2eff9a4d && test ! -e /tmp/lcx-t12-20260908-2eff9a4d && printf '%s dir REMOVED\n' /tmp/lcx-t12-20260908-2eff9a4d
+EXIT: 0
+STDOUT:
+/tmp/lcx-t12-20260908-2eff9a4d dir REMOVED
+
+STDERR:
+

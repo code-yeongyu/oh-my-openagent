@@ -1,0 +1,32 @@
+sisyphus-gpt-5-5 expects "`true` is the standard spawn": PASS
+sisyphus-gpt-5-5 expects "Run it in the background and continue": PASS
+sisyphus-gpt-5-5 expects "run_in_background=true,": PASS
+sisyphus-gpt-5-5 forbids "`false` for synchronous work where the next step depends": PASS
+sisyphus-gpt-5-5 forbids "Synchronous (`run_in_background=false`)": PASS
+sisyphus-gpt-5-5 forbids "run_in_background=false,\n  prompt": PASS
+sisyphus-gpt-5-5 chars=33710
+sisyphus-junior-gpt-5-5 expects "Run it in the background; continue": PASS
+sisyphus-junior-gpt-5-5 forbids "`run_in_background=false` when their answer blocks": PASS
+sisyphus-junior-gpt-5-5 chars=19922
+delegate-task-description expects "true is the standard spawn": PASS
+delegate-task-description expects "run_in_background=true)": PASS
+delegate-task-description forbids "ONLY for parallel exploration": PASS
+delegate-task-description forbids "Defaults to false (sync, waits)": PASS
+delegate-task-description forbids "run_in_background=false, prompt=\"Task 1": PASS
+delegate-task-description chars=3660
+delegate-task-schema-run_in_background expects "true is the standard spawn": PASS
+delegate-task-schema-run_in_background expects "Omitted counts as false": PASS
+delegate-task-schema-run_in_background forbids "Use true ONLY for parallel exploration": PASS
+delegate-task-schema-run_in_background chars=302
+atlas-gpt expects "the completion notification wakes you to verify": PASS
+atlas-gpt expects "run_in_background=true, prompt=\"...task A...\"": PASS
+atlas-gpt forbids "blocks for verification": PASS
+atlas-gpt forbids "run_in_background=false": PASS
+atlas-gpt chars=18063
+ultrawork-gpt expects "subagent_type=\"oracle\", load_skills=[], run_in_background=true": PASS
+ultrawork-gpt forbids "run_in_background=false": PASS
+ultrawork-gpt chars=15021
+retry-fix-hint expects "run_in_background=true (the standard spawn)": PASS
+retry-fix-hint forbids "run_in_background=false (for delegation)": PASS
+retry-fix-hint chars=131
+task-resume-info exports: createTaskResumeInfoHook

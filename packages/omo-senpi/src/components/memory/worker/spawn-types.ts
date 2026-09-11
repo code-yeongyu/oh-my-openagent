@@ -1,6 +1,4 @@
-import type { FactsPayload, RecallCandidate, ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
-
-import type { FactsQueuedKey } from "../facts-failure-recording"
+import type { ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
 import type { RunAttempt } from "./run-artifacts"
 
 export interface ReflectionSpawnPaths {
@@ -65,43 +63,6 @@ export interface ReflectionChildResult {
   readonly timedOut: boolean
 }
 
-export interface FactsSpawnArgs {
-  readonly runId: string
-  readonly attempt: number
-  readonly hardDeadlineAt: number
-  readonly model: string
-  readonly thinking?: string
-  readonly nextAttempt?: RunAttempt
-  readonly command: string
-  readonly args: readonly string[]
-  readonly cwd: string
-  readonly env: NodeJS.ProcessEnv
-  readonly detached: true
-  readonly paths: {
-    readonly runDir: string
-    readonly payload: string
-    readonly extraction: string
-  }
-}
-
-export interface FactsRunLedgerEnvelope {
-  readonly version: 1
-  readonly runId: string
-  readonly attempt: number
-  readonly model: string
-  readonly thinking?: string
-  readonly kind: "facts"
-  readonly startedAt: string
-  readonly hardDeadlineAt: number
-  readonly terminationGraceMs: number
-  readonly deadlineAt: number
-  readonly batchId: string
-  readonly queued: readonly FactsQueuedKey[]
-  readonly headBeforeApply?: string
-}
-
-export type FactsSandbox = (spawnArgs: FactsSpawnArgs) => FactsSpawnArgs | Promise<FactsSpawnArgs>
-
 export interface PrepareReflectionSpawnInput {
   /** Fork mode: the live parent session file to fork, and the parent's cwd for prefix identity. */
   readonly parentSessionFile?: string
@@ -123,68 +84,6 @@ export interface PrepareReflectionSpawnInput {
   readonly peoplePolicy: DreamPeoplePolicy
   readonly systemTokenBudget?: number
   readonly systemTokenTarget?: number
-  readonly senpiCommand?: string
-  readonly senpiPrefixArgs?: readonly string[]
-  readonly chmodFile?: (path: string, mode: number) => Promise<void>
-}
-
-/** One line of the judge's read-only transcript window. */
-export interface MemorianTranscriptTurn {
-  readonly role: "user" | "assistant"
-  readonly text: string
-}
-
-export interface MemorianSpawnPaths {
-  readonly runDir: string
-  readonly candidates: string
-  readonly transcript: string
-  readonly persona: string
-  readonly extension: string
-  /** NDJSON sink the child's nudge tool appends to; the parent is its only reader. */
-  readonly nudges: string
-}
-
-export interface MemorianSpawnArgs {
-  readonly hardDeadlineAt: number
-  readonly model: string
-  readonly thinking?: string
-  readonly command: string
-  readonly args: readonly string[]
-  readonly cwd: string
-  readonly env: NodeJS.ProcessEnv
-  readonly detached: true
-  readonly paths: MemorianSpawnPaths
-}
-
-export type MemorianSandbox = (spawnArgs: MemorianSpawnArgs) => MemorianSpawnArgs | Promise<MemorianSpawnArgs>
-
-export interface PrepareMemorianSpawnInput {
-  readonly runDir: string
-  readonly candidates: readonly RecallCandidate[]
-  /** Paths already surfaced this session; the persona sees them, the parent re-checks them. */
-  readonly surfaced: readonly string[]
-  /** Authoritative cap (memory.recall.max_items); the payload carries it for the persona. */
-  readonly maxItems: number
-  readonly transcript: readonly MemorianTranscriptTurn[]
-  readonly model: string
-  readonly thinking?: string
-  readonly hardDeadlineAt?: number
-  readonly env: NodeJS.ProcessEnv
-  readonly senpiCommand?: string
-  readonly senpiPrefixArgs?: readonly string[]
-  readonly chmodFile?: (path: string, mode: number) => Promise<void>
-}
-
-export interface PrepareFactsSpawnInput {
-  readonly runId: string
-  readonly runDir: string
-  readonly payload: FactsPayload
-  readonly model: string
-  readonly thinking?: string
-  readonly attempt?: number
-  readonly hardDeadlineAt?: number
-  readonly nextAttempt?: RunAttempt
-  readonly env: NodeJS.ProcessEnv
   readonly senpiCommand?: string
   readonly senpiPrefixArgs?: readonly string[]
   readonly chmodFile?: (path: string, mode: number) => Promise<void>

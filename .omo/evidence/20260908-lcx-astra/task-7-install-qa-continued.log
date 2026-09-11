@@ -1,0 +1,40 @@
+REAL_HOME_SHASUM_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+
+COMMAND: scripts/install-verify.sh --keep (fresh real install)
+installing local omo into /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.2hhRlAJZAb/codex ...
+PASS: plugin cache present (5.0.0-beta.48)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (9 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged (ABSENT)
+kept isolated home: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.2hhRlAJZAb/codex
+PASS: install-verify
+{"mode":"fresh","home":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.2hhRlAJZAb/codex","model":"gpt-6-astra","model_context_window":600000,"model_reasoning_effort":"high","plan_mode_reasoning_effort":"xhigh","agents":[{"role":"explorer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-clone-fidelity-reviewer","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-code-reviewer","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-gate-reviewer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-qa-executor","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-high","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-worker-low","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-medium","model":"gpt-6-astra","effort":"high"},{"role":"librarian","model":"gpt-6-astra","effort":"low"},{"role":"metis","model":"gpt-6-astra","effort":"high"},{"role":"momus","model":"gpt-6-astra","effort":"high"},{"role":"plan","model":"gpt-6-astra","effort":"high"}],"agentBlocks":12,"installedHookCount":21,"sourceHookCount":21,"installedManifestSurface":".tmp/marketplaces/sisyphuslabs/plugins/omo/.codex-plugin/plugin.json","cacheHookCount":19,"cacheVsSourceCountEqual":false,"cacheRemovedHooks":["./hooks/pre-tool-use-recommending-git-bash-mcp.json","./hooks/post-compact-resetting-git-bash-mcp-reminder.json"],"customV2Cap":null,"passed":true}
+
+INSTALL_MODE=legacy CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.jxQn3Ad6kp/codex HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.jxQn3Ad6kp/home
+INSTALL_EXIT=0
+{"mode":"legacy","home":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.jxQn3Ad6kp/codex","model":"gpt-6-astra","model_context_window":600000,"model_reasoning_effort":"high","plan_mode_reasoning_effort":"xhigh","agents":[{"role":"explorer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-clone-fidelity-reviewer","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-code-reviewer","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-gate-reviewer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-qa-executor","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-high","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-worker-low","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-medium","model":"gpt-6-astra","effort":"high"},{"role":"librarian","model":"gpt-6-astra","effort":"low"},{"role":"metis","model":"gpt-6-astra","effort":"high"},{"role":"momus","model":"gpt-6-astra","effort":"high"},{"role":"plan","model":"gpt-6-astra","effort":"high"}],"agentBlocks":12,"installedHookCount":21,"sourceHookCount":21,"installedManifestSurface":".tmp/marketplaces/sisyphuslabs/plugins/omo/.codex-plugin/plugin.json","cacheHookCount":19,"cacheVsSourceCountEqual":false,"cacheRemovedHooks":["./hooks/pre-tool-use-recommending-git-bash-mcp.json","./hooks/post-compact-resetting-git-bash-mcp-reminder.json"],"customV2Cap":null,"passed":true}
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+
+INSTALL_MODE=preservation CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Tqz77HpOHw/codex HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Tqz77HpOHw/home
+INSTALL_EXIT=0
+{"mode":"preservation","home":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Tqz77HpOHw/codex","model":"gpt-5.6-terra","model_reasoning_effort":"medium","agents":[{"role":"explorer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-clone-fidelity-reviewer","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-code-reviewer","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-gate-reviewer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-qa-executor","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-high","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-worker-low","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-medium","model":"gpt-6-astra","effort":"high"},{"role":"librarian","model":"gpt-6-astra","effort":"low"},{"role":"metis","model":"gpt-6-astra","effort":"high"},{"role":"momus","model":"gpt-6-astra","effort":"high"},{"role":"plan","model":"gpt-6-astra","effort":"high"}],"agentBlocks":12,"installedHookCount":21,"sourceHookCount":21,"installedManifestSurface":".tmp/marketplaces/sisyphuslabs/plugins/omo/.codex-plugin/plugin.json","cacheHookCount":19,"cacheVsSourceCountEqual":false,"cacheRemovedHooks":["./hooks/pre-tool-use-recommending-git-bash-mcp.json","./hooks/post-compact-resetting-git-bash-mcp-reminder.json"],"customV2Cap":4,"passed":true}
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+
+INSTALL_MODE=agent-preservation CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.7NlIyVeGRA/codex HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.7NlIyVeGRA/home
+INSTALL_EXIT=0
+{"mode":"agent-preservation","home":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.7NlIyVeGRA/codex","model":"gpt-6-astra","model_context_window":600000,"model_reasoning_effort":"high","plan_mode_reasoning_effort":"xhigh","agents":[{"role":"explorer","model":"gpt-6-astra","effort":"xhigh"},{"role":"lazycodex-clone-fidelity-reviewer","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-code-reviewer","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-gate-reviewer","model":"gpt-6-astra","effort":"low"},{"role":"lazycodex-qa-executor","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-high","model":"gpt-6-astra","effort":"medium"},{"role":"lazycodex-worker-low","model":"gpt-6-astra","effort":"high"},{"role":"lazycodex-worker-medium","model":"gpt-6-astra","effort":"high"},{"role":"librarian","model":"gpt-6-astra","effort":"low"},{"role":"metis","model":"gpt-6-astra","effort":"high"},{"role":"momus","model":"gpt-6-astra","effort":"high"},{"role":"plan","model":"gpt-6-astra","effort":"high"}],"agentBlocks":12,"installedHookCount":21,"sourceHookCount":21,"installedManifestSurface":".tmp/marketplaces/sisyphuslabs/plugins/omo/.codex-plugin/plugin.json","cacheHookCount":19,"cacheVsSourceCountEqual":false,"cacheRemovedHooks":["./hooks/pre-tool-use-recommending-git-bash-mcp.json","./hooks/post-compact-resetting-git-bash-mcp-reminder.json"],"customV2Cap":null,"passed":true}
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+
+INSTALL_MODE=malformed CODEX_HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.IRS9g1jym5/codex HOME=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.IRS9g1jym5/home
+INSTALL_EXIT=0
+MALFORMED_BEFORE_SHA1=8d54f3d88a9037e1cd606ba9b278f6db27a5ed7f
+MALFORMED_AFTER_SHA1=245a351335ae9d6e90e7fbd74b89097ca0da929f
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+REAL_HOME_SHASUM_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.uvHdGH4Oju
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.2hhRlAJZAb
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.jxQn3Ad6kp
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Tqz77HpOHw
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.7NlIyVeGRA
+REMOVED=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.IRS9g1jym5

@@ -8,6 +8,7 @@ const OMO_COMMAND_TIMEOUT_MS = 30_000
 export interface SpawnTarget {
   readonly command: string
   readonly args: readonly string[]
+  readonly env?: NodeJS.ProcessEnv
 }
 
 // Windows .cmd/.bat shims must be invoked through cmd.exe; Node's BatBadBut hardening
@@ -22,7 +23,12 @@ export function toSpawnTarget(
 ): SpawnTarget {
   // .js entries spawn through the current runtime on every platform, so an
   // override (e.g. OMO_AGENT_TOOLKIT_BIN) may point at a JS entry directly.
-  if (/\.js$/i.test(bin)) return { command: process.execPath, args: [bin, ...args] }
+  // Under the packaged runtime process.execPath is the compiled omo binary, not
+  // an interpreter: without BUN_BE_BUN it runs its own embedded entrypoint with
+  // the toolkit path as a prompt (status exits 1, the loop reads as inactive).
+  if (/\.js$/i.test(bin)) {
+    return { command: process.execPath, args: [bin, ...args], env: { ...process.env, BUN_BE_BUN: "1" } }
+  }
   const isWindowsScript = platform === "win32" && /\.(cmd|bat)$/i.test(bin)
   if (!isWindowsScript) return { command: bin, args }
   return { command: "cmd.exe", args: ["/d", "/s", "/c", bin, ...args] }
@@ -72,6 +78,7 @@ export async function runOmoCommand(
     cwd: options.cwd,
     stdio: ["ignore", "pipe", "ignore"],
     windowsHide: true,
+    ...(target.env === undefined ? {} : { env: target.env }),
   })
 
   const stdoutChunks: Buffer[] = []

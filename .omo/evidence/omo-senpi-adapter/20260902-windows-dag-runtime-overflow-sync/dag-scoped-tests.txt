@@ -1,0 +1,10 @@
+Command:
+PATH=/private/tmp/bun-1.4.0/bin:$PATH bun test packages/omo-senpi/src/components/task/dag-runtime-config.test.ts packages/omo-senpi/src/components/task/dag-runtime.test.ts packages/senpi-task/src/dag/journal.test.ts
+
+Observed:
+30 pass
+0 fail
+115 expect() calls
+Ran 30 tests across 3 files. [3.20s]
+
+The runtime suite deliberately logs a throwing subscriber in its containment case; all 30 tests passed.

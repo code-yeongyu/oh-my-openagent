@@ -1,0 +1,8 @@
+{
+  "scenario": "librarian",
+  "attempts": [
+    { "attempt": 1, "result": "PASS", "verdict": true, "xSearchResults": 1, "agentType": "quick", "note": "Earlier mislabeled run; root target was category:quick", "senpiVersion": "2026.9.2-4" },
+    { "attempt": 2, "result": "PASS", "verdict": true, "xSearchResults": 1, "agentType": "librarian", "senpiVersion": "2026.9.2-4" }
+  ],
+  "selectedAttempt": 2
+}

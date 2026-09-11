@@ -1,0 +1,33 @@
+$ bun run --cwd packages/ast-grep-mcp build && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs
+# staged runtimes so the CLI --check preflight can run
+
+$ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+Senpi LSP runtime is current: /private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Senpi ast-grep-mcp runtime is current: /private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js sha256=80fa42b26c4b2055854fc533409b2dd02019f4bd072cd31ad5e94a635bae79de
+Senpi agent-toolkit runtime is current: /private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/runtime/agent-toolkit sha256=7c2abaa6b233ef76309f8268ded94751aad4fe8b344c4477da962e5a8331a2d4
+x-search conditional skill is current: /private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 934 modules in 71ms
+
+  omo.js  1.61 MB  (entry point)
+
+Bundled 688 modules in 52ms
+
+  omo-task.js  0.98 MB  (entry point)
+
+Bundled 212 modules in 25ms
+
+  omo-member.js  169.32 KB  (entry point)
+
+Bundled 142 modules in 16ms
+
+  memory-run-supervisor.mjs  38.72 KB  (entry point)
+
+Bundled 118 modules in 14ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+omo-senpi extension build is current: /private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/extensions/omo.js
+CHECK_EXIT=0
+
+$ git status --short   # after the rebuild: empty, committed bundle is byte-identical
+(no output above = clean)

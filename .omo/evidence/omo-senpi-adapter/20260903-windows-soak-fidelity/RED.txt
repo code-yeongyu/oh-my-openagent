@@ -1,0 +1,47 @@
+$ bun test script/windows-flake-soak-workflow.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script/windows-flake-soak-workflow.test.ts:
+error: expect(received).toContain(expected)
+
+Expected to contain: "test_ref:"
+(fail) Windows flake soak workflow > #given a repaired workflow ref #when another commit is soaked #then checkout targets the requested test ref [1.06ms]
+
+error: expect(received).toContain(expected)
+
+Expected to contain: "id: run-soak"
+(fail) Windows flake soak workflow > #given completed and failing iterations #when the summary renders #then step outputs report the true indices [6.85ms]
+
+error: missing ordered workflow token: uses: actions/setup-node@v7
+
+Expected: > 780
+Received: -1
+(fail) Windows flake soak workflow > #given the real Windows shard-2 job #when full-shard-2 is soaked #then setup and test commands stay equivalent [0.39ms]
+
+ 7 pass
+ 3 fail
+ 56 expect() calls
+Ran 10 tests across 1 file. [3.29s]
+
+Command exited with code 1
+
+$ bun test script/windows-flake-soak-workflow.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script/windows-flake-soak-workflow.test.ts:
+error: expect(received).toContain(expected)
+
+Expected to contain: "- Iterations actually run: `${{ steps.run-soak.outputs.iterations_ran || '0' }}`."
+(fail) Windows flake soak workflow > #given completed and failing iterations #when the summary renders #then step outputs report the true indices [0.37ms]
+
+error: expect(received).toContain(expected)
+
+Expected to contain: "$ciWorkflow = Get-Content -Path \".github/workflows/ci.yml\" -Raw"
+(fail) Windows flake soak workflow > #given the real Windows shard-2 job #when full-shard-2 is soaked #then setup and test commands stay equivalent [3.65ms]
+
+ 8 pass
+ 2 fail
+ 79 expect() calls
+Ran 10 tests across 1 file. [535.00ms]
+
+Command exited with code 1

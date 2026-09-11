@@ -1,0 +1,98 @@
+machine: mengmotaMac (macos/aarch64 online)
+listMachines():
+mengmotaHost macos/aarch64 offline
+vultr-tokyo linux/x86_64 online
+sionicMac macos/aarch64 online
+gorky linux/x86_64 online
+mengmotaMac macos/aarch64 online
+
+CLONE+INSTALL (pristine origin/dev)
+remote HEAD: 602f721
+INSTALL_EXIT=0
+install shell exitCode=0
+D=/tmp/lcx-t9-20260908
+
+RED: copy ONLY test/quality-gate-fields-messages.test.ts onto the pristine origin/dev clone
+COMMAND: export PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH; cd /tmp/lcx-t9-20260908/omo && bash -c 'bun --cwd packages/omo-codex/plugin/components/ulw-loop test ./test/quality-gate-fields-messages.test.ts ./test/quality-gate-blockers.test.ts 2>&1 | tail -150; echo TEST_EXIT=${PIPESTATUS[0]}'
+=== RED ===
+exitCode=0
+--- stdout ---
+$ vitest --run ./test/quality-gate-fields-messages.test.ts ./test/quality-gate-blockers.test.ts
+
+ RUN  v4.1.11 /private/tmp/lcx-t9-20260908/omo/packages/omo-codex/plugin/components/ulw-loop
+
+ ✓ test/quality-gate-blockers.test.ts (6 tests) 10ms
+ ❯ test/quality-gate-fields-messages.test.ts (3 tests | 3 failed) 148ms
+     × missing-manualQa error contains accepted input and names bare-object and top-level qualityGate forms 121ms
+     × status next-action text mentions currentAttemptDir 17ms
+     × CLI help mentions currentAttemptDir 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/quality-gate-fields-messages.test.ts > quality-gate field and status messages > missing-manualQa error contains accepted input and names bare-object and top-level qualityGate forms
+AssertionError: expected 'Final quality gate has 7 validation d…' to contain 'accepted input'
+
+- Expected
++ Received
+
+- accepted input
++ Final quality gate has 7 validation defects:
++ - manualQa: Final quality gate is missing manualQa evidence.
++ - manualQa.by: Final quality gate requires non-empty manualQa.by.
++ - manualQa.evidence: Final quality gate requires non-empty manualQa.evidence.
++ - manualQa.artifactRefs: manualQa.artifactRefs must not be empty.
++ - manualQa.surfaceEvidence: manualQa.surfaceEvidence must not be empty.
++ - manualQa.adversarialCases: manualQa.adversarialCases must not be empty.
++ - manualQa.status: manualQa.status must be passed.
+
+ ❯ test/quality-gate-fields-messages.test.ts:55:19
+     53|   const message = thrownMessage(() => validateQualityGate(GATE_WITHOUT…
+     54|
+     55|   expect(message).toContain("accepted input");
+       |                   ^
+     56|   expect(message).toContain("bare object");
+     57|   expect(message).toContain('top-level "qualityGate" key');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/quality-gate-fields-messages.test.ts > quality-gate field and status messages > status next-action text mentions currentAttemptDir
+AssertionError: expected 'G001 passes every criterion and is th…' to contain 'currentAttemptDir'
+
+- Expected
++ Received
+
+- currentAttemptDir
++ G001 passes every criterion and is the final story: update_goal complete, then checkpoint --print-template to build the final quality gate.
++ plan is evidence-layout v1; artifacts go under .omo/evidence/
+
+ ❯ test/quality-gate-fields-messages.test.ts:92:46
+     90|   };
+     91|
+     92|   expect(statusNextActions(plan).join("\n")).toContain("currentAttempt…
+       |                                              ^
+     93|  });
+     94|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/quality-gate-fields-messages.test.ts > quality-gate field and status messages > CLI help mentions currentAttemptDir
+AssertionError: expected 'Usage:\n  omo-agent-toolkit hook user…' to contain 'currentAttemptDir'
+
+ ❯ test/quality-gate-fields-messages.test.ts:96:25
+     94|
+     95|  it("CLI help mentions currentAttemptDir", () => {
+     96|   expect(ULW_LOOP_HELP).toContain("currentAttemptDir");
+       |                         ^
+     97|  });
+     98| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  3 failed | 6 passed (9)
+   Start at  20:51:33
+   Duration  1.37s (transform 1.21s, setup 0ms, import 1.46s, tests 158ms, environment 0ms)
+
+error: script "test" exited with code 1
+TEST_EXIT=1

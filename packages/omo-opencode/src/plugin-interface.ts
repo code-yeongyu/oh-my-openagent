@@ -79,6 +79,7 @@ export function createPluginInterface(args: {
     "experimental.chat.system.transform": createSystemTransformHandler(
       pluginConfig.default_mode,
       getUltraworkMessage,
+      hooks.keywordDetector,
     ),
 
     config: managers.configHandler,

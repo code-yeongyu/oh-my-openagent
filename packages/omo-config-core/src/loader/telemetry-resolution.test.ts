@@ -101,7 +101,7 @@ describe("loadOmoConfig telemetry resolution", () => {
     }
   })
 
-  test("#given an unknown sibling inside telemetry #when loading the senpi view #then the strict block is rejected", () => {
+  test("#given an unknown sibling inside telemetry #when loading the senpi view #then the sibling is ignored and the valid setting is honored", () => {
     // given
     const fixture = makeFixture()
     writeUserConfig(fixture.homeDir, `{"telemetry":{"enabled":false,"unexpected":true}}`)
@@ -112,9 +112,9 @@ describe("loadOmoConfig telemetry resolution", () => {
 
       // then
       expect(result.diagnostics).toHaveLength(1)
-      expect(result.diagnostics[0]).toMatchObject({ kind: "validation" })
-      expect(result.diagnostics[0]?.issuePaths).toContain("telemetry")
-      expect(isOmoTelemetryEnabled(result.config)).toBe(true)
+      expect(result.diagnostics[0]).toMatchObject({ kind: "unknown-keys" })
+      expect(result.diagnostics[0]?.issuePaths).toEqual(["telemetry.unexpected"])
+      expect(isOmoTelemetryEnabled(result.config)).toBe(false)
     } finally {
       rmSync(fixture.root, { force: true, recursive: true })
     }

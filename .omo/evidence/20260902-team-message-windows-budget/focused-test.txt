@@ -1,0 +1,10 @@
+Command:
+bun test ./packages/omo-opencode/src/features/team-mode/tools/messaging.test.ts --test-name-pattern "generic fallback wakes cover two messages"
+
+Observed:
+(pass) createTeamSendMessageTool > #given generic fallback wakes cover two messages #when the first is acknowledged #then the second message still wakes [2489.34ms]
+1 pass
+40 filtered out
+0 fail
+6 expect() calls
+Ran 1 test across 1 file. [5.61s]

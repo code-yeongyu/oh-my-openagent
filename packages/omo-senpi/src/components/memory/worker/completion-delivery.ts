@@ -11,6 +11,8 @@ import {
   type ReflectionLiveSession,
 } from "./completion-contracts"
 import { readCompletionRecord, writeCompletionRecord } from "./completion-records"
+import { detailExcerpt, optionalRendererText } from "./entry-renderers"
+import { childFailureCause, failureFingerprint } from "./failure-detail"
 
 const DETAILED_DRAIN_LIMIT = 5
 const COMPLETION_MAX_AGE_MS = 7 * 24 * 60 * 60_000
@@ -110,7 +112,7 @@ function drainMessage(records: readonly ReflectionCompletionRecord[]): string {
 }
 
 function completionFingerprint(record: ReflectionCompletionRecord): string {
-  return `${record.reason ?? record.outcome}:${(record.detail ?? "").slice(0, 60)}`
+  return failureFingerprint(record.reason ?? record.outcome, record.detail)
 }
 
 function isUnsuccessful(record: ReflectionCompletionRecord): boolean {
@@ -133,8 +135,23 @@ export function safeNotify(
 function completionMessage(record: ReflectionCompletionRecord): string {
   if (record.outcome === "merged") return `Memory reflection ${record.runId} merged.`
   if (record.outcome === "no_changes") return `Memory reflection ${record.runId} completed with no changes.`
-  if (record.outcome === "timed_out") return `Memory reflection ${record.runId} timed out; its transcript cursor was not advanced.`
+  const facts = formatFailureFacts(record)
+  if (record.outcome === "timed_out") {
+    return `Memory reflection ${record.runId} timed out${facts}; its transcript cursor was not advanced.`
+  }
+  if (facts.length > 0) {
+    return `Memory reflection ${record.runId} ${record.outcome}${facts}; its transcript cursor was not advanced.`
+  }
   return `Memory reflection ${record.runId} ended with ${record.outcome}; its transcript cursor was not advanced.`
+}
+
+function formatFailureFacts(record: ReflectionCompletionRecord): string {
+  const reason = optionalRendererText(record.reason)
+  const detail = optionalRendererText(childFailureCause(record.detail))
+  const bounded = detail === undefined ? undefined : detailExcerpt(detail)
+  const reasonPart = reason === undefined ? "" : ` (${reason})`
+  const detailPart = bounded === undefined ? "" : `: ${bounded}`
+  return `${reasonPart}${detailPart}`
 }
 
 function completionLevel(outcome: ReflectionOutcome): "info" | "warning" {

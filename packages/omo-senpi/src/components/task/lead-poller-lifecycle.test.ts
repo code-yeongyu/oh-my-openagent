@@ -47,7 +47,7 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
     coordinator: options.withCoordinator === false
       ? undefined
       : {
-          enqueue: (injection) => injected.push(injection),
+          enqueue: (injection) => { injected.push(injection); return true },
           scheduleFlush: () => { scheduled += 1 },
           flushSoon: () => { soon += 1 },
         },

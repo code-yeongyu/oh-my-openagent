@@ -8,8 +8,10 @@ import {
   normalizeRendererText,
   optionalRendererText,
 } from "./entry-renderers"
+import { childFailureCause } from "./failure-detail"
 import { readReflectionHealth } from "./health"
 import { reflectionRemediation } from "./remediation"
+import type { ReflectionLauncher } from "./launcher-identity"
 
 export const REFLECTION_HEALTH_ENTRY_TYPE = "senpi-memory.health"
 
@@ -22,6 +24,9 @@ export interface ReflectionHealthEntry {
   readonly lastDetail?: string
   readonly sinceISO: string
   readonly recommendation: string
+  readonly launcher?: ReflectionLauncher
+  readonly thisRuntime?: string
+  readonly streakRuntimes?: readonly string[]
 }
 
 // A failure streak is an attention-grabbing state: error tone, with the actionable
@@ -30,6 +35,8 @@ export interface ReflectionHealthEntry {
 export const renderReflectionHealthEntry: EntryRenderer<ReflectionHealthEntry> = (entry, options, theme) => {
   const health = entry.data
   if (!health) return undefined
+  // Entries persisted before distillation existed still carry a raw stderr tail on resume.
+  const cause = childFailureCause(health.lastDetail)
   return noticeComponent(
     {
       glyph: "✗",
@@ -38,7 +45,14 @@ export const renderReflectionHealthEntry: EntryRenderer<ReflectionHealthEntry> =
       why: recommendationWhy(health.recommendation),
       detail: joinFields([
         `reason ${normalizeRendererText(health.lastReason)}`,
-        optionalRendererText(health.lastDetail) === undefined ? undefined : detailExcerpt(health.lastDetail ?? ""),
+        optionalRendererText(cause) === undefined ? undefined : detailExcerpt(cause ?? ""),
+        health.launcher === undefined ? undefined : `launched by ${normalizeRendererText(health.launcher.runtime)}`,
+        health.thisRuntime === undefined || health.launcher?.runtime === health.thisRuntime
+          ? undefined
+          : `this session ${normalizeRendererText(health.thisRuntime)}`,
+        health.streakRuntimes === undefined || health.streakRuntimes.length < 2
+          ? undefined
+          : `across ${health.streakRuntimes.length} runtimes`,
         `since ${normalizeRendererText(health.sinceISO)}`,
         `identity ${normalizeRendererText(health.identity)}`,
       ]),
@@ -69,25 +83,50 @@ export async function emitReflectionHealthAlert(
   identity: string,
   live: ReflectionLiveSession | undefined,
   once: (key: string) => boolean,
+  context?: {
+    readonly observedRunIds: readonly string[]
+    readonly currentLauncher?: ReflectionLauncher
+    readonly now?: number
+  },
 ): Promise<boolean> {
   if (!live?.ui) return false
-  const health = await readReflectionHealth(completionsDir)
+  const health = await readReflectionHealth(completionsDir, {
+    includeStreakRunIds: true,
+    ...(context?.now === undefined ? {} : { now: context.now }),
+  })
   if (health.streak < 3 || health.fingerprint.length === 0) return false
   if (health.recentFailureFingerprints.filter((item) => item === health.fingerprint).length < 2) return false
+  if (context !== undefined && !context.observedRunIds.some((runId) => (health.streakRunIds ?? []).includes(runId))) return false
   if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
   const failure = health.lastFailure
   const recommendation = reflectionRemediation(failure?.reason, failure?.detail)
+  const cause = childFailureCause(failure?.detail)
+  const launcher = failure?.launcher
+  const thisRuntime = context?.currentLauncher?.runtime
   const entry: ReflectionHealthEntry = {
     schemaVersion: 1,
     identity,
     streak: health.streak,
     fingerprint: health.fingerprint,
     lastReason: failure?.reason ?? "failed",
-    ...(failure?.detail === undefined ? {} : { lastDetail: failure.detail }),
+    ...(cause === undefined ? {} : { lastDetail: cause }),
+    ...(launcher === undefined ? {} : { launcher }),
+    ...(thisRuntime === undefined ? {} : { thisRuntime }),
+    ...((health.streakRuntimes ?? []).length === 0 ? {} : { streakRuntimes: health.streakRuntimes }),
     sinceISO: health.streakSinceISO ?? failure?.finishedAt ?? new Date(0).toISOString(),
     recommendation,
   }
   live.api.appendEntry(REFLECTION_HEALTH_ENTRY_TYPE, entry)
-  safeNotify(live, `Memory reflection has failed ${health.streak} times (${health.fingerprint}). ${recommendation}`, "warning")
+  safeNotify(
+    live,
+    joinFields([
+      `Memory reflection has failed ${health.streak} times`,
+      cause ?? failure?.reason,
+      launcher === undefined ? undefined : `launched by ${launcher.runtime}`,
+      thisRuntime === undefined || launcher?.runtime === thisRuntime ? undefined : `this session ${thisRuntime}`,
+      recommendation,
+    ]),
+    "warning",
+  )
   return true
 }

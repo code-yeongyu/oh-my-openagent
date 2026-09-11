@@ -154,6 +154,37 @@ describe("RpcProcessRunner", () => {
     },
   )
 
+  test("#given the initial prompt rejects while the child is alive #when startup cleans up #then the failure records alive and no cleanup exit", async () => {
+    // given: force the stdin write to reject without changing the child's live exit state.
+    const runner = new RpcProcessRunner({
+      modelAdmission: async () => {},
+      buildSpawn: (spec) => ({ command: process.execPath, args: [], cwd: spec.cwd, env: process.env }),
+      spawnChild: () => {
+        const child = spawnFakeChild()
+        children.push(child)
+        const stdin = child.stdin
+        if (stdin === null) throw new Error("fake child stdin was not piped")
+        const write = (...args: unknown[]): boolean => {
+          const callback = args.findLast((value): value is (error: Error) => void => typeof value === "function")
+          callback?.(new Error("synthetic prompt rejection"))
+          return false
+        }
+        Object.defineProperty(stdin, "write", { value: write })
+        return child
+      },
+    })
+
+    // when / then
+    const failure = await runner.start(makeSpec()).catch((error: unknown) => error)
+    expect(failure).toMatchObject({
+      failure: {
+        kind: "child-prompt-failed",
+        rejected_while: "alive",
+      },
+    })
+    expect(failure).not.toMatchObject({ failure: { exit: expect.anything() } })
+  })
+
   test("#given a child that exits nonzero before terminal #when it crashes #then the outcome carries the stderr tail", async () => {
     // given
     const rejections: unknown[] = []
@@ -169,6 +200,8 @@ describe("RpcProcessRunner", () => {
       failure: {
         kind: "child-prompt-failed",
         message: expect.stringContaining("boom stderr detail"),
+        rejected_while: "exited",
+        exit: { kind: "crashed", code: 4, signal: null },
       },
     })
     await Promise.resolve()

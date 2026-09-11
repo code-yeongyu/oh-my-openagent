@@ -61,6 +61,9 @@ function renderLocalLauncher(options) {
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    changelog: {
+      path: join2(options.pluginPath, "CHANGELOG.md")
+    },
     update: {
       packageName: "omo-ai",
       distTag: "beta",
@@ -143,11 +146,26 @@ import { constants as constants2 } from "node:fs";
 import { access as access2, readFile as readFile2, stat } from "node:fs/promises";
 import { dirname as dirname3, join as join4 } from "node:path";
 
+// packages/memory-core/src/personas/manifest.ts
+var PERSONA_ASSET_FILENAMES = {
+  reflection: "reflection-persona.md",
+  dream: "dream-persona.md",
+  facts: "facts-persona.md",
+  kibitzer: "kibitzer-persona.md"
+};
+var PERSONA_ASSET_FILES = [
+  PERSONA_ASSET_FILENAMES.reflection,
+  PERSONA_ASSET_FILENAMES.dream,
+  PERSONA_ASSET_FILENAMES.facts,
+  PERSONA_ASSET_FILENAMES.kibitzer
+];
+
 // packages/omo-senpi/src/install/senpi-settings.ts
 import { constants } from "node:fs";
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname as dirname2, join as join3, resolve as resolve3 } from "node:path";
+import { basename, dirname as dirname2, join as join3, resolve as resolve3 } from "node:path";
 var OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi";
+var GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/;
 var LEGACY_BUILTIN_SHADOW_PACKAGES = [
   join3("packages", "pi-goal"),
   join3("packages", "pi-webfetch")
@@ -188,7 +206,11 @@ async function removeSupersededOmoPackages(packages, currentPluginPath, agentDir
     const packagePath = resolve3(agentDir, entry);
     if (packagePath === currentPath)
       return currentPath;
-    return await readPackageName(packagePath) === OMO_SENPI_PACKAGE_NAME ? undefined : entry;
+    if (await readPackageName(packagePath) === OMO_SENPI_PACKAGE_NAME)
+      return;
+    if (GENERATED_PLUGIN_BASENAME.test(basename(entry)) && !await fileExists(packagePath))
+      return;
+    return entry;
   }));
   return entries.filter((entry) => entry !== undefined);
 }
@@ -231,7 +253,14 @@ async function readPackageName(packagePath) {
       return;
     throw error;
   }
-  const parsed = JSON.parse(raw);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      return;
+    throw error;
+  }
   return isRecord(parsed) && typeof parsed.name === "string" ? parsed.name : undefined;
 }
 async function fileExists(path) {
@@ -254,10 +283,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo-task.js"),
   join4("extensions", "omo-member.js"),
   join4("extensions", "memory-run-supervisor.mjs"),
-  join4("extensions", "reflection-persona.md"),
-  join4("extensions", "dream-persona.md"),
-  join4("extensions", "facts-persona.md"),
-  join4("extensions", "memorian-persona.md"),
+  ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
   join4("skills", "ast-grep", "SKILL.md"),
   join4("skills", "coding-agent-sessions", "SKILL.md"),
   join4("skills", "debugging", "SKILL.md"),
@@ -276,6 +302,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("skills", "ulw-plan", "SKILL.md"),
   join4("skills", "ulw-research", "SKILL.md"),
   join4("skills", "visual-qa", "SKILL.md"),
+  join4("skills-conditional", "x-search", "SKILL.md"),
   join4("runtime", "ast-grep-mcp", "cli.js"),
   join4("runtime", "agent-toolkit", "cli.js"),
   join4("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
@@ -299,6 +326,7 @@ async function ensurePluginArtifacts(context) {
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], { cwd: context.repoRoot });
   }
   if (await hasMissingPluginArtifact(context.pluginPath)) {
     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);
@@ -387,9 +415,10 @@ async function runSenpiInstaller(options = {}) {
     packages.push(context.pluginPath);
   settings.packages = packages;
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  installLocalLauncher({
+  const launcherPath = installLocalLauncher({
     pluginPath: context.pluginPath,
-    senpiCliPath: join5(context.repoRoot, "packages", "coding-agent", "dist", "cli.js")
+    senpiCliPath: join5(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
+    homeDir: context.homeDir
   });
   return {
     ok: true,
@@ -397,6 +426,7 @@ async function runSenpiInstaller(options = {}) {
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
+    launcherPath,
     changed: JSON.stringify(settings) !== before,
     backupPath
   };
@@ -409,13 +439,14 @@ async function runSenpiUninstaller(options = {}) {
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath);
   settings.packages = nextPackages;
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  uninstallLocalLauncher();
+  uninstallLocalLauncher(context.homeDir);
   return {
     ok: true,
     action: "uninstall",
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
+    launcherPath: undefined,
     changed: JSON.stringify(settings) !== before,
     backupPath,
     removed: nextPackages.length !== packages.length
@@ -425,12 +456,14 @@ function resolveInstallContext(options) {
   const env = options.env ?? process.env;
   const allowBuild = options.pluginPath === undefined;
   const repoRoot = resolve4(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname4(fileURLToPath(import.meta.url))) : dirname4(resolve4(options.pluginPath))));
-  const agentDir = resolve4(options.agentDir ?? resolveAgentHome({ env, homeDir: env.HOME ?? homedir3() }));
+  const homeDir = options.homeDir ?? env.HOME ?? homedir3();
+  const agentDir = resolve4(options.agentDir ?? resolveAgentHome({ env, homeDir }));
   const pluginPath = resolve4(options.pluginPath ?? join5(repoRoot, "packages", "omo-senpi", "plugin"));
   return {
     env,
     repoRoot,
     agentDir,
+    homeDir,
     settingsPath: join5(agentDir, "settings.json"),
     pluginPath,
     platform: options.platform ?? process.platform,

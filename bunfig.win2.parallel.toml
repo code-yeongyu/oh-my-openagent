@@ -12,7 +12,6 @@ pathIgnorePatterns = [
   "packages/omo-opencode/**",
   "packages/memory-core/**",
   "packages/senpi-task/src/runners/rpc-process.windows.test.ts",
-  "packages/utils/src/codegraph-provision-upgrade.test.ts",
   "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts",
   "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts",
   "script/codex-installer-version.test.ts",

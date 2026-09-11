@@ -16,6 +16,49 @@ function pendingRecord(): TaskRecord {
 }
 
 describe("transitionTaskRecord lifecycle graph", () => {
+  test("#given a pending task without launch facts #when start commits and later transitions or reconciliation lose it #then started_at is stamped and preserved", () => {
+    // given - launch evidence must exist even without pid or child_session_id.
+    const pending = pendingRecord()
+    const startedAt = "2026-07-06T00:00:00.000Z"
+    expect(pending).not.toHaveProperty("started_at")
+
+    // when
+    const started = transitionTaskRecord(pending, { type: "start", timestamp: startedAt })
+
+    // then
+    expect(started.applied).toBe(true)
+    expect(started.record).toMatchObject({ status: "running", started_at: startedAt })
+    const timestamp = "2026-07-06T00:00:01.000Z"
+    const later: readonly TaskTransition[] = [
+      { type: "complete", timestamp, final_response: "done" },
+      { type: "fail", timestamp, error_message: "failed" },
+      { type: "cancel", timestamp },
+      { type: "interrupt", timestamp },
+      { type: "evict", timestamp },
+      { type: "dispose", timestamp },
+      { type: "persist_only", timestamp },
+      { type: "detach_rpc", timestamp },
+      { type: "mark_resident", timestamp },
+    ]
+    for (const transition of later) {
+      const result = transitionTaskRecord(started.record, transition)
+      expect(result.applied).toBe(true)
+      expect(result.record).toHaveProperty("started_at", startedAt)
+    }
+    // Ordinary lose is intentionally rejected; only reconciliation may mark a task lost.
+    const rejected = transitionTaskRecord(started.record, { type: "lose", timestamp, error_message: "lost" })
+    expect(rejected.applied).toBe(false)
+    expect(rejected.record).toHaveProperty("started_at", startedAt)
+    const lost = markRecordLostForReconciliation(started.record, { timestamp, error_message: "owner died" })
+    expect(lost.applied).toBe(true)
+    expect(lost.record).toMatchObject({ status: "lost", started_at: startedAt })
+    const refreshed = markRecordLostForReconciliation(lost.record, { timestamp, error_message: "still lost", updateReason: true })
+    expect(refreshed.applied).toBe(true)
+    expect(refreshed.record).toHaveProperty("started_at", startedAt)
+    expect(markRecordLostForReconciliation(pending, { timestamp, error_message: "queued owner died" }).record)
+      .not.toHaveProperty("started_at")
+  })
+
   test("#given pending task #when running-only terminals (complete/fail/interrupt) arrive before start #then they are rejected", () => {
     // given
     // cancel-from-pending is legal (see the w2trans suite below); complete/fail/interrupt stay running-only.
@@ -358,6 +401,7 @@ describe("transitionTaskRecord suspension residency", () => {
     const running: TaskRecord = {
       ...started,
       host_pid: 777,
+      child_session_id: "01a0815e-child-session",
       notification: { run_epoch: 3, notified_epoch: 1 },
     }
 
@@ -375,6 +419,7 @@ describe("transitionTaskRecord suspension residency", () => {
     expect("host_pid" in result.record).toBe(false)
     expect(result.record.pid).toBeUndefined()
     expect("pid" in result.record).toBe(false)
+    expect(result.record.child_session_id).toBe("01a0815e-child-session")
     expect(result.record.notification).toEqual({ run_epoch: 3, notified_epoch: 1 })
   })
 

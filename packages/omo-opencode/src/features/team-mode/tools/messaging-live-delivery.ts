@@ -49,6 +49,7 @@ export async function deliverLive(
       config,
       directory,
       settleMs: deps.liveDeliverySettleMs,
+      dispatchTiming: deps.dispatchTiming,
     })
   }
 }

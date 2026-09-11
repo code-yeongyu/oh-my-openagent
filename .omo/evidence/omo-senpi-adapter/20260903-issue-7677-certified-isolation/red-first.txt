@@ -1,0 +1,22 @@
+Reviewed exact head: d2489baeeb51973d456d0f6ea06b758a75961a81
+Original source fix commit: a0aff6422546ac1267b88dd1b0ff8144421e5483
+Certified source head: 509929c8266467ce1a8a07f4ea5a027461436149
+Reviewed-head source identity: d2489baeeb51973d456d0f6ea06b758a75961a81 is evidence-only relative to a0aff6422546ac1267b88dd1b0ff8144421e5483 for all source-bearing paths.
+
+RED/GREEN receipt for final isolation blockers
+
+RED — volatile log entry budget:
+Command: bun test packages/omo-senpi/scripts/qa/isolation-state.test.mjs
+Observed: 11 pass, 1 fail. The new case expected complete:true but received false because a.log consumed maxEntries before stable.
+
+RED — post-open setup cleanup:
+Command: bun test packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs
+Observed: 16 pass, 1 fail. FILE_REPLACED remained primary and the descriptor closed once, but directoryCloseCalls was 0 instead of 1.
+
+RED — bounded enumeration, late mutation, no-follow final identity, and ENOTDIR:
+Command: bun test packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs
+Observed: 17 pass, 5 fail. The failures independently showed 9 readSync calls instead of bounded lookahead 2, a late persistent file reported complete, snapshotDirectory and digestDirectory treated root ENOTDIR as absence, and final identity dereferenced a replacement symlink.
+
+GREEN:
+Command: bun test <seven focused isolation/task-13/upstream-compatibility suites>
+Result: 76 pass, 0 fail, 282 assertions.

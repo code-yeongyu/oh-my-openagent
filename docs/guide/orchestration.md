@@ -1,551 +1,306 @@
+<!-- sources: packages/senpi-task/src/tools/task/description.ts, packages/senpi-task/src/agents/builtin/index.ts, packages/senpi-task/src/category/builtins.ts, packages/omo-senpi/skills/ulw-plan/SKILL.md, packages/shared-skills/skills/ulw-execute/SKILL.md, packages/omo-senpi/skills/mass-ulw/SKILL.md, packages/omo-senpi/skills/ulw-loop/SKILL.md, packages/omo-senpi/skills/hyperplan/SKILL.md, packages/omo-senpi/skills/ultrawork/SKILL.md, packages/omo-senpi/src/components/ulw-execute-continuation/index.ts, packages/omo-senpi/src/components/ulw-execute-continuation/boulder-eligibility.ts, packages/omo-senpi/src/components/memory/AGENTS.md, packages/omo-config-core/src/schema/agent.ts -->
+
 # Orchestration System Guide
 
-Oh My OpenAgent's orchestration system transforms a simple AI agent into a coordinated development team through **separation of planning and execution**.
+omo-senpi turns one coding session into a coordinated team by separating planning from execution. The main agent (the session you're typing into) does the thinking and the orchestration; everything else is delegated through the `task` tool.
 
 ---
 
 ## TL;DR - When to Use What
 
-| Complexity            | Approach                  | When to Use                                                                              |
-| --------------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
-| **Simple**            | Just prompt               | Simple tasks, quick fixes, single-file changes                                           |
-| **Complex + Lazy**    | Type `ulw` or `ultrawork` | Complex tasks where explaining context is tedious. Agent figures it out.                 |
-| **Complex + Precise** | Prometheus → `/ulw-execute` | Precise, multi-step work requiring true orchestration. Switch to Prometheus (agent selector) to plan; Atlas executes. |
+| Situation | Approach | What happens |
+| --- | --- | --- |
+| Quick fix, single file | Just prompt | The main agent does it directly. |
+| Complex, and explaining the context is tedious | Type `ulw` (or `ultrawork`) | The main agent enters ultrawork mode: explores, plans in a notepad, delegates, verifies with evidence. |
+| Complex, and you want a written, reviewed plan first | `/ulw-plan`, then `/ulw-execute` | The Ultrawork Planner interviews you and writes `.omo/plans/<slug>.md`. `/ulw-execute` then runs that plan in the same session. |
+| Many tasks where some must wait on others | `mass-ulw` | The main agent defines a dependency graph and drives it through the `workflow` tool, one run per phase. |
+| Several lanes that touch the same module and need to talk mid-flight | Team mode (`team_create`) | The main agent leads background member children. See [Team Mode](./team-mode.md). |
 
-**Decision Flow:**
+**Decision flow:**
 
 ```
-
-Is it a quick fix or simple task?
-  └─ YES → Just prompt normally
-  └─ NO  → Is explaining the full context tedious?
-              └─ YES → Type "ulw" and let the agent figure it out
-              └─ NO  → Do you need precise, verifiable execution?
-                         └─ YES → Switch to Prometheus (agent selector) for planning, then /ulw-execute
-                         └─ NO  → Just use "ulw"
+Is it a quick fix or a simple task?
+  |- YES -> just prompt
+  |- NO  -> is explaining the full context tedious?
+             |- YES -> type "ulw" and let the agent figure it out
+             |- NO  -> do you need a written, reviewable plan?
+                        |- YES -> /ulw-plan, approve, then /ulw-execute
+                        |- NO  -> real ordering between many tasks? mass-ulw
+                                  overlapping lanes? team mode
+                                  otherwise "ulw"
 ```
 
 ---
 
 ## The Architecture
 
-The orchestration system uses a three-layer architecture that solves context overload, cognitive drift, and verification gaps through specialization and delegation.
+There is one orchestrator: the main agent, running on your session model. It never hands the session to a different agent. Instead it delegates units of work through `task`, reads results back, and keeps the plan, the todo list, and the evidence in sync.
 
 ```mermaid
 flowchart TB
-    subgraph Planning["Planning Layer (Human + Prometheus)"]
-        User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>claude-fable-5 / kimi-k3"]
-        Metis[" Metis<br/>(Consultant)<br/>claude-opus-5 / kimi-k3"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.6-sol / claude-opus-5 / gemini-3.1-pro / glm-5.2"]
+    User(("User"))
+    Main["Main agent<br/>(orchestrator, your session model)"]
+
+    subgraph Delegation["task tool"]
+        Worker["Category worker<br/>task(category=...)"]
+        Curated["Curated read-only agents<br/>explore / librarian /<br/>plan-consultant / plan-reviewer"]
+        Reviewers["ulw-loop reviewers<br/>omo-senpi-code-reviewer /<br/>omo-senpi-qa-executor /<br/>omo-senpi-gate-reviewer"]
     end
 
-    subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
-    end
+    Kibitzer["Kibitzer<br/>(memory recall nudges)"]
 
-    subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-5 / kimi-k3 / gpt-5.6-sol / minimax-m3 / MiniMax-M3 / minimax-m2.7 / big-pickle"]
-        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-5 / glm-5.2"]
-        Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m2.7-highspeed / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
-        Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.6-luna-fast / deepseek-v4-flash (max) / qwen3.7-plus / minimax-m2.7-highspeed / minimax-m3 / MiniMax-M3 / minimax-m2.7 / claude-haiku-4-5 / gpt-5.4-nano"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>claude-opus-5 / kimi-k3 / glm-5.2 / gpt-5.6-sol"]
-    end
-
-    User -->|"Describe work"| Prometheus
-    Prometheus -->|"Consult"| Metis
-    Prometheus -->|"Interview"| User
-    Prometheus -->|"Generate plan"| Plan[".omo/plans/*.md"]
-    Plan -->|"High accuracy review"| Momus
-    Plan -->|"Independent review"| Oracle
-    Momus -->|"OKAY / REJECT"| Prometheus
-    Oracle -->|"OKAY / REJECT"| Prometheus
-
-    User -->|"/ulw-execute"| Orchestrator
-    Plan -->|"Read"| Orchestrator
-
-    Orchestrator -->|"task(category=deep/quick/unspecified-*)"| Junior
-    Orchestrator -->|"task(subagent_type=oracle)"| Oracle
-    Orchestrator -->|"call_omo_agent(subagent_type=explore)"| Explore
-    Orchestrator -->|"call_omo_agent(subagent_type=librarian)"| Librarian
-    Orchestrator -->|"task(category=visual-engineering, load_skills=[frontend])"| Frontend
-
-    Junior -->|"Results + Learnings"| Orchestrator
-    Oracle -->|"Advice"| Orchestrator
-    Explore -->|"Code patterns"| Orchestrator
-    Librarian -->|"Documentation"| Orchestrator
-    Frontend -->|"UI code"| Orchestrator
+    User -->|"prompt / ulw / /ulw-plan / /ulw-execute"| Main
+    Main -->|"implementation, tests, QA"| Worker
+    Main -->|"research, gap analysis, plan review"| Curated
+    Main -->|"final gates"| Reviewers
+    Kibitzer -.->|"recalled memory: <hint>"| Main
+    Worker -->|"results + evidence"| Main
+    Curated -->|"findings / verdicts"| Main
+    Reviewers -->|"report artifacts"| Main
 ```
 
-Model labels above show the current fallback stacks from `packages/omo-opencode/src/shared/model-requirements.ts`, not marketing names.
+### The main agent
 
-### Agent Inventory and Modes (Current)
+The main agent is whatever model your session is using. It carries the ultrawork directive, the planning skill, and the execution skill; there's no separate "planner agent" or "executor agent" to switch to. Tuned prompt presets exist for the common frontier models, and the planning and execution prompts are written to work across families. See [Agent-Model Matching](./agent-model-matching.md) for the model-specific notes.
 
-The system has **11 built-in agents**:
+### Delegation through `task`
 
-- Primary: `sisyphus`, `hephaestus`, `prometheus`, `atlas`
-- Subagent: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `sisyphus-junior`
+Every spawn provides exactly one of `category` or `subagent_type`:
 
-Canonical assembly order for primary agents is:
+- `task(category="...")` routes to **the category worker**: a fresh worker session configured by the category's model and skills. This is how implementation, tests, and QA get done. A category-routed task always takes its model from `omo.json` (`categories.<name>.models`); passing `model` alongside `category` is rejected.
+- `task(subagent_type="...")` invokes a named agent directly. The builtin roster is:
+  - Curated read-only agents (in-process, cannot write files): `explore` (codebase grep: "where is X?"), `librarian` (remote repos, official docs, OSS examples), `plan-consultant` (pre-planning gap analysis), `plan-reviewer` (plan review). `plan-consultant` and `plan-reviewer` are **plan-gated**: spawnable only after you explicitly asked for the ulw-plan workflow, a `.omo/plans/*.md` file was touched this session, and `/ulw-execute` hasn't run.
+  - ulw-loop reviewers (they write report artifacts, so they aren't in the read-only set): `omo-senpi-code-reviewer` (diff, tests, risk), `omo-senpi-qa-executor` (runs real scenarios, records surface evidence), `omo-senpi-gate-reviewer` (approves unless it can cite a failed success criterion).
 
-`Sisyphus → Hephaestus → Prometheus → Atlas`
+Useful spawn options: `run_in_background: true` for parallel waves (the default posture), `load_skills` to prepend skills to the child's prompt, `name` for a stable handle, `task_summary` for the one-line footer label. Continue a child with `task_send`, peek with `task_output`, end it with `task_cancel`; `/tasks` lists what this session spawned. `plan-reviewer` is one-shot: `task_send` to it is always refused.
 
-Mode distinction:
+Curated agents are rejected as team members. Route them through `task`, never `team_create`.
 
-- `mode: "primary"`: top-level session agents selected directly in UI/CLI
-- `mode: "subagent"`: worker/consultant agents invoked via `task(..., subagent_type="...")` or `call_omo_agent(...)`
+### Kibitzer memory nudges
 
-### Display Names vs Providers
-
-`Sisyphus - ultraworker` is the display name for the primary Sisyphus agent. It is not a separate provider, proxy, or replacement for your original model account.
-
-Three names can appear together in logs or the TUI:
-
-- **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
-- **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
-- **Model id**: `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.2`
-
-The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k3`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
-
-When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instruction set for a harder autonomous task. By default it keeps the agent's configured model or fallback chain. An explicit `agents.sisyphus.ultrawork.model` or `variant` setting can override that routing for ultrawork prompts.
-
-### Delegation Semantics (Important)
-
-- `task(category="...")` routes to **Sisyphus-Junior** with category-optimized model routing
-- `task(subagent_type="...")` invokes that specific agent directly (for example `oracle`, `explore`, `librarian`)
-- Category and `subagent_type` are mutually exclusive inputs in one call
+Kibitzer is the memory component's read-only recall judge. At tool-call boundaries and at settle it looks at the turn's lexical candidates and, when a stored memory is relevant, injects one notice reading `recalled memory: <hint>`. It never edits anything and never wakes an idle session; it just reminds the main agent of what it already knows. `/search` is the manual recall surface.
 
 ---
 
-## Planning: Prometheus + Metis + Momus + Oracle
+## Planning: the Ultrawork Planner
 
-### Prometheus: Your Strategic Consultant
+`/ulw-plan` puts the main agent into planning mode as **the Ultrawork Planner**, a planning consultant. It announces `ULW-PLAN MODE ENABLED!`, states that it won't implement anything until you say okay, and explains that approval authorizes writing the plan only. Execution starts separately with `/ulw-execute`.
 
-Prometheus is not just a planner, it's an intelligent interviewer that helps you think through what you actually need. The `prometheus-md-only` hook restricts its Write/Edit to `.omo/*.md`; Bash and read/search tools remain allowed, and it must not implement, including via subagents.
+Plan mode is sticky. "do X", "fix X", "just do it" all mean "plan X".
 
-**The Interview Process (via `ulw-plan`):** Prometheus explores first. On CLEAR intent it interviews only the surviving owner-decisions; on UNCLEAR intent it adopts defaults. It waits for your explicit approval before writing the plan.
+### The interview
+
+The planner explores first: parallel read-only research through `explore` and `librarian`, plus the `architect` and `ultrabrain` categories as advisory design lanes when they're available. Only then does it decide how to talk to you:
+
+- **CLEAR intent** (you know the outcome; only preferences remain): it asks the surviving owner-decisions, with the reason for each, and nothing the repo could have answered.
+- **UNCLEAR intent** (the outcome itself is fuzzy): it adopts and announces best-practice defaults instead of interviewing you, and turns high-accuracy review on automatically.
+- **On the fence**: treated as CLEAR with exactly one question.
+
+If you say "ask me" or "interview me", it interviews regardless. Owner-decisions (anything irreversible, destructive, or a spend) always survive as a question, even when a default exists.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Interview: User describes work
-    Interview --> Research: Launch explore/librarian agents
-    Research --> Interview: Gather codebase context
-    Interview --> ClearanceCheck: After each response
-
-    ClearanceCheck --> Interview: Requirements unclear
-    ClearanceCheck --> PlanGeneration: All requirements clear
-
-    state ClearanceCheck {
-        [*] --> Check
-        Check: Core objective defined?
-        Check: Scope boundaries established?
-        Check: No critical ambiguities?
-        Check: Technical approach decided?
-        Check: Test strategy confirmed?
-    }
-
-    PlanGeneration --> MetisConsult: Mandatory gap analysis
-    MetisConsult --> WritePlan: Incorporate findings
-    WritePlan --> HighAccuracyChoice: Present to user
-
-    state "Momus + Oracle review" as DualReview
-
-    HighAccuracyChoice --> DualReview: High accuracy required or selected
-    HighAccuracyChoice --> Done: User accepts plan
-
-    DualReview --> WritePlan: EITHER REJECTS - fix issues
-    DualReview --> Done: BOTH APPROVE - plan approved
-
-    Done --> [*]: Guide to /ulw-execute
+    [*] --> Explore: /ulw-plan
+    Explore --> Verdict: research waves done
+    Verdict --> Interview: CLEAR
+    Verdict --> Defaults: UNCLEAR
+    Interview --> Brief
+    Defaults --> Brief
+    Brief --> Approval: user says okay
+    Approval --> GapAnalysis: plan-consultant
+    GapAnalysis --> WritePlan: .omo/plans/<slug>.md
+    WritePlan --> Review: plan-reviewer round
+    Review --> WritePlan: REJECT - fix cited issues
+    Review --> Done: APPROVE
+    Done --> [*]: handoff to /ulw-execute
 ```
 
-**Intent-Specific Strategies:**
+### Plan Consultant gap analysis
 
-Prometheus adapts its interview style based on what you're doing:
+Before the plan is written, the planner spawns `plan-consultant` to catch what it missed: hidden intentions in the request, ambiguities that would derail a worker, over-engineering and scope creep, missing acceptance criteria, unaddressed edge cases. The planner has the whole picture in its head; the consultant forces that implicit knowledge onto the page.
 
-| Intent                 | Prometheus Focus               | Example Questions                                          |
-| ---------------------- | ------------------------------ | ---------------------------------------------------------- |
-| **Refactoring**        | Safety - behavior preservation | "What tests verify current behavior?" "Rollback strategy?" |
-| **Build from Scratch** | Discovery - patterns first     | "Found pattern X in codebase. Follow it or deviate?"       |
-| **Mid-sized Task**     | Guardrails - exact boundaries  | "What must NOT be included? Hard constraints?"             |
-| **Architecture**       | Strategic - long-term impact   | "Expected lifespan? Scale requirements?"                   |
+### Plan Reviewer high-accuracy rounds
 
-### Metis: The Gap Analyzer
-
-Before Prometheus writes the plan, Metis catches what Prometheus missed:
-
-- Hidden intentions in user's request
-- Ambiguities that could derail implementation
-- AI-slop patterns (over-engineering, scope creep)
-- Missing acceptance criteria
-- Edge cases not addressed
-
-**Why Metis Exists:**
-
-The plan author (Prometheus) has "ADHD working memory" - it makes connections that never make it onto the page. Metis forces externalization of implicit knowledge.
-
-### High-Accuracy Review: Momus + Oracle
-
-High-accuracy mode runs two independent reviews in parallel: Momus checks plan quality and Oracle checks the plan on the strongest available reasoning model. Both must approve before handoff.
-
-**The Dual-Review Loop:**
-
-Momus is approval-biased and rejects only verified blockers. It checks that:
+High-accuracy review is the default for every plan `/ulw-plan` produces; the only opt-out is you declining it. One round is exactly one `plan-reviewer` pass over the complete plan file. The reviewer is approval-biased and rejects only verified blockers:
 
 - Referenced files exist and support the plan's claims
 - Every task gives a developer a usable starting point
-- Tasks do not contradict each other
-- QA scenarios name the tool, steps, and expected result
-- No missing information would completely stop execution
+- Tasks don't contradict each other
+- QA scenarios name the tool, the steps, and the expected result
+- No missing information would stop execution cold
 
-Minor gaps and details that a developer can resolve during implementation do not block approval; a plan that is roughly 80% clear is considered executable.
+An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Rounds are capped at 5 unless you ask for more.
 
-If either reviewer rejects the plan, Prometheus fixes every cited issue and resubmits to both reviewers. Review rounds are capped at 5 unless you explicitly ask to continue.
+The spawn is contract-driven: the harness replaces the `plan-reviewer` prompt with the canonical review contract (one `.omo/plans/*.md` path), so anything else in the prompt is discarded.
 
-### Where to Spend a Scarce Premium Model
+### Plan-gate rules
 
-Choose a compatible role before optimizing for invocation frequency. For example, a scarce Claude-family model such as Fable 5 fits Metis better than GPT-oriented Oracle or Momus. High-accuracy planning also runs Oracle and Momus together on every review round, so neither is purely an on-demand slot in that workflow.
+- `plan-consultant` and `plan-reviewer` open only when you explicitly requested the ulw-plan workflow, a plan artifact under `.omo/plans/` was touched this session, and `/ulw-execute` hasn't been invoked.
+- A bare `ulw` run never gets them, however big the work feels. It records a self-review in its notepad instead.
+- When `/ulw-execute` finds no plan and bootstraps `/ulw-plan` itself, the gate stays locked: that bootstrap plan is written without gap analysis or review, and the planner says so.
 
-See [Agent-Model Matching: Where to Spend One Scarce Premium Model](./agent-model-matching.md#where-to-spend-one-scarce-premium-model) for the family-aware heuristic and a concrete configuration.
+### Plan artifacts
 
----
+The planner runs `scaffold-plan.mjs` rather than hand-building files. A draft lives at `.omo/drafts/<slug>.md` (the compaction-safe resume point, carrying `intent`, `review_required`, decisions, and the approval gate); after your okay the plan lands at `.omo/plans/<slug>.md`. Every executable item is a column-zero `- [ ] N. <title>` row with references, acceptance criteria, QA scenarios, and a `Recommended task executor category:` line.
 
-## Execution: Atlas
+### Adversarial alternative: `/hyperplan`
 
-### The Conductor Mindset
-
-Atlas is like an orchestra conductor: it doesn't play instruments, it ensures perfect harmony.
-
-```mermaid
-flowchart LR
-    subgraph Orchestrator["Atlas"]
-        Read["1. Read Plan"]
-        Analyze["2. Analyze Tasks"]
-        Wisdom["3. Accumulate Wisdom"]
-        Delegate["4. Delegate Tasks"]
-        Verify["5. Verify Results"]
-        Report["6. Final Report"]
-    end
-
-    Read --> Analyze
-    Analyze --> Wisdom
-    Wisdom --> Delegate
-    Delegate --> Verify
-    Verify -->|"More tasks"| Delegate
-    Verify -->|"All done"| Report
-
-    Delegate -->|"task() (parallel when independent)"| Workers["Workers"]
-    Workers -->|"Results + Learnings"| Verify
-```
-
-**What Atlas CAN do:**
-
-- Read files to understand context
-- Run commands to verify results
-- Use lsp_diagnostics to check for errors
-- Search patterns with grep/glob/ast-grep
-
-**What Atlas is prompted to always delegate (warn-only enforcement):**
-
-- Writing or editing code files
-- Fixing bugs
-- Creating tests
-
-Direct Write/Edit of non-`.omo` files by Atlas gets a warning, not a hard block, and git commits are not tool-gated — the discipline lives in the prompt, not the harness.
-
-### Wisdom Accumulation
-
-The power of orchestration is cumulative learning. After each task:
-
-1. Extract learnings from subagent's response
-2. Categorize into: Conventions, Successes, Failures, Gotchas, Commands
-3. Pass forward to ALL subsequent subagents
-
-This prevents repeating mistakes and ensures consistent patterns.
-
-**Notepad System:**
-
-```
-.omo/notepads/{plan-name}/
-├── learnings.md      # Patterns, conventions, successful approaches
-├── decisions.md      # Architectural choices and rationales
-├── issues.md         # Problems, blockers, gotchas encountered
-└── problems.md       # Unresolved issues, technical debt
-```
+When one planner isn't enough rigor, `/hyperplan` stands up a hostile team that cross-critiques the plan before it's formalized. The result is still a `.omo/plans/*.md` file you hand to `/ulw-execute`.
 
 ---
 
-## Workers: Sisyphus-Junior and Specialists
+## Execution: `/ulw-execute`
 
-### Sisyphus-Junior: The Task Executor
-
-Junior is the workhorse that actually writes code. Key characteristics:
-
-- **Focused**: Cannot delegate (blocked from task tool)
-- **Disciplined**: Obsessive todo tracking
-- **Verified**: Must pass lsp_diagnostics before completion
-- **Constrained**: Cannot delegate via `task()` (blocked); `call_omo_agent` stays available for explore/librarian. Plan-file writes are not tool-blocked.
-
-**Why the fallback chain is sufficient:**
-
-Junior doesn't need to be the smartest - it needs to be reliable. With:
-
-1. Detailed prompts from Atlas (50-200 lines)
-2. Accumulated wisdom passed forward
-3. Clear MUST DO / MUST NOT DO constraints
-4. Verification requirements
-
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-5` → `kimi-k3` → `gpt-5.6-sol` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
-
-### System Reminder Mechanism
-
-The hook system ensures Junior never stops halfway:
-
-```
-[SYSTEM REMINDER - TODO CONTINUATION]
-
-Incomplete tasks remain in your todo list. Continue working on the next pending task — without asking, and re-examining any false completion claims.
+```text
+/ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]
 ```
 
-This "boulder pushing" mechanism is why the system is named after Sisyphus.
+- `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
+- `--worktree`: reuse an existing task-owned worktree for the first phase instead of creating one.
+- `--make-pr`: deliver each phase's worktree as a pull request and hand off with the URL; merge only if you ask.
+- `--ship`: implies `--make-pr`; stay on the job until the PR is merged, fixing CI and review feedback from the worktree.
 
----
+The main agent executes the approved work plan in the same session. It doesn't become a different agent; it picks up the execution skill and the orchestrator rule that comes with it: **it never writes product code itself**. Every implementation, test, QA, and review unit is delegated to a spawned worker. The main agent's hands touch plan selection, `.omo/` state, decomposition, dispatch, verdicts, and evidence.
 
-## Category + Skill System
+### What happens when you run it
 
-### Why Categories are Revolutionary
+1. **Select the plan.** Read `.omo/boulder.json`; if this session has one active or paused work, resume it. Otherwise match `plan-name`, auto-select a lone plan, or ask one focused question when several remain. With no selectable plan at all, it bootstraps `/ulw-plan` first.
+2. **Register the goal and todos.** One registered goal for the session (via `create_goal` when the tool exists), one todo per column-zero checkbox, all up front.
+3. **Write boulder state.** `.omo/boulder.json` is a multi-work registry (`works` + `active_work_id`). Each work records `active_plan`, `plan_name`, `session_ids` (prefixed `senpi:<session_id>`), `status`, and `worktree_path`.
+4. **Execute the next checkbox.** Classify it LIGHT or HEAVY, decompose it into worker-sized sub-tasks, and dispatch every independent sub-task in one parallel burst, routed by the plan's `Recommended task executor category:` line or the delegation router below.
+5. **Verify and record.** Five gates per checkbox: plan reread, automated verification, a Manual-QA artifact, adversarial QA, cleanup receipts. Evidence goes to `.omo/ulw-execute/ledger.jsonl`. A worker's done claim is verified by an independent reviewer (the gate reviewer or a fresh reviewer worker) before the checkbox flips to `- [x]`.
+6. **Finish.** When every top-level checkbox is checked, run the plan's final verification, sync `.omo/` state back, complete the PR lifecycle if requested, and print an `ORCHESTRATION COMPLETE` block.
 
-**The Problem with Model Names:**
+Each plan wave runs in its own task-owned worktree and lands on the integration base once its checkboxes are verified. Only the orchestrator merges.
 
-```typescript
-// OLD: Model name creates distributional bias
-task({ agent: "gpt-5.6-sol", prompt: "..." }); // Model knows its limitations
-task({ agent: "claude-opus-5", prompt: "..." }); // Different self-perception
-```
+### Continuation across sessions
 
-**The Solution: Semantic Categories:**
-
-```typescript
-// NEW: Category describes INTENT, not implementation
-task({ category: "ultrabrain", prompt: "..." }); // "Think strategically"
-task({ category: "visual-engineering", prompt: "..." }); // "Design beautifully"
-task({ category: "quick", prompt: "..." }); // "Just get it done fast"
-```
-
-### Delegate-Task Categories
-
-`task(category="...")` supports these category names in user-facing orchestration:
-
-`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`
-
-Notes:
-
-- Authoritative built-in fallback chains are defined in `packages/model-core/src/category-model-requirements.ts`; `packages/omo-opencode/src/shared/model-requirements.ts` is only a re-export shim
-- Projects/users can define additional categories via config; names such as `quick-rust`, `quick-zig`, or `git` are user-defined rather than built in
-- Regardless of category name, category dispatch goes through Sisyphus-Junior
-
-### Skills: Domain-Specific Instructions
-
-Skills prepend specialized instructions to subagent prompts:
-
-```typescript
-// Category + Skill combination
-task(
-  (category = "visual-engineering"),
-  (load_skills = ["frontend"]), // Adds UI/UX expertise
-  (prompt = "..."),
-);
-
-task(
-  (category = "deep"),
-  (load_skills = ["playwright"]), // Adds browser automation expertise
-  (prompt = "..."),
-);
-```
-
-Skill loading priority is:
-
-`project > opencode > user > builtin`
-
-### Skill MCP (Tier 3)
-
-Skill-embedded MCP servers are isolated per session using a composite key pattern:
-
-`${sessionID}:${skillName}:${serverName}`
-
-This prevents state bleed across sessions when the same skill/MCP is used concurrently.
-
-### Background Task Concurrency
-
-Background task concurrency defaults to **5** when no overrides are configured.
-
-- Keyed by model/provider routing key
-- Configurable via `background_task.defaultConcurrency`, `background_task.providerConcurrency`, and `background_task.modelConcurrency`
-
-### Team Mode
-
-Team mode is parallel multi-agent orchestration and is **OFF by default**.
-
-For `subagent_type` team members, current eligibility is:
-
-- Eligible: `sisyphus`, `atlas`, `sisyphus-junior`
-- Conditional: `hephaestus` (requires teammate permission enablement)
-- Hard-reject: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`
-
-Why `oracle`/`prometheus` are rejected in team members:
-
-- Oracle is read-only (cannot write/edit/patch/delegate)
-- Prometheus is constrained to `.omo/*.md` writes by the `prometheus-md-only` hook
-
----
-
-## Usage Patterns
-
-### How to Invoke Prometheus
-
-**Method 1: Switch to Prometheus Agent (Tab → Select Prometheus)**
-
-```
-1. Press Tab at the prompt
-2. Select "Prometheus" from the agent list
-3. Describe your work: "I want to refactor the auth system"
-4. Answer interview questions
-5. Prometheus creates plan in .omo/plans/{name}.md
-```
-
-**Alternative: `/hyperplan`**
-
-When you want adversarial multi-agent planning instead of a single planner, run `/hyperplan` from Sisyphus — it cross-critiques the plan before it is handed to `/ulw-execute`.
-
-**Which Should You Use?**
-
-| Scenario                          | Recommended Method         | Why                                                  |
-| --------------------------------- | -------------------------- | ---------------------------------------------------- |
-| **New session, starting fresh**   | Switch to Prometheus agent | Clean mental model - you're entering "planning mode" |
-| **Want explicit control**         | Switch to Prometheus agent | Clear separation of planning vs execution contexts   |
-| **Adversarial, high-rigor plan**  | `/hyperplan`               | Cross-critique debate before the plan is written     |
-
-### /ulw-execute Behavior and Session Continuity
-
-**What Happens When You Run /ulw-execute:**
-
-```
-User: /ulw-execute
-    ↓
-[ulw-execute hook activates]
-    ↓
-Parse: /ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship]
-    ↓
-Check: active/paused works in .omo/boulder.json?
-    ↓
-    ├─ SEVERAL → ask which work to resume
-    ├─ EXACTLY ONE → RESUME MODE
-    │   - Read the existing boulder state
-    │   - Calculate progress (checked vs unchecked boxes)
-    │   - Inject continuation prompt with remaining tasks
-    │   - Atlas continues where you left off
-    │
-    └─ NONE (fresh start) → INIT MODE
-        - Discover incomplete plans: the plan most recently referenced
-          in this session wins; one incomplete plan auto-selects;
-          several incomplete plans ask you to pick
-        - Create new boulder.json tracking this plan
-        - Switch session agent to Atlas
-        - Begin execution from task 1
-```
-
-**Session Continuity Explained:**
-
-The `boulder.json` file is a multi-work registry (`works` + `active_work_id`). Each tracked work records:
-
-- **active_plan**: Path to the current plan file
-- **session_ids**: All sessions that have worked on this plan
-- **started_at**: When work began
-- **plan_name**: Human-readable plan identifier
-- **worktree_path** (optional): The task-owned worktree for the work
-
-**Example Timeline:**
+The `ulw-execute-continuation` component watches `.omo/boulder.json`. While the current session's work is `active` or `paused` and the plan still has unchecked top-level boxes, every user prompt gets a steering reminder appended (read the boulder state and the plan, continue with evidence-bound execution, don't start unrelated work), and an idle turn is re-injected automatically, up to 8 consecutive continuations. Nothing is lost when a session dies mid-plan: run `/ulw-execute` again and the same work resumes from the plan checkboxes and the ledger.
 
 ```
 Monday 9:00 AM
-  └─ Switch to Prometheus: "Build user authentication"
-  └─ Prometheus interviews and creates plan
-  └─ User: /ulw-execute
-  └─ Atlas begins execution, creates boulder.json
-  └─ Task 1 complete, Task 2 in progress...
-  └─ [Session ends - computer crash, user logout, etc.]
+  |- /ulw-plan "Build user authentication"
+  |- Ultrawork Planner interviews, writes .omo/plans/user-auth.md, plan-reviewer approves
+  |- /ulw-execute
+  |- boulder.json created, tasks 1-2 land
+  |- [session ends]
 
-Monday 2:00 PM (NEW SESSION)
-  └─ User opens new session (agent = Sisyphus by default)
-  └─ User: /ulw-execute
-  └─ [ulw-execute hook reads boulder.json]
-  └─ "Resuming 'Build user authentication' - 3 of 8 tasks complete"
-  └─ Atlas continues from Task 3 (no context lost)
+Monday 2:00 PM (new session)
+  |- /ulw-execute
+  |- "Resuming 'user-auth' - 2 of 8 tasks complete"
+  |- execution continues from task 3
 ```
 
-Atlas is automatically activated when you run `/ulw-execute`. You don't need to manually switch to Atlas.
+---
 
-### Hephaestus vs Sisyphus + ultrawork
+## Categories + Skills
 
-**Quick Comparison:**
+### Why categories instead of model names
 
-| Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
-| --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-5` / `kimi-k3` / `gpt-5.6-sol` / `glm-5.2` depending on setup |
-| **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
-| **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
-| **Planning**    | Self-plans during execution                | Executes Prometheus plans via `/ulw-execute` (Atlas), not by typing `ulw` |
-| **Delegation**  | Heavy use of explore/librarian agents      | Uses category-based delegation                       |
+A model name in a prompt carries the model's own idea of its limits. A category carries intent:
 
-**When to Use Hephaestus:**
+```typescript
+task({ category: "ultrabrain", prompt: "..." }); // one genuinely hard, logic-heavy problem
+task({ category: "visual-engineering", prompt: "..." }); // frontend, UI/UX, styling
+task({ category: "quick", prompt: "..." }); // mechanical, single-file, boilerplate
+```
 
-Switch to Hephaestus (Tab → Select Hephaestus) when:
+### Builtin categories
 
-1. **Deep architectural reasoning needed**
-   - "Design a new plugin system"
-   - "Refactor this monolith into microservices"
+`architect`, `artistry`, `deep`, `quick`, `ultrabrain`, `unspecified-high`, `unspecified-low`, `visual-engineering`, `writing`.
 
-2. **Complex debugging requiring inference chains**
-   - "Why does this race condition only happen on Tuesdays?"
-   - "Trace this memory leak through 15 files"
+The delegation router used by `/ulw-execute`:
 
-3. **Cross-domain knowledge synthesis**
-   - "Integrate our Rust core with the TypeScript frontend"
-   - "Migrate from MongoDB to PostgreSQL with zero downtime"
+| Category | Route here |
+| --- | --- |
+| `quick` | mechanical, single-file, boilerplate, config/copy; the default for every splittable piece |
+| `unspecified-low` | small tasks that fit no other category |
+| `unspecified-high` | standard features across a few files with known patterns |
+| `visual-engineering` | frontend, UI/UX, styling, animation |
+| `writing` | documentation and prose |
+| `deep` | hairy debugging, research-heavy or subtle cross-module work |
+| `ultrabrain` | one genuinely hard, logic-heavy problem; hand it the goal, not steps |
+| `architect` | the architect consult lane: module boundaries, decomposition, trade-offs (advisory, read-only) |
 
-4. **You specifically want GPT-native autonomous reasoning**
-   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.6 Sol as the broad fallback
+Splittable work splits into a swarm of `quick`/`unspecified-low` workers in one burst. Cohesive hard work stays whole and goes to `deep` or `ultrabrain` as one delegation.
 
-**When to Use Sisyphus + `ulw`:**
+Some categories gate on a model being present in your registry (`ultrabrain` and `deep` need a GPT flagship, for example); an unavailable category is reported as such rather than silently routed to a different family. Projects and users can add categories in `omo.json`.
 
-Use the `ulw` keyword in Sisyphus when:
+### Skills
 
-1. **You want the agent to figure it out**
-   - "ulw fix the failing tests"
-   - "ulw add input validation to the API"
+`load_skills` prepends named skills to the worker's prompt:
 
-2. **Complex but well-scoped tasks**
-   - "ulw implement JWT authentication following our patterns"
-   - "ulw create a new CLI command for deployments"
+```typescript
+task({ category: "visual-engineering", load_skills: ["frontend"], prompt: "..." });
+task({ category: "deep", load_skills: ["playwright"], prompt: "..." });
+```
 
-3. **You're feeling lazy** (officially supported use case)
-   - Don't want to write detailed requirements
-   - Trust the agent to explore and decide
+The main agent's own skills (`ulw-plan`, `ulw-execute`, `ulw-loop`, `mass-ulw`, `hyperplan`, `ultrawork`, `ulw-research`) are invoked by name; workers get skills only through `load_skills`.
 
-4. **You want plan-driven execution**
-   - Run `/ulw-execute` instead: it hands an existing Prometheus plan to Atlas
-   - `ulw` explores autonomously and does not resume plans
+### Dependency graphs: `mass-ulw`
 
-**Recommendation:**
+When tasks have real ordering (C needs A and B first), `mass-ulw` defines a run for the `workflow` tool from an eval cell: nodes with `id`, `prompt`, `category`, and `dependsOn`. One run covers one phase; the next phase is a new run. Failed nodes are recovered with `retry`, steered with `send`, or edited with `amend` without re-running what already finished. `/dag` opens the detail view.
 
-- **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
-- **For power users**: Switch to Hephaestus when you want GPT-native reasoning or the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+---
 
-### Brownfield / KISS Mode
+## Team Mode
 
-For mature projects, the safest default is not "make the best architecture." It is "make the smallest correct change that fits the architecture already here."
+Team mode is for overlapping lanes that need to exchange discoveries mid-flight. The main agent becomes the lead of background member children (`team_create`), sends work with `task_send`, tracks it through `task_create` / `task_list` / `task_update`, and tears down with `team_delete`. Curated read-only agents can't be members. Full details, config schema, and eligibility rules: [Team Mode](./team-mode.md).
 
-Use Prometheus first when a brownfield task could invite broad cleanup, rewrites, or speculative abstractions. Select Prometheus with the agent selector or `/agent`, then ask it to produce a constrained plan with explicit boundaries:
+---
+
+## Configuration
+
+`omo.json` controls the delegation surfaces. Agent overrides use the agent id as the key; category overrides use the category name.
+
+```jsonc
+{
+  "agents": {
+    "plan-consultant": {
+      "models": ["anthropic/claude-opus-5"]
+    },
+    "plan-reviewer": {
+      "models": ["openai/gpt-5.6-sol"],
+      "reasoning": "high"
+    },
+    "explore": {
+      "disable": false
+    }
+  },
+  "categories": {
+    "quick": {
+      "models": ["anthropic/claude-haiku-4-5"]
+    },
+    "writing": {
+      "models": ["anthropic/claude-opus-5"]
+    }
+  }
+}
+```
+
+Agent entries accept `model`, `models` (ordered fallback chain), `reasoning`, `tools`, `allowed_subagents`, `disallowed_tools`, `max_turns`, `temperature`, and `disable`. Category entries carry the `models` chain the category worker is built from. The full schema is in the [omo.json reference](../reference/omo-json.md).
+
+---
+
+## Troubleshooting
+
+### "I ran /ulw-plan but it isn't writing a plan"
+
+That's the design. The Ultrawork Planner explores first, tells you whether it read your intent as CLEAR or UNCLEAR, asks only the owner-decisions that survived exploration, and then presents a brief. The plan is written after you say okay. There is no "make it a plan" trigger; approve the brief.
+
+### "/ulw-execute says no plan was found"
+
+- With no plans under `.omo/plans/`, `/ulw-execute` bootstraps `/ulw-plan` and generates one (without gap analysis or review, since the plan gate is locked on that path). Run `/ulw-plan` yourself first if you want the reviewed version.
+- With several plans and no active work, pass the stem: `/ulw-execute user-auth`.
+- Don't reach for deleting `.omo/boulder.json` first. Works recorded for other sessions are ignored; the session id is part of the match.
+
+### "The planner refuses to spawn plan-reviewer"
+
+Both `plan-consultant` and `plan-reviewer` are plan-gated. The gate opens only after an explicit ulw-plan request, a touched `.omo/plans/*.md` file in this session, and no `/ulw-execute` yet. A bare `ulw` run, however large, self-reviews in its notepad instead. If you want the review, start with `/ulw-plan`.
+
+### "Should I type ulw or write a plan?"
+
+Type `ulw` when the target is narrow enough to state in a sentence and you're happy to let the agent decide the rest. Write a plan with `/ulw-plan` when the work is brownfield, multi-file, or when you want the scope boundaries in writing before anything is touched. A constrained brownfield plan looks like:
 
 ```text
 Fix <problem> in this existing codebase.
@@ -556,67 +311,15 @@ Do not refactor, rename, reorganize, or clean up unrelated code.
 List exact files in scope and exact verification commands.
 ```
 
-Then run `/ulw-execute` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
-
-Use `ulw` directly only when the target is already narrow:
-
-```text
-ulw fix the null handling in packages/foo/src/bar.ts using the existing helper style. No unrelated cleanup.
-```
-
-Use Hephaestus when you deliberately want autonomous deep implementation or architectural exploration. If the job is "touch the old system without disturbing it," an explicit Prometheus plan provides written scope boundaries before Atlas starts execution.
-
----
-
-## Configuration
-
-The `sisyphus_agent` object of `~/.omo/omo.jsonc` exposes optional legacy Sisyphus/planner compatibility toggles: `disabled`, `default_builder_enabled`, `planner_enabled`, `replace_plan`, and `tdd`. These fields do not enable Atlas orchestration; omit them unless you need the legacy behavior they control.
-
-```jsonc
-{
-  "sisyphus_agent": {
-    "planner_enabled": true,
-    "replace_plan": true,
-    "tdd": true,
-  },
-
-  // Hook settings (add to disable)
-  "disabled_hooks": [
-    // "ulw-execute",             // Disable execution trigger
-    // "prometheus-md-only"      // Remove Prometheus write restrictions (not recommended)
-  ],
-}
-```
-
----
-
-## Troubleshooting
-
-### "I switched to Prometheus but nothing happened"
-
-Prometheus explores first. On CLEAR intent it asks only the remaining owner-decisions; on UNCLEAR intent it adopts defaults. Approve the brief to have the plan written to `.omo/plans/`. There is no "make it a plan" trigger.
-
-### "/ulw-execute says 'no active plan found'"
-
-- If you see **No Plans Found**, no plans exist in `.omo/plans/` → Create one with Prometheus first
-- If several active works exist, pick one explicitly with `/ulw-execute {plan-name}`
-- Deleting `.omo/boulder.json` is not the first fix — unrelated boulder state is ignored when it does not match
-
-### "I'm in Atlas but I want to switch back to normal mode"
-
-Start a new session, or use the agent selector to switch back to Sisyphus. There is no OMO `exit` command. Atlas is primarily entered via `/ulw-execute` - you don't typically "switch to Atlas" manually.
-
-### "Should I use Hephaestus or type ulw?"
-
-**For most tasks**: Type `ulw` in Sisyphus.
-
-**Use Hephaestus when**: You need GPT-native reasoning for deep architectural work or complex debugging.
+Then `/ulw-execute` runs against the written scope instead of treating the task as an open-ended modernization pass.
 
 ---
 
 ## Further Reading
 
 - [Overview](./overview.md)
+- [Team Mode](./team-mode.md)
+- [Agent-Model Matching](./agent-model-matching.md)
 - [Features Reference](../reference/features.md)
 - [Configuration Reference](../reference/configuration.md)
 - [Manifesto](../manifesto.md)

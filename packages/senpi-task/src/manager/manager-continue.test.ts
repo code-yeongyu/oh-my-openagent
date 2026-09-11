@@ -104,7 +104,7 @@ describe("TaskManager.sendToTask one-shot refusal", () => {
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
     expect(outcome.task_id).toBe(started.task_id)
     expect(outcome.agent).toBe("momus")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
     expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual([])
   })

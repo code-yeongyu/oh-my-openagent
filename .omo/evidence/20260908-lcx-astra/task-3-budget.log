@@ -1,0 +1,128 @@
+WHAT WAS TESTED
+Re-ran plan todo 3 PostCompact raw-pipe QA with a scratch cwd OUTSIDE the worktree that actually contains project rules, so the post-compact recovery path has something to inject and the 600k vs 200k budgets are exercised.
+
+Previous run used the worktree as cwd with no always-apply project rules. PostCompact stdout was empty for all three models; the compact SessionStart follow-up then injected only bundled Hephaestus bodies (18967 / 11728 / 10188) — variant size, not budget truncation.
+
+Handler facts (read, not edited):
+- runPostCompactHook only markSessionCompacted (clears staticDedup, sets postCompactPending) and returns "".
+- withPostCompactBudget runs on the next SessionStart source=compact / UserPromptSubmit recovery.
+- Project rules are discovered from CONTEXT.md and .omo/rules (alwaysApply: true). There is no .codex/rules source.
+- Bundled Hephaestus is never-truncated and differs by model, so it was excluded via CODEX_RULES_ENABLED_SOURCES so budget truncation is the thing being measured.
+- Default postCompactMaxResultChars=4000. 760_000-byte retained transcript → unknown-model dynamic budget floors at 500; gpt-6-astra / gpt-5.6-sol stay at the 4000 cap (600k/650k windows still have room).
+
+BUILD
+cd packages/omo-codex/plugin/components/rules && bun run build
+BUILD_EXIT=0
+Bundled 51 modules in 7ms; dist/cli.js present (156.17 KB).
+
+SETUP (scratch cwd outside the worktree; removed by cqa_cleanup after capture)
+source .agents/skills/codex-qa/scripts/lib/common.sh
+cqa_guard_real_home
+cqa_mk_isolated_home
+SCRATCH=$QA_CWD (isolated /tmp cqa-home.XXXXXX.Rotp4TEuMp/proj)
+package.json project marker
+CONTEXT.md 20031 bytes (always-apply single file)
+80 x .omo/rules/always-apply-rule-NN.md, alwaysApply: true, 12056 bytes each, 964480 bytes total
+transcript.jsonl compacted replacement_history retained text "A"*760000 (file 760134 bytes, RETAINED_CHARS=760000)
+CODEX_HOME isolated; PLUGIN_DATA=$CODEX_HOME/plugins/data/omo-rules
+PLUGIN_ROOT=<worktree>/packages/omo-codex/plugin
+CODEX_RULES_ENABLED_SOURCES=CONTEXT.md,.omo/rules
+HOME for the node process = isolated hook-home (does not change the shell HOME used for ~/.codex shasum)
+Recipe: printf '%s' "$PAYLOAD_JSON" | PLUGIN_ROOT=... PLUGIN_DATA=... node .../rules/dist/cli.js hook <event>
+
+REAL_HOME_SHASUM_BEFORE=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+REAL_HOME_SHASUM_AFTER=b012e531f5aa9fb1bce9003593c3eadf07081fcd
+cqa_assert_real_home_unchanged → PASS
+
+PRIME (SessionStart source=startup, same session_id/model, to write PLUGIN_DATA session cache)
+All three models: exit=0, additionalContext_length=32000 (hook output cap), has_output_cap_marker=true. Same length across models confirms Hephaestus variant bodies were not in this probe.
+
+POSTCOMPACT RAW-PIPE (plan todo 3 payload: session_id, turn_id, transcript_path, cwd, hook_event_name=PostCompact, model, trigger=auto — no permission_mode)
+
+[astra]
+PAYLOAD={"session_id":"qa-3-gpt-6-astra","turn_id":"t1","transcript_path":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/transcript.jsonl","cwd":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj","hook_event_name":"PostCompact","model":"gpt-6-astra","trigger":"auto"}
+STDOUT=<empty>
+EXIT=0
+hookSpecificOutput.additionalContext length=0
+
+[sol]
+PAYLOAD={"session_id":"qa-3-gpt-5-6-sol","turn_id":"t1","transcript_path":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/transcript.jsonl","cwd":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj","hook_event_name":"PostCompact","model":"gpt-5.6-sol","trigger":"auto"}
+STDOUT=<empty>
+EXIT=0
+hookSpecificOutput.additionalContext length=0
+
+[unknown]
+PAYLOAD={"session_id":"qa-3-unknown-model","turn_id":"t1","transcript_path":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/transcript.jsonl","cwd":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj","hook_event_name":"PostCompact","model":"unknown-model","trigger":"auto"}
+STDOUT=<empty>
+EXIT=0
+hookSpecificOutput.additionalContext length=0
+
+RECOVERY (SessionStart source=compact, same session_id/model/cwd/transcript — this is the path that calls withPostCompactBudget)
+
+[astra]
+PAYLOAD={"session_id":"qa-3-gpt-6-astra","transcript_path":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/transcript.jsonl","cwd":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj","hook_event_name":"SessionStart","model":"gpt-6-astra","permission_mode":"default","source":"compact"}
+EXIT=0
+hookEventName=SessionStart
+additionalContext_length=4087
+listed_rule_lines=31 (30 paths + omission line)
+has_mandatory_directive=true
+omission="+51 more rule files omitted"
+STDOUT_BYTES=4202
+HEAD:
+## MANDATORY: POST-COMPACTION RULE RECOVERY
+...
+- .../always-apply-rule-00.md
+TAIL:
+- .../always-apply-rule-29.md
+- (+51 more rule files omitted - rescan the project rule directories and read those too)
+Operating without these rules is a protocol violation. Reconstructing them from memory is NOT reading. READ THEM ALL. NO EXCUSES.
+
+[sol]
+PAYLOAD={"session_id":"qa-3-gpt-5-6-sol","transcript_path":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/transcript.jsonl","cwd":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj","hook_event_name":"SessionStart","model":"gpt-5.6-sol","permission_mode":"default","source":"compact"}
+EXIT=0
+hookEventName=SessionStart
+additionalContext_length=4087
+listed_rule_lines=31
+has_mandatory_directive=true
+omission="+51 more rule files omitted"
+STDOUT_BYTES=4202
+Same directive class as astra (identical length).
+
+[unknown]
+PAYLOAD={"session_id":"qa-3-unknown-model","transcript_path":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/transcript.jsonl","cwd":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj","hook_event_name":"SessionStart","model":"unknown-model","permission_mode":"default","source":"compact"}
+EXIT=0
+hookEventName=SessionStart
+additionalContext_length=665
+listed_rule_lines=2 (1 path + omission line)
+has_mandatory_directive=true
+omission="+80 more rule files omitted"
+FULL additionalContext:
+## MANDATORY: POST-COMPACTION RULE RECOVERY
+
+Context compaction DROPPED the project rule files listed below from your context.
+YOU MUST READ THE FOLLOWING RULES with your file-reading tool RIGHT NOW, BEFORE ANY OTHER ACTION. NO EXCUSES.
+Do not plan, answer, edit, or run anything until EVERY file below has been read end to end:
+- /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.Rotp4TEuMp/proj/.omo/rules/always-apply-rule-00.md
+- (+80 more rule files omitted - rescan the project rule directories and read those too)
+Operating without these rules is a protocol violation. Reconstructing them from memory is NOT reading. READ THEM ALL. NO EXCUSES.
+
+ORDERING
+recovery additionalContext lengths:
+  gpt-6-astra     4087
+  gpt-5.6-sol     4087
+  unknown-model    665
+astra == sol (600k-class, default 4000 post-compact cap, not truncated by the 600k window)
+unknown truncated to the 200k-fallback floor (~500 chars of listing budget; 665 with header/footer + first path + omission)
+4087 == 4087 > 665  PASS
+Reproduced on two isolated runs with the same lengths.
+
+WHAT WAS OBSERVED
+PostCompact CLI stdout is empty for every model (implementation: mark compacted, return "").
+The budgeted rules guide is emitted by SessionStart source=compact after that mark, as a mandatory read-directive of project rule paths truncated by withPostCompactBudget.
+With 80 large always-apply rules + CONTEXT.md and a 760k retained transcript, astra and sol keep the 4000-class directive (31 listing lines) and unknown is cut to 1 path (665 chars).
+
+WHY THIS IS ENOUGH
+The previous empty-JSON result was lack of project rules, not a missing PostCompact emitter. Inputs were adjusted (scratch project + large always-apply rules + compacted 760k transcript + SessionStart prime); no production code was changed. The three non-zero recovery lengths show astra≈sol (600k class) > unknown-model (200k fallback, truncated). Real ~/.codex/config.toml shasum unchanged.
+
+WHAT WAS OMITTED
+No bun test / bun run test:* (forbidden on this machine). No agentic probes. No edits to packages/shared-skills or the main checkout. Bundled Hephaestus was not part of this probe (CODEX_RULES_ENABLED_SOURCES) because never-truncated variant bodies would re-mask the budget the way the previous 18967/11728/10188 lengths did. Isolated CODEX_HOME / scratch cwd were removed by cqa_cleanup after capture.

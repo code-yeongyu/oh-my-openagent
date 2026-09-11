@@ -1,0 +1,28 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-codex\src\install\install-codex.test.ts:
+236 |     const missingScripts: string[] = []
+237 |     for (const scriptPath of spawnedScripts) {
+238 |       const exists = await stat(scriptPath).then(() => true, () => false)
+239 |       if (!exists) missingScripts.push(scriptPath)
+240 |     }
+241 |     expect(missingScripts).toEqual([])
+                                 ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "C:\Users\LilMG\Desktop\oh-my-openagent\.local-ignore\pr-worktrees\sot-step\packages\omo-codex\plugin\scripts\migrate-omo-sot.mjs",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\.local-ignore\pr-worktrees\sot-step\packages\omo-codex\src\install\install-codex.test.ts:241:28)
+(fail) install-codex > #given codex installer #when installing omo #then never spawns a repo script that is not shipped [8213.69ms]
+
+ 0 pass
+ 10 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [9.80s]

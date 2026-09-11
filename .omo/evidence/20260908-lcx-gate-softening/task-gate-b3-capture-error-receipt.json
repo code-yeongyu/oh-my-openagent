@@ -1,0 +1,22 @@
+{
+  "taskId": "st_01a0810a",
+  "branch": "lcx/gate-softening",
+  "commit": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+  "primary": "mengmotaMac",
+  "fallback": "gorky",
+  "fallbackUsed": false,
+  "gates": [],
+  "startedAt": "2026-09-08T12:31:29.678Z",
+  "transcript": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-gate-softening/.omo/evidence/20260908-lcx-gate-softening/task-gate-b-remote-tests.log",
+  "machine": "mengmotaMac",
+  "setupExit": 0,
+  "remoteHead": "eeeb3287e3af75148ecd3318800610a5e814af4a",
+  "error": "ReadLimitError: read limitBytes 33554432 exceeds the 10485760-byte ceiling; read in chunks instead",
+  "cleanup": {
+    "exitCode": 0,
+    "stdout": "CLEANUP_EXIT=0\nREMOVAL_RECEIPT: /tmp/lcx-gate-b3-20260908 REMOVED\n",
+    "stderr": ""
+  },
+  "finishedAt": "2026-09-08T12:33:29.808Z",
+  "allGatesPassed": false
+}

@@ -78,18 +78,19 @@ function baseSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
 }
 
 describe("task child memory tool exclusion", () => {
-  test("#given the ui-only tool names passed to the in-process runner #when inspected #then both memory tools are listed", () => {
+  test("#given the ui-only tool names passed to the in-process runner #when inspected #then memory and both question tools are listed", () => {
     // given / when / then
     expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("memory")
-    expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("memory_apply_patch")
+    expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("request_user_input")
+    expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("ask_user_question")
   })
 
-  test("#given shared parent tools including memory tools #when an in-process child starts #then the child tool set excludes them", async () => {
+  test("#given shared parent tools including memory and question tools #when an in-process child starts #then the child tool set excludes them", async () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
-      sharedParentTools: [makeTool("grep"), makeTool("memory"), makeTool("memory_apply_patch")],
+      sharedParentTools: [makeTool("grep"), makeTool("memory"), makeTool("ask_user_question"), makeTool("request_user_input")],
       uiOnlyToolNames: TASK_CHILD_UI_ONLY_TOOL_NAMES,
       createSession: async (options) => {
         captured = options
@@ -106,7 +107,8 @@ describe("task child memory tool exclusion", () => {
     const names = (captured?.customTools ?? []).map((tool) => tool.name)
     expect(names).toEqual(["grep"])
     expect(names).not.toContain("memory")
-    expect(names).not.toContain("memory_apply_patch")
+    expect(names).not.toContain("ask_user_question")
+    expect(names).not.toContain("request_user_input")
   })
 
   test("#given the default runner factories #when the in-process runner is built #then construction succeeds with the ui-only names wired", () => {

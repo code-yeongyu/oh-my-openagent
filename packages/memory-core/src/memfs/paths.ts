@@ -11,7 +11,7 @@ import {
  * Confined memory path validation.
  *
  * Dual-copy verdict: Letta's memory.ts:346-454 and
- * memory-apply-patch.ts:509-643 implementations are behaviorally identical.
+ * Both memory write paths use this shared validation.
  * They differ only in tool-name error prefixes, comments, and formatting.
  */
 export class MemoryPathError extends Error {

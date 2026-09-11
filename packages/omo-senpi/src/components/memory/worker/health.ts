@@ -3,6 +3,9 @@ import { join } from "node:path"
 
 import type { ReflectionOutcome } from "@oh-my-opencode/memory-core"
 
+import { failureFingerprint } from "./failure-detail"
+import type { ReflectionLauncher } from "./launcher-identity"
+
 /**
  * A trailing failure streak stops counting once its newest failure is older than this window.
  * Pending completion delivery already expires after 7 days (COMPLETION_MAX_AGE_MS), so a streak
@@ -22,6 +25,7 @@ export interface ReflectionHealth {
     readonly reason: string
     readonly detail?: string
     readonly finishedAt: string
+    readonly launcher?: ReflectionLauncher
   }
   readonly lastSuccessAt?: string
   /** Newest completion of any outcome, so status surfaces can report the last run that finished. */
@@ -40,6 +44,8 @@ export interface ReflectionHealth {
   readonly pendingCount: number
   readonly recentFailureFingerprints: readonly string[]
   readonly streakSinceISO?: string
+  readonly streakRunIds?: readonly string[]
+  readonly streakRuntimes?: readonly string[]
 }
 
 type HealthRecord = {
@@ -49,11 +55,16 @@ type HealthRecord = {
   readonly detail?: string
   readonly finishedAt: string
   readonly pending: boolean
+  readonly launcher?: ReflectionLauncher
 }
 
 export async function readReflectionHealth(
   completionsDir: string,
-  options: { readonly limit?: number; readonly now?: number } = {},
+  options: {
+    readonly limit?: number
+    readonly now?: number
+    readonly includeStreakRunIds?: boolean
+  } = {},
 ): Promise<ReflectionHealth> {
   let names: string[]
   try {
@@ -90,6 +101,10 @@ export async function readReflectionHealth(
   const lastFailure = bounded.find((record) => record.outcome === "failed")
   const lastSuccess = bounded.find((record) => record.outcome === "merged" || record.outcome === "no_changes")
   const streakSinceISO = stale ? undefined : failuresBeforeSuccess.at(-1)?.finishedAt
+  const streakRunIds = failuresBeforeSuccess.flatMap((record) => record.runId === undefined ? [] : [record.runId])
+  const streakRuntimes = [...new Set(failuresBeforeSuccess.flatMap((record) =>
+    record.launcher === undefined ? [] : [record.launcher.runtime],
+  ))]
   const newest = bounded[0]
 
   return {
@@ -102,6 +117,7 @@ export async function readReflectionHealth(
             reason: lastFailure.reason ?? "failed",
             ...(lastFailure.detail === undefined ? {} : { detail: lastFailure.detail }),
             finishedAt: lastFailure.finishedAt,
+            ...(lastFailure.launcher === undefined ? {} : { launcher: lastFailure.launcher }),
           },
         }),
     ...(lastSuccess === undefined ? {} : { lastSuccessAt: lastSuccess.finishedAt }),
@@ -119,15 +135,13 @@ export async function readReflectionHealth(
     pendingCount: bounded.filter((record) => record.pending).length,
     recentFailureFingerprints: recent,
     ...(streakSinceISO === undefined ? {} : { streakSinceISO }),
+    ...(options.includeStreakRunIds === true ? { streakRunIds } : {}),
+    ...(streakRuntimes.length === 0 ? {} : { streakRuntimes }),
   }
 }
 
-export function reflectionFailureFingerprint(reason: string | undefined, detail: string | undefined): string {
-  return `${reason ?? "failed"}:${(detail ?? "").slice(0, 60)}`
-}
-
 function fingerprintOf(record: HealthRecord): string {
-  return reflectionFailureFingerprint(record.reason, record.detail)
+  return failureFingerprint(record.reason, record.detail)
 }
 
 function dominantFingerprint(fingerprints: readonly string[]): string {
@@ -148,6 +162,7 @@ async function readHealthRecord(path: string): Promise<HealthRecord | undefined>
       ...(typeof parsed.detail === "string" ? { detail: parsed.detail } : {}),
       finishedAt: parsed.finishedAt,
       pending: delivery?.status === "pending",
+      ...(isReflectionLauncher(parsed.launcher) ? { launcher: parsed.launcher } : {}),
     }
   } catch {
     return undefined
@@ -176,4 +191,13 @@ function isOutcome(value: unknown): value is ReflectionOutcome {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function isReflectionLauncher(value: unknown): value is ReflectionLauncher {
+  if (!isRecord(value)
+    || typeof value.runtime !== "string"
+    || typeof value.execPath !== "string"
+    || !Number.isInteger(value.pid)
+    || Number(value.pid) <= 0) return false
+  return value.sessionId === undefined || typeof value.sessionId === "string"
 }

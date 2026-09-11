@@ -1,0 +1,10 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+(pass) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [38.58ms]
+(pass) x-search backtest CLI > record mode under the no-network guard fails fast [17.70ms]
+
+ 2 pass
+ 0 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [1436.00ms]

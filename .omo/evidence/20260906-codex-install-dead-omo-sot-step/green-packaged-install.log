@@ -1,0 +1,172 @@
+[install] Building omo@5.0.0-beta.43
+
+removed 1 package, changed 9 packages, and audited 88 packages in 984ms
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice run @sisyphuslabs/omo-codex-plugin@5.0.0-beta.43 build
+npm notice run node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.43 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+(node:38956) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Building components/comment-checker
+npm notice run @code-yeongyu/codex-comment-checker@5.0.0-beta.43 build
+npm notice run node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+Bundled 10 modules in 21ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/ulw-execute-continuation
+npm notice run @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.43 build
+npm notice run node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+Bundled 5 modules in 31ms
+
+  cli.js  14.55 KB  (entry point)
+
+Building components/teammode
+npm notice run @sisyphuslabs/codex-teammode@5.0.0-beta.43 build
+npm notice run node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+Bundled 2 modules in 42ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/git-bash
+npm notice run @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.43 build
+npm notice run tsc -p tsconfig.build.json
+Building components/rules
+npm notice run @code-yeongyu/codex-rules@5.0.0-beta.43 build
+npm notice run node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+Bundled 51 modules in 42ms
+
+  cli.js  155.74 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 46ms
+
+  cli.js  19.43 KB  (entry point)
+
+Building components/ulw-loop
+npm notice run @code-yeongyu/codex-ulw-loop@5.0.0-beta.43 build
+npm notice run tsc -p tsconfig.build.json
+Building components/telemetry
+npm notice run @code-yeongyu/codex-telemetry@5.0.0-beta.43 build
+npm notice run node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+Bundled 94 modules in 50ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 72ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Building components/lazycodex-executor-verify
+npm notice run @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.43 build
+npm notice run tsc -p tsconfig.build.json
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 19ms
+
+  cli.js  14.80 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 24ms
+
+  cli.js  5.75 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 23ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 51ms
+
+  cli.js  155.95 KB  (entry point)
+
+Building components/lsp
+npm notice run @code-yeongyu/codex-lsp@5.0.0-beta.43 prebuild
+npm notice run node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+npm notice run @code-yeongyu/codex-lsp@5.0.0-beta.43 build
+npm notice run node scripts/build-runtime.mjs
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 16ms
+
+  cli.js  8.33 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 51ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 44 modules in 37ms
+
+  cli.js  178.1 KB  (entry point)
+
+Building components/bootstrap
+npm notice run @sisyphuslabs/codex-bootstrap@5.0.0-beta.43 build
+npm notice run node scripts/build.mjs
+
+  dist\cli.js  148.2kb
+
+⚡ Done in 26ms
+Building components/ultrawork
+npm notice run @code-yeongyu/codex-ultrawork@5.0.0-beta.43 build
+npm notice run node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+Bundled 5 modules in 71ms
+
+  cli.js  34.88 KB  (entry point)
+
+Bundling components/bootstrap/dist/cli.js
+Bundled 49 modules in 22ms
+
+  cli.js  152.66 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 19ms
+
+  cli.js  35.0 KB  (entry point)
+
+
+added 15 packages in 1s
+npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts:
+npm warn install-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+[install] Linked omo-comment-checker -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\comment-checker\dist\cli.js
+[install] Linked omo-git-bash-hook -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\git-bash\dist\cli.js
+[install] Linked lazycodex-executor-verify -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\lazycodex-executor-verify\dist\cli.js
+[install] Linked omo-lsp -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\lsp\dist\cli.js
+[install] Linked omo-rules -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\rules\dist\cli.js
+[install] Linked omo-telemetry -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\telemetry\dist\cli.js
+[install] Linked omo-ultrawork -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ultrawork\dist\cli.js
+[install] Linked omo-ulw-execute-continuation -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-execute-continuation\dist\cli.js
+[install] Linked omo-ulw-loop -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-loop\dist\cli.js
+[install] Linked ulw -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-loop\dist\cli.js
+[install] Linked ulw-loop -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\plugins\cache\sisyphuslabs\omo\5.0.0-beta.43\components\ulw-loop\dist\cli.js
+[install] Warning: skipped the omo-agent-toolkit runtime wrapper because C:\Users\LilMG\Desktop\oh-my-openagent\.local-ignore\pr-worktrees\sot-step\dist\cli\index.js is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed
+[install] Linked agent explorer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\explorer.toml
+[install] Linked agent lazycodex-clone-fidelity-reviewer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-clone-fidelity-reviewer.toml
+[install] Linked agent lazycodex-code-reviewer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-code-reviewer.toml
+[install] Linked agent lazycodex-gate-reviewer.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-gate-reviewer.toml
+[install] Linked agent lazycodex-qa-executor.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-qa-executor.toml
+[install] Linked agent lazycodex-worker-high.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-worker-high.toml
+[install] Linked agent lazycodex-worker-low.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-worker-low.toml
+[install] Linked agent lazycodex-worker-medium.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\lazycodex-worker-medium.toml
+[install] Linked agent librarian.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\librarian.toml
+[install] Linked agent metis.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\metis.toml
+[install] Linked agent momus.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\momus.toml
+[install] Linked agent plan.toml -> C:\Users\LilMG\AppData\Local\Temp\omo-repro\sandbox-sotgreen\codex-home\.tmp\marketplaces\sisyphuslabs\plugins\omo\components\ultrawork\agents\plan.toml
+[install] Found project-local legacy artifact C:\Users\LilMG\.codex\agents; left in place
+[install] Found project-local legacy artifact C:\Users\LilMG\.codex\skills; left in place
+RESULT: ok installed=1
+codexHome entries: .tmp, agents, config.toml, plugins

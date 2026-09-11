@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, sep } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { canonicalUltraworkDirectiveRelativePath } from "../scripts/canonical-ultrawork-directive.mjs";
+
 import {
+	applyCodexSkillOverlays,
 	codexHarnessToolCompatibility,
 	insertCodexCompatibilityGuidance,
+	reviewWorkAnchor,
+	ulwExecuteOriginalCompletion,
+	ulwExecuteOriginalHardRule,
 } from "../scripts/sync-skills.mjs";
 
 const frontmatter = "---\nname: fixture-sentinel\n---\n\n";
@@ -14,6 +22,7 @@ const opencodeExample = "# SENTINEL_SECTION\ntask(SENTINEL_INPUT)\n";
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = join(pluginRoot, "..", "..");
 const opencodeToolPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
+const sharedSkillsRoot = join(repositoryRoot, "shared-skills", "skills");
 
 test("#given sentinel OpenCode tool content #when compatibility guidance is inserted #then the production artifact is placed after frontmatter and before the tool token", () => {
 	const input = `${frontmatter}${opencodeExample}`;
@@ -22,6 +31,23 @@ test("#given sentinel OpenCode tool content #when compatibility guidance is inse
 
 	assert.equal(actual, `${frontmatter}${codexHarnessToolCompatibility}${opencodeExample}`);
 	assert.ok(actual.indexOf(codexHarnessToolCompatibility) < actual.indexOf(opencodeExample));
+});
+
+test("#given shared skill source anchors #when Codex overlays are applied #then exact anchors transform and match the generated artifacts", async () => {
+	const ulwExecuteSource = await readFile(join(sharedSkillsRoot, "ulw-execute", "SKILL.md"), "utf8");
+	const reviewWorkSource = await readFile(join(sharedSkillsRoot, "review-work", "SKILL.md"), "utf8");
+
+	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalCompletion), "ulw-execute completion anchor drifted from shared source");
+	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalHardRule), "ulw-execute hard-rule anchor drifted from shared source");
+	assert.ok(reviewWorkSource.includes(reviewWorkAnchor), "review-work anchor drifted from shared source");
+
+	for (const [skillName, source] of [["ulw-execute", ulwExecuteSource], ["review-work", reviewWorkSource]]) {
+		const compatible = insertCodexCompatibilityGuidance(source);
+		const overlaid = applyCodexSkillOverlays(skillName, compatible);
+		assert.notEqual(overlaid, compatible, `${skillName} overlay must change the shared source`);
+		assert.equal(applyCodexSkillOverlays(skillName, overlaid), overlaid, `${skillName} overlay must be idempotent`);
+		assert.equal(await readFile(join(pluginRoot, "skills", skillName, "SKILL.md"), "utf8"), overlaid);
+	}
 });
 
 test("#given already transformed sentinel content #when compatibility guidance is inserted again #then the transform is idempotent", () => {
@@ -95,7 +121,48 @@ test("#given the aggregate sync implementation #when its skill adaptation pipeli
 
 	assert.match(
 		script,
-		/applyCodexSkillOverlays\(\s*skillName,\s*insertCodexCompatibilityGuidance\(content\),?\s*\)/,
+		/applyCodexSkillOverlays\(\s*skillName,\s*insertCodexCompatibilityGuidance\(content,\s*needsSpawnPayloadGuidance\),?\s*\)/,
 	);
 	assert.match(script, /await adaptSkillForCodex\(skillName\)/);
+});
+
+test("#given the flattened plugin cache the Codex installer produces #when sync-skills runs inside it #then it resolves shared skills through the linked package and writes the skill tree", async () => {
+	// given: installMarketplaceLocally copies plugin/ (minus node_modules) to
+	// <CODEX_HOME>/plugins/cache/<marketplace>/omo/<version>, materializes the canonical directive
+	// under that root, links @oh-my-opencode/shared-skills through the rewritten file: dependency,
+	// and only then runs `npm run sync:skills` there. packages/shared-skills is NOT a sibling of
+	// that directory, so a checkout-relative import cannot resolve in this layout.
+	const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cache-layout-"));
+	const cachedPluginRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.0.0-cache-layout");
+	await cp(pluginRoot, cachedPluginRoot, {
+		recursive: true,
+		filter: (source) => {
+			const parts = relative(pluginRoot, source).split(sep);
+			return parts[0] !== "skills" && !parts.includes("node_modules") && !parts.includes(".git");
+		},
+	});
+	const directiveTarget = join(cachedPluginRoot, canonicalUltraworkDirectiveRelativePath);
+	await mkdir(dirname(directiveTarget), { recursive: true });
+	await cp(join(repositoryRoot, "..", canonicalUltraworkDirectiveRelativePath), directiveTarget);
+	const linkedSharedSkills = join(cachedPluginRoot, "node_modules", "@oh-my-opencode", "shared-skills");
+	await mkdir(dirname(linkedSharedSkills), { recursive: true });
+	await symlink(join(repositoryRoot, "shared-skills"), linkedSharedSkills, "dir");
+
+	try {
+		// when: the installer runs `npm run sync:skills` here, whose script is `node scripts/sync-skills.mjs`
+		const result = spawnSync(process.execPath, [join(cachedPluginRoot, "scripts", "sync-skills.mjs")], {
+			cwd: cachedPluginRoot,
+			encoding: "utf8",
+		});
+
+		// then
+		assert.equal(result.status, 0, `sync-skills failed in the cache layout:\n${result.stderr}`);
+		const syncedSkills = (await readdir(join(cachedPluginRoot, "skills"), { withFileTypes: true }))
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name);
+		assert.ok(syncedSkills.includes("ultrawork"), "component skill ultrawork must be synced");
+		assert.ok(syncedSkills.includes("git-master"), "shared skill git-master must be synced from the linked package");
+	} finally {
+		await rm(codexHome, { recursive: true, force: true });
+	}
 });

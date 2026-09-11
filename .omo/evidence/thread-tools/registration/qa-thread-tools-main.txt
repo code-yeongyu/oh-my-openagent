@@ -1,0 +1,96 @@
+
+===== cli-surface =====
+host pid=51956 socket=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-cli-surface-jA0WJx/rpc.sock
+PASS cli-surface/caller-session-hosted fallback=none
+PASS cli-surface/caller-visible-in-host sessions=1 caller_durable=01a0474a-e1ee-7b25-a6e1-2417df4374d3
+peer routing=rpc-2 durable=01a0474a-e307-7ba9-a5a0-a890bddb25c5
+PASS cli-surface/create-transcript user_turns=1 roles=["user","assistant"]
+PASS cli-surface/address-book-resolves-peer resolution=name entries=2
+PASS cli-surface/send-transcript delivery=started user_turns=1
+PASS cli-surface/steer-transcript user_turns=1 roles=["user","assistant","user","assistant","user","assistant","user","assistant"]
+PASS cli-surface/unknown-target-typed-error tool_code=not_found wire_error=unknown_session transcript_unchanged=true
+PASS cli-surface/reader-sees-peer-turns reader_kind=ok items=16
+PASS cli-surface/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+PASS cli-surface assertions_failed=0
+----- cli-surface exit=0 -----
+
+===== desktop-client =====
+PASS desktop-client/desktop-client-handshake serverVersion=2026.8.28 capabilities=["multi_session","extension_events"]
+desktop-managed host pid=undefined socket=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-desktop-client-VNA5wH/rpc/rpc.sock
+peer routing=rpc-1 durable=01a0474a-f14d-73af-a191-6da3c2da6456
+PASS desktop-client/create-transcript user_turns=1 roles=["user","assistant"]
+PASS desktop-client/address-book-resolves-peer resolution=name entries=1
+PASS desktop-client/send-transcript delivery=started user_turns=1
+PASS desktop-client/steer-transcript user_turns=1 roles=["user","assistant","user","assistant","user","assistant","user","assistant"]
+PASS desktop-client/unknown-target-typed-error tool_code=not_found wire_tag=OmoSharedProcessRequestFailed wire_detail=unknown_session transcript_unchanged=true
+PASS desktop-client/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+PASS desktop-client assertions_failed=0
+----- desktop-client exit=0 -----
+
+===== terminal-to-ui =====
+host pid=53047 socket=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-terminal-to-ui-riF792/rpc.sock
+[16:34:56.208] INFO (#6): Migrations ran successfully {
+  migrations: [
+    "1_OrchestrationEvents", "2_OrchestrationCommandReceipts", "3_CheckpointDiffBlobs",
+    "4_ProviderSessionRuntime", "5_Projections", "6_ProjectionThreadSessionRuntimeModeColumns",
+    "7_ProjectionThreadMessageAttachments", "8_ProjectionThreadActivitySequence", "9_ProviderSessionRuntimeMode",
+    "10_ProjectionThreadsRuntimeMode", "11_OrchestrationThreadCreatedRuntimeMode", "12_ProjectionThreadsInteractionMode",
+    "13_ProjectionThreadProposedPlans", "14_ProjectionThreadProposedPlanImplementation",
+    "15_ProjectionTurnsSourceProposedPlan", "16_CanonicalizeModelSelections", "17_ProjectionThreadsArchivedAt",
+    "18_ProjectionThreadsArchivedAtIndex", "19_ProjectionSnapshotLookupIndexes", "20_AuthAccessManagement",
+    "21_AuthSessionClientMetadata", "22_AuthSessionLastConnectedAt", "23_ProjectionThreadShellSummary",
+    "24_BackfillProjectionThreadShellSummary", "25_CleanupInvalidProjectionPendingApprovals",
+    "26_CanonicalizeModelSelectionOptions", "27_ProviderSessionRuntimeInstanceId", "28_ProjectionThreadSessionInstanceId",
+    "29_ProjectionThreadDetailOrderingIndexes", "30_ProjectionThreadShellArchiveIndexes",
+    "31_AuthAuthorizationScopes", "32_AuthPairingProofKeyThumbprint", "33_ProjectionThreadsSettled",
+    "34_ProjectionThreadsSnoozed", "35_ProjectionThreadTitleRegeneration", "36_ProjectionThreadsPinned",
+    "37_ProjectionTurnsKeysetIndex", "38_ProjectionThreadsPinOrderKey", "39_ProjectionProjectsDefaultThreadEnvMode",
+    "40_ProjectionProjectFaviconPath", "41_ProviderOmoRename", "42_AdoptedSessionProvenance"
+  ],
+}
+terminal durable=01a0474b-0df2-7406-a09d-dda2614d4cfe derived_thread=omo-host-01a0474b-0df2-7406-a09d-dda2614d4cfe
+PASS terminal-to-ui/shell-snapshot-contains-terminal-session thread_id=omo-host-01a0474b-0df2-7406-a09d-dda2614d4cfe title=terminal-session rows=1
+PASS terminal-to-ui/cwd-project-mapping project_id=omo-host-project-8929384fbc55618cd343b2ff expected=omo-host-project-8929384fbc55618cd343b2ff workspace_root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-terminal-to-ui-riF792/terminal-project
+PASS terminal-to-ui/row-title-from-host-session-name title=terminal-session
+PASS terminal-to-ui/unknown-target-typed-error wire_tag=OmoSharedProcessRequestFailed wire_detail=unknown_session rows_before=1 rows_after=1
+PASS terminal-to-ui/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+PASS terminal-to-ui assertions_failed=0
+----- terminal-to-ui exit=0 -----
+
+===== desktop-to-cli =====
+[16:34:57.506] INFO (#6): Migrations ran successfully {
+  migrations: [
+    "1_OrchestrationEvents", "2_OrchestrationCommandReceipts", "3_CheckpointDiffBlobs",
+    "4_ProviderSessionRuntime", "5_Projections", "6_ProjectionThreadSessionRuntimeModeColumns",
+    "7_ProjectionThreadMessageAttachments", "8_ProjectionThreadActivitySequence", "9_ProviderSessionRuntimeMode",
+    "10_ProjectionThreadsRuntimeMode", "11_OrchestrationThreadCreatedRuntimeMode", "12_ProjectionThreadsInteractionMode",
+    "13_ProjectionThreadProposedPlans", "14_ProjectionThreadProposedPlanImplementation",
+    "15_ProjectionTurnsSourceProposedPlan", "16_CanonicalizeModelSelections", "17_ProjectionThreadsArchivedAt",
+    "18_ProjectionThreadsArchivedAtIndex", "19_ProjectionSnapshotLookupIndexes", "20_AuthAccessManagement",
+    "21_AuthSessionClientMetadata", "22_AuthSessionLastConnectedAt", "23_ProjectionThreadShellSummary",
+    "24_BackfillProjectionThreadShellSummary", "25_CleanupInvalidProjectionPendingApprovals",
+    "26_CanonicalizeModelSelectionOptions", "27_ProviderSessionRuntimeInstanceId", "28_ProjectionThreadSessionInstanceId",
+    "29_ProjectionThreadDetailOrderingIndexes", "30_ProjectionThreadShellArchiveIndexes",
+    "31_AuthAuthorizationScopes", "32_AuthPairingProofKeyThumbprint", "33_ProjectionThreadsSettled",
+    "34_ProjectionThreadsSnoozed", "35_ProjectionThreadTitleRegeneration", "36_ProjectionThreadsPinned",
+    "37_ProjectionTurnsKeysetIndex", "38_ProjectionThreadsPinOrderKey", "39_ProjectionProjectsDefaultThreadEnvMode",
+    "40_ProjectionProjectFaviconPath", "41_ProviderOmoRename", "42_AdoptedSessionProvenance"
+  ],
+}
+desktop-managed host pid=undefined socket=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/senpi-t13-desktop-to-cli-NDBXtO/rpc/rpc.sock
+desktop routing=rpc-1 durable=01a0474b-1abe-7bfe-a0fb-f52ecb8dc924
+PASS desktop-to-cli/thread-list-shows-desktop-session-live status=live routing_id=rpc-1 entries=1
+PASS desktop-to-cli/cli-resolves-desktop-session by_name=name by_id=id
+PASS desktop-to-cli/cli-send-lands-in-desktop-session delivery=started user_turns=1
+PASS desktop-to-cli/desktop-row-matches-cli-entry derived_thread=omo-host-01a0474b-1abe-7bfe-a0fb-f52ecb8dc924 rows=1
+PASS desktop-to-cli/unknown-target-typed-error tool_code=not_found wire_error=unknown_session transcript_unchanged=true
+PASS desktop-to-cli/cleanup-no-leftovers survivor_pids=[] socket_holders=[] scratch_present=false
+PASS desktop-to-cli assertions_failed=0
+----- desktop-to-cli exit=0 -----
+
+===== summary =====
+PASS cli-surface exit=0
+PASS desktop-client exit=0
+PASS terminal-to-ui exit=0
+PASS desktop-to-cli exit=0
+PASS run-all failed_scenarios=0

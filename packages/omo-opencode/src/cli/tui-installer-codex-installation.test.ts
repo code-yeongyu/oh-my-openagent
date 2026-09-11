@@ -245,6 +245,7 @@ describe("runTuiInstaller Codex install failure exit status", () => {
     // given
     const warnSpy = spyOn(p.log, "warn").mockImplementation(() => undefined)
     const errorSpy = spyOn(p.log, "error").mockImplementation(() => undefined)
+    const infoSpy = spyOn(p.log, "info").mockImplementation(() => undefined)
     const restoreSpies = [
       spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
       spyOn(p, "intro").mockImplementation(() => undefined),
@@ -317,8 +318,10 @@ describe("runTuiInstaller Codex install failure exit status", () => {
 
     // then
     const warningText = warnSpy.mock.calls.map((call) => String(call[0])).join("\n")
+    const infoText = infoSpy.mock.calls.map((call) => String(call[0])).join("\n")
     expect(result).toBe(0)
     expect(warningText).toContain("Codex install failed (OpenCode install remains successful): codex failed")
+    expect(infoText).toContain("install --platform=codex")
     expect(errorSpy).not.toHaveBeenCalled()
 
     for (const spy of restoreSpies) {
@@ -326,6 +329,7 @@ describe("runTuiInstaller Codex install failure exit status", () => {
     }
     warnSpy.mockRestore()
     errorSpy.mockRestore()
+    infoSpy.mockRestore()
     installSpy.mockRestore()
   })
 })

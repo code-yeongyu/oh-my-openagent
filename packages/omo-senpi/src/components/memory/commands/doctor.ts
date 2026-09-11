@@ -17,6 +17,7 @@ import {
   type CheckLevel,
   type DoctorCheck,
 } from "./doctor-checks"
+import { checkGhostReservation } from "./doctor-reservation"
 import { factsRemediationHint, formatFactsAdvisory, readFactsOverview } from "./facts-status"
 import {
   formatSkillNameFrontmatterRepairReport,
@@ -83,6 +84,7 @@ export function registerDoctorCommand(pi: SenpiExtensionAPI, deps: MemoryCommand
           await checkLocks(deps, identity.identityPaths.locks),
           await checkWorktrees(deps, identity),
           await checkAbandonedRuns(identity.identityPaths.reflection),
+          await checkGhostReservation(identity.identityPaths, deps),
           await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
           await checkTokens(repoDir, warnTokens),
         )

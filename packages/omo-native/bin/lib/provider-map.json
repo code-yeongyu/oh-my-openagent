@@ -1,5 +1,5 @@
 {
-  "_comment": "Derived from @code-yeongyu/senpi 2026.8.21 builtinProviders(). Hosted gateways remain excluded; ollama/radius are dynamic providers without static model modules. Re-derive builtin provider ids and mappings whenever that pin changes.",
+  "_comment": "Derived from @code-yeongyu/senpi 2026.9.11 builtinProviders(). Hosted gateways remain excluded; ollama/radius are dynamic providers without static model modules. Re-derive builtin provider ids and mappings whenever that pin changes.",
   "builtinProviderIds": [
     "alibaba-token-plan",
     "amazon-bedrock",
@@ -12,6 +12,7 @@
     "cloudflare-workers-ai",
     "cursor",
     "deepseek",
+    "devin",
     "fireworks",
     "github-copilot",
     "google",
@@ -35,6 +36,7 @@
     "qwen-token-plan-individual",
     "radius",
     "together",
+    "venice",
     "vercel-ai-gateway",
     "xai",
     "xiaomi",

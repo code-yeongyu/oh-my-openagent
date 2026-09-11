@@ -14,6 +14,7 @@ const NEVER_TRUNCATED_RULE_PATHS = new Set([
 	"bundled-rules/hephaestus.md",
 	"bundled-rules/hephaestus/gpt-5.5.md",
 	"bundled-rules/hephaestus/gpt-5.6.md",
+	"bundled-rules/hephaestus/gpt-6.md",
 ]);
 
 function truncationNotice(relativePath: string): string {

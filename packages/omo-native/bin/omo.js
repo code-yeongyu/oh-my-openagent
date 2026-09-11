@@ -6,10 +6,11 @@ import { runLauncher } from "./lib/launcher.js"
 import { runSetup } from "./lib/setup-import.js"
 
 try {
-  // A `bun add -g omo-ai` install is reached through a symlink in ~/.bun/bin, and node resolves the
-  // main module to its real path, so this URL already points inside the bun global tree. Handing
-  // that install back to bun keeps the engine on the runtime the user installed it with; every
-  // other install, and an explicit OMO_RUNTIME=node, stays on node.
+  // A machine that has bun runs omo on bun, whichever package manager installed it. A `bun add -g`
+  // install is reached through a symlink in ~/.bun/bin, and node resolves the main module to its
+  // real path, so this URL already points inside the bun global tree and that bun is trusted as-is;
+  // every other install probes the bun it found and hands over when it meets the engine's floor.
+  // Only an explicit OMO_RUNTIME=node, or a machine without a usable bun, stays on node.
   const scriptPath = fileURLToPath(import.meta.url)
   // That same symlink makes node boot before every re-exec, so POSIX bun-global installs pay for
   // node on every launch. This keeps the user-facing bin a tiny sh shim that execs bun directly;

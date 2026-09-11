@@ -1,0 +1,28 @@
+$ node -e "checkExtensionCurrent()" # build-extension.mjs --check, without the staged-runtime preflight
+Bundled 934 modules in 42ms
+
+  omo.js  1.61 MB  (entry point)
+
+Bundled 688 modules in 39ms
+
+  omo-task.js  0.98 MB  (entry point)
+
+Bundled 212 modules in 12ms
+
+  omo-member.js  169.32 KB  (entry point)
+
+Bundled 142 modules in 10ms
+
+  memory-run-supervisor.mjs  38.72 KB  (entry point)
+
+Bundled 118 modules in 13ms
+
+  omo-init-deep-advisor.js  85.0 KB  (entry point)
+
+{
+ "ok": true,
+ "output": "/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/extensions/omo.js",
+ "taskOutput": "/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/extensions/omo-task.js",
+ "memberOutput": "/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/extensions/omo-member.js",
+ "advisorRuntimeOutput": "/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js"
+}

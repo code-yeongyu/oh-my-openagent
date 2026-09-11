@@ -203,6 +203,8 @@ export async function reviewBlockers(
 			blockedGoal: result.blockedGoal,
 			goal: result.newGoal,
 			ledgerEntries: result.ledgerEntries,
+			nextActions: result.nextActions,
+			warnings: result.warnings,
 			summary: summarizeUlwLoopPlan(result.plan),
 		});
 	} else {

@@ -1,0 +1,5 @@
+Command:
+./node_modules/.bin/tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+Observed:
+Exit code 0 with no diagnostics.

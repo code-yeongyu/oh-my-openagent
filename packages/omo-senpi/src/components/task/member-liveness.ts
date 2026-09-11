@@ -6,7 +6,7 @@ import {
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
 
-import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
 
 export const TEAM_MEMBER_LIVENESS_MESSAGE_TYPE = "senpi-task.team-member-liveness"
@@ -100,7 +100,12 @@ export function createTeamMemberLivenessNotifier(
     }
     if (deps.coordinator !== undefined) {
       try {
-        deps.coordinator.enqueue(injection)
+        // A refused enqueue (coordinator retired with the session) is not queued and gets no receipt,
+        // so the retry has to be driven from here; an accepted one reports through onDeliveryFailed.
+        if (deps.coordinator.enqueue(injection) === false) {
+          failDelivery(key, record, new IdleInjectionRetiredError())
+          return
+        }
         if (deps.isStreaming()) deps.coordinator.scheduleFlush()
         else deps.coordinator.flushSoon()
       } catch (error) {

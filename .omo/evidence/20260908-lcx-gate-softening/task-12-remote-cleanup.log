@@ -1,0 +1,50 @@
+Bunshin listMachines(): [{"alias":"mengmotaHost","os":"macos","arch":"aarch64","state":"offline"},{"alias":"vultr-tokyo","os":"linux","arch":"x86_64","state":"online"},{"alias":"sionicMac","os":"macos","arch":"aarch64","state":"online"},{"alias":"gorky","os":"linux","arch":"x86_64","state":"online"},{"alias":"mengmotaMac","os":"macos","arch":"aarch64","state":"online"}]
+
+### mengmotaMac
+=== BEFORE ===
+/tmp/lcx-fix2-overlay
+/tmp/lcx-t1-20260908-green-1788860617301
+/tmp/lcx-t1-20260908-green-1788860782704
+/tmp/lcx-t1-20260908-green-1788860868644
+/tmp/lcx-t1-20260908-red-1788860196905
+/tmp/lcx-t1-20260908-red-1788860305554
+/tmp/lcx-t1-20260908-rules-1788861193806
+/tmp/lcx-t1-20260908-suite-1788861082693
+/tmp/lcx-t12-20260908-01659993
+/tmp/lcx-t12-20260908-6894330b
+/tmp/lcx-t12-20260908-8fafc772
+/tmp/lcx-t12-20260908-f6b2180e
+/tmp/lcx-t8-20260908-1788860455701
+=== REMOVALS ===
+REMOVED /tmp/lcx-t12-20260908-6894330b
+REMOVED /tmp/lcx-t12-20260908-01659993
+REMOVED /tmp/lcx-t12-20260908-f6b2180e
+REMOVED /tmp/lcx-t12-20260908-8fafc772
+=== AFTER ===
+/tmp/lcx-fix2-overlay
+/tmp/lcx-t1-20260908-green-1788860617301
+/tmp/lcx-t1-20260908-green-1788860782704
+/tmp/lcx-t1-20260908-green-1788860868644
+/tmp/lcx-t1-20260908-red-1788860196905
+/tmp/lcx-t1-20260908-red-1788860305554
+/tmp/lcx-t1-20260908-rules-1788861193806
+/tmp/lcx-t1-20260908-suite-1788861082693
+/tmp/lcx-t8-20260908-1788860455701
+
+### gorky
+=== BEFORE ===
+/tmp/lcx-pr-body-test-BdCfO1
+/tmp/lcx-pr-body-test-fr4qPt
+/tmp/lcx-pr-body-test-IOZRpN
+/tmp/lcx-pr-body-test-TVWRIR
+=== REMOVALS ===
+REMOVED /tmp/lcx-t12-20260908-6894330b (already absent)
+REMOVED /tmp/lcx-t12-20260908-01659993 (already absent)
+REMOVED /tmp/lcx-t12-20260908-f6b2180e (already absent)
+REMOVED /tmp/lcx-t12-20260908-8fafc772 (already absent)
+REMOVED /tmp/lcx-pr-body-test-BdCfO1
+REMOVED /tmp/lcx-pr-body-test-fr4qPt
+REMOVED /tmp/lcx-pr-body-test-IOZRpN
+REMOVED /tmp/lcx-pr-body-test-TVWRIR
+=== AFTER ===
+ls: cannot access '/tmp/lcx-*': No such file or directory

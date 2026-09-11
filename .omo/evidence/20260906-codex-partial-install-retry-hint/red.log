@@ -1,0 +1,37 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\omo-opencode\src\cli\cli-installer.platform.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm notice run @code-yeongyu/lsp-daemon@0.1.0 build
+npm notice run node scripts/build.mjs
+(node:42640) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(pass) runCliInstaller platform branching > runs only OpenCode installation for platform=opencode [7.58ms]
+(pass) runCliInstaller platform branching > runs only Codex installation and skips OpenCode version checks for platform=codex [3.34ms]
+(pass) runCliInstaller platform branching > runs only Senpi installation and skips OpenCode provider checks for platform=senpi [2.86ms]
+(pass) runCliInstaller platform branching > passes Codex autonomous selection into Codex installer [2.30ms]
+(pass) runCliInstaller platform branching > passes explicit Codex autonomous opt-out into Codex installer [1.95ms]
+(pass) runCliInstaller platform branching > runs OpenCode and Codex installation for platform=both [2.34ms]
+(pass) runCliInstaller platform branching > fails when Senpi-only installation cannot install Senpi [2.38ms]
+(pass) runCliInstaller platform branching > fails when Codex-only installation cannot install Codex [2.74ms]
+217 |
+218 |     // then
+219 |     const output = consoleLogMock.mock.calls.map((call) => call.join(" ")).join("\n")
+220 |     expect(result).toBe(0)
+221 |     expect(output).toContain("Codex install failed (OpenCode install is still complete): codex failed")
+222 |     expect(output).toContain("install --platform=codex")
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "install --platform=codex"
+Received: "\n oMoMoMoMo... Install \n\n[1/4] Checking OpenCode installation...\n[OK] OpenCode 1.4.0 detected\n[2/4] Adding oh-my-openagent plugin...\n[OK] Plugin added -> /tmp/opencode.jsonc\n[3/4] Writing oh-my-openagent configuration...\n[OK] Config written -> /tmp/omo.jsonc\n\n┌─ Installation Complete ───────────────────────────────────────────────────────────────────┐\n│ Configuration Summary                                                                      │\n│                                                                                            │\n│   [i] Platform: both                                                                       │\n│   [i] Codex autonomous mode: enabled                                                       │\n│                                                                                            │\n│   ○ Claude                                                                                 │\n│   ○ OpenAI/ChatGPT (GPT-5.6 Sol for Oracle)                                                │\n│   ○ Gemini                                                                                 │\n│   ○ GitHub Copilot (fallback)                                                              │\n│   ○ OpenCode Zen (opencode/ models)                                                        │\n│   ○ Z.ai Coding Plan (GLM fallbacks)                                                       │\n│   ○ Kimi For Coding (Sisyphus/Prometheus fallback)                                         │\n│   ○ Bailian Coding Plan (Qwen/GLM/Kimi fallback)                                           │\n│   ○ MiniMax Coding Plan (minimaxi.com) (MiniMax-M3 fallback)                               │\n│   ○ MiniMax Coding Plan (minimax.io) (MiniMax-M3 fallback)                                 │\n│   ○ Vercel AI Gateway (universal proxy)                                                    │\n│                                                                                            │\n│ ────────────────────────────────────────                                                   │\n│                                                                                            │\n│ Model Assignment                                                                           │\n│                                                                                            │\n│   [i] Models auto-configured based on provider priority                                    │\n│   * Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel   │\n└────────────────────────────────────────────────────────────────────────────────────────────┘\n\n[i] Note: Sisyphus agent performs best with Claude Opus 5. Other models work but may have reduced orchestration quality.\n[!] No model providers configured. Using opencode/gpt-5-nano as fallback.\n* Installation complete!\n  Run opencode to start!\n\n[i] Installing Codex harness adapter...\n[!] Codex install failed (OpenCode install is still complete): codex failed\n\n[i] Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.\n[i] Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md\n\n\n┌─ The Magic Word ─────────────────────────────────────────────────┐\n│ Pro Tip: Include ultrawork (or ulw) in your prompt.               │\n│ All features work like magic-parallel agents, background tasks,   │\n│ deep exploration, and relentless execution until completion.      │\n└───────────────────────────────────────────────────────────────────┘\n\noMoMoMoMo... Enjoy!\n"
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\.local-ignore\pr-worktrees\retry-hint\packages\omo-opencode\src\cli\cli-installer.platform.test.ts:222:20)
+(fail) runCliInstaller platform branching > keeps OpenCode success when Codex fails for platform=both [3.39ms]
+(pass) runCliInstaller platform branching > does not print star commands in noninteractive installs [2.65ms]
+(pass) runCliInstaller platform branching > does not prompt for GitHub stars in noninteractive installs even when stdout is a TTY [10.76ms]
+
+ 10 pass
+ 1 fail
+ 32 expect() calls
+Ran 11 tests across 1 file. [9.48s]

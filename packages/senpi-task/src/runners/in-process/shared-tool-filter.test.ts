@@ -10,9 +10,10 @@ import {
 
 const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 
-function makeTool(name: string): ToolDefinition {
+function makeTool(name: string, exposure?: ToolDefinition["exposure"]): ToolDefinition {
   return {
     name,
+    ...(exposure === undefined ? {} : { exposure }),
     label: name,
     description: `test tool ${name}`,
     parameters: sampleParameters,
@@ -57,5 +58,30 @@ describe("shared parent tool family filter", () => {
     const merged = mergeChildCustomTools(shared, undefined)
 
     expect(merged.map((tool) => tool.name)).toEqual(["glob"])
+  })
+
+  test("#given x_search and thread_create search-exposed tools #when filtered #then only x_search is direct and copied", () => {
+    const xSearch = makeTool("x_search", "search")
+    const threadCreate = makeTool("thread_create", "search")
+
+    const filtered = filterSharedParentTools([xSearch, threadCreate])
+
+    expect(filtered[0]?.exposure).toBe("direct")
+    expect(filtered[0]).not.toBe(xSearch)
+    expect(xSearch.exposure).toBe("search")
+    expect(filtered[1]).toBe(threadCreate)
+    expect(filtered.map((tool) => tool.name)).toEqual(["x_search", "thread_create"])
+  })
+
+  test("#given a parent list with ask_user_question #when filtered without vs with the name in uiOnly #then the filter is the only gate", () => {
+    const shared = [makeTool("grep"), makeTool("ask_user_question"), makeTool("request_user_input")]
+
+    const without = filterSharedParentTools(shared)
+    const withUiOnly = filterSharedParentTools(shared, {
+      uiOnlyToolNames: ["ask_user_question", "request_user_input"],
+    })
+
+    expect(without.map((tool) => tool.name)).toEqual(["grep", "ask_user_question", "request_user_input"])
+    expect(withUiOnly.map((tool) => tool.name)).toEqual(["grep"])
   })
 })

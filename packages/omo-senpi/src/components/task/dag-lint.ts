@@ -1,3 +1,5 @@
+import { canonicalAgentName, legacyAgentNameNotice } from "@oh-my-opencode/senpi-task"
+
 // Advisory lint for dag definitions, surfacing the mass-ulw planning doctrine at the tool
 // boundary. Warnings never reject: the dag tool is generic, so a definition that ignores the
 // node prompt contract still runs - the model sees the warning in the start result and can
@@ -6,6 +8,7 @@
 export type DagLintNode = {
   readonly id: string
   readonly prompt: string
+  readonly subagent_type?: string
 }
 
 const TASK_MARKER = /TASK:/
@@ -22,6 +25,14 @@ export function lintDagDefinitionNodes(nodes: readonly DagLintNode[]): readonly 
     }
     if (!STOP_MARKER.test(node.prompt)) {
       warnings.push(`node "${node.id}": prompt is missing a STOP WHEN condition from the mass-ulw node prompt contract`)
+    }
+    if (node.subagent_type !== undefined) {
+      // Retired curated ids still spawn through the canonical route (dag/graph.ts canonicalizes the
+      // route); the lint surfaces the deprecation so the definition can be fixed before removal.
+      const canonical = canonicalAgentName(node.subagent_type)
+      if (canonical.legacy !== undefined) {
+        warnings.push(`node "${node.id}": ${legacyAgentNameNotice(canonical.legacy, canonical.name)}`)
+      }
     }
   }
   if (nodes.length >= 2 && !nodes.some((node) => VERIFICATION_SHAPE.test(node.id) || VERIFICATION_SHAPE.test(node.prompt))) {

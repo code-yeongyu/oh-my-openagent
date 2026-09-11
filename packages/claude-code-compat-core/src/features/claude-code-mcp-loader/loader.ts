@@ -30,7 +30,7 @@ interface ResolvedMcpLoaderContext {
   readonly claudeConfigDir: string
 }
 
-function resolveMcpLoaderContext(
+export function resolveMcpLoaderContext(
   options: McpLoaderOptions = {}
 ): ResolvedMcpLoaderContext {
   const cwd = options.cwd ?? process.cwd()
@@ -40,6 +40,10 @@ function resolveMcpLoaderContext(
   )
 
   return { cwd, homeDir, claudeConfigDir }
+}
+
+export const mcpLoaderInternals = {
+  resolveMcpLoaderContext,
 }
 
 function getMcpConfigPaths(context: ResolvedMcpLoaderContext): McpConfigPath[] {
@@ -79,7 +83,7 @@ async function loadMcpConfigFile(
 
 export function getSystemMcpServerNames(options: McpLoaderOptions = {}): Set<string> {
   const names = new Set<string>()
-  const context = resolveMcpLoaderContext(options)
+  const context = mcpLoaderInternals.resolveMcpLoaderContext(options)
   const paths = getMcpConfigPaths(context)
   const { cwd } = context
 
@@ -114,7 +118,7 @@ export async function loadMcpConfigs(
 ): Promise<McpLoadResult> {
   const servers: McpLoadResult["servers"] = {}
   const loadedServers: LoadedMcpServer[] = []
-  const context = resolveMcpLoaderContext(options)
+  const context = mcpLoaderInternals.resolveMcpLoaderContext(options)
   const paths = getMcpConfigPaths(context)
   const disabledSet = new Set(disabledMcps)
   const { cwd } = context

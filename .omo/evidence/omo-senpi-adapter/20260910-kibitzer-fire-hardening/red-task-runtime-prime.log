@@ -1,0 +1,15 @@
+SyntaxError: Export named 'MEMORY_PRIME_TARGETS' not found in module '/private/tmp/ulw-d48/impl-8052-kibitzer-fire/packages/omo-senpi/src/components/memory/persona-prime.ts'.
+error: Cannot find module './kibitzer-task-runtime' from '/private/tmp/ulw-d48/impl-8052-kibitzer-fire/packages/omo-senpi/src/components/memory/kibitzer-task-runtime.test.ts'
+ 0 pass
+ 2 fail
+error: Cannot find module './extensions/omo-task.js'
+error: expect(received).toEqual(expected)
+- [
+-   "#omo-task-runtime",
+- ]
++ []
+- Expected  - 3
++ Received  + 1
+(fail) RED probe: rejecting runtime import is reported unavailable [74.49ms]
+ 0 pass
+ 1 fail

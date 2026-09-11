@@ -30,8 +30,10 @@ const workflowExpectations = [
     ],
   },
   { path: ".github/workflows/cla.yml", jobs: ["cla"] },
+  { path: ".github/workflows/compiled-worker.yml", jobs: ["relocated-worker"] },
   { path: ".github/workflows/bot-merge.yml", jobs: ["merge"] },
   { path: ".github/workflows/lint-workflows.yml", jobs: ["actionlint"] },
+  { path: ".github/workflows/npm-dist-tag-rollback.yml", jobs: ["retag"] },
   { path: ".github/workflows/package-labels.yml", jobs: ["ensure-labels", "label-pull-request", "label-issue"] },
   { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish", "smoke-linux-arm64"] },
   {
@@ -56,6 +58,7 @@ const workflowExpectations = [
   { path: ".github/workflows/stats.yml", jobs: ["stats"] },
   { path: ".github/workflows/web-ci.yml", jobs: ["format-lint-typecheck-build"] },
   { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
+  { path: ".github/workflows/windows-flake-soak.yml", jobs: ["soak"] },
 ] as const satisfies readonly WorkflowExpectation[]
 
 function discoverWorkflowPaths(): readonly string[] {

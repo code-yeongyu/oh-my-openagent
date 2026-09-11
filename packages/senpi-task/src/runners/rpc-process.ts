@@ -75,16 +75,25 @@ export class RpcProcessRunner {
         await resume
       }
     } catch (error) {
+      // Capture this BEFORE cleanup: a rejected prompt can leave the child alive, and the cleanup
+      // termination must never be recorded as the cause of the rejection.
+      const exitOutcome = handle.exitOutcome()
       try {
         await discardUnstartedRpcHandle(handle)
       } catch (cleanupError) {
         log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
       }
       const message = error instanceof Error ? error.message : String(error)
+      // A child that died before its first prompt leaves its cause ONLY here: the classified exit is
+      // otherwise folded into `message`, which is stderr-derived and gets sanitized away downstream.
       throw new RunnerError({
         kind: resume === undefined ? "child-prompt-failed" : "session_unavailable",
         message,
         cause: error,
+        rejected_while: exitOutcome === undefined ? "alive" : "exited",
+        ...(exitOutcome === undefined
+          ? {}
+          : { exit: { kind: exitOutcome.kind, code: exitOutcome.facts.code, signal: exitOutcome.facts.signal } }),
       })
     }
     return Object.assign(handle, {

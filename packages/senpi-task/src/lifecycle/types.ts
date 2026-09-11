@@ -1,5 +1,6 @@
 import type { AgentLimitReached } from "./errors"
-import type { DestroyCause } from "./port"
+import type { TaskRecord } from "../state"
+import type { DestroyCause, DetachedRevivalRollbackResult } from "./port"
 
 export type AdmissionResult =
   | { readonly kind: "admitted" }
@@ -55,6 +56,7 @@ export type SuspendSummary = {
 
 export type TaskLifecycle = {
   destroyResidentTask(taskId: string, cause: DestroyCause): Promise<void>
+  rollbackDetachedRevival(prior: TaskRecord): DetachedRevivalRollbackResult
   reclaimIdleResidents?(): Promise<readonly string[]>
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
   dispose?(): void

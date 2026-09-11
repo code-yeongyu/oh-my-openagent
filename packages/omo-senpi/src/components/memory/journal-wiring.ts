@@ -36,9 +36,9 @@ export interface MemoryJournalWiring {
 
 const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
 
-// Memory-owned hidden custom-message channels (memorian recall hints, memory notices). Any other
+// Memory-owned hidden custom-message channels (kibitzer recall hints, memory notices). Any other
 // custom message belongs to a foreign extension and is admitted like any other entry.
-const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, MEMORY_NOTICE_CUSTOM_TYPE])
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, "omo-memorian:recall", MEMORY_NOTICE_CUSTOM_TYPE])
 
 function isJournalLockFailure(error: unknown): boolean {
   if (error instanceof JournalLockTimeoutError) return true
@@ -155,7 +155,7 @@ function sessionMessageOf(entry: unknown): SessionMessage | undefined {
   const role = stringOf(body.role)
   if (role === undefined) return undefined
   // Memory-owned hidden channels, never conversation. The journal feeds BOTH the facts queue
-  // payload and the reflection/dream snapshot, so a role-custom memorian recall hint must never
+  // payload and the reflection/dream snapshot, so a role-custom kibitzer recall hint must never
   // be extracted back into memory as if the session had said it. Senpi writes these as
   // `custom_message` entries (already dropped by the type gate); this covers the role-custom
   // `message` shape forks and older writers can leave behind. Foreign custom messages are not

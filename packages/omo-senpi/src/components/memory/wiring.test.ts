@@ -23,6 +23,7 @@ import {
 } from "./status"
 import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
+import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
 const roots: string[] = []
 
@@ -219,7 +220,8 @@ describe("memory recall wiring", () => {
     const recall = messages.find((result) => result.message?.customType === RECALL_CUSTOM_TYPE)
     const notice = messages.find((result) => result.message?.customType === MEMORY_NOTICE_CUSTOM_TYPE)
     expect(recall).toBeUndefined()
-    expect(pi.entries).toEqual([])
+    // The kibitzer prompt trigger may append its gate observability entry; nothing else may land.
+    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate")).toEqual([])
     expect(notice?.systemPrompt).toContain("persona")
   }, 30_000)
 })
@@ -241,7 +243,6 @@ describe("memory footer wiring", () => {
 
     const toolContext = sessionContext(fixture.sessionId, statusCalls)
     await pi.dispatch("tool_result", memoryResult("mcp_omo-memory_memory"), toolContext)
-    await pi.dispatch("tool_result", memoryResult("mcp_omo-memory_memory_apply_patch"), toolContext)
     await pi.dispatch("tool_result", memoryResult("read"), toolContext)
 
     expect(statusCalls).toHaveLength(1)
@@ -612,6 +613,109 @@ async function liveFooterHarness(): Promise<{
     },
   }
 }
+
+describe("facts shutdown wiring", () => {
+  test("#given an active facts launch #when the session shuts down #then facts cancellation runs before the shutdown drain", async () => {
+    // given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-facts-shutdown-")))
+    roots.push(root)
+    const sessionId = "session-facts-shutdown"
+    const identity = createMemoryIdentityContext({
+      identity: "facts-shutdown-agent",
+      identityPaths: buildIdentityPaths(root, "facts-shutdown-agent"),
+      binding: { identity: "facts-shutdown-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const sequence: string[] = []
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+      createFactsExtractor: () => ({
+        launchPending: async () => undefined,
+        reconcilePending: async () => undefined,
+        cancelActive: async () => { sequence.push("cancel") },
+      }),
+    })
+    wiring.registerShutdownEvaluator(async () => { sequence.push("drain") })
+
+    // when
+    await wiring.onSessionShutdown({
+      reason: "quit",
+      sessionId,
+      deadlineAt: Date.now() + 1_000,
+      now: () => Date.now(),
+    })
+
+    // then
+    expect(sequence.indexOf("cancel")).toBeLessThan(sequence.indexOf("drain"))
+  })
+})
+
+describe("session shutdown journal durability", () => {
+  // Issue #7889: the pre-drain awaits (kibitzer drain, gate cancel, facts cancel) run inside the
+  // same handler as the drain but BEFORE it, while the 1500ms budget is already fixed at entry, so
+  // slow pre-drain work starved the FIRST drain step - journal-flush - and the session's journal
+  // tail was never made durable. The invariant is reason-independent: every ShutdownReason goes
+  // through the same handler, and reload alone accounts for 183 of the 199 measured events.
+  for (const reason of ["quit", "reload", "new", "resume", "fork"] as const) {
+    test(`#given pre-drain work that consumes the entire drain budget #when a ${reason} shutdown runs #then the journal flush still runs and only optional work is dropped`, async () => {
+      // given
+      const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-journal-durability-")))
+      roots.push(root)
+      const sessionId = "session-journal-durability"
+      const identity = createMemoryIdentityContext({
+        identity: "journal-durability-agent",
+        identityPaths: buildIdentityPaths(root, "journal-durability-agent"),
+        binding: { identity: "journal-durability-agent", repoPathHash: "hash", boundAt: 1 },
+      })
+      const budgetWarnings: { readonly message: string; readonly details: unknown }[] = []
+      let clock = 10_000
+      const wiring = createMemoryWiring({
+        sessions: new Map([[sessionId, { context: identity }]]),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        env: {},
+        logger: {
+          info: () => {},
+          warn: (message, details) => { budgetWarnings.push({ message, details }) },
+          error: () => {},
+        },
+        createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+        // Pre-drain work stands in for every optional await the handler performs before the
+        // drain: the facts cancellation burns the whole budget by advancing the clock past the
+        // deadline fixed at handler entry.
+        createFactsExtractor: () => ({
+          launchPending: async () => undefined,
+          reconcilePending: async () => undefined,
+          cancelActive: async () => { clock = 100_000 },
+        }),
+      })
+
+      // when
+      await wiring.onSessionShutdown({
+        reason,
+        sessionId,
+        deadlineAt: clock + SESSION_SHUTDOWN_DRAIN_BUDGET_MS,
+        now: () => clock,
+      })
+
+      // then
+      const journalSkips = budgetWarnings.filter((call) => {
+        if (call.message !== "memory shutdown drain hit its budget") return false
+        return (call.details as { step?: string } | undefined)?.step === "journal-flush"
+      })
+      expect(journalSkips).toHaveLength(0)
+      const optionalSkips = budgetWarnings.filter((call) => {
+        if (call.message !== "memory shutdown drain hit its budget") return false
+        return (call.details as { step?: string } | undefined)?.step === "facts-enqueue"
+      })
+      expect(optionalSkips).toHaveLength(1)
+      expect((optionalSkips[0]?.details as { remainingMs?: number } | undefined)?.remainingMs).toBe(0)
+    })
+  }
+})
 
 describe("memory footer live wiring", () => {
   test("#given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints", async () => {

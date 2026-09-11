@@ -5,10 +5,17 @@ import { hasLocale } from "next-intl"
 import { setRequestLocale } from "next-intl/server"
 import { LocalizedPageShell } from "@/app/_components/localized-page-shell"
 import { routing } from "@/i18n/routing"
+import { getStats, FALLBACK_DESCRIPTION } from "@/lib/stats"
 
-export const metadata: Metadata = {
-  description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, background agents, 60+ lifecycle hooks.",
+export async function generateMetadata(): Promise<Metadata> {
+  let description = FALLBACK_DESCRIPTION
+  try {
+    description = (await getStats()).description
+  } catch (error) {
+    console.warn("Unable to refresh localized metadata; using fallback description", error)
+  }
+
+  return { description }
 }
 
 export function generateStaticParams(): Array<{ readonly locale: string }> {

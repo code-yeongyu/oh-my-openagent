@@ -68,6 +68,10 @@ export type ManagerStartSpec = {
   readonly model?: string
   readonly name?: string
   readonly description?: string
+  readonly team_run_id?: string
+  readonly team_name?: string
+  readonly team_member_name?: string
+  readonly team_role?: "member"
   readonly cwd?: string
   readonly instructions?: string
   readonly allowed_subagents?: readonly string[]

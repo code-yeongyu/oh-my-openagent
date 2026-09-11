@@ -1,10 +1,11 @@
-import { lstatSync, readdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { lstatSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import type { ToolCallEventResult } from "@code-yeongyu/senpi"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { TRANSIENT_DIRNAME } from "./transient-identity"
 
 const FILE_TOOL_NAMES = ["read", "write", "edit", "ls", "find", "grep", "glob"] as const
 const ENUMERATION_TOOL_NAMES = new Set(["ls", "find", "grep", "glob"])
@@ -22,9 +23,9 @@ type ToolCall = {
 }
 
 type GuardRoots = {
-  readonly agentsRoot: string
+  /** Every memory area a bound run may not touch outside its own root, lexically. */
+  readonly deniedRoots: readonly string[]
   readonly ownRoot: string
-  readonly foreignRoots: readonly string[]
 }
 
 /**
@@ -143,36 +144,36 @@ function extractPatchDirectivePaths(patch: string): string[] {
   return paths
 }
 
+/**
+ * Structural, not enumerated (issue #7765): the verdict is "inside a memory area but outside your
+ * own root", so guard construction costs no directory listing and its cost cannot grow with the
+ * number of runs the machine has executed. It is also strictly stronger than the old sibling scan,
+ * which could only deny identity directories that happened to exist at the time of the call.
+ *
+ * Both areas are denied because a transient run's own root lives under `transient-runs/`
+ * (transient-identity.ts) while durable memory stays under `agents/`.
+ */
 function resolveGuardRoots(context: MemoryIdentityContext): GuardRoots {
   const ownRoot = resolve(context.identityPaths.root)
-  const agentsRoot = dirname(ownRoot)
-  const foreignRoots: string[] = []
-
-  try {
-    for (const entry of readdirSync(agentsRoot, { withFileTypes: true })) {
-      if (entry.name === context.identity) continue
-      foreignRoots.push(join(agentsRoot, entry.name))
-    }
-  } catch (error) {
-    if (!isMissingPathError(error)) throw error
+  const durableAgentsRoot = dirname(resolve(context.durableRoot))
+  const memoryRoot = dirname(durableAgentsRoot)
+  return {
+    ownRoot,
+    deniedRoots: uniquePaths([dirname(ownRoot), durableAgentsRoot, join(memoryRoot, TRANSIENT_DIRNAME)]),
   }
-
-  return { agentsRoot, ownRoot, foreignRoots }
 }
 
 function isForbiddenTarget(rawPath: string, cwd: string, roots: GuardRoots, recursive: boolean): boolean {
   if (rawPath.includes("\0")) return false
   const lexical = resolve(cwd, rawPath)
   const candidates = uniquePaths([lexical, canonicalizeFromNearestExisting(lexical)])
-  const agentsRoots = uniquePaths([roots.agentsRoot, canonicalizeFromNearestExisting(roots.agentsRoot)])
+  const deniedRoots = uniquePaths(roots.deniedRoots.flatMap((root) => [root, canonicalizeFromNearestExisting(root)]))
   const ownRoots = uniquePaths([roots.ownRoot, canonicalizeFromNearestExisting(roots.ownRoot)])
-  const foreignRoots = uniquePaths(roots.foreignRoots.flatMap((root) => [root, canonicalizeFromNearestExisting(root)]))
 
   for (const candidate of candidates) {
     if (ownRoots.some((root) => isWithin(root, candidate))) continue
-    if (agentsRoots.some((root) => candidate === root)) return true
-    if (recursive && agentsRoots.some((root) => isWithin(candidate, root))) return true
-    if (foreignRoots.some((root) => isWithin(root, candidate))) return true
+    if (deniedRoots.some((root) => isWithin(root, candidate))) return true
+    if (recursive && deniedRoots.some((root) => isWithin(candidate, root))) return true
   }
   return false
 }
@@ -213,8 +214,9 @@ function adviseBashOnce(
   const command = event.input.command
   if (typeof command !== "string") return
 
-  const forbiddenLiterals = [roots.agentsRoot, ...roots.foreignRoots]
-  if (!forbiddenLiterals.some((root) => command.includes(root))) return
+  // A sibling identity path always contains its area root literally, so matching the areas is
+  // equivalent to the old per-sibling literal list - without listing anything.
+  if (!roots.deniedRoots.some((root) => command.includes(root))) return
 
   const sessionId = readSessionId(eventContext)
   if (warnedSessions.has(sessionId)) return

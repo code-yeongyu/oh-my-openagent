@@ -1,0 +1,241 @@
+{
+  "queryId": "q13",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421486,
+    "completed_at": 1788421486,
+    "id": "cc27661a-7563-93e0-99b4-ad811214b3ef",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_cc27661a-7563-93e0-99b4-ad811214b3ef_call-1ef40272-1e0d-48d8-bc6d-df788e206bd6-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Grok latest release",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://cryptorank.io/news/feed/db1bc-grok-4-7-release-spacex-data"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/build/changelog"
+            },
+            {
+              "type": "url",
+              "url": "https://tesorb.com/command/xai/"
+            },
+            {
+              "type": "url",
+              "url": "https://x.com/TheAIObserverX/status/2071526396552200366"
+            },
+            {
+              "type": "url",
+              "url": "https://mashable.com/tech/musk-grok-4-5-launch"
+            },
+            {
+              "type": "url",
+              "url": "https://m.economictimes.com/tech/artificial-intelligence/elon-musk-teases-grok-4-6-and-4-7-doubling-down-on-xais-rapid-fire-releases/articleshow/132693365.cms"
+            },
+            {
+              "type": "url",
+              "url": "https://r.jina.ai/https:/x.ai/blog"
+            },
+            {
+              "type": "url",
+              "url": "https://letsdatascience.com/news/topic/grok"
+            },
+            {
+              "type": "url",
+              "url": "https://updatealert.io/updates/x-ai"
+            },
+            {
+              "type": "url",
+              "url": "https://x.ai/build/changelog"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_cc27661a-7563-93e0-99b4-ad811214b3ef_call-1ef40272-1e0d-48d8-bc6d-df788e206bd6-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**The latest major model release from xAI is Grok 4.6**, which launched on August 12, 2026.[[1]](https://r.jina.ai/https:/x.ai/blog)\n\n### Key Details on Grok 4.6\n- It focuses on improvements for long-running agents, coding, knowledge work, interactive and visual tasks, with a 500,000-token context window.[[2]](https://tesorb.com/command/xai/)\n- On the Artificial Analysis Intelligence Index, it scored approximately 60.92–61, essentially tying OpenAI’s GPT-5.6 Sol Max while being offered at a lower price ($2 per million input tokens / $6 per million output tokens).[[2]](https://tesorb.com/command/xai/)\n- It has been rolled out to platforms including GitHub Copilot, Amazon Bedrock, Microsoft Foundry, Google Vertex AI / Gemini Enterprise Agent Platform, and others throughout August 2026.[[3]](https://updatealert.io/updates/x-ai)\n\n### Upcoming Release\nElon Musk announced on September 2, 2026, that **Grok 4.7** is expected in about 10 days (around September 12, 2026). It will scale from 1.5 trillion to 2.1 trillion parameters, incorporate unique SpaceX training data, and is claimed to surpass all current models—especially in real-world engineering—while being slightly slower but more token-efficient.[[4]](https://cryptorank.io/news/feed/db1bc-grok-4-7-release-spacex-data)\n\nOther recent updates include Grok Voice 2.0 (August 5, 2026), Grok Bot (agent system), Imagine Image 2.0 / Video 1.5, and various integrations and tooling improvements (e.g., Grok Build changelog).[[2]](https://tesorb.com/command/xai/)\n\nFor the most up-to-date official information, check [x.ai/news](https://x.ai/news) or Elon Musk’s / xAI’s posts on X.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://r.jina.ai/https:/x.ai/blog",
+                "start_index": 91,
+                "end_index": 132,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://tesorb.com/command/xai/",
+                "start_index": 306,
+                "end_index": 344,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://tesorb.com/command/xai/",
+                "start_index": 569,
+                "end_index": 607,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://updatealert.io/updates/x-ai",
+                "start_index": 794,
+                "end_index": 836,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://cryptorank.io/news/feed/db1bc-grok-4-7-release-spacex-data",
+                "start_index": 1213,
+                "end_index": 1286,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://tesorb.com/command/xai/",
+                "start_index": 1485,
+                "end_index": 1523,
+                "title": "2"
+              }
+            ]
+          }
+        ],
+        "id": "msg_cc27661a-7563-93e0-99b4-ad811214b3ef",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 137290500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 137290500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:44:46.370Z"
+}

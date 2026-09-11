@@ -1,13 +1,13 @@
 ---
 name: ultimate-browsing
-description: "Escalation skill for blocked or hard-to-reach web access — load it when a normal browse/fetch is blocked (WAF, 403, Cloudflare, JS-only render, login-gated, or a platform a generic fetcher cannot read). Tiered router: TIER 1 insane-search (headless extraction + WAF bypass via curl_cffi TLS impersonation, yt-dlp, Jina Reader, public APIs, Playwright real-Chrome fallback); TIER 1.5 agent-reach (platform-native readers for Chinese and social platforms: Xiaohongshu, Douyin, Weibo, Bilibili, V2EX, WeChat, plus Twitter/Reddit/LinkedIn/GitHub); TIER 2 Chrome stealth (CloakBrowser stealth Chromium + agent-browser CDP for clicks, forms, screenshots, video, cookie login). Triggers: blocked site, bypass bot detection, cloudflare/WAF bypass, scrape, stealth browser, import cookies, fill form, screenshot, play youtube, xiaohongshu, douyin, weibo, bilibili, v2ex, wechat article, podcast transcript. NOT for simple searches (use web-search) or plain fetches (use webfetch)."
+description: "Reaches web pages a plain fetch cannot: renders JS, drives clicks and forms, captures screenshots, holds a login, and gets past WAF blocks through platform-native readers and stealth Chrome. Use for any page work beyond retrieving static text."
 ---
 
 # Ultimate Browsing
 
-Escalation web access for tasks a normal browse or fetch cannot complete. Reach for this skill the moment a page is blocked (WAF / 403 / Cloudflare), needs JS rendering, hides behind a login, or lives on a platform a generic fetcher cannot read. Escalate only when the cheaper tier cannot do the job:
+Web access for everything a plain fetch cannot finish: a page that renders in JS, a click or a form, a screenshot, a login that must persist across pages, or a host that blocks generic fetchers (WAF / 403 / Cloudflare). Start at the cheapest tier that can do the job and climb only when it cannot:
 
-**Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — Chrome stealth** (real interaction via CloakBrowser + agent-browser).
+**Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — a real browser**: 2a a code-driven kernel browser, 2b Chrome stealth (CloakBrowser + agent-browser) when the page fights back.
 
 ## PHASE 0 — ROUTE FIRST (MANDATORY)
 
@@ -23,11 +23,11 @@ User request
   +- podcast transcript / stock forum ----------------- TIER 1.5 agent-reach
   +- Twitter feed / LinkedIn profile / GitHub via CLI - TIER 1.5 agent-reach
   |
-  +- Tier 1/1.5 returned empty or partial ------------- TIER 2  Chrome stealth
-  +- click / fill form / scroll / interact ------------ TIER 2  Chrome stealth
-  +- screenshot / render / play video ----------------- TIER 2  Chrome stealth
-  +- login session across pages / inject cookies ------ TIER 2  Chrome stealth
-  +- test web app / QA / dogfood ---------------------- TIER 2  Chrome stealth
+  +- Tier 1/1.5 returned empty or partial ------------- TIER 2  2a kernel browser -> 2b stealth
+  +- click / fill form / scroll / interact ------------ TIER 2  2a kernel browser -> 2b stealth
+  +- screenshot / render / play video ----------------- TIER 2  2a kernel browser -> 2b stealth
+  +- login session across pages / inject cookies ------ TIER 2  2b Chrome stealth (profile + cookies)
+  +- test web app / QA / dogfood ---------------------- TIER 2  2a kernel browser -> 2b stealth
   |
   +- simple search query ------------------------------ NOT this skill (use web-search)
 ```
@@ -80,9 +80,24 @@ curl -s "https://www.v2ex.com/api/topics/hot.json"            # V2EX public API
 
 Routing table, per-platform auth (set `TWITTER_*` env vars, `gh auth login`, a transcription key — only if you have access), rate-limit notes, and known version quirks are in [references/agent-reach/README.md](references/agent-reach/README.md).
 
-## Tier 2 — Chrome stealth (real interaction)
+## Tier 2 — a real browser (real interaction)
 
 **When**: real interaction is needed (clicks, forms, screenshots, video, persistent login), or Tier 1/1.5 failed.
+
+### Tier 2a — kernel browser (default)
+
+Drive the page from the code cell you are already in, with no CLI process and no open CDP port. On a Bun >= 1.4 runtime that is `new Bun.WebView()` (`navigate`, `click`, `type`, `evaluate`, `screenshot`, raw `cdp`); elsewhere it is `playwright-core`/`puppeteer-core` against the local Chrome. Snapshots and screenshots come back in-process, so this is the cheapest way to answer "what does the page actually render".
+
+```js
+await using view = new Bun.WebView({ width: 1280, height: 800 })
+await view.navigate(url)
+const title = await view.evaluate("document.title")
+await view.screenshot({ path: "/tmp/page.png" })
+```
+
+Climb to 2b when the site detects automation (Turnstile, FingerprintJS, "unusual traffic"), when the flow needs a persistent logged-in profile or injected cookies, or when the kernel browser cannot reach the page at all.
+
+### Tier 2b — Chrome stealth (blocked or logged-in pages)
 
 CloakBrowser is a stealth Chromium with source-level fingerprint patches that passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors; agent-browser is the CDP automation CLI that drives it. Both are runtime-installed tools (not vendored here). Full setup, version pins, launch flow, cookie login, and cross-platform notes are in [references/chrome-stealth.md](references/chrome-stealth.md).
 

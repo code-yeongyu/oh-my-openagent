@@ -1,6 +1,6 @@
 {
   "name": "@code-yeongyu/omo-senpi",
-  "version": "5.0.0-beta.31",
+  "version": "5.0.0-beta.54",
   "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
@@ -25,8 +25,10 @@
   "files": [
     "extensions",
     "skills",
+    "skills-conditional",
     "runtime",
     "scripts/install.mjs",
+    "CHANGELOG.md",
     "README.md",
     "NOTICE",
     "LICENSE"

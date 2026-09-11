@@ -1,0 +1,48 @@
+$ bun test packages/omo-senpi/src/components/builtin-mcps packages/omo-senpi/src/extension/component-list.test.ts
+# state: tests written, component + registration not yet implemented
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/extension/component-list.test.ts:
+(pass) createOmoSenpiComponents > #given the production registration array #when x-search is looked up #then it is present exactly once [2.51ms]
+30 | 
+31 |     // when
+32 |     const occurrences = names.filter((name) => name === "builtin-mcps")
+33 | 
+34 |     // then
+35 |     expect(occurrences).toEqual(["builtin-mcps"])
+                             ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "builtin-mcps",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/src/extension/component-list.test.ts:35:25)
+(fail) createOmoSenpiComponents > #given the production registration array #when builtin-mcps is looked up #then it registers exactly once right after ast-grep [0.26ms]
+(pass) createOmoSenpiComponents > #given the production registration array #when ordering is inspected #then x-search registers after lsp and before task tool capture [0.12ms]
+
+packages/omo-senpi/src/components/builtin-mcps/index.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './index' from '/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/src/components/builtin-mcps/index.test.ts'
+-------------------------------
+
+
+packages/omo-senpi/src/components/builtin-mcps/host-declaration-contract.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './index' from '/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/src/components/builtin-mcps/host-declaration-contract.test.ts'
+-------------------------------
+
+
+ 2 pass
+ 3 fail
+ 2 errors
+ 4 expect() calls
+Ran 5 tests across 3 files. [2.89s]

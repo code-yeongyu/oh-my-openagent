@@ -1,0 +1,5 @@
+Command: bun run test:senpi
+Exit: 0
+Package suite: 2558 pass, 7 platform-specific skips, 0 fail; 8190 assertions across 336 files.
+Evidence resolver suite: 10 pass, 0 fail; 31 assertions.
+The command was run once, serialized as the repository script defines it.

@@ -108,6 +108,14 @@ type Deferred<T> = {
 
 const temporaryDirectories: string[] = []
 const TEST_EVENT_TIMEOUT_MS = 3_000
+// Collapses the prompt gate's post-dispatch hold and durable-retry backoff so a
+// fallback wake that must retry is observed through its event, never through
+// wall-clock backoff (2s+2s+2s+4s with the production schedule).
+const IMMEDIATE_DISPATCH_TIMING = {
+  postDispatchHoldMs: 0,
+  queueRetryMs: 5,
+  fallbackWakeSettleMs: 0,
+} as const
 const realSetTimeout = globalThis.setTimeout
 const realClearTimeout = globalThis.clearTimeout
 
@@ -121,6 +129,13 @@ function createTeamSendMessageTool(
     ...deps,
     liveDeliverySettleMs: 0,
   })
+}
+
+function createImmediateTeamSendMessageTool(
+  config: Parameters<typeof createProductionTeamSendMessageTool>[0],
+  client: Parameters<typeof createProductionTeamSendMessageTool>[1],
+): ReturnType<typeof createProductionTeamSendMessageTool> {
+  return createTeamSendMessageTool(config, client, { loadRuntimeState, dispatchTiming: IMMEDIATE_DISPATCH_TIMING })
 }
 
 function createDeferred<T>(): Deferred<T> {
@@ -649,7 +664,7 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     }
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
+    const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
     await dispatchInternalPrompt({
       mode: "async",
@@ -714,7 +729,7 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     }
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
+    const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
     await dispatchInternalPrompt({
       mode: "async",
@@ -777,7 +792,7 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     }
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
+    const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
     await dispatchInternalPrompt({
       mode: "async",
@@ -844,7 +859,7 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     }
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
+    const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
     await dispatchInternalPrompt({
       mode: "async",
@@ -908,7 +923,7 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     }
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
+    const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
     await dispatchInternalPrompt({
       mode: "async",
@@ -1308,7 +1323,7 @@ describe("createTeamSendMessageTool", () => {
         },
       },
     } satisfies LiveDeliveryClient
-    const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
+    const liveTool = createImmediateTeamSendMessageTool(fixture.config, failingClient)
 
     // when
     await liveTool.execute({
@@ -1316,11 +1331,7 @@ describe("createTeamSendMessageTool", () => {
       to: "m2",
       body: "ping",
     }, fixture.toolContext(fixture.memberOneSessionId))
-    await waitForEvent(
-      fallbackDispatched.promise,
-      "fallback wake after pre-send transport failure",
-      12_000,
-    )
+    await waitForEvent(fallbackDispatched.promise, "fallback wake after pre-send transport failure")
     const injection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
       "m2",
@@ -1336,7 +1347,7 @@ describe("createTeamSendMessageTool", () => {
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))
     expect(inboxEntries).toHaveLength(1)
-  }, 15_000)
+  })
 
   test("#given live delivery promptAsync fails ambiguously #when delivery handles the accepted-like failure #then it marks pending without inbox retry", async () => {
     // given

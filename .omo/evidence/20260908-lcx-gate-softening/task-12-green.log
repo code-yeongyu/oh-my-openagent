@@ -1,0 +1,347 @@
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo && bun test packages/omo-codex/plugin/components/ulw-execute-continuation packages/omo-codex/plugin/test
+EXIT: 1
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+
+STDERR:
+The following filters did not match any test files:
+ packages/omo-codex/plugin/components/ulw-execute-continuation packages/omo-codex/plugin/test
+7193 files were searched [10.20s]
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+
+Learn more about bun test: https://bun.com/docs/cli/test
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin && set -e; bun test ./components/ulw-execute-continuation; node --test ./test/aggregate-manifest.test.mjs ./test/aggregate-hooks.test.mjs ./test/hook-status-message.test.mjs
+EXIT: 1
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+
+STDERR:
+
+components/ulw-execute-continuation/test/boulder-reader.test.ts:
+(pass) ulw-execute plan checklist consumption > #given scaffold headings and canonical numbered rows #when parsed #then structured totals and next label match [1.95ms]
+(pass) ulw-execute plan checklist consumption > #given nested checkboxes #when parsed #then ignores non-column-zero items [0.73ms]
+(pass) ulw-execute plan checklist consumption > #given checkboxes outside counted sections #when parsed #then ignores unrelated top-level tasks [0.74ms]
+(pass) ulw-execute plan checklist consumption > #given all top-level tasks complete #when parsed #then next task is null [0.68ms]
+(pass) ulw-execute plan checklist consumption > #given no structured headings #when parsed #then legacy top-level checkbox fallback remains [0.87ms]
+(pass) ulw-execute plan checklist consumption > #given a heading-free legacy star checklist #when parsed #then fallback behavior is preserved [0.94ms]
+(pass) ulw-execute plan checklist consumption > #given noncanonical structured rows #when parsed #then only exact positive-number grammar is counted [0.79ms]
+(pass) ulw-execute plan checklist consumption > #given fenced examples and a higher-level heading #when parsed #then section scope excludes them [0.70ms]
+(pass) ulw-execute plan checklist consumption > #given a child heading inside TODOs #when parsed #then canonical rows remain in the parent section [0.95ms]
+(pass) ulw-execute plan checklist consumption > #given a four-backtick fence containing triple-backtick examples #when parsed #then shorter fences do not close it [0.88ms]
+(pass) ulw-execute plan checklist consumption > #given structured headings with ATX closing markers #when parsed #then canonical tasks remain structured [1.09ms]
+(pass) ulw-execute plan checklist consumption > #given inline backtick code before a canonical task #when parsed #then it does not open a fence [0.72ms]
+(pass) ulw-execute plan checklist consumption > #given a heading-free fenced checkbox example #when parsed #then legacy fallback ignores it [0.72ms]
+(pass) ulw-execute boulder state reader > #given active codex work with remaining checklist #when state is read #then continuation fields match baseline [1.52ms]
+(pass) ulw-execute boulder state reader > #given completed codex work #when state is read #then continuation is absent [1.16ms]
+(pass) ulw-execute boulder state reader > #given paused codex work with remaining checklist #when state is read #then continuation is present [1.27ms]
+(pass) ulw-execute boulder state reader > #given active codex work with no remaining checklist items #when state is read #then final gate continuation remains present [1.24ms]
+(pass) ulw-execute boulder state reader > #given active codex work with no readable checklist #when state is read #then continuation remains absent [1.28ms]
+(pass) ulw-execute boulder state reader > #given corrupt boulder JSON #when state is read #then continuation is absent [1.26ms]
+(pass) ulw-execute boulder state reader > #given bare boulder session id #when codex state is read #then continuation is absent [1.17ms]
+(pass) ulw-execute boulder state reader > #given works omit the codex session but stale mirror matches #when state is read #then continuation is absent [1.01ms]
+
+components/ulw-execute-continuation/test/cli.test.ts:
+21 | 		// when
+22 | 		const result = runCli("stop", payload);
+23 | 
+24 | 		// then
+25 | 		if (result.error !== undefined) throw result.error;
+26 | 		expect(result.status).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts:26:25)
+(fail) ulw-execute continuation CLI > #given valid Stop stdin #when CLI runs #then stdout contains block JSON [13.44ms]
+36 | 		// when
+37 | 		const result = runCli("subagent-stop", payload);
+38 | 
+39 | 		// then
+40 | 		if (result.error !== undefined) throw result.error;
+41 | 		expect(result.status).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts:41:25)
+(fail) ulw-execute continuation CLI > #given valid SubagentStop stdin #when CLI runs #then stdout is empty [12.54ms]
+50 | 		// when
+51 | 		const result = runCli("stop", payload);
+52 | 
+53 | 		// then
+54 | 		if (result.error !== undefined) throw result.error;
+55 | 		expect(result.status).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts:55:25)
+(fail) ulw-execute continuation CLI > #given active stop hook stdin #when CLI runs #then stdout is empty and exit is zero [7.81ms]
+64 | 		// when
+65 | 		const result = runCli("stop", payload);
+66 | 
+67 | 		// then
+68 | 		if (result.error !== undefined) throw result.error;
+69 | 		expect(result.status).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts:69:25)
+(fail) ulw-execute continuation CLI > #given unrelated session stdin #when CLI runs #then stdout is empty and exit is zero [7.20ms]
+77 | 		// when
+78 | 		const result = runCli("stop", payload);
+79 | 
+80 | 		// then
+81 | 		if (result.error !== undefined) throw result.error;
+82 | 		expect(result.status).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts:82:25)
+(fail) ulw-execute continuation CLI > #given malformed stdin #when CLI runs #then stdout is empty and exit is zero [6.78ms]
+86 | 	it("#given built CLI bundle #when inspected #then it does not depend on the monorepo boulder package", () => {
+87 | 		// given
+88 | 		const cliPath = join(process.cwd(), "dist", "cli.js");
+89 | 
+90 | 		// when
+91 | 		const source = readFileSync(cliPath, "utf8");
+                      ^
+error: ENOENT: no such file or directory, open '/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/dist/cli.js'
+      at <anonymous> (/private/tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts:91:18)
+(fail) ulw-execute continuation CLI > #given built CLI bundle #when inspected #then it does not depend on the monorepo boulder package [0.08ms]
+
+components/ulw-execute-continuation/test/codex-hook.test.ts:
+(pass) ulw-execute Stop hook > #given stop hook is already active #when hook runs #then returns empty output [0.10ms]
+(pass) ulw-execute Stop hook > #given no boulder state and start work prompt #when stop hook runs #then it stays quiet [0.12ms]
+(pass) ulw-execute Stop hook > #given active codex work with remaining top-level tasks #when hook runs #then returns block JSON [1.33ms]
+(pass) ulw-execute Stop hook > #given active Boulder work and a SubagentStop event #when hook runs #then returns empty output [0.93ms]
+(pass) ulw-execute Stop hook > #given active codex work and an external-blocker marker #when hook runs #then returns empty output [1.02ms]
+(pass) ulw-execute Stop hook > #given ultrawork opener then external-blocker marker #when hook runs #then returns empty output [0.73ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker with no stated blocker #when hook runs #then still returns block JSON [0.90ms]
+(pass) ulw-execute Stop hook > #given the ultrawork opener and a bare marker #when hook runs #then still returns block JSON [1.12ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker below the first line #when hook runs #then still returns block JSON [0.96ms]
+(pass) ulw-execute Stop hook > #given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate [0.75ms]
+(pass) ulw-execute Stop hook > #given context-window pressure in transcript #when hook runs #then it does not inject continuation text [0.06ms]
+(pass) ulw-execute Stop hook > #given active work belongs to another harness #when hook runs #then returns empty output [0.57ms]
+(pass) ulw-execute Stop hook > #given bare legacy session id #when hook runs #then returns empty output [0.92ms]
+(pass) ulw-execute Stop hook > #given completed boulder work #when hook runs #then returns empty output [0.95ms]
+(pass) ulw-execute Stop hook > #given malformed boulder JSON #when hook runs #then returns empty output [0.74ms]
+(pass) ulw-execute Stop hook > #given malformed input #when hook runs #then returns empty output [0.03ms]
+
+6 tests failed:
+(fail) ulw-execute continuation CLI > #given valid Stop stdin #when CLI runs #then stdout contains block JSON [13.44ms]
+(fail) ulw-execute continuation CLI > #given valid SubagentStop stdin #when CLI runs #then stdout is empty [12.54ms]
+(fail) ulw-execute continuation CLI > #given active stop hook stdin #when CLI runs #then stdout is empty and exit is zero [7.81ms]
+(fail) ulw-execute continuation CLI > #given unrelated session stdin #when CLI runs #then stdout is empty and exit is zero [7.20ms]
+(fail) ulw-execute continuation CLI > #given malformed stdin #when CLI runs #then stdout is empty and exit is zero [6.78ms]
+(fail) ulw-execute continuation CLI > #given built CLI bundle #when inspected #then it does not depend on the monorepo boulder package [0.08ms]
+
+ 37 pass
+ 6 fail
+ 55 expect() calls
+Ran 43 tests across 3 files. [102.00ms]
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation && set -e; bun test; cd ../.. && node --test ./test/aggregate-manifest.test.mjs ./test/aggregate-hooks.test.mjs ./test/hook-status-message.test.mjs
+EXIT: 0
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+✔ #given isolated components #when hooks are inspected #then commands stay inside component roots (22.647667ms)
+✔ #given aggregate Stop hooks #when inspected #then ulw-execute continuation and ulw-loop resume are separate groups (10.963083ms)
+✔ #given aggregate SubagentStop hooks #when inspected #then only LazyCodex executor verification remains (11.483833ms)
+✔ #given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered (5.194417ms)
+✔ #given aggregate hook commands #when inspected #then every command exposes a Codex status message (4.159917ms)
+✔ #given aggregate hook commands #when inspected #then commands stay Node-based and platform-neutral (5.470041ms)
+✔ #given component hook commands #when inspected #then standalone packages expose Codex status messages (21.500708ms)
+✔ #given aggregate OMO plugin is enabled #when hooks are inspected #then shell guidance and ulw-loop guard are registered (4.841833ms)
+✔ #given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection (1.819834ms)
+✔ #given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered (6.7835ms)
+✔ #given aggregate SessionStart hooks #when inspected #then cold-start-prone hooks carry 15s timeout headroom (1.654583ms)
+✔ #given aggregate PostToolUse hooks #when inspected #then thread title hygiene is registered for created Codex threads (2.315625ms)
+✔ #given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free (3.572ms)
+✔ #given aggregate plugin manifest #when inspected #then it owns the omo namespace (16.66825ms)
+✔ #given aggregate plugin metadata #when inspected #then ulw-loop is the public loop name (3.097833ms)
+✔ #given component directories #when scanned #then only intentional resource roots declare plugin manifests (31.2625ms)
+✔ #given hook status label #when formatting #then prefixes OmO display namespace and version (14.407167ms)
+✔ #given hook status label with blank version #when formatting #then uses local OmO display version (0.39575ms)
+✔ #given loose legacy status label #when normalizing #then removes OMO wording and title-cases label (5.00175ms)
+✔ #given LazyCodex appears inside hook label #when normalizing #then product casing is preserved (3.643ms)
+✔ #given MCP appears inside hook label #when normalizing #then protocol casing is preserved (0.223834ms)
+✔ #given versioned OmO status label #when normalizing #then it does not duplicate display prefix (0.874542ms)
+✔ #given aggregate comment-checker hook #when status is inspected #then it uses OmO comments label (14.042458ms)
+✔ #given aggregate and component hooks #when status messages are inspected #then all use the OmO formatter (43.922417ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 217.115833
+
+STDERR:
+
+test/boulder-reader.test.ts:
+(pass) ulw-execute plan checklist consumption > #given scaffold headings and canonical numbered rows #when parsed #then structured totals and next label match [2.53ms]
+(pass) ulw-execute plan checklist consumption > #given nested checkboxes #when parsed #then ignores non-column-zero items [0.84ms]
+(pass) ulw-execute plan checklist consumption > #given checkboxes outside counted sections #when parsed #then ignores unrelated top-level tasks [0.49ms]
+(pass) ulw-execute plan checklist consumption > #given all top-level tasks complete #when parsed #then next task is null [0.80ms]
+(pass) ulw-execute plan checklist consumption > #given no structured headings #when parsed #then legacy top-level checkbox fallback remains [1.02ms]
+(pass) ulw-execute plan checklist consumption > #given a heading-free legacy star checklist #when parsed #then fallback behavior is preserved [0.88ms]
+(pass) ulw-execute plan checklist consumption > #given noncanonical structured rows #when parsed #then only exact positive-number grammar is counted [0.85ms]
+(pass) ulw-execute plan checklist consumption > #given fenced examples and a higher-level heading #when parsed #then section scope excludes them [1.03ms]
+(pass) ulw-execute plan checklist consumption > #given a child heading inside TODOs #when parsed #then canonical rows remain in the parent section [0.71ms]
+(pass) ulw-execute plan checklist consumption > #given a four-backtick fence containing triple-backtick examples #when parsed #then shorter fences do not close it [0.62ms]
+(pass) ulw-execute plan checklist consumption > #given structured headings with ATX closing markers #when parsed #then canonical tasks remain structured [0.54ms]
+(pass) ulw-execute plan checklist consumption > #given inline backtick code before a canonical task #when parsed #then it does not open a fence [0.62ms]
+(pass) ulw-execute plan checklist consumption > #given a heading-free fenced checkbox example #when parsed #then legacy fallback ignores it [0.65ms]
+(pass) ulw-execute boulder state reader > #given active codex work with remaining checklist #when state is read #then continuation fields match baseline [1.90ms]
+(pass) ulw-execute boulder state reader > #given completed codex work #when state is read #then continuation is absent [1.30ms]
+(pass) ulw-execute boulder state reader > #given paused codex work with remaining checklist #when state is read #then continuation is present [1.03ms]
+(pass) ulw-execute boulder state reader > #given active codex work with no remaining checklist items #when state is read #then final gate continuation remains present [1.31ms]
+(pass) ulw-execute boulder state reader > #given active codex work with no readable checklist #when state is read #then continuation remains absent [1.41ms]
+(pass) ulw-execute boulder state reader > #given corrupt boulder JSON #when state is read #then continuation is absent [1.30ms]
+(pass) ulw-execute boulder state reader > #given bare boulder session id #when codex state is read #then continuation is absent [1.09ms]
+(pass) ulw-execute boulder state reader > #given works omit the codex session but stale mirror matches #when state is read #then continuation is absent [1.26ms]
+
+test/cli.test.ts:
+(pass) ulw-execute continuation CLI > #given valid Stop stdin #when CLI runs #then stdout contains block JSON [50.26ms]
+(pass) ulw-execute continuation CLI > #given valid SubagentStop stdin #when CLI runs #then stdout is empty [50.39ms]
+(pass) ulw-execute continuation CLI > #given active stop hook stdin #when CLI runs #then stdout is empty and exit is zero [32.57ms]
+(pass) ulw-execute continuation CLI > #given unrelated session stdin #when CLI runs #then stdout is empty and exit is zero [23.31ms]
+(pass) ulw-execute continuation CLI > #given malformed stdin #when CLI runs #then stdout is empty and exit is zero [26.38ms]
+(pass) ulw-execute continuation CLI > #given built CLI bundle #when inspected #then it does not depend on the monorepo boulder package [0.14ms]
+
+test/codex-hook.test.ts:
+(pass) ulw-execute Stop hook > #given stop hook is already active #when hook runs #then returns empty output [0.19ms]
+(pass) ulw-execute Stop hook > #given no boulder state and start work prompt #when stop hook runs #then it stays quiet [0.26ms]
+(pass) ulw-execute Stop hook > #given active codex work with remaining top-level tasks #when hook runs #then returns block JSON [2.12ms]
+(pass) ulw-execute Stop hook > #given active Boulder work and a SubagentStop event #when hook runs #then returns empty output [1.33ms]
+(pass) ulw-execute Stop hook > #given active codex work and an external-blocker marker #when hook runs #then returns empty output [0.96ms]
+(pass) ulw-execute Stop hook > #given ultrawork opener then external-blocker marker #when hook runs #then returns empty output [2.42ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker with no stated blocker #when hook runs #then still returns block JSON [2.43ms]
+(pass) ulw-execute Stop hook > #given the ultrawork opener and a bare marker #when hook runs #then still returns block JSON [3.12ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker below the first line #when hook runs #then still returns block JSON [2.35ms]
+(pass) ulw-execute Stop hook > #given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate [2.04ms]
+(pass) ulw-execute Stop hook > #given context-window pressure in transcript #when hook runs #then it does not inject continuation text [0.10ms]
+(pass) ulw-execute Stop hook > #given active work belongs to another harness #when hook runs #then returns empty output [1.64ms]
+(pass) ulw-execute Stop hook > #given bare legacy session id #when hook runs #then returns empty output [1.36ms]
+(pass) ulw-execute Stop hook > #given completed boulder work #when hook runs #then returns empty output [1.33ms]
+(pass) ulw-execute Stop hook > #given malformed boulder JSON #when hook runs #then returns empty output [1.47ms]
+(pass) ulw-execute Stop hook > #given malformed input #when hook runs #then returns empty output [0.04ms]
+
+ 43 pass
+ 0 fail
+ 62 expect() calls
+Ran 43 tests across 3 files. [271.00ms]
+
+
+COMMAND (mengmotaMac): cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation && set -e; bun test; cd ../.. && node --test ./test/aggregate-manifest.test.mjs ./test/aggregate-hooks.test.mjs ./test/hook-status-message.test.mjs
+EXIT: 0
+STDOUT:
+bun test v1.4.0 (34cbb9a40)
+✔ #given isolated components #when hooks are inspected #then commands stay inside component roots (26.964709ms)
+✔ #given aggregate Stop hooks #when inspected #then ulw-execute continuation and ulw-loop resume are separate groups (4.45275ms)
+✔ #given aggregate SubagentStop hooks #when inspected #then only LazyCodex executor verification remains (3.368417ms)
+✔ #given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered (2.071792ms)
+✔ #given aggregate hook commands #when inspected #then every command exposes a Codex status message (3.650125ms)
+✔ #given aggregate hook commands #when inspected #then commands stay Node-based and platform-neutral (1.97825ms)
+✔ #given component hook commands #when inspected #then standalone packages expose Codex status messages (15.025209ms)
+✔ #given aggregate OMO plugin is enabled #when hooks are inspected #then shell guidance and ulw-loop guard are registered (4.55225ms)
+✔ #given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection (1.920416ms)
+✔ #given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered (6.571625ms)
+✔ #given aggregate SessionStart hooks #when inspected #then cold-start-prone hooks carry 15s timeout headroom (1.739667ms)
+✔ #given aggregate PostToolUse hooks #when inspected #then thread title hygiene is registered for created Codex threads (2.577542ms)
+✔ #given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free (2.980625ms)
+✔ #given aggregate plugin manifest #when inspected #then it owns the omo namespace (17.432708ms)
+✔ #given aggregate plugin metadata #when inspected #then ulw-loop is the public loop name (4.448333ms)
+✔ #given component directories #when scanned #then only intentional resource roots declare plugin manifests (12.154083ms)
+✔ #given hook status label #when formatting #then prefixes OmO display namespace and version (14.14525ms)
+✔ #given hook status label with blank version #when formatting #then uses local OmO display version (0.476333ms)
+✔ #given loose legacy status label #when normalizing #then removes OMO wording and title-cases label (2.533416ms)
+✔ #given LazyCodex appears inside hook label #when normalizing #then product casing is preserved (0.877542ms)
+✔ #given MCP appears inside hook label #when normalizing #then protocol casing is preserved (0.20525ms)
+✔ #given versioned OmO status label #when normalizing #then it does not duplicate display prefix (0.688ms)
+✔ #given aggregate comment-checker hook #when status is inspected #then it uses OmO comments label (5.537542ms)
+✔ #given aggregate and component hooks #when status messages are inspected #then all use the OmO formatter (23.074417ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 195.101625
+
+STDERR:
+
+test/boulder-reader.test.ts:
+(pass) ulw-execute plan checklist consumption > #given scaffold headings and canonical numbered rows #when parsed #then structured totals and next label match [1.66ms]
+(pass) ulw-execute plan checklist consumption > #given nested checkboxes #when parsed #then ignores non-column-zero items [0.54ms]
+(pass) ulw-execute plan checklist consumption > #given checkboxes outside counted sections #when parsed #then ignores unrelated top-level tasks [1.19ms]
+(pass) ulw-execute plan checklist consumption > #given all top-level tasks complete #when parsed #then next task is null [0.99ms]
+(pass) ulw-execute plan checklist consumption > #given no structured headings #when parsed #then legacy top-level checkbox fallback remains [1.63ms]
+(pass) ulw-execute plan checklist consumption > #given a heading-free legacy star checklist #when parsed #then fallback behavior is preserved [0.71ms]
+(pass) ulw-execute plan checklist consumption > #given noncanonical structured rows #when parsed #then only exact positive-number grammar is counted [1.29ms]
+(pass) ulw-execute plan checklist consumption > #given fenced examples and a higher-level heading #when parsed #then section scope excludes them [0.72ms]
+(pass) ulw-execute plan checklist consumption > #given a child heading inside TODOs #when parsed #then canonical rows remain in the parent section [0.75ms]
+(pass) ulw-execute plan checklist consumption > #given a four-backtick fence containing triple-backtick examples #when parsed #then shorter fences do not close it [1.29ms]
+(pass) ulw-execute plan checklist consumption > #given structured headings with ATX closing markers #when parsed #then canonical tasks remain structured [2.09ms]
+(pass) ulw-execute plan checklist consumption > #given inline backtick code before a canonical task #when parsed #then it does not open a fence [0.82ms]
+(pass) ulw-execute plan checklist consumption > #given a heading-free fenced checkbox example #when parsed #then legacy fallback ignores it [0.63ms]
+(pass) ulw-execute boulder state reader > #given active codex work with remaining checklist #when state is read #then continuation fields match baseline [2.23ms]
+(pass) ulw-execute boulder state reader > #given completed codex work #when state is read #then continuation is absent [0.94ms]
+(pass) ulw-execute boulder state reader > #given paused codex work with remaining checklist #when state is read #then continuation is present [1.25ms]
+(pass) ulw-execute boulder state reader > #given active codex work with no remaining checklist items #when state is read #then final gate continuation remains present [1.39ms]
+(pass) ulw-execute boulder state reader > #given active codex work with no readable checklist #when state is read #then continuation remains absent [1.31ms]
+(pass) ulw-execute boulder state reader > #given corrupt boulder JSON #when state is read #then continuation is absent [0.96ms]
+(pass) ulw-execute boulder state reader > #given bare boulder session id #when codex state is read #then continuation is absent [1.01ms]
+(pass) ulw-execute boulder state reader > #given works omit the codex session but stale mirror matches #when state is read #then continuation is absent [1.06ms]
+
+test/cli.test.ts:
+(pass) ulw-execute continuation CLI > #given valid Stop stdin #when CLI runs #then stdout contains block JSON [30.89ms]
+(pass) ulw-execute continuation CLI > #given valid SubagentStop stdin #when CLI runs #then stdout is empty [32.41ms]
+(pass) ulw-execute continuation CLI > #given active stop hook stdin #when CLI runs #then stdout is empty and exit is zero [31.64ms]
+(pass) ulw-execute continuation CLI > #given unrelated session stdin #when CLI runs #then stdout is empty and exit is zero [28.85ms]
+(pass) ulw-execute continuation CLI > #given malformed stdin #when CLI runs #then stdout is empty and exit is zero [26.23ms]
+(pass) ulw-execute continuation CLI > #given built CLI bundle #when inspected #then it does not depend on the monorepo boulder package [0.14ms]
+
+test/codex-hook.test.ts:
+(pass) ulw-execute Stop hook > #given stop hook is already active #when hook runs #then returns empty output [0.14ms]
+(pass) ulw-execute Stop hook > #given no boulder state and start work prompt #when stop hook runs #then it stays quiet [0.16ms]
+(pass) ulw-execute Stop hook > #given active codex work with remaining top-level tasks #when hook runs #then returns block JSON [1.86ms]
+(pass) ulw-execute Stop hook > #given active Boulder work and a SubagentStop event #when hook runs #then returns empty output [0.96ms]
+(pass) ulw-execute Stop hook > #given active codex work and an external-blocker marker #when hook runs #then returns empty output [3.86ms]
+(pass) ulw-execute Stop hook > #given ultrawork opener then external-blocker marker #when hook runs #then returns empty output [3.15ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker with no stated blocker #when hook runs #then still returns block JSON [2.23ms]
+(pass) ulw-execute Stop hook > #given the ultrawork opener and a bare marker #when hook runs #then still returns block JSON [2.20ms]
+(pass) ulw-execute Stop hook > #given the external-blocker marker below the first line #when hook runs #then still returns block JSON [2.65ms]
+(pass) ulw-execute Stop hook > #given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate [2.00ms]
+(pass) ulw-execute Stop hook > #given context-window pressure in transcript #when hook runs #then it does not inject continuation text [0.08ms]
+(pass) ulw-execute Stop hook > #given active work belongs to another harness #when hook runs #then returns empty output [2.47ms]
+(pass) ulw-execute Stop hook > #given bare legacy session id #when hook runs #then returns empty output [1.47ms]
+(pass) ulw-execute Stop hook > #given completed boulder work #when hook runs #then returns empty output [1.16ms]
+(pass) ulw-execute Stop hook > #given malformed boulder JSON #when hook runs #then returns empty output [1.27ms]
+(pass) ulw-execute Stop hook > #given malformed input #when hook runs #then returns empty output [0.03ms]
+
+ 43 pass
+ 0 fail
+ 62 expect() calls
+Ran 43 tests across 3 files. [221.00ms]
+

@@ -1,0 +1,34 @@
+SURFACE-AWARE GATE QUOTA CLEANUP PASS
+
+- isolated Codex homes: automatically removed
+- Codex mock model processes: terminated by QA harness
+- real Codex config hash: unchanged
+- isolated Senpi adapter sandbox: removed
+- task-owned Senpi LSP daemon and typings installer: terminated
+- built-surface fixture: removed
+- isolated Bun 1.4.0 runtime: removed
+- generated app-server schema scratch: removed
+- matching task-owned processes after cleanup: 0
+
+CROSS-SURFACE ALIAS FOLLOW-UP CLEANUP PASS
+
+- isolated Codex homes: automatically removed
+- Codex mock model processes: terminated by QA harness
+- real Codex config hash: unchanged
+- isolated Senpi adapter sandbox: removed
+- task-owned Senpi LSP daemon and typings installer: terminated
+- built alias fixture: removed
+- isolated Bun 1.4.0 runtime: removed
+- unrelated generated build drift: restored
+- matching alias task-owned processes after cleanup: 0
+
+NEWEST-UPSTREAM RE-VERIFICATION CLEANUP PASS
+
+- isolated Codex homes: automatically removed
+- Codex mock model processes: terminated by QA harness
+- real Codex config hash: unchanged
+- isolated Senpi adapter sandbox: removed
+- task-owned Senpi typings installer: terminated
+- unrelated CodeGraph and installer build drift: restored
+- matching newest-upstream QA processes after cleanup: 0
+- matching task-owned temporary paths after cleanup: 0

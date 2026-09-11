@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "01a084ae-d1f9-7fd3-aeb4-9a9c4c412baf",
+  "turnId": "01a084ae-d30d-78a2-9d67-41da536771a1",
+  "expectHook": [],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [],
+  "stderrTail": "\u001b[2m2026-09-09T05:40:44.603461Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Project-local config, hooks, and exec policies are disabled in the following folders until the project is trusted, but skills still load.\n    1. /Users/yeongyu/lcx-inboard-20260909/omo-wt-d/.codex\n       To load project-local config, hooks, and exec policies, add /Users/yeongyu/lcx-inboard-20260909/omo as a trusted project in /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.zeSc58PtUf/codex/config.toml.\n\n\u001b[2m2026-09-09T05:40:44.914545Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_skills_extension::loader::host\u001b[0m\u001b[2m:\u001b[0m failed to scan skill path file:///Users/yeongyu/.agents/skills/omowright: Operation not permitted (os error 1)\n"
+}
+PASS: real ~/.codex/config.toml unchanged (5ba341ba17ef6709651a43d2dbf9ba6c14b2b58c)
+PASS: app-server turn completed; assistant text: Hello from the codex-qa mock model.
+/Users/yeongyu/lcx-inboard-20260909/omo-wt-d/.agents/skills/codex-qa/scripts/lib/common.sh: line 131: 87511 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$log" 2>&1
+APP_SERVER_SELF_TEST_EXIT=0

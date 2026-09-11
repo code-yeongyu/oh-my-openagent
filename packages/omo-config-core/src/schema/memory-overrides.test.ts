@@ -66,13 +66,22 @@ describe("OmoMemorySettingsSchema per-agent overrides", () => {
 describe("OmoMemorySettingsLayerSchema", () => {
   test("#given a partial layer block #when parsed #then it remains a default-free deep-partial", () => {
     // given
-    const input = { reflection: { category: "deep" } }
+    const input = {
+      recall: {
+        category: "deep",
+        event_caps: { tool_args: 200 },
+        sidecar_max_tokens: 24000,
+        max_concurrent_wakes: 1,
+        tool_budget: 4,
+      },
+      reflection: { category: "deep" },
+    }
 
     // when
     const parsed = OmoMemorySettingsLayerSchema.parse(input)
 
     // then
-    expect(parsed).toEqual({ reflection: { category: "deep" } })
+    expect(parsed).toEqual(input)
   })
 
   test("#given an unknown layer key #when parsed #then the strict layer schema rejects it", () => {

@@ -15,12 +15,17 @@ import {
   type ManagedRunner,
 } from "@oh-my-opencode/senpi-task"
 
-import { MEMORY_APPLY_PATCH_TOOL_NAME, MEMORY_TOOL_NAME } from "../memory/tools"
+import { MEMORY_TOOL_NAME } from "../memory/tools"
 import type { TaskRuntimeContext } from "./runtime-context"
 
-// Memory tools are bound to the parent session's identity (repo commits + writer lock); a task
-// child must never inherit them, so they ride the same ui-only exclusion as render-only tools.
-export const TASK_CHILD_UI_ONLY_TOOL_NAMES: readonly string[] = [MEMORY_TOOL_NAME, MEMORY_APPLY_PATCH_TOOL_NAME]
+// Memory tools are bound to the parent session's identity (repo commits + writer lock); question
+// tools need a parent user UI. A task child must never inherit either, so they ride the same
+// ui-only exclusion as render-only tools.
+export const TASK_CHILD_UI_ONLY_TOOL_NAMES: readonly string[] = [
+  MEMORY_TOOL_NAME,
+  "request_user_input",
+  "ask_user_question",
+]
 
 export interface RunnerBuildContext {
   readonly runtime: TaskRuntimeContext

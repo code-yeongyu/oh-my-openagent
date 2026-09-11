@@ -1,0 +1,25 @@
+# GREEN: corrected shape test vs WIRED publish.yml (LATEST_FLAG in BOTH gh release create steps)
+# mengmotaMac via bunshin, hermetic /tmp/omo-rls-20260904/c2-green3 (no pipe: exit code is bun's)
+# remote exit=0
+cwd=/tmp/omo-rls-20260904/c2-green3
+./.github/workflows/publish.yml
+./script/omo-ai-publish-shape.test.ts
+bun test v1.4.0 (34cbb9a40)
+
+script/omo-ai-publish-shape.test.ts:
+(pass) omo-ai publish workflow shape > preserves an explicit prerelease version and derives its beta dist tag [0.20ms]
+(pass) omo-ai publish workflow shape > decides the Latest badge from the highest published semver, never from a pre-release flag [0.37ms]
+(pass) omo-ai publish workflow shape > maps every root release to a unique ordered prerelease [0.17ms]
+(pass) omo-ai publish workflow shape > checks out before asserting root bin ownership [0.04ms]
+(pass) omo-ai publish workflow shape > stamps omo-native in both release paths and stages its manifest [0.04ms]
+(pass) omo-ai publish workflow shape > builds and verifies the payload before stripping token auth [0.04ms]
+(pass) omo-ai publish workflow shape > publishes omo-ai through beta-only OIDC after every wrapper publish [0.07ms]
+(pass) omo-ai publish workflow shape > always runs readiness, dist-tag guard, and live verification [0.07ms]
+(pass) omo-ai publish workflow shape > keeps trusted publishing unconditional and DIST_TAG derivation byte-pinned [0.04ms]
+
+ 9 pass
+ 0 fail
+ 71 expect() calls
+Ran 9 tests across 1 file. [15.00ms]
+EXIT=0
+

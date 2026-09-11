@@ -1,13 +1,12 @@
 import { existsSync, mkdirSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname, join } from "node:path"
 
-import type { FactsSpawnArgs, MemorianSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
+import type { ReflectionSpawnArgs } from "./worker/spawn"
 
-/** Every child spawn shape the path sandbox can wrap; it only rewrites command/args/env. */
-type SandboxableSpawnArgs = ReflectionSpawnArgs | FactsSpawnArgs | MemorianSpawnArgs
+/** The path sandbox only rewrites reflection command/args/env. */
+type SandboxableSpawnArgs = ReflectionSpawnArgs
 
-/** Surfaces the sandbox names in its warnings; one per memory child kind. */
-type SandboxSurface = "reflection" | "facts" | "memorian"
+type SandboxSurface = "reflection"
 import { canonicalAbsentPath, canonicalPath, defaultWhich, resolveInnerCommand } from "./sandbox-paths"
 import { probeBwrapUsability, type SandboxUsability } from "./sandbox-bwrap-probe"
 import { SandboxUnavailableError, type SandboxPolicy } from "./sandbox-contracts"

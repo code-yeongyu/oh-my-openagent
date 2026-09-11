@@ -1,6 +1,6 @@
 ---
 name: ultrawork
-description: Binding ultrawork mode directive for omo-senpi. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive as a hidden custom message (customType omo-ultrawork:directive, display false) ahead of the user's text, which is left untouched; a prompt queued while the agent is streaming instead carries the directive appended inside that same message. The directive is present in the conversation context; on the idle path it is not shown in the visible prompt, while a queued prompt carries the directive visibly (exactly as before this change). When the directive is already present in the conversation, do not read this file again - this file is that same directive. Read this file only when ultrawork mode is requested and the directive is not already present in the conversation.
+description: "The binding ultrawork-mode directive. This file IS the directive; read it only when ultrawork mode is requested and the directive is not already in the conversation."
 metadata:
   short-description: Binding ultrawork mode directive
 ---
@@ -70,31 +70,39 @@ exercises the surface; capture the artifact.
      xterm.js web terminal (see the TUI visual QA note below). tmux
      `send-keys` is fine for a boot smoke; NEVER `tmux capture-pane`
      for color / layout / CJK evidence, which degrades truecolor.
-  3. Browser use — in omo-senpi, use `browser:control-in-app-browser`
-     first when available and no authenticated/persistent user browser
-     profile is required. Otherwise use Chrome to drive the REAL page;
-     if Chrome is not available, download and use agent-browser
-     (https://github.com/vercel-labs/agent-browser). Capture action
-     log + screenshot path. Never downgrade to a non-browser surface
-     for a browser-facing criterion. NEVER clear cookies, cache, or
-     site data (`Network.clearBrowserCookies`, `Storage.clearCookies`,
+  3. Browser use — drive the REAL page from the eval js kernel:
+     `new Bun.WebView()` (navigate / click / type / evaluate /
+     screenshot; bun-1-4 skill) is the default, `playwright-core`
+     when the criterion needs a real Chrome build or its trace, and
+     the `agent-browser` CLI
+     (https://github.com/vercel-labs/agent-browser) only when no
+     kernel path exists. Capture action log + screenshot path. Never
+     downgrade to a non-browser surface for a browser-facing
+     criterion. NEVER clear cookies, cache, or site data
+     (`Network.clearBrowserCookies`, `Storage.clearCookies`,
      `chrome.browsingData.remove`, "clear browsing data") on the user's
      real/main browser profile — it wipes their logged-in state. If you
      need that profile's login state, clone it first (`rsync -a
-     <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against
-     the clone as the user-data-dir; run any clearing there only.
+     <profile>/ <tmp-clone>/`) and point the browser at the clone as
+     its user-data-dir; run any clearing there only. For frontend work,
+     screenshot after each change and look before the next one; check
+     desktop and mobile widths for blank, misframed, or overlapping
+     output.
   4. Computer use — when the surface is a desktop/GUI app rather than a
      page, drive it via OS-level automation (a computer-use agent,
      AppleScript, xdotool, etc.) against the running app; capture
      action log + screenshot. USE THIS for any non-browser GUI
-     criterion; do not substitute a CLI dump for it.
+     criterion; do not substitute a CLI dump for it. For 3D or spatial
+     work (a modeling tool, a game scene, CAD), render from several
+     angles after each change and compare with the reference or the
+     stated intent before the next change.
 
 For EVERY scenario name the exact tool and the exact invocation
 upfront: the literal command / API call / page action with its concrete
 inputs (URL, payload, keystrokes, selectors) and the single binary
 observable that decides PASS vs FAIL. "run the endpoint", "open the
 page", "check it works" are NOT scenarios — write the `curl ...`, the
-`send-keys ...`, the Browser plugin action, the `page.click(...)`, the
+`send-keys ...`, the `view.click(...)` / `page.click(...)`, the
 expected status/text.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump)
@@ -106,14 +114,18 @@ count.
 For TUI visual QA, render the terminal through the real xterm.js web
 terminal and screenshot it - never a `tmux capture-pane` dump, which
 degrades color and wide-glyph width. In this repo:
-`node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>`
+`bun script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>`
 (live pty + xterm.js in Chrome; `--from-file <capture>` replays a raw
 stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
-When a ulw-loop skill pointer accompanies this directive, the ulw-loop run contract supersedes bootstrap sections 1-3: the loop CLI owns goal state, its ledger is the notepad, and its `todo` checklist is the plan.
+When a ulw-loop pointer or the ulw-execute skill accompanies this
+directive, that contract supersedes bootstrap sections 1-3: its state
+owns the goal and is the notepad (the loop CLI's goals and ledger, or
+Boulder plus `.omo/ulw-execute/ledger.jsonl`), and its checklist is
+the plan.
 
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each
@@ -124,7 +136,11 @@ task is a defect. Open a skill's body only when THIS session will
 execute its workflow; skills a delegated session needs are named in
 its prompt and read there, not here.
 Next, fire the first discovery wave under Finding things below — one
-eval cell, every independent lookup dispatched in parallel.
+eval cell, with parallel lookups covering the code, git history of paths
+to touch, memory, and prior session evidence. Record the current problem,
+decision points with their evidence, and the IDEAL END STATE in the
+notepad; name that state in the goal objective and measure later choices
+against it.
 Then run Tier triage (above) on the change set and record the tier —
 tier sizes evidence and review, never who plans. Size planning by
 what the wave left UNDECIDED, not by how many steps you can list:
@@ -178,7 +194,9 @@ and let it fire. `update_goal` with status blocked requires a true
 impasse — no live resumption channel exists AND the same block recurs
 across consecutive goal turns. Blocking over an armed wait (the
 canonical case: a CI watch with auto-merge) freezes the goal while its
-wake-up event is already in flight.
+wake-up event is already in flight. A decision only the user can make
+is asked through the question tool - waiting for the answer when the
+run cannot proceed without it - never recorded as blocked.
 
 ## 2. Open the durable notepad
 Run: `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)`. Echo the
@@ -247,8 +265,9 @@ production code before its failing test → rewrite.
 
 # Finding things (lead with these, code-mode the first wave)
 Never guess from memory — locate with the right tool, and re-read before
-you claim or change. **Every bounded wave goes through `# Parallel
-execution` below — one eval cell, everything dispatched at once.**
+you claim or change. **The independent lookups of a wave go through `# Parallel
+execution` below - one js eval cell; a result you must inspect before
+the next call is sequenced, not batched.**
 Discovery order:
 1. **SYMBOLS REQUIRE LSP** — definitions, references, rename impact,
    workspace symbols, diagnostics: the built-in `lsp_*` tools, not
@@ -267,34 +286,39 @@ Research outside the repo (library/API/docs/web) → `librarian`;
 unfamiliar layouts → `explore` (read-only, absolute paths). Run both
 in background; keep working.
 
-# Parallel execution (EVAL TOOL MAXXING — batch as hell)
-The `eval` tool is your DEFAULT execution surface — think about how
-each step parallelises as code, then drive it as a PROGRAM, not
-one-off tool calls: the moment a step needs more than one call, write
-one LONG cell with real control flow — `if` branches, `for` loops
-over targets, `try`/`except` per item so one failure degrades only
-that item. For ANY bounded wave of two or more independent
-operations — file reads, `rg`/glob searches, git queries, LSP
-requests, web fetches, package metadata lookups — that cell runs
-them ALL concurrently (`Promise.all` in JavaScript,
-`ThreadPoolExecutor` + `subprocess` in Python) and returns ONLY
-distilled, decision-relevant facts: chain, filter, dedupe, join, and
-aggregate INSIDE the kernel — never paste raw dumps back when a
-comprehension can reduce them. When one result feeds the next call,
-that is STILL one cell: sequence it in code and branch on the
-intermediate value. Batch `lsp_*` requests (definitions, references,
-symbols, diagnostics) in the same cell. DEFAULT to fan-out:
-spawn independent `task(...)` subagents in the same wave — batched spawn,
-`run_in_background: true`, each part routed to the `category` that fits
-it. Fan-out is SAFE only when write scopes are disjoint: cut parts so
-no two children edit the same files; units whose edits must overlap go
-to a team with per-member worktrees, or run in sequence. Doing the
-parts yourself serially is the choice that needs a
-reason: your priors under-delegate, so parts that do not read each
-other's output go out together and you keep only what needs your
-judgment. Step outside eval only when the whole step is one tiny
-call, semantic judgment sits between calls, or approvals / side
-effects are involved.
+# Parallel execution (batch what is independent, observe what is not)
+**`eval` with `language: "js"` is the default surface for the independent
+part of a step - reads, searches, symbol lookups, git/`lsp_*`/web
+queries, `task(...)` spawns - not `bash`, not a parade of one-off calls,
+not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun-1-4` skill is listed),
+read that skill before your first cell; use its builtins (`Bun.$` for a
+command that finishes inside the cell, `Bun.Glob`, `fetch`) over shelling
+out; a command that can outlive one reply starts through `tool.monitor`
+(Waiting discipline). Sort the step before you write the cell: every
+independent lookup fires AT ONCE via `Promise.all` / `parallel(thunks)`
+with real control flow - `if`/`else` per case, `for` over every target, a
+`try`/`catch` per item - and a result that feeds a later lookup may still
+be sequenced inside the same cell. Edits, side-effecting commands,
+deploys, approvals, and any call whose input you have not seen yet run
+ONE ACTION AT A TIME, each observed before the next. Before a cell runs,
+name the state it should produce; when it returns, compare the returned
+evidence with that state, and check a mutating cell for changes beyond
+it. Reduce in the kernel to the facts the decision needs, but keep every
+failed or missing item verbatim - a `try`/`catch` that turns a failure
+into an absent row makes the aggregate lie - and re-read truncated output
+before deciding on it. When the result must be SEEN rather than read - a
+page, a component, an image, a 3D scene, a layout - make one change,
+render or screenshot it, look, then make the next; check a 3D scene from
+several angles and a page at desktop and mobile widths, compare with the
+reference or the stated intent, and ask only where two readings of that
+intent diverge. Kernel busy with a detached cell? HOP to `py` - never
+bash + `python3 -c`. Spawn independent `task(...)` children in the same
+wave (`run_in_background: true`, each routed to its fitting `category`);
+fan-out is SAFE only with disjoint write scopes - no two children edit the
+same files; overlapping units go to a team with per-member worktrees or
+run in sequence. Keep for yourself what needs your judgment, and step
+outside eval for one tiny call, judgment between calls, or approvals /
+side effects.
 
 # Execution loop (PIN → RED → GREEN → SURFACE → CLEAN)
 Until every success criterion PASSES with its evidence captured:
@@ -369,28 +393,38 @@ Until every success criterion PASSES with its evidence captured:
 Within a step, follow Finding things; NEVER parallelise RED and GREEN of
 the same criterion.
 
-# Waiting discipline (MONITOR MAXXING — subscribe, never sleep)
-Blocking waits are gone from this harness. When something runs long —
-a background command, a child task, a team member, a slow eval cell —
-its completion arrives as an injected notification that already
-carries the payload you need (final tail and exit code, the child's
-full result, the cell's buffered output). Every wait is a
-SUBSCRIPTION: NEVER `sleep`, spin a timed retry, or re-poll the same
-surface with empty reads — every status check replays the entire
-accumulated context through the model. Keep doing independent root
-work, or end your turn when none remains; ending the turn is the
-required wait and an idle session is always woken.
-- To watch a long-running command's output for a pattern, register a
-  `monitor` for it; matching lines arrive as injected monitor events.
-- Only when a midpoint decision requires it, peek once with
-  `bash_output` or `task_output({ mode: "tail" })`; both return
-  immediately and neither is a completion wait.
+# Waiting discipline (subscribe, never sleep)
+**EVERY CONDITION YOU WOULD OTHERWISE CHECK ON GETS A SUBSCRIPTION,
+REGISTERED IN THE SAME EVAL CELL THAT STARTS THE WORK:
+`tool.monitor({ description, command, filter })` for a command or a
+gate (`until <cond>; do sleep 5; done; printf 'READY\n'`),
+`tool.monitor({ description, path, event })` for a file.** `monitor`
+and `bash` are not in your direct tool list while `eval` exists;
+`tool.monitor` inside a cell is the only form there is. A build,
+install, or test run finishing, a CI check or PR turning green, a
+deploy landing, a log line, a file appearing, a port opening, another
+session's pane or a remote machine changing state — its matching line
+arrives as an injected event while you keep working, and a background
+command, child task, team member, or detached eval cell completes the
+same way (tail + exit code, child result, cell output). The
+subscription is the whole cost of a wait: `sleep`, timed retries,
+re-polls, a cell that awaits a `--watch` or a spawned process, and a
+child spawned to watch are FORBIDDEN — each replays the whole context
+through the model or holds the js kernel until the cell limit kills
+it. Once subscribed, do root work or end the turn; an idle session is
+always woken.
+**ARM MONITORS FROM THE USER'S INTENT, UNPROMPTED.** When the user
+names any such state, work out what they will want next and watch it
+RIGHT THEN: "check the deploy" = watch its status, "I pushed a fix" =
+watch that CI run, "the other session is doing X" = watch its output.
+A session without monitors while state moves around it is asleep. Peek (`bash_output`, `task_output({ mode: "tail" })`) ONLY for
+a midpoint decision, never to wait.
 
 # omo-senpi task + team tools
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
-`metis`, `momus` work with zero configuration);
+`plan-consultant`, `plan-reviewer` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
 child with skills, `name` to track it. Read a child back with
 `task_output`, steer it with `task_send`, end it with `task_cancel`;
@@ -408,49 +442,28 @@ doing root work instead of waiting on them. Members are
 injection-driven: your mail reaches them as injected follow-ups, and
 they reply with `task_send({ to: "lead", ... })`.
 
-# omo-senpi subagent reliability
-Every child prompt is self-contained and starts with
-`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`,
-`VERIFY`, and `STOP WHEN` — the observable condition that ends the
-child's run; a child without a stop condition wanders past its goal.
-State that it is an executable assignment, not a context handoff, and
-paste only the context the child needs.
-Treat child status as a progress signal, not a timeout counter. For
-work likely to exceed one wait cycle, tell the child to report
-`WORKING: <task> - <current phase>` before long reading, testing, or
-review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned child names locally. No notification yet only means no
-new update arrived — a one-off peek with
-`task_output({ mode: "tail" })` shows current progress without
-blocking. Treat a running child as alive and keep doing independent
-root work. Fall back only when the
-child completes without the deliverable, answers ack-only, or stops
-running: send one follow-up demanding the deliverable, and if that
-stays silent or ack-only, record the lane inconclusive (never as
-approval/pass), cancel it if safe, and respawn a smaller task with the
-missing deliverable.
+# Child execution and transitions
+Every child prompt starts with `TASK: <imperative assignment>` and
+names `DELIVERABLE`, `SCOPE`, `VERIFY`, and `STOP WHEN`; state that it
+is executable, not a context handoff, and include only needed context.
+For long work, require `WORKING: <task> - <current phase>` before long
+passes and `BLOCKED: <reason>` only when progress is impossible. Treat
+status as progress, not timeout; a running child remains alive. If it
+completes without the deliverable, answers ack-only, or stops, send
+one follow-up; if still silent or ack-only, record the lane
+inconclusive (never approval/pass), cancel if safe, and respawn
+smaller when needed.
 
-# Subagent-dependent transition barrier
-Do not mark a todo step `done` while an active child owns evidence for
-that step. Do not start dependent implementation until the audit,
-research, or review result is integrated or explicitly recorded as
-inconclusive. Do not draft a plan before the research lanes that feed
-it have returned or been closed as inconclusive.
-Spawn every independent child for the current wave FIRST. After the
-wave is launched, end your turn or keep doing independent root work —
-each child's completion arrives as an injected notification carrying
-its final result. Every spawned child must reach terminal status
-(`completed`, `failed`, `blocked`, or explicitly recorded
-inconclusive) before any dependent todo transition, goal continuation,
-implementation tool call, plan drafting, approval-gate work, PR
-handoff, or final response. Silence is not terminal status.
-Do not write the final answer, PR handoff, or completion summary while
-active children remain open. When a child stays silent past its
-expected window, peek once with `task_output({ mode: "tail" })`, then
-send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`.
-After four silent or ack-only checks, close the lane as inconclusive,
-record that it is not approval, and respawn smaller only if the
-deliverable is still required.
+Do not mark a todo `done` while an active child owns its evidence or
+start dependent work before audit, research, or review is integrated
+or explicitly inconclusive. Launch independent children first, then
+keep independent root work or end the turn; every child must reach
+terminal status (`completed`, `failed`, `blocked`, or recorded
+inconclusive) before dependent todo transitions, implementation,
+planning, approval gates, handoff, or final response. Silence is not
+terminal: a running child is alive and its completion will wake you,
+so end the turn rather than poll it, and do not finalize while
+children remain open.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
@@ -463,12 +476,12 @@ No plan file means no reviewer: a bare `ulw` run — however heavy —
 records a self-review in the notepad instead. Same for LIGHT tier.
 Self-review is: re-read the diff, run diagnostics, confirm each
 criterion's evidence, and state in one line why the tier held.
-`momus` and `metis` are plan-gated reviewers, not general helpers —
+`plan-reviewer` and `plan-consultant` are plan-gated reviewers, not general helpers —
 never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "momus"` for read-only
+   assignment in `prompt` — `subagent_type: "plan-reviewer"` for read-only
    review, or a reviewer-shaped `category` when the review must run
    code. Pass: goal, success-criteria, scenario evidence, full diff,
    notepad path.
@@ -484,8 +497,10 @@ Procedure (NON-NEGOTIABLE):
    marked out-of-scope. An approval whose only remaining items are
    notes counts as approval.
 5. On approval, declare done. If criterion-cited blockers remain after
-   two re-reviews, stop and surface them to the user (mirroring the
-   2-attempt stop rule below) — do not loop further.
+   two re-reviews, ask the user through the question tool
+   (request_user_input / ask_user_question) with the outstanding
+   blockers as options, mirroring the 2-attempt rule below — do not
+   loop further.
 
 # Commits
 Commit frequently: one atomic commit per verified increment (RED→GREEN
@@ -516,7 +531,14 @@ commits this session — then stage + draft the message instead.
   test over a tautological one.
 - Refactors: characterization tests pinning current observable
   behavior FIRST, green against the old code, green throughout.
-- Smallest correct change. No drive-by refactors.
+- Make the smallest correct change per unit, but own every defect met
+  mid-run: a pre-existing bug, failing test, stale doc, or wrong
+  guidance becomes registered work in THIS run with a todo plus
+  success criterion (under ulw-loop, a subgoal; under ulw-execute, a
+  plan checkbox; inside a workflow run, a node) and is fixed to the
+  ideal state, never deferred as a follow-up. Keep delegated unit
+  scope hard: the worker reports the defect and the orchestrator
+  registers it.
 - Never suppress lints / errors / test failures. Never delete, skip,
   `.only`, `.skip`, `xfail`, or comment out tests to green the suite.
 - Never claim done from inference — only from captured evidence.
@@ -547,7 +569,8 @@ commits this session — then stage + draft the message instead.
   bound port, temp file / dir) means NOT done. Tear it down, record
   the receipt, then continue.
 - After 2 identical failed attempts at one step, surface what was tried
-  and ask the user before another retry.
+  and ask the user through the question tool before another retry; if
+  the question times out, continue on best judgment.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 

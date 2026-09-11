@@ -1,0 +1,10 @@
+# Resolution proof — mengmotaMac (bunshin), branch feat/gpt-6-astra-momus @ 1594610fd
+# command: bun .omo/evidence/omo-senpi-adapter/20260905-gpt-6-astra-momus/resolution-proof.ts
+
+1594610 test(evidence): record the momus GPT-6 Astra RED and GREEN runs
+{"label":"native Astra available","resolved":{"model":"openai-codex/gpt-6-astra","source":"provider-fallback","variant":"xhigh"}}
+{"label":"Copilot-only Astra","resolved":{"model":"github-copilot/gpt-6-astra","source":"provider-fallback","variant":"high"}}
+{"label":"native + Copilot Astra","resolved":{"model":"openai-codex/gpt-6-astra","source":"provider-fallback","variant":"xhigh"}}
+{"label":"opencode-only Astra","resolved":{"model":"opencode/gpt-6-astra","source":"provider-fallback","variant":"high"}}
+{"label":"no Astra, Opus available","resolved":{"model":"anthropic/claude-opus-5","source":"provider-fallback","variant":"max"}}
+{"label":"senpi-task transcription matches model-core","matches":true,"modelCore":[{"providers":["openai","openai-codex"],"model":"gpt-6-astra","variant":"xhigh"},{"providers":["github-copilot"],"model":"gpt-6-astra","variant":"high"},{"providers":["openai","openai-codex","opencode"],"model":"gpt-6-astra","variant":"high"},{"providers":["anthropic","github-copilot","opencode"],"model":"claude-opus-5","variant":"max"},{"providers":["google","github-copilot","opencode"],"model":"gemini-3.1-pro","variant":"high"},{"providers":["opencode-go"],"model":"glm-5.2"}],"senpiTask":[{"providers":["openai","openai-codex"],"model":"gpt-6-astra","variant":"xhigh"},{"providers":["github-copilot"],"model":"gpt-6-astra","variant":"high"},{"providers":["openai","openai-codex","opencode"],"model":"gpt-6-astra","variant":"high"},{"providers":["anthropic","github-copilot","opencode"],"model":"claude-opus-5","variant":"max"},{"providers":["google","github-copilot","opencode"],"model":"gemini-3.1-pro","variant":"high"},{"providers":["opencode-go"],"model":"glm-5.2"}]}

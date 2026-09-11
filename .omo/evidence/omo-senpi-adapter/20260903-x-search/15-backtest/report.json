@@ -1,0 +1,3748 @@
+{
+  "run": {
+    "status": "ok",
+    "mode": "offline",
+    "runDate": "2026-09-03",
+    "timestamp": "2026-09-03T08:31:25.770Z",
+    "queries": 20
+  },
+  "grokProbe": {
+    "status": "blocked_auth",
+    "reason": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+    "errors": [
+      "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)"
+    ]
+  },
+  "tuning": {
+    "chosen": {
+      "variant": "v1",
+      "carrier": "fast",
+      "meanJaccard": 0.5,
+      "meanRecall": 0.5,
+      "x_search_calls": 1
+    },
+    "calibration": {
+      "jaccard": {
+        "mean": 0.5,
+        "median": 0.5,
+        "n": 14
+      }
+    }
+  },
+  "cost": {
+    "cap_usd": 6,
+    "estimated_usd": 2.70731614,
+    "source": "fixtures",
+    "within_cap": true
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "split": "calibration",
+      "reference": [
+        "2095333026204971141"
+      ],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q02",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305",
+            "2095094704589422989"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305",
+            "2095094704589422989"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095094704589422989",
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095094704589422989",
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305",
+            "2095094704589422989"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305",
+            "2095094704589422989"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095094704589422989",
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095094704589422989",
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305",
+            "2095094704589422989"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2095051682317275196",
+            "2095043325741207962",
+            "2095040134546919487",
+            "2094942106716717209",
+            "2094800470460248348",
+            "2094719619844227144",
+            "2094704180984500565",
+            "2094656971903533305",
+            "2095094704589422989"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q03",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2094733835015782570",
+            "2092862616486162734"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q04",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q05",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2094680652314763652",
+            "2094302297643954391",
+            "2094287180013457763"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q06",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q07",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q08",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q09",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2095246132909625411",
+            "2095161786462855169",
+            "2095152666330505612",
+            "2094831268785791080",
+            "2094777884137209977",
+            "2094774420921549215",
+            "2094754181500346596",
+            "2094712559408722048"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q10",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938",
+            "2094475494104404390",
+            "2093142858647957974"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094475494104404390",
+            "2093142858647957974",
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094475494104404390",
+            "2093142858647957974",
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094475494104404390",
+            "2093142858647957974",
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2092491626815868938",
+            "2092663877859151985",
+            "2092744166618865934",
+            "2092752140838285546",
+            "2093142858647957974",
+            "2094475494104404390"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2092752140838285546",
+            "2092663877859151985",
+            "2092491626815868938",
+            "2093142858647957974",
+            "2094475494104404390",
+            "2092744166618865934"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094475494104404390",
+            "2093142858647957974",
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094475494104404390",
+            "2093142858647957974",
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938",
+            "2094475494104404390",
+            "2093142858647957974"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2094475494104404390",
+            "2093142858647957974",
+            "2092752140838285546",
+            "2092744166618865934",
+            "2092663877859151985",
+            "2092491626815868938"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q11",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q12",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2094896473028911509",
+            "2092701827397804221",
+            "2091910883572101257"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q13",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110",
+            "2095184212768747692",
+            "2095131808304132139",
+            "2094992579615957039",
+            "2095018119957794904"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2071526396552200366"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2071526396552200366"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2071526396552200366"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2071526396552200366"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110",
+            "2095184212768747692",
+            "2095131808304132139",
+            "2094992579615957039",
+            "2095018119957794904"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2095184212768747692",
+            "2095131808304132139",
+            "2095018119957794904",
+            "2094992579615957039",
+            "2094991346473779600",
+            "2094991036552548614",
+            "2094880585948746211",
+            "2094870657263624455",
+            "2094860609548382248",
+            "2094838052388471110"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [
+            "2071526396552200366"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q14",
+      "split": "calibration",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q15",
+      "split": "holdout",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2075063654291223007"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q16",
+      "split": "holdout",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q17",
+      "split": "holdout",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2092593776929931307"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q18",
+      "split": "holdout",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2060392252858589669"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2060392252858589669"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2060392252858589669"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2060392252858589669"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2090489886704841060"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [
+            "2060392252858589669"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q19",
+      "split": "holdout",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [
+            "2090450549510668733",
+            "2089066024825962883",
+            "2088385992642150594"
+          ],
+          "jaccard": 0,
+          "recall": 0,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    },
+    {
+      "id": "q20",
+      "split": "holdout",
+      "reference": [],
+      "lanes": {
+        "grok-cli:v1:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v1:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v1:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:fast": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:fast": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli:v2:reasoning": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web:v2:reasoning": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        },
+        "grok-cli": {
+          "status": "blocked_auth",
+          "error": "sign-in prompt or probe timeout (orchestrator verified not logged in at 06:42Z)",
+          "ids": [],
+          "jaccard": null,
+          "recall": null,
+          "x_search_calls": null
+        },
+        "api-direct": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "omo-tool": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 1
+        },
+        "web": {
+          "status": "ok",
+          "ids": [],
+          "jaccard": 1,
+          "recall": 1,
+          "x_search_calls": 0
+        }
+      },
+      "chosen": "v1:fast"
+    }
+  ],
+  "aggregate": {
+    "lanes": {
+      "grok-cli": {
+        "jaccard": {
+          "mean": null,
+          "median": null,
+          "n": 0
+        },
+        "recall": {
+          "mean": null,
+          "median": null,
+          "n": 0
+        }
+      },
+      "api-direct": {
+        "jaccard": {
+          "mean": 0.4625,
+          "median": 0,
+          "n": 80
+        },
+        "recall": {
+          "mean": 0.4625,
+          "median": 0,
+          "n": 80
+        }
+      },
+      "omo-tool": {
+        "jaccard": {
+          "mean": 0.4625,
+          "median": 0,
+          "n": 80
+        },
+        "recall": {
+          "mean": 0.4625,
+          "median": 0,
+          "n": 80
+        }
+      },
+      "web": {
+        "jaccard": {
+          "mean": 0.8375,
+          "median": 1,
+          "n": 80
+        },
+        "recall": {
+          "mean": 0.8375,
+          "median": 1,
+          "n": 80
+        }
+      }
+    },
+    "calibration": {
+      "jaccard": {
+        "mean": 0.580952380952381,
+        "median": 1,
+        "n": 210
+      },
+      "recall": {
+        "mean": 0.580952380952381,
+        "median": 1,
+        "n": 210
+      }
+    },
+    "holdout": {
+      "jaccard": {
+        "mean": 0.6111111111111112,
+        "median": 1,
+        "n": 90
+      },
+      "recall": {
+        "mean": 0.6111111111111112,
+        "median": 1,
+        "n": 90
+      }
+    }
+  }
+}

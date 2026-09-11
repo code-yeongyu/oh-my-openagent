@@ -42,7 +42,7 @@ describe("isExcludedReleaseNoteSubject", () => {
     ["feat(api): expose new endpoint", false],
     ["fix(opencode): keep pinned model order", false],
     ["feat(cli): gate install platforms", false],
-    ["fix(codex): refresh codegraph runtime gate", false],
+    ["fix(codex): refresh lsp runtime gate", false],
   ])("#given subject %p #when exclusion is checked #then excluded is %p", (subject, expected) => {
     // given / when / then
     expect(isExcludedReleaseNoteSubject(subject)).toBe(expected)

@@ -59,6 +59,18 @@ describe("runMemoryModelAttempts", () => {
     expect(result.candidate.model).toBe("builtin/fallback")
   })
 
+  test("#given a context overflow #when a fallback exists #then it retries the fallback instead of failing the run", async () => {
+    const attempted: string[] = []
+    const result = await runMemoryModelAttempts(candidates, async (candidate) => {
+      attempted.push(candidate.model)
+      return candidate.model === "extension-only/primary"
+        ? child({ stderr: "Your input exceeds the context window of this model" })
+        : child({ code: 0 })
+    })
+    expect(attempted).toEqual(["extension-only/primary", "builtin/fallback"])
+    expect(result.candidate.model).toBe("builtin/fallback")
+  })
+
   test("#given a provider cooldown 503 #when a fallback exists #then it retries the fallback instead of failing the run", async () => {
     // given
     const attempted: string[] = []
@@ -91,6 +103,23 @@ describe("runMemoryModelAttempts", () => {
     expect(attempted).toEqual(["extension-only/primary"])
     expect(result.candidate.model).toBe("extension-only/primary")
     expect(result.child.code).toBe(1)
+  })
+
+  test("#given every candidate overflows #when the chain is exhausted #then context_overflow is carried by a typed signal and message", async () => {
+    const allOverflow: MemoryModelChain = [
+      { model: "openai/primary" },
+      { model: "anthropic/fallback" },
+    ]
+    const attempt = runMemoryModelAttempts(allOverflow, async () => child({
+      stderr: "prompt is too long: 213462 tokens > 200000 maximum",
+    }))
+    await expect(attempt).rejects.toMatchObject({
+      message: expect.stringContaining("context_overflow:"),
+      attempts: [
+        { miss: { kind: "context_overflow" } },
+        { miss: { kind: "context_overflow" } },
+      ],
+    })
   })
 
   test("#given every candidate has a retryable model or auth miss #when the chain is exhausted #then every candidate and cause are carried by a typed signal", async () => {

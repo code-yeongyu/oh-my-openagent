@@ -27,8 +27,23 @@ function isSelfUpdate(args) {
 // environment prefix is read first, what goes on the wire, and which channel to check for
 // updates. The engine consumes this once and scrubs it, so nested engine processes are
 // unaffected.
+function pluginChangelogSource() {
+  try {
+    const pluginRoot = join(packageRoot, "plugin")
+    const changelogPath = join(pluginRoot, "CHANGELOG.md")
+    if (!existsSync(changelogPath)) return undefined
+    const version = readJson(join(pluginRoot, "package.json")).version
+    return typeof version === "string" && version ? { path: changelogPath, version } : { path: changelogPath }
+  } catch {
+    return undefined
+  }
+}
+
 function brandProfile() {
   const update = updateTarget()
+  // The changelog source is advisory: a missing plugin manifest or file must disable
+  // startup notes, never fail the launch.
+  const changelog = pluginChangelogSource()
   return {
     name: "OmO",
     command: "omo",
@@ -40,6 +55,7 @@ function brandProfile() {
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    ...(changelog ? { changelog } : {}),
     update: {
       packageName: "omo-ai",
       distTag: "beta",

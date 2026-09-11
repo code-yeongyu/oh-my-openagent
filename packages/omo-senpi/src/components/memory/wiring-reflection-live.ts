@@ -18,6 +18,7 @@ import {
   type ReflectionCompletionApi,
   type ReflectionLiveSession,
 } from "./worker"
+import { describeReflectionLauncher } from "./worker/launcher-identity"
 import { readUi } from "./wiring-context"
 import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
@@ -40,14 +41,39 @@ export interface MemoryReflectionLiveWiring {
   clearStatus(eventCtx: unknown): void
 }
 
+// Stale-ctx prefixes thrown by senpi's runner guard when a pi captured at bind is probed after
+// session replacement (newSession/fork/switchSession) or runtime reload. Under --multi-session the
+// RPC host replaces sessions inside one long-lived process, so a reflection run launched off a
+// reservation right at boot can probe a ctx retired before the first fresh bind.
+// See: https://github.com/code-yeongyu/oh-my-openagent/issues/7946
+const STALE_EXTENSION_CONTEXT_ERROR_PREFIXES = [
+  "This extension ctx is stale after session replacement or reload.",
+  "stale extension generation after reload",
+] as const
+
+function isStaleExtensionContextError(error: unknown): boolean {
+  return error instanceof Error
+    && STALE_EXTENSION_CONTEXT_ERROR_PREFIXES.some((prefix) => error.message.startsWith(prefix))
+}
+
 export function createReflectionCompletionApi(pi: SenpiExtensionAPI): ReflectionCompletionApi | undefined {
   if (!hasMemoryCapabilities(pi)) return undefined
   return {
+    // Best-effort journal writes: a stale pi means the session this entry would journal into is
+    // gone, so swallow the guard's throw instead of letting it kill the reflection run upstream.
     appendEntry: (customType, data) => {
-      pi.appendEntry(customType, data)
+      try {
+        pi.appendEntry(customType, data)
+      } catch (error) {
+        if (!isStaleExtensionContextError(error)) throw error
+      }
     },
     registerEntryRenderer: (customType, renderer) => {
-      pi.registerEntryRenderer(customType, renderer)
+      try {
+        pi.registerEntryRenderer(customType, renderer)
+      } catch (error) {
+        if (!isStaleExtensionContextError(error)) throw error
+      }
     },
   }
 }
@@ -106,7 +132,18 @@ export function createMemoryReflectionLiveWiring(
       refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
       if (liveSession.current !== undefined) {
         try {
-          await drainCompletions(identity, liveSession.current, activeRuns.settle, healthAlertOnce)
+          await drainCompletions(
+            identity,
+            liveSession.current,
+            activeRuns.settle,
+            healthAlertOnce,
+            describeReflectionLauncher({
+              env: options.env,
+              execPath: process.execPath,
+              pid: process.pid,
+              sessionId,
+            }),
+          )
           footerLive.syncActive(sessionId, ui)
           await footerLive.refresh(sessionId, ui)
         } catch (error) {
@@ -169,11 +206,18 @@ async function drainCompletions(
   liveSession: ReflectionLiveSession,
   settle: (identity: string, runId: string) => void,
   healthAlertOnce: (key: string) => boolean,
+  currentLauncher: ReturnType<typeof describeReflectionLauncher>,
 ): Promise<void> {
   const completionsDir = join(identity.identityPaths.reflection, "completions")
   const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession)
   for (const record of consumed) settle(identity.identity, record.runId)
-  await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce)
+  const observedRunIds = consumed
+    .filter((record) => record.outcome !== "merged" && record.outcome !== "no_changes")
+    .map((record) => record.runId)
+  await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce, {
+    observedRunIds,
+    currentLauncher,
+  })
 }
 
 function describe(error: unknown): string {

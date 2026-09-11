@@ -119,6 +119,8 @@ Categories are `motion` (primitives) and `blocks` (composed patterns). When the 
 | `shader-background` | Canvas shader variants (mesh gradient, grain, warp, waves…); reduced motion freezes them | Atmospheric backgrounds with dimension |
 | `scroll-animation` | Lenis smooth-scroll provider plus a reading-progress indicator | Scroll-driven storytelling |
 
+This table is the edge of this catalog. Hero atmospheres, animated or shader backgrounds, typographic reveals, scroll chapters, and card surface effects route to `ambience-skill.md`, whose react-bits map and retrofit checklist own that quadrant.
+
 ## 4. Mechanics rules
 
 These sharpen the shared axioms for interaction work; none of them replace the style skill.

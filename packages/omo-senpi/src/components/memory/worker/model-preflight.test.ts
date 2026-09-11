@@ -94,7 +94,27 @@ process.stdout.write("builtin/fallback\\n")
     expect(await Bun.file(probeLog).text()).toBe("probe\n")
   })
 
-  test("#given a cached negative catalog #when preflight repeats before expiry #then it preserves reactive attempts instead of throwing none_visible", async () => {
+  test("#given a fresh catalog that omits every candidate #when candidates are preflighted #then it degrades to reactive attempts and warns instead of failing closed", async () => {
+    // given
+    const item = await fixture('process.stdout.write("other/model\\n")')
+    const warnings: string[] = []
+
+    // when
+    const result = await preflightMemoryModels({
+      candidates,
+      launch: item.launch,
+      env: { PATH: process.env.PATH },
+      configSources: [{ path: item.config, exists: true }],
+      warn: (message, details) => warnings.push(`${message}: ${JSON.stringify(details)}`),
+      now: () => 1_000,
+    })
+
+    // then
+    expect(result).toEqual({ kind: "unavailable", candidates })
+    expect(warnings.join("\n")).toContain("omits every candidate")
+  })
+
+  test("#given a catalog that omits every candidate #when preflight runs fresh and then cached #then both verdicts preserve reactive attempts", async () => {
     // given
     const item = await fixture(`
 import { appendFileSync } from "node:fs"
@@ -115,10 +135,7 @@ process.stdout.write("other/model\\n")
     const cached = await preflightMemoryModels(input)
 
     // then
-    expect(fresh).toEqual({
-      kind: "none_visible",
-      rejected: candidates.map((candidate) => ({ model: candidate.model, cause: "model_not_visible" })),
-    })
+    expect(fresh).toEqual({ kind: "unavailable", candidates })
     expect(cached).toEqual({ kind: "unavailable", candidates })
     expect(await Bun.file(probeLog).text()).toBe("probe\n")
   })
@@ -140,7 +157,7 @@ process.stdout.write(existsSync(process.env.AUTH_READY) ? "builtin/fallback\\n" 
       configSources: [{ path: item.config, exists: true }],
       now: () => now,
     }
-    expect((await preflightMemoryModels(input)).kind).toBe("none_visible")
+    expect((await preflightMemoryModels(input)).kind).toBe("unavailable")
     await writeFile(authReady, "ready\n", "utf8")
     now += 2 * 60_000
 

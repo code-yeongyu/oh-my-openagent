@@ -1,0 +1,30 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/src/components/task/engine-agents.test.ts:
+(pass) task engine builtin agent overlay > #given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present [7.39ms]
+87 | 
+88 |     // then
+89 |     const explore = engine.agents["explore"]
+90 |     expect(explore?.model).toBe("acme/custom-1")
+91 |     expect(explore?.prompt).toBe(BUILTIN_AGENTS["explore"]?.prompt)
+92 |     expect(explore?.tools).toHaveLength(9)
+                                ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 9
+Received length: 10
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/src/components/task/engine-agents.test.ts:92:28)
+(fail) task engine builtin agent overlay > #given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive [2.02ms]
+(pass) task engine builtin agent overlay > #given an omo.json-only agent #when the engine resolves agents #then it is appended alongside the builtins [0.94ms]
+(pass) task engine builtin agent overlay > #given a process override for a curated agent #when the engine resolves agents #then in-process execution remains pinned [1.02ms]
+(pass) task engine builtin agent overlay > #given a process override for a reviewer agent #when the engine resolves agents #then in-process execution remains pinned [0.87ms]
+(pass) task engine builtin agent overlay > #given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable [0.79ms]
+(pass) task engine builtin agent overlay > #given the default engine agents #when the task tool description renders #then plain builtins are advertised and the plan-gated tier is classified separately [0.71ms]
+(pass) task engine builtin agent overlay > #given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed [1.17ms]
+
+ 7 pass
+ 1 fail
+ 18 expect() calls
+Ran 8 tests across 1 file. [2.54s]
+[captured bun exit: 1]

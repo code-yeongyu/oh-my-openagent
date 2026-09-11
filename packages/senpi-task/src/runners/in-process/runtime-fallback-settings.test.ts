@@ -33,4 +33,24 @@ describe("createRuntimeFallbackSettings", () => {
       },
     })
   })
+
+  test("#given a child retry budget beside the chain #when settings are created #then the same-model budget is overridden and the chain stays enabled", () => {
+    // given / when
+    const fallback: ResolvedModelRecord = {
+      provider: "vendor",
+      model_id: "fallback",
+      display: "vendor/fallback",
+      source: "category",
+    }
+    const settings = createRuntimeFallbackSettings("vendor/primary", [fallback], { maxRetries: 1 })
+
+    // then
+    expect(settings.getRetrySettings()).toMatchObject({ maxRetries: 1 })
+    expect(settings.getRetryFallbackSettings()).toMatchObject({
+      modelFallback: true,
+      chains: {
+        "vendor/primary": ["vendor/fallback"],
+      },
+    })
+  })
 })

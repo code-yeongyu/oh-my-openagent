@@ -841,8 +841,8 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.6-sol")
-    expect(config?.variant).toBe("xhigh")
+    expect(config?.model).toBe("openai/gpt-6-astra")
+    expect(config?.variant).toBe("max")
   })
 
   test("resolves visual-engineering category config", () => {
@@ -854,7 +854,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("anthropic/claude-opus-5")
+    expect(config?.model).toBe("anthropic/claude-fable-5-1")
   })
 
   test("user categories override default categories", () => {
@@ -901,8 +901,8 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.6-sol")
-    expect(config?.variant).toBe("xhigh")
+    expect(config?.model).toBe("openai/gpt-6-astra")
+    expect(config?.variant).toBe("max")
   })
 
   test("preserves all category properties (temperature, top_p, tools, etc.)", () => {
