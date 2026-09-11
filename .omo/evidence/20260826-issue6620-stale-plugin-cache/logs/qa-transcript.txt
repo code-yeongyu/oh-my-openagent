@@ -1,0 +1,13 @@
+== path isolation self-proof ==
+resolved cache dir: /tmp/opencode/issue-6620/sandbox/cache/opencode
+resolved config dir: /tmp/opencode/issue-6620/sandbox/cfg/opencode
+[PASS] code under test resolves cache dir INSIDE sandbox
+[PASS] code under test resolves config dir INSIDE sandbox
+== before ==
+[PASS] stale per-spec sandbox exists
+[PASS] bun.lock pins stale 4.15.1
+[PASS] flat node_modules copy exists
+== after ==
+[PASS] #6620 stale per-spec sandbox removed (reporter's rm -rf step 1)
+[PASS] flat node_modules copy removed (rm -rf step 2)
+[PASS] bun.lock pin purged (rm -rf step 3; next start re-resolves @latest)

@@ -1,0 +1,28 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/auto-update-checker/cache.test.ts:
+90 |     })
+91 |
+92 |     // then
+93 |     const lock = JSON.parse(readFileSync(lockPath, "utf-8")) as { packages: Record<string, unknown> }
+94 |     expect(result).toBe(true)
+95 |     expect(Object.keys(lock.packages)).toEqual(["unrelated-pkg@latest", "@scope/other"])
+                                            ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,4 @@
+  [
++   "oh-my-openagent@latest",
++   "oh-my-openagent@^4.0.0",
+    "unrelated-pkg@latest",
+
+- Expected  - 0
++ Received  + 2
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6620/packages/omo-opencode/src/hooks/auto-update-checker/cache.test.ts:95:40)
+(fail) auto-update cache invalidation > #given text lockfile pins spec-keyed entries like oh-my-openagent@latest #when invalidating package #then every spec entry for the package is purged so the next install re-resolves the tag (#6620) [0.78ms]
+
+ 2 pass
+ 1 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [1194.00ms]
