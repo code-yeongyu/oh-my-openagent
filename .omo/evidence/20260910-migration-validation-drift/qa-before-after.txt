@@ -1,0 +1,21 @@
+=== BEFORE (unfixed, git stash of fix) ===
+$ HOME=/tmp/migration-schema-drift-qa/home bun /tmp/migration-schema-drift-qa/run.ts
+{
+  "error": "Migration validation failed for /tmp/migration-schema-drift-qa/home/.omo/omo.jsonc: agents.sisyphus: Unrecognized keys: \"ultrawork\", \"compaction\", agents.hephaestus: Unrecognized key: \"allow_non_gpt_model\", agents.sisyphus-junior: Unrecognized keys: \"ultrawork\", \"compaction\"",
+  "statuses": [],
+  "migratedFrom": []
+}
+
+=== AFTER (fixed) ===
+$ HOME=/tmp/migration-schema-drift-qa/home bun /tmp/migration-schema-drift-qa/run.ts
+{
+  "error": null,
+  "statuses": [
+    { "status": "migrated", "diagnostics": ["skipped: $schema legacy=... kept=..."] },
+    { "status": "migrated", "diagnostics": [] }
+  ],
+  "migratedFrom": ["/private/tmp/migration-schema-drift-qa/home/.config/opencode/oh-my-openagent.jsonc"]
+}
+
+=== target agents keys preserved after migration ===
+{"hasUltrawork":true,"hasCompaction":true,"hasAllowNonGpt":true,"migrations":"\"_migrations\": [\n    \"2026-07-opencode-config-unification\",\n    \"2026-08-reasoning-unification\"\n  ]"}

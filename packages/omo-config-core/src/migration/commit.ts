@@ -1,5 +1,5 @@
 import { basename, dirname, join, resolve } from "node:path"
-import { isPlainObject } from "../internal/plain-object"
+import { hasTamperedPrototype, isPlainObject, isUnsafeObjectKey } from "../internal/plain-object"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
 import { toPosixPath } from "../internal/posix-path"
 import { resolveHomeDir } from "../loader"
@@ -32,10 +32,36 @@ function markerValue(target: Readonly<Record<string, unknown>>, migrationId: str
   return hasMigrationMarker(target, migrationId) ? value : [...value, migrationId]
 }
 
-function validateTarget(targetPath: string, document: Readonly<Record<string, unknown>>): void {
+function containerInTarget(target: Readonly<Record<string, unknown>>, path: readonly string[]): Record<string, unknown> | null {
+  let container: Record<string, unknown> = target
+  for (const segment of path) {
+    const next = container[segment]
+    if (!isPlainObject(next)) return null
+    container = next
+  }
+  return container
+}
+
+/**
+ * Mirrors loader semantics: unrecognized keys the user already carries in the target are tolerated
+ * (the loader strips them with a diagnostic instead of dropping the layer), while keys the migration
+ * additions introduce, unsafe keys, and prototype tampering stay fail-closed.
+ */
+function validateTarget(targetPath: string, document: Readonly<Record<string, unknown>>, target: Readonly<Record<string, unknown>>): void {
   const result = OmoConfigSchema.safeParse(document)
   if (result.success) return
-  const detail = result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(", ")
+  const blocking = result.error.issues.filter((issue) => {
+    if (issue.code !== "unrecognized_keys") return true
+    if (issue.keys.some((key) => isUnsafeObjectKey(key))) return true
+    const path = issue.path.map((segment) => String(segment))
+    const container = containerInTarget(target, path)
+    return container === null || issue.keys.some((key) => !Object.prototype.hasOwnProperty.call(container, key))
+  })
+  if (blocking.length === 0) {
+    if (!hasTamperedPrototype(document)) return
+    throw new MigrationValidationError(targetPath, "the document contains prototype tampering")
+  }
+  const detail = blocking.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(", ")
   throw new MigrationValidationError(targetPath, detail)
 }
 
@@ -85,7 +111,7 @@ export function prepareTargetWrite(input: {
   const merged = mergeWithoutClobber(input.target, input.additions)
   const marker = markerValue(input.target, input.migrationId, input.targetPath)
   const document = { ...merged.merged, _migrations: marker }
-  validateTarget(input.targetPath, document)
+  validateTarget(input.targetPath, document, input.target)
   const edits = [...collectMigrationEdits(merged.additions), { path: ["_migrations"], value: marker }]
   return { diagnostics: merged.diagnostics, document, edits }
 }
@@ -98,7 +124,7 @@ export function prepareTargetReplacement(input: {
 }): PreparedTargetWrite {
   const marker = markerValue(input.target, input.migrationId, input.targetPath)
   const document = { ...input.document, _migrations: marker }
-  validateTarget(input.targetPath, document)
+  validateTarget(input.targetPath, document, input.target)
   const edits: { path: readonly string[]; value: unknown }[] = []
   for (const key of Object.keys(input.target)) {
     if (key !== "_migrations" && !Object.prototype.hasOwnProperty.call(input.document, key)) {
