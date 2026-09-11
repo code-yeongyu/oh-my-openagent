@@ -10,6 +10,7 @@ import { applyDisabledProviders } from "../shared/disabled-providers"
 import { log } from "../shared/logger"
 import { loadOmoOpenCodeConfigChain, type OmoOpenCodeConfigView } from "../plugin-config/omo-config-chain"
 import { mergeConfigs } from "../plugin-config/config-merger"
+import { addIgnoredAgentOverrideWarnings } from "../plugin-config/ignored-agent-override-warnings"
 import { findUnknownKeyPaths } from "../plugin-config/unknown-key-diagnostics"
 import { prunePluginView } from "./prune-plugin-view"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./schema"
@@ -229,6 +230,7 @@ export function validatePluginConfig(
       projectRoot: detectWorktreePath(directory) ?? directory, userRoots,
     })
   }
+  addIgnoredAgentOverrideWarnings(config)
 
   return {
     valid: messages.length === 0,
