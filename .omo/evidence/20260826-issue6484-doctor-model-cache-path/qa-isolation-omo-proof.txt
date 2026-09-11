@@ -1,0 +1,4 @@
+Excluding ambient codegraph daemon churn (host daemon, unrelated to doctor):
+real ~/.omo digest before: 4cb415f7672b094a3b9ec148a5c05d21788bf7f946f7f5eecadf1ae02880b568
+real ~/.omo digest after : 4cb415f7672b094a3b9ec148a5c05d21788bf7f946f7f5eecadf1ae02880b568
+REAL ~/.OMO UNCHANGED BY DOCTOR QA
