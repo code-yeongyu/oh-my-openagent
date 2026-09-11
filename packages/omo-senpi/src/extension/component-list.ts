@@ -18,6 +18,7 @@ import { createThreadComponent } from "../components/thread"
 import { createUltraworkComponent } from "../components/ultrawork"
 import { createUlwExecuteContinuationComponent } from "../components/ulw-execute-continuation"
 import { createUlwLoopComponent } from "../components/ulw-loop"
+import { createFreeInferenceComponent } from "../components/freeinference"
 import { createXSearchComponent } from "../components/x-search"
 import type { OmoSenpiComponent } from "./types"
 
@@ -41,6 +42,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createBuiltinMcpsComponent(),
     createLspComponent(),
     createXSearchComponent(),
+    createFreeInferenceComponent(),
     createCommentCheckerComponent(),
     taskComponent,
     createThreadComponent(),
