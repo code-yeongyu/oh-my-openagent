@@ -741,6 +741,15 @@ This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness r
 
 `git_env_prefix` (default `"GIT_MASTER=1"`) is prepended to git commands; set it to `""` to disable.
 
+#### Attribution Overrides
+
+Commit attribution can also be controlled outside configuration files:
+
+- **Git config**: Run `git config --global omo.attribution false` or `git config omo.attribution false` to suppress footers and co-author trailers. `sisyphus.attribution` is also recognized.
+- **Environment variables**: Export `NO_AI_ATTRIBUTION=1`, `OMO_NO_COMMIT_ATTRIBUTION=1`, or `OMO_GIT_ATTRIBUTION=0`.
+- **Commit signing**: Repositories with `commit.gpgsign = true` automatically suppress third-party trailers and promotional footers unless explicitly enabled in configuration.
+
+
 ### Comment Checker
 
 Customize the comment quality checker:
