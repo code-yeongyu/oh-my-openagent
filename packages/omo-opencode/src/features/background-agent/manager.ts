@@ -81,7 +81,7 @@ import {
 } from "./loop-detector"
 import { ParentWakeNotifier, type ParentWakePromptContext } from "./parent-wake-notifier"
 import type { PendingParentWake } from "./parent-wake-dedupe"
-import { type PollProbeResults, resolvePollSessionProbes } from "./poll-session-probes"
+import { startPollSessionProbes, type PollSessionProbeBatch } from "./poll-session-probes"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
@@ -181,15 +181,24 @@ interface Todo {
   id: string
 }
 
-/**
- * A running task whose session looks idle or gone, pending confirmation probes.
- */
-interface PollCompletionCandidate {
+interface PollCandidateTaskIdentity {
   task: BackgroundTask
   sessionID: string
+  currentAttemptID: string | undefined
+  startedAt: Date | undefined
   completionSource: string
+}
+
+interface PollTerminalCandidate extends PollCandidateTaskIdentity {
+  kind: "terminal"
+}
+
+interface PollProbeCandidate extends PollCandidateTaskIdentity {
+  kind: "probe"
   sessionGoneThresholdReached: boolean
 }
+
+type PollCompletionCandidate = PollTerminalCandidate | PollProbeCandidate
 
 function formatAttemptModelSummary(attempt: Pick<BackgroundTaskAttempt, "providerId" | "modelId"> | undefined): string | undefined {
   if (!attempt?.providerId || !attempt.modelId) {
@@ -3059,18 +3068,22 @@ The task was re-queued on a fallback model after a retryable failure.
       await this.checkAndInterruptStaleTasks(allStatuses)
 
       const candidates = await this.collectPollCompletionCandidates(allStatuses)
-      const probes = await resolvePollSessionProbes(
-        candidates.map((candidate) => ({
+      if (this.shutdownTriggered) return
+
+      const probes = startPollSessionProbes(
+        candidates.filter((candidate): candidate is PollProbeCandidate => candidate.kind === "probe").map((candidate) => ({
           sessionID: candidate.sessionID,
           requiresExistenceCheck: candidate.sessionGoneThresholdReached,
         })),
         {
-          validateSessionHasOutput: (sessionID) => this.validateSessionHasOutput(sessionID),
-          verifySessionExists: (sessionID) => this.verifySessionExists(sessionID),
-          checkSessionTodos: (sessionID) => this.checkSessionTodos(sessionID),
-        },
-        (sessionID, probe, error) => {
-          log("[background-agent] Poll probe failed:", { sessionID, probe, error })
+          resolvers: {
+            validateSessionHasOutput: (sessionID) => this.validateSessionHasOutput(sessionID),
+            verifySessionExists: (sessionID) => this.verifySessionExists(sessionID),
+            checkSessionTodos: (sessionID) => this.checkSessionTodos(sessionID),
+          },
+          onProbeError: (sessionID, probe, error) => {
+            log("[background-agent] Poll probe failed:", { sessionID, probe, error })
+          },
         },
       )
       await this.resolvePollCompletionCandidates(candidates, probes)
@@ -3086,10 +3099,9 @@ The task was re-queued on a fallback model after a retryable failure.
   /**
    * Classify every running task against the batched session status map.
    *
-   * Terminal and retry transitions are applied here because they mutate task
-   * state and must keep their original sequential ordering. Tasks that look
-   * idle or gone are returned as candidates instead, so their confirmation
-   * probes can run as one batch rather than one blocking round trip per task.
+   * Retry transitions are applied here because they mutate task state. Terminal
+   * and probe-backed actions are returned in task order, so teardown remains
+   * ordered while session reads begin without waiting for earlier teardown.
    */
   private async collectPollCompletionCandidates(
     allStatuses: SessionStatusMap | undefined,
@@ -3128,7 +3140,14 @@ The task was re-queued on a fallback model after a retryable failure.
         }
 
         if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
-          await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
+          candidates.push({
+            kind: "terminal",
+            task,
+            sessionID,
+            currentAttemptID: task.currentAttemptID,
+            startedAt: task.startedAt,
+            completionSource: `polling (terminal session status: ${sessionStatus.type})`,
+          })
           continue
         }
 
@@ -3152,7 +3171,15 @@ The task was re-queued on a fallback model after a retryable failure.
           ? "polling (idle status)"
           : "polling (session gone from status)"
 
-        candidates.push({ task, sessionID, completionSource, sessionGoneThresholdReached })
+        candidates.push({
+          kind: "probe",
+          task,
+          sessionID,
+          currentAttemptID: task.currentAttemptID,
+          startedAt: task.startedAt,
+          completionSource,
+          sessionGoneThresholdReached,
+        })
       } catch (error) {
         log("[background-agent] Poll error for task:", { taskId: task.id, error })
       }
@@ -3162,22 +3189,53 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   /**
-   * Apply the batched probe results in the original task order.
-   *
-   * A probe that is missing from the result maps failed for that session, so
-   * the task is left running and reconsidered on the next tick. That keeps one
-   * unhealthy session from deciding the outcome of its neighbours.
+   * Apply completion actions in original task order. Each probe is awaited only
+   * when its ordered candidate is reached, so a slow suffix cannot block a ready
+   * prefix from releasing its concurrency slot.
    */
+  private isCurrentPollCompletionCandidate(candidate: PollCompletionCandidate): boolean {
+    const { task } = candidate
+    const isCurrent = !this.shutdownTriggered
+      && this.tasks.get(task.id) === task
+      && task.status === "running"
+      && task.sessionId === candidate.sessionID
+      && task.currentAttemptID === candidate.currentAttemptID
+      && task.startedAt === candidate.startedAt
+    if (!isCurrent) {
+      log("[background-agent] Skipping stale poll completion candidate:", {
+        taskId: task.id,
+        sessionID: candidate.sessionID,
+        shutdownTriggered: this.shutdownTriggered,
+      })
+    }
+    return isCurrent
+  }
+
   private async resolvePollCompletionCandidates(
     candidates: Array<PollCompletionCandidate>,
-    probes: PollProbeResults,
+    probes: PollSessionProbeBatch,
   ): Promise<void> {
     for (const candidate of candidates) {
+      if (this.shutdownTriggered) return
       const { task, sessionID } = candidate
-      if (task.status !== "running") continue
 
       try {
-        const hasValidOutput = probes.hasOutput.get(sessionID)
+        if (candidate.kind === "terminal") {
+          if (!this.isCurrentPollCompletionCandidate(candidate)) continue
+          await this.tryCompleteTask(task, candidate.completionSource)
+          continue
+        }
+
+        const result = probes.resultsBySession.get(sessionID)
+        if (!result) {
+          log("[background-agent] Output probe unresolved this poll, waiting:", task.id)
+          continue
+        }
+
+        const probeResult = await result
+        if (!this.isCurrentPollCompletionCandidate(candidate)) continue
+
+        const hasValidOutput = probeResult.hasOutput
         if (hasValidOutput === undefined) {
           log("[background-agent] Output probe unresolved this poll, waiting:", task.id)
           continue
@@ -3185,7 +3243,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
         if (!hasValidOutput) {
           if (candidate.sessionGoneThresholdReached) {
-            const sessionExists = probes.sessionExists.get(sessionID)
+            const sessionExists = probeResult.sessionExists
             if (sessionExists === false) {
               log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
               await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
@@ -3200,13 +3258,13 @@ The task was re-queued on a fallback model after a retryable failure.
           continue
         }
 
-        const hasIncompleteTodos = probes.hasIncompleteTodos.get(sessionID)
+        const hasIncompleteTodos = probeResult.hasIncompleteTodos
         if (hasIncompleteTodos === undefined) {
           log("[background-agent] Todo probe unresolved this poll, waiting:", task.id)
           continue
         }
 
-        if (hasIncompleteTodos) {
+        if (hasIncompleteTodos || this.observedIncompleteTodosBySession.get(sessionID) === true) {
           log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
           continue
         }
