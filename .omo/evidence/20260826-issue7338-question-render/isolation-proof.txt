@@ -1,0 +1,14 @@
+=== REAL-STORE ISOLATION PROOF (final, 2026-08-26T02:56:00Z) ===
+
+Method: probe scripts snapshot 'SELECT count(*) FROM session' from the REAL
+store before spawning any sandboxed server, and again after. Additionally,
+every probe session id was queried against the real store.
+
+probe session ses_fc4131d63ffe1n9Sq2kZj3kGUb in real store: 0
+probe session ses_fc431c438ffecq6wN3xd4bnw84 in real store: 0
+probe session ses_fc42539e2ffeJP4WkuvIbKE2HN in real store: 0
+probe session ses_fc4211e86ffeoVx7VTNquiurV2 in real store: 0
+probe session ses_fc48c7c03ffeEXOvazZccoWi6I in real store: 0
+probe session ses_fc484eec4ffetbBzT8fVK1fhhE in real store: 0
+total sessions with /tmp directory in real store: 2 (both dated 2026-07-25/26, months before this work)
+real-store sessions created in the last 6h (all user project activity): 167
