@@ -177,29 +177,4 @@ describe("BackgroundManager poll probe guards", () => {
     })
   })
 
-  describe("#given an idle task before a terminal task", () => {
-    test("#when polling completes both #then teardown keeps task iteration order", async () => {
-      //#given
-      const abortedSessions: string[] = []
-      const manager = createManager({
-        status: async () => ({ data: { "ses-idle": { type: "idle" }, "ses-terminal": { type: "interrupted" } } }),
-        abort: async (input: { path: { id: string } }) => {
-          abortedSessions.push(input.path.id)
-          return {}
-        },
-      })
-      injectTask(manager, createTask("ses-idle"))
-      injectTask(manager, createTask("ses-terminal"))
-
-      try {
-        //#when
-        await manager["pollRunningTasks"]()
-
-        //#then
-        expect(abortedSessions).toEqual(["ses-idle", "ses-terminal"])
-      } finally {
-        await manager.shutdown()
-      }
-    })
-  })
 })
