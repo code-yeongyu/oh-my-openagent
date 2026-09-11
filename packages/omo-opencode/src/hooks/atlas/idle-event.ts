@@ -91,6 +91,16 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
+  if (sessionState.tokenLimitDetected) {
+    log(`[${HOOK_NAME}] Skipped: token limit error detected, retry would worsen context overflow`, { sessionID })
+    return
+  }
+
+  if (sessionState.unrecoverableErrorDetected) {
+    log(`[${HOOK_NAME}] Skipped: non-retryable request error detected, re-injecting would rebuild the same failing request`, { sessionID })
+    return
+  }
+
   const noProgressIterations = updateNoToolProgressIterations(sessionState)
   if (shouldAbortForNoToolProgress(sessionState)) {
     markContinuationStalled(sessionState, boulderState.plan_name, activePlanPath)

@@ -7,7 +7,11 @@ import {
   readCurrentTopLevelTask,
   resolveBoulderPlanPath,
 } from "../../features/boulder-state"
+import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
+import { isCompactionMessage } from "../../shared/compaction-marker"
+import { isLastAssistantMessageAborted } from "../todo-continuation-enforcer"
+import type { MessageWithInfo } from "../todo-continuation-enforcer"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import {
@@ -19,6 +23,42 @@ import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+
+function isErroredCompactionMarker(message: MessageWithInfo): boolean {
+  return isCompactionMessage(message) && message.info?.error != null
+}
+
+async function shouldSkipInjectionForLatestTurnState(input: {
+  ctx: PluginInput
+  sessionID: string
+}): Promise<boolean> {
+  let messages: MessageWithInfo[]
+  try {
+    const messagesResp = await input.ctx.client.session.messages({
+      path: { id: input.sessionID },
+      query: { directory: input.ctx.directory },
+    })
+    messages = normalizeSDKResponse(messagesResp, [] as MessageWithInfo[])
+  } catch (error) {
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Latest message state unavailable, continuing without turn-state guard`, {
+      sessionID: input.sessionID,
+      error: loggedError,
+    })
+    return false
+  }
+
+  if (isLastAssistantMessageAborted(messages)) {
+    log(`[${HOOK_NAME}] Skipped injection: last assistant message was aborted`, { sessionID: input.sessionID })
+    return true
+  }
+  const latestMessage = messages[messages.length - 1]
+  if (latestMessage && isErroredCompactionMarker(latestMessage)) {
+    log(`[${HOOK_NAME}] Skipped injection: latest message is an errored compaction marker`, { sessionID: input.sessionID })
+    return true
+  }
+  return false
+}
 
 export function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
@@ -84,6 +124,10 @@ export async function injectContinuation(input: {
         sessionID: input.sessionID,
         requiredAgent: currentBoulder.agent ?? "atlas",
       })
+      return
+    }
+
+    if (await shouldSkipInjectionForLatestTurnState({ ctx: input.ctx, sessionID: input.sessionID })) {
       return
     }
 
@@ -175,6 +219,8 @@ export function scheduleRetry(input: {
 
       if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
       if (sessionState.stalledContinuationReason) return
+      if (sessionState.tokenLimitDetected) return
+      if (sessionState.unrecoverableErrorDetected) return
       if (sessionState.waitingForFinalWaveApproval) return
 
       const now = Date.now()

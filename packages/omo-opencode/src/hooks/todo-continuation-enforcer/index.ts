@@ -8,6 +8,10 @@ import { createSessionStateStore } from "./session-state"
 import type { TodoContinuationEnforcer, TodoContinuationEnforcerOptions } from "./types"
 
 export type { TodoContinuationEnforcer, TodoContinuationEnforcerOptions } from "./types"
+export type { MessageWithInfo } from "./types"
+export { isLastAssistantMessageAborted } from "./abort-detection"
+export { isTokenLimitError } from "./token-limit-detection"
+export { isUnrecoverableRequestError } from "./unrecoverable-request-error"
 
 export function createTodoContinuationEnforcer(
   ctx: PluginInput,
