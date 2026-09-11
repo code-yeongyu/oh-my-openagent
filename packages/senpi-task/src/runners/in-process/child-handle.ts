@@ -9,6 +9,7 @@ export type ChildSessionListener = (event: ChildSessionEvent) => void
 // live AgentSession; fakes implement only these members.
 export type ChildSession = {
   readonly sessionId: string
+  readonly messages?: readonly unknown[]
   prompt(text: string): Promise<void>
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
@@ -101,7 +102,11 @@ function observeTurnEvent(observation: TurnObservation, event: ChildSessionEvent
   if (!isRecord(message) || message.role !== "assistant") return
   const text = assistantText(message)
   observation.terminalToolCall = assistantHasToolCall(message)
-  observation.text = observation.terminalToolCall ? undefined : text
+  if (observation.terminalToolCall) {
+    observation.text = undefined
+  } else if (text !== undefined) {
+    observation.text = text
+  }
   observation.stopReason = typeof message.stopReason === "string" ? message.stopReason : undefined
   observation.errorMessage = typeof message.errorMessage === "string" ? message.errorMessage : undefined
   observation.provider = typeof message.provider === "string" ? message.provider : undefined
@@ -148,6 +153,7 @@ function turnOutcome(session: ChildSession, observation: TurnObservation, comple
     }
   }
   if (observation.terminalToolCall) {
+    if (completion === "turn") return { status: "completed", finalResponse: "", ...provenance }
     return {
       status: "error",
       ...provenance,
@@ -207,6 +213,16 @@ async function runTurn(
 // transcript's last assistant text is the honest drain for a child whose completion never reached
 // its record (crash between turn end and transition). No text means nothing durable was produced.
 function settledSessionOutcome(session: ChildSession, completion: ChildCompletionPolicy): RunnerOutcome {
+  const restoredAssistant = lastAssistantMessage(session.messages)
+  if (completion !== "turn" && restoredAssistant !== undefined && assistantHasToolCall(restoredAssistant)) {
+    return {
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "restored session ended after a tool call without a terminal assistant response",
+      },
+    }
+  }
   const final = session.getLastAssistantText()
   if (final !== undefined && final.length > 0) return { status: "completed", finalResponse: final }
   if (completion === "turn") return { status: "completed", finalResponse: "" }
@@ -214,6 +230,15 @@ function settledSessionOutcome(session: ChildSession, completion: ChildCompletio
     status: "error",
     failure: { kind: "child-turn-failed", message: "restored session has no assistant output" },
   }
+}
+
+function lastAssistantMessage(messages: readonly unknown[] | undefined): Record<string, unknown> | undefined {
+  if (messages === undefined) return undefined
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (isRecord(message) && message.role === "assistant") return message
+  }
+  return undefined
 }
 
 type TrackedChildHandle = {
