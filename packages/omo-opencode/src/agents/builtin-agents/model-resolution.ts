@@ -1,4 +1,4 @@
-import { resolveModelPipeline } from "../../shared"
+import { isAnyProviderConnected, resolveModelPipeline } from "../../shared"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 
 export function applyModelResolution(input: {
@@ -16,12 +16,17 @@ export function applyModelResolution(input: {
   })
 }
 
-export function getFirstFallbackModel(requirement?: {
-  fallbackChain?: { providers: string[]; model: string; variant?: string }[]
-}) {
+export function getFirstFallbackModel(
+  requirement?: {
+    fallbackChain?: { providers: string[]; model: string; variant?: string }[]
+  },
+  availableModels: Set<string> = new Set(),
+) {
   const entry = requirement?.fallbackChain?.[0]
   if (!entry || entry.providers.length === 0) return undefined
-  const provider = entry.providers[0]
+  const provider =
+    entry.providers.find((candidate) => isAnyProviderConnected([candidate], availableModels))
+    ?? entry.providers[0]
   const transformedModel = transformModelForProvider(provider, entry.model)
   return {
     model: `${provider}/${transformedModel}`,
