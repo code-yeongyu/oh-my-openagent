@@ -55,13 +55,13 @@ export async function readRunJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T
 }
 
-export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o600): Promise<void> {
+export async function writeRunTextAtomic(path: string, text: string, mode = 0o600): Promise<void> {
   const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
   const file = await open(temporary, "wx", mode)
   let renamed = false
   try {
     try {
-      await file.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8")
+      await file.writeFile(text, "utf8")
       await file.sync()
     } finally {
       await file.close()
@@ -72,6 +72,10 @@ export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o
   } finally {
     if (!renamed) await unlinkRunArtifact(temporary)
   }
+}
+
+export async function writeRunJsonAtomic(path: string, value: unknown, mode = 0o600): Promise<void> {
+  await writeRunTextAtomic(path, `${JSON.stringify(value, null, 2)}\n`, mode)
 }
 
 async function syncDirectory(path: string): Promise<void> {

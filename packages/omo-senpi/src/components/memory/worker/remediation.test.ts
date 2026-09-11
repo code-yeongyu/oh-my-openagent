@@ -99,5 +99,12 @@ describe("reflectionRemediation", () => {
     test("#when nothing matches #then the child log hint remains the default for post-spawn failures", () => {
       expect(reflectionRemediation("child_exit", "exit code 1")).toContain("child-stderr.log")
     })
+
+    test("#when the supervisor fails before a child exists #then the hint points at supervisor stderr, not the child log", () => {
+      const hint = reflectionRemediation("supervisor_failed", "memory run supervisor exited with 1")
+
+      expect(hint).toContain("supervisor-stderr.log")
+      expect(hint).not.toContain("child-stderr.log")
+    })
   })
 })

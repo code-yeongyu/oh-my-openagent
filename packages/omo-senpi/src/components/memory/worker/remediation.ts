@@ -32,5 +32,14 @@ export function reflectionRemediation(reason: string | undefined, detail: string
   if (combined.includes("api key") || combined.includes("auth_missing")) {
     return "run /login <provider>"
   }
+  // The supervisor died before a child existed (or before outcome.json landed). child-stderr.log
+  // is the wrong pointer: the durable evidence is the supervisor's own bounded stderr artifact.
+  if (
+    reason === "supervisor_failed"
+    || combined.includes("memory run supervisor exited")
+    || combined.includes("did not publish an outcome")
+  ) {
+    return "inspect runtime/reflection-sessions/<runId>/supervisor-stderr.log"
+  }
   return "inspect runtime/reflection-sessions/<runId>/child-stderr.log"
 }

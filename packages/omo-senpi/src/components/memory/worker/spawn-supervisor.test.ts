@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createNodeGitExec, GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
+import { childFailureCause } from "./failure-detail"
 import { runReflectionChild } from "./spawn-supervisor"
 import { waitForRunSentinel } from "./run-sentinel"
+import type { ReflectionSpawnArgs } from "./spawn-types"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
@@ -227,3 +230,116 @@ describe("supervised child outcome authority", () => {
     }
   }, 30_000)
 })
+
+describe("supervised supervisor-stderr diagnostics", () => {
+  test("#given a supervisor that throws before publishing #when the parent completes #then stderr is retained locally and only a distilled cause is surfaced", async () => {
+    // given
+    const prepared = await prepareSupervisedRun("supervisor-throws-", "run-throws")
+
+    // when
+    const run = runReflectionChild(prepared.spawnArgs, {
+      supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-throws.ts"),
+    })
+
+    // then
+    const error = await run.then(
+      () => {
+        throw new Error("expected the throwing supervisor to fail")
+      },
+      (cause: unknown) => cause,
+    )
+    expect(error).toBeInstanceOf(Error)
+    const message = (error as Error).message
+    expect(message).toContain("memory run supervisor exited with")
+    expect(message).toContain("fixture supervisor crashed before child launch")
+    expect(message).not.toMatch(/^\s*\d+\s*\|/m)
+    expect(message).not.toMatch(/^at\s+\S/m)
+    expect(message).not.toContain("child-stderr.log")
+    expect(existsSync(join(prepared.runDir, "child-stderr.log"))).toBe(false)
+    expect(existsSync(join(prepared.runDir, "outcome.json"))).toBe(false)
+    const stored = await readFile(join(prepared.runDir, "supervisor-stderr.log"), "utf8")
+    expect(stored).toContain("fixture supervisor crashed before child launch")
+    expect(stored).toMatch(/at\s+\S/)
+    expect(childFailureCause(stored)).toContain("fixture supervisor crashed before child launch")
+  }, 30_000)
+
+  test("#given a throwing supervisor with oversized stderr #when the parent completes #then the stored diagnostic is bounded", async () => {
+    // given
+    const prepared = await prepareSupervisedRun("supervisor-overflow-", "run-overflow")
+    const maxOutputBytes = 1024
+
+    // when
+    const run = runReflectionChild(prepared.spawnArgs, {
+      maxOutputBytes,
+      supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-throws-oversized.ts"),
+    })
+
+    // then
+    const error = await run.then(
+      () => {
+        throw new Error("expected the oversized supervisor to fail")
+      },
+      (cause: unknown) => cause,
+    )
+    const message = (error as Error).message
+    expect(message).toContain("memory run supervisor exited with")
+    expect(message).toContain("fixture supervisor overflow")
+    expect(message).not.toContain("x".repeat(64))
+    const stored = await readFile(join(prepared.runDir, "supervisor-stderr.log"), "utf8")
+    expect(stored.startsWith(`[truncated to last ${maxOutputBytes} bytes]\n`)).toBe(true)
+    expect(Buffer.byteLength(stored, "utf8")).toBeLessThanOrEqual(
+      Buffer.byteLength(`[truncated to last ${maxOutputBytes} bytes]\n`, "utf8") + maxOutputBytes,
+    )
+    expect(existsSync(join(prepared.runDir, "child-stderr.log"))).toBe(false)
+  }, 30_000)
+})
+
+async function prepareSupervisedRun(prefix: string, runId: string): Promise<{
+  readonly runDir: string
+  readonly spawnArgs: ReflectionSpawnArgs
+}> {
+  const runDir = await mkdtemp(join(tmpdir(), prefix))
+  roots.push(runDir)
+  const payloadDir = join(runDir, "payload")
+  await mkdir(payloadDir)
+  const exec = createNodeGitExec()
+  return {
+    runDir,
+    spawnArgs: {
+      runId,
+      kind: "reflection",
+      trigger: "step-count",
+      origin: "manual",
+      attempt: 1,
+      hardDeadlineAt: Date.now() + 10_000,
+      category: "quick",
+      conversationIds: ["conversation-a"],
+      model: "fixture/model",
+      command: process.execPath,
+      args: [],
+      cwd: runDir,
+      env: {},
+      detached: true,
+      paths: {
+        sessionDir: runDir,
+        worktree: runDir,
+        gitCommonDir: runDir,
+        transcript: join(payloadDir, "transcript.jsonl"),
+        persona: join(payloadDir, "persona.md"),
+        prompt: join(payloadDir, "prompt.md"),
+      },
+      mergePolicy: "auto",
+      worktree: {
+        parent: new GitMemoryRepo({ dir: runDir, agentId: "agent-test", exec }),
+        dir: runDir,
+        branch: `reflection/${runId}`,
+        baseSha: "base-sha",
+        gitFilePath: join(runDir, ".git"),
+        gitFileSnapshot: "gitdir: original\n",
+        commonConfigPath: join(runDir, "config"),
+        commonConfigSnapshot: null,
+        exec,
+      },
+    },
+  }
+}
