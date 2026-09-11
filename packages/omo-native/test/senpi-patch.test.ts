@@ -5,6 +5,8 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import { LEGACY_PI_DIR_MIGRATION_RELATIVE, NESTED_PI_DIR_MOVES } from "../bin/lib/legacy-pi-dir-guard.js"
+
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
 const BUNDLED_ANTHROPIC_MESSAGES = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
@@ -41,6 +43,9 @@ function createFixture(claudeCodeVersion: string): Fixture {
   const anthropicMessages = join(root, BUNDLED_ANTHROPIC_MESSAGES)
   mkdirSync(dirname(anthropicMessages), { recursive: true })
   writeFileSync(anthropicMessages, anthropicMessagesSource(claudeCodeVersion))
+  const migration = join(root, LEGACY_PI_DIR_MIGRATION_RELATIVE)
+  mkdirSync(dirname(migration), { recursive: true })
+  writeFileSync(migration, `export function migrateLegacySenpiDirs() {}\n${NESTED_PI_DIR_MOVES}`)
   return { root, anthropicMessages }
 }
 
