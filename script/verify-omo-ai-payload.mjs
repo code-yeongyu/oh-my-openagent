@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { npmSpawnOptions } from "./npm-invocation.mjs"
+import { parseNpmPackResult } from "./npm-pack-paths.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -50,8 +51,7 @@ function packedPaths() {
     stdio: ["ignore", "pipe", "inherit"],
     ...npmSpawnOptions(),
   })
-  const [result] = JSON.parse(raw)
-  if (!result) return { paths: [], unpackedSize: 0 }
+  const result = parseNpmPackResult(raw)
   return {
     paths: result.files.map((file) => file.path),
     unpackedSize: result.unpackedSize ?? 0,
