@@ -87,6 +87,7 @@ export type CreateRestoredChildHandleInput = {
 // from prompt() resolution alone (the silent-empty-completion bug).
 type TurnObservation = {
   text: string | undefined
+  terminalToolCall: boolean
   stopReason: string | undefined
   errorMessage: string | undefined
   provider: string | undefined
@@ -99,7 +100,8 @@ function observeTurnEvent(observation: TurnObservation, event: ChildSessionEvent
   const message = event.message
   if (!isRecord(message) || message.role !== "assistant") return
   const text = assistantText(message)
-  if (text !== undefined) observation.text = text
+  observation.terminalToolCall = assistantHasToolCall(message)
+  observation.text = observation.terminalToolCall ? undefined : text
   observation.stopReason = typeof message.stopReason === "string" ? message.stopReason : undefined
   observation.errorMessage = typeof message.errorMessage === "string" ? message.errorMessage : undefined
   observation.provider = typeof message.provider === "string" ? message.provider : undefined
@@ -117,6 +119,11 @@ function assistantText(message: Record<string, unknown>): string | undefined {
 
 function isTextPart(part: unknown): part is { readonly type: "text"; readonly text: string } {
   return isRecord(part) && part.type === "text" && typeof part.text === "string"
+}
+
+function assistantHasToolCall(message: Record<string, unknown>): boolean {
+  return Array.isArray(message.content)
+    && message.content.some((part: unknown) => isRecord(part) && part.type === "toolCall")
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -137,6 +144,16 @@ function turnOutcome(session: ChildSession, observation: TurnObservation, comple
       failure: {
         kind: "child-turn-failed",
         message: observation.errorMessage ?? `child turn ended with stopReason "${observation.stopReason}"`,
+      },
+    }
+  }
+  if (observation.terminalToolCall) {
+    return {
+      status: "error",
+      ...provenance,
+      failure: {
+        kind: "child-turn-failed",
+        message: "child turn ended after a tool call without a terminal assistant response",
       },
     }
   }
@@ -215,7 +232,13 @@ function createTrackedChildHandle(
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
   const observation: TurnObservation = {
-    text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined, provider: undefined, model: undefined,
+    text: undefined,
+    terminalToolCall: false,
+    stopReason: undefined,
+    errorMessage: undefined,
+    baseline: undefined,
+    provider: undefined,
+    model: undefined,
   }
   const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
 
@@ -225,6 +248,7 @@ function createTrackedChildHandle(
     aborted = false
     turnActive = true
     observation.text = undefined
+    observation.terminalToolCall = false
     observation.stopReason = undefined
     observation.errorMessage = undefined
     observation.provider = undefined

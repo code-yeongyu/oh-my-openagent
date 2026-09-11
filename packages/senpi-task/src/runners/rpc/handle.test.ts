@@ -17,6 +17,7 @@ type RpcHandleWithTerminalFacts = RpcChildHandle & {
 function createHarness(): {
   readonly handle: RpcHandleWithTerminalFacts
   readonly emit: (event: AgentSessionEvent) => void
+  readonly close: () => void
 } {
   const child = Object.assign(new EventEmitter(), { pid: 4242 }) as unknown as ChildProcess
   const listeners = new Set<(event: AgentSessionEvent) => void>()
@@ -41,6 +42,7 @@ function createHarness(): {
     emit: (event) => {
       for (const listener of listeners) listener(event)
     },
+    close: () => child.emit("close", 0, null),
   }
 }
 
@@ -49,6 +51,36 @@ function event(value: unknown): AgentSessionEvent {
 }
 
 describe("createRpcChildHandle terminal turn observation", () => {
+  test("#given narration attached to a tool call #when the RPC child exits cleanly without agent_end #then the narration is not reused as successful completion", async () => {
+    // given
+    const harness = createHarness()
+    harness.emit(event({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Running the final command:" },
+          { type: "toolCall", id: "call-1", name: "bash", arguments: {} },
+        ],
+        stopReason: "toolUse",
+      },
+    }))
+
+    // when
+    harness.close()
+
+    // then
+    const waitForOutcome = harness.handle.waitForOutcome
+    if (waitForOutcome === undefined) throw new Error("RPC handle must expose waitForOutcome")
+    await expect(waitForOutcome()).resolves.toEqual({
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "RPC child exited without assistant output",
+      },
+    })
+  })
+
   test("#given an assistant provider error followed by terminal agent_end #when idle settles #then text and failure fields are retained", async () => {
     // given
     const harness = createHarness()
