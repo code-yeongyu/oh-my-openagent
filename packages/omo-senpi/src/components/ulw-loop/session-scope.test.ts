@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { join } from "node:path"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
 import { normalizeUlwLoopSessionId, ulwLoopScopedGoalsPath, ulwLoopStatusArgs } from "./session-scope"
 import { activeStatus, createLogger, type RecordedLog } from "./ulw-loop.test-support"
@@ -50,7 +50,7 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
       { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
       ctx,
     )
-    await pi.dispatch("agent_end", { type: "agent_end" }, ctx)
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, ctx)
     await pi.dispatch("tool_result", { toolName: "bash" }, ctx)
 
     expect(calls).toHaveLength(4)
@@ -60,7 +60,7 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
   it("#given NO session id available #when agent_end fires on an active unscoped run #then no continuation is delivered", async () => {
     const { pi, calls, logger } = await registerScoped()
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, { cwd: "/repo" })
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, { cwd: "/repo" })
 
     expect(pi.messages).toEqual([])
     expect(pi.userMessages).toEqual([])
@@ -88,7 +88,7 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
   it("#given a session id but no .omo/ulw-loop directory #when agent_end fires #then the perf guard short-circuits with no spawn", async () => {
     const { pi, calls } = await registerScoped({ planExists: () => false })
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionCtx("/repo", "sess-guard"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionCtx("/repo", "sess-guard"))
 
     expect(calls).toEqual([])
     expect(pi.messages).toEqual([])

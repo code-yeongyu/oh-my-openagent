@@ -5,9 +5,9 @@ import { LedgerRow } from "@/components/ledger/ledger-row"
 import { ManifestoSection, TITLE_CLASS } from "@/components/manifesto/manifesto-section"
 
 const CORE_LOOP_FEATURES = [
-  { key: "prometheus", index: "01" },
-  { key: "metis", index: "02" },
-  { key: "momus", index: "03" },
+  { key: "planner", index: "01" },
+  { key: "planConsultant", index: "02" },
+  { key: "planReviewer", index: "03" },
   { key: "orchestrator", index: "04" },
   { key: "todoContinuation", index: "05" },
   { key: "categorySystem", index: "06" },

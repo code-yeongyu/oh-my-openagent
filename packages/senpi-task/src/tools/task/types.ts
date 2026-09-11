@@ -62,7 +62,7 @@ export type TaskToolDeps = {
   readonly agents: Readonly<Record<string, AgentDefinition>>
   readonly resolveAncestry?: ResolveAncestry
   readonly loadSkills?: SkillLoader
-  // Session-scoped skill-invocation state for plan-gated agents (metis/momus). When absent the
+  // Session-scoped skill-invocation state for plan-gated agents (plan-consultant/plan-reviewer). When absent the
   // invocation gate fails CLOSED: without a resolver there is no proof ulw-plan was invoked.
   readonly resolveSkillInvocations?: (sessionId: string) => SkillInvocationState
 }

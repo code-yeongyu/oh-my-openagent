@@ -100,6 +100,15 @@ describe("compiled omo entry launcher parity", () => {
     expect(buildSenpiArgs(["chat"], "/provisioned")).toEqual(["--extension", join("/provisioned", "plugin"), "chat"])
   })
 
+  test("--no-extensions leaves the caller's extension list untouched", () => {
+    // A memory child lists no extensions and an RPC child lists the plugin itself; injecting the
+    // plugin on top would either load it into a bare child or load it twice.
+    const bare = ["-p", "--no-extensions", "--tools", "bash,edit", "@/tmp/task.md"]
+    const rpc = ["--mode", "rpc", "--no-extensions", "--extension", join("/provisioned", "plugin")]
+    expect(buildSenpiArgs(bare, "/provisioned")).toEqual(bare)
+    expect(buildSenpiArgs(rpc, "/provisioned")).toEqual(rpc)
+  })
+
   test("version line reads the sibling package version and pinned engine", () => {
     expect(versionLine({ version: "9.2.1" }, "2026.8.28")).toBe("omo 9.2.1 (engine: senpi 2026.8.28)")
   })

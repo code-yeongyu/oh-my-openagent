@@ -59,6 +59,10 @@ export type DagRecoveryOptions = {
   // Liveness probe for a paused run's previous lease holder. Defaults to the lifecycle port's
   // signaller so the signal-0 existence check has exactly one implementation in the package.
   readonly isProcessAlive?: (pid: number) => boolean
+  // Whether THIS process still runs a scheduler for the run. Consulted only when the recorded holder
+  // pid is our own: a signal-0 probe on ourselves is always true, so without this a same-process
+  // session reopen (multi-session host) would wait for its own host to exit. (#8006)
+  readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
   readonly now?: () => number
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
@@ -74,6 +78,7 @@ export type DagRecovery = {
 type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager">> & {
   readonly hostPid: number
   readonly isProcessAlive: (pid: number) => boolean
+  readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
   readonly now: () => number
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
@@ -96,6 +101,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     taskManager: options.taskManager,
     hostPid: options.hostPid ?? process.pid,
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+    ...(options.isRunHeldInProcess === undefined ? {} : { isRunHeldInProcess: options.isRunHeldInProcess }),
     now: options.now ?? Date.now,
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
@@ -190,13 +196,22 @@ function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSession
     if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
     if (fresh.parentSessionId !== parentSessionId) return { kind: "skipped", reason: "foreign_session" }
     const priorHolder = fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid
-    if (priorHolder !== undefined && context.isProcessAlive(priorHolder)) {
+    if (priorHolder !== undefined && holderStillLive(context, runId, priorHolder)) {
       return { kind: "skipped", reason: "live_lease", holderPid: priorHolder }
     }
     const claimed: RecoverableRecord = { ...fresh, leaseHolderPid: context.hostPid }
     context.store.writeCheckpoint(runId, claimed)
     return { kind: "claimed", record: claimed }
   })
+}
+
+// Our own pid is always alive to a signal-0 probe, so for it the only holder that can still matter
+// is a scheduler registered in this process (same-runtime pause + re-attach). A fresh runtime that
+// reopens the session in the same process holds nothing and claims. Every other pid keeps the
+// cross-host liveness fence: two live host processes must never both schedule a run.
+function holderStillLive(context: RecoveryContext, runId: DagRunId, holderPid: number): boolean {
+  if (holderPid === context.hostPid) return context.isRunHeldInProcess?.(runId) ?? false
+  return context.isProcessAlive(holderPid)
 }
 
 async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRecord): Promise<DagRecoveryOutcome> {

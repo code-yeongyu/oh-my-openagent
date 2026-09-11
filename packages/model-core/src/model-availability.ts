@@ -6,6 +6,25 @@ function normalizeModelName(name: string): string {
 		.replace(/\b(glm|gpt)-(\d+)[.-](\d+)/g, "$1-$2.$3")
 }
 
+function modelIdOf(model: string): string {
+	return model.split("/").slice(1).join("/")
+}
+
+// Tie-break among equally good matches. Provider preference is the caller's `providers` order (a
+// chain rung lists its lanes best-first; every match already passed that filter); after that the
+// shorter MODEL id is the closer match. The provider name never enters the comparison:
+// `opencode/claude-opus-5` must not beat `claude-sdk-oauth/claude-opus-5` just because "opencode"
+// is shorter (#8051). Equal candidates keep their `available` order.
+function closestMatch(matches: readonly string[], providers: readonly string[] | undefined): string {
+	const providerRank = (model: string): number =>
+		providers === undefined || providers.length === 0 ? 0 : providers.indexOf(model.split("/")[0] ?? "")
+	return matches.reduce((best, current) => {
+		const rankDelta = providerRank(current) - providerRank(best)
+		if (rankDelta !== 0) return rankDelta < 0 ? current : best
+		return modelIdOf(current).length < modelIdOf(best).length ? current : best
+	})
+}
+
 export function fuzzyMatchModel(
 	target: string,
 	available: Set<string>,
@@ -43,19 +62,14 @@ export function fuzzyMatchModel(
 		return exactMatch
 	}
 
-	const exactModelIdMatches = matches.filter((model) => {
-		const modelId = model.split("/").slice(1).join("/")
-		return normalizeModelName(modelId) === targetNormalized
-	})
+	const exactModelIdMatches = matches.filter(
+		(model) => normalizeModelName(modelIdOf(model)) === targetNormalized,
+	)
 	if (exactModelIdMatches.length > 0) {
-		return exactModelIdMatches.reduce((shortest, current) =>
-			current.length < shortest.length ? current : shortest,
-		)
+		return closestMatch(exactModelIdMatches, providers)
 	}
 
-	return matches.reduce((shortest, current) =>
-		current.length < shortest.length ? current : shortest,
-	)
+	return closestMatch(matches, providers)
 }
 
 export function isModelAvailable(

@@ -18,6 +18,7 @@ import {
   type ReflectionCompletionApi,
   type ReflectionLiveSession,
 } from "./worker"
+import { describeReflectionLauncher } from "./worker/launcher-identity"
 import { readUi } from "./wiring-context"
 import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
@@ -131,7 +132,18 @@ export function createMemoryReflectionLiveWiring(
       refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
       if (liveSession.current !== undefined) {
         try {
-          await drainCompletions(identity, liveSession.current, activeRuns.settle, healthAlertOnce)
+          await drainCompletions(
+            identity,
+            liveSession.current,
+            activeRuns.settle,
+            healthAlertOnce,
+            describeReflectionLauncher({
+              env: options.env,
+              execPath: process.execPath,
+              pid: process.pid,
+              sessionId,
+            }),
+          )
           footerLive.syncActive(sessionId, ui)
           await footerLive.refresh(sessionId, ui)
         } catch (error) {
@@ -194,11 +206,18 @@ async function drainCompletions(
   liveSession: ReflectionLiveSession,
   settle: (identity: string, runId: string) => void,
   healthAlertOnce: (key: string) => boolean,
+  currentLauncher: ReturnType<typeof describeReflectionLauncher>,
 ): Promise<void> {
   const completionsDir = join(identity.identityPaths.reflection, "completions")
   const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession)
   for (const record of consumed) settle(identity.identity, record.runId)
-  await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce)
+  const observedRunIds = consumed
+    .filter((record) => record.outcome !== "merged" && record.outcome !== "no_changes")
+    .map((record) => record.runId)
+  await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce, {
+    observedRunIds,
+    currentLauncher,
+  })
 }
 
 function describe(error: unknown): string {

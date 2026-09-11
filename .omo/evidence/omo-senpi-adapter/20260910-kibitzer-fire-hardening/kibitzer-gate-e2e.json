@@ -1,0 +1,149 @@
+{
+  "ok": true,
+  "scenarios": [
+    "s1",
+    "s2"
+  ],
+  "checks": [
+    {
+      "name": "s1.sandbox-isolated",
+      "ok": true,
+      "detail": "agentDir=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b/agent memoryHome=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b/memory"
+    },
+    {
+      "name": "s1.memory-seeded",
+      "ok": true,
+      "detail": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b/memory/agents/project-d93b3478/repo/reference/kubernetes-rollouts.md"
+    },
+    {
+      "name": "s1.seed-turn-gate-quiet",
+      "ok": true,
+      "detail": "runs=0 judgeRequests=0"
+    },
+    {
+      "name": "s1.session-identified",
+      "ok": true,
+      "detail": "sessionId=01a08a2e-5ac2-7dc5-8959-93fcbf7074da sessionFile=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b/agent/sessions/2026-09-10T07-18-08-835Z_01a08a2e-5ac2-7dc5-8959-93fcbf7074da.jsonl"
+    },
+    {
+      "name": "s1.judge-settled",
+      "ok": true,
+      "detail": "{\"pending\":[\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b/memory/agents/project-d93b3478/runtime/recall/pending/01a08a2e-5ac2-7dc5-8959-93fcbf7074da.json\"]}"
+    },
+    {
+      "name": "s1.nudged-entry",
+      "ok": true,
+      "detail": "count=1 path=reference/kubernetes-rollouts.md"
+    },
+    {
+      "name": "s1.recall-injected",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "name": "s1.no-failed-gate",
+      "ok": true,
+      "detail": "no failed gate entry"
+    },
+    {
+      "name": "s1.run-dir-artifacts",
+      "ok": true,
+      "detail": "runs=1 candidates=true stopReason=stop"
+    },
+    {
+      "name": "s1.judge-request-count",
+      "ok": true,
+      "detail": "judgeRequests=2"
+    },
+    {
+      "name": "s2.sandbox-isolated",
+      "ok": true,
+      "detail": "agentDir=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fA9h1b/agent memoryHome=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fA9h1b/memory"
+    },
+    {
+      "name": "s2.memory-seeded",
+      "ok": true,
+      "detail": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fA9h1b/memory/agents/project-a40287ba/repo/reference/kubernetes-rollouts.md"
+    },
+    {
+      "name": "s2.seed-turn-gate-quiet",
+      "ok": true,
+      "detail": "runs=0 judgeRequests=0"
+    },
+    {
+      "name": "s2.session-identified",
+      "ok": true,
+      "detail": "sessionId=01a08a2e-6cd1-776a-9dc2-7f6d79076a2e sessionFile=/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fA9h1b/agent/sessions/2026-09-10T07-18-13-457Z_01a08a2e-6cd1-776a-9dc2-7f6d79076a2e.jsonl"
+    },
+    {
+      "name": "s2.judge-settled",
+      "ok": true,
+      "detail": "{\"gate\":[\"failed\"]}"
+    },
+    {
+      "name": "s2.gate-child-failed",
+      "ok": true,
+      "detail": "count=1 cause=child_failed"
+    },
+    {
+      "name": "s2.gate-reason-sanitized",
+      "ok": true,
+      "detail": "reason=\"500: {\\\"message\\\":\\\"mock judge outage\\\\nline2\\\"}\" length=43"
+    },
+    {
+      "name": "s2.gate-run-id",
+      "ok": true,
+      "detail": "runId=1a640b1d-ced7-4bfd-9435-84e03983111f"
+    },
+    {
+      "name": "s2.no-nudged-entry",
+      "ok": true,
+      "detail": "count=0"
+    },
+    {
+      "name": "s2.no-pending-file",
+      "ok": true,
+      "detail": "no pending nudges"
+    }
+  ],
+  "facts": [
+    {
+      "scenario": "s1",
+      "baseUrl": "http://127.0.0.1:50601",
+      "sandboxRoot": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b",
+      "sessionId": "01a08a2e-5ac2-7dc5-8959-93fcbf7074da",
+      "sessionFile": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-FIh80b/agent/sessions/2026-09-10T07-18-08-835Z_01a08a2e-5ac2-7dc5-8959-93fcbf7074da.jsonl",
+      "judgeRequests": 2,
+      "runId": "a6321d14-b7cc-434c-b8d6-c53a1843d192",
+      "childStopReason": "stop",
+      "cleanup": [
+        "pid 99398 exited",
+        "server closed",
+        "sandbox removed"
+      ]
+    },
+    {
+      "scenario": "s2",
+      "baseUrl": "http://127.0.0.1:50650",
+      "sandboxRoot": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fA9h1b",
+      "sessionId": "01a08a2e-6cd1-776a-9dc2-7f6d79076a2e",
+      "sessionFile": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fA9h1b/agent/sessions/2026-09-10T07-18-13-457Z_01a08a2e-6cd1-776a-9dc2-7f6d79076a2e.jsonl",
+      "judgeRequests": 6,
+      "gate": {
+        "version": 1,
+        "status": "failed",
+        "cause": "child_failed",
+        "model": "omo-mock/mock-1",
+        "candidateCount": 1,
+        "reason": "500: {\"message\":\"mock judge outage\\nline2\"}",
+        "runId": "1a640b1d-ced7-4bfd-9435-84e03983111f"
+      },
+      "runId": "1a640b1d-ced7-4bfd-9435-84e03983111f",
+      "cleanup": [
+        "pid 635 exited",
+        "server closed",
+        "sandbox removed"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 
+import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { findContinuableBoulderWork } from "../ulw-execute-continuation/boulder-eligibility"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
@@ -61,6 +62,9 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       const state = {
         consecutiveContinuations: 0,
         previousStatusRaw: undefined as string | undefined,
+        // This run's agent_end payload plus the status snapshot taken for it. The continuation
+        // decision runs on agent_settled, so nothing is recorded across a user turn.
+        pendingRun: undefined as { payload: unknown; status: ActiveStatus } | undefined,
       }
 
       pi.on("session_start", async (_payload, eventCtx) => {
@@ -74,6 +78,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
         state.consecutiveContinuations = 0
         state.previousStatusRaw = undefined
+        state.pendingRun = undefined
         if (payload.streamingBehavior === undefined) return { action: "continue" }
         const status = await readActiveStatus(omoBin, runCommand, planExists, eventCtx, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
@@ -85,7 +90,14 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         }
       })
 
-      pi.on("agent_end", async (_payload, eventCtx) => {
+      // agent_end only records this run: it refreshes the footer for EVERY ended run (a blocked
+      // outcome must never leave the `⚡ ultraworking` spinner on screen for a finished run) and
+      // hands the outcome to agent_settled. No terminal-outcome gate runs here, because this handler
+      // is awaited by the host across a two-process toolkit spawn during which a late Esc mutates
+      // this very payload into a user abort, and because a turn the host is holding for required
+      // auto-compaction still reports `willRetry: false` here.
+      pi.on("agent_end", async (payload, eventCtx) => {
+        state.pendingRun = undefined
         if (state.consecutiveContinuations >= CONTINUATION_LIMIT) {
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", {
             reason: "continuation-cap-reached",
@@ -106,21 +118,45 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         if (status === null) {
           return
         }
-        if (status.sessionScoped === false) {
+        state.pendingRun = { payload, status }
+      })
+
+      // The host emits agent_settled only once no automatic retry, compaction or queued continuation
+      // will run (`dist/core/extensions/types.d.ts` AgentSettledEvent), and it keeps mutating the
+      // recorded agent_end event until this boundary closes. Deciding here is what makes a mid-probe
+      // abort and a compaction-owned turn observable, and no continuation budget or dedupe signature
+      // is consumed before the decision is made.
+      pi.on("agent_settled", () => {
+        const run = state.pendingRun
+        state.pendingRun = undefined
+        if (run === undefined) return
+
+        const outcome = readAgentEndOutcome(run.payload)
+        if (outcome.blockedBy !== null) {
+          ctx.logger.info("omo-senpi ulw-loop continuation skipped", {
+            reason: "terminal-outcome",
+            blockedBy: outcome.blockedBy,
+            stopReason: outcome.stopReason,
+            aborted: outcome.aborted,
+            willRetry: outcome.willRetry,
+          })
+          return
+        }
+        if (run.status.sessionScoped === false) {
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "session-id-unavailable" })
           return
         }
-        if (!status.active) {
+        if (!run.status.active) {
           state.previousStatusRaw = undefined
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "inactive" })
           return
         }
-        if (state.previousStatusRaw === status.raw) {
+        if (state.previousStatusRaw === run.status.raw) {
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "stale-status" })
           return
         }
 
-        state.previousStatusRaw = status.raw
+        state.previousStatusRaw = run.status.raw
         state.consecutiveContinuations += 1
         deliverContinuation(pi, ctx)
       })
@@ -146,13 +182,19 @@ const ULW_CONTINUATION_INJECTION_KEY = "omo-senpi-ulw-loop-continuation"
 // no-ops. Falls back to a direct followUp when no coordinator is wired (isolated unit context).
 function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
   if (ctx.idleCoordinator !== undefined) {
-    ctx.idleCoordinator.enqueue({
+    const accepted = ctx.idleCoordinator.enqueue({
       key: ULW_CONTINUATION_INJECTION_KEY,
       source: "ulw-continuation",
       customType: "omo-senpi:ulw-continuation",
       content: CONTINUATION_PROMPT,
       display: false,
     })
+    // Refused = the coordinator retired with the session. The continuation is derived state, not a
+    // durable notification: the next turn's agent_end re-derives it. Log rather than drop in silence.
+    if (accepted === false) {
+      ctx.logger.warn("omo-senpi ulw continuation skipped: idle-injection coordinator retired")
+      return
+    }
     ctx.idleCoordinator.scheduleFlush()
     return
   }

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "bun:test"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import { createUlwLoopComponent } from "./index"
 import { activeStatus, createLogger, sessionEventCtx } from "./ulw-loop.test-support"
@@ -23,7 +23,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     // then the continuation was delivered through the coordinator exactly once, and NOT via sendUserMessage
     expect(delivered).toHaveLength(1)
@@ -46,7 +46,7 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     // then exactly one injection carries both, completion first
     expect(delivered).toHaveLength(1)
@@ -89,9 +89,8 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
       }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
       // when
-      await pi.dispatch(
-        "agent_end",
-        { type: "agent_end" },
+      await dispatchRunEnd(pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
         { cwd: root, sessionManager: { getSessionId: () => "qa-s1" } },
       )
 

@@ -72,6 +72,8 @@ export interface DoctorResult {
   exitCode: number
   target?: DoctorTarget
   codex?: CodexDoctorSummary
+  /** Latest published version on the installed channel; null when the registry lookup failed. */
+  latestVersion: string | null
 }
 
 export interface CodexConfigSummary {

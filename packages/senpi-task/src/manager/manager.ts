@@ -101,6 +101,24 @@ function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
   return join(ownerDir, digest)
 }
 
+/**
+ * The safe, structured slice of a start failure for the internal event log.
+ *
+ * `publicStartFailureMessage` reduces every failure to one fixed sentence, pinned by
+ * start-failure-security.test.ts, because `RunnerFailure.message` is stderr-derived untrusted child
+ * output and `store/redaction.ts` only redacts by KEY name - a free-text value carrying a credential
+ * would be persisted verbatim. So the message stays collapsed, and only these closed enums and
+ * numbers are recorded. That is enough to tell "crashed with code 1" from "spawn_error" from
+ * "killed", which is what a bare `status=error` could never distinguish.
+ */
+function startFailureFacts(error: unknown): Record<string, unknown> | undefined {
+  if (!RunnerError.is(error)) return undefined
+  const { kind, exit } = error.failure
+  return exit === undefined
+    ? { failure_kind: kind }
+    : { failure_kind: kind, exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }
+}
+
 function publicStartFailureMessage(error: unknown): string {
   try {
     if (!RunnerError.is(error)) return GENERIC_START_FAILURE_MESSAGE
@@ -197,7 +215,8 @@ class TaskManagerImpl implements TaskManager {
       tryLoad: (taskId) => this.#tryLoad(taskId),
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       releaseSlot: (taskId, model, epoch) => this.#releaseSlot(taskId, model, epoch),
-      settleWaiters: (taskId) => this.#settleWaiters(taskId),
+      forget: (taskId) => this.forget(taskId),
+      settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
     })
     registerLifecycleReattachPorts(options.store, {
@@ -670,7 +689,10 @@ class TaskManagerImpl implements TaskManager {
       const message = publicStartFailureMessage(error)
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#options.store.transition(record.task_id, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
-      this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })
+      this.#options.store.appendEvent(record.task_id, {
+        type: "task_start_failed",
+        payload: { error_message: message, ...startFailureFacts(error) },
+      })
       this.#steering.dropPending(record.task_id)
       this.#settleWaiters(record.task_id)
       return { ok: false, error: message }
@@ -883,6 +905,12 @@ class TaskManagerImpl implements TaskManager {
         timestamp: nowIso(this.#now),
         error_message: message,
       })
+      // The primary launch path records this breadcrumb; a fallback launch that dies must not be the
+      // one failure that leaves the event log with no cause at all.
+      this.#options.store.appendEvent(context.record.task_id, {
+        type: "task_start_failed",
+        payload: { error_message: message, ...startFailureFacts(error) },
+      })
       this.#settleWaiters(context.record.task_id)
       return
     }
@@ -982,8 +1010,10 @@ class TaskManagerImpl implements TaskManager {
     this.#concurrency.remove(record.model, taskId)
   }
 
-  #settleWaiters(taskId: string): void {
-    const record = this.#tryLoad(taskId)
+  // `terminal` overrides the store read for the one case where the on-disk record cannot be terminal:
+  // the terminal write itself failed (#8050) and the tracker synthesized the record the waiters are owed.
+  #settleWaiters(taskId: string, terminal?: TaskRecord): void {
+    const record = terminal ?? this.#tryLoad(taskId)
     if (record === null || record === undefined || !isTerminalRecord(record)) return
     const waiters = this.#waiters.get(taskId)
     if (waiters === undefined) return

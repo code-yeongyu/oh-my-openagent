@@ -102,70 +102,70 @@
         "description": "OMO 拡張を内蔵したネイティブ omo コマンド。OpenCode や Codex ホスト不要のスタンドアロン。ベータチャンネルのみ。",
         "install": "npm i -g omo-ai@beta"
       },
-      "tagAgents": "11 エージェント",
+      "tagAgents": "11 のロール",
       "tagHooks": "55 ライフサイクルフック",
       "tagComponents": "Light: 11 コンポーネント",
       "tagBeta": "Senpi: ベータチャンネル"
     },
     "agents": {
       "eyebrow": "ロスター",
-      "title": "11 のエージェント、一つのグラフ。",
-      "subtitle": "ウェーブでスケジュールされる 11 エージェントの有向グラフ。オーケストレーターが率い、プランナー・ギャップ分析・プランレビューがゲートを担い、ワーカーが実行します。グラフのノードをクリックすると該当セルが点灯します。",
-      "sisyphus": {
+      "title": "11 のロール、一つのグラフ。",
+      "subtitle": "ウェーブでスケジュールされる 11 ロールの有向グラフ。オーケストレーターが率い、プランナー・ギャップ分析・プランレビューがゲートを担い、カテゴリとキュレーション済みエージェントが実行します。グラフのノードをクリックすると該当セルが点灯します。",
+      "orchestrator": {
         "name": "オーケストレーター",
-        "role": "リードエージェント",
-        "model": "Claude Opus 5 Max",
-        "description": "言葉ではなく意図を読み、一行も触る前にコードベースを把握し、専門エージェントに委譲して結果を独立に検証します。中断した実行は boulder.json から止まった箇所で再開します。"
+        "role": "メインエージェント",
+        "model": "プロファイル: Capable · Simple work · Deep work",
+        "description": "あなたのセッションで、あなたのモデルで動きます。意図を読み、一行も触る前にコードベースを把握し、カテゴリで委譲してすべての結果を独立に検証します。中断した実行は boulder.json から止まった箇所で再開します。"
       },
-      "hephaestus": {
-        "name": "Hephaestus",
-        "role": "ディープワーカー — 探索、計画、決定、実行、検証",
-        "model": "GPT 5.6 Sol Medium"
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan プランニングインタビュー",
+        "model": "メインセッションで実行"
       },
-      "prometheus": {
-        "name": "プランナー",
-        "role": "戦略プランナー",
-        "model": "Claude Fable 5.1 XHigh"
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "ギャップ分析",
+        "model": "Claude Sonnet 4.6"
       },
-      "metis": {
-        "name": "Metis",
-        "role": "計画コンサルタント",
-        "model": "Claude Opus 5 High"
-      },
-      "momus": {
-        "name": "プランレビュアー",
-        "role": "レビューゲート",
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "プランレビューゲート",
         "model": "GPT 6 Astra xHigh"
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "並列タスク実行者",
-        "model": "Claude Sonnet 5"
+      "kibitzer": {
+        "name": "Kibitzer",
+        "role": "ターン終了後のメモリアドバイザー",
+        "model": "Quick カテゴリ"
       },
-      "oracle": {
-        "name": "Oracle",
-        "role": "アーキテクチャコンサルタント",
-        "model": "GPT 5.6 Sol xHigh"
+      "architect": {
+        "name": "Architect",
+        "role": "アーキテクチャ相談レーン",
+        "model": "Claude Fable 5.1 Max"
       },
-      "librarian": {
-        "name": "Librarian",
-        "role": "ドキュメント・コード検索",
-        "model": "GPT 5.6 Luna Fast"
+      "deep": {
+        "name": "Deep",
+        "role": "深い自律的問題解決",
+        "model": "GPT 6 Astra High"
+      },
+      "quick": {
+        "name": "Quick",
+        "role": "小さな単一ファイル変更",
+        "model": "Kimi For Coding Highspeed"
+      },
+      "visualEngineering": {
+        "name": "Visual Engineering",
+        "role": "UI・スタイリング・デザインシステム",
+        "model": "Claude Fable 5.1 Max"
       },
       "explore": {
         "name": "Explore",
         "role": "コードベース grep",
         "model": "GPT 5.6 Luna Fast"
       },
-      "sisyphusJunior": {
-        "name": "ワーカー",
-        "role": "単一タスク実行者",
-        "model": "Per-category"
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "メディア解析",
-        "model": "GPT 5.6 Sol Low"
+      "librarian": {
+        "name": "Librarian",
+        "role": "ドキュメント・コード検索",
+        "model": "GPT 5.6 Luna Fast"
       },
       "dynamic": {
         "name": "Dynamic Agent",
@@ -173,37 +173,57 @@
         "model": "Per-category"
       }
     },
+    "profiles": {
+      "eyebrow": "プロファイル",
+      "title": "モデルではなく、意図を選ぶ。",
+      "subtitle": "プロファイルは順序付きのモデルチェーンです。model_profile を一度設定すると、omo はあなたのプロバイダが提供する最初のモデルでセッションを開始します。同じキーに provider/model をそのまま書けば、そのモデルに固定されます。",
+      "capable": {
+        "name": "Capable",
+        "role": "使える中で最も強い汎用モデル — モデルを考えたくないときの既定。",
+        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
+      },
+      "simpleWork": {
+        "name": "Simple work",
+        "role": "小さく明確な修正を速く安く。",
+        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
+      },
+      "deepWork": {
+        "name": "Deep work",
+        "role": "難問のための最大推論 — deep カテゴリと同じチェーン。",
+        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
+      }
+    },
     "orchestration": {
       "eyebrow": "オーケストレーション",
       "title": "考えてから、動く。",
       "subtitle": "計画と実行は別の仕事です。プランナーはコードを書かず、実行者は二人のレビュアーを通った計画に従います。",
-      "prometheus": {
-        "name": "プランナー",
-        "role": "戦略プランナー",
-        "model": "Claude Fable 5.1 XHigh",
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan",
+        "model": "メインセッションで実行",
         "description": "インタビューし、コードベースを探索し、計画を書く。コードは書かない。",
         "features": ["インタビューモード", "マルチエージェントによるコードベース探索"]
       },
-      "metis": {
-        "name": "Metis",
+      "planConsultant": {
+        "name": "Plan Consultant",
         "role": "ギャップ分析",
-        "model": "Claude Opus 5 High",
+        "model": "Claude Sonnet 4.6",
         "description": "バグになる前に計画の曖昧さを読み取る。",
         "features": ["欠けた要件", "暗黙の前提"]
       },
-      "momus": {
-        "name": "プランレビュアー",
+      "planReviewer": {
+        "name": "Plan Reviewer",
         "role": "計画レビュー",
         "model": "GPT 6 Astra xHigh",
         "description": "計画が持ちこたえる時だけ承認。そうでなければ差し戻す。",
         "features": ["敵対的レビュー", "OKAY か理由の一覧"]
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "マスター実行者",
-        "model": "Claude Sonnet 5",
-        "description": "承認済みの計画を読み、カテゴリとスキルで委譲し、学びを記録し、すべての結果を自ら検証する。",
-        "features": ["意図ベースのルーティング", "独立検証"]
+      "executor": {
+        "name": "実行者",
+        "role": "/ulw-execute",
+        "model": "メインセッションで実行",
+        "description": "承認済みの計画を同じセッションで実行し、カテゴリとスキルで委譲し、すべての結果を自ら検証する。",
+        "features": ["Boulder 状態", "独立検証"]
       }
     },
     "teamMode": {
@@ -400,14 +420,14 @@
         },
         "footer": "ゼロ介入。完全な自律性。ただ結果。"
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "アプローチ2",
         "title": "プランナー + 実行者",
         "subtitle": "戦略的なコントロールが欲しい時。",
-        "prometheusTitle": "プランナー",
-        "prometheusDescription": "インタビューを実施し、コンテキストを調査し、詳細なYAMLプランを生成します。",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "プランを実行し、サブエージェントに委譲し、ウェーブを管理し、進捗を追跡します。",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "インタビューを実施し、コンテキストを調査し、詳細な作業計画を書きます。",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "承認済みの計画を同じセッションで実行し、カテゴリで委譲し、ウェーブを管理し、進捗を追跡します。",
         "footer": "あなたがアーキテクト。エージェントが実行。完全な透明性。"
       }
     },
@@ -428,15 +448,15 @@
     "coreLoop": {
       "title": "コアループ",
       "features": {
-        "prometheus": {
+        "planner": {
           "feature": "プランニングインタビュー",
           "purpose": "知的なインタビューを通じて意図を抽出"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "プランコンサルタント",
           "purpose": "バグになる前に曖昧さを捕捉"
         },
-        "momus": {
+        "planReviewer": {
           "feature": "プランレビューゲート",
           "purpose": "実行前にプランが完全であることを検証"
         },

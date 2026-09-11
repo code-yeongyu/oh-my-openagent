@@ -524,6 +524,57 @@ describe("DAG scheduler terminal result persistence", () => {
   })
 })
 
+describe("#8020 scheduler quiescence", () => {
+  test("#given an in-flight admission #when suspended #then lease handoff waits for admission and stale completion cannot write", async () => {
+    const admitted = deferred<void>()
+    const release = deferred<void>()
+    class GatedManager extends FakeTaskManager {
+      override async startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
+        const result = await super.startOwned(spec, owner)
+        admitted.resolve()
+        await release.promise
+        return result
+      }
+    }
+    const manager = new GatedManager({ autoComplete: false })
+    const { scheduler, store } = schedulerFixture(definition([node("live"), node("next", ["live"])]), manager)
+    const running = scheduler.run()
+    await within(admitted.promise, 3000)
+    let quiesced = false
+    const suspending = scheduler.suspend().then(() => { quiesced = true })
+    expect(quiesced).toBe(false)
+    const seq = scheduler.snapshot().checkpointSeq
+    release.resolve()
+    await within(suspending, 3000)
+    await within(running, 3000)
+    manager.complete("live")
+    await scheduler.whenIdle()
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.checkpointSeq).toBe(seq)
+    expect(manager.starts).toEqual(["live"])
+    expect(manager.cancellations).toEqual([])
+    expect(scheduler.snapshot().nodes.map((entry) => entry.state)).toEqual(["scheduled", "pending"])
+  })
+
+  test("#given an attached running child #when suspended then the child settles #then the retired frontier never admits its dependent", async () => {
+    const manager = new FakeTaskManager({ autoComplete: false })
+    const { scheduler } = schedulerFixture(definition([node("live"), node("next", ["live"])]), manager)
+    const attached = deferred<void>()
+    scheduler.subscribe((event) => {
+      if (event.type === "dag.node.task-attached") attached.resolve()
+    })
+    const running = scheduler.run()
+    await within(attached.promise, 3000)
+    await scheduler.suspend()
+    await within(running, 3000)
+    const before = scheduler.snapshot()
+    manager.complete("live")
+    await scheduler.whenIdle()
+    expect(scheduler.snapshot()).toEqual(before)
+    expect(manager.starts).toEqual(["live"])
+    expect(manager.cancellations).toEqual([])
+  })
+})
+
 describe("DAG scheduler subscriber backpressure", () => {
   test("#given a non-default subscriber ring #when a scheduler listener falls behind #then overflow occurs at the configured bound", async () => {
     // given
@@ -1173,11 +1224,11 @@ describe("DAG scheduler node spawn policy", () => {
     // given
     const manager = new FakeTaskManager()
     const { scheduler } = schedulerFixture(
-      definition([{ id: "review", prompt: "review the plan", subagent_type: "momus" }]),
+      definition([{ id: "review", prompt: "review the plan", subagent_type: "plan-reviewer" }]),
       manager,
       undefined,
       undefined,
-      () => ({ kind: "deny" as const, message: "momus requires a plan gate" }),
+      () => ({ kind: "deny" as const, message: "plan-reviewer requires a plan gate" }),
     )
 
     // when
@@ -1185,7 +1236,7 @@ describe("DAG scheduler node spawn policy", () => {
 
     // then
     expect(result.nodes[0]?.state).toBe("failed")
-    expect(result.nodes[0]?.error?.message).toContain("momus requires a plan gate")
+    expect(result.nodes[0]?.error?.message).toContain("plan-reviewer requires a plan gate")
     expect(manager.attempts).toEqual([])
   })
 
@@ -1194,7 +1245,7 @@ describe("DAG scheduler node spawn policy", () => {
     const manager = new FakeTaskManager()
     const canonical = "Review the work plan at .omo/plans/x.md for contradictions and blocking issues."
     const { scheduler } = schedulerFixture(
-      definition([{ id: "review", prompt: "caller wording", subagent_type: "momus" }]),
+      definition([{ id: "review", prompt: "caller wording", subagent_type: "plan-reviewer" }]),
       manager,
       undefined,
       undefined,
@@ -1564,7 +1615,7 @@ describe("DAG scheduler node controls", () => {
     // given
     const manager = new FakeTaskManager({
       sendOutcomes: {
-        "one-shot": { kind: "one_shot_agent", task_id: "task-one-shot", agent: "momus", message: "momus takes no follow-ups" },
+        "one-shot": { kind: "one_shot_agent", task_id: "task-one-shot", agent: "plan-reviewer", message: "plan-reviewer takes no follow-ups" },
         denied: { kind: "scope_denied", task_id: "task-denied", owning_session_id: "other", reason: "belongs to another session" },
         detached: { kind: "not_continuable", task_id: "task-detached", reason: "suspended", suggestion: "task_output" },
       },
@@ -1606,7 +1657,7 @@ describe("DAG scheduler node controls", () => {
       queuePosition: 1,
     })
     expect(outcomes["one-shot"]).toContain("node_not_continuable")
-    expect(outcomes["one-shot"]).toContain("momus takes no follow-ups")
+    expect(outcomes["one-shot"]).toContain("plan-reviewer takes no follow-ups")
     expect(outcomes.denied).toContain("node_not_continuable")
     expect(outcomes.denied).toContain("belongs to another session")
     expect(outcomes.detached).toContain("node_not_continuable")

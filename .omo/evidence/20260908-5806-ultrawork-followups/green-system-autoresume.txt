@@ -1,0 +1,16 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin-interface.test.ts:
+(pass) createPluginInterface - command.execute.before > executes ulw-execute side effects for native command execution [18.64ms]
+(pass) createPluginInterface - command.execute.before > does not run ulw-execute side effects for other native commands with session context [2.30ms]
+(pass) createPluginInterface - command.execute.before > switches native ulw-execute to Atlas when Atlas is registered in config [3.96ms]
+(pass) createPluginInterface - goal native command smoke > starts the goal from the native command flow with parsed arguments intact [1.61ms]
+(pass) createPluginInterface - post-compaction ULW restoration > keeps runtime guidance in system transforms until a real message restores it [1.15ms]
+(pass) createPluginInterface - backward compatibility > strips legacy ZWSP-prefixed agent names from persisted chat.message session state (GH-3259) [0.22ms]
+(pass) createPluginInterface - chat.params variant injection > injects variant from agent config into chat.params message [1.38ms]
+(pass) createPluginInterface - chat.params variant injection > does not overwrite existing variant in chat.params message [0.28ms]
+
+ 8 pass
+ 0 fail
+ 15 expect() calls
+Ran 8 tests across 1 file. [744.00ms]

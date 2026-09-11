@@ -43,7 +43,13 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // reader, receipts, mailbox and metadata seams into the entry for the first time. First-party code only -
 // bundle-purity stays green with no new third-party dependency inlined. Measured 1,068,655 bytes after
 // minification on top of dev's 1,031,755; 1,100,000 keeps ~2.9% headroom rather than the failing value.
-const BUDGET_BYTES = 1_100_000
+// Raised 1,100,000 -> 1,140,000 for plan omo-senpi-role-names (model profiles): the `model-profile`
+// component (builtin profile table, chain resolver, session-apply wiring) enters the entry for the
+// first time. First-party code only - `bundle purity` stays green on both cases and no dependency
+// manifest changed (`git diff origin/dev...HEAD -- package.json packages/omo-senpi/package.json` is
+// empty). Measured 1,105,921 bytes after minification on top of dev's 1,098,205; 1,140,000 keeps ~3%
+// headroom rather than the failing value.
+const BUDGET_BYTES = 1_140_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

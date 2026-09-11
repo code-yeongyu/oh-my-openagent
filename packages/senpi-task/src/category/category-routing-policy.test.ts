@@ -40,7 +40,7 @@ describe("Senpi category routing policy", () => {
         variant: "high",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["claude-sdk-oauth", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5",
         variant: "low",
       },

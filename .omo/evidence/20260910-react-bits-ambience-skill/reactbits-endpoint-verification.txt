@@ -1,0 +1,13 @@
+# reactbits.dev endpoint verification — 2026-09-10T07:34:47.439Z
+Captured from the session host with Bun fetch; source bodies deliberately NOT stored (MIT + Commons Clause: read, never vendor).
+
+GET https://reactbits.dev/llms.txt -> 200 text/plain 75374 bytes; catalog entries: 171; catalog header and intro line present (not reproduced here: upstream documentation text is not ours to copy).
+
+GET https://reactbits.dev/r/registry.json -> 200 application/json 287651 bytes; items: 684; schema: https://ui.shadcn.com/schema/registry.json; name: @react-bits
+  every routing-map component present as <Name>-TS-TW: YES (74 names checked)
+
+GET https://reactbits.dev/r/BlurText-TS-TW.json -> 200 application/json 4117 bytes; files: 1 (BlurText/BlurText.tsx); files[0].content length: 3571 chars; dependencies: ["motion@^12.23.12"]
+GET https://reactbits.dev/r/Aurora-TS-TW.json -> 200 application/json 7051 bytes; files: 1; content length: 6445; dependencies: ["ogl@^1.0.11"]
+GET https://reactbits.dev/r/SpotlightCard-TS-TW.json -> 200 application/json 2340 bytes; files: 1; content length: 1860; dependencies: [] (zero-dependency row)
+
+jq recipe equivalence: '.files[].content' selects the source string(s) above; '.dependencies' selects the pinned engine list. Verified shapes match the recipe in ambience-skill.md section 2.

@@ -44,6 +44,7 @@ describe("dead-chain category disabling", () => {
         "bailian-coding-plan",
         "opencode-go",
         "xai",
+        "claude-sdk-oauth",
         "anthropic-api",
         "github-copilot",
       ])
@@ -91,6 +92,23 @@ describe("dead-chain category disabling", () => {
       expect(result.kind).toBe("resolved")
       expect(result.availableCategories).toContain("unspecified-high")
       expect(result.availableCategories).not.toContain("quick")
+    })
+  })
+
+  describe("#given a Copilot-only registry whose Claude ids use the engine's dotted spelling", () => {
+    test("#when the quick chain's copilot rung is claude-haiku-4-5 #then the transformed id keeps the category alive", () => {
+      // given
+      const copilotOnly = registry([model("github-copilot", "claude-haiku-4.5")])
+
+      // when
+      const result = resolveCategory("quick", {}, copilotOnly)
+
+      // then
+      expect(result.kind).toBe("resolved")
+      if (result.kind !== "resolved") throw new Error("Expected resolved")
+      expect(result.spec.provider).toBe("github-copilot")
+      expect(result.spec.modelId).toBe("claude-haiku-4.5")
+      expect(result.availableCategories).toContain("quick")
     })
   })
 

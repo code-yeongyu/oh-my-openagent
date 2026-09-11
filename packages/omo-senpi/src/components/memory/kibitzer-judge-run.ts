@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "@oh-my-opencode/memory-core/fs"
-import type { RecallNudge } from "@oh-my-opencode/memory-core"
+import { loadKibitzerPersona, PERSONA_ASSET_FILENAMES, type RecallNudge } from "@oh-my-opencode/memory-core"
 import type { ChildHandle } from "@oh-my-opencode/senpi-task"
 import { join } from "node:path"
 
@@ -10,6 +10,7 @@ import { classifyJudgeTurn, normalizeGateReason } from "./kibitzer-judge-outcome
 import { buildKibitzerJudgeSpec } from "./kibitzer-judge-spec"
 import { kibitzerCandidatesPayload, renderTranscriptWindow } from "./kibitzer-prompt"
 import { writeKibitzerRunOutcome } from "./kibitzer-run-retention"
+import { loadKibitzerTaskRuntime } from "./kibitzer-task-runtime"
 import type {
   KibitzerGateLaunchInput,
   KibitzerGateLaunchResult,
@@ -54,6 +55,17 @@ export async function runKibitzerJudge(
     })
     return result
   }
+  // The persona is the one asset the child consumes that lives in the mutable install tree. It is
+  // primed at registration (persona-prime.ts) and served from memory-core's cache; a read that still
+  // fails here is reported as itself, named by asset, instead of as a session-creation failure.
+  let systemPrompt: string
+  try {
+    systemPrompt = (host.options.loadPersona ?? loadKibitzerPersona)()
+  } catch (error) {
+    const reason = normalizeGateReason(`${PERSONA_ASSET_FILENAMES.kibitzer}: ${describe(error)}`)
+    host.options.logger?.warn("kibitzer gate persona unavailable", { runId, asset: PERSONA_ASSET_FILENAMES.kibitzer, reason })
+    return await record({ status: "failed", cause: "persona_unavailable", reason, runId, model: resolution.model, candidateCount: input.candidates.length })
+  }
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined
   let deadlineReached = false
   const deadline = new Promise<"deadline">((resolve) => {
@@ -64,15 +76,9 @@ export async function runKibitzerJudge(
     deadlineTimer.unref?.()
   })
   const setup = (async (): Promise<ChildHandle> => {
-    await mkdir(runDir, { recursive: true, mode: 0o700 })
-    // Auditable artifacts, NOT inputs: the child receives both inline in its prompt and holds no
-    // read tool. The run dir is kept after the run so a live or finished judge can be inspected.
-    await Promise.all([
-      writeFile(join(runDir, "candidates.json"), `${JSON.stringify(kibitzerCandidatesPayload(input), null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
-      writeFile(join(runDir, "transcript-window.txt"), renderTranscriptWindow(input.transcript), { encoding: "utf8", mode: 0o600 }),
-    ])
-
-    const taskRuntime = await import("#omo-task-runtime")
+    await writeRunArtifacts(host, input, runDir, runId)
+    // Primed at registration (persona-prime.ts); this awaits that same load, never a fresh resolve.
+    const taskRuntime = await loadKibitzerTaskRuntime()
     const runnerOptions = host.options.createSession === undefined ? {} : { createSession: host.options.createSession }
     const runner = host.options.createRunner?.(runnerOptions)
       ?? taskRuntime.createInProcessJudgeRunner(runnerOptions)
@@ -85,6 +91,7 @@ export async function runKibitzerJudge(
       chain: childModelChainSpec({ model: resolution.model, fallbacks: resolution.fallbacks }),
       ...(resolution.thinking === undefined ? {} : { thinkingLevel: resolution.thinking }),
       accepted,
+      systemPrompt,
     }))
   })()
   const setupResult = setup.then(
@@ -126,7 +133,7 @@ export async function runKibitzerJudge(
       state.cancelled = true
       return await record({ status: "dropped", cause: "deadline", model: resolution.model, candidateCount: input.candidates.length, runId })
     }
-    const classification = classifyJudgeTurn(raced.outcome)
+    const classification = classifyJudgeTurn(raced.outcome, accepted)
     const model = raced.outcome.status === "cancelled" ? undefined : raced.outcome.model
     if (classification.status === "failed") {
       const reason = normalizeGateReason(classification.reason)
@@ -136,6 +143,7 @@ export async function runKibitzerJudge(
     if (classification.status === "dropped") {
       return await record({ status: "dropped", cause: "cancelled", runId, candidateCount: input.candidates.length })
     }
+    // `empty` is a completed run with nothing accepted; the runner reports it as `empty` from `accepted`.
     return await record({ status: "completed", ...(model === undefined ? {} : { model }) })
   } catch (error) {
     host.options.logger?.warn("kibitzer gate child session creation failed", { error: normalizeGateReason(describe(error)), runId })
@@ -146,6 +154,21 @@ export async function runKibitzerJudge(
       host.handle = undefined
       handle.dispose()
     }
+  }
+}
+
+// Auditable artifacts, NOT inputs: the child receives both inline in its prompt and holds no read
+// tool. The run dir is kept after the run so a live or finished judge can be inspected. A write
+// that fails is therefore logged and skipped; only what the child consumes may fail the fire.
+async function writeRunArtifacts(host: KibitzerJudgeRunHost, input: KibitzerGateLaunchInput, runDir: string, runId: string): Promise<void> {
+  try {
+    await mkdir(runDir, { recursive: true, mode: 0o700 })
+    await Promise.all([
+      writeFile(join(runDir, "candidates.json"), `${JSON.stringify(kibitzerCandidatesPayload(input), null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
+      writeFile(join(runDir, "transcript-window.txt"), renderTranscriptWindow(input.transcript), { encoding: "utf8", mode: 0o600 }),
+    ])
+  } catch (error) {
+    host.options.logger?.warn("kibitzer gate run artifacts skipped", { runId, runDir, error: normalizeGateReason(describe(error)) })
   }
 }
 

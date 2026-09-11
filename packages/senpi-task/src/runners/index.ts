@@ -38,6 +38,7 @@ export {
   buildRpcSpawn,
   OMO_SENPI_TASK_RPC_CHILD,
   detectBunBinary,
+  detectCompiledEngine,
   resolveChildSessionDir,
   resolveSenpiExecutable,
   resolveSenpiLauncher,

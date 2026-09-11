@@ -1,4 +1,4 @@
-import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import { transformModelForProvider, type DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoCategoryConfig } from "@oh-my-opencode/omo-config-core"
 
 import { ANTHROPIC_CATEGORIES } from "./anthropic-categories"
@@ -54,6 +54,18 @@ export function categoryGateModels(categoryName: string): readonly string[] | un
     : undefined
 }
 
+function categoryChainProviders(categoryName: string): readonly string[] {
+  const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName)
+    ? CATEGORY_FALLBACK_CHAINS[categoryName]
+    : []
+  return chain.flatMap((rung) => rung.providers)
+}
+
+// The gate model is spelled the way omo's routing tables spell it (claude-fable-5-1); some engine
+// providers expose the same model under a provider-specific id (github-copilot: claude-fable-5.1).
+// Accept the gate when any provider this category can actually route to transforms the gate id
+// into a registry id, mirroring what delegate-core does before resolving a rung. Only the provider
+// transform widens the match; family and version comparison stays exact.
 export function isCategoryGateSatisfied(
   categoryName: string,
   hasExplicitUserConfig: boolean,
@@ -61,30 +73,24 @@ export function isCategoryGateSatisfied(
 ): boolean {
   const gateModels = categoryGateModels(categoryName)
   if (gateModels === undefined || hasExplicitUserConfig) return true
-  return gateModels.some((gateModel) => availableModelIds.has(gateModel))
-}
-
-// Mirrors the kimi transform from model-core provider-model-id-transform.ts (kimi-k3 -> k3); the
-// other chain providers resolve by their bare model id. senpi-task cannot import model-core here
-// without adding a package dependency outside this task's scope (see fallback-chains.ts).
-function transformChainModelId(provider: string, model: string): string {
-  if (provider === "kimi-coding" || provider === "kimi-for-coding") {
-    if (model === "kimi-k3") return "k3"
-    if (model === "kimi-k3-256k") return "k3-256k"
-  }
-  return model
+  const chainProviders = categoryChainProviders(categoryName)
+  return gateModels.some((gateModel) =>
+    availableModelIds.has(gateModel)
+      || chainProviders.some((provider) => availableModelIds.has(transformModelForProvider(provider, gateModel)))
+  )
 }
 
 // A chain rung resolves when the live registry exposes its model id: either directly (the
 // gateway-prefix unwrap in resolver.modelIdsOf surfaces vercel/openai/gpt-5.6-sol as gpt-5.6-sol)
-// or through the provider-specific id transform (kimi-coding/k3 satisfies a kimi-k3 rung).
+// or through the provider-specific id transform delegate-core applies at resolution time
+// (kimi-coding/k3 satisfies a kimi-k3 rung, github-copilot/claude-haiku-4.5 a claude-haiku-4-5 rung).
 export function isCategoryChainRungResolvable(
   entry: DelegateFallbackEntry,
   availableModelIds: ReadonlySet<string>,
 ): boolean {
   if (availableModelIds.has(entry.model)) return true
   return entry.providers.some((provider) =>
-    availableModelIds.has(transformChainModelId(provider, entry.model))
+    availableModelIds.has(transformModelForProvider(provider, entry.model))
   )
 }
 

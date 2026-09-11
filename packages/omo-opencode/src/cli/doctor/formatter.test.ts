@@ -38,6 +38,7 @@ function createDoctorResult(): DoctorResult {
       duration: 12,
     },
     exitCode: 0,
+    latestVersion: "3.5.0",
   }
 }
 
@@ -102,7 +103,7 @@ function createCodexDoctorResult(): DoctorResult {
 
 describe("formatDoctorOutput", () => {
   describe("#given default mode", () => {
-    it("shows System OK when no issues", async () => {
+    it("shows the edition, installed, latest, and update command when no issues", async () => {
       //#given
       const result = createDoctorResult()
       const { formatDoctorOutput } = await import(`./framework/formatter?default-ok-${Date.now()}`)
@@ -111,7 +112,8 @@ describe("formatDoctorOutput", () => {
       const output = stripAnsi(formatDoctorOutput(result, "default"))
 
       //#then
-      expect(output).toContain("System OK (opencode 1.0.200 · oh-my-openagent 3.4.0)")
+      expect(output).toContain("System OK · Edition: OpenCode · Installed: 3.4.0 · Latest: 3.5.0")
+      expect(output).toContain("Update: bunx oh-my-openagent install")
     })
 
     it("shows issue count and details when issues exist", async () => {
@@ -279,6 +281,7 @@ describe("formatDoctorOutput", () => {
       expect(parsed.summary.total).toBe(2)
       expect(parsed.systemInfo.pluginVersion).toBe("3.4.0")
       expect(parsed.exitCode).toBe(0)
+      expect(parsed.latestVersion).toBe("3.5.0")
     })
   })
 })

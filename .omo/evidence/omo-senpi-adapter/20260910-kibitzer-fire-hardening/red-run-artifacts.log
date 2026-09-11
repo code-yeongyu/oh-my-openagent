@@ -1,0 +1,18 @@
+error: expect(received).toMatchObject(expected)
+-   "nudges": [
+-     {
+-       "path": "reference/kubernetes-rollouts.md",
+-     },
+-   ],
+-   "status": "nudged",
++   "candidateCount": 1,
++   "cause": "session_create_failed",
++   "model": "omo-mock/mock-1",
++   "reason": "ENOTDIR: not a directory, mkdir '/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-kibitzer-runner-Y93kbz/agents/kibitzer-agent/runtime/recall/runs/…",
++   "runId": "6ead197e-f597-4c22-a2fd-8e873fcc2d49",
++   "status": "failed",
+- Expected  - 6
++ Received  + 6
+(fail) KibitzerGateRunner > #given a run dir whose artifact writes reject #when a judge nudges once #then the artifacts are skipped with a warning and the nudge is still delivered [18.10ms]
+ 0 pass
+ 1 fail

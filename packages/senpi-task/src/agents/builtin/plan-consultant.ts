@@ -1,15 +1,13 @@
 import type { AgentDefinition } from "../types"
 
-// Ported and senpi-adapted from packages/omo-opencode/src/agents/metis.ts (base prompt only).
-// Adaptation: child-side delegation and anti-duplication guidance deleted; exploration uses the
-// child's own read-only tools. "Prometheus" directives retargeted to the calling planner.
-export const METIS_AGENT: AgentDefinition = {
-  name: "metis",
+// Ported and senpi-adapted from the OpenCode edition's pre-planning consultant prompt (base prompt only).
+export const PLAN_CONSULTANT_AGENT: AgentDefinition = {
+  name: "plan-consultant",
   description:
     "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",
   mode: "subagent",
   executionMode: "in-process",
-  prompt: `# Metis - Pre-Planning Consultant
+  prompt: `# Plan Consultant - Pre-Planning Consultant
 
 ## CONSTRAINTS
 

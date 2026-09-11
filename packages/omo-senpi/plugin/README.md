@@ -20,7 +20,7 @@ The plugin ships 19 skills by default:
 - `review-work` — multi-angle implementation and PR review
 - `ultimate-browsing` — escalation browsing for blocked or hard-to-reach pages
 - `ultrawork` — ultrawork mode directive
-- `ulw-execute` — execute a Prometheus work plan with Boulder state
+- `ulw-execute` — execute a ulw-plan work plan with Boulder state
 - `ulw-loop` — goal-like ultrawork loop
 - `ulw-plan` — adversarial planning workflow
 - `ulw-research` — ultra-wide research orchestration
@@ -47,6 +47,15 @@ omo install --platform=senpi
 ```
 
 Only local-path installs are supported in v1. `git:` and `npm:` installs are not supported because `extensions/` and `skills/` are generated build outputs, not checked-in source trees.
+
+## Bundled MCP servers
+
+The extension declares two lazy remote MCP servers, so they cost nothing until a tool call needs them:
+
+- `context7` — `https://mcp.context7.com/mcp`, library and framework documentation lookup. Anonymous by default; set `CONTEXT7_API_KEY` to authenticate (the key is read from the environment at connect time and never written into config).
+- `grep_app` — `https://mcp.grep.app`, GitHub-wide code search.
+
+A server of the same name in your user or project `mcp.json` always wins, so `{ "mcpServers": { "context7": { "enabled": false } } }` turns one off and a full entry replaces it with your own configuration. `--omo-senpi-builtin-mcps-disabled` drops both. Web search and page fetching are senpi builtins (`websearch`, `webfetch`) and are not re-declared here.
 
 ## Disable Components
 

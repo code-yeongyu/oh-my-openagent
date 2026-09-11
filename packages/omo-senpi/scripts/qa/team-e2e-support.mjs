@@ -9,7 +9,7 @@ import { join } from "node:path"
 
 const RESERVED_PREFIX = ".delivering-"
 
-// The Metis #7/#8 credential-isolation guarantee: these four files in the real ~/.senpi/agent must be
+// The plan-consultant #7/#8 credential-isolation guarantee: these four files in the real ~/.senpi/agent must be
 // byte-unchanged across a QA run. The whole-dir digest is informational only (a live dev machine writes
 // senpi-debug.log + concurrent session JSONL), so allPass gates on THIS scoped digest, never the dir.
 export { credentialDigest } from "./drive.mjs"

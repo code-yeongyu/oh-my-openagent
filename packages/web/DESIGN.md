@@ -166,13 +166,13 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 ### LedgerRow (`components/ledger/ledger-row.tsx`)
 
-- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by Editions, Orchestration flow, Principles.
+- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by Editions, Orchestration flow, Profiles, Principles.
 - States: default, hover, focus-within (index turns `--accent`), `data-active` (left 2px `--accent` rule) when linked from the graph.
 
 ### BentoCell (`components/ledger/bento-cell.tsx`)
 
-- Cells of the agents grid (`grid-flow-dense`, 1px gaps revealing `--line`, so the grid itself draws the rules). Cell fill `--ink-1`, hover `--ink-2` + icon `--accent`, spans: orchestrator 2×2, Hephaestus 2×1, others 1×1; mobile 1 column, tablet 2. Content: icon 20px (Lucide/Phosphor SVG), name (Subheading), role (Body/sm `--text-mid`), model chip (Meta mono on `--ink-2`, `--line` border, 2px radius).
-- Gapless verification: 4 columns × 3 rows desktop = 12 cells: orchestrator 4 + Hephaestus 2 + 6 singles = 12. Tablet 2 columns: orchestrator 2×2, Hephaestus 2×1, 6 singles → 4 + 2 + 6 = 12 = 2 × 6 rows. No holes.
+- Cells of the agents grid (`grid-flow-dense`, 1px gaps revealing `--line`, so the grid itself draws the rules). Cell fill `--ink-1`, hover `--ink-2` + icon `--accent`, spans: orchestrator 2×2, planner 2×1, others 1×1; mobile 1 column, tablet 2. Content: icon 20px (Lucide/Phosphor SVG), name (Subheading), role (Body/sm `--text-mid`), model chip (Meta mono on `--ink-2`, `--line` border, 2px radius).
+- Gapless verification: 4 columns × 4 rows desktop = 16 units: orchestrator 4 + planner 2 + 10 singles = 16. Tablet 2 columns: orchestrator 2×2, planner 2×1, 10 singles → 4 + 2 + 10 = 16 = 2 × 8 rows. No holes.
 
 ### Terminal (`components/landing/terminal.tsx`)
 
@@ -253,11 +253,11 @@ Grain is not used (omp.sh's canvas grain and factory's texture PNG would fight t
 
 ### Meaning
 
-The GitHub one-liner calls the user "the master of graph engineering". The focal object is that graph: a directed acyclic graph of agent nodes scheduled in waves by `mass ulw`. Wave 1 = orchestrator (lead) → wave 2 = planner, gap analysis, plan review (plan + gates) → wave 3 = Atlas, Hephaestus, Oracle, Librarian, Explore, worker, Multimodal-Looker (execution). A 12s loop lights the waves in order, pulses travel down the edges, and a final "verified" flash settles the graph.
+The GitHub one-liner calls the user "the master of graph engineering". The focal object is that graph: a directed acyclic graph of agent nodes scheduled in waves by `mass ulw`. Wave 1 = orchestrator (lead) → wave 2 = Ultrawork Planner, Plan Consultant, Plan Reviewer (plan + gates) → wave 3 = Kibitzer, Architect, Deep, Quick, Visual Engineering, Explore, Librarian (categories and curated agents, execution). A 12s loop lights the waves in order, pulses travel down the edges, and a final "verified" flash settles the graph.
 
 ### Content and geometry
 
-- Desktop 11 nodes / mobile 7 (drop gap analysis, plan review, Multimodal-Looker, worker). Positions precomputed in `components/landing/graph/graph-data.ts` (seeded, three planes along -Z).
+- Desktop 11 nodes / mobile 7 (drop Plan Consultant, Kibitzer, Quick, Visual Engineering). Positions precomputed in `components/landing/graph/graph-data.ts` (seeded, three planes along -Z).
 - Node = icosahedron (detail 1) `MeshStandardMaterial` (`--ink-3` base, emissive `--accent-dim`, emissiveIntensity 0.2 idle → 1.6 lit) + one additive-blended halo sprite (shared 64×64 radial CanvasTexture, `--accent-16` → transparent). No bloom / postprocessing.
 - Edges = one `LineSegments` geometry, `--accent-dim` at 0.35 opacity; lit edge 0.8.
 - Pulses = one `Points` object (≤ 48 desktop / 24 mobile) whose `t` along its edge advances per frame in a typed array; size 6px, `--accent-hot`.

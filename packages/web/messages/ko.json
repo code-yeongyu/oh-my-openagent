@@ -102,70 +102,70 @@
         "description": "OMO 확장이 내장된 네이티브 omo 명령. OpenCode 나 Codex 호스트 없이 단독 실행. 베타 채널 전용.",
         "install": "npm i -g omo-ai@beta"
       },
-      "tagAgents": "11개 에이전트",
+      "tagAgents": "11개 역할",
       "tagHooks": "55개 라이프사이클 훅",
       "tagComponents": "Light: 11개 컴포넌트",
       "tagBeta": "Senpi: 베타 채널"
     },
     "agents": {
       "eyebrow": "로스터",
-      "title": "열한 에이전트, 하나의 그래프.",
-      "subtitle": "웨이브로 스케줄되는 11개 에이전트의 방향 그래프: 오케스트레이터가 이끌고, 플래너·갭 분석·플랜 리뷰가 검문을, 워커가 실행을 맡습니다. 그래프의 노드를 클릭하면 해당 셀이 켜집니다.",
-      "sisyphus": {
+      "title": "열한 역할, 하나의 그래프.",
+      "subtitle": "웨이브로 스케줄되는 11개 역할의 방향 그래프: 오케스트레이터가 이끌고, 플래너·갭 분석·플랜 리뷰가 검문을, 카테고리와 큐레이션된 에이전트가 실행을 맡습니다. 그래프의 노드를 클릭하면 해당 셀이 켜집니다.",
+      "orchestrator": {
         "name": "오케스트레이터",
-        "role": "리드 에이전트",
-        "model": "Claude Opus 5 Max",
-        "description": "말한 그대로가 아니라 의도를 읽고, 코드 한 줄을 건드리기 전에 코드베이스를 파악하고, 전문 에이전트에 위임한 뒤 결과를 독립적으로 검증합니다. 중단된 실행은 boulder.json 에서 멈춘 지점부터 재개됩니다."
+        "role": "메인 에이전트",
+        "model": "프로필: Capable · Simple work · Deep work",
+        "description": "당신의 세션에서, 당신의 모델로 실행됩니다. 의도를 읽고, 코드 한 줄을 건드리기 전에 코드베이스를 파악하고, 카테고리로 위임한 뒤 모든 결과를 독립적으로 검증합니다. 중단된 실행은 boulder.json 에서 멈춘 지점부터 재개됩니다."
       },
-      "hephaestus": {
-        "name": "Hephaestus",
-        "role": "딥 워커 — 탐색, 계획, 결정, 실행, 검증",
-        "model": "GPT 5.6 Sol Medium"
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan 플래닝 인터뷰",
+        "model": "메인 세션에서 실행"
       },
-      "prometheus": {
-        "name": "플래너",
-        "role": "전략 플래너",
-        "model": "Claude Fable 5.1 XHigh"
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "갭 분석",
+        "model": "Claude Sonnet 4.6"
       },
-      "metis": {
-        "name": "Metis",
-        "role": "계획 컨설턴트",
-        "model": "Claude Opus 5 High"
-      },
-      "momus": {
-        "name": "플랜 리뷰어",
-        "role": "리뷰 게이트",
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "플랜 리뷰 게이트",
         "model": "GPT 6 Astra xHigh"
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "병렬 작업 실행자",
-        "model": "Claude Sonnet 5"
+      "kibitzer": {
+        "name": "Kibitzer",
+        "role": "턴 종료 후 메모리 어드바이저",
+        "model": "Quick 카테고리"
       },
-      "oracle": {
-        "name": "Oracle",
-        "role": "아키텍처 컨설턴트",
-        "model": "GPT 5.6 Sol xHigh"
+      "architect": {
+        "name": "Architect",
+        "role": "아키텍처 상담 레인",
+        "model": "Claude Fable 5.1 Max"
       },
-      "librarian": {
-        "name": "Librarian",
-        "role": "문서·코드 검색",
-        "model": "GPT 5.6 Luna Fast"
+      "deep": {
+        "name": "Deep",
+        "role": "심층 자율 문제 해결",
+        "model": "GPT 6 Astra High"
+      },
+      "quick": {
+        "name": "Quick",
+        "role": "작은 단일 파일 변경",
+        "model": "Kimi For Coding Highspeed"
+      },
+      "visualEngineering": {
+        "name": "Visual Engineering",
+        "role": "UI·스타일링·디자인 시스템",
+        "model": "Claude Fable 5.1 Max"
       },
       "explore": {
         "name": "Explore",
         "role": "코드베이스 grep",
         "model": "GPT 5.6 Luna Fast"
       },
-      "sisyphusJunior": {
-        "name": "워커",
-        "role": "단일 작업 실행자",
-        "model": "Per-category"
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "미디어 분석",
-        "model": "GPT 5.6 Sol Low"
+      "librarian": {
+        "name": "Librarian",
+        "role": "문서·코드 검색",
+        "model": "GPT 5.6 Luna Fast"
       },
       "dynamic": {
         "name": "Dynamic Agent",
@@ -173,37 +173,57 @@
         "model": "Per-category"
       }
     },
+    "profiles": {
+      "eyebrow": "프로필",
+      "title": "모델이 아니라 의도를 고르세요.",
+      "subtitle": "프로필은 순서가 있는 모델 체인입니다. model_profile 을 한 번 설정하면 omo 는 당신의 프로바이더가 제공하는 첫 번째 모델로 세션을 시작합니다. 같은 키에 provider/model 을 그대로 적으면 그 모델로 고정됩니다.",
+      "capable": {
+        "name": "Capable",
+        "role": "쓸 수 있는 가장 강한 범용 모델 — 모델을 고민하고 싶지 않을 때의 기본값.",
+        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
+      },
+      "simpleWork": {
+        "name": "Simple work",
+        "role": "작고 명확한 수정을 빠르고 저렴하게.",
+        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
+      },
+      "deepWork": {
+        "name": "Deep work",
+        "role": "어려운 문제를 위한 최대 추론 — deep 카테고리와 같은 체인.",
+        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
+      }
+    },
     "orchestration": {
       "eyebrow": "오케스트레이션",
       "title": "먼저 생각하고, 그다음 실행.",
       "subtitle": "계획과 실행은 다른 일입니다. 플래너는 코드를 쓰지 않고, 실행자는 두 리뷰어를 통과한 계획을 따릅니다.",
-      "prometheus": {
-        "name": "플래너",
-        "role": "전략 플래너",
-        "model": "Claude Fable 5.1 XHigh",
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan",
+        "model": "메인 세션에서 실행",
         "description": "인터뷰하고, 코드베이스를 탐색하고, 계획을 씁니다. 코드는 쓰지 않습니다.",
         "features": ["인터뷰 모드", "다중 에이전트 코드베이스 탐색"]
       },
-      "metis": {
-        "name": "Metis",
-        "role": "빈틈 분석",
-        "model": "Claude Opus 5 High",
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "갭 분석",
+        "model": "Claude Sonnet 4.6",
         "description": "버그가 되기 전에 계획의 모호함을 읽어냅니다.",
         "features": ["누락된 요구사항", "암묵적 가정"]
       },
-      "momus": {
-        "name": "플랜 리뷰어",
+      "planReviewer": {
+        "name": "Plan Reviewer",
         "role": "계획 리뷰",
         "model": "GPT 6 Astra xHigh",
         "description": "계획이 버틸 때만 승인합니다. 아니면 되돌려 보냅니다.",
         "features": ["적대적 리뷰", "OKAY 또는 이유 목록"]
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "마스터 실행자",
-        "model": "Claude Sonnet 5",
-        "description": "승인된 계획을 읽고, 카테고리와 스킬로 위임하고, 학습을 기록하고, 모든 결과를 직접 검증합니다.",
-        "features": ["의도 기반 라우팅", "독립 검증"]
+      "executor": {
+        "name": "실행자",
+        "role": "/ulw-execute",
+        "model": "메인 세션에서 실행",
+        "description": "승인된 계획을 같은 세션에서 실행하고, 카테고리와 스킬로 위임하고, 모든 결과를 직접 검증합니다.",
+        "features": ["Boulder 상태", "독립 검증"]
       }
     },
     "teamMode": {
@@ -400,14 +420,14 @@
         },
         "footer": "제로 개입. 완전한 자율성. 오직 결과만."
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "방식 2",
         "title": "플래너 + 실행자",
         "subtitle": "전략적 통제를 원할 때.",
-        "prometheusTitle": "플래너",
-        "prometheusDescription": "인터뷰를 진행하고, 컨텍스트를 조사하며, 상세한 YAML 계획을 생성합니다.",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "계획을 실행하고, 하위 Agent에 위임하고, 웨이브를 관리하며, 진행 상황을 추적합니다.",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "인터뷰를 진행하고, 컨텍스트를 조사하며, 상세한 작업 계획을 작성합니다.",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "승인된 계획을 같은 세션에서 실행하고, 카테고리로 위임하고, 웨이브를 관리하며, 진행 상황을 추적합니다.",
         "footer": "당신이 설계합니다. Agent가 실행합니다. 완전한 투명성."
       }
     },
@@ -428,15 +448,15 @@
     "coreLoop": {
       "title": "핵심 루프",
       "features": {
-        "prometheus": {
+        "planner": {
           "feature": "플래닝 인터뷰",
           "purpose": "지능형 인터뷰로 의도 추출"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "플랜 컨설턴트",
           "purpose": "버그가 되기 전에 모호함 포착"
         },
-        "momus": {
+        "planReviewer": {
           "feature": "플랜 리뷰 게이트",
           "purpose": "실행 전 계획의 완성도 검증"
         },

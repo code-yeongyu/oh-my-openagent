@@ -7,6 +7,7 @@ import type { ChildModelChainSpec } from "./memory-child-model-chain"
 import { CANDIDATE_PATH, launchInput } from "./kibitzer-runner.test-support"
 
 const HINT = "Drain nodes before a rollout."
+const PERSONA = "# kibitzer persona\n"
 const PRIMARY = "omo-mock/mock-1"
 const FALLBACK: ResolvedModelRecord = { provider: "omo-mock", model_id: "mock-2", display: "omo-mock/mock-2", source: "category" }
 
@@ -19,6 +20,7 @@ function specInput(chain: ChildModelChainSpec) {
     model: undefined,
     chain,
     accepted: [],
+    systemPrompt: PERSONA,
   }
 }
 
@@ -37,6 +39,7 @@ describe("buildKibitzerJudgeSpec", () => {
       model: undefined,
       chain: { selectedModel: PRIMARY },
       accepted,
+      systemPrompt: PERSONA,
     })
     const nudge = spec.memberScopedTools?.find((tool): tool is KibitzerNudgeTool => tool.name === KIBITZER_NUDGE_TOOL_NAME)
     if (nudge === undefined) throw new Error("nudge tool missing from the judge spec")
@@ -45,6 +48,7 @@ describe("buildKibitzerJudgeSpec", () => {
 
     // then
     expect(spec.completion).toBe("turn")
+    expect(spec.systemPrompt).toBe(PERSONA)
     expect(spec.promptEnvelope).toBe("bare")
     expect(spec.toolAllowlist).toEqual([KIBITZER_NUDGE_TOOL_NAME])
     expect(spec.memberScopedTools?.map((tool) => tool.name)).toEqual([KIBITZER_NUDGE_TOOL_NAME])

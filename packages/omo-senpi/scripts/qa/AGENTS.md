@@ -48,6 +48,8 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 node scripts/qa/drive.mjs --self-test
 node scripts/qa/task-rpc-e2e.mjs --self-test
 node scripts/qa/task-load-skills-e2e.mjs --self-test
+node packages/omo-senpi/scripts/qa/policy-continuation-e2e.mjs --self-test   # deterministic half; also runs inside `bun test packages/omo-senpi`
+BUN_BIN="$(command -v bun)" node packages/omo-senpi/scripts/qa/policy-continuation-e2e.mjs   # live; needs the staged agent-toolkit
 bun packages/omo-senpi/scripts/qa/kibitzer-gate-e2e.mjs --self-test
 bun packages/omo-senpi/plugin/scripts/build-extension.mjs && bun packages/omo-senpi/scripts/qa/kibitzer-gate-e2e.mjs --scenario all   # needs the built bundle
 SENPI_BIN="$(command -v senpi)" node scripts/qa/task-e2e.mjs   # live mode; same for team-e2e.mjs

@@ -684,7 +684,7 @@ Record the chosen path in the TodoWrite list.
 
 Rationale for this composition:
 - **4 workers = team mode's parallel cap.** 5+ just queues.
-- **No verifier team member.** Verification needs \`deep\` reasoning (or \`unspecified-high\` fallback). In-team category routing downcasts to sisyphus-junior, which is weaker than required — the verifier runs OUTSIDE the team as a \`task(category="deep")\`.
+- **No verifier team member.** Verification needs \`deep\` reasoning (or \`unspecified-high\` fallback). In-team category routing downcasts to the category worker, which is weaker than required — the verifier runs OUTSIDE the team as a \`task(category="deep")\`.
 - **quick × 2** for mechanical edits, **unspecified-low × 2** for reasoning edits — mirrors the plan's split.
 
 **Team lifecycle** (one team, reused until Phase 6 cleanup):
@@ -713,7 +713,7 @@ Rationale for this composition:
 While any team task is \`pending | claimed | in_progress\`:
 
 - Wait for \`<system-reminder>\` or member messages. Avoid tight polling; a single \`team_status\` check is acceptable if no notification arrives within roughly 10 seconds of expected completion.
-- On a worker completion report, immediately dispatch an **external verifier** — verification runs OUTSIDE the team because team-member category routing downcasts to sisyphus-junior:
+- On a worker completion report, immediately dispatch an **external verifier** — verification runs OUTSIDE the team because team-member category routing downcasts to the category worker:
   \`\`\`
   task(
     category="deep",
@@ -750,5 +750,5 @@ Append to the 6.6 summary a "Dispatch path" line and, when team path was used, t
 - Do not inline the Intent Card or verify-spec into task descriptions — rely on the broadcasts.
 - Do not recreate the team mid-session.
 - Do not run tests from Lead — the external verifier owns that lane.
-- Do not put \`oracle\` / \`librarian\` / \`deep\` into the team spec — oracle/librarian are team-ineligible, and \`deep\` under category routing downcasts to sisyphus-junior. Use them via \`task()\` outside the team when needed.
+- Do not put \`oracle\` / \`librarian\` / \`deep\` into the team spec — curated read-only agents are team-ineligible, and \`deep\` under category routing downcasts to the category worker. Use them via \`task()\` outside the team when needed.
 `

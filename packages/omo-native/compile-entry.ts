@@ -54,6 +54,10 @@ const doctorArtifacts = [
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
   const command = args[0]
   if (earlyCommands.has(command) || command === "update") return args
+  // `--no-extensions` is the caller owning the extension list: a memory child lists none and an
+  // RPC task child lists this plugin itself, so injecting it here would load the plugin into a
+  // bare child or load it twice.
+  if (args.includes("--no-extensions")) return args
   return ["--extension", join(execDir, "plugin"), ...args]
 }
 

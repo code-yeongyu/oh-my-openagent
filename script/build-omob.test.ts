@@ -13,6 +13,7 @@ import {
 	hostTargetFor,
 	packSoleSenpiTarball,
 	parseOmobArgs,
+	resolveCachedSenpiPackage,
 } from "./build-omob"
 import { planRuntimePrune, selectPruneEntries } from "./omob-runtime-prune"
 
@@ -190,6 +191,24 @@ describe("packSoleSenpiTarball", () => {
 				writeFileSync(join(tarballDir, "pkg-1.0.0.tgz"), "x")
 			})
 			expect(name).toBe("pkg-1.0.0.tgz")
+		} finally {
+			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+})
+
+describe("resolveCachedSenpiPackage", () => {
+	test("#given a cache manifest for one commit #when resolving another commit #then it never reuses the package", () => {
+		const cacheDir = tempDir("omob-artifact-cache-")
+		try {
+			const artifactRoot = join(cacheDir, "artifacts", "senpi", "aaa1111", "install", "node_modules", "@code-yeongyu", "senpi")
+			mkdirSync(artifactRoot, { recursive: true })
+			writeFileSync(
+				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz" }),
+			)
+			expect(resolveCachedSenpiPackage(cacheDir, "bbb2222")).toBeUndefined()
+			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBe(artifactRoot)
 		} finally {
 			rmSync(cacheDir, { recursive: true, force: true })
 		}

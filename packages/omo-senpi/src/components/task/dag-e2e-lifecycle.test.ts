@@ -315,9 +315,8 @@ function events(fixture: RuntimeFixture, runId: DagRunId): readonly DagRunEvent[
   return fixture.runtime.manager.history({ runId, parentSessionId: sessionId, limit: 256 }).events
 }
 
-function pauseForShutdown(runtime: DagRuntime): void {
-  const candidate: Partial<Pick<DagRuntime, "pauseForShutdown">> = runtime
-  candidate.pauseForShutdown?.()
+async function pauseForShutdown(runtime: DagRuntime): Promise<void> {
+  await runtime.pauseForShutdown()
 }
 
 async function seedPendingRun(project: string, runId: DagRunId): Promise<void> {
@@ -467,7 +466,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const first = await runtimeFixture({ project, attach: false })
 
     // when
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
 
     // then
@@ -505,7 +504,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const runId = "dag-lifecycle-adopt" as DagRunId
     await seedPendingRun(project, runId)
     const first = await runtimeFixture({ project, attach: false })
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
@@ -548,7 +547,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const runId = "dag-lifecycle-first-snapshot" as DagRunId
     await seedPendingRun(project, runId)
     const first = await runtimeFixture({ project, attach: false })
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
@@ -645,7 +644,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const first = await fixture.start("wake-first")
@@ -676,7 +675,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const runId = await fixture.start("wake-detached")

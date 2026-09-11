@@ -109,6 +109,7 @@ export async function executeSyncContinuation(
     throw new Error("task_id is required to continue a sync task")
   }
   cancelSyncSessionDeletion(continuationID)
+  const detachFromManager = executorCtx.manager?.attachSyncContinuation?.(continuationID)
   const taskId = `resume_sync_${continuationID.slice(0, 8)}`
   const startTime = new Date()
 
@@ -189,6 +190,7 @@ export async function executeSyncContinuation(
        toastManager.removeTask(taskId)
      }
      const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+     detachFromManager?.()
      scheduleSyncSessionDeletion(client, continuationID)
      return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
    }
@@ -269,6 +271,7 @@ ${buildTaskMetadataBlock({
      }
      // Every terminal continuation path must restore the cleanup grace timer,
      // including prompt/poll failures after revival cancelled the old timer.
+     detachFromManager?.()
      scheduleSyncSessionDeletion(client, continuationID)
    }
 }

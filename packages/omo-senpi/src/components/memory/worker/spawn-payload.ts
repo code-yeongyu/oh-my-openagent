@@ -13,7 +13,7 @@ import type {
   ReflectionSpawnArgs,
   ReflectionSpawnPaths,
 } from "./spawn-types"
-import { resolveMemoryChildLaunch } from "./senpi-command"
+import { resolveMemoryChildLaunch, withoutForeignPackageDirEnv } from "./senpi-command"
 
 export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
   const sessionDir = join(input.reflectionSessionsDir, safeRunId(input.run.runId))
@@ -75,8 +75,9 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...dreamPaths,
     ...(dreamTarget === undefined ? {} : { dreamTarget }),
   }
+  const launch = resolveMemoryChildLaunch(input)
   const env: NodeJS.ProcessEnv = {
-    ...input.env,
+    ...withoutForeignPackageDirEnv(input.env, launch),
     MEMORY_DIR: input.worktree.dir,
     TRANSCRIPT_PATH: transcript,
     ...(dreamPaths === undefined ? {} : {
@@ -113,7 +114,6 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${prompt}`,
   ]
-  const launch = resolveMemoryChildLaunch(input)
   return {
     runId: input.run.runId,
     attempt: input.attempt ?? 1,

@@ -30,6 +30,12 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
+function hermeticMemoryHome(): string {
+  const root = mkdtempSync(join(tmpdir(), "memory-read-classifier-home-"))
+  roots.push(root)
+  return join(root, "memory")
+}
+
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "memory-read-classifier-"))
   roots.push(root)
@@ -134,7 +140,7 @@ describe("memory read classifier component lifecycle", () => {
   test("#given a capable host #when the component registers and shuts down #then one classifier is registered and removed", async () => {
     const pi = new ReadClassifierHost()
     const component = createMemoryComponent({
-      env: {},
+      env: { OMO_MEMORY_HOME: hermeticMemoryHome() },
       loadConfig: () => loadedMemoryConfig(memorySettings()),
     })
 
@@ -174,7 +180,7 @@ describe("memory read classifier component lifecycle", () => {
   test("#given a legacy host #when the component registers #then it remains usable without the classifier API", () => {
     const pi = new MemoryFakeExtensionAPI()
     expect(() => createMemoryComponent({
-      env: {},
+      env: { OMO_MEMORY_HOME: hermeticMemoryHome() },
       loadConfig: () => loadedMemoryConfig(memorySettings()),
     }).register(pi, componentContext())).not.toThrow()
     expect(pi.tools.length).toBeGreaterThan(0)

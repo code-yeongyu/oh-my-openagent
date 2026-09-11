@@ -168,7 +168,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 |       | 機能                                                     | Editions | 何をするのか                                                                                                                                                                                                                   |
 | :---: | :------------------------------------------------------- | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   🤖   | **規律あるエージェント (Discipline Agents)**             | Ultimate | Sisyphus が Hephaestus、Oracle、Librarian、Explore をオーケストレーションします。完全な AI 開発チームが並列で動きます。                                                                                                        |
+|   🤖   | **規律あるエージェント (Discipline Agents)**             | Ultimate | メインエージェントがアーキテクトコンサルト、Librarian、Explore、カテゴリーワーカーをオーケストレーションします。完全な AI 開発チームが並列で動きます。                                                                        |
 |   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI 上で動作する omo の移植コンポーネント (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, ulw-execute continuation, telemetry, teammode など)。インストール: `npx lazycodex-ai install`。                                    |
 |   👥   | **Team Mode** (オプトイン)                                | Ultimate | リードエージェント + 最大 8 メンバーの並列実行、リアルタイム tmux 可視化、専用 `team_*` ツール群。`hyperplan`(5 人の敵対的批評家)と `security-research`(3 人のハンター + 2 人の PoC エンジニア)を駆動します。[ドキュメント →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | 一言で OK。すべてのエージェント (Ultimate) または Codex `ultrawork` コンポーネント (Light) がアクティブになり、終わるまで止まりません。                                                                                          |
@@ -185,27 +185,20 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |   🖥️   | **Tmux 統合**                                            | Ultimate | 完全なインタラクティブターミナル。REPL、デバッガー、TUI アプリがすべてリアルタイムで動きます。                                                                                                                                 |
 |   🔌   | **Claude Code 互換性**                                   | Ultimate | 既存のフック、コマンド、スキル、MCP、プラグイン？すべてここでそのまま動きます。(Codex は独自のネイティブプラグインシステムを保有。)                                                                                            |
 |   🎯   | **スキル内蔵 MCP**                                       | Ultimate | スキルが独自の MCP サーバーを持ち歩きます。コンテキストが肥大化しません。                                                                                                                                                      |
-|   📋   | **Prometheus プランナー**                                | Ultimate | インタビューモードで、実行前に戦略的な計画から立てます。                                                                                                                                                                        |
+|   📋   | **Ultrawork Planner**                                    | Ultimate | インタビューモードで、実行前に戦略的な計画から立てます。                                                                                                                                                                        |
 |   🔍   | **`/init-deep`**                                         | Ultimate | プロジェクト全体にわたって階層的な `AGENTS.md` ファイルを自動生成。トークン効率とエージェントのパフォーマンスの両方を向上させます。                                                                                            |
 
 > **Editions legend.** **Ultimate** = OpenCode 専用 (`bunx oh-my-openagent install`)。**Light** = Codex CLI 専用 (`npx lazycodex-ai install`)。**Both** = 両エディションに提供、しばしば内部実装は若干異なる。
 
 ### 規律あるエージェント (Discipline Agents)
 
-<table><tr>
-<td align="center"><img src=".github/assets/sisyphus.png" height="300" /></td>
-<td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
-</tr></table>
+**メインエージェント**はセッションのモデルで動くオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。*正当なる職人 (The Legitimate Craftsman).*
 
-**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。Claude Opus 5 と Kimi K3 が推奨デフォルトです。
+**Ultrawork Planner** (`/ulw-plan`) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。続いて `/ulw-execute` が同じセッションでその計画を実行します。
 
-**Hephaestus** (OpenAI、OpenAI Codex、GitHub Copilot、または OpenCode 経由で medium effort の `gpt-5.6-sol` を使う) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。最強の GPT を使いたいなら、OpenAI の最上位モデル `gpt-6-astra` を指定してください。*正当なる職人 (The Legitimate Craftsman).*
+すべてのプロンプトプリセットは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[詳しくはこちら →](docs/guide/overview.md)
 
-**Prometheus** (`claude-fable-5-1` / **`kimi-k3`**) はあなたの戦略プランナーです。インタビューモードで質問を投げ、スコープを特定し、コードに一行触れる前に詳細な計画を構築します。
-
-すべてのエージェントは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[詳しくはこちら →](docs/guide/overview.md)
-
-> Anthropic が [私たちのせいで OpenCode をブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそ Hephaestus は「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
+> Anthropic が [私たちのせいで OpenCode をブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそメインエージェントは「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
 >
 > Opus または Kimi K3 で最もよく動きますが、Kimi K3 + GPT-5.6 Sol の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
 
@@ -235,7 +228,7 @@ opencode を再起動すると `team_*` ツールファミリーが解放され�
 
 ### エージェントのオーケストレーション
 
-Sisyphus がサブエージェントにタスクを委任する際、モデルを直接選ぶことはありません。**カテゴリー** を選びます。カテゴリーは自動的に適切なモデルにマッピングされます:
+メインエージェントがサブエージェントにタスクを委任する際、モデルを直接選ぶことはありません。**カテゴリー** を選びます。カテゴリーは自動的に適切なモデルにマッピングされます:
 
 | カテゴリー           | 用途                                 |
 | :------------------- | :----------------------------------- |
@@ -300,11 +293,11 @@ project/
 
 エージェントが関連するコンテキストだけを自動で読み込みます。手動での管理はゼロです。
 
-### プランニング。Prometheus
+### プランニング。Ultrawork Planner
 
 複雑なタスクですか？プロンプトを投げて祈るのはやめましょう。
 
-Prometheus は**本物のエンジニアのようにあなたにインタビューし**、スコープと曖昧さを特定し、コードに触れる前に検証済みの計画を `.omo/plans/` に書きます。`/ulw-execute` はその計画から **Atlas** のワークセッションを開始します。エージェントは作業を始める前に、自分が何を作るべきか正確に理解しています。
+Ultrawork Planner (`/ulw-plan`) は**本物のエンジニアのようにあなたにインタビューし**、スコープと曖昧さを特定し、コードに触れる前に検証済みの計画を `.omo/plans/` に書きます。`/ulw-execute` はメインエージェントに同じセッションでその計画を実行させます。エージェントは作業を始める前に、自分が何を作るべきか正確に理解しています。
 
 ### スキル (Skills)
 
@@ -383,7 +376,7 @@ oh-my-openagent を削除するには:
 全体は [Features Documentation](docs/reference/features.md) を参照してください。
 
 **概要:**
-- **エージェント**: Sisyphus (メインエージェント)、Prometheus (プランナー)、Oracle (アーキテクチャ・デバッグ)、Librarian (ドキュメント・コード検索)、Explore (高速な codebase grep)、Multimodal Looker
+- **エージェント**: メインエージェント (オーケストレーター)、Ultrawork Planner (`/ulw-plan`)、アーキテクトコンサルト (アーキテクチャ・デバッグ)、Librarian (ドキュメント・コード検索)、Explore (高速な codebase grep)、Multimodal Looker
 - **バックグラウンドエージェント**: 本物の開発チームのように複数エージェントを並列実行
 - **LSP & AST ツール**: リファクタリング、リネーム、診断、AST 対応のコード検索
 - **ハッシュベース編集ツール** (`hashline_edit: true` でオプトイン): `LINE#ID` 参照で全ての変更前に内容を検証。外科的な編集、stale-line エラー 0
@@ -409,7 +402,7 @@ oh-my-openagent を削除するには:
 - **JSONC サポート**: コメントと末尾カンマをサポート
 - **エージェント**: どのエージェントについてもモデル、temperature、プロンプト、権限をオーバーライド可能
 - **組み込みスキル**: `playwright` (ブラウザ自動化)、`git-master` (atomic コミット)
-- **Sisyphus エージェント**: Prometheus (プランナー) と Metis (プランコンサルタント) を伴うメインオーケストレーター
+- **メインエージェント**: Ultrawork Planner (`/ulw-plan`) と Plan Consultant を伴うオーケストレーター
 - **バックグラウンドタスク**: プロバイダー/モデル別の同時実行数を設定
 - **カテゴリー**: `visual-engineering`、`ultrabrain`、`deep`、`artistry`、`quick`、`unspecified-low`、`unspecified-high`、`writing`、加えてカスタム名
 - **フック**: 54 以上の組み込みライフサイクルフック（Team Mode 有効時は 61）。すべて `disabled_hooks` で制御可能

@@ -22,6 +22,10 @@ const REQUIRED_CAPABILITIES = [
 
 type RequiredCapability = (typeof REQUIRED_CAPABILITIES)[number]
 
+// Batch window for the shared idle-injection flush: everything that becomes ready inside it collapses
+// into ONE steer injection.
+const IDLE_FLUSH_BATCH_WINDOW_MS = 200
+
 // Forward `details` only when present: `console.info(message, undefined)` renders a trailing "undefined".
 function consoleArgs(message: string, details: unknown): [string] | [string, unknown] {
   return details === undefined ? [message] : [message, details]
@@ -99,12 +103,28 @@ export function composeOmoSenpiExtension(
     const captureRegistry = installToolCaptureRegistry(pi)
     // The 200ms batch window: every delivered notification (completions, team messages, the ulw
     // continuation) defers its flush through this timer, so everything that becomes ready within the
-    // window collapses into ONE steer injection instead of N separate ones.
+    // window collapses into ONE steer injection instead of N separate ones. The timer is unref'd and
+    // cancellable like every sibling scheduler in this codebase (lead-poller-lifecycle's interval,
+    // senpi-task's completion retry): retirement cancels the armed handle instead of leaving a live
+    // 200ms timer behind after a `quit` shutdown.
     const idleCoordinator = new IdleInjectionCoordinator(
       (message, options) =>
         pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
-      { scheduleFlush: (flush) => void setTimeout(flush, 200) },
+      {
+        scheduleFlush: (flush) => {
+          const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)
+          timer.unref?.()
+          return () => clearTimeout(timer)
+        },
+      },
     )
+    // senpi emits session_shutdown on the old runner before it invalidates that generation; retire the
+    // shared queue there so a 200ms flush armed before a reload cannot call pi.sendMessage on a stale
+    // API and throw out of the timer queue (uncaughtException -> exit 1). Retirement hands every
+    // still-queued injection back to its producer as a delivery failure, so a completion caught inside
+    // the batch window is recorded as undelivered and redelivered after the reload.
+    // See: https://github.com/code-yeongyu/oh-my-openagent/issues/7932
+    pi.on("session_shutdown", () => idleCoordinator.retire())
 
     // Warm the pi-tui lazy boundary once for the whole extension, before any component registers.
     // Renderers across several components (fallback-architect notices, memory worker entries, task

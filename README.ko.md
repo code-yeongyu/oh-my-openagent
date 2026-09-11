@@ -169,7 +169,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 |       | 기능                                                      | Editions | 하는 일                                                                                                                                                                                                          |
 | :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus가 Hephaestus, Oracle, Librarian, Explore를 지휘합니다. 병렬로 도는 풀스택 AI 개발팀.                                                                                                                    |
+|   🤖   | **Discipline Agents**                                    | Ultimate | 메인 에이전트가 아키텍트 컨설트, Librarian, Explore, 카테고리 워커를 지휘합니다. 병렬로 도는 풀스택 AI 개발팀.                                                                                                  |
 |   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI에서 동작하는 omo의 포팅 컴포넌트(rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, ulw-execute continuation, telemetry, teammode 등). 설치: `npx lazycodex-ai install`.                                                   |
 |   👥   | **Team Mode** (opt-in)                                   | Ultimate | 리드 에이전트 + 최대 8명의 병렬 멤버, 실시간 tmux 시각화, 전용 `team_*` 도구. `hyperplan`(5명의 적대적 비평가)과 `security-research`(3명의 헌터 + 2명의 PoC 엔지니어)를 구동합니다. [문서 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | 한 단어. 모든 에이전트(Ultimate)나 Codex `ultrawork` 컴포넌트(Light)가 켜집니다. 끝날 때까지 멈추지 않습니다.                                                                                                    |
@@ -186,27 +186,20 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |   🖥️   | **Tmux Integration**                                     | Ultimate | 풀 인터랙티브 터미널. REPL, 디버거, TUI 전부 라이브.                                                                                                                                                             |
 |   🔌   | **Claude Code Compatible**                               | Ultimate | 쓰시던 hook, command, skill, MCP, plugin 전부 그대로 동작합니다. (Codex는 자체 플러그인 시스템 보유.)                                                                                                            |
 |   🎯   | **Skill-Embedded MCPs**                                  | Ultimate | 스킬이 자기만의 MCP 서버를 들고 다닙니다. 컨텍스트 낭비 없음.                                                                                                                                                   |
-|   📋   | **Prometheus Planner**                                   | Ultimate | 실행 전 인터뷰 모드로 전략 플래닝.                                                                                                                                                                               |
+|   📋   | **Ultrawork Planner**                                    | Ultimate | 실행 전 인터뷰 모드로 전략 플래닝.                                                                                                                                                                               |
 |   🔍   | **`/init-deep`**                                         | Ultimate | 프로젝트 전반에 계층형 `AGENTS.md` 파일을 자동 생성합니다. 토큰 효율에도, 에이전트 성능에도 좋습니다.                                                                                                            |
 
 > **Editions legend.** **Ultimate** = OpenCode 전용 (`bunx oh-my-openagent install`). **Light** = Codex CLI 전용 (`npx lazycodex-ai install`). **Both** = 두 에디션 모두 제공, 종종 내부 구현은 약간 다름.
 
 ### Discipline Agents
 
-<table><tr>
-<td align="center"><img src=".github/assets/sisyphus.png" height="300" /></td>
-<td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
-</tr></table>
+**메인 에이전트**는 세션 모델로 돌아가는 오케스트레이터입니다. 계획을 세우고, 전문가에게 위임하고, 공격적인 병렬 실행으로 작업을 끝까지 밀어붙입니다. 중간에 멈추지 않습니다. 레시피가 아니라 목표를 주세요. 코드베이스를 탐색하고, 패턴을 조사하고, 손을 잡아주지 않아도 엔드투엔드로 실행합니다. *The Legitimate Craftsman.*
 
-**Sisyphus** (`claude-opus-5` / **`kimi-k3`** / **`gpt-5.6-sol`** / **`glm-5.2`**)는 메인 오케스트레이터입니다. 계획을 세우고, 전문가에게 위임하고, 공격적인 병렬 실행으로 작업을 끝까지 밀어붙입니다. 중간에 멈추지 않습니다. Claude Opus 5와 Kimi K3가 권장 기본값입니다.
+**Ultrawork Planner** (`/ulw-plan`)는 전략 플래너입니다. 인터뷰 모드: 질문으로 스코프를 파악하고, 코드에 손대기 전에 상세한 계획을 만듭니다. 이어서 `/ulw-execute`가 같은 세션에서 그 계획을 실행합니다.
 
-**Hephaestus** (OpenAI, OpenAI Codex, GitHub Copilot 또는 OpenCode에서 medium effort의 `gpt-5.6-sol`을 사용하는)는 자율적으로 깊게 파는 작업자입니다. 레시피가 아니라 목표를 주세요. 코드베이스를 탐색하고, 패턴을 조사하고, 손을 잡아주지 않아도 엔드투엔드로 실행합니다. 가장 강력한 GPT를 쓰고 싶다면 OpenAI의 최상위 모델인 `gpt-6-astra`를 지정하세요. *The Legitimate Craftsman.*
+모든 프롬프트 프리셋은 해당 모델의 강점에 맞춰 튜닝되어 있습니다. 수동으로 모델을 돌려가며 쓸 필요가 없습니다. [더 알아보기 →](docs/guide/overview.md)
 
-**Prometheus** (`claude-fable-5-1` / **`kimi-k3`**)는 전략 플래너입니다. 인터뷰 모드: 질문으로 스코프를 파악하고, 코드에 손대기 전에 상세한 계획을 만듭니다.
-
-모든 에이전트는 자기 모델의 강점에 맞춰 튜닝되어 있습니다. 수동으로 모델을 돌려가며 쓸 필요가 없습니다. [더 알아보기 →](docs/guide/overview.md)
-
-> Anthropic은 [우리 때문에 OpenCode를 차단했습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 Hephaestus에게 "The Legitimate Craftsman"이라는 별명이 붙었습니다. 의도된 아이러니입니다.
+> Anthropic은 [우리 때문에 OpenCode를 차단했습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 메인 에이전트에게 "The Legitimate Craftsman"이라는 별명이 붙었습니다. 의도된 아이러니입니다.
 >
 > Opus나 Kimi K3에서 가장 잘 돌지만, Kimi K3 + GPT-5.6 Sol 조합만으로도 이미 바닐라 Claude Code를 이깁니다. 별도 설정 없이요.
 
@@ -301,11 +294,11 @@ project/
 
 에이전트는 관련 컨텍스트를 알아서 읽습니다. 수동 관리 0.
 
-### 플래닝. Prometheus
+### 플래닝. Ultrawork Planner
 
 복잡한 작업인가요? 프롬프트 쓰고 기도하지 마세요.
 
-Prometheus가 **진짜 엔지니어처럼 인터뷰**를 진행하고, 스코프와 모호한 부분을 짚어내고, 코드에 손대기 전에 검증된 계획을 `.omo/plans/`에 작성합니다. `/ulw-execute`는 그 계획으로 **Atlas** 작업 세션을 시작합니다. 에이전트는 뭘 만들지 알고 나서야 시작합니다.
+Ultrawork Planner(`/ulw-plan`)가 **진짜 엔지니어처럼 인터뷰**를 진행하고, 스코프와 모호한 부분을 짚어내고, 코드에 손대기 전에 검증된 계획을 `.omo/plans/`에 작성합니다. `/ulw-execute`는 메인 에이전트가 같은 세션에서 그 계획을 실행하게 합니다. 에이전트는 뭘 만들지 알고 나서야 시작합니다.
 
 ### Skills
 
@@ -384,7 +377,7 @@ oh-my-openagent를 제거하려면:
 전체 내용은 [Features Documentation](docs/reference/features.md) 참고.
 
 **요약:**
-- **Agents**: Sisyphus(메인), Prometheus(플래너), Oracle(아키텍처·디버깅), Librarian(문서·코드 검색), Explore(빠른 코드베이스 grep), Multimodal Looker
+- **Agents**: 메인 에이전트(오케스트레이터), Ultrawork Planner(`/ulw-plan`), 아키텍트 컨설트(아키텍처·디버깅), Librarian(문서·코드 검색), Explore(빠른 코드베이스 grep), Multimodal Looker
 - **Background Agents**: 진짜 개발팀처럼 여러 에이전트를 병렬로 실행
 - **LSP & AST Tools**: 리팩터링, rename, 진단, AST 기반 코드 검색
 - **Hash-anchored Edit Tool** (`hashline_edit: true`로 옵트인): `LINE#ID` 참조로 모든 변경 전에 내용을 검증. 수술적 편집, 낡은 라인 에러 0
@@ -410,7 +403,7 @@ oh-my-openagent를 제거하려면:
 - **JSONC 지원**: 주석과 trailing comma 지원
 - **Agents**: 어떤 에이전트든 모델, temperature, 프롬프트, 권한을 오버라이드
 - **Built-in Skills**: `playwright`(브라우저 자동화), `git-master`(atomic 커밋)
-- **Sisyphus Agent**: Prometheus(플래너), Metis(플랜 컨설턴트)와 함께 도는 메인 오케스트레이터
+- **메인 에이전트**: Ultrawork Planner(`/ulw-plan`), Plan Consultant와 함께 도는 오케스트레이터
 - **Background Tasks**: 프로바이더/모델별 동시성 제한 설정
 - **Categories**: `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, 그리고 커스텀 이름
 - **Hooks**: 54개 이상의 라이프사이클 hook (Team Mode 활성화 시 61개), 전부 `disabled_hooks`로 제어 가능

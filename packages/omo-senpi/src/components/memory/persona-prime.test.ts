@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import type { ComponentLogger } from "../../extension/types"
-import { primeMemoryPersonaAssets, type PersonaPrimeTarget } from "./persona-prime"
+import { MEMORY_PRIME_TARGETS, primeMemoryPersonaAssets, type PersonaPrimeTarget } from "./persona-prime"
 
 interface RecordedWarning {
   readonly message: string
@@ -21,7 +21,7 @@ function recordingLogger(): { readonly logger: ComponentLogger; readonly warning
 }
 
 describe("primeMemoryPersonaAssets", () => {
-  it("#given every persona readable #when priming #then each asset is read once and nothing is reported", () => {
+  it("#given every persona readable #when priming #then each asset is read once and nothing is reported", async () => {
     // given
     const reads: string[] = []
     const targets: readonly PersonaPrimeTarget[] = [
@@ -31,7 +31,7 @@ describe("primeMemoryPersonaAssets", () => {
     const { logger, warnings } = recordingLogger()
 
     // when
-    const unavailable = primeMemoryPersonaAssets({ logger, targets })
+    const unavailable = await primeMemoryPersonaAssets({ logger, targets })
 
     // then
     expect(reads).toEqual(["facts", "kibitzer"])
@@ -39,7 +39,7 @@ describe("primeMemoryPersonaAssets", () => {
     expect(warnings).toEqual([])
   })
 
-  it("#given one unreadable persona #when priming #then registration continues and the asset is named once", () => {
+  it("#given one unreadable persona #when priming #then registration continues and the asset is named once", async () => {
     // given
     const reads: string[] = []
     const targets: readonly PersonaPrimeTarget[] = [
@@ -54,12 +54,59 @@ describe("primeMemoryPersonaAssets", () => {
     const { logger, warnings } = recordingLogger()
 
     // when
-    const unavailable = primeMemoryPersonaAssets({ logger, targets })
+    const unavailable = await primeMemoryPersonaAssets({ logger, targets })
 
     // then
     expect(unavailable).toEqual(["kibitzer-persona.md"])
     expect(reads).toEqual(["facts"])
     expect(warnings).toHaveLength(1)
     expect(warnings[0]?.details).toMatchObject({ asset: "kibitzer-persona.md" })
+  })
+
+  it("#given the registration targets #when listed #then the task runtime module is primed beside the four personas", () => {
+    // then: every asset a fire needs to START is resolved at registration, from the payload the process booted with
+    expect(MEMORY_PRIME_TARGETS.map((target) => target.asset)).toEqual([
+      "reflection-persona.md",
+      "dream-persona.md",
+      "facts-persona.md",
+      "kibitzer-persona.md",
+      "#omo-task-runtime",
+    ])
+  })
+
+  it("#given the task runtime import rejects #when priming #then it is awaited and reported unavailable while sync personas are still read first", async () => {
+    // given: the install tree lost extensions/omo-task.js under the live process
+    const reads: string[] = []
+    const targets: readonly PersonaPrimeTarget[] = [
+      { asset: "kibitzer-persona.md", load: () => reads.push("kibitzer") },
+      { asset: "#omo-task-runtime", load: () => Promise.reject(new Error("Cannot find module './extensions/omo-task.js'")) },
+    ]
+    const { logger, warnings } = recordingLogger()
+
+    // when
+    const pending = primeMemoryPersonaAssets({ logger, targets })
+    const readSynchronously = [...reads]
+    const unavailable = await pending
+
+    // then
+    expect(readSynchronously).toEqual(["kibitzer"])
+    expect(unavailable).toEqual(["#omo-task-runtime"])
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]?.details).toMatchObject({ asset: "#omo-task-runtime", error: "Cannot find module './extensions/omo-task.js'" })
+  })
+
+  it("#given the task runtime import resolves #when priming #then nothing is reported", async () => {
+    // given
+    const targets: readonly PersonaPrimeTarget[] = [
+      { asset: "#omo-task-runtime", load: () => Promise.resolve({ createInProcessJudgeRunner: () => undefined }) },
+    ]
+    const { logger, warnings } = recordingLogger()
+
+    // when
+    const unavailable = await primeMemoryPersonaAssets({ logger, targets })
+
+    // then
+    expect(unavailable).toEqual([])
+    expect(warnings).toEqual([])
   })
 })

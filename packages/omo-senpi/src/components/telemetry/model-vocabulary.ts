@@ -18,6 +18,8 @@ export const KNOWN_MODELS = Object.freeze({
   anthropic: Object.freeze(["claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"]),
   "anthropic-api": Object.freeze(["claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"]),
   "bailian-coding-plan": Object.freeze(["qwen3.6-flash"]),
+  // senpi's Claude subscription lane serves the anthropic ids verbatim (#8051).
+  "claude-sdk-oauth": Object.freeze(["claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"]),
   deepseek: Object.freeze(["deepseek-v4-flash", "deepseek-v4-pro"]),
   google: Object.freeze(["gemini-3.1-pro", "gemini-3.6-flash"]),
   "github-copilot": Object.freeze([

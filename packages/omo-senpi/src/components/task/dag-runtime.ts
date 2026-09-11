@@ -70,7 +70,8 @@ export interface DagRuntime {
   attach(event?: unknown): Promise<void>
   sync(): void
   detach(): void
-  pauseForShutdown(): void
+  /** Retires live schedulers without cancelling them, then persists the pause. Await before teardown. */
+  pauseForShutdown(): Promise<void>
   dispose(): void
 }
 
@@ -424,6 +425,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     taskManager,
     ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
+    // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
+    // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
+    // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
+    isRunHeldInProcess: (runId) => schedulers.has(runId),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     stopAdmission: (runId) => stoppedAdmissions.add(runId),
@@ -453,6 +458,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   // session_start, so without this watch that skip was final and the run stayed paused forever.
   const watchLiveLease = (scope: RecoveryScope, outcome: DagRecoveryOutcome & { readonly holderPid: number }): void => {
     if (leaseWatches.has(outcome.runId)) return
+    // A live_lease naming our own pid means a scheduler in this runtime still holds the run (same-runtime
+    // pause + re-attach). A watch on our own pid could only fire once this process is gone, and the
+    // "resuming once that pid is gone" it would log could never come true.
+    if (outcome.holderPid === process.pid) return
     deps.logger.warn("omo-senpi DAG run stays paused while its previous host exits; resuming once that pid is gone", {
       runId: outcome.runId,
       holderPid: outcome.holderPid,
@@ -542,8 +551,24 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       activeSessionId = undefined
       statusUi.dispose()
     },
-    pauseForShutdown() {
+    async pauseForShutdown() {
       cancelLeaseWatches()
+      // #8020: a committed shutdown RETIRES the schedulers instead of cancelling them (that is what
+      // `detach` does, and doing it here is what used to destroy a run on every session switch).
+      // The frontier loop must have exited before the pause is persisted, otherwise a late admission
+      // or settlement writes over the paused checkpoint. Retirement also drops the run from
+      // `schedulers`, so the #8029 in-process probe (`isRunHeldInProcess`) reports it unheld and a
+      // later recovery in this SAME process can reclaim it instead of skipping on a live lease.
+      const retiring = [...schedulers]
+      await Promise.all(retiring.map(([, owned]) => owned.scheduler.suspend()))
+      // Retiring the run makes `ensureScheduled`'s UNGUARDED `.finally(delete)` fire early, so it is
+      // drained here: otherwise it could land after a later control verb re-registered the same runId
+      // and evict that live controller. No assertion isolates this line - it closes a window this
+      // retirement itself opens, rather than fixing an observable behaviour of its own.
+      await Promise.allSettled(retiring.map(([, owned]) => owned.running))
+      for (const [runId, owned] of retiring) {
+        if (schedulers.get(runId) === owned) schedulers.delete(runId)
+      }
       const sessionId = activeSessionId ?? deps.engine.runtime.sessionId()
       if (sessionId !== undefined) recovery.pauseRunsForShutdown(sessionId)
     },

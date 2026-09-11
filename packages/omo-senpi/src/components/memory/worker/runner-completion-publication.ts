@@ -9,6 +9,7 @@ import {
 } from "./completion"
 import { readReflectionHealth } from "./health"
 import { emitReflectionHealthAlert } from "./health-alert"
+import { describeReflectionLauncher } from "./launcher-identity"
 import type { ReflectionModelResolution } from "./resolve-model"
 import type { ExecutionResult, ReflectionRunResult, SenpiSubprocessRunnerOptions } from "./runner-types"
 
@@ -27,6 +28,12 @@ export async function settleReflectionRun(input: {
   const live = input.options.liveSession?.()
   input.ensureRenderer(live)
   const finishedAt = input.now().toISOString()
+  const launcher = describeReflectionLauncher({
+    env: input.options.env ?? process.env,
+    execPath: process.execPath,
+    pid: process.pid,
+    ...(live === undefined ? {} : { sessionId: live.sessionId }),
+  })
   const completionsDir = join(input.options.identity.paths.reflection, "completions")
   const healthBefore = await readReflectionHealth(completionsDir)
   const record: ReflectionCompletionRecord = {
@@ -52,6 +59,7 @@ export async function settleReflectionRun(input: {
     finishedAt,
     durationMs: Math.max(0, Date.parse(finishedAt) - Date.parse(input.startedAt)),
     consecutiveFailures: input.result.outcome === "failed" ? healthBefore.streak + 1 : 0,
+    launcher,
     delivery: { status: "pending" },
   }
   const completion = await recordReflectionCompletion(
@@ -61,7 +69,10 @@ export async function settleReflectionRun(input: {
       ? { sessionId: live.sessionId, api: live.api, logger: live.logger }
       : live,
   )
-  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth)
+  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth, {
+    observedRunIds: [completion.runId],
+    currentLauncher: launcher,
+  })
   return {
     runId: input.run.runId,
     outcome: input.result.outcome,
@@ -82,6 +93,7 @@ export async function publishFinalizedReflectionRun(input: {
   const live = input.options.liveSession?.()
   input.ensureRenderer(live)
   const finishedAt = input.result.completion.finishedAt
+  const launcher = input.result.completion.launcher
   const completionsDir = join(input.options.identity.paths.reflection, "completions")
   const health = await readReflectionHealth(completionsDir)
   const completion = await recordReflectionCompletion(
@@ -96,6 +108,9 @@ export async function publishFinalizedReflectionRun(input: {
     },
     live,
   )
-  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth)
+  await emitReflectionHealthAlert(completionsDir, input.options.identity.id, live, input.warnedHealth, {
+    observedRunIds: [completion.runId],
+    ...(launcher === undefined ? {} : { currentLauncher: launcher }),
+  })
   return { ...input.result, completion }
 }

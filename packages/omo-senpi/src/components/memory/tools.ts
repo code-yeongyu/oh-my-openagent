@@ -24,7 +24,7 @@ import {
 export { MEMORY_TOOL_NAME }
 
 const UNBOUND_IDENTITY_MESSAGE =
-  "no memory identity bound to this session; enable omo memory and restart the session so the memory tools can initialize"
+  "no memory identity bound to this session yet; the binding is re-established on the next user turn, or start a new session if this persists"
 
 export const MemoryToolParams = Type.Object({
   command: Type.Union([

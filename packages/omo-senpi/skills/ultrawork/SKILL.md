@@ -194,7 +194,9 @@ and let it fire. `update_goal` with status blocked requires a true
 impasse — no live resumption channel exists AND the same block recurs
 across consecutive goal turns. Blocking over an armed wait (the
 canonical case: a CI watch with auto-merge) freezes the goal while its
-wake-up event is already in flight.
+wake-up event is already in flight. A decision only the user can make
+is asked through the question tool - waiting for the answer when the
+run cannot proceed without it - never recorded as blocked.
 
 ## 2. Open the durable notepad
 Run: `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)`. Echo the
@@ -422,7 +424,7 @@ a midpoint decision, never to wait.
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
-`metis`, `momus` work with zero configuration);
+`plan-consultant`, `plan-reviewer` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
 child with skills, `name` to track it. Read a child back with
 `task_output`, steer it with `task_send`, end it with `task_cancel`;
@@ -474,12 +476,12 @@ No plan file means no reviewer: a bare `ulw` run — however heavy —
 records a self-review in the notepad instead. Same for LIGHT tier.
 Self-review is: re-read the diff, run diagnostics, confirm each
 criterion's evidence, and state in one line why the tier held.
-`momus` and `metis` are plan-gated reviewers, not general helpers —
+`plan-reviewer` and `plan-consultant` are plan-gated reviewers, not general helpers —
 never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "momus"` for read-only
+   assignment in `prompt` — `subagent_type: "plan-reviewer"` for read-only
    review, or a reviewer-shaped `category` when the review must run
    code. Pass: goal, success-criteria, scenario evidence, full diff,
    notepad path.
@@ -495,8 +497,10 @@ Procedure (NON-NEGOTIABLE):
    marked out-of-scope. An approval whose only remaining items are
    notes counts as approval.
 5. On approval, declare done. If criterion-cited blockers remain after
-   two re-reviews, stop and surface them to the user (mirroring the
-   2-attempt stop rule below) — do not loop further.
+   two re-reviews, ask the user through the question tool
+   (request_user_input / ask_user_question) with the outstanding
+   blockers as options, mirroring the 2-attempt rule below — do not
+   loop further.
 
 # Commits
 Commit frequently: one atomic commit per verified increment (RED→GREEN
@@ -565,7 +569,8 @@ commits this session — then stage + draft the message instead.
   bound port, temp file / dir) means NOT done. Tear it down, record
   the receipt, then continue.
 - After 2 identical failed attempts at one step, surface what was tried
-  and ask the user before another retry.
+  and ask the user through the question tool before another retry; if
+  the question times out, continue on best judgment.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 

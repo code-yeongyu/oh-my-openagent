@@ -241,7 +241,44 @@ export function packSoleSenpiTarball(tarballDir: string, pack: () => void): stri
 	return tarballs[0] as string
 }
 
-function buildSenpiPackage(senpiDir: string, cacheDir: string): string {
+interface SenpiArtifactCache {
+	readonly commit: string
+	readonly packageRoot: string
+	readonly tarballName: string
+}
+
+function senpiArtifactCachePath(cacheDir: string, commit: string): string {
+	return join(cacheDir, "artifacts", "senpi", commit, "manifest.json")
+}
+
+function readSenpiArtifactCache(cacheDir: string, commit: string): string | undefined {
+	const manifestPath = senpiArtifactCachePath(cacheDir, commit)
+	if (!existsSync(manifestPath)) return undefined
+	try {
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Partial<SenpiArtifactCache>
+		if (manifest.commit !== commit || typeof manifest.packageRoot !== "string" || !existsSync(manifest.packageRoot)) return undefined
+		return manifest.packageRoot
+	} catch {
+		return undefined
+	}
+}
+
+function writeSenpiArtifactCache(cacheDir: string, artifact: SenpiArtifactCache): void {
+	const manifestPath = senpiArtifactCachePath(cacheDir, artifact.commit)
+	mkdirSync(dirname(manifestPath), { recursive: true })
+	writeFileSync(manifestPath, `${JSON.stringify(artifact, undefined, "\t")}\n`)
+}
+
+export function resolveCachedSenpiPackage(cacheDir: string, commit: string): string | undefined {
+	return readSenpiArtifactCache(cacheDir, commit)
+}
+
+function buildSenpiPackage(senpiDir: string, cacheDir: string, commit: string): string {
+	const cached = readSenpiArtifactCache(cacheDir, commit)
+	if (cached !== undefined) {
+		console.error(`[omob] reusing senpi artifact ${commit}`)
+		return cached
+	}
 	run("bun", ["install"], senpiDir)
 	materializeNestedLockDeps(senpiDir)
 	run("bun", ["run", "build:bun"], senpiDir)
@@ -253,13 +290,15 @@ function buildSenpiPackage(senpiDir: string, cacheDir: string): string {
 	)
 	// Isolated production install: the tarball plus its registry deps, resolved under
 	// a dedicated root so the resulting tree can be dropped into omo's node_modules.
-	const installRoot = join(cacheDir, "senpi-install")
+	const installRoot = join(cacheDir, "artifacts", "senpi", commit, "install")
 	rmSync(installRoot, { recursive: true, force: true })
 	mkdirSync(installRoot, { recursive: true })
-	writeFileSync(join(installRoot, "package.json"), `${JSON.stringify({ private: true, dependencies: { "@code-yeongyu/senpi": `file:../tarballs/${tarballName}` } }, undefined, "\t")}\n`)
+	writeFileSync(join(installRoot, "package.json"), `${JSON.stringify({ private: true, dependencies: { "@code-yeongyu/senpi": `file:${resolve(tarballDir, tarballName)}` } }, undefined, "\t")}\n`)
 	run("bun", ["install", "--production", "--ignore-scripts"], installRoot)
 	nestHoistedDeps(installRoot)
-	return join(installRoot, "node_modules", "@code-yeongyu", "senpi")
+	const packageRoot = join(installRoot, "node_modules", "@code-yeongyu", "senpi")
+	writeSenpiArtifactCache(cacheDir, { commit, packageRoot, tarballName })
+	return packageRoot
 }
 
 /** Moves the isolated install's hoisted deps under the senpi package, mirroring the published nested layout. */
@@ -381,7 +420,7 @@ async function runBuild(options: OmobOptions): Promise<number> {
 	console.error(`[omob] building: omo ${omoInfo.commit} + senpi ${senpiInfo.commit}`)
 	ensureCacheClone(senpiUrl, senpi.directory, options.senpiRef, true)
 	ensureCacheClone(omoUrl, omo.directory, options.omoRef, true)
-	const builtSenpiRoot = buildSenpiPackage(senpi.directory, options.cacheDir)
+	const builtSenpiRoot = buildSenpiPackage(senpi.directory, options.cacheDir, senpiInfo.commit)
 	// The omo prepare chain materializes gitignored plugin/skills from the shared-skills
 	// upstream submodules; a caller's OMO_SKIP_MATERIALIZE=1 would skip that and break the
 	// build, so the dev-binary install always runs the full materialization.

@@ -22,6 +22,7 @@ export interface ReservationRunLedger {
   readonly processStart?: string | null
   readonly childPid?: number
   readonly childProcessStart?: string | null
+  readonly launcher?: import("./launcher-identity").ReflectionLauncher
   readonly startedAt: string
   readonly hardDeadlineAt: number
   readonly terminationGraceMs: number

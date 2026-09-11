@@ -4,15 +4,15 @@ import { CODE_REVIEWER_AGENT } from "./code-reviewer"
 import { EXPLORE_AGENT } from "./explore"
 import { GATE_REVIEWER_AGENT } from "./gate-reviewer"
 import { LIBRARIAN_AGENT } from "./librarian"
-import { METIS_AGENT } from "./metis"
-import { MOMUS_AGENT } from "./momus"
+import { PLAN_CONSULTANT_AGENT } from "./plan-consultant"
+import { PLAN_REVIEWER_AGENT } from "./plan-reviewer"
 import { QA_EXECUTOR_AGENT } from "./qa-executor"
 
 export const CURATED_READONLY_AGENT_DEFAULTS: readonly AgentDefinition[] = [
   EXPLORE_AGENT,
   LIBRARIAN_AGENT,
-  METIS_AGENT,
-  MOMUS_AGENT,
+  PLAN_CONSULTANT_AGENT,
+  PLAN_REVIEWER_AGENT,
 ] as const
 
 // The ulw-loop reviewer trio writes report artifacts, so it stays out of the curated read-only

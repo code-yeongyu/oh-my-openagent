@@ -15,7 +15,7 @@ Single or `tasks:[...]` batch spawn of child tasks routed by category or agent. 
 | `execute-single.ts` / `execute-batch.ts` / `execute-spec.ts` | Single spawn, batch aggregation (start/error/background/foreground), start-spec construction. |
 | `batch-item-details.ts` / `batch-progress.ts` | Per-item result details for batches; throttled per-child progress partials for a foreground batch (one status row per child). |
 | `foreground-wait.ts` | Foreground wait surface. |
-| `invocation-gate.ts` / `plan-review-contract.ts` | metis/momus plan-gate consult before `manager.start` (single: `denied`; batch item: `plan_unresolved` / `invalid_target`). |
+| `invocation-gate.ts` / `plan-review-contract.ts` | plan-consultant/plan-reviewer plan-gate consult before `manager.start` (single: `denied`; batch item: `plan_unresolved` / `invalid_target`). |
 | `spawn-policy.ts` | `evaluateSpawnPolicy` verdicts. |
 | `skills.ts` / `skill-result.ts` | Skill loading/prepend + task skill summaries. |
 | `renderers.ts` / `call-renderer.ts` / `start-presentation.ts` / `result-details.ts` | Result rendering and details; package subpath `./task-renderers` points at `renderers.ts`. |

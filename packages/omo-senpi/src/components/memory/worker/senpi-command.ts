@@ -1,9 +1,10 @@
-import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
 import { createRequire } from "node:module"
-import { isAbsolute, join } from "node:path"
+import { isAbsolute, join, relative } from "node:path"
 
 import {
   detectBunBinary,
+  detectCompiledEngine,
   resolveSenpiLauncher as resolveTaskSenpiLauncher,
   type SenpiLauncher,
 } from "@oh-my-opencode/senpi-task"
@@ -22,6 +23,10 @@ const CLI_RELATIVE = join("dist", "cli.js")
  * A PATH scan cannot be the last resort because the child inherits the same PATH that already
  * failed. The launcher retains any interpreter prefix needed by npm/Windows shims and falls back to
  * the CLI or entry script of the running Senpi installation.
+ *
+ * A compiled omo binary is its own engine and launches itself (`isCompiledEngine`): a PATH senpi is
+ * a DIFFERENT install whose assets live in another layout, and it died on the inherited package
+ * root before doing any work (`ENOENT .../dist/modes/interactive/theme/dark.json`).
  */
 export function resolveSenpiLaunch(
   env: NodeJS.ProcessEnv,
@@ -29,6 +34,7 @@ export function resolveSenpiLaunch(
 ): SenpiLauncher {
   const launcher = resolveTaskSenpiLauncher({
     isBunBinary: runtime.isBunBinary,
+    isCompiledEngine: runtime.isCompiledEngine,
     execPath: runtime.execPath,
     platform: runtime.platform,
     parentEnv: env,
@@ -60,8 +66,58 @@ export function resolveMemoryChildLaunch(input: {
   return { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
 }
 
+/**
+ * Brand-scoped roots that senpi reads as its own package directory. The omo binary pins these to
+ * its own runtime root for the engine it embeds (`remapSenpiEnvironment`).
+ */
+const PACKAGE_DIR_ENV_NAMES = ["OMO_PACKAGE_DIR", "SENPI_PACKAGE_DIR", "PI_PACKAGE_DIR"] as const
+
+/**
+ * The launcher arrives realpath-canonicalized (senpi-task `canonicalExecutable`) while the package
+ * root is the raw directory the parent exported, so a symlinked home, agent dir, or `/var` vs
+ * `/private/var` would make a containment test on raw strings disagree with itself. Canonicalize
+ * both sides, falling back to the input when the path does not exist.
+ */
+function canonical(path: string): string {
+  try {
+    return realpathSync.native(path)
+  } catch {
+    return path
+  }
+}
+
+function isInside(root: string, target: string): boolean {
+  const rel = relative(canonical(root), canonical(target))
+  return rel.length > 0 && !rel.startsWith("..") && !isAbsolute(rel)
+}
+
+/**
+ * Drop package-dir variables that do not describe the senpi this child actually launches.
+ *
+ * A memory child inherits the parent's environment, and the omo binary exports its own runtime root
+ * as `*_PACKAGE_DIR`. When the launcher resolves to a DIFFERENT senpi - the npm install found on
+ * PATH - that child reads the inherited root as its own package directory and looks for shipped
+ * assets under a tree that never contained them, dying before the run starts. Keeping the variables
+ * only while the launcher lives inside the root they name preserves the intended override for the
+ * embedded engine and for a relocated install.
+ */
+export function withoutForeignPackageDirEnv(
+  env: NodeJS.ProcessEnv,
+  launch: SenpiLauncher,
+): NodeJS.ProcessEnv {
+  const target = launch.prefixArgs[0] ?? launch.command
+  const next = { ...env }
+  for (const name of PACKAGE_DIR_ENV_NAMES) {
+    const root = next[name]
+    if (root === undefined || root.length === 0) continue
+    if (!isInside(root, target)) delete next[name]
+  }
+  return next
+}
+
 export type SenpiLaunchRuntime = {
   readonly isBunBinary: boolean
+  readonly isCompiledEngine: boolean
   readonly execPath: string
   readonly platform: NodeJS.Platform
   readonly argv: readonly string[]
@@ -80,6 +136,7 @@ function resolveInstalledSenpiCli(): string | null {
 function defaultRuntime(): SenpiLaunchRuntime {
   return {
     isBunBinary: detectBunBinary(import.meta.url),
+    isCompiledEngine: detectCompiledEngine(),
     execPath: process.execPath,
     platform: process.platform,
     argv: process.argv,

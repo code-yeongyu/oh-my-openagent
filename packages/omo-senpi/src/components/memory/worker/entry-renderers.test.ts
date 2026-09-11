@@ -270,6 +270,32 @@ describe("memory reflection entry rendering", () => {
       expect(lines[2]).toBe("took 4.3s · reason child_exit · merge refused")
     })
 
+    test("#when the child died inside a Bun code frame #then the payoff line carries the cause, not the source that raised it", () => {
+      // given: the stored detail is the raw child stderr tail of a crashed Bun child
+      const detail = [
+        '345 |             dark: JSON.parse(fs.readFileSync(darkPath, "utf-8")),',
+        "                                      ^",
+        "ENOENT: no such file or directory, open '/opt/omo-runtime/dist/modes/interactive/theme/dark.json'",
+        '  syscall: "open",',
+        "      at getBuiltinThemes (/global/senpi/dist/modes/interactive/theme/theme.js:345:33)",
+        "",
+        "Bun v1.4.2 (macOS arm64)",
+      ].join("\n")
+
+      // when
+      const lines = render(
+        renderReflectionCompletionEntry,
+        completion({ outcome: "failed", reason: "child_exit", detail }),
+      )
+
+      // then
+      const payoff = lines[2] ?? ""
+      expect(payoff).not.toMatch(/\d+\s\|\s/)
+      expect(payoff).not.toContain("JSON.parse")
+      expect(payoff).not.toContain("at getBuiltinThemes")
+      expect(payoff).toContain("reason child_exit · ENOENT: no such file or directory")
+    })
+
     test("#when a failure carries a reason and detail and is expanded #then the detail row carries identity", () => {
       // when
       const lines = render(

@@ -7,7 +7,7 @@ You are an elite frontend design engineer. Your only job in this skill is to **r
 
 You are not done when it is clean and correct. You are done when a senior product designer at Linear, Stripe, or Supabase would ship it: surfaces read as real materials (depth, light, layering), color carries a story and a ramp, type has personality, and motion has intent. **Correct-but-flat is a failure, not a finish.** The most common way this skill fails is effort drain: the build, lint, file-size, and test gates eat all the attention and the surface ships at the floor. Spend on the surface like it is the deliverable, because for an expressive brief it is. When you render and find only bug-level issues, you are not done — you are at the start of the part that separates good from generic.
 
-Two things ship flat most often, and both read as "clean but generic": the **hero's focal object** and the **atmosphere**. Render the focal object as a real, lit, dimensional thing — a generated bitmap (imagegen) for a product/brand/object hero, or CSS/SVG art that carries light, shadow, gradient, and depth. Flat geometric primitives (plain circles and rounded rects) for a brand hero are the flat trap. Give the background depth too — gradient, glow, layered light, an atmospheric band, or a real image — not one flat fill. Glass is only one material: a dark glossy brand wants tint+blur+rim+sheen+glow, a bright playful brand wants gradient fills+soft depth shadows+a lit focal object. Pick what the brand calls for, but it must have dimension.
+Two things ship flat most often, and both read as "clean but generic": the **hero's focal object** and the **atmosphere**. Render the focal object as a real, lit, dimensional thing — a generated bitmap (imagegen) for a product/brand/object hero, or CSS/SVG art that carries light, shadow, gradient, and depth. Flat geometric primitives (plain circles and rounded rects) for a brand hero are the flat trap. Give the background depth too — gradient, glow, layered light, an atmospheric band, or a real image — not one flat fill. Glass is only one material: a dark glossy brand wants tint+blur+rim+sheen+glow, a bright playful brand wants gradient fills+soft depth shadows+a lit focal object. Pick what the brand calls for, but it must have dimension. The mechanisms for that atmosphere and for how the headline arrives come from `ambience-skill.md` (Step 10), not from memory.
 
 ## Why route at all
 
@@ -120,7 +120,7 @@ Do NOT let an expressive brief fall through to `taste-skill`. Then map the phras
 | "minimal", "clean", "Notion-like", "Linear-like", "editorial", "boring is good" | `minimalist-skill.md` |
 | "brutalist", "raw", "Swiss", "experimental", "industrial", "anti-design", "unstyled" | `brutalist-skill.md` |
 | "premium", "luxury", "calm", "expensive", "elegant", "spa", "boutique", "glossy", "glassy", "liquid glass", "startup-grade", "make it beautiful/pretty" | `soft-skill.md` + a high-craft Layer B (`supabase` / `linear.app` / `vercel` / `stripe`) |
-| "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` |
+| "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` + `ambience-skill.md` for the backgrounds and scroll scenes its sections 5 and 7 demand |
 | Neutral or operational — internal tool, dashboard, admin, "just make it usable" with no surface ambition | `taste-skill.md` as Layer A, plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference |
 
 You may also load a brand DESIGN.md from Layer B as a *concrete reference* if the user's mood maps cleanly (see the "Mood-based shortcuts" section in `_INDEX.md`).
@@ -181,6 +181,12 @@ Triggers: micro-interactions, animated components, transitions, gestures, hover/
 
 **Action:** Add `interaction-skill.md` on top of whatever style skill you selected. It anchors interaction design to the beui.dev catalog: find the nearest pattern, read its real source through the file's curl recipe, extract the mechanism (spring config, layout strategy, enter/exit order, reduced-motion path), and adapt the values to `DESIGN.md`. It owns interaction mechanics only — no visual direction — so it stacks cleanly, like `layout-skill.md`.
 
+### Step 10 — Does the work add a hero atmosphere, background, typographic reveal, or card surface effect?
+
+Triggers: an animated, shader, particle, or grid background; a hero that must feel atmospheric or dimensional; text that splits, blurs, shimmers, types, counts, scrambles, or loops; scroll-triggered chapters; spotlight / tilt / glare / glowing-border cards — or "make the hero stunning", "add a living background", "animate the headline".
+
+**Action:** Add `ambience-skill.md` on top of whatever style skill you selected. It anchors ambience to the react-bits catalog: find the nearest pattern in its intent map, read its real source through the file's curl recipe, extract the mechanism (render loop and its driver, shader uniforms or split strategy, sizing, dependencies), then run its retrofit checklist — reduced-motion static state, off-screen pause, no scroll listeners, compositor-only properties, `DESIGN.md` tokens, lazy-loaded budget. One atmosphere per hero; cursor effects stay quarantined to `gpt-tasteskill.md` briefs. It owns ambience mechanics only — no visual direction — and never vendors react-bits code.
+
 ## Stacking rules (read this once, internalize it)
 
 1. **At most one Layer A *style* skill at a time.** A layout cannot be both `minimalist-skill` and `brutalist-skill` simultaneously — they encode opposite spacing and typography philosophies. Pick one.
@@ -191,6 +197,7 @@ Triggers: micro-interactions, animated components, transitions, gestures, hover/
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
 7. **`layout-skill.md` stacks on top of any style skill** for app-shell / dashboard / split-pane work. It owns spatial structure and scroll ownership only — no visual direction — so it never conflicts with the style skill you picked.
 8. **`interaction-skill.md` stacks on top of any style skill** for interaction/motion work. It owns interaction mechanics — springs, layout morphs, enter/exit orchestration, reduced motion — and no visual direction, so it never conflicts with the style skill either.
+9. **`ambience-skill.md` stacks on top of any style skill** for hero atmosphere, backgrounds, typographic reveals, scroll chapters, and card surface effects. It owns ambience mechanics and their retrofit contract — no visual direction — so it stacks with the style skill and with `interaction-skill.md` at the same time.
 
 ## Anti-patterns — do not do these
 
@@ -235,6 +242,7 @@ Once references are loaded, before writing any UI code:
 | "Build a dashboard / settings / inbox / app shell" | one style skill (usually `taste-skill.md`) + `layout-skill.md` |
 | "Panel won't scroll / footer pushed off-screen / mobile overflow" | Add `layout-skill.md` to current stack |
 | "Add micro-interactions / animate this / make it feel alive" | Add `interaction-skill.md` to current stack |
+| "Make the hero stunning / add an animated background / animate the headline / spotlight cards" | Add `ambience-skill.md` to current stack |
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 

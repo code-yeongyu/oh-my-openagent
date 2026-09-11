@@ -1,5 +1,8 @@
 /**
- * Refusal detection for the fallback-architect nudge.
+ * Refusal detection for the adapter. This is the SINGLE refusal predicate: the fallback-architect
+ * nudge and the continuation terminal-outcome gate
+ * (`components/ulw-execute-continuation/agent-end-eligibility.ts`) both read it, so the two can
+ * never disagree about whether a turn was refused.
  *
  * `isRefusalLikeMessage` intentionally mirrors senpi's own `isClassifierRefusal`
  * (senpi repo `packages/ai/src/utils/stop-details.ts`), which is the predicate senpi uses to
@@ -16,6 +19,15 @@ const ANTHROPIC_POLICY_REFUSAL_PATTERN =
 
 const REFUSAL_STOP_DETAIL_TYPES = new Set(["refusal", "sensitive"])
 const REFUSAL_ELIGIBLE_STOP_REASONS = new Set(["error", "toolUse"])
+
+/**
+ * `demoteToolUseWithoutToolCalls` (`@earendil-works/pi-agent-core/dist/assistant-terminal-state.js`)
+ * rewrites a tool-call-less `toolUse` stop to `stop` and leaves this diagnostic as, in its own
+ * words, "the only surviving evidence that the turn was malformed rather than a clean stop".
+ * A refusal observed after that demotion is therefore keyed on the diagnostic, never on a bare
+ * `stop` carrying stale `stopDetails`.
+ */
+export const EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC = "empty_tool_use_terminal_state"
 
 export const FABLE_FIVE_MODEL_ID = "claude-fable-5"
 
@@ -49,9 +61,12 @@ export function isRefusalLikeMessage(message: unknown): boolean {
 
   // Order matters and mirrors senpi: the stop reason is checked FIRST, so a message that ended for
   // another reason (an abort, a normal stop) can never be read as a refusal just because it still
-  // carries stale stopDetails.
+  // carries stale stopDetails. The one extension over `isClassifierRefusal` is the host's own
+  // normalization: a demoted empty tool-use turn reports `stop`, and its refusal signal is admitted
+  // only together with the demotion diagnostic that proves the demotion happened.
   const stopReason = message["stopReason"]
-  if (typeof stopReason !== "string" || !REFUSAL_ELIGIBLE_STOP_REASONS.has(stopReason)) return false
+  if (typeof stopReason !== "string") return false
+  if (!REFUSAL_ELIGIBLE_STOP_REASONS.has(stopReason) && !isDemotedEmptyToolUse(message, stopReason)) return false
 
   const stopDetails = message["stopDetails"]
   if (isRecord(stopDetails) && typeof stopDetails["type"] === "string" && REFUSAL_STOP_DETAIL_TYPES.has(stopDetails["type"])) {
@@ -60,6 +75,13 @@ export function isRefusalLikeMessage(message: unknown): boolean {
 
   const errorMessage = message["errorMessage"]
   return typeof errorMessage === "string" && ANTHROPIC_POLICY_REFUSAL_PATTERN.test(errorMessage)
+}
+
+export function isDemotedEmptyToolUse(message: Record<string, unknown>, stopReason: unknown): boolean {
+  if (stopReason !== "stop") return false
+  const diagnostics = message["diagnostics"]
+  if (!Array.isArray(diagnostics)) return false
+  return diagnostics.some((diagnostic) => isRecord(diagnostic) && diagnostic["type"] === EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC)
 }
 
 export function isFableFiveModel(model: unknown): model is FallbackModelDescriptor {

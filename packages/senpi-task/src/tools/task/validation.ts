@@ -1,3 +1,5 @@
+import { canonicalAgentName } from "../../agents/legacy-agent-names"
+
 import type { ResolvedSpawnItem } from "./types"
 
 export type TaskTargetErrorCode = "both_targets" | "no_target" | "category_with_model"
@@ -9,7 +11,7 @@ export type TaskTargetError = {
 
 export type TaskTargetSelection =
   | { readonly kind: "category"; readonly category: string }
-  | { readonly kind: "subagent_type"; readonly subagentType: string }
+  | { readonly kind: "subagent_type"; readonly subagentType: string; readonly legacySubagentType?: string }
   | { readonly kind: "error"; readonly error: TaskTargetError }
 
 type TargetInput = {
@@ -76,7 +78,7 @@ const CATEGORY_WITH_MODEL_MESSAGE =
   "Provide EITHER category OR model, never both. A category-routed task always takes its model from the omo.json category config; a call-site model override would silently bypass that routing. Remove model and retry, or use subagent_type for an explicit-model spawn, or configure categories.<name>.models in omo.json."
 
 const NO_TARGET_MESSAGE =
-  'You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Example: task(category="quick", prompt="...") or task(subagent_type="momus", prompt="...").'
+  'You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Example: task(category="quick", prompt="...") or task(subagent_type="plan-reviewer", prompt="...").'
 
 const PROMPT_AND_TASKS_MESSAGE = "Provide EITHER prompt OR tasks, not both. Remove one and retry."
 
@@ -106,7 +108,14 @@ export function validateTaskTarget(params: TargetInput): TaskTargetSelection {
     return { kind: "category", category: params.category.trim() }
   }
   if (present(params.subagent_type)) {
-    return { kind: "subagent_type", subagentType: params.subagent_type.trim() }
+    // Legacy curated ids canonicalize here; the legacy id rides along in-memory only
+    // so the caller can surface the deprecation notice without changing any persisted shape.
+    const canonical = canonicalAgentName(params.subagent_type)
+    return {
+      kind: "subagent_type",
+      subagentType: canonical.name,
+      ...(canonical.legacy === undefined ? {} : { legacySubagentType: canonical.legacy }),
+    }
   }
   return { kind: "error", error: { code: "no_target", message: NO_TARGET_MESSAGE } }
 }
@@ -201,7 +210,14 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
     if (target.kind === "category") {
       items.push({ ...common, kind: "category", category: target.category })
     } else {
-      items.push({ ...common, kind: "subagent_type", subagentType: target.subagentType })
+      // Additive, in-memory only: the batch item carries the canonical id plus the legacy id when
+      // the caller submitted one, and nothing else about ResolvedSpawnItem changes.
+      items.push({
+        ...common,
+        kind: "subagent_type",
+        subagentType: target.subagentType,
+        ...(target.legacySubagentType === undefined ? {} : { legacySubagentType: target.legacySubagentType }),
+      })
     }
   }
 

@@ -61,6 +61,8 @@ export interface KibitzerGateRunnerOptions {
    */
   readonly createSession?: CreateChildSession
   readonly createRunner?: (options: { readonly createSession?: CreateChildSession }) => InProcessRunnerLike
+  /** QA seam: replaces the persona read so a missing asset can be simulated; production leaves it unset. */
+  readonly loadPersona?: () => string
   readonly logger?: ComponentLogger
 }
 
@@ -90,7 +92,12 @@ export interface KibitzerGateLaunchInput {
 }
 
 /** Precise failure causes: which stage of the in-process launch died. */
-export type KibitzerGateFailureCause = "session_create_failed" | "child_failed" | "child_failed_upstream" | "launch_failed"
+export type KibitzerGateFailureCause =
+  | "persona_unavailable"
+  | "session_create_failed"
+  | "child_failed"
+  | "child_failed_upstream"
+  | "launch_failed"
 
 export type KibitzerGateLaunchResult =
   /** Another gate run holds the latch; this trigger is dropped. */
@@ -99,7 +106,7 @@ export type KibitzerGateLaunchResult =
   | { readonly status: "skipped"; readonly cause?: string; readonly model?: string; readonly candidateCount?: number; readonly runId?: string }
   /** The child ran and said nothing the parent accepted. */
   | { readonly status: "empty"; readonly runId?: string; readonly model?: string }
-  /** The child session could not be created or its turn failed. */
+  /** The persona asset could not be read, the child session could not be created, or its turn failed. */
   | {
     readonly status: "failed"
     readonly cause?: KibitzerGateFailureCause

@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readdir, readFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import type { ChildSpec, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
+import { KIBITZER_NUDGE_TOOL_NAME, type KibitzerNudgeTool } from "./kibitzer-nudge-tool"
 import { KibitzerGateRunner } from "./kibitzer-runner"
 import { CANDIDATE_PATH, callNudge, fixture, launchInput, nudgeOnce, roots, runnerOptions, scriptedSession } from "./kibitzer-runner.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 const SECRET = "sk-live-abcdefghijklmnop"
 const SECRET_ERROR = `Authorization: Bearer ${SECRET}`
+/** senpi packages/agent/src/empty-assistant-recovery.ts settles a second invisible stop as this error. */
+const EMPTY_RESPONSE_TWICE = { stopReason: "error", errorMessage: "Model returned an empty response twice" } as const
 
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))) })
 
@@ -57,6 +61,101 @@ describe("KibitzerGateRunner", () => {
 
     // then
     expect(result.status).toBe("empty")
+  })
+
+  test("#given a judge that nudges once then settles with the empty-response-twice error #when the runner launches #then the accepted nudge is delivered as nudged", async () => {
+    // given: the judge answered through `nudge`, then stopped silently twice (issue #7963)
+    const { identityPaths } = await fixture()
+    const { warnings, logger } = captureWarnings()
+    const stub = scriptedSession(nudgeOnce, EMPTY_RESPONSE_TWICE)
+    const runner = new KibitzerGateRunner(runnerOptions(identityPaths, { createSession: stub.createSession, logger }))
+
+    // when
+    const result = await runner.launch(launchInput())
+
+    // then
+    expect(result).toMatchObject({ status: "nudged", nudges: [{ path: CANDIDATE_PATH }] })
+    expect(warnings.map((entry) => entry.message)).not.toContain("kibitzer gate child failed")
+  })
+
+  test("#given a judge that nudges nothing and settles with the empty-response-twice error #when the runner launches #then the result is empty, not failed", async () => {
+    // given
+    const { identityPaths } = await fixture()
+    const stub = scriptedSession(async () => undefined, EMPTY_RESPONSE_TWICE)
+    const runner = new KibitzerGateRunner(runnerOptions(identityPaths, { createSession: stub.createSession }))
+
+    // when
+    const result = await runner.launch(launchInput())
+
+    // then
+    expect(result.status).toBe("empty")
+  })
+
+  test("#given a run dir whose artifact writes reject #when a judge nudges once #then the artifacts are skipped with a warning and the nudge is still delivered", async () => {
+    // given: `recall/runs` is a regular file, so every write under the run dir rejects on every
+    // platform and for every user (a read-only dir would let root through). The child is started
+    // through a fake runner that reads nothing from disk: it receives its input inline and holds no
+    // read tool, so the run-dir artifacts are auditable output only, never an input.
+    const { identityPaths } = await fixture()
+    await mkdir(identityPaths.recall, { recursive: true })
+    await writeFile(join(identityPaths.recall, "runs"), "", "utf8")
+    const { warnings, logger } = captureWarnings()
+    const createRunner = (): InProcessRunnerLike => ({
+      start: async (spec: ChildSpec) => {
+        const nudge = spec.memberScopedTools?.find((tool): tool is KibitzerNudgeTool => tool.name === KIBITZER_NUDGE_TOOL_NAME)
+        if (nudge === undefined) throw new Error("nudge tool missing from the judge spec")
+        const recorded = await nudge.execute("call-1", { path: CANDIDATE_PATH, hint: "Drain nodes before a rollout." })
+        if (recorded.isError === true) throw new Error("expected the nudge to be accepted")
+        return {
+          task_id: spec.taskId,
+          sessionId: `session-${spec.taskId}`,
+          steer: async () => undefined,
+          followUp: async () => undefined,
+          abort: async () => undefined,
+          subscribe: () => () => undefined,
+          waitForIdle: async () => ({ status: "completed", finalResponse: "" }),
+          lastAssistantText: () => undefined,
+          dispose: () => undefined,
+        }
+      },
+    })
+    const runner = new KibitzerGateRunner(runnerOptions(identityPaths, { createRunner, logger }))
+
+    // when
+    const result = await runner.launch(launchInput())
+
+    // then
+    expect(result).toMatchObject({ status: "nudged", nudges: [{ path: CANDIDATE_PATH }] })
+    const messages = warnings.map((entry) => entry.message)
+    expect(messages).toContain("kibitzer gate run artifacts skipped")
+    expect(messages).not.toContain("kibitzer gate child session creation failed")
+    expect(warnings.find((entry) => entry.message === "kibitzer gate run artifacts skipped")?.details).toMatchObject({ runId: result.runId })
+  })
+
+  test("#given the persona asset missing on disk #when the runner launches #then the failure is persona_unavailable and names the asset", async () => {
+    // given: the payload lost kibitzer-persona.md (in-place upgrade or runtime prune under a live process)
+    const { identityPaths } = await fixture()
+    const { warnings, logger } = captureWarnings()
+    let sessions = 0
+    const runner = new KibitzerGateRunner(runnerOptions(identityPaths, {
+      loadPersona: () => {
+        throw new Error("ENOENT: no such file or directory, open '/opt/omo/plugin/extensions/kibitzer-persona.md'")
+      },
+      createSession: async () => {
+        sessions += 1
+        throw new Error("the child must not be created without its persona")
+      },
+      logger,
+    }))
+
+    // when
+    const result = await runner.launch(launchInput())
+
+    // then
+    expect(result).toMatchObject({ status: "failed", cause: "persona_unavailable" })
+    expect(result.status === "failed" ? result.reason : undefined).toContain("kibitzer-persona.md")
+    expect(sessions).toBe(0)
+    expect(warnings.map((entry) => entry.message)).not.toContain("kibitzer gate child session creation failed")
   })
 
   test("#given a child turn that ends with a secret-bearing provider error #when the runner launches #then child_failed is redacted and logs omit the token", async () => {

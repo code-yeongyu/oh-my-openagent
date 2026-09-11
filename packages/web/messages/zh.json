@@ -102,70 +102,70 @@
         "description": "内置 OMO 扩展的原生 omo 命令。独立运行，无需 OpenCode 或 Codex 宿主。仅限测试版渠道。",
         "install": "npm i -g omo-ai@beta"
       },
-      "tagAgents": "11 个智能体",
+      "tagAgents": "11 个角色",
       "tagHooks": "55 个生命周期钩子",
       "tagComponents": "Light：11 个组件",
       "tagBeta": "Senpi：测试版渠道"
     },
     "agents": {
       "eyebrow": "阵容",
-      "title": "十一个智能体，一张图。",
-      "subtitle": "按波次调度的 11 个智能体有向图：编排器领队，规划器、缺口分析与计划评审负责把关，执行者动手。点击图中的节点即可找到对应格子。",
-      "sisyphus": {
+      "title": "十一个角色，一张图。",
+      "subtitle": "按波次调度的 11 个角色有向图：编排器领队，规划器、缺口分析与计划评审负责把关，类别与精选智能体动手执行。点击图中的节点即可找到对应格子。",
+      "orchestrator": {
         "name": "编排器",
-        "role": "主导智能体",
-        "model": "Claude Opus 5 Max",
-        "description": "读懂你的意图而非字面，动手前先摸清代码库，委派给专家并独立验证结果。中断的运行会从 boulder.json 记录的位置精确恢复。"
+        "role": "主智能体",
+        "model": "模型配置: Capable · Simple work · Deep work",
+        "description": "在你的会话里、用你的模型运行。读懂你的意图，动手前先摸清代码库，按类别委派并独立验证每个结果。中断的运行会从 boulder.json 记录的位置精确恢复。"
       },
-      "hephaestus": {
-        "name": "Hephaestus",
-        "role": "深度执行者 — 探索、规划、决定、执行、验证",
-        "model": "GPT 5.6 Sol Medium"
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan 规划访谈",
+        "model": "在主会话中运行"
       },
-      "prometheus": {
-        "name": "规划器",
-        "role": "战略规划者",
-        "model": "Claude Fable 5.1 XHigh"
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "缺口分析",
+        "model": "Claude Sonnet 4.6"
       },
-      "metis": {
-        "name": "Metis",
-        "role": "计划顾问",
-        "model": "Claude Opus 5 High"
-      },
-      "momus": {
-        "name": "计划评审",
-        "role": "评审关卡",
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "计划评审关卡",
         "model": "GPT 6 Astra xHigh"
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "并行任务执行者",
-        "model": "Claude Sonnet 5"
+      "kibitzer": {
+        "name": "Kibitzer",
+        "role": "回合结束后的记忆顾问",
+        "model": "Quick 类别"
       },
-      "oracle": {
-        "name": "Oracle",
-        "role": "架构顾问",
-        "model": "GPT 5.6 Sol xHigh"
+      "architect": {
+        "name": "Architect",
+        "role": "架构咨询通道",
+        "model": "Claude Fable 5.1 Max"
       },
-      "librarian": {
-        "name": "Librarian",
-        "role": "文档与代码搜索",
-        "model": "GPT 5.6 Luna Fast"
+      "deep": {
+        "name": "Deep",
+        "role": "深度自主问题求解",
+        "model": "GPT 6 Astra High"
+      },
+      "quick": {
+        "name": "Quick",
+        "role": "小型单文件改动",
+        "model": "Kimi For Coding Highspeed"
+      },
+      "visualEngineering": {
+        "name": "Visual Engineering",
+        "role": "UI、样式与设计系统",
+        "model": "Claude Fable 5.1 Max"
       },
       "explore": {
         "name": "Explore",
         "role": "代码库 grep",
         "model": "GPT 5.6 Luna Fast"
       },
-      "sisyphusJunior": {
-        "name": "执行者",
-        "role": "单任务执行者",
-        "model": "Per-category"
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "媒体分析",
-        "model": "GPT 5.6 Sol Low"
+      "librarian": {
+        "name": "Librarian",
+        "role": "文档与代码搜索",
+        "model": "GPT 5.6 Luna Fast"
       },
       "dynamic": {
         "name": "Dynamic Agent",
@@ -173,37 +173,57 @@
         "model": "Per-category"
       }
     },
+    "profiles": {
+      "eyebrow": "模型配置",
+      "title": "选意图，不选模型。",
+      "subtitle": "一个配置就是一条有序的模型链。设一次 model_profile，omo 就会用你的提供商能提供的第一个模型启动会话；在同一个键里直接写 provider/model 则固定为该模型。",
+      "capable": {
+        "name": "Capable",
+        "role": "可用的最强通用模型 — 不想纠结模型时的默认选择。",
+        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
+      },
+      "simpleWork": {
+        "name": "Simple work",
+        "role": "为小而明确的修改提供快速且便宜的选择。",
+        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
+      },
+      "deepWork": {
+        "name": "Deep work",
+        "role": "为难题提供最大推理能力 — 与 deep 类别使用同一条链。",
+        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
+      }
+    },
     "orchestration": {
       "eyebrow": "编排",
       "title": "先想，再做。",
       "subtitle": "规划和执行是两件事。规划者不写代码；执行者只跟随已通过两位评审的计划。",
-      "prometheus": {
-        "name": "规划器",
-        "role": "战略规划者",
-        "model": "Claude Fable 5.1 XHigh",
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan",
+        "model": "在主会话中运行",
         "description": "访谈你，探索代码库，写出计划。从不写代码。",
         "features": ["访谈模式", "多智能体代码库探索"]
       },
-      "metis": {
-        "name": "Metis",
+      "planConsultant": {
+        "name": "Plan Consultant",
         "role": "缺口分析",
-        "model": "Claude Opus 5 High",
+        "model": "Claude Sonnet 4.6",
         "description": "在歧义变成 bug 之前把它从计划里读出来。",
         "features": ["缺失的需求", "未说明的假设"]
       },
-      "momus": {
-        "name": "计划评审",
+      "planReviewer": {
+        "name": "Plan Reviewer",
         "role": "计划评审",
         "model": "GPT 6 Astra xHigh",
         "description": "只有计划站得住才批准，否则退回。",
         "features": ["对抗式评审", "OKAY 或一列理由"]
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "主执行者",
-        "model": "Claude Sonnet 5",
-        "description": "读取已批准的计划，按类别与技能委派，记录经验，亲自验证每个结果。",
-        "features": ["基于意图的路由", "独立验证"]
+      "executor": {
+        "name": "执行者",
+        "role": "/ulw-execute",
+        "model": "在主会话中运行",
+        "description": "在同一会话中执行已批准的计划，按类别与技能委派，亲自验证每个结果。",
+        "features": ["Boulder 状态", "独立验证"]
       }
     },
     "teamMode": {
@@ -400,14 +420,14 @@
         },
         "footer": "零干预。完全自主。只看结果。"
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "方法 2",
         "title": "规划器 + 执行器",
         "subtitle": "当你需要战略性控制时。",
-        "prometheusTitle": "规划器",
-        "prometheusDescription": "进行访谈、研究上下文并生成详细的 YAML 计划。",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "执行计划，委派给子 Agent，管理波次并跟踪进度。",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "进行访谈、研究上下文并写出详细的工作计划。",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "在同一会话中执行已批准的计划，按类别委派，管理波次并跟踪进度。",
         "footer": "你设计架构。Agent 执行。完全透明。"
       }
     },
@@ -428,15 +448,15 @@
     "coreLoop": {
       "title": "核心循环",
       "features": {
-        "prometheus": {
+        "planner": {
           "feature": "规划访谈",
           "purpose": "通过智能访谈提取意图"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "计划顾问",
           "purpose": "在歧义变成 Bug 之前捕获它们"
         },
-        "momus": {
+        "planReviewer": {
           "feature": "计划评审关卡",
           "purpose": "在执行前验证计划完整性"
         },

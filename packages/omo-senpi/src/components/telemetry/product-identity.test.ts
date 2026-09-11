@@ -134,6 +134,16 @@ describe("OmO Native product identity", () => {
     })
   })
 
+  test("#given the senpi Claude subscription lane #when masked #then it exports as itself with the anthropic vocabulary", () => {
+    // #8051: the builtin Claude rungs head with claude-sdk-oauth, so the category-model insight must
+    // read that provider as itself instead of collapsing the most-routed Claude lane to `custom`.
+    expect(KNOWN_MODELS["claude-sdk-oauth"]).toEqual(KNOWN_MODELS.anthropic)
+    expect(maskProviderAndModel("claude-sdk-oauth", "claude-opus-5")).toEqual({
+      provider: "claude-sdk-oauth",
+      model_id: "claude-opus-5",
+    })
+  })
+
   test("#given a publicly known model routed through an unknown gateway provider #when masked #then the model id is exported while the provider stays custom", () => {
     // given: users route shipped models through OpenRouter, LiteLLM, or a self-hosted gateway.
     // The gateway name is user-configured and private; the model id is a public product name.

@@ -59,7 +59,7 @@ describe("kibitzer nudged recollection", () => {
   test("#given a nudged record #when rendered #then the title is the single Kibitzer", () => {
     const component = renderKibitzerNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], via: "steer" }), { expanded: false }, theme)
     const rendered = component?.render(120).join("\n")
-    expect(rendered).toContain("✦ Kibitzer")
+    expect(rendered).toContain("✦ Kibitzer !")
     expect(rendered).toContain("recalled memory: Use it.")
     expect(rendered).toContain("a.md")
   })
@@ -71,7 +71,7 @@ describe("kibitzer nudged recollection", () => {
       theme,
     )
     const rendered = component?.render(120).join("\n")
-    expect(rendered).toContain("✦ Kibitzer")
+    expect(rendered).toContain("✦ Kibitzer !")
     expect(rendered).not.toContain("Come to think of it")
     expect(rendered).toContain("recalled memory: Use it.")
   })
@@ -80,7 +80,7 @@ describe("kibitzer nudged recollection", () => {
     for (const opener of ["x".repeat(41), "Oh,\u001b[31m right —", "two\nlines —", 7, ""]) {
       const component = renderKibitzerNudgedEntry(entry({ version: 1, nudges: [{ path: "a.md", hint: "Use it." }], opener }), { expanded: false }, theme)
       const rendered = component?.render(120).join("\n")
-      expect(rendered).toContain("✦ Kibitzer")
+      expect(rendered).toContain("✦ Kibitzer !")
       expect(rendered).toContain("recalled memory: Use it.")
     }
   })

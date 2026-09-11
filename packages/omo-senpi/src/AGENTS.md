@@ -10,6 +10,7 @@ Source root of the Senpi adapter package. The package barrel (`index.ts`) export
 | Install / uninstall | `install/` | `runSenpiInstaller` / `runSenpiUninstaller`, local launcher, atomic settings writes. |
 | Real host modules for tests | `senpi-test-runtime.ts` | Resolves the installed `@code-yeongyu/senpi` dist and imports real theme/ModelRegistry/ModelRuntime at load time. |
 | Deep components | `components/{task,memory,lsp,telemetry,init-deep-advisor}/` | Each has its own AGENTS.md; `memory/` additionally documents `worker/`, `commands/`, `palace/`. |
+| Bundled remote MCPs | `components/builtin-mcps/` | `context7` + `grep_app` HTTP declarations, `CONTEXT7_API_KEY` bearer gating, and the disable switches. Own AGENTS.md. |
 | X search | `components/x-search/` | Credential-gated `x_search` tool and conditional skill (files, gating, contract, error codes, backtest pointer). Own AGENTS.md. |
 | Small components | `components/*` | Single-purpose factories (ulw-loop, config-watch, onboarding, fallback-architect, ...) documented in `../AGENTS.md`. |
 

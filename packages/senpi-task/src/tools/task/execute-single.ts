@@ -9,7 +9,7 @@ import { waitForForegroundTask } from "./foreground-wait"
 import { partialDetails, recordDetails, startedDetails, type SingleSpawnParams } from "./result-details"
 import { appendMissingSkills } from "./skill-result"
 import { evaluateSpawnPolicy } from "./spawn-policy"
-import { backgroundConversionText, backgroundStartText } from "./start-presentation"
+import { backgroundConversionText, backgroundStartText, type StartLabels } from "./start-presentation"
 import type { TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
 import { validateTaskTarget } from "./validation"
 
@@ -18,6 +18,9 @@ type RunSpawnInput = ForegroundWaitOptions & {
   readonly signal: AbortSignal | undefined
   readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
   readonly ctx: TaskToolContext
+  // Set by the caller when the spawn resolved through a retired curated agent id; validateTaskTarget
+  // re-derives it when the params still carry the raw legacy id.
+  readonly legacySubagentType?: string
 }
 
 function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToolDetails> {
@@ -66,6 +69,18 @@ export async function runSpawn(
   }
   const effectiveParams = policy?.kind === "force" ? { ...params, prompt: policy.prompt, load_skills: [] } : params
   const target = selection.kind === "category" ? { category: selection.category } : { subagentType: selection.subagentType }
+  // Retired curated ids canonicalize before the spawn; the legacy id rides along in-memory only so
+  // the start text and details can surface the deprecation notice.
+  const legacySubagentType =
+    (selection.kind === "subagent_type" ? selection.legacySubagentType : undefined) ?? input.legacySubagentType
+  const startLabels: StartLabels = {
+    taskSummary: params.task_summary,
+    description: params.description,
+    ...(legacySubagentType !== undefined &&
+      selection.kind === "subagent_type" && {
+        legacyAlias: { legacy: legacySubagentType, canonical: selection.subagentType },
+      }),
+  }
   // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
   // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
   await loadSenpiBarrel()
@@ -111,11 +126,8 @@ export async function runSpawn(
   }
   if (params.run_in_background === true) {
     return result(
-      appendMissingSkills(
-        backgroundStartText(started, { taskSummary: params.task_summary, description: params.description }),
-        spec.skills,
-      ),
-      startedDetails(started, params, spec.execution_mode, spec.skills),
+      appendMissingSkills(backgroundStartText(started, startLabels), spec.skills),
+      startedDetails(started, params, spec.execution_mode, spec.skills, legacySubagentType),
     )
   }
 
@@ -142,7 +154,7 @@ export async function runSpawn(
     emittedAt = Date.now()
     onUpdate({
       content: [{ type: "text", text: progress.contentText() }],
-      details: partialDetails(started, params, spec.execution_mode, progress.details(), spec.skills),
+      details: partialDetails(started, params, spec.execution_mode, progress.details(), spec.skills, legacySubagentType),
     })
   }
   const schedule = (): void => {
@@ -173,7 +185,7 @@ export async function runSpawn(
         progress: { activity: "queued · waiting for slot", startedAt },
         childId: started.task_id,
         turns: 0,
-      }, spec.skills),
+      }, spec.skills, legacySubagentType),
     })
   } else {
     emit()
@@ -189,14 +201,10 @@ export async function runSpawn(
     })
     if (waited.kind === "promoted") {
       return result(appendMissingSkills(
-        backgroundConversionText(
-          started,
-          { taskSummary: params.task_summary, description: params.description },
-          waited.budgetSeconds,
-        ),
+        backgroundConversionText(started, startLabels, waited.budgetSeconds),
         spec.skills,
       ), {
-        ...startedDetails(started, params, spec.execution_mode, spec.skills),
+        ...startedDetails(started, params, spec.execution_mode, spec.skills, legacySubagentType),
         run_in_background: true,
       })
     }
@@ -211,7 +219,7 @@ export async function runSpawn(
     const reason = "parent turn aborted"
     await deps.manager.cancelTask(started.task_id, reason)
     return result(`Task ${started.task_id} cancelled: ${reason}.${continuationFooter(started.task_id)}`, {
-      ...startedDetails(started, params, spec.execution_mode, spec.skills),
+      ...startedDetails(started, params, spec.execution_mode, spec.skills, legacySubagentType),
       status: "cancelled",
       reason,
     })

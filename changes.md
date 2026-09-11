@@ -1,3 +1,7 @@
+## 2026-09-09 - Suspend native DAG runs on committed session switches (#8020)
+
+OMO no longer cancels DAG nodes from the vetoable `session_before_switch` hook. Committed shutdown first retires scheduler admission and settlement, awaits in-flight admission and journal delivery, then persists the pause before task-child suspension. Returning in the same process can reclaim an explicitly released own lease; active self claims and live foreign holders remain protected. Completed output is reused, running children reconcile through their durable task owners, and pending dependents are admitted once. Deliberate workflow cancellation remains destructive. `/session` information and `/resume` selector cancellation are unchanged. External terminal-hosted controllers are outside this native DAG lifecycle fix.
+
 ## 2026-09-09 — Preserve Windows omob executable suffixes
 
 Windows omob builds now retain the `.exe` suffix through installation, cache/provenance lookup, and direct refresh. The test fixtures use native compiled executables and platform-native paths while preserving the POSIX launcher contract and all refresh assertions.

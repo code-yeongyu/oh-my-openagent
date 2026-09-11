@@ -82,12 +82,20 @@ describe("reflection health", () => {
   test("#given the read-only health module #when its source is inspected #then it imports no writer and calls no appendEntry or notify", async () => {
     // given
     const source = await readFile(new URL("./health.ts", import.meta.url), "utf8")
+    const distiller = await readFile(new URL("./failure-detail.ts", import.meta.url), "utf8")
 
     // when
     const imports = [...source.matchAll(/^import[\s\S]*?from "(.+?)"$/gm)].map((match) => match[1])
 
-    // then
-    expect(imports).toEqual(["@oh-my-opencode/memory-core/fs", "node:path", "@oh-my-opencode/memory-core"])
+    // then: the only sibling import is the pure distiller, which itself imports nothing
+    expect(imports).toEqual([
+      "@oh-my-opencode/memory-core/fs",
+      "node:path",
+      "@oh-my-opencode/memory-core",
+      "./failure-detail",
+      "./launcher-identity",
+    ])
+    expect(distiller).not.toMatch(/^import /m)
     expect(source).not.toContain("appendEntry")
     expect(source).not.toContain("safeNotify")
     expect(source).not.toContain("writeFile")

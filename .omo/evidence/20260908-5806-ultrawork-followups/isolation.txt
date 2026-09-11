@@ -1,0 +1,8 @@
+Command: bash .omo/evidence/20260908-5806-ultrawork-followups/commands.sh
+SQL: SELECT count(*) FROM session
+Database resolution: opencode db path
+BUN_VERSION=1.4.0
+HOST_DB_SESSIONS_BEFORE=8083
+HOST_DB_SESSIONS_AFTER=8083
+HOST_DB_UNCHANGED
+Exit code: 0

@@ -43,7 +43,7 @@ const TASK_EVENTS = [
   "agent_end",
 ]
 const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
-const DAG_LIFECYCLE_EVENTS = ["session_start", "session_before_switch", "session_shutdown", "session_shutdown"]
+const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "session_shutdown"]
 const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 
 interface RecordedLog {
@@ -226,8 +226,8 @@ describe("omo-senpi task component wiring", () => {
     if (typeof wireDagLifecycle !== "function") return
     wireDagLifecycle(pi, {
       attach: async () => { order.push("dag-resume") },
-      detach: () => undefined,
-      pauseForShutdown: () => { order.push("dag-pause") },
+      detach: () => { order.push("dag-detach") },
+      pauseForShutdown: async () => { order.push("dag-pause") },
       dispose: () => { order.push("dag-dispose") },
     }, () => {
       pi.on("session_start", () => { order.push("task-reconcile") })
@@ -236,6 +236,8 @@ describe("omo-senpi task component wiring", () => {
 
     // when
     await pi.dispatch("session_start", {})
+    await pi.dispatch("session_before_switch", { reason: "resume" })
+    expect(order).toEqual(["task-reconcile", "dag-resume"])
     await pi.dispatch("session_shutdown", {})
 
     // then
@@ -243,6 +245,7 @@ describe("omo-senpi task component wiring", () => {
       "task-reconcile",
       "dag-resume",
       "dag-pause",
+      "dag-detach",
       "task-suspend",
       "dag-dispose",
     ])

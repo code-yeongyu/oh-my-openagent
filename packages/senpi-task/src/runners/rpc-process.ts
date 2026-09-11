@@ -81,10 +81,16 @@ export class RpcProcessRunner {
         log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
       }
       const message = error instanceof Error ? error.message : String(error)
+      // A child that died before its first prompt leaves its cause ONLY here: the classified exit is
+      // otherwise folded into `message`, which is stderr-derived and gets sanitized away downstream.
+      const exitOutcome = handle.exitOutcome()
       throw new RunnerError({
         kind: resume === undefined ? "child-prompt-failed" : "session_unavailable",
         message,
         cause: error,
+        ...(exitOutcome === undefined
+          ? {}
+          : { exit: { kind: exitOutcome.kind, code: exitOutcome.facts.code, signal: exitOutcome.facts.signal } }),
       })
     }
     return Object.assign(handle, {

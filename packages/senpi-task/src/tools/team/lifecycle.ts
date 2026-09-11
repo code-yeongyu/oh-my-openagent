@@ -1,4 +1,4 @@
-import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
 
@@ -7,7 +7,9 @@ import { SenpiTeamRuntimeError, SenpiTeamSpecError } from "../../team"
 import type { CreatedMemberInfo } from "../../team"
 import type { ResolvedModelRecord } from "../../state"
 import { formatTargetIdentity, formatTargetWithModel } from "../../status-line"
-import { toolResult } from "../control"
+import { toolErrorResult, toolResult } from "../control"
+import type { ToolExecutionResult } from "../control"
+import { renderTeamCreateCall, renderTeamCreateResult, renderTeamDeleteCall, renderTeamDeleteResult } from "./renderers"
 import type { TeamToolDeps, TeamToolsService } from "./types"
 
 const InlineTeamSpecMemberSchema = Type.Object(
@@ -103,18 +105,18 @@ function coerceInlineSpec(input: unknown): { readonly ok: true; readonly spec: u
   }
 }
 
-export async function runTeamCreate(service: TeamToolsService, params: TeamCreateInput): Promise<AgentToolResult<TeamCreateDetails>> {
+export async function runTeamCreate(service: TeamToolsService, params: TeamCreateInput): Promise<ToolExecutionResult<TeamCreateDetails>> {
   const hasName = params.team_name !== undefined && params.team_name.length > 0
   const hasInline = params.inline_spec !== undefined
   if (!hasName && !hasInline) {
-    return toolResult("Provide team_name or inline_spec.", { kind: "invalid_arguments", reason: "provide team_name or inline_spec" })
+    return toolErrorResult("Provide team_name or inline_spec.", { kind: "invalid_arguments", reason: "provide team_name or inline_spec" })
   }
 
   let inlineSpec: unknown
   if (hasInline) {
     const coerced = coerceInlineSpec(params.inline_spec)
     if (!coerced.ok) {
-      return toolResult(coerced.reason, { kind: "invalid_arguments", reason: coerced.reason })
+      return toolErrorResult(coerced.reason, { kind: "invalid_arguments", reason: coerced.reason })
     }
     inlineSpec = coerced.spec
   }
@@ -142,13 +144,13 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
       { kind: "created", team_run_id: state.teamRunId, team_name: state.teamName, members },
     )
   } catch (error) {
-    if (error instanceof SenpiTeamSpecError) return toolResult(error.message, { kind: "spec_error", code: error.code, reason: error.message })
-    if (error instanceof SenpiTeamRuntimeError) return toolResult(error.message, { kind: "runtime_error", code: error.code, reason: error.message })
+    if (error instanceof SenpiTeamSpecError) return toolErrorResult(error.message, { kind: "spec_error", code: error.code, reason: error.message })
+    if (error instanceof SenpiTeamRuntimeError) return toolErrorResult(error.message, { kind: "runtime_error", code: error.code, reason: error.message })
     throw error
   }
 }
 
-export async function runTeamDelete(service: TeamToolsService, params: TeamDeleteInput): Promise<AgentToolResult<TeamDeleteDetails>> {
+export async function runTeamDelete(service: TeamToolsService, params: TeamDeleteInput): Promise<ToolExecutionResult<TeamDeleteDetails>> {
   try {
     const result = await service.deleteTeam({ teamRunId: params.team_run_id, force: params.force })
     const cancelled = result.cancelledTaskIds
@@ -159,7 +161,7 @@ export async function runTeamDelete(service: TeamToolsService, params: TeamDelet
     )
   } catch (error) {
     if (error instanceof SenpiTeamRuntimeError) {
-      return toolResult(error.message, { kind: "invalid_state", team_run_id: params.team_run_id, code: error.code, reason: error.message })
+      return toolErrorResult(error.message, { kind: "invalid_state", team_run_id: params.team_run_id, code: error.code, reason: error.message })
     }
     throw error
   }
@@ -183,22 +185,26 @@ function formatCreatedMemberLine(member: CreatedMemberInfo): string {
   return `- ${member.name} [${member.status}] ${target ?? formatMemberRole(member.role)} task:${member.taskId}`
 }
 
-export function createTeamCreateTool(deps: TeamToolDeps): ToolDefinition {
+export function createTeamCreateTool(deps: TeamToolDeps): ToolDefinition<typeof TeamCreateParams, TeamCreateDetails> {
   return {
     name: "team_create",
     label: "Team Create",
     description: CREATE_DESCRIPTION,
     parameters: TeamCreateParams,
     execute: (_toolCallId: string, params: TeamCreateInput) => runTeamCreate(deps.service, params),
+    renderCall: (args, theme) => renderTeamCreateCall(args, theme),
+    renderResult: (result, options, theme) => renderTeamCreateResult(result, options, theme),
   }
 }
 
-export function createTeamDeleteTool(deps: TeamToolDeps): ToolDefinition {
+export function createTeamDeleteTool(deps: TeamToolDeps): ToolDefinition<typeof TeamDeleteParams, TeamDeleteDetails> {
   return {
     name: "team_delete",
     label: "Team Delete",
     description: DELETE_DESCRIPTION,
     parameters: TeamDeleteParams,
     execute: (_toolCallId: string, params: TeamDeleteInput) => runTeamDelete(deps.service, params),
+    renderCall: (args, theme) => renderTeamDeleteCall(args, theme),
+    renderResult: (result, options, theme) => renderTeamDeleteResult(result, options, theme),
   }
 }

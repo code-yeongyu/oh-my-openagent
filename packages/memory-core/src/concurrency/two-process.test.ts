@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
+import { exitedWithin } from "../locks/process-liveness.test-support"
 import { ReflectionReservationStore, type ReservationResult } from "../reflection/reservation"
 import { realpathSync } from "node:fs"
 
@@ -14,6 +15,8 @@ const writerChildPath = fileURLToPath(new URL("./writer-child.ts", import.meta.u
 const reflectionChildPath = fileURLToPath(new URL("./reflection-child.ts", import.meta.url))
 const temporaryDirectories: string[] = []
 const liveChildren = new Set<ChildProcessWithoutNullStreams>()
+
+const TEARDOWN_GRACE_MS = 2_000
 
 type Exit = { readonly code: number | null; readonly signal: NodeJS.Signals | null }
 
@@ -144,7 +147,20 @@ async function assertTwentyLinearCommits(identity: MemoryIdentity): Promise<void
 }
 
 afterEach(async () => {
-  for (const child of liveChildren) child.kill("SIGKILL")
+  // Temp roots die only after every tracked child is confirmed exited: rm under a live lock
+  // holder strands it, and a fire-and-forget SIGKILL is not a confirmation.
+  const tracked = [...liveChildren]
+  liveChildren.clear()
+  for (const child of tracked) {
+    if (child.exitCode !== null || child.signalCode !== null) continue
+    child.kill("SIGTERM")
+    if (!(await exitedWithin(child, TEARDOWN_GRACE_MS))) {
+      child.kill("SIGKILL")
+      if (!(await exitedWithin(child, TEARDOWN_GRACE_MS))) {
+        throw new Error(`tracked child pid ${String(child.pid)} survived SIGTERM and SIGKILL teardown`)
+      }
+    }
+  }
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 

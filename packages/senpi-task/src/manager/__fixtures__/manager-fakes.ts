@@ -7,6 +7,7 @@ import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
 import { createTaskRecordStore } from "../../store"
+import type { TaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
 import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
@@ -144,6 +145,8 @@ export function flush(): Promise<void> {
 
 export function makeManager(options: {
   project?: string
+  // A caller-owned store (e.g. a wrapper that injects persistence faults) over the same project dir.
+  store?: TaskRecordStore
   config?: OmoTaskSettings
   planner?: ChildPlanner
   inProcess?: FakeRunner
@@ -151,7 +154,7 @@ export function makeManager(options: {
   admit?: AdmitResident
 } = {}) {
   const project = options.project ?? tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = options.store ?? createTaskRecordStore({ project_dir: project })
   const inProcess = options.inProcess ?? new FakeRunner()
   const processRunner = options.process ?? new FakeRunner()
   const manager = createTaskManager({

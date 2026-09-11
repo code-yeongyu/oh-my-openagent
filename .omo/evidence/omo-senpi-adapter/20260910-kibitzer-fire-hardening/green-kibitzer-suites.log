@@ -1,0 +1,295 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/components/memory/kibitzer-delivery.test.ts:
+(pass) createKibitzerDelivery > #given accepted nudges #when accepted #then ledger is surfaced and pending lists every path [11.86ms]
+(pass) createKibitzerDelivery > #given a quiet tool boundary #when a nudge is pending #then one steer delivers and clears all mirrors [3.13ms]
+(pass) createKibitzerDelivery > #given pending host messages #when tool_result fires #then it stays silent and intact [2.33ms]
+(pass) createKibitzerDelivery > #given an idle host #when tool_result fires #then it stays silent [1.75ms]
+(pass) createKibitzerDelivery > #given an already delivered set #when tool_result fires twice #then one steer is sent [1.84ms]
+(pass) createKibitzerDelivery > #given a rejecting pending writer #when accepted #then delivery still works and warning is logged [1.43ms]
+(pass) createKibitzerDelivery > #given no coordinator #when accepted and steered #then no exception occurs [2.00ms]
+(pass) createKibitzerDelivery > #given a rejecting ledger #when accepted #then it queues and warns [1.77ms]
+(pass) createKibitzerDelivery > #given nudges #when drained for prompt #then they are returned once and coordinator keys removed [1.84ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-compaction.test.ts:
+(pass) KibitzerGateRunner > #given a compaction accepted mid-flight #when the child finishes #then the stale nudges are discarded instead of written [117.76ms]
+(pass) KibitzerGateRunner > #given a compaction-epoch bump mid-flight #when the child finishes #then outcome.json records dropped compaction [3.54ms]
+(pass) KibitzerGateRunner > #given an unchanged compaction epoch #when the child finishes #then the result is nudged and carries the validated list [3.51ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-compat.test.ts:
+(pass) Kibitzer session compatibility (#7993) > emits the Kibitzer channels while registering both generations for replay [0.48ms]
+(pass) Kibitzer session compatibility (#7993) > excludes omo-kibitzer:recall from both transcript windows without excluding conversation [0.13ms]
+(pass) Kibitzer session compatibility (#7993) > excludes omo-memorian:recall from both transcript windows without excluding conversation [0.07ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-delivery-idle.test.ts:
+(pass) kibitzer accept-time delivery > #given a running prompt session #when nudges are accepted #then one steer batches every nudge [2.07ms]
+(pass) kibitzer accept-time delivery > #given a running session with a rejecting sender #when nudges are accepted #then it warns and preserves every fallback [1.75ms]
+(pass) kibitzer accept-time delivery > #given a session without a prompt event #when nudges are accepted #then they stay queued without steering [1.45ms]
+(pass) kibitzer accept-time delivery > #given a steer in flight #when another verdict is accepted #then the steering latch prevents a second send [2.71ms]
+(pass) kibitzer accept-time delivery > #given a settled session after a prompt event #when a late verdict is accepted #then it stays queued [1.64ms]
+(pass) kibitzer accept-time delivery > #given a compacted session after a prompt event #when a late verdict is accepted #then it stays queued [1.45ms]
+(pass) kibitzer accept-time delivery > #given a shutdown session after a prompt event #when a late verdict is accepted #then it stays queued [1.68ms]
+(pass) kibitzer delivery idle lifecycle > #given only a passive kibitzer entry #when idle flushes #then it does not deliver [1.92ms]
+(pass) kibitzer delivery idle lifecycle > #given accepted nudges #when compaction is accepted #then state, coordinator, and pending file are cleared [1.70ms]
+(pass) kibitzer delivery idle lifecycle > #given accepted nudges #when session shuts down #then only in-memory wake state is cleared [1.90ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-nudge-tool.test.ts:
+(pass) createKibitzerNudgeTool > #given a valid candidate and hint #when nudge is called #then the nudge is recorded and a short success text returns [0.18ms]
+(pass) createKibitzerNudgeTool > #given a path outside the candidate set #when nudge is called #then an error result returns and nothing is recorded [0.10ms]
+(pass) createKibitzerNudgeTool > #given a path already surfaced this session #when nudge is called #then an error result returns and nothing is recorded [0.09ms]
+(pass) createKibitzerNudgeTool > #given a system path among the candidates #when nudge is called #then an error result returns and nothing is recorded [0.09ms]
+(pass) createKibitzerNudgeTool > #given a blank hint #when nudge is called #then an error result returns and nothing is recorded [0.08ms]
+(pass) createKibitzerNudgeTool > #given a hint over the character budget #when nudge is called #then an error result returns and nothing is recorded [0.09ms]
+(pass) createKibitzerNudgeTool > #given a secret-bearing hint #when nudge is called #then an error result names the secret rule and nothing is recorded [0.17ms]
+(pass) createKibitzerNudgeTool > #given a password assignment hint #when nudge is called #then an error result returns and nothing is recorded [0.14ms]
+(pass) createKibitzerNudgeTool > #given a bearer authorization hint #when nudge is called #then an error result returns and nothing is recorded [0.12ms]
+(pass) createKibitzerNudgeTool > #given a OpenAI key hint #when nudge is called #then an error result returns and nothing is recorded [0.08ms]
+(pass) createKibitzerNudgeTool > #given a multiline hint #when nudge is called #then an error result returns and nothing is recorded [0.07ms]
+(pass) createKibitzerNudgeTool > #given a meta hint No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout. #when nudge is called #then it is rejected and a factual correction can still use the cap [0.09ms]
+(pass) createKibitzerNudgeTool > #given a meta hint This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay. #when nudge is called #then it is rejected and a factual correction can still use the cap [0.06ms]
+(pass) createKibitzerNudgeTool > #given a factual hint The fix is on senpi main, not the extension. #when nudge is called #then it is accepted unchanged [0.07ms]
+(pass) createKibitzerNudgeTool > #given a factual hint senpi monitors have a verified two-flag desync where registry.paused can remain set. #when nudge is called #then it is accepted unchanged [0.07ms]
+(pass) createKibitzerNudgeTool > #given a factual hint The regression test does not cover Windows process cleanup. #when nudge is called #then it is accepted unchanged [0.06ms]
+(pass) createKibitzerNudgeTool > #given a factual hint The outage is unrelated to the database migration. #when nudge is called #then it is accepted unchanged [0.06ms]
+(pass) createKibitzerNudgeTool > #given the maxItems budget already spent #when nudge is called again #then an error result returns and the accepted set is unchanged [0.07ms]
+(pass) createKibitzerNudgeTool > #given maxItems 2 #when the first nudge is accepted #then the result leaves the tool loop open for a second call [0.06ms]
+(pass) createKibitzerNudgeTool > #given maxItems 1 #when the accepting nudge reaches the cap #then the result terminates the tool loop so the judge never has to answer with nothing [0.07ms]
+(pass) createKibitzerNudgeTool > #given the cap already reached #when a further nudge is rejected #then the rejection also terminates the tool loop [0.07ms]
+(pass) createKibitzerNudgeTool > #given a rejected nudge below the cap #when inspected #then the loop stays open so the judge can correct the call [0.06ms]
+(pass) createKibitzerNudgeTool > #given the tool definition #when inspected #then it keeps the subprocess extension's name and contract [0.09ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-hooks.test.ts:
+(pass) registerKibitzerHooks > #given a tool call #when dispatched #then the trigger receives it synchronously [0.15ms]
+(pass) registerKibitzerHooks > #given a tool result #when dispatched #then delivery receives the session id and event context [0.10ms]
+(pass) registerKibitzerHooks > #given text-only and empty sessions #when agent_settled dispatches #then only the non-empty branch settles [0.12ms]
+(pass) registerKibitzerHooks > #given a delivery whose onToolResult rejects #when tool_result dispatches #then the handler resolves undefined and a warning is logged [0.11ms]
+(pass) registerKibitzerHooks > #given a SENPI_MEMORY_REFLECTION child #when before_agent_start dispatches #then the judge is never triggered [0.08ms]
+(pass) registerKibitzerHooks > #given a SENPI_MEMORY_FACTS child #when before_agent_start dispatches #then the judge is never triggered [0.06ms]
+(pass) registerKibitzerHooks > #given a stale session resolver #when before_agent_start dispatches #then it returns undefined and warns [0.08ms]
+(pass) registerKibitzerHooks > #given a trigger that throws #when tool_call dispatches #then it returns undefined and warns [0.07ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-trigger.test.ts:
+(pass) #given a tool call #when triggered #then args are captured and a deadline is passed [0.27ms]
+(pass) #given unchanged candidates #when triggered twice #then the second launch is skipped [0.12ms]
+(pass) #given different candidate sets #when triggered #then the new set launches [0.08ms]
+(pass) #given candidate paths in a different order #when triggered #then only one launch occurs [0.08ms]
+(pass) #given a settle trigger #when launched #then no deadline is passed [0.07ms]
+(pass) #given two hundred launches #when the 201st arrives #then the launch ceiling is logged [0.70ms]
+(pass) #given a nudged result #when launched #then accepted nudges receive the launch epoch [0.10ms]
+(pass) #given all judge slots are held #when triggered #then it logs judge_cap without launching [0.08ms]
+(pass) kibitzer prompt events > #given an existing branch without the live prompt #when before_agent_start dispatches #then the prompt collects and reaches the judge [303.76ms]
+(pass) kibitzer prompt events > #given an empty branch without the live prompt #when before_agent_start dispatches #then the prompt collects and reaches the judge [295.48ms]
+(pass) kibitzer prompt events > #given the live prompt already in the branch #when before_agent_start dispatches #then the judge receives no duplicate user turn [266.42ms]
+(pass) kibitzer prompt events > #given unchanged branch candidates #when the prompt turn settles #then only the prompt-origin transcript launches [296.05ms]
+(pass) kibitzer trigger contract > #given a stale event context #when the handler returns #then detached work uses snapshots [0.19ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-judge-outcome.test.ts:
+(pass) classifyJudgeTurn > #given a completed runner outcome #when classified #then the judge turn is completed [0.10ms]
+(pass) classifyJudgeTurn > #given the engine's empty-response-twice error after an accepted nudge #when classified #then the judge turn is completed, not failed [0.13ms]
+(pass) classifyJudgeTurn > #given the engine's empty-response-twice error with no accepted nudge #when classified #then the judge turn is empty, not failed [0.07ms]
+(pass) classifyJudgeTurn > #given a different settled error after an accepted nudge #when classified #then the judge turn still fails [0.10ms]
+(pass) classifyJudgeTurn > #given an error outcome with a multi-line provider message #when classified #then failed/child_failed carries the single-line normalized reason [0.06ms]
+(pass) classifyJudgeTurn > #given an error outcome whose message is upstream-shaped #when classified #then failed/child_failed_upstream carries the sanitized reason [0.06ms]
+(pass) classifyJudgeTurn > #given a cancelled outcome #when classified #then the judge turn is dropped as cancelled [0.09ms]
+(pass) classifyJudgeTurn > #given a 500-character message #when normalized #then it is capped at 160 characters ending with an ellipsis [0.08ms]
+(pass) classifyJudgeTurn > #given a message containing an Authorization bearer token #when normalized #then the reason is redacted [0.06ms]
+(pass) classifyJudgeTurn > #given control characters and CRLF #when normalized #then they are removed [0.06ms]
+(pass) classifyJudgeTurn > #given an empty or whitespace message #when normalized #then the reason is undefined [0.06ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-notice.test.ts:
+(pass) kibitzer gate notice > #given a dropped deadline gate record #when rendered #then nothing is drawn [0.13ms]
+(pass) kibitzer gate notice > #given a skipped gate record #when rendered #then the why line names recalled memory candidates [6.68ms]
+(pass) kibitzer gate notice > #given a failed gate record #when rendered #then the why line names recalled memory candidates [0.34ms]
+(pass) kibitzer gate notice > #given a persistent failed gate record #when rendered #then the notice gives an actionable settings hint [0.13ms]
+(pass) kibitzer nudged recollection > #given a nudged record #when rendered #then the title is the single Kibitzer [0.33ms]
+(pass) kibitzer nudged recollection > #given a nudged record from an opener-era producer #when rendered #then the stored opener is ignored for the unified title [0.11ms]
+(pass) kibitzer nudged recollection > #given an invalid stored opener #when rendered #then the notice still draws the unified title [0.20ms]
+(pass) kibitzer nudged recollection > #given a second nudge #when rendered #then the extra hint continues the recollection [0.24ms]
+(pass) kibitzer nudged recollection > #given any provenance #when rendered #then no provenance line is shown [0.18ms]
+(pass) kibitzer nudged recollection > #given an expanded nudged record #when rendered #then the stored-memory caveat is available [0.16ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-concurrency.test.ts:
+(pass) kibitzer judge concurrency > holds at most two judge slots and releases them [0.26ms]
+(pass) kibitzer judge concurrency > release is idempotent and never goes negative [0.13ms]
+(pass) kibitzer judge concurrency > reports an empty ledger before acquiring [0.10ms]
+(pass) kibitzer judge concurrency > cap zero rejects every acquire [0.10ms]
+(pass) kibitzer judge concurrency > a second module instance shares the process-global count [0.29ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-completion.test.ts:
+(pass) KibitzerGateRunner > #given a silent normal judge #when the runner launches #then the result is empty [4.01ms]
+(pass) KibitzerGateRunner > #given a rejected-only nudge then a normal stop #when the runner launches #then the result is empty [3.40ms]
+(pass) KibitzerGateRunner > #given a judge that nudges once then settles with the empty-response-twice error #when the runner launches #then the accepted nudge is delivered as nudged [3.33ms]
+(pass) KibitzerGateRunner > #given a judge that nudges nothing and settles with the empty-response-twice error #when the runner launches #then the result is empty, not failed [2.98ms]
+(pass) KibitzerGateRunner > #given a run dir whose artifact writes reject #when a judge nudges once #then the artifacts are skipped with a warning and the nudge is still delivered [2.73ms]
+(pass) KibitzerGateRunner > #given the persona asset missing on disk #when the runner launches #then the failure is persona_unavailable and names the asset [2.40ms]
+(pass) KibitzerGateRunner > #given a child turn that ends with a secret-bearing provider error #when the runner launches #then child_failed is redacted and logs omit the token [3.57ms]
+(pass) KibitzerGateRunner > #given loadConfig throws #when the runner launches #then the failure is launch_failed with a normalized reason [1.70ms]
+(pass) KibitzerGateRunner > #given session creation throws a secret-bearing error #when the runner launches #then the creation warning is sanitized [2.68ms]
+(pass) KibitzerGateRunner > #given a child that accepts one nudge then never settles #when the launch deadline fires #then the result is nudged with partial true and the accepted path [51.98ms]
+(pass) KibitzerGateRunner > #given a child that never nudges and never settles #when the launch deadline fires #then the result is dropped with cause deadline [52.05ms]
+(pass) KibitzerGateRunner > #given an accepted nudge and a compaction epoch bump mid-flight #when the launch deadline fires #then the result is dropped with cause compaction [60.52ms]
+(pass) KibitzerGateRunner > #given a completed scripted run #when the runner launches #then outcome.json records status completed [2.79ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner.test.ts:
+(pass) KibitzerGateRunner > #given a gate child that calls nudge on a valid candidate #when the runner launches #then the result is nudged with the validated list [3.32ms]
+(pass) KibitzerGateRunner > #given a snapshotted registry on the input #when the ctx behind it is already disposed #then the launch still succeeds [3.96ms]
+(pass) KibitzerGateRunner > #given no registry snapshot on the input #when the runner launches #then it warns, skips and creates no child session [1.46ms]
+(pass) KibitzerGateRunner > #given the quick category cannot resolve #when the runner launches #then it warns, skips and creates no child session [2.48ms]
+(pass) KibitzerGateRunner > #given no quick category but another usable registry model #when the runner launches #then it warns, skips and never rides the beyond-category ladder [2.52ms]
+(pass) KibitzerGateRunner > #given a launch already in flight #when a second trigger arrives #then only one child session is created [3.78ms]
+(pass) KibitzerGateRunner > #given a child that nudges the same valid candidate twice #when the runner validates the result #then the result is nudged with one validated nudge [2.47ms]
+(pass) KibitzerGateRunner > #given a child session that cannot be created #when the runner launches #then the failure names the creation cause [2.16ms]
+(pass) KibitzerGateRunner > #given a child turn that ends with an error #when the runner launches #then the failure names the child cause [2.33ms]
+(pass) KibitzerGateRunner > #given a completed run #when the runner finishes #then the run directory is kept with its auditable artifacts [2.46ms]
+(pass) KibitzerGateRunner > #given an inlined launch #when the child session is created #then the judge prompt carries the inputs inline with a bare envelope [2.42ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-chain.test.ts:
+(pass) KibitzerGateRunner quick chain > #given a quick category with in-category fallbacks #when the judge child is created #then its runtime settings enable exactly that chain with a one-retry same-model budget [3.50ms]
+(pass) KibitzerGateRunner quick chain > #given a single-model quick category #when the judge child is created #then model fallback stays disabled [3.25ms]
+
+packages/omo-senpi/src/components/memory/facts-in-process-launch.test.ts:
+(pass) launchFactsInProcess quick chain > #given a quick fallback #when the facts child is created #then its runtime enables the remaining chain [15.71ms]
+(pass) launchFactsInProcess quick chain > #given a quick fallback #when the facts child is created #then its same-model retry budget is one [10.62ms]
+(pass) launchFactsInProcess quick chain > #given no fallback #when the facts child is created #then model fallback stays disabled [9.82ms]
+(pass) launchFactsInProcess quick chain > #given primary session creation fails #when the next candidate launches #then its chain contains only later rungs [22.27ms]
+(pass) launchFactsInProcess quick chain > #given the child turn fails #when the launch settles #then the outer loop does not launch another child [11.13ms]
+(pass) launchFactsInProcess quick chain > #given a facts child that records one fact and stops without assistant text #when the launch settles #then the run completes with childExit 0 [9.99ms]
+(pass) launchFactsInProcess quick chain > #given a facts child whose turn ends with stopReason error #when the launch settles #then the run still fails [10.44ms]
+(pass) launchFactsInProcess quick chain > #given a facts child that records nothing and stops without assistant text #when the launch settles #then the run completes with childExit 0 [9.74ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-trigger-cooldown.test.ts:
+(pass) #given A and B accepted through the trigger and C skipped for cooldown #when the window expires #then identical C creates a judge and judged C stays suppressed [6.37ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-wiring-shutdown.test.ts:
+(pass) createKibitzerGateWiring lifecycle > #given an active session #when shutdown runs #then the runner cancels, drains, and clears its compaction epoch [0.21ms]
+(pass) createKibitzerGateWiring lifecycle > #given accepted compactions #when the epoch is read #then it reflects every bump for that session alone [0.12ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-run-retention.test.ts:
+(pass) writeKibitzerRunOutcome > #given a completed status with nudged paths #when writeKibitzerRunOutcome runs #then outcome.json records them [0.77ms]
+(pass) writeKibitzerRunOutcome > #given a model for a completed run #when writeKibitzerRunOutcome runs #then outcome.json records it [0.55ms]
+(pass) writeKibitzerRunOutcome > #given a runDir that does not exist yet #when writeKibitzerRunOutcome runs #then it creates the directory and the file [0.56ms]
+(pass) pruneKibitzerRuns > #given an 8-day-old dir with no outcome.json #when pruning #then the dir is removed [0.88ms]
+(pass) pruneKibitzerRuns > #given a 29-day-old nudged dir #when pruning at 29 then 31 days #then it is kept then removed [0.88ms]
+(pass) pruneKibitzerRuns > #given a dropped deadline dir #when pruning at 20 then 31 days #then it is kept then removed [0.95ms]
+(pass) pruneKibitzerRuns > #given a 6-day-old failed dir #when pruning #then the dir is kept [0.66ms]
+(pass) pruneKibitzerRuns > #given a 400-day-old empty dir and an 8-day-old dir with a 1-minute-old file #when pruning #then the empty dir is removed and the fresh-file dir is kept [1.28ms]
+(pass) pruneKibitzerRuns > #given a dir whose newest file is 1 minute old #when pruning #then the dir is skipped [0.79ms]
+(pass) pruneKibitzerRuns > #given a stale .prune-x tombstone #when pruning #then the tombstone is removed [0.94ms]
+(pass) pruneKibitzerRuns > #given a remove seam that throws ENOENT #when pruning #then it does not throw [0.88ms]
+(pass) createThrottledPrune > #given a throttled prune #when called twice within an hour then after the interval #then the second call is skipped and the later call runs [0.69ms]
+
+packages/omo-senpi/src/components/memory/in-process-memory-child.test.ts:
+(pass) runInProcessMemoryChild > #given start is pending after invocation #when the deadline fires #then a late handle is aborted and disposed once [1.16ms]
+(pass) runInProcessMemoryChild > #given setup still pending when the deadline fires #when setup later resolves #then runner.start is never invoked [1.08ms]
+(pass) runInProcessMemoryChild > #given cancellation before start resolves #when the late handle arrives #then it is aborted and disposed once without onHandle [0.11ms]
+(pass) runInProcessMemoryChild > #given setup has settled and runtime import is pending #when cancel is invoked #then runner.start is never invoked [0.08ms]
+(pass) runInProcessMemoryChild > #given an accepted child whose turn never settles #when cancel is invoked #then abort and dispose finish once before the launch returns [0.10ms]
+(pass) runInProcessMemoryChild > #given start rejects before the deadline #when the child is launched #then session creation failure is returned [0.10ms]
+(pass) runInProcessMemoryChild > #given a child that completes #when the launch settles #then onHandle is called once [0.07ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-observability.test.ts:
+(pass) kibitzer observability contract > #given two accepted judges #when tool and settle triggers exceed the budget #then one cooldown gate entry is recorded without another child or delivery [10.11ms]
+(pass) kibitzer observability contract > #given unchanged candidates #when triggered twice #then skip is logged without a gate entry [0.19ms]
+(pass) kibitzer observability contract > #given judge slots are full #when triggered #then judge cap is logged without a gate entry [0.10ms]
+(pass) kibitzer observability contract > #given a salvaged launch #when the judge returns partial nudges #then one normal nudged entry and no gate entry are produced [0.09ms]
+(pass) kibitzer observability contract > #given a dropped deadline outcome #when reported and rendered #then a gate record is kept without a notice [0.09ms]
+(pass) kibitzer observability contract > #given accepted nudges #when steer wake and prompt deliver #then each trace records its via [7.38ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-cooldown.test.ts:
+(pass) KibitzerGateRunner nudge cooldown > #given two accepted outcomes #when another launch arrives in the rolling window #then it skips before creating a child and expires each acceptance separately [6.86ms]
+(pass) KibitzerGateRunner nudge cooldown > #given sessions sharing one identity runner #when one exhausts its budget #then the other retains two accepts [7.07ms]
+(pass) KibitzerGateRunner nudge cooldown > #given skipped empty failed and compaction-dropped outcomes #when two later outcomes are accepted #then only those accepts consume budget [8.14ms]
+(pass) KibitzerGateRunner nudge cooldown > #given a judge that finishes later than it launched #when the launch-time window expires #then its acceptance still counts [4.22ms]
+(pass) KibitzerGateRunner nudge cooldown > #given an active launch and later compaction #when the session reaches two accepts #then neither resets or overspends the budget but a new runner starts fresh [5.63ms]
+(pass) KibitzerGateRunner nudge cooldown > #given two hints in each accepted outcome #when the same session launches again #then the budget counts outcomes rather than hint paths [3.75ms]
+
+packages/omo-senpi/src/components/memory/persona-prime.test.ts:
+(pass) primeMemoryPersonaAssets > #given every persona readable #when priming #then each asset is read once and nothing is reported [0.12ms]
+(pass) primeMemoryPersonaAssets > #given one unreadable persona #when priming #then registration continues and the asset is named once [0.11ms]
+(pass) primeMemoryPersonaAssets > #given the registration targets #when listed #then the task runtime module is primed beside the four personas [0.06ms]
+(pass) primeMemoryPersonaAssets > #given the task runtime import rejects #when priming #then it is awaited and reported unavailable while sync personas are still read first [0.08ms]
+(pass) primeMemoryPersonaAssets > #given the task runtime import resolves #when priming #then nothing is reported [0.07ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-fallback.test.ts:
+(pass) KibitzerGateRunner live fallback rotation > #given a primary rung that returns 503 and a healthy in-category fallback #when the judge runs on the tool_call deadline #then the engine rotates after one same-model retry and the turn completes [2127.67ms]
+(pass) KibitzerGateRunner live fallback rotation > #given every rung returns 503 #when the judge runs on the tool_call deadline #then the engine settles the turn and the gate reports child_failed_upstream long before the deadline [2347.66ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-judge-spec.test.ts:
+(pass) buildKibitzerJudgeSpec > #given a launch input #when the spec is built #then the nudge closure writes accepted output and the child surface stays restricted [1.40ms]
+(pass) buildKibitzerJudgeSpec > #given a resolved quick chain #when the spec is built #then the child carries the selected model, its in-category fallbacks and a one-retry same-model budget [1.10ms]
+(pass) buildKibitzerJudgeSpec > #given a single-model quick category #when the spec is built #then no fallback list is attached and the engine's default same-model budget is kept [0.98ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-wiring.test.ts:
+(pass) createKibitzerGateWiring > #given one failed gate outcome #when reported #then it records the failure without appending a user notice [0.14ms]
+(pass) createKibitzerGateWiring > #given repeated failed gate outcomes #when the persistence threshold is reached #then one actionable notice is appended [0.08ms]
+(pass) createKibitzerGateWiring > #given a notified failure streak #when another failure occurs during notification cooldown #then no duplicate notice is appended [0.07ms]
+(pass) createKibitzerGateWiring > #given a failed gate streak #when the gate completes normally #then the next failure starts a fresh streak [0.06ms]
+(pass) createKibitzerGateWiring > #given repeated diagnostic outcomes #when reported #then one gate entry is appended at the persistence threshold [0.07ms]
+(pass) createKibitzerGateWiring > #given a dropped deadline outcome #when reported #then no user notice is appended [0.06ms]
+(pass) createKibitzerGateWiring > #given a dropped outcome that names the judged model #when reported #then no user notice is appended [0.06ms]
+(pass) createKibitzerGateWiring > #given a session epoch #when compaction is accepted #then the epoch increments and shutdown drains the runner [0.07ms]
+
+packages/omo-senpi/src/components/memory/recall-notice.test.ts:
+(pass) renderKibitzerNudgedEntry > #given nudges #when rendered #then title and dim paths are shown [0.30ms]
+(pass) renderKibitzerNudgedEntry > #given malformed nudges #when rendered #then nothing is drawn [0.07ms]
+(pass) renderKibitzerNudgedEntry > #given a meta hint No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout. #when rendered #then nothing is drawn [0.05ms]
+(pass) renderKibitzerNudgedEntry > #given a meta hint This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay. #when rendered #then nothing is drawn [0.05ms]
+(pass) renderKibitzerNudgedEntry > #given a factual hint The fix is on senpi main, not the extension. #when rendered #then it remains renderable [0.07ms]
+(pass) renderKibitzerNudgedEntry > #given a factual hint senpi monitors have a verified two-flag desync where registry.paused can remain set. #when rendered #then it remains renderable [0.06ms]
+(pass) renderKibitzerNudgedEntry > #given a factual hint The regression test does not cover Windows process cleanup. #when rendered #then it remains renderable [0.06ms]
+(pass) renderKibitzerNudgedEntry > #given a factual hint The outage is unrelated to the database migration. #when rendered #then it remains renderable [0.05ms]
+(pass) renderKibitzerNudgedEntry > #given a multiline hint #when rendered #then nothing is drawn [0.05ms]
+(pass) renderKibitzerNudgedEntry > #given a hint that normalizes to nothing or exceeds the gate budget #when rendered #then nothing is drawn [0.07ms]
+(pass) renderKibitzerGateEntry > #given a skipped gate #when rendered #then it uses the warning notice [0.17ms]
+(pass) renderKibitzerGateEntry > #given a null or count-malformed gate record #when rendered #then nothing is drawn and nothing throws [0.08ms]
+(pass) renderKibitzerGateEntry > #given a dropped gate #when rendered #then nothing is drawn [0.05ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a failed gate with a valid reason and runId #when rendered #then the dim reason and run lines follow the title [0.20ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a failed gate whose reason is multiline, overlong or secret-like #when rendered #then the notice is drawn without the reason line [0.14ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a dropped gate with a reason #when rendered #then nothing is drawn [0.06ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a persistent skipped gate record without reason #when rendered #then the output includes the actionable settings hint [0.07ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a failed gate with an invalid reason but a valid runId #when rendered #then the title and the run line are drawn and the reason line is absent [0.07ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a reason of exactly 160 characters and one of 161 #when rendered #then the first is drawn and the second is omitted [0.34ms]
+(pass) renderKibitzerGateEntry reason and runId > #given a reason containing CR/LF or a bearer token #when rendered #then the line is omitted while the title remains [0.19ms]
+(pass) renderRecallEntry > #given surfaced recall paths #when the entry renders collapsed #then the compact title names every path [0.19ms]
+(pass) renderRecallEntry > #given a record without paths #when the entry renders #then nothing is drawn [0.06ms]
+(pass) renderRecallEntry > #given the renderer channel #when its custom type is read #then it matches the injected recall message [0.06ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-wiring-persist.test.ts:
+(pass) kibitzer delivery persistence > #given accepted nudges #when delivery accepts #then pending stores the launch epoch [1.82ms]
+(pass) kibitzer delivery persistence > #given pending nudges #when compaction is accepted #then pending is deleted [1.68ms]
+(pass) kibitzer delivery persistence > #given accepted nudges #when prompt delivery drains the in-memory queue #then the pending file stays for take() to consume [1.60ms]
+(pass) kibitzer delivery persistence > #given a rejecting pending writer #when accepted #then delivery logs no throw and remains usable [1.22ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-task-runtime.test.ts:
+(pass) createTaskRuntimeLoader > #given a resolving import #when the loader is called twice #then the module is imported once and both calls share it [0.09ms]
+(pass) createTaskRuntimeLoader > #given a rejecting import #when the loader is called again #then the failure is not cached and the import is retried [0.08ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-trigger-latch.test.ts:
+(pass) #given an active runner #when a new candidate arrives #then one trailing launch waits for idle [0.20ms]
+(pass) #given a compaction #when the same candidates arrive #then the fingerprint is reset [0.11ms]
+(pass) #given a failed judge for unchanged candidates #when the same candidates arrive #then the fingerprint still suppresses a relaunch [0.08ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-upstream.test.ts:
+(pass) KibitzerGateRunner settled upstream failure > #given a child turn that settles with an upstream provider error #when the gate classifies it #then the result is failed/child_failed_upstream with the reason and the operator log line [2.60ms]
+(pass) KibitzerGateRunner settled upstream failure > #given an upstream failure event the engine recovers from #when the turn completes with a nudge #then the result is nudged, not failed [2.01ms]
+(pass) KibitzerGateRunner settled upstream failure > #given a child turn that settles with a non-upstream error #when the gate classifies it #then the cause stays child_failed [2.49ms]
+(pass) KibitzerGateRunner settled upstream failure > #given a pending turn that emits nothing #when the gate awaits it #then the deadline backstop drops [303.52ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-meta-validation.test.ts:
+(pass) #given a judge that only offers meta hint No stored memory clears the bar for this planning step; the transcript already contains the full methodology, QA approach, and rollout. #when the runner finishes #then the result is silence [2.83ms]
+(pass) #given a judge that only offers meta hint This memory covers OAuth login prompts and remote-test helpers, not the goal continuation timer delay. #when the runner finishes #then the result is silence [2.46ms]
+
+packages/omo-senpi/src/components/memory/kibitzer-runner-lifecycle.test.ts:
+(pass) KibitzerGateRunner > #given child setup never resolves #when the whole-launch deadline fires #then the latch releases and a late handle is disposed [509.66ms]
+(pass) KibitzerGateRunner > #given a runner constructed with deadlineMs 60_000, a launch input with deadlineMs 50, and a child that never settles #when the runner launches #then the result is dropped with cause deadline within 2s [53.20ms]
+(pass) KibitzerGateRunner > #given a child that never settles #when the deadline fires #then the child is aborted and disposed [24.20ms]
+(pass) KibitzerGateRunner > #given a child in flight #when cancel is called #then it aborts and disposes without writing a late nudge [3.23ms]
+(pass) KibitzerGateRunner > #given child setup is still deferred #when cancel is requested then the handle resolves #then the late handle is dropped without a pending payload [2.56ms]
+
+ 224 pass
+ 0 fail
+ 599 expect() calls
+Ran 224 tests across 31 files. [10.13s]
+TYPECHECK_OK
+omo-senpi extension build is current: /private/tmp/ulw-d48/impl-8052-kibitzer-fire/packages/omo-senpi/plugin/extensions/omo.js
+FRESHNESS_OK

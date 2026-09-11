@@ -184,6 +184,56 @@ describe("createKibitzerNudgeTool", () => {
     expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: HINT }])
   })
 
+  test("#given maxItems 2 #when the first nudge is accepted #then the result leaves the tool loop open for a second call", async () => {
+    // given
+    const { tool } = launch({ maxItems: 2 })
+
+    // when
+    const result = await tool.execute("call-1", params(CANDIDATE_PATH, HINT))
+
+    // then: the judge may still nudge once more, so the loop must continue
+    expect(result.isError).toBeUndefined()
+    expect(result.terminate).toBeUndefined()
+  })
+
+  test("#given maxItems 1 #when the accepting nudge reaches the cap #then the result terminates the tool loop so the judge never has to answer with nothing", async () => {
+    // given
+    const { accepted, tool } = launch({ maxItems: 1 })
+
+    // when
+    const result = await tool.execute("call-1", params(CANDIDATE_PATH, HINT))
+
+    // then
+    expect(result.isError).toBeUndefined()
+    expect(result.terminate).toBe(true)
+    expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: HINT }])
+  })
+
+  test("#given the cap already reached #when a further nudge is rejected #then the rejection also terminates the tool loop", async () => {
+    // given
+    const { tool } = launch({ maxItems: 1 })
+    await tool.execute("call-1", params(CANDIDATE_PATH, HINT))
+
+    // when
+    const result = await tool.execute("call-2", params("notes/quiet.md", HINT))
+
+    // then: nothing more can be accepted this run, so the loop has no reason to continue
+    expect(result.isError).toBe(true)
+    expect(result.terminate).toBe(true)
+  })
+
+  test("#given a rejected nudge below the cap #when inspected #then the loop stays open so the judge can correct the call", async () => {
+    // given
+    const { tool } = launch({ maxItems: 2 })
+
+    // when
+    const result = await tool.execute("call-1", params("notes/never-offered.md", HINT))
+
+    // then
+    expect(result.isError).toBe(true)
+    expect(result.terminate).toBeUndefined()
+  })
+
   test("#given the tool definition #when inspected #then it keeps the subprocess extension's name and contract", () => {
     // given
     const { tool } = launch()

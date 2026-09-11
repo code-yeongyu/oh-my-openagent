@@ -11,7 +11,7 @@ import { spawn } from "node:child_process"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 
-import { resolveSenpiLaunch } from "../worker/senpi-command"
+import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../worker/senpi-command"
 import { resolveReflectionModel } from "../worker/resolve-model"
 
 const QUICK_CATEGORY = "quick"
@@ -101,7 +101,7 @@ export function createPeopleAskRunner(options: PeopleAskOptions): PeopleAskRunne
     const answer = await runChild(
       launch.command,
       [...launch.prefixArgs, ...args],
-      env,
+      withoutForeignPackageDirEnv(env, launch),
       options.deadlineMs ?? DEFAULT_DEADLINE_MS,
     )
     return answer.length === 0 ? ABSTENTION_LINE : answer

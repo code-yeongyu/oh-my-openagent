@@ -8,8 +8,8 @@ import { SectionHeader } from "@/components/landing/section-header"
 import { Frame } from "@/components/ledger/frame"
 
 /**
- * The 11 graph agents plus the dynamic agent as a gapless bento (DESIGN.md §5): the orchestrator
- * 2×2, Hephaestus 2×1, the rest 1×1 — 16 units, no holes. Node ids are shared with the 3D
+ * The 11 graph roles plus the dynamic agent as a gapless bento (DESIGN.md §5): Orchestrator 2x2,
+ * Planner 2x1, the rest 1x1 - 16 units, no holes. Node ids are shared with the 3D
  * hero graph, so a focused node lights its cell (`data-active`).
  */
 export async function AgentsSection(): Promise<JSX.Element> {

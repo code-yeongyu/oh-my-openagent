@@ -1,9 +1,8 @@
 import type { AgentDefinition } from "../types"
 
-// Ported and senpi-adapted from packages/omo-opencode/src/agents/momus.ts (base default prompt only;
-// momus-gpt-5-6 variant routing is not ported - the fallback chain owns model choice).
-export const MOMUS_AGENT: AgentDefinition = {
-  name: "momus",
+// Ported and senpi-adapted from the OpenCode edition's plan-review prompt (base default prompt only; per-model variant routing is not ported - the fallback chain owns model choice).
+export const PLAN_REVIEWER_AGENT: AgentDefinition = {
+  name: "plan-reviewer",
   description:
     "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards.",
   mode: "subagent",

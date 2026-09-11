@@ -25,7 +25,8 @@ export interface KibitzerNudgeToolInput {
 }
 
 // The agent loop honors an inline `isError` on the returned result (senpi builtin tool convention);
-// the base AgentToolResult type does not declare it, so it is intersected on here.
+// the base AgentToolResult type does not declare it, so it is intersected on here. `terminate` is
+// the loop's own early-termination hint (pi-agent-core AgentToolResult).
 export type KibitzerNudgeToolResult = AgentToolResult<undefined> & { readonly isError?: boolean }
 
 export type KibitzerNudgeTool = Omit<
@@ -46,6 +47,11 @@ export type KibitzerNudgeTool = Omit<
  * and surfaced membership mirror `validateNudges`, which the parent still runs over the collected
  * set before persisting (defence in depth - duplicates, should the judge repeat a path, are
  * dropped there, not here).
+ *
+ * Once `accepted` reaches `maxItems` nothing more can be recorded this run, so the result carries
+ * `terminate: true` and the agent loop ends the turn on the tool batch. Without it the judge has to
+ * produce one more assistant message with nothing to say, and senpi's empty-assistant recovery
+ * settles a second silent stop as an error (issue #7963).
  */
 export function createKibitzerNudgeTool(input: KibitzerNudgeToolInput): KibitzerNudgeTool {
   return {
@@ -60,15 +66,24 @@ export function createKibitzerNudgeTool(input: KibitzerNudgeToolInput): Kibitzer
           content: [{ type: "text", text: `Nudge rejected: ${rejection} Correct the call once, or end the run.` }],
           details: undefined,
           isError: true,
+          ...capReached(input),
         }
       }
       input.accepted.push({ path: params.path, hint: params.hint })
+      const capped = capReached(input)
       return {
-        content: [{ type: "text", text: `Nudge recorded for ${params.path}.` }],
+        content: [{ type: "text", text: capped.terminate === true
+          ? `Nudge recorded for ${params.path}. The maxItems limit (${input.maxItems}) is reached; the run ends here.`
+          : `Nudge recorded for ${params.path}.` }],
         details: undefined,
+        ...capped,
       }
     },
   }
+}
+
+function capReached(input: KibitzerNudgeToolInput): { readonly terminate?: true } {
+  return input.accepted.length >= input.maxItems ? { terminate: true } : {}
 }
 
 function rejectNudge(params: Static<typeof KibitzerNudgeParams>, input: KibitzerNudgeToolInput): string | undefined {

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-// The isolation guarantee the driver GATES on (Metis #7/#8): the real agent dir's credential/config files
+// The isolation guarantee the driver GATES on (plan-consultant #7/#8): the real agent dir's credential/config files
 // are never read or rewritten - a child must resolve auth/models from the SANDBOX agent dir. These are
 // byte-stable across a run, unlike the whole-dir digest which a live dev machine churns through ambient
 // senpi activity (other sessions' JSONL, the global ~/.senpi/agent/senpi-debug.log that ignores

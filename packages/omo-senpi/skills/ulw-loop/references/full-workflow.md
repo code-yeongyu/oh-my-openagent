@@ -23,7 +23,7 @@ stream) and record `terminal.png`, `terminal.txt`, and `metadata.json`.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump) are first-class evidence for CLI- or data-shaped criteria; use a channel scenario when the behavior is user-facing. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
 
-## Delegation model (ATLAS-STYLE — YOU CONDUCT, WORKERS PLAY)
+## Delegation model (CONDUCTOR-STYLE — YOU CONDUCT, WORKERS PLAY)
 
 Size each worker to the task. Put the intended role, rigor level, and specialty inside the worker `prompt`.
 
@@ -77,7 +77,7 @@ session's own id, so a run under a custom id is resumed by hand. Use `--force`
 only when deliberately overwriting completed evidence.
 Write state through the CLI path. Do not hand-edit state files.
 
-### 2. Refine success criteria + a Prometheus-grade QA and parallelism plan per goal
+### 2. Refine success criteria + a plan-quality QA and parallelism plan per goal
 Shape every goal's objective and `successCriteria` by `references/define-goal.md`: its quality bar, objective anatomy, and criterion construction govern this step. Where the brief is silent on a constraint the work forks on, derive the default per that reference, record it via `annotate_ledger` (`--evidence` naming the repo fact, `--rationale` the default plus reversibility), and surface the assumed list in the first user-visible report so a wrong default is a one-line veto, not a finished run.
 Gather context BEFORE planning with parallel `explorer` / `librarian` workers plus your own read-only tools.
 First survey available skills: read every loosely-relevant skill's description, deliberately choose which this work uses, and prefer applying genuinely-relevant skills over working raw.

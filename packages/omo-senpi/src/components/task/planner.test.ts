@@ -182,7 +182,7 @@ describe("createTaskChildPlanner", () => {
       prompt: "Review this design.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "openai/gpt-5.5",
     })
 
@@ -195,7 +195,7 @@ describe("createTaskChildPlanner", () => {
       model_id: "gpt-5.5",
       display: "openai/gpt-5.5",
     })
-    expect(resolved.plan.agentType).toBe("momus")
+    expect(resolved.plan.agentType).toBe("plan-reviewer")
     expect(resolved.plan.instructions).toBeDefined()
     expect(resolved.plan.toolAllowlist).toHaveLength(9)
     expect(resolved.plan.agentExecutionMode).toBe("in-process")
@@ -274,7 +274,7 @@ describe("createTaskChildPlanner", () => {
 
   test("#given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement", () => {
     // given
-    const agents = { ...BUILTIN_AGENTS, momus: { name: "momus", disable: true } }
+    const agents = { ...BUILTIN_AGENTS, "plan-reviewer": { name: "plan-reviewer", disable: true } }
     const planner = createTaskChildPlanner({}, agents, () => undefined)
 
     // when
@@ -282,7 +282,7 @@ describe("createTaskChildPlanner", () => {
       prompt: "Review this design.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "openai/gpt-5.5",
     })
 
@@ -292,10 +292,10 @@ describe("createTaskChildPlanner", () => {
     expect(result.error.availableAgents).toEqual([
       "explore",
       "librarian",
-      "metis",
       "omo-senpi-code-reviewer",
       "omo-senpi-gate-reviewer",
       "omo-senpi-qa-executor",
+      "plan-consultant",
     ])
   })
 
@@ -321,11 +321,11 @@ describe("createTaskChildPlanner", () => {
     expect(result.error.availableAgents).toEqual([
       "explore",
       "librarian",
-      "metis",
-      "momus",
       "omo-senpi-code-reviewer",
       "omo-senpi-gate-reviewer",
       "omo-senpi-qa-executor",
+      "plan-consultant",
+      "plan-reviewer",
     ])
     // writing survives when its Fable 5.1 rung resolves; ultrabrain's
     // Astra-only chain is dead, so the dead-chain gate excludes it.
@@ -356,11 +356,11 @@ describe("createTaskChildPlanner", () => {
     expect(result.error.availableAgents).toEqual([
       "explore",
       "librarian",
-      "metis",
-      "momus",
       "omo-senpi-code-reviewer",
       "omo-senpi-gate-reviewer",
       "omo-senpi-qa-executor",
+      "plan-consultant",
+      "plan-reviewer",
     ])
   })
 })
@@ -490,7 +490,7 @@ describe("createTaskChildPlanner plan variant", () => {
     expect(expectResolved(result).plan.variant).toBeUndefined()
   })
 
-  test("#given momus resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model", () => {
+  test("#given plan-reviewer resolves a variant-bearing chain entry #when planned #then the applied variant matches the resolved model", () => {
     // given
     const planner = createTaskChildPlanner(
       {},
@@ -503,7 +503,7 @@ describe("createTaskChildPlanner plan variant", () => {
       prompt: "Review the plan.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
     })
 
     // then

@@ -182,10 +182,10 @@ function dagEvents(cwd: string, runId: DagRunId): readonly DagRunEvent[] {
   return dagStore(cwd).readEvents(runId, 0, { limit: 100 }).events
 }
 
-function pauseForShutdown(runtime: ReturnType<typeof createDagRuntime>): void {
+async function pauseForShutdown(runtime: ReturnType<typeof createDagRuntime>): Promise<void> {
   expect("pauseForShutdown" in runtime).toBe(true)
   if (!("pauseForShutdown" in runtime) || typeof runtime.pauseForShutdown !== "function") return
-  runtime.pauseForShutdown()
+  await runtime.pauseForShutdown()
 }
 
 function fakeUi(widgetRows: string[][]): CapturedUi {
@@ -742,7 +742,7 @@ describe("assembled DAG runtime", () => {
     const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: logger() })
 
     // when
-    pauseForShutdown(firstRuntime)
+    await pauseForShutdown(firstRuntime)
     firstRuntime.dispose()
 
     // then
@@ -846,7 +846,7 @@ describe("assembled DAG runtime", () => {
     runtime.dispose()
   })
 
-  test("#given a paused adapter DAG whose lease holder PID is still live #when another adapter starts #then it never claims or resumes the run", async () => {
+  test("#given a paused adapter DAG whose lease holder is a live FOREIGN pid #when another adapter starts in this process #then it never claims or resumes the run", async () => {
     // given
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-live-lease-"))
     cleanupRoots.push(cwd)
@@ -862,8 +862,14 @@ describe("assembled DAG runtime", () => {
     })
     firstEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
     const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: logger() })
-    pauseForShutdown(firstRuntime)
+    await pauseForShutdown(firstRuntime)
 
+    // given the pause is held by ANOTHER host process the probe reports alive (our own pid is never a
+    // fence: the same process reopening the session must claim, see dag-runtime-lease-recovery.test.ts)
+    const pausedStore = dagStore(cwd)
+    const paused = pausedStore.readCheckpoint<DagRunRecordV1>(runId)
+    if (paused === null) throw new Error("expected paused adapter run")
+    pausedStore.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
     const secondPi = new FakeExtensionAPI()
     const secondEngine = composeTaskEngine({
       pi: secondPi,
@@ -872,7 +878,12 @@ describe("assembled DAG runtime", () => {
       sharedParentTools: () => [],
     })
     secondEngine.runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId } })
-    const secondRuntime = createDagRuntime({ pi: secondPi, engine: secondEngine, logger: logger() })
+    const secondRuntime = createDagRuntime({
+      pi: secondPi,
+      engine: secondEngine,
+      logger: logger(),
+      leaseWatch: { isProcessAlive: () => true },
+    })
 
     // when
     await secondRuntime.attach()
@@ -911,7 +922,7 @@ describe("dag runtime node spawn policy", () => {
       pi,
       engine,
       logger: logger(),
-      nodeSpawnPolicy: () => ({ kind: "deny", message: "momus requires a plan gate" }),
+      nodeSpawnPolicy: () => ({ kind: "deny", message: "plan-reviewer requires a plan gate" }),
     })
     runtime.attach()
 
@@ -929,7 +940,7 @@ describe("dag runtime node spawn policy", () => {
         definition: {
           key: "policy-denied",
           name: "policy denied",
-          nodes: [{ id: "review", prompt: "review the plan", subagent_type: "momus", model: "omo-mock/mock-1" }],
+          nodes: [{ id: "review", prompt: "review the plan", subagent_type: "plan-reviewer", model: "omo-mock/mock-1" }],
         },
       },
     )
@@ -940,7 +951,7 @@ describe("dag runtime node spawn policy", () => {
     expect(result.status).toBe("failed")
     const review = result.nodes.review
     if (review?.state !== "failed") throw new Error("expected the denied node to fail")
-    expect(review.error.message).toContain("momus requires a plan gate")
+    expect(review.error.message).toContain("plan-reviewer requires a plan gate")
     expect(runner.handles).toHaveLength(0)
     runtime.dispose()
   })
@@ -1021,6 +1032,34 @@ describe("assembled DAG runtime control verbs", () => {
     return { cwd, runner, runtime, tool, sessionId, whenAttached, whenState, runId: started.details.run_id as DagRunId }
   }
 
+  test("#given a control verb re-registered a controller after the shutdown pause #when the committed shutdown detaches #then the run is retired, not cancelled, and stays reclaimable", async () => {
+    // given a run whose child is resident and whose scheduler the committed shutdown retired
+    const { cwd, runner, runtime, sessionId, runId, whenAttached } = await controlFixture("pause-then-detach", [{ id: "solo" }])
+    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(whenAttached("solo"), 5_000, "solo attached")
+    await runtime.pauseForShutdown()
+    expect(dagStore(cwd).readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("paused")
+
+    // given a control verb that registers a controller which never runs a frontier, so nothing ever
+    // settles it out of the scheduler map on its own
+    await within(runtime.send(runId, "solo", "steer while paused"), 5_000, "send")
+
+    // when the committed shutdown retires that controller too and only then detaches
+    await runtime.pauseForShutdown()
+    runtime.detach()
+
+    // then detach found nothing left to cancel: the run is still paused, so reopening reclaims it and
+    // the surviving child carries it to completion. A cancelling detach would have made it terminal.
+    const attaching = runtime.attach()
+    runner.handles[0]?.settle("survived the committed shutdown")
+    await within(attaching, 5_000, "attach")
+    expect(runner.handles).toHaveLength(1)
+    const finished = dagStore(cwd).readCheckpoint<DagRunRecordV1>(runId)
+    expect(finished?.status).toBe("completed")
+    expect(dagEvents(cwd, runId).some((event) => event.type === "dag.run.cancelled")).toBe(false)
+    runtime.dispose()
+  }, { timeout: 20_000 })
+
   test("#given a failed node #when the runtime retry entry point runs #then a fresh scheduler re-registers and the run completes", async () => {
     // given
     const { runner, runtime, sessionId, runId } = await controlFixture("retry-reentry", [
@@ -1057,12 +1096,18 @@ describe("assembled DAG runtime control verbs", () => {
     await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
     await within(whenAttached("solo"), 5_000)
     // pausing a RUNNING run is the ONLY thing that latches admission, and nothing ever un-latches it
-    runtime.pauseForShutdown()
-    await within(runtime.attach(), 5_000)
+    await runtime.pauseForShutdown()
+    // #8020: the committed shutdown RETIRED this runtime's scheduler, so the reopen reclaims the run
+    // and reattaches to the SAME child. Attach settles only once the reclaimed run does, so the
+    // child's failure has to be delivered before the attach is awaited.
+    const attaching = runtime.attach()
     runner.handles[0]?.fail("solo blew up")
     await within(whenState("solo", "failed"), 5_000)
+    await within(attaching, 5_000)
     const failed = await within(runtime.wait(runId, sessionId), 5_000)
     expect(failed.status).toBe("failed")
+    // the retirement reused the durable child instead of admitting a second one
+    expect(runner.handles).toHaveLength(1)
 
     // when the stoppedAdmissions latch is NOT cleared, this retry hangs forever
     await within(runtime.retry(runId), 5_000)

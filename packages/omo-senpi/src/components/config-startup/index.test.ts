@@ -12,7 +12,12 @@ import { parse } from "jsonc-parser"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { createConfigStartupComponent, runSenpiStartupMigration, type SenpiStartupMigrationResult } from "./index"
+import {
+  createConfigStartupComponent,
+  notificationMessages,
+  runSenpiStartupMigration,
+  type SenpiStartupMigrationResult,
+} from "./index"
 
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
@@ -273,5 +278,87 @@ describe("createConfigStartupComponent", () => {
 
     // then
     expect(logs).toEqual(["warn:omo-senpi: configuration diagnostics: Invalid omo config"])
+  })
+
+  test("#given a legacy agents.momus key in omo.json #when session_start captures a UI #then it reports one alias-deprecation warning naming agents.plan-reviewer", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const logs: string[] = []
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { momus: { model: "omo-mock/mock-1" } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+    createConfigStartupComponent({
+      loadConfig: () => config,
+      resolveCwd: () => "/project",
+      runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
+    }).register(pi, context(logs))
+    const notifications: Array<{ message: string; type: string | undefined }> = []
+    const eventContext = { ui: { notify: (message: string, type?: string) => notifications.push({ message, type }) } }
+
+    // when
+    await pi.dispatch("session_start", {}, eventContext)
+
+    // then
+    expect(notifications).toEqual([
+      {
+        message:
+          "omo-senpi: omo.json agents.momus is deprecated; rename the key to agents.plan-reviewer. The alias is removed in the next release.",
+        type: "warning",
+      },
+    ])
+    expect(logs).toEqual([])
+  })
+})
+
+describe("notificationMessages", () => {
+  const quietMigration: SenpiStartupMigrationResult = { journalResumed: false, migratedFrom: [], results: [] }
+
+  test("#given legacy agents.momus and agents.metis keys #when notices are built #then exactly one alias-deprecated notice per legacy key is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { momus: { model: "omo-mock/mock-1" }, metis: { disable: true } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([
+      {
+        kind: "omo-config:agent-alias-deprecated",
+        message:
+          "omo-senpi: omo.json agents.metis is deprecated; rename the key to agents.plan-consultant. The alias is removed in the next release.",
+        type: "warning",
+      },
+      {
+        kind: "omo-config:agent-alias-deprecated",
+        message:
+          "omo-senpi: omo.json agents.momus is deprecated; rename the key to agents.plan-reviewer. The alias is removed in the next release.",
+        type: "warning",
+      },
+    ])
+  })
+
+  test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { "plan-reviewer": { model: "omo-mock/mock-1" }, scout: { description: "Project scout" } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices.filter((notice) => notice.kind === "omo-config:agent-alias-deprecated")).toEqual([])
+    expect(notices).toEqual([])
   })
 })

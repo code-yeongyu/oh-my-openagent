@@ -44,6 +44,7 @@ export class FactsExtractorRunner {
   private readonly terminal: FactsTerminalWrites
   private readonly failureReader: FactsFailureReadPort
   private activeLaunch: Promise<FactsLaunchResult> | undefined; private activeCancel: (() => void) | undefined
+  private readonly activeReconciles = new Map<Promise<FactsLaunchResult>, AbortController>()
 
   constructor(private readonly options: FactsExtractorRunnerOptions) {
     this.queue = options.queue ?? new FactsQueue({ identityPaths: options.identity.paths })
@@ -75,9 +76,30 @@ export class FactsExtractorRunner {
     }
   }
 
-  async cancelActive(): Promise<void> { this.activeCancel?.(); await this.activeLaunch }
+  /**
+   * Stops the in-flight child AND every reconcile still in flight, then waits for them. A
+   * reconcile is detached at bind (`fire("reconcile")`), so without this a shutdown could release
+   * the identity while the reconcile's remaining steps still write into its runtime tree - for a
+   * transient run (#7765) that recreates the directories finalize has just removed.
+   */
+  async cancelActive(): Promise<void> {
+    for (const abort of this.activeReconciles.values()) abort.abort()
+    this.activeCancel?.()
+    await Promise.allSettled([...this.activeReconciles.keys(), this.activeLaunch])
+  }
 
   async reconcilePending(signal?: AbortSignal): Promise<FactsLaunchResult> {
+    const abort = new AbortController()
+    const operation = this.reconcilePendingOnce(signal === undefined ? abort.signal : AbortSignal.any([signal, abort.signal]))
+    this.activeReconciles.set(operation, abort)
+    try {
+      return await operation
+    } finally {
+      this.activeReconciles.delete(operation)
+    }
+  }
+
+  private async reconcilePendingOnce(signal: AbortSignal): Promise<FactsLaunchResult> {
     const active = await this.reconcileRuns()
     if (active) return { status: "active" }
     return this.launchPending(signal)
@@ -93,7 +115,7 @@ export class FactsExtractorRunner {
     const ledger = await readLaunchableFailures(this.failureReader, (message, fields) =>
       this.options.logger?.warn(message, fields),
     )
-    if (!ledger.ok) return { status: "skipped" }
+    if (!ledger.ok || isAborted()) return { status: "skipped" }
     const selection = selectLaunchable(pending, ledger.failures, this.now())
     if (selection.selected.length === 0) return { status: "empty" }
     const claimId = randomUUID()

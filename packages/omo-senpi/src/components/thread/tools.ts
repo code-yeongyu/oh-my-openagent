@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static } from "typebox"
 import { assembleAddressBook, toThreadAddressEntries, type AddressBookHost, type DiskSession } from "./address-book"
-import { fuzzyMatch, resolveTarget, type ThreadAddressEntry } from "./addressing"
+import { fuzzyMatch, resolveTarget, workspaceEntries, type ThreadAddressEntry } from "./addressing"
 import {
   parseThreadParams,
   threadToolParamSchemas,
@@ -172,10 +172,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     parameters: threadToolParamSchemas.thread_list,
     execute: async (_id: string, args: ThreadListInput) => {
       const current = await sessions()
-      const entries = resolveEntries(options, current)
+      // Default scope is the caller's workspace, the same test thread_send applies before it
+      // delivers; the address book itself spans every workspace the host knows.
+      const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
       const visible = args.all_scope === true
         ? current
-        : current.filter((session) => entries.some((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId)))
+        : current.filter((session) => scoped.some((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId)))
       return output({ kind: "ok", threads: visible.map(summary), scope: args.all_scope === true ? "all" : "workspace" })
     },
   }

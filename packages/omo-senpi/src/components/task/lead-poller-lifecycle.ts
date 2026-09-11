@@ -12,7 +12,7 @@ import {
   type TeamCoreConfig,
 } from "@oh-my-opencode/senpi-task"
 
-import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskRuntimeContext } from "./runtime-context"
 
@@ -209,11 +209,15 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
           injection.onFlushed?.()
           return
         }
-        input.coordinator.enqueue({
+        // Refused (coordinator retired with the session): throw so the lead poller releases its
+        // durable delivery reservation and redelivers the message after the reload, instead of
+        // leaving it reserved-but-never-flushed.
+        const accepted = input.coordinator.enqueue({
           ...injection,
           customType: "senpi-task:team-message",
           display: false,
         })
+        if (accepted === false) throw new IdleInjectionRetiredError()
         const parentState = input.runtime.parentState()
         switch (parentState.kind) {
           case "streaming":

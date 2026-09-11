@@ -8,7 +8,7 @@ import {
   createTeamTaskUpdateTool,
 } from "./tasks"
 
-type ToolFactory = (deps: never) => ToolDefinition
+type ToolFactory = (deps: never) => Pick<ToolDefinition, "name" | "exposure" | "allowLazyActivation" | "searchGroup" | "searchKeywords" | "description">
 
 const CASES: ReadonlyArray<readonly [string, ToolFactory]> = [
   ["task_create", createTeamTaskCreateTool],

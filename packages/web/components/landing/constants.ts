@@ -30,7 +30,7 @@ export const REVIEW_KEYS = [
 ] as const
 export type ReviewKey = (typeof REVIEW_KEYS)[number]
 
-export const ORCHESTRATION_KEYS = ["prometheus", "metis", "momus", "atlas"] as const
+export const ORCHESTRATION_KEYS = ["planner", "planConsultant", "planReviewer", "executor"] as const
 export type OrchestrationKey = (typeof ORCHESTRATION_KEYS)[number]
 
 /** Evidence for the "Category system" principle row. */

@@ -1,0 +1,37 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin-interface.test.ts:
+(pass) createPluginInterface - command.execute.before > executes ulw-execute side effects for native command execution [19.48ms]
+(pass) createPluginInterface - command.execute.before > does not run ulw-execute side effects for other native commands with session context [2.93ms]
+(pass) createPluginInterface - command.execute.before > switches native ulw-execute to Atlas when Atlas is registered in config [4.46ms]
+(pass) createPluginInterface - goal native command smoke > starts the goal from the native command flow with parsed arguments intact [1.58ms]
+305 |     expect({
+306 |       guidanceStable: firstResumeSystem.system.at(-1) === guidance && secondResumeSystem.system.at(-1) === guidance,
+307 |       durableMessageRestored: durableMessage.parts[0].text.includes("<ultrawork-mode>"),
+308 |       systemRestorationCleared: restoredSystem.system.every((part) => !part.includes("<ultrawork-mode>")),
+309 |       followingMessageCompact: followingMessage.parts.some((part) => part.synthetic === true),
+310 |     }).toEqual({
+             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "durableMessageRestored": true,
+    "followingMessageCompact": true,
+-   "guidanceStable": true,
++   "guidanceStable": false,
+    "systemRestorationCleared": true,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/plugin-interface.test.ts:310:8)
+(fail) createPluginInterface - post-compaction ULW restoration > keeps runtime guidance in system transforms until a real message restores it [1.48ms]
+(pass) createPluginInterface - backward compatibility > strips legacy ZWSP-prefixed agent names from persisted chat.message session state (GH-3259) [0.32ms]
+(pass) createPluginInterface - chat.params variant injection > injects variant from agent config into chat.params message [1.39ms]
+(pass) createPluginInterface - chat.params variant injection > does not overwrite existing variant in chat.params message [0.26ms]
+
+ 7 pass
+ 1 fail
+ 15 expect() calls
+Ran 8 tests across 1 file. [679.00ms]

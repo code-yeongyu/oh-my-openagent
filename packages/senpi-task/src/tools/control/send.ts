@@ -26,7 +26,7 @@ const DESCRIPTION = [
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
-  "One-shot agents (momus) always refuse task_send in every state; spawn a new momus instead.",
+  "One-shot agents (plan-reviewer) always refuse task_send in every state; spawn a new plan-reviewer instead.",
 ].join(" ")
 
 const MEMBER_SCOPED_DESCRIPTION = [
@@ -70,7 +70,8 @@ export async function runTaskSend(
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),
     })
-    return toolResult(firstText(teamResult), { kind: "team_message", team: teamResult.details })
+    const wrapped: SendToolResult = toolResult(firstText(teamResult), { kind: "team_message", team: teamResult.details })
+    return teamResult.isError === true ? { ...wrapped, isError: true } : wrapped
   }
 
   if (params.message !== undefined) return routeStructuredMessage(params.to, params.message, params, teamRouting)

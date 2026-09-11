@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
 import { createLogger, sessionEventCtx } from "./ulw-loop.test-support"
 
@@ -40,7 +40,7 @@ describe("omo-senpi ulw-loop run-command failure containment", () => {
       runCommand: async () => ({ code: 127, stdout: "" }),
     }).register(pi, { logger, config: { getFlag: () => false } })
 
-    const results = await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    const results = await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(results).toEqual([undefined])
     expect(pi.userMessages).toEqual([])

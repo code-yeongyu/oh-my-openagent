@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises"
 
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
-import type { ManagerStartSpec, StartResult } from "../manager"
+import type { ManagerStartSpec, PlanResolutionError, StartResult } from "../manager"
 import type { ResolvedModelRecord } from "../state"
 import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
@@ -161,12 +161,26 @@ function buildMemberPrompt(spec: TeamSpec, member: TeamMember): string {
   ].join("\n\n")
 }
 
+// Mirrors the task tool's plan-error presentation (tools/task/execute-single.ts): a member that
+// cannot be routed reports the same recoverable target lists the model needs to retry.
+function describePlanError(error: PlanResolutionError): string {
+  const agents = error.availableAgents ?? []
+  const categories = error.availableCategories ?? []
+  const agentSuffix = agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
+  const categorySuffix = categories.length === 0
+    ? ""
+    : error.code === "model_unavailable"
+      ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+      : ` Available categories: ${categories.join(", ")}.`
+  return error.message + agentSuffix + categorySuffix
+}
+
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {
   switch (result.kind) {
     case "depth_denied":
       return result.reason
     case "plan_unresolved":
-      return result.error.message
+      return describePlanError(result.error)
     case "start_failed":
       return result.error_message
     case "residency_denied":

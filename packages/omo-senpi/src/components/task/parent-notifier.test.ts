@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionCoordinator, IdleInjectionRetiredError } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createParentNotifier } from "./parent-notifier"
 
@@ -75,6 +75,7 @@ describe("createParentNotifier batched injection delivery", () => {
     const coordinator = {
       enqueue: (injection: unknown) => {
         enqueued.push(injection)
+        return true
       },
       scheduleFlush: () => undefined,
     } as unknown as IdleInjectionCoordinator
@@ -90,8 +91,43 @@ describe("createParentNotifier batched injection delivery", () => {
         content: "st_1 completed",
         display: false,
         details: [{ ...completionDetails[0], task_id: "st_1" }],
+        onDeliveryFailed: expect.any(Function),
       },
     ])
+  })
+
+  test("#given a completion accepted inside the batch window #when the coordinator retires before the flush #then the engine is told delivery failed", () => {
+    // given a streaming parent, so the completion sits in the batch window
+    const delivered: Delivered[] = []
+    const failures: Array<{ taskIds: readonly string[]; error: unknown }> = []
+    const { coordinator } = coordinatorWithManualFlush(delivered)
+    const notifier = createParentNotifier(fakePi(), coordinator, () => true, (taskIds, error) => {
+      failures.push({ taskIds, error })
+    })
+    notifier.enqueue(completionMessage("st_1"))
+
+    // when the session shuts down (/reload) before the batch window closes
+    coordinator.retire()
+
+    // then the completion is reported undelivered - the receipt senpi-task needs to roll notified_epoch
+    // back so the post-reload reconcile redelivers it
+    expect(delivered).toHaveLength(0)
+    expect(failures).toHaveLength(1)
+    expect(failures[0]?.taskIds).toEqual(["st_1"])
+    expect(failures[0]?.error).toBeInstanceOf(IdleInjectionRetiredError)
+  })
+
+  test("#given a retired coordinator #when a completion enqueues #then it throws instead of reporting a phantom delivery", () => {
+    // given
+    const delivered: Delivered[] = []
+    const { coordinator } = coordinatorWithManualFlush(delivered)
+    const notifier = createParentNotifier(fakePi(), coordinator, () => true)
+    coordinator.retire()
+
+    // when / then: the engine's only synchronous failure signal is a throw; swallowing it here is what
+    // persists notified_epoch for a completion the parent never saw
+    expect(() => notifier.enqueue(completionMessage("st_1"))).toThrow(IdleInjectionRetiredError)
+    expect(delivered).toHaveLength(0)
   })
 
   test("#given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer", () => {

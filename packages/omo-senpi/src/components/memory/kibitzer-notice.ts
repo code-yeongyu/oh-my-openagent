@@ -43,7 +43,7 @@ export const renderKibitzerNudgedEntry: EntryRenderer<unknown> = (entry, options
   // change its title, including when replaying older sessions.
   return noticeComponent({
     glyph: "✦",
-    title: "Kibitzer",
+    title: "Kibitzer !",
     tone: "accent",
     why: `recalled memory: ${first.hint}`,
     extra: [

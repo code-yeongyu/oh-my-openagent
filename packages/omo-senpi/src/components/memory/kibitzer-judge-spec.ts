@@ -1,4 +1,3 @@
-import { loadKibitzerPersona } from "@oh-my-opencode/memory-core"
 import type { RecallNudge } from "@oh-my-opencode/memory-core"
 import type { ChildSpec } from "@oh-my-opencode/senpi-task"
 import type { ChildModelChainSpec } from "./memory-child-model-chain"
@@ -15,6 +14,8 @@ type JudgeSpecInput = {
   readonly chain: ChildModelChainSpec
   readonly thinkingLevel?: ChildSpec["thinkingLevel"]
   readonly accepted: RecallNudge[]
+  /** The persona text, read by the caller so a missing asset is reported as itself (persona_unavailable). */
+  readonly systemPrompt: string
 }
 
 export function buildKibitzerJudgeSpec(input: JudgeSpecInput): ChildSpec {
@@ -38,7 +39,7 @@ export function buildKibitzerJudgeSpec(input: JudgeSpecInput): ChildSpec {
     depth: 1,
     parentSessionId: launch.sessionId,
     rootSessionId: launch.sessionId,
-    systemPrompt: loadKibitzerPersona(),
+    systemPrompt: input.systemPrompt,
     promptEnvelope: "bare",
     completion: "turn",
     prompt: buildKibitzerPrompt(launch),

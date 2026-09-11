@@ -68,7 +68,8 @@ describe("memory tool activation", () => {
     // then
     expect(memoryResult.isError).toBe(true)
     expect(textOf(memoryResult)).toContain("no memory identity bound")
-    expect(textOf(memoryResult)).toContain("restart")
+    expect(textOf(memoryResult)).toContain("next user turn")
+    expect(textOf(memoryResult)).not.toContain("enable omo memory")
   })
 
   test("#given a resolver that binds after registration #when the tool executes #then activation follows binding", async () => {

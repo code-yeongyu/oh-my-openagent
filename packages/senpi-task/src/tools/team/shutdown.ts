@@ -1,7 +1,6 @@
-import type { AgentToolResult } from "@code-yeongyu/senpi"
-
 import { SenpiShutdownError } from "../../team"
-import { toolResult } from "../control"
+import { toolErrorResult, toolResult } from "../control"
+import type { ToolExecutionResult } from "../control"
 import type { TeamToolsService } from "./types"
 
 // Shutdown has no standalone tool registration: the model-facing surface is the structured-message
@@ -40,32 +39,32 @@ function shutdownErrorView(error: unknown): ShutdownErrorView {
   throw error
 }
 
-export async function runTeamShutdownRequest(service: TeamToolsService, params: TeamShutdownRequestInput): Promise<AgentToolResult<TeamShutdownRequestDetails>> {
+export async function runTeamShutdownRequest(service: TeamToolsService, params: TeamShutdownRequestInput): Promise<ToolExecutionResult<TeamShutdownRequestDetails>> {
   try {
     await service.requestShutdown(params.team_run_id, params.member)
     return toolResult(`Requested shutdown for '${params.member}' (team ${params.team_run_id}).`, { kind: "requested", team_run_id: params.team_run_id, member: params.member })
   } catch (error) {
     const view = shutdownErrorView(error)
-    return toolResult(view.reason, view)
+    return toolErrorResult(view.reason, view)
   }
 }
 
-export async function runTeamApproveShutdown(service: TeamToolsService, params: TeamApproveShutdownInput): Promise<AgentToolResult<TeamApproveShutdownDetails>> {
+export async function runTeamApproveShutdown(service: TeamToolsService, params: TeamApproveShutdownInput): Promise<ToolExecutionResult<TeamApproveShutdownDetails>> {
   try {
     await service.approveShutdown(params.team_run_id, params.member)
     return toolResult(`Approved shutdown for '${params.member}' (team ${params.team_run_id}).`, { kind: "approved", team_run_id: params.team_run_id, member: params.member })
   } catch (error) {
     const view = shutdownErrorView(error)
-    return toolResult(view.reason, view)
+    return toolErrorResult(view.reason, view)
   }
 }
 
-export async function runTeamRejectShutdown(service: TeamToolsService, params: TeamRejectShutdownInput): Promise<AgentToolResult<TeamRejectShutdownDetails>> {
+export async function runTeamRejectShutdown(service: TeamToolsService, params: TeamRejectShutdownInput): Promise<ToolExecutionResult<TeamRejectShutdownDetails>> {
   try {
     await service.rejectShutdown(params.team_run_id, params.member, params.reason)
     return toolResult(`Rejected shutdown for '${params.member}' (team ${params.team_run_id}): ${params.reason.replace(/\s+/g, " ").trim().slice(0, 160)}`, { kind: "rejected", team_run_id: params.team_run_id, member: params.member, reason: params.reason })
   } catch (error) {
     const view = shutdownErrorView(error)
-    return toolResult(view.reason, view)
+    return toolErrorResult(view.reason, view)
   }
 }

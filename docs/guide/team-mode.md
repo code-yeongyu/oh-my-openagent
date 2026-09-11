@@ -55,30 +55,29 @@ Team specs live under `~/.omo/teams/{name}/config.json` (user scope) or `<projec
 {
   "name": "ccapi-explorers",
   "description": "Explore the ccapi project structure.",
-  "lead": { "kind": "subagent_type", "subagent_type": "sisyphus" },
   "members": [
     { "kind": "category", "name": "scout-1", "category": "deep", "prompt": "Scout the source directory for auth patterns." },
-    { "kind": "category", "name": "scout-2", "category": "quick", "prompt": "Scout tests for auth coverage." }
+    { "kind": "category", "name": "scout-2", "category": "quick", "prompt": "Scout tests for auth coverage." },
+    { "kind": "subagent_type", "name": "auditor", "subagent_type": "my-security-auditor", "prompt": "Audit the auth findings the scouts report." }
   ]
 }
 ```
 
 When both scopes define the same team name, project scope wins.
 
-`version`, `createdAt`, and `leadAgentId` are optional in config files. The loader fills them automatically. You can either write a top-level `lead: {...}` shorthand, mark one member with `isLead: true`, or omit both when the team has exactly one member.
+`version` and `createdAt` are optional in config files; the loader fills them automatically. The lead is always the current session, so there is no lead member to declare. `team_create` also accepts the same shape inline: `{ name, members: [{ name, category|subagent_type, prompt? }] }`.
 
 ## Member kinds
 
-- **`kind: "subagent_type"`** — direct agent (atlas, sisyphus, sisyphus-junior, hephaestus). `prompt` optional.
-- **`kind: "category"`** — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
+- **`kind: "category"`**: routed to the category worker, a fresh worker session configured by the category's model and skills. `prompt` REQUIRED. Unknown categories fail with `UNRESOLVABLE_CATEGORY` and the error lists the available ones.
+- **`kind: "subagent_type"`** (alias `"agent"`): a user-defined agent from `omo.json` `agents`, invoked directly. `prompt` optional. The kind is inferred from whichever field you set, so you can omit it.
 
-## Eligible agents
+## Who can be a member
 
-- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`.
-- **Conditional:** `hephaestus` (registry verdict `conditional`; OpenCode still sets `teammate: "allow"` in `tool-config-handler.ts`).
-- **Hard-reject:** `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`.
+- **Eligible:** any resolvable category, and any user-defined agent.
+- **Rejected at parse:** the curated read-only agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`) and the ulw-loop reviewer trio (`omo-senpi-code-reviewer`, `omo-senpi-qa-executor`, `omo-senpi-gate-reviewer`).
 
-Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state. Use the `task` tool for those agents; its implementation module is named `delegate-task`.
+The curated agents are read-only and in-process, so they can't write mailbox state. The reviewer trio is rejected because process-mode members drop reviewer instructions and tool allowlists. Route both groups through the `task` tool instead (`packages/senpi-task/src/team/member-validator.ts`).
 
 ## Lifecycle
 

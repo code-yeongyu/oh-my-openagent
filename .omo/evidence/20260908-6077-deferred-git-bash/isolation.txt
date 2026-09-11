@@ -1,0 +1,6 @@
+Command: bash .omo/evidence/20260908-6077-deferred-git-bash/commands.sh
+Hash command: shasum -a 256 "$HOME/.codex/config.toml"
+HOST_CODEX_CONFIG_SHA256_BEFORE=2f0687ad36db1876646f8d60c0062bfffe63fa69e3c4b7254e258b02b1ad345e
+HOST_CODEX_CONFIG_SHA256_AFTER=2f0687ad36db1876646f8d60c0062bfffe63fa69e3c4b7254e258b02b1ad345e
+HOST_CODEX_CONFIG_UNCHANGED
+Exit code: 0

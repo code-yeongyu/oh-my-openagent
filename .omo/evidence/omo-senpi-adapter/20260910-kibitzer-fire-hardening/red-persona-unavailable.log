@@ -1,0 +1,12 @@
+error: expect(received).toMatchObject(expected)
+-   "cause": "persona_unavailable",
++   "candidateCount": 1,
++   "cause": "session_create_failed",
++   "model": "omo-mock/mock-1",
++   "reason": "Failed to create in-process child session: the child must not be created without its persona",
++   "runId": "c8c1bba5-1751-400d-9afa-7bc985503853",
+- Expected  - 1
++ Received  + 5
+(fail) KibitzerGateRunner > #given the persona asset missing on disk #when the runner launches #then the failure is persona_unavailable and names the asset [67.79ms]
+ 0 pass
+ 1 fail

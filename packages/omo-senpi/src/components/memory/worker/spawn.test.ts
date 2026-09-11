@@ -167,6 +167,40 @@ describe("worker senpi prefix args", () => {
     expect(prepared.args[0]).toBe(PREFIX_MARKER)
   })
 
+  test("#given an inherited package root that does not own the launcher #when a reflection spawn is prepared #then the child env drops it and the launcher shape survives", async () => {
+    // given: the omo binary exported its own runtime root, but the child launches a different senpi
+    const base = await root()
+    const prepared = await prepareReflectionSpawn({
+      ...reflectionInput(base),
+      env: {
+        OMO_PACKAGE_DIR: "/opt/omo-runtime",
+        SENPI_PACKAGE_DIR: "/opt/omo-runtime",
+        MEMORY_KEEP_ME: "1",
+      },
+    })
+
+    // then
+    expect(prepared.env.OMO_PACKAGE_DIR).toBeUndefined()
+    expect(prepared.env.SENPI_PACKAGE_DIR).toBeUndefined()
+    expect(prepared.env.MEMORY_KEEP_ME).toBe("1")
+    expect(prepared.command).toBe("/custom/senpi")
+    expect(prepared.args[0]).toBe(PREFIX_MARKER)
+  })
+
+  test("#given a package root that owns the launcher #when a reflection spawn is prepared #then the child keeps the override", async () => {
+    // given
+    const base = await root()
+    const prepared = await prepareReflectionSpawn({
+      ...reflectionInput(base),
+      senpiCommand: "/opt/omo-runtime/omo",
+      senpiPrefixArgs: [],
+      env: { SENPI_PACKAGE_DIR: "/opt/omo-runtime" },
+    })
+
+    // then
+    expect(prepared.env.SENPI_PACKAGE_DIR).toBe("/opt/omo-runtime")
+  })
+
   test("#given senpiCommand and senpiPrefixArgs #when a reflection fork spawn is prepared #then args start with the prefix before -p/--fork", async () => {
     const base = await root()
     const prepared = await prepareReflectionForkSpawn({

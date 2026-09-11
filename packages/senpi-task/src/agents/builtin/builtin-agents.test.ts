@@ -9,7 +9,7 @@ import {
   ULW_REVIEWER_AGENT_NAMES,
 } from "./index"
 
-const CURATED_AGENT_NAMES = ["explore", "librarian", "metis", "momus"] as const
+const CURATED_AGENT_NAMES = ["explore", "librarian", "plan-consultant", "plan-reviewer"] as const
 const REVIEWER_AGENT_NAMES = ["omo-senpi-code-reviewer", "omo-senpi-gate-reviewer", "omo-senpi-qa-executor"] as const
 const ALL_BUILTIN_NAMES = [...CURATED_AGENT_NAMES, ...REVIEWER_AGENT_NAMES].sort()
 

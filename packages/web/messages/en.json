@@ -102,70 +102,70 @@
         "description": "Native omo command with the OMO extension built in. Standalone — no OpenCode or Codex host. Beta channel only.",
         "install": "npm i -g omo-ai@beta"
       },
-      "tagAgents": "11 agents",
+      "tagAgents": "11 roles",
       "tagHooks": "55 lifecycle hooks",
       "tagComponents": "Light: 11 components",
       "tagBeta": "Senpi: beta channel"
     },
     "agents": {
       "eyebrow": "The roster",
-      "title": "Eleven agents, one graph.",
-      "subtitle": "A directed graph of 11 agents scheduled in waves: the orchestrator leads, the planner, gap analysis and plan review gate the work, the workers execute. Click a node in the graph to find its cell here.",
-      "sisyphus": {
+      "title": "Eleven roles, one graph.",
+      "subtitle": "A directed graph of 11 roles scheduled in waves: the orchestrator leads, the planner, gap analysis and plan review gate the work, categories and curated agents execute. Click a node in the graph to find its cell here.",
+      "orchestrator": {
         "name": "Orchestrator",
-        "role": "Lead agent",
-        "model": "Claude Opus 5 Max",
-        "description": "Parses what you meant, maps the codebase before touching a line, delegates to specialists and verifies their work independently. Interrupted runs resume from boulder.json exactly where they stopped."
+        "role": "The main agent",
+        "model": "Profiles: Capable · Simple work · Deep work",
+        "description": "Runs in your session, on your model. Parses what you meant, maps the codebase before touching a line, delegates by category and verifies every result independently. Interrupted runs resume from boulder.json exactly where they stopped."
       },
-      "hephaestus": {
-        "name": "Hephaestus",
-        "role": "Deep worker — explore, plan, decide, execute, verify",
-        "model": "GPT 5.6 Sol Medium"
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan planning interview",
+        "model": "Runs in the main session"
       },
-      "prometheus": {
-        "name": "Planner",
-        "role": "Strategic planner",
-        "model": "Claude Fable 5.1 XHigh"
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "Gap analysis",
+        "model": "Claude Sonnet 4.6"
       },
-      "metis": {
-        "name": "Metis",
-        "role": "Plan consultant",
-        "model": "Claude Opus 5 High"
-      },
-      "momus": {
-        "name": "Plan reviewer",
-        "role": "Review gate",
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "Plan review gate",
         "model": "GPT 6 Astra xHigh"
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "Parallel task executor",
-        "model": "Claude Sonnet 5"
+      "kibitzer": {
+        "name": "Kibitzer",
+        "role": "Post-turn memory advisor",
+        "model": "Quick category"
       },
-      "oracle": {
-        "name": "Oracle",
-        "role": "Architecture consultant",
-        "model": "GPT 5.6 Sol xHigh"
+      "architect": {
+        "name": "Architect",
+        "role": "Architecture consult lane",
+        "model": "Claude Fable 5.1 Max"
       },
-      "librarian": {
-        "name": "Librarian",
-        "role": "Docs and code search",
-        "model": "GPT 5.6 Luna Fast"
+      "deep": {
+        "name": "Deep",
+        "role": "Deep autonomous problem-solving",
+        "model": "GPT 6 Astra High"
+      },
+      "quick": {
+        "name": "Quick",
+        "role": "Small, single-file changes",
+        "model": "Kimi For Coding Highspeed"
+      },
+      "visualEngineering": {
+        "name": "Visual Engineering",
+        "role": "UI, styling and design systems",
+        "model": "Claude Fable 5.1 Max"
       },
       "explore": {
         "name": "Explore",
         "role": "Codebase grep",
         "model": "GPT 5.6 Luna Fast"
       },
-      "sisyphusJunior": {
-        "name": "Worker",
-        "role": "Focused task executor",
-        "model": "Per-category"
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "Media analysis",
-        "model": "GPT 5.6 Sol Low"
+      "librarian": {
+        "name": "Librarian",
+        "role": "Docs and code search",
+        "model": "GPT 5.6 Luna Fast"
       },
       "dynamic": {
         "name": "Dynamic Agent",
@@ -173,37 +173,57 @@
         "model": "Per-category"
       }
     },
+    "profiles": {
+      "eyebrow": "Profiles",
+      "title": "Pick the intent, not the model.",
+      "subtitle": "A profile is an ordered chain of models. Set model_profile once and omo starts your session on the first model your providers serve; a literal provider/model in the same key pins it instead.",
+      "capable": {
+        "name": "Capable",
+        "role": "The strongest generalist available — the default when you do not want to think about models.",
+        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
+      },
+      "simpleWork": {
+        "name": "Simple work",
+        "role": "Fast and cheap for small, well-specified edits.",
+        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
+      },
+      "deepWork": {
+        "name": "Deep work",
+        "role": "Maximum reasoning for hard problems — the same chain the deep category runs.",
+        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
+      }
+    },
     "orchestration": {
       "eyebrow": "Orchestration",
       "title": "Think, then act.",
       "subtitle": "Planning and execution are different jobs. The planner never writes code; the executor follows a plan two reviewers already passed.",
-      "prometheus": {
-        "name": "Planner",
-        "role": "Strategic planner",
-        "model": "Claude Fable 5.1 XHigh",
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan",
+        "model": "Runs in the main session",
         "description": "Interviews you, explores the codebase, writes the plan. Never writes code.",
         "features": ["Interview mode", "Multi-agent codebase exploration"]
       },
-      "metis": {
-        "name": "Metis",
+      "planConsultant": {
+        "name": "Plan Consultant",
         "role": "Gap analysis",
-        "model": "Claude Opus 5 High",
+        "model": "Claude Sonnet 4.6",
         "description": "Reads the plan for ambiguities before they become bugs.",
         "features": ["Missing requirements", "Unstated assumptions"]
       },
-      "momus": {
-        "name": "Plan reviewer",
+      "planReviewer": {
+        "name": "Plan Reviewer",
         "role": "Plan review",
         "model": "GPT 6 Astra xHigh",
         "description": "Approves only when the plan holds up. Otherwise it goes back.",
         "features": ["Hostile review", "OKAY or a list of reasons"]
       },
-      "atlas": {
-        "name": "Atlas",
-        "role": "Master executor",
-        "model": "Claude Sonnet 5",
-        "description": "Reads the approved plan, delegates by category and skills, tracks learnings, verifies every result itself.",
-        "features": ["Intent-based routing", "Independent verification"]
+      "executor": {
+        "name": "Executor",
+        "role": "/ulw-execute",
+        "model": "Runs in the main session",
+        "description": "Executes the approved plan in the same session, delegates by category and skills, verifies every result itself.",
+        "features": ["Boulder state", "Independent verification"]
       }
     },
     "teamMode": {
@@ -400,14 +420,14 @@
         },
         "footer": "Zero intervention. Full autonomy. Just results."
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "Approach 2",
         "title": "Planner + Executor",
         "subtitle": "When you want strategic control.",
-        "prometheusTitle": "Planner",
-        "prometheusDescription": "Conducts interview, researches context, and generates a detailed YAML plan.",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "Executes the plan, delegates to sub-agents, manages waves, and tracks progress.",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "Runs the interview, researches context, and writes a detailed work plan.",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "Executes the approved plan in the same session, delegates by category, manages waves, and tracks progress.",
         "footer": "You architect. Agents execute. Full transparency."
       }
     },
@@ -428,15 +448,15 @@
     "coreLoop": {
       "title": "The Core Loop",
       "features": {
-        "prometheus": {
+        "planner": {
           "feature": "Planning interview",
           "purpose": "Extract intent through intelligent interview"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "Plan consultant",
           "purpose": "Catch ambiguities before they become bugs"
         },
-        "momus": {
+        "planReviewer": {
           "feature": "Plan review gate",
           "purpose": "Verify plans are complete before execution"
         },

@@ -31,6 +31,22 @@ export type RunnerFailure = {
     | "session_unavailable"
   readonly message: string
   readonly cause?: unknown
+  /**
+   * Structured exit facts for the internal event log, when the child actually reached a process exit.
+   *
+   * `message` is stderr-derived (`runners/rpc/exit-mapping.ts`) and therefore untrusted child output,
+   * so it must never reach a durable artifact - `manager.ts publicStartFailureMessage` collapses it for
+   * exactly that reason. These are closed enums and numbers, which cannot carry a credential, so they
+   * can be persisted and finally answer WHY a child died instead of only THAT it died.
+   *
+   * Shape is inlined rather than imported from `../types`: that module imports RunnerOutcome from this
+   * one, so importing back would close a cycle.
+   */
+  readonly exit?: {
+    readonly kind: "clean" | "killed" | "crashed" | "spawn_error"
+    readonly code: number | null
+    readonly signal: NodeJS.Signals | null
+  }
 }
 
 export type RunnerOutcome =

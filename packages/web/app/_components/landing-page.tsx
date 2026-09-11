@@ -8,6 +8,7 @@ import { HeroSection } from "@/components/landing/sections/hero"
 import { MassUlwSection } from "@/components/landing/sections/mass-ulw"
 import { OrchestrationSection } from "@/components/landing/sections/orchestration"
 import { PrinciplesSection } from "@/components/landing/sections/principles"
+import { ProfilesSection } from "@/components/landing/sections/profiles"
 import { ProofStripSection } from "@/components/landing/sections/proof-strip"
 import { ReviewsSection } from "@/components/landing/sections/reviews"
 import { TeamModeSection } from "@/components/landing/sections/team-mode"
@@ -35,6 +36,7 @@ export async function LandingPage(): Promise<JSX.Element> {
       <MassUlwSection />
       <EditionsSection />
       <AgentsSection />
+      <ProfilesSection />
       <OrchestrationSection />
       <TeamModeSection />
       <PrinciplesSection />
