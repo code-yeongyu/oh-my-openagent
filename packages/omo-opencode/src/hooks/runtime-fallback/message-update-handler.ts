@@ -2,15 +2,17 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isProviderFailureCoordinationError, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { markProviderFailed } from "../../shared/provider-failure-state"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { resolveFailedProviderID } from "./resolve-failed-provider"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -145,6 +147,16 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           statusCode: extractStatusCode(error, config.retry_on_errors),
           errorName: extractErrorName(error),
           errorType: classifyErrorType(error),
+        })
+      }
+
+      const failedProviderID = resolveFailedProviderID(sessionID, state)
+      if (failedProviderID && isProviderFailureCoordinationError(error, config.retry_on_errors)) {
+        markProviderFailed(sessionID, failedProviderID)
+        sessionLastAccess.set(sessionID, Date.now())
+        log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {
+          sessionID,
+          providerID: failedProviderID,
         })
       }
 

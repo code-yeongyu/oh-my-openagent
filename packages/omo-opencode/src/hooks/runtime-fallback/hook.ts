@@ -1,6 +1,7 @@
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { DEFAULT_CONFIG } from "./constants"
+import { setProviderFailureCooldownMs } from "../../shared/provider-failure-state"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
@@ -43,8 +44,13 @@ export function createRuntimeFallbackHook(
     timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
     restore_primary_after_cooldown: options?.config?.restore_primary_after_cooldown ?? DEFAULT_CONFIG.restore_primary_after_cooldown,
+    provider_failure_cooldown_seconds: options?.config?.provider_failure_cooldown_seconds ?? DEFAULT_CONFIG.provider_failure_cooldown_seconds,
   }
 
+  // Sync the provider-failure-state cooldown with the runtime-fallback config.
+  // omo.jsonc can tune via runtime_fallback.provider_failure_cooldown_seconds
+  // (default 120s; set to 0 to disable the cooldown entirely).
+  setProviderFailureCooldownMs(config.provider_failure_cooldown_seconds * 1000)
   const deps: HookDeps = {
     ctx,
     config,

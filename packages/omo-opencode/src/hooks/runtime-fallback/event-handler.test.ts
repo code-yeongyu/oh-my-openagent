@@ -1,9 +1,21 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { createStaleSessionCleanup } from "./auto-retry-cleanup"
+import {
+  clearAllProviderFailures,
+  isProviderFailed,
+  markProviderFailed,
+} from "../../shared/provider-failure-state"
+import { clearSessionModel, setSessionModel } from "../../shared/session-model-state"
+
+const PROVIDER_COORDINATION_SESSION_IDS = [
+  "session-transient-service-error",
+  "session-rate-limit",
+] as const
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
@@ -66,6 +78,97 @@ afterEach(() => {
 })
 
 describe("createEventHandler", () => {
+  beforeEach(() => {
+    clearAllProviderFailures()
+  })
+
+  afterEach(() => {
+    for (const sessionID of PROVIDER_COORDINATION_SESSION_IDS) clearSessionModel(sessionID)
+  })
+
+  it("#given session A has a provider failure #when session B is created #then session A failure remains", async () => {
+    const failedSessionID = "session-a"
+    const createdSessionID = "session-b"
+    const deps = createDeps()
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+    markProviderFailed(failedSessionID, "google")
+
+    await handler({
+      event: {
+        type: "session.created",
+        properties: { info: { id: createdSessionID, model: "anthropic/claude-sonnet-4-6" } },
+      },
+    })
+
+    expect(isProviderFailed(failedSessionID, "google")).toBe(true)
+    expect(isProviderFailed(createdSessionID, "google")).toBe(false)
+  })
+
+  it("#given a retryable service failure #when session.error fires #then provider reachability is unchanged", async () => {
+    const sessionID = "session-transient-service-error"
+    const deps = createDeps()
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+    setSessionModel(sessionID, { providerID: "google", modelID: "gemini-3.1-pro" })
+
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { statusCode: 503, message: "service unavailable" },
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "google")).toBe(false)
+  })
+
+  it("#given stored provider differs from event and no fallbacks #when session is reaped #then only stored failure is cleared", async () => {
+    const sessionID = "session-rate-limit"
+    const deps = createDeps()
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+    setSessionModel(sessionID, { providerID: "google", modelID: "gemini-3.1-pro" })
+
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "untrusted-event-provider",
+          error: { message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "google")).toBe(true)
+    expect(isProviderFailed(sessionID, "untrusted-event-provider")).toBe(false)
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+
+    deps.sessionLastAccess.set(sessionID, 0)
+    createStaleSessionCleanup(deps, () => {})()
+
+    expect(isProviderFailed(sessionID, "google")).toBe(false)
+  })
+
+  it("#given no stored provider #when session.error supplies a provider #then no provider is marked unreachable", async () => {
+    const sessionID = "session-without-stored-provider"
+    const deps = createDeps()
+    const handler = createEventHandler(deps, createHelpers(deps, [], []))
+
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "untrusted-event-provider",
+          error: { message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "untrusted-event-provider")).toBe(false)
+  })
+
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
     const sessionID = "session-stop"
