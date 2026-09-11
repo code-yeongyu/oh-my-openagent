@@ -274,6 +274,71 @@ describe("session-notification", () => {
     expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
   })
 
+  test("should use resolved runtime platform for delayed idle notifications", async () => {
+    // given - hook creation should not cache the platform before runtime notification execution
+    const detectPlatformSpy = spyOn(sender, "detectPlatform").mockReturnValue("unsupported")
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 0,
+      skipIfIncompleteTodos: false,
+      enforceMainSessionFilter: false,
+    })
+    expect(detectPlatformSpy).not.toHaveBeenCalled()
+    detectPlatformSpy.mockReturnValue("darwin")
+
+    const sendSpy = spyOn(sender, "sendSessionNotification").mockImplementation(
+      async (
+        _ctx: Parameters<typeof sender.sendSessionNotification>[0],
+        platform: Parameters<typeof sender.sendSessionNotification>[1],
+        _title: Parameters<typeof sender.sendSessionNotification>[2],
+        message: Parameters<typeof sender.sendSessionNotification>[3]
+      ) => {
+        notificationCalls.push(`${platform}:${message}`)
+      }
+    )
+
+    // when
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "main-runtime-platform" },
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    // then
+    expect(sendSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      "darwin",
+      expect.any(String),
+      expect.any(String),
+    )
+    expect(notificationCalls.some((call) => call.startsWith("darwin:"))).toBe(true)
+  })
+
+  test("should preserve custom sound path for delayed idle notification sound", async () => {
+    // given
+    const playSoundSpy = spyOn(sender, "playSessionNotificationSound").mockResolvedValue(undefined)
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 0,
+      skipIfIncompleteTodos: false,
+      enforceMainSessionFilter: false,
+      playSound: true,
+      soundPath: "/tmp/custom-ready.wav",
+    })
+
+    // when
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "main-custom-sound" },
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    // then
+    expect(playSoundSpy).toHaveBeenCalledWith(expect.anything(), "darwin", "/tmp/custom-ready.wav")
+  })
+
   test("should skip notification for subagent even when mainSessionID is set", async () => {
     // given - both mainSessionID and subagent session exist
     const mainSessionID = "main-999"
