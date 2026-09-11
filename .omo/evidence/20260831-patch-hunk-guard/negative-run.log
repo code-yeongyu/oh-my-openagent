@@ -1,0 +1,15 @@
+$ bun run script/verify-patch-hunks.ts   # scratch dir with the pre-fix patch content from e109689 renamed to @code-yeongyu%2Fsenpi@2026.8.31.patch
+verifying patches\@code-yeongyu%2Fsenpi@2026.8.31.patch against @code-yeongyu/senpi@2026.8.31
+  hunk 1 (-69,6 +69,11): applies
+  hunk 2 (-87,7 +92,7): applies
+  hunk 3 (-1,4 +1,5): obsolete
+  hunk 4 (-10,13 +11,34): conflict
+  hunk 5 (-53,6 +75,17): applies
+::error file=patches/@code-yeongyu%2Fsenpi@2026.8.31.patch::hunk 3 (-1,4 +1,5) does not apply: its change already exists upstream, drop the hunk and regenerate the patch
+error: patch failed: dist/core/extensions/builtin/hooks/trust-storage.js:1
+error: dist/core/extensions/builtin/hooks/trust-storage.js: patch does not apply
+::error file=patches/@code-yeongyu%2Fsenpi@2026.8.31.patch::hunk 4 (-10,13 +11,34) does not apply: the published source moved on, rebase the hunk onto the pinned version
+error: patch failed: dist/core/extensions/builtin/hooks/trust-storage.js:10
+error: dist/core/extensions/builtin/hooks/trust-storage.js: patch does not apply
+patch verification failed: regenerate patches/ so every hunk applies to its published package (see issue #7546)
+negative_exit=1

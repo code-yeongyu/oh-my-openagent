@@ -624,6 +624,10 @@ jobs:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
 
+      - name: Verify version-scoped patch hunks
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run script/verify-patch-hunks.ts
+
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
@@ -662,6 +666,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the distributable OpenCode/Codex packages.
+            - Rejects version-scoped patches whose hunks no longer apply to the pinned published package.
             - Confirms `dist/index.js` and `dist/index.d.ts` exist.
             - Fails when the build regenerates `assets/oh-my-opencode.schema.json` or `assets/omo.schema.json` differently from the committed copy.
             - Runs dist bundle regression tests.
