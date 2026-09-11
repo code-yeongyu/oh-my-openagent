@@ -1,3 +1,4 @@
+import { canonicalAgentName } from "../agents/legacy-agent-names"
 import {
   DAG_SETTINGS_DEFAULTS,
   type DagBottleneck,
@@ -36,6 +37,7 @@ export const DAG_COMPILE_ERROR_CODES = [
   "node_count_exceeded",
   "prompt_bytes_exceeded",
   "dependency_fanout_exceeded",
+  "empty_graph",
 ] as const
 
 export type DagCompileErrorCode = (typeof DAG_COMPILE_ERROR_CODES)[number]
@@ -82,9 +84,15 @@ function compareSequences(a: readonly DagNodeId[], b: readonly DagNodeId[]): num
 }
 
 function routeOf(input: DagNodeInput): DagRoute {
+  // Only the canonical agent is stored: DagRoute is hashed by dag/fingerprint.ts, so a legacy
+  // subagent_type must never leak into the persisted route.
   return input.category !== undefined
     ? { kind: "category", category: input.category }
-    : { kind: "agent", agent: input.subagent_type, ...(input.model === undefined ? {} : { model: input.model }) }
+    : {
+        kind: "agent",
+        agent: canonicalAgentName(input.subagent_type).name,
+        ...(input.model === undefined ? {} : { model: input.model }),
+      }
 }
 
 function failure(errors: readonly DagCompileError[], at: string): DagCompileResult {
@@ -149,6 +157,14 @@ export function compileDag(definition: DagDefinition, options?: DagCompileOption
   const at = options?.at ?? EMPTY_AT
   const settings: DagSettings = { ...DAG_SETTINGS_DEFAULTS, ...options?.settings }
   const errors: DagCompileError[] = []
+
+  if (definition.nodes.length === 0) {
+    errors.push({
+      code: "empty_graph",
+      message: "dag has no nodes; a run needs at least one node",
+      nodeIds: [],
+    })
+  }
 
   if (definition.nodes.length > settings.max_nodes_per_run) {
     errors.push({

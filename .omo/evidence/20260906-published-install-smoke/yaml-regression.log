@@ -1,0 +1,4 @@
+continue-on-error: true
+steps: ["actions/setup-node@v7","oven-sh/setup-bun@v2","Run published lazycodex-ai smoke commands","actions/checkout@v7","Install published payloads into an isolated CODEX_HOME","Write job summary"]
+dry-run install assertion kept: true
+dry-run doctor assertion kept: true

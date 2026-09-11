@@ -1,299 +1,323 @@
-# Oh My OpenAgent Web — Design System
+# Oh My OpenAgent Web — Design System v2 ("Phosphor Ledger")
 
-> **Extracted from existing code and rendered baseline evidence. Refreshed 2026-06-24.** This document is the implementation contract for the current site. The dark + cyan terminal/hacker identity is the brand and stays. This contract preserves the current rendered experience first; consolidation ideas are design debt unless a later PR explicitly changes the visual language.
+> **Redesign contract. Written 2026-09-08 from runtime extraction of three reference sites, StyleGallery pattern contracts, the frontend skill's Layer A/B references, and three imagen concept drafts.** This document replaces the 2026-06-24 extraction contract. Every color, size, spacing value, motion value, and component the site renders must trace to a token or primitive named here. If a value is missing, add it here first, then use it.
 
-## 0. Implementation Contract
+## 0. Research Log
 
-- CSS source of truth: `app/styles/design-system.css` owns the Tailwind entrypoint, theme mappings, root tokens, base rules, shared utilities, docs prose styles, and motion primitives. `app/globals.css` is a filesystem alias to that entry so Next/Tailwind continue to read the same single global stylesheet surface without an import-wrapper layer.
-- Component primitives: `components/ui/*` provide shadcn-style Button, Badge, Card, Input, Section, and Separator variants. New repeated UI patterns must use these primitives or document a new primitive here first.
-- Page surfaces: `app/_components/landing-page.tsx`, `components/landing/**`, `components/docs/docs-shell.tsx`, `components/nav-header.tsx`, and `components/footer.tsx` consume the contract.
-- Current PR intent: no redesign, no copy change, no interaction change. Extraction work must be pixel-identical to the baseline screenshots under `.omo/ultrawork/design-system-fidelity/evidence/baseline/screenshots/`.
-- Pre-existing accepted debt for this extraction: `/docs` at 390x844 has horizontal overflow in the baseline (`scrollWidth - innerWidth = 538`). Do not worsen it in this PR; fixing it requires a docs-shell layout PR with fresh design review.
+One line per lane. A lane with no line did not run.
+
+- **Reference site — omp.sh** (runtime `getComputedStyle`, 330 elements × 3 viewports, 17 hover targets driven): single-viewport poster console; substrate `#09090b`, hairlines `rgba(255,255,255,0.08)`, **0px radii everywhere**, Geist 500 display `clamp(2.4rem, 1.2rem + 3.8vw, 4.4rem)` / lh 0.98 / tracking -0.03em, uppercase Geist captions 10–12px tracking 2.2–2.6px, the install command bar IS the CTA (accent prompt cell + mono command + fixed-width COPY), nav underline `scaleX(0→1)` 320ms `cubic-bezier(0.2,0.8,0.2,1)`, color transitions 150ms `cubic-bezier(0.4,0,0.2,1)`, scrolled header `black/72% + blur(12px)`; focal object is a procedural Canvas2D grain horizon (not 3D). Report: `/tmp/omo-web-research/omp-sh/report.md`, tokens `tokens.json`, screenshots 375/768/1280 + hero.
+- **Reference site — factory.ai** (runtime extraction, 12→4 track grid measured): pale industrial paper inverted for us; 1440px frame, 24/16px gutters, 3px controls vs 6–12px panels, `box-shadow: none` everywhere, header diffusion `backdrop-filter: blur(64px) saturate(1.5)` without a hard glass card, primary CTA inverts over 150ms, section separation by generous margins (96–160px), one real product demonstration (video) instead of decorative WebGL, headline text-resolution reveal with immediately readable fallback. Report: `/tmp/omo-web-research/factory-ai/report.md`.
+- **Reference site — herdr.dev** (runtime extraction, 28 baseline colors): ink `#17171a`, 1440px frame with 1px side rules, gutters 16/20/34px, Archivo 900 display with heavy negative tracking, lavender single accent used sparingly, **stats strip** (large tabular numerals + 10px mono uppercase labels, 4 → 2×2 columns), feature rows as an **index / explanation / evidence ledger** (130 + 1fr + 1fr at 1280, evidence stacks below at ≤768), row hover tint accent/4%, 120ms feature hovers, 2200ms status-dot pulse, interactive HTML terminal as the product visual. Report: `/tmp/omo-web-research/herdr-dev/report.md`. (herdr shows a "backed by" investor line — explicitly NOT copied; see §12.)
+- **StyleGallery spatial patterns** (curl, raw.githubusercontent.com/changeroa/StyleGallery): adopted `sticky-header` (nav; no internal scroll), `cover` (hero: `grid-template-rows: auto 1fr auto; min-block-size: 100dvh`), `grid-wrapper` (page frame: `1fr minmax(0, 90rem) 1fr` with full-bleed breakout tracks), `sticky-aside` (mass-ulw section: sticky title column beside the terminal), `reel` (reviews: horizontal scroll container OWNS scroll), `content-limiter` (manifesto prose 68ch), `fixed-sidenav-shell` (docs: `16rem minmax(0,1fr)` grid, `min-block-size: 0`, **`<main>` owns the scroll**). Structural decisions restated in our words; upstream prose not copied.
+- **Embedded refs**: shortlisted `linear.app`, `warp`, `vercel`; picked **Layer A `gpt-tasteskill`** (AIDA chapters, 2-line hero rule, gapless bento, massive section spacing; GSAP replaced by CSS scroll-driven animation + IntersectionObserver per §6) + **Layer B `linear.app`** (luminance ladder, `rgba(255,255,255,0.05–0.08)` borders, single chromatic accent, weight ~500 UI text) with `warp` for the mono uppercase editorial labels. `redesign-skill` audit list applied to the existing UI (findings in §11).
+- **Imagen concept drafts** (gpt-image-2 via Quotio, 1536×1024): `/tmp/omo-web-research/concepts/a-centered-graph.png`, `b-editorial-split.png`, `c-canvas-bottom-left.png` → **picked B (editorial split)** as the hero reference-fidelity contract: left text column (eyebrow → 2-line display → tagline → command bar → primary + text link), right two-thirds a lit DAG of icosahedral nodes in three waves with a numbered wave rail. A contributes the glass command pill; C contributes pulses travelling along edges.
+- **Prior art (own)**: `planet-simulator/src/components/asteroid/Asteroid3D.tsx` — R3F scene with IntersectionObserver defer, WebGL probe + static image fallback, `prefers-reduced-motion` gate, `dpr=[1,2]`, Suspense SVG fallback; LHCI 100/100/100/100 mobile asserts; size-limit budgets. Adopted and tightened in §9.
+- **Lazyweb**: skipped — the three user-supplied live references already cover real shipped agent-tool landing pages; recorded as intentional.
 
 ## 1. Atmosphere & Identity
 
-A senior engineer's command center, glowing in the dark. Surfaces are near-black with a faint cool undertone; cyan punctuation marks the live wires of the system — install commands, primary CTAs, terminal cursors, hover affordances. Density is purposeful: stats bar, code blocks, agent cards. Whitespace exists but is _engineered_, never decorative.
+An operations ledger read at night. The whole site is one framed sheet of ink ruled by hairlines; content lives in rows and cells, never in floating cards. Everything is still until it is _live_: the only light on the page comes from wires that carry work — the edges of the agent graph, the prompt glyph in the install bar, the active node, the cursor in the terminal — and that light is OmO cyan with a white-hot core.
 
-**Signature**: cyan-on-near-black with razor-thin borders and a single hero photograph receding into the canvas — like a screenshot of `htop` lit by a moon. The terminal mockup in the Ultrawork section is the visual anchor: this product _is_ the terminal, not a marketing site about the terminal.
+**Signature material: ink + phosphor.** Flat ink surfaces step by luminance (`ink-0 → ink-3`), separated by 1px `line` hairlines with square corners. Cyan appears only where something is running, selectable, or verified. No gradients as decoration, no purple, no drop shadows.
+
+**The memorable moment:** the hero's agent graph lights up wave by wave — the orchestrator, then the planners, then the workers — and you can grab it and orbit it. Two sections later the same wave grammar plays inside a terminal as `mass ulw` runs. The product's idea (a DAG of specialised agents scheduled in waves and verified at the end) is understood before a paragraph is read.
 
 ## 2. Color
 
-### Palette
+### Palette (dark only — the site has no light theme)
 
-| Role                    | Token                     | Hex                       | Usage                                         |
-| ----------------------- | ------------------------- | ------------------------- | --------------------------------------------- |
-| Surface / 0             | `--surface-0`             | `#0a0a0a`                 | Page background                               |
-| Surface / 1             | `--surface-1`             | `rgba(255,255,255,0.018)` | Subtle section/card tint                      |
-| Surface / 2             | `--surface-2`             | `rgba(255,255,255,0.035)` | Default elevated tint                         |
-| Surface / 3             | `--surface-3`             | `rgba(255,255,255,0.055)` | Hover/elevated tint                           |
-| Text / primary          | `--text-primary`          | `#ededed`                 | Headlines, body emphasis                      |
-| Text / secondary        | `--text-secondary`        | `#a1a1a1`                 | Body copy (current `--muted-foreground`)      |
-| Text / tertiary         | `--text-tertiary`         | `#71717a`                 | Captions, metadata (zinc-500)                 |
-| Border / default        | `--border-default`        | `#262626`                 | Card borders, dividers (current `--border`)   |
-| Border / subtle         | `--border-subtle`         | `rgba(255,255,255,0.06)`  | Whisper-thin separators (used in nav/footer)  |
-| Accent / primary        | `--accent-primary`        | `#00d4ff`                 | Brand cyan — CTAs, links, focus, terminal `$` |
-| Accent / primary-soft   | `--accent-primary-soft`   | `rgba(0,212,255,0.10)`    | Cyan backgrounds, glow tints                  |
-| Accent / primary-border | `--accent-primary-border` | `rgba(0,212,255,0.20)`    | Cyan-tinted borders on badges                 |
-| Accent / secondary      | legacy `--secondary`      | `#7c3aed`                 | Reserved — currently overused (see below)     |
-| Status / success        | `--status-success`        | `#10b981`                 | Success indicators only                       |
-| Status / warning        | `--status-warning`        | `#f59e0b`                 | Cautions only                                 |
-| Status / error          | `--status-error`          | `#ef4444`                 | Errors / destructive only                     |
-| Code / bg               | `--code-bg`               | `#1e1e2e`                 | Code block backgrounds                        |
-| Code / fg               | `--code-text`             | `#cdd6f4`                 | Code text                                     |
+| Role          | Token           | Value                    | Usage                                                                                                                 |
+| ------------- | --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Ink / 0       | `--ink-0`       | `#09090b`                | Page substrate                                                                                                        |
+| Ink / 1       | `--ink-1`       | `#0e0e11`                | Ledger rows, section bands, command bar                                                                               |
+| Ink / 2       | `--ink-2`       | `#14141a`                | Hovered row / tile, terminal chrome                                                                                   |
+| Ink / 3       | `--ink-3`       | `#1b1b22`                | Popover, mobile nav sheet, terminal sidebar                                                                           |
+| Text / hi     | `--text-hi`     | `#f5f5f7`                | Display, H1–H3, numerals, primary UI                                                                                  |
+| Text / mid    | `--text-mid`    | `#c3c4c9`                | Body copy, nav links                                                                                                  |
+| Text / lo     | `--text-lo`     | `#8b8c95`                | Captions, metadata, eyebrows                                                                                          |
+| Text / faint  | `--text-faint`  | `#55565e`                | Wave rail numerals, disabled, quiet indices — decorative only (2.7:1), never for text that carries meaning on its own |
+| Line / strong | `--line-strong` | `rgba(255,255,255,0.12)` | Focused cell, active tab underline base                                                                               |
+| Line          | `--line`        | `rgba(255,255,255,0.08)` | Frame, rows, dividers (the default hairline)                                                                          |
+| Line / faint  | `--line-faint`  | `rgba(255,255,255,0.04)` | Dot grid, quiet cell separators                                                                                       |
+| Accent        | `--accent`      | `#00d4ff`                | Prompt glyph, live wires, active state, links on hover, primary CTA fill                                              |
+| Accent / hot  | `--accent-hot`  | `#e6fdff`                | White-hot node core, cursor block, verified flash                                                                     |
+| Accent / dim  | `--accent-dim`  | `#0ea5c4`                | Primary CTA hover fill, edge idle color in the 3D scene                                                               |
+| Accent / 4    | `--accent-4`    | `rgba(0,212,255,0.04)`   | Row hover tint                                                                                                        |
+| Accent / 8    | `--accent-8`    | `rgba(0,212,255,0.08)`   | Selected tile fill, glass chip fill                                                                                   |
+| Accent / 16   | `--accent-16`   | `rgba(0,212,255,0.16)`   | Node halo, glow wash center                                                                                           |
+| Accent / 32   | `--accent-32`   | `rgba(0,212,255,0.32)`   | 1px inset selection ring, focus ring                                                                                  |
+| Status / ok   | `--status-ok`   | `#10b981`                | Done dots, health                                                                                                     |
+| Status / busy | `--status-busy` | `#f5c451`                | Working dots (terminal, team grid)                                                                                    |
+| Status / err  | `--status-err`  | `#ef4444`                | Blocked / failed dots only                                                                                            |
+| Code / bg     | `--code-bg`     | `#0b0b0e`                | Code blocks, terminal body                                                                                            |
+| Code / fg     | `--code-fg`     | `#cdd6f4`                | Code text                                                                                                             |
 
-### Rules
+### Ramp rules
 
-- **Cyan is the only chromatic brand color.** Every interactive element should resolve through it.
-- **Surface hierarchy via luminance, not borders where possible.** `0a0a0a` → `111111` → `1a1a1a` is the depth stack. Borders are the punctuation, not the wall.
-- **Never use pure `#000000`** — `#0a0a0a` or `#08090a` is the floor. Pure black is too harsh and signals "AI dark mode".
-- **Never use pure `#ffffff`** for text — `#ededed` is the ceiling. Pure white screams.
-- **No purple/blue "AI gradient"** decoratively. The `--accent-secondary` purple (`#7c3aed`) exists as a token but should be reserved for genuine semantic moments (Sisyphus / agent identity), not as eye candy on CTAs or backgrounds.
-
-### Inconsistencies to consolidate (design debt, not this extraction)
-
-The current landing page assigns a distinct accent color _per section_ — purple, orange, pink, fuchsia, teal, indigo, amber, green, blue. Because this PR must preserve the current rendered baseline, these colors remain in component class names for now. Refinement target:
-
-- **Cyan**: Primary CTA, install command, hero, CTA section, default link/hover.
-- **Legacy `--secondary` / future `--accent-secondary` (single muted indigo `#7c3aed`)**: Agent identity (Sisyphus, sub-agents) — when an agent name appears, it gets the secondary accent badge. Not the whole card.
-- **Status colors**: ONLY for actual status (success/warning/error). NOT for decorative section accents.
-- **Everything else**: monochrome (white opacity ladder for surfaces, zinc/neutral for text).
-
-Target for a future visual-refinement PR: 2 chromatic colors total (cyan + indigo), all per-section colors removed. This extraction PR does not apply that visual change because it must preserve the current rendered baseline exactly.
+- **Cyan is the only chromatic brand color** and it always means _live_: running, selectable, focused, verified. Decorative cyan is a defect. The ramp above is the only way cyan appears; never re-tint `#00d4ff` at an opacity that is not in the table.
+- **Status colors mean status.** Green/amber/red appear as 8px dots or 1px indicators next to a state label, never as fills or headings.
+- **Depth is luminance, not shadow.** `ink-0 → ink-3` is the elevation stack. `box-shadow` is banned except the two glow recipes in §7.
+- **No pure `#000000` or `#ffffff`.** Floor `#09090b`, ceiling `#f5f5f7`.
+- **Per-section accent colors are removed** (the violet/orange/pink/fuchsia/teal/indigo/amber/green/blue classes of the previous site). Agent identity is carried by the icon, the mono label, and position in the graph — not by a color.
 
 ## 3. Typography
 
-### Font Stack
+### Stack
 
-- **Primary sans**: `var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif` (Geist via `next/font/sans`)
-- **Mono**: `var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace` (Geist Mono via `next/font/mono`)
-- **No serif**: Banned for this product — technical dev tool, not editorial.
-
-`next/font` is used → fonts are self-hosted, `display: swap` is the default, CLS is zero.
+- Sans: `var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif` (Geist via `next/font`, self-hosted, `display: swap`).
+- Mono: `var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace`.
+- No serif. No Inter. Two families only. (omp.sh renders Geist too; herdr's Archivo 900 is _not_ adopted — Geist 500 with tight tracking gives the same authority without the shouting weight.)
 
 ### Scale
 
-| Level      | Class                  | Size    | Weight | Line | Tracking            | Usage                           |
-| ---------- | ---------------------- | ------- | ------ | ---- | ------------------- | ------------------------------- |
-| Display XL | `text-7xl md:text-8xl` | 72→96px | 700    | 1.00 | `-0.04em` (tighter) | Reserved — manifesto only       |
-| Display    | `text-5xl md:text-7xl` | 48→72px | 700    | 1.05 | `-0.03em`           | Hero H1                         |
-| H1         | `text-4xl md:text-5xl` | 36→48px | 700    | 1.10 | `-0.025em`          | Section headlines               |
-| H2         | `text-3xl md:text-4xl` | 30→36px | 700    | 1.15 | `-0.02em`           | Sub-section headlines           |
-| H3         | `text-2xl md:text-3xl` | 24→30px | 600    | 1.25 | `-0.015em`          | Card titles                     |
-| H4         | `text-xl md:text-2xl`  | 20→24px | 600    | 1.30 | `-0.01em`           | Subheads                        |
-| Lead       | `text-xl md:text-2xl`  | 20→24px | 300    | 1.50 | normal              | Hero subtitle                   |
-| Body L     | `text-lg`              | 18px    | 400    | 1.60 | normal              | Long-form paragraphs            |
-| Body       | `text-base`            | 16px    | 400    | 1.60 | normal              | Default                         |
-| Body S     | `text-sm`              | 14px    | 400    | 1.55 | normal              | Card descriptions               |
-| Caption    | `text-xs`              | 12px    | 500    | 1.45 | `0.02em`            | Metadata, badges                |
-| Overline   | `text-xs uppercase`    | 12px    | 600    | 1.40 | `0.10em`            | Section labels (PHASE 1, BADGE) |
-| Mono       | `font-mono text-sm`    | 14px    | 400    | 1.50 | normal              | Install command, code labels    |
+| Level      | CSS                                       | Weight | Line | Tracking                                      | Usage                                                              |
+| ---------- | ----------------------------------------- | ------ | ---- | --------------------------------------------- | ------------------------------------------------------------------ |
+| Display    | `clamp(2.5rem, 1.35rem + 4.4vw, 5.25rem)` | 500    | 0.98 | -0.03em                                       | Hero H1 (2 lines max, `text-wrap: balance`, container `max-w-6xl`) |
+| Title      | `clamp(2rem, 1.3rem + 2.4vw, 3.25rem)`    | 500    | 1.04 | -0.025em                                      | Section headlines, manifesto H2                                    |
+| Heading    | `1.5rem`                                  | 500    | 1.2  | -0.015em                                      | Ledger row titles, bento card titles                               |
+| Subheading | `1.125rem`                                | 500    | 1.35 | -0.01em                                       | Agent names, terminal pane titles                                  |
+| Numeral    | `clamp(2rem, 1.4rem + 2vw, 2.75rem)`      | 500    | 1.0  | -0.03em, `font-variant-numeric: tabular-nums` | Proof strip                                                        |
+| Lead       | `1.125rem` / `1.25rem` ≥ md               | 400    | 1.6  | 0                                             | Hero tagline, section intros                                       |
+| Body       | `1rem`                                    | 400    | 1.6  | 0                                             | Default                                                            |
+| Body / sm  | `0.875rem`                                | 400    | 1.55 | 0                                             | Row descriptions, review text                                      |
+| Eyebrow    | `0.6875rem` mono, uppercase               | 500    | 1.4  | 0.2em                                         | Section labels with meaning ("PRIMARY ORCHESTRATOR"), wave rail    |
+| Meta       | `0.75rem` mono                            | 400    | 1.45 | 0.04em                                        | Model chips, timestamps, footer                                    |
+| Command    | `0.875rem` mono (`0.8125rem` < sm)        | 400    | 1.55 | -0.01em                                       | Install bar, terminal body                                         |
 
 ### Rules
 
-- **Body never below 14px.** Captions at 12px must be uppercase or tabular.
-- **Display sizes always run negative tracking.** From `-0.04em` at 72px down to `-0.015em` at 24px.
-- **Geist 700 is the workhorse weight** for headlines. 600 for sub-heads, 400 reading. Avoid 800/900 — Geist's heaviest weights are too thick at small sizes.
-- **CJK locales** (ko/ja/zh) reset `letter-spacing: normal`, use `text-wrap: pretty`, and apply `word-break: keep-all` (Korean) or `word-break: normal; line-break: strict` (Japanese/Chinese). Already in `globals.css:183-219`.
-- **No serif. No Inter.** Geist Sans + Geist Mono only.
+- Display and Title always carry negative tracking; body never does.
+- Body never below 14px; the 11px eyebrow is uppercase mono with 0.2em tracking, which is the readability floor for that role.
+- Eyebrows are content labels, not chapter numerals. "SECTION 01" / "ABOUT" style meta-labels are banned; "01 / 02 / 03" appears only on the wave rail where the number _is_ the meaning.
+- CJK locales keep the existing base-layer rules: `letter-spacing: normal` on headings, `text-wrap: pretty`, `word-break: keep-all` (ko), `line-break: strict` (ja/zh). Display size for CJK drops one clamp step (`clamp(2.25rem, 1.25rem + 3.6vw, 4.5rem)`) so two lines still hold.
 
 ## 4. Spacing & Layout
 
-### Base Unit
+### Base unit: 4px
 
-4px grid (Tailwind default). All multiples derived from `--space-1 = 4px`.
+| Token        | Value | Usage                                           |
+| ------------ | ----- | ----------------------------------------------- |
+| `--space-1`  | 4px   | icon-to-label                                   |
+| `--space-2`  | 8px   | inline groups, dot-to-label                     |
+| `--space-3`  | 12px  | chip padding, cell padding (compact)            |
+| `--space-4`  | 16px  | mobile gutter, cell padding                     |
+| `--space-5`  | 20px  | tablet gutter                                   |
+| `--space-6`  | 24px  | row padding, bento card padding                 |
+| `--space-8`  | 32px  | desktop gutter, command bar height rhythm       |
+| `--space-12` | 48px  | block gap inside a section                      |
+| `--space-16` | 64px  | section padding (mobile)                        |
+| `--space-24` | 96px  | section padding (desktop)                       |
+| `--space-40` | 160px | hero → proof strip separation, final CTA margin |
 
-| Token        | Tailwind | Value | Usage                                  |
-| ------------ | -------- | ----- | -------------------------------------- |
-| `--space-1`  | `p-1`    | 4px   | Icon-to-label                          |
-| `--space-2`  | `p-2`    | 8px   | List items, inline groups              |
-| `--space-3`  | `p-3`    | 12px  | Form padding                           |
-| `--space-4`  | `p-4`    | 16px  | Card padding (compact)                 |
-| `--space-6`  | `p-6`    | 24px  | Card padding (default)                 |
-| `--space-8`  | `p-8`    | 32px  | Card padding (featured)                |
-| `--space-10` | `p-10`   | 40px  | Section inner                          |
-| `--space-12` | `p-12`   | 48px  | Hero vertical                          |
-| `--space-16` | `p-16`   | 64px  | Section vertical                       |
-| `--space-24` | `py-24`  | 96px  | Major section breaks (current default) |
-| `--space-32` | `py-32`  | 128px | Hero top padding                       |
+### Frame and grid
 
-### Grid
-
-- Max content width: `container mx-auto` resolves to `max-w-7xl` (1280px). Hero/manifesto use `max-w-4xl` (896px) or `max-w-5xl` (1024px) for typographic density.
-- Breakpoints: Tailwind defaults — sm 640, md 768, lg 1024, xl 1280, 2xl 1536.
-- Padding: `px-4 md:px-6` on every container — never `px-8` on mobile (cramped).
+- **Frame** (`grid-wrapper`): `grid-template-columns: 1fr minmax(0, 90rem) 1fr`; content sits in the center track (max 1440px) and is bounded by 1px `--line` side rules at ≥ lg; full-bleed sections (hero glow, CTA band) span all three tracks.
+- Gutters: 16px (< sm) → 20px (sm–lg) → 32px (≥ lg). Never `px-8` on mobile.
+- Inner grid: 12 tracks / 24px gap at ≥ lg; 4 tracks / 16px gap below.
+- Breakpoints: Tailwind defaults (sm 640, md 768, lg 1024, xl 1280, 2xl 1536). The hero switches from stacked to editorial split at **lg**.
+- Section rhythm: `py-16 lg:py-24`; the hero → proof strip and reviews → CTA gaps use `--space-40`. Sections are chapters; do not cramp.
+- Hero: `cover` pattern, `min-h-[100dvh]` (never `h-screen`), `grid-template-rows: auto 1fr auto` with nav / content / proof-strip anchor.
+- Docs shell: `fixed-sidenav-shell` — `grid-template-columns: 16rem minmax(0, 1fr)`, `min-block-size: 0` on the grid and both children, `<main>` is the scroll owner (`overflow: auto`), sidebar sticky inside its column. On < lg the sidebar collapses into a top disclosure; `<main>` keeps `min-inline-size: 0` and prose gets `overflow-wrap: anywhere`, code blocks `overflow-x: auto` — this fixes the recorded 390px horizontal overflow debt instead of carrying it.
+- Manifesto: `content-limiter` at 68ch for prose; section breaks are ruled by `--line`, not by background swaps.
 
 ### Rules
 
-- **No `h-screen`.** Always `min-h-[100dvh]` — current `min-h-screen` and `min-h-[90vh]` should migrate to `dvh` for iOS Safari stability.
-- **No flexbox percentage math.** CSS Grid for multi-column.
-- **Container** wraps every section content. No edge-bleed except hero background image.
-- **3-column equal card grids** for _features_ are banned. The current Reviews and Architecture sections use 3-column — acceptable for testimonial/principle tiles where uniformity is the point. The Hephaestus 5-column step row is also acceptable (sequential numbered steps).
+- Grid for multi-column; no flexbox percentage math.
+- Radius scale: **0px** for panels, rows, cards, terminals; **2px** for buttons, chips, inputs; **50%** for status dots only. `rounded-xl`/`rounded-3xl` are gone.
+- Cards exist only as bento cells inside a ruled grid (agents). No free-floating cards with borders + shadows.
 
-## 5. Components
+## 5. Components (primitives + states)
 
-### Hero
+All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or `components/ledger/*` (new). Every state below must be visible in the primitive showcase route (`/design` in dev builds, excluded from the sitemap) at 375/768/1280 before any product screen uses it.
 
-- **Structure**: `<section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden pt-16">` with absolute-positioned background image (decorative, ~30% opacity) and gradient overlay.
-- **Background**: `hero.webp` preloaded `fetchPriority="low"` so the headline is the LCP. Image fades in via CSS keyframe over 600ms, respects `prefers-reduced-motion`.
-- **Variants**: Landing hero (centered), manifesto hero (centered with stronger gradient).
-- **Spacing**: `gap-8` between stack items, max-width `max-w-3xl` for headline.
-- **Motion**: CSS-only fade-in on the background.
+### Frame (`components/ledger/frame.tsx`)
 
-### Button (shadcn-based)
+- `grid-wrapper` implementation; renders the two side rules at ≥ lg. Props: `bleed?: boolean` for full-bleed children.
 
-- **Structure**: cva variants `default | secondary | ghost | outline | link | destructive` × sizes `sm | default | lg | icon`.
-- **Primary CTA**: `bg-cyan-500 text-black hover:bg-cyan-600` — black-on-cyan reads as a primary "system action".
-- **Outline**: `border-zinc-700 text-white hover:bg-zinc-800` — secondary.
-- **States**: default, hover (color shift), focus-visible (`ring-1 ring-ring`), disabled (`pointer-events-none opacity-50`). Active translation is not part of the current implementation.
-- **Radius**: 6px (`rounded-md`).
-- **Primitive sizes**: lg = `h-10 px-8`, default = `h-9 px-4 py-2`, sm = `h-8 px-3 text-xs`, icon = `h-9 w-9`.
-- **Hero/CTA overrides**: primary hero buttons add `h-12 px-8 text-lg font-bold` and outline hero buttons add `h-12 px-8 text-lg`.
+### Nav (`components/nav-header.tsx`)
 
-### Card (shadcn-based)
+- Sticky (`sticky-header`), height 60px, `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
+- Left: OmO mark (24px SVG from `.github/assets/omo-icon-light.svg` re-exported to `public/brand/omo-mark.svg`) + wordmark `Oh My OpenAgent` (Geist 500 15px, -0.02em).
+- Center/right: links `Agents · Docs · Manifesto` in `--text-mid` mono 12px uppercase 0.12em; hover → `--text-hi` with a 1px underline growing `scaleX(0→1)` 320ms.
+- Right: GitHub chip (mono `★ 68.8k` live count, `--ink-1` fill, `--line` border) and primary button `Install` (sm size).
+- Mobile: hamburger 44×44; sheet `--ink-3` with `--line` top rule; items 44px tall.
+- States: default, scrolled, open (mobile), link hover/focus-visible (2px `--accent-32` outline offset 2px), active route (underline visible at scaleX(1), `--text-hi`).
 
-- **Structure**: `Card / CardHeader / CardTitle / CardDescription / CardContent`.
-- **Background**: primitive default is `bg-card`; landing sections commonly override with `bg-zinc-900/30`, `bg-black/40`, or related white-alpha tints. New shared surfaces should map to `--surface-1/2/3`.
-- **Border**: primitive default is `border`; landing sections commonly override with `border-zinc-800`, `border-white/10`, and `border-border`. New shared surfaces should map to `--border-default` or `--border-subtle`.
-- **Radius**: primitive default is 12px (`rounded-xl`); section-local cards may use `rounded-lg`, `rounded-xl`, or `rounded-3xl` where currently rendered.
-- **Shadow**: primitive default includes Tailwind `shadow`; many landing card usages visually rely on border + translucent surface more than strong shadows. Do not remove the primitive shadow in this extraction.
-- **Hover**: Optional border-color shift to `border-cyan-500/30` for interactive cards.
-- **States**: default, hover (border lifts), focus-within (cyan border).
+### Button (`components/ui/button.tsx`)
 
-### Badge
+- Variants: `primary` (fill `--accent`, text `#09090b`, hover fill `--accent-dim`, active `translateY(1px)`), `secondary` (fill `--ink-1`, border `--line-strong`, text `--text-hi`, hover border `--accent-32` + text `--accent`), `ghost` (text `--text-mid`, hover `--text-hi`), `link` (mono uppercase 12px with arrow, underline scaleX on hover).
+- Sizes: sm `h-9 px-3 text-sm`, md `h-11 px-5 text-sm`, lg `h-12 px-6 text-base`. Radius 2px. Focus-visible: 2px `--accent-32` outline, offset 2px. Disabled: opacity .5, no pointer.
+- Transitions: color/background/border 150ms `cubic-bezier(0.4,0,0.2,1)`; transform 150ms.
 
-- **Structure**: cva variants `default | secondary | outline | destructive`.
-- **Primary**: `border-cyan-500/20 bg-cyan-500/10 text-cyan-400` — cyan-tinted pill.
-- **Outline**: `border-zinc-700 text-zinc-400` — neutral.
-- **Radius**: 9999px (`rounded-full`) for status pills, `rounded-md` (6px) for badges.
+### CommandBar (`components/landing/install-command.tsx`)
 
-### Install Command
+- The primary CTA of the site (omp.sh grammar). Row: prompt cell (40px wide, `--accent` `$`/`>` glyph on `--ink-2`), mono command in `--text-hi` on `--ink-1`, fixed-width COPY cell (mono uppercase 11px, `--text-lo` → `--text-hi` on hover, → `--accent` + "COPIED" for 2s after click). 1px `--line` border, 0px radius, height 48px; on < sm the command scrolls horizontally inside the cell (no wrap) and COPY stays reachable.
+- Optional tab row above (e.g. `OPENCODE · CODEX · SENPI`): mono 11px uppercase, inactive `--text-lo`, active `--text-hi` with a 1px `--accent` bottom border; 150ms color.
+- Glow: none by default; `focus-within` adds the inset ring `0 0 0 1px var(--accent-32)`.
 
-- **Structure**: `<div className="relative rounded-lg border bg-black/50 backdrop-blur-sm p-4 font-mono">` with copy button.
-- **States**: default (copy icon), copied (check icon, 2s timeout).
-- **Glow**: `shadow-2xl shadow-cyan-500/10` — restrained.
+### Eyebrow (`components/ledger/eyebrow.tsx`)
 
-### Terminal Mockup (Ultrawork section)
+- Mono 11px uppercase 0.2em `--text-lo`; optional leading 24px hairline rule (`--line-strong`) like a ledger tab. Optional trailing status dot.
 
-- **Structure**: rounded card with `chrome dots`, title bar, content with monospace text + animated typewriter for the command input.
-- **Border**: `border-zinc-800`.
-- **Background**: pure black to mimic terminal.
-- **Motion**: TerminalTypewriter via IntersectionObserver — once visible, types out at 40ms/char. No motion library dep — pure JS.
+### ProofStrip (`components/landing/proof-strip.tsx`)
 
-### Nav
+- 4 cells (2×2 < lg) separated by `--line`; each cell: Numeral (live from `/api/stats`, tabular, `--text-hi`) + Eyebrow label + icon 14px. Hover: cell fill `--accent-4`. Numbers count up once on enter (600ms) — meaning: they are live; reduced motion renders the final value.
 
-- **Structure**: sticky header `border-b border-white/10 bg-black/50 backdrop-blur-xl`.
-- **Brand**: `text-lg font-bold tracking-tight`.
-- **Links**: `text-sm font-medium text-zinc-400 hover:text-cyan-400 transition-colors`.
-- **Mobile**: hamburger toggles a max-height transition panel (`transition-[max-height,opacity] duration-200`).
+### LedgerRow (`components/ledger/ledger-row.tsx`)
 
-### Footer
+- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by Editions, Orchestration flow, Profiles, Principles.
+- States: default, hover, focus-within (index turns `--accent`), `data-active` (left 2px `--accent` rule) when linked from the graph.
 
-- **Structure**: `border-t border-white/10 bg-black py-12`.
-- **Links**: matched nav style — zinc-400 → cyan-400 on hover.
+### BentoCell (`components/ledger/bento-cell.tsx`)
+
+- Cells of the agents grid (`grid-flow-dense`, 1px gaps revealing `--line`, so the grid itself draws the rules). Cell fill `--ink-1`, hover `--ink-2` + icon `--accent`, spans: orchestrator 2×2, planner 2×1, others 1×1; mobile 1 column, tablet 2. Content: icon 20px (Lucide/Phosphor SVG), name (Subheading), role (Body/sm `--text-mid`), model chip (Meta mono on `--ink-2`, `--line` border, 2px radius).
+- Gapless verification: 4 columns × 4 rows desktop = 16 units: orchestrator 4 + planner 2 + 10 singles = 16. Tablet 2 columns: orchestrator 2×2, planner 2×1, 10 singles → 4 + 2 + 10 = 16 = 2 × 8 rows. No holes.
+
+### Terminal (`components/landing/terminal.tsx`)
+
+- HTML/CSS terminal (herdr grammar): chrome bar (`--ink-2`, three 8px status dots `--text-faint`, title mono meta), sidebar `--ink-3` at ≥ md listing waves, body `--code-bg` mono 13px `--code-fg`. Cursor block `--accent-hot` blinking 1s steps(1). Scroll-gated typewriter of `mass ulw …` at 40ms/char once 40% visible; then wave rows render one by one with status dots `--status-busy → --status-ok`; final line `verified ✓` flashes `--accent-hot` → `--text-hi`. Reduced motion: renders the final frame immediately.
+- Interactive: clicking a wave row highlights that wave's nodes in the hero graph if the hero is mounted (shared `useGraphFocus` store), otherwise it is inert but styled as `data-active`.
+
+### Reel (`components/ledger/reel.tsx`)
+
+- `display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 34%); overflow-x: auto; scroll-snap-type: x mandatory;` the reel owns the scroll; edge fade masks 32px; keyboard: cells are focusable, arrow keys scroll by one cell. Used by Reviews.
+
+### Chip (`components/ui/badge.tsx` → `Chip`)
+
+- Mono Meta text, `--ink-2` fill, `--line` border, 2px radius, 24px tall; `accent` variant fills `--accent-8` with `--accent` text (live/selected only).
+
+### DocsShell (`components/docs/docs-shell.tsx`)
+
+- `fixed-sidenav-shell` as in §4; sidebar: search input (Chip-styled, focus ring), section list with active item marked by a 2px `--accent` left rule; main: prose with `--line` ruled H2s, code blocks `--code-bg` with `overflow-x: auto`.
+
+### Footer (`components/footer.tsx`)
+
+- Top hairline, `py-12`, grid 2 → 4 columns: brand + copyright (mono meta: "© {year} Sisyphus Labs · Source-available under SUL-1.0"), Product (Docs, Manifesto, Releases), Community (GitHub, Discord, X @justsisyphus), Legal (Privacy, Terms). Links `--text-lo` → `--text-hi`. No investor/affiliation lines.
 
 ## 6. Motion & Interaction
 
-### Timing
-
-| Type       | Duration  | Easing                          | Usage                                           |
-| ---------- | --------- | ------------------------------- | ----------------------------------------------- |
-| Micro      | 150ms     | `ease-out`                      | Hover color shift, button press                 |
-| Standard   | 200ms     | `ease-in-out`                   | Mobile nav reveal, accordion                    |
-| Emphasis   | 400-600ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Hero background fade, scroll-triggered entrance |
-| Typewriter | 40ms/char | linear                          | Terminal command typing                         |
+| Token              | Value                            | Usage                                                    |
+| ------------------ | -------------------------------- | -------------------------------------------------------- |
+| `--ease-standard`  | `cubic-bezier(0.4, 0, 0.2, 1)`   | color/opacity                                            |
+| `--ease-out-quart` | `cubic-bezier(0.16, 1, 0.3, 1)`  | entrance                                                 |
+| `--ease-underline` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | link underline                                           |
+| `--dur-micro`      | 150ms                            | hover color, press                                       |
+| `--dur-underline`  | 320ms                            | nav/link underline                                       |
+| `--dur-reveal`     | 600ms                            | section entrance (`translate3d(0,16px,0) → 0` + opacity) |
+| `--dur-count`      | 600ms                            | proof-strip count-up                                     |
+| `--dur-type`       | 40ms/char                        | terminal typewriter                                      |
+| `--dur-pulse`      | 2200ms                           | status dot pulse (opacity 1 → .55 → 1)                   |
+| `--dur-wave`       | 12s cycle                        | graph wave loop (shared by 3D scene and terminal)        |
 
 ### Rules
 
-- **Only `transform` and `opacity`** for animation. Never `width / height / top / left / margin / padding`.
-- **No motion library imports.** The site uses CSS keyframes + Tailwind's `animate-pulse` + a custom typewriter component. Adding `motion/react` is allowed ONLY for shared layout transitions (`<motion.div layoutId>`) — and never the full `framer-motion` package.
-- **`prefers-reduced-motion: reduce`** disables non-essential animation. The hero background already respects this.
-- **Scroll-triggered animation** uses `IntersectionObserver`, never scroll listeners.
-- **Stagger on entrance**: section entries get `animation-delay: calc(var(--index) * 80ms)` for cascaded fade-in-up on first paint.
-
-### Forbidden
-
-- Scroll-jacking (smooth-scroll hijacking).
-- Parallax on images.
-- Magnetic buttons.
-- Cursor trails / custom cursors.
-- GSAP / Lottie / Three.js — overkill for a marketing page.
+- Only `transform`, `opacity`, `filter` and the color family (`color`, `background-color`, `border-color`, `fill`, `stroke`) animate — never layout properties (`width`, `height`, `top`, `left`, margin, padding). Height morphs (mobile nav) use `grid-template-rows: 0fr → 1fr` on a wrapper, not `max-height`.
+- Entrance: `.reveal` uses `animation-timeline: view()` (`animation-range: entry 0% entry 40%`) when `@supports (animation-timeline: view())`, else the IntersectionObserver `.is-visible` class. Stagger `calc(var(--index) * 60ms)`. Each element reveals once.
+- Every motion maps to a state or affordance: hover → underline/tint, press → 1px translate, live data → count-up, scene progress → wave lights. Motion on non-interactive decoration is banned (this includes floating shapes, parallax, cursor trails, magnetic buttons, scroll-jacking).
+- No motion library. GSAP, Lottie, `framer-motion` are banned; `motion/react` is allowed only for a `layoutId` shared-layout need, currently unused.
+- `prefers-reduced-motion: reduce`: reveals render final state, count-ups render final numbers, terminal renders its final frame, typewriter and pulses stop, the 3D scene is not mounted (poster only).
+- Interaction mechanics traced to beui.dev catalog patterns: `action-swap` (COPY → COPIED), `number` (count-up), `tabs` underline indicator (command bar tabs, CSS-only), `tooltip`-style label chip for hovered graph nodes (opacity 150ms).
 
 ## 7. Depth & Surface
 
-**Strategy**: `tonal-shift` primary, with `border` as the punctuation.
+Strategy: **tonal shift + hairline**. Surfaces are flat ink; separation is 1px `--line`; elevation is one ink step.
 
-Surfaces stack by background opacity (luminance), not by shadow:
+| Level | Fill      | Rule            | Usage                          |
+| ----- | --------- | --------------- | ------------------------------ |
+| 0     | `--ink-0` | —               | page                           |
+| 1     | `--ink-1` | `--line`        | rows, command bar, bento cells |
+| 2     | `--ink-2` | `--line`        | hover, terminal chrome, chips  |
+| 3     | `--ink-3` | `--line-strong` | mobile sheet, terminal sidebar |
 
-| Level                 | Background                                                               | Border            | Usage               |
-| --------------------- | ------------------------------------------------------------------------ | ----------------- | ------------------- |
-| 0 (page)              | `#0a0a0a`                                                                | none              | Body background     |
-| 1 (section bg accent) | `rgba(255,255,255,0.01)` or `bg-[#0a0a0a]` with border-top/border-bottom | `border-white/5`  | Section separations |
-| 2 (card)              | `rgba(255,255,255,0.02)` (`bg-zinc-900/30`)                              | `border-zinc-800` | Default card        |
-| 3 (elevated)          | `rgba(255,255,255,0.05)`                                                 | `border-zinc-700` | Hover state on card |
-| 4 (popover)           | `#1a1a1a` solid                                                          | `border-zinc-800` | Mobile nav drawer   |
+Allowed glow recipes (the only `box-shadow`/gradient decoration on the site):
 
-Shadows are reserved for the cyan glow accent on the install command (`shadow-2xl shadow-cyan-500/10`) and on the primary CTA (`shadow-sm`). No generic black drop-shadows.
+- **Selection ring**: `box-shadow: inset 0 0 0 1px var(--accent-32)` (focus-within, selected tile).
+- **Hero wash**: `radial-gradient(circle at 70% 45%, var(--accent-16), transparent 46%)` behind the graph, plus a `--line-faint` dot grid (`radial-gradient(var(--line-faint) 1px, transparent 1px)` at 28px) — both static.
+- **Scrolled nav**: `--ink-0/72%` + `backdrop-filter: blur(12px)`.
+- The 3D node halos are additive sprites inside the canvas, not CSS.
 
-## 8. Accessibility (mandatory checks)
+Grain is not used (omp.sh's canvas grain and factory's texture PNG would fight the 3D scene); the dot grid is the texture.
 
-- Root `<html lang="en">` plus locale wrapper `lang`/`data-locale` for localized routes.
-- `<title>` per route (`generateMetadata` provides).
-- Every `<button>` and `<a>` has a discernible name (icon-only buttons require `aria-label`).
-- Skip link to `#main-content` at the top of `<body>`.
-- Focus-visible ring on all interactive elements.
-- Contrast ≥ 4.5:1 for body text, ≥ 3:1 for large text. Current cyan `#00d4ff` on `#0a0a0a` = 11.4:1 (AAA). Text-zinc-400 on `#0a0a0a` = 7.2:1 (AAA). Text-zinc-500 = 5.0:1 (AA).
-- Touch targets ≥ 44px on mobile (`h-12` buttons meet this; `h-9` small buttons need vertical padding).
-- `prefers-reduced-motion: reduce` disables animations.
-- Form fields: label above input, helper/error below.
+## 8. Accessibility
 
-## 9. Inclusive Personas & Adaptive Constraints
+- `<html lang>` per locale; unique `<title>` per route; skip link to `#main-content`; landmarks `header/nav/main/footer/section[aria-labelledby]`.
+- Contrast: `--text-hi` on `--ink-0` 17.8:1, `--text-mid` 11.5:1, `--text-lo` 5.9:1 (AA for 11px+ mono uppercase is met because eyebrows are ≥ 11px 500 with tracking; body never uses `--text-faint`), `--accent` on `--ink-0` 11.4:1, primary button `#09090b` on `--accent` 11.4:1.
+- Focus-visible ring on every interactive element (2px `--accent-32`, offset 2px); the canvas wrapper is focusable with arrow-key orbit and is `aria-hidden` for AT while the poster `<img alt>` describes the scene.
+- Touch targets ≥ 44px on mobile (nav items, COPY cell, bento cells are ≥ 44px tall).
+- Reduced motion honored everywhere (§6). Reduced data (`navigator.connection.saveData`) and low memory skip the 3D chunk (§9).
+- Reel and docs main announce as scroll regions (`role="region"` + `aria-label`, `tabindex=0`).
+- Personas: terminal power user (keyboard-first, copyable commands, dense reference), mobile evaluator (no horizontal overflow on `/`, `/manifesto`, `/docs` at 375), CJK reader (heading tracking reset, keep-all), motion-sensitive user (poster hero, static terminal).
 
-- **Terminal power user**: keyboard-first, scans dense command/reference content, expects instant docs section navigation and copyable commands. Pass criteria: nav/search/focus states are visible and keyboard reachable; code blocks remain readable.
-- **Mobile evaluator**: checks the project from a narrow viewport before installing. Pass criteria: landing and manifesto have no horizontal overflow; docs mobile behavior is preserved and its known overflow debt is not worsened.
-- **CJK reader**: reads Korean/Japanese/Chinese localized pages. Pass criteria: heading letter spacing resets to normal, CJK line breaking avoids clipped glyphs, and body text can wrap without layout breakage.
-- **Motion-sensitive user**: uses reduced motion. Pass criteria: hero/background/reveal motion respects `prefers-reduced-motion`; no layout-property animation is required for comprehension.
+## 9. The Graph — 3D interactive hero scene
 
-Adaptive preferences:
+### Meaning
 
-- Honor `prefers-reduced-motion`.
-- Maintain dark color scheme and current contrast ratios.
-- Preserve visible focus rings and 44px mobile hit targets where current components provide them.
-- Preserve locale-aware CJK line-breaking rules in the design-system base layer.
+The GitHub one-liner calls the user "the master of graph engineering". The focal object is that graph: a directed acyclic graph of agent nodes scheduled in waves by `mass ulw`. Wave 1 = orchestrator (lead) → wave 2 = Ultrawork Planner, Plan Consultant, Plan Reviewer (plan + gates) → wave 3 = Kibitzer, Architect, Deep, Quick, Visual Engineering, Explore, Librarian (categories and curated agents, execution). A 12s loop lights the waves in order, pulses travel down the edges, and a final "verified" flash settles the graph.
+
+### Content and geometry
+
+- Desktop 11 nodes / mobile 7 (drop Plan Consultant, Kibitzer, Quick, Visual Engineering). Positions precomputed in `components/landing/graph/graph-data.ts` (seeded, three planes along -Z).
+- Node = icosahedron (detail 1) `MeshStandardMaterial` (`--ink-3` base, emissive `--accent-dim`, emissiveIntensity 0.2 idle → 1.6 lit) + one additive-blended halo sprite (shared 64×64 radial CanvasTexture, `--accent-16` → transparent). No bloom / postprocessing.
+- Edges = one `LineSegments` geometry, `--accent-dim` at 0.35 opacity; lit edge 0.8.
+- Pulses = one `Points` object (≤ 48 desktop / 24 mobile) whose `t` along its edge advances per frame in a typed array; size 6px, `--accent-hot`.
+- Labels: a single drei `<Html>` chip (Chip primitive, mono) for the hovered/focused node only.
+- Lights: 1 ambient (0.25) + 1 directional (1.2, cool). No shadows, no env map.
+
+### Interaction
+
+- Drag/touch-drag orbits (OrbitControls: `enableZoom=false`, `enablePan=false`, `enableDamping`, `dampingFactor 0.08`, polar angle clamped to `[π/3, 2π/3]`). Auto-rotate 0.15 rad/s when idle; pauses on interaction, resumes 4s after the last input.
+- Hover → node halo brightens + label chip; click/tap → camera eases to the node (600ms `--ease-out-quart`) and the matching agent bento cell receives `data-active`; Escape / empty click resets.
+- Keyboard: wrapper is focusable; ← → rotate 15°, Enter focuses the nearest node, Escape resets.
+
+### Performance contract (planet-simulator pattern, tightened)
+
+- `next/dynamic(() => import("./graph-scene"), { ssr: false })` mounted only when ALL hold: hero IntersectionObserver hit; `requestIdleCallback` fired (fallback 200ms timeout); `!matchMedia("(prefers-reduced-motion: reduce)").matches`; WebGL2 context probe succeeded; `navigator.deviceMemory` ≥ 2 when present; `navigator.connection?.saveData !== true`.
+- Poster `/images/graph-poster.webp` (1600×1000, ≤ 60 KB, rendered from the scene) is the LCP: explicit `width/height`, `fetchPriority="high"`, `sizes` per breakpoint. The canvas fades in over it (opacity 400ms) after its first frame; the poster stays as the fallback for reduced-motion / no-WebGL / low-end / runtime error (ErrorBoundary).
+- Canvas: `dpr={[1, isMobile ? 1.25 : 1.75]}`, `gl={{ antialias: !isMobile, powerPreference: "high-performance", alpha: true }}`, `frameloop="always"` only while the hero is on screen and the tab visible, otherwise `"demand"`; after 20s without interaction, `"demand"` with one `invalidate()` per second to keep the wave loop alive.
+- Budget: the lazy renderer chunks (three core + @react-three/fiber + react-reconciler + the two drei modules) ≤ 224 KB gzip total, asserted by `scripts/check-graph-budget.mjs` (`bun run check:graph-budget`); three must not appear in the first-load JS of `/` (checked against the app build manifest). Measured 2026-09-08: 209.3 KB gzip across two chunks (163.4 + 45.9); three's core alone is ~150 KB gzip and is irreducible, so the budget is set at measured + 7% headroom rather than the 190 KB first estimate. drei is imported per module, never the barrel.
+- Lighthouse guard: chunk loads after LCP; TBT contribution ≤ 50ms on the mobile preset; the poster keeps CLS at 0.
 
 ## 10. Verification Matrix
 
-This contract is valid only when implementation evidence proves the current surface still matches it:
+| Scenario           | Surface                         | Evidence                                                                                                                                                                       |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Primitive showcase | `/design` (dev) at 375/768/1280 | Screenshot per primitive state before product screens                                                                                                                          |
+| Landing fidelity   | `/` at 375/768/1280 (+ `/ko`)   | Screenshots; hero matches concept B structure; `scrollWidth <= innerWidth` at 375                                                                                              |
+| Manifesto          | `/manifesto` at 375/1280        | Screenshots; no overflow at 375                                                                                                                                                |
+| Docs shell         | `/docs` at 375/1280             | Screenshots; sidebar toggle, search, hash nav; **no horizontal overflow at 375** (debt closed)                                                                                 |
+| 3D hero            | `/` desktop                     | Canvas present; drag before/after screenshots; poster-only with `prefers-reduced-motion` and with WebGL disabled; chunk size + route-table proof                               |
+| Motion             | `/`                             | Reveal fires once; terminal typewriter gated by visibility; reduced-motion final frames                                                                                        |
+| Gates              | `packages/web`                  | `format:check`, `lint`, `type-check`, `opennextjs-cloudflare build`, Playwright e2e, Lighthouse (real Chromium, prod build): perf ≥ 90 mobile / ≥ 95 desktop, a11y/BP/SEO ≥ 95 |
+| Token compliance   | `packages/web`                  | `rg` for raw hex outside `DESIGN.md` and `app/styles/design-system.css` returns only `lib/og/palette.ts` (satori has no CSS variables; it mirrors §2)                          |
 
-| Scenario                  | Surface                              | Evidence                                                                          |
-| ------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
-| Landing visual fidelity   | `/` at 1280x800 and 390x844          | Baseline/after screenshots plus image diff                                        |
-| Docs visual fidelity      | `/docs` at 1280x800 and 390x844      | Baseline/after screenshots plus image diff; mobile overflow delta must not worsen |
-| Manifesto visual fidelity | `/manifesto` at 1280x800 and 390x844 | Baseline/after screenshots plus image diff                                        |
-| Docs interactions         | `/docs` mobile and desktop           | Sidebar toggle, search filtering, section/hash navigation                         |
-| Landing navigation        | `/` mobile and desktop               | Mobile nav toggle and Docs/Manifesto navigation                                   |
-| Regression gates          | `packages/web`                       | format, lint, type-check, build, Playwright e2e; Lighthouse when available        |
+## 11. Redesign audit (what the previous site got wrong, per `redesign-skill`)
 
-## 11. Refinement Targets
-
-The 5 areas the refinement PR will improve while keeping the soul:
-
-1. **Consolidate per-section accents**: Replace purple/orange/pink/fuchsia/teal/indigo/amber/green section colors with cyan (primary) + indigo (agent identity) + neutral grays. The dev-tool feel sharpens; the rainbow goes away.
-2. **Tighten typography rhythm**: Move display from `text-5xl md:text-7xl` to a more disciplined scale with consistent negative tracking. Set `text-wrap: balance` on H1/H2.
-3. **Decompose the 832-LOC landing monolith**: Each section → its own file ≤250 LOC. Composition shell stays under 100 LOC.
-4. **Dynamic OG image**: Static `hero.webp` (1024×683) → `app/opengraph-image.tsx` via `next/og` at 1200×630, brand-aligned.
-5. **Motion choreography**: Add cascaded fade-in-up on section entry via CSS + IntersectionObserver. Respect `prefers-reduced-motion`. No motion library.
+- Per-section rainbow accents (violet/orange/pink/fuchsia/teal/indigo/amber/green/blue) — removed (§2).
+- Three-equal-column feature grids (Reviews, Architecture) and 5-column step rows — replaced by ledger rows, a gapless bento, and a reel (§5).
+- `rounded-xl/3xl` cards with `bg-zinc-900/30` + border + shadow — replaced by ruled ink cells with 0px radius (§4, §7).
+- Stats crammed into the hero — moved to the proof strip; the hero carries one statement, one tagline, one command, two actions (§5, gpt-tasteskill hero rule).
+- Static hero photograph fading behind text — replaced by the meaningful 3D graph with a poster LCP (§9).
+- Bold-everywhere headlines (`font-bold` 700 at 72px) — Geist 500 with -0.03em tracking (§3).
+- Docs horizontal overflow at 390px carried as debt — fixed by the shell contract (§4).
+- Static OG PNG — dynamic `next/og` image using the same palette, Geist subsets, and the graph glyph (`app/opengraph-image.tsx`).
 
 ## 12. Banned Patterns (project-specific)
 
-- New or changed UI hardcoding raw hex outside this file or `app/styles/design-system.css`. Existing rendered class names such as `bg-[#0a0a0a]`, `text-[#ededed]`, and gradient stops remain accepted debt in this extraction because this PR preserves the current pixels.
-- Pure `#000000` or `#ffffff`.
-- Per-section accent colors not in the consolidated palette.
-- `h-screen` (use `min-h-[100dvh]`).
-- 3-column equal feature card grids (use 2-col zig-zag or 1-col + visual).
-- Emojis in JSX, alt text, or visible UI.
-- Any-casts and TypeScript suppression directives.
-- `export const runtime = "edge"` (incompatible with `@opennextjs/cloudflare`).
-- Animating `width / height / top / left / margin / padding`.
-- Importing the full `framer-motion` package (use `motion/react` + `LazyMotion` if needed; currently not needed).
-- Generic hype copy. Use concrete product language instead.
-- Lorem ipsum or "John Doe" placeholders.
+- Any mention of investors, accelerators, or "backed by" lines anywhere on the site, in OG images, or in metadata. (Confidential; the reference site herdr.dev carries one — do not mirror it.)
+- Raw hex or rgba outside this file, `app/styles/design-system.css`, and `lib/og/palette.ts`.
+- `#000000`, `#ffffff`, purple/blue gradients, decorative cyan, per-section accent colors.
+- Border radius other than 0 / 2px / 50%.
+- `h-screen`; `max-height` animations; animating layout properties.
+- Three-equal-column feature card grids; floating bordered cards with shadows.
+- Emojis in JSX, alt text, or visible UI. Icons are SVG (Lucide / Phosphor).
+- Meta-labels ("SECTION 01", "ABOUT US"); generic hype copy ("seamless", "unleash", "next-gen").
+- `framer-motion`, GSAP, Lottie; `export const runtime = "edge"`; `any` casts and TS suppressions.
+- Importing the `@react-three/drei` barrel; mounting the 3D scene before the gates in §9 pass; shipping the scene without the poster.
+- Serif or Inter typefaces; Korean serif fallbacks.
+
+## 13. Accepted debt
+
+- `/design` showcase route is dev-only and not localized.
+- The 3D poster is rendered once per design change by `scripts/render-graph-poster.mjs` (Playwright screenshot of the mounted scene); it is a committed asset, not generated at build.
+- Satori cannot read CSS variables, so `lib/og/palette.ts` duplicates §2 values; a `scripts/check-og-palette.mjs` diff against `design-system.css` guards drift.

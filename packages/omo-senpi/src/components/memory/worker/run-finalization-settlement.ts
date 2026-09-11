@@ -78,6 +78,7 @@ export async function settleReservationRun(
       : {}),
     ...(current.validatedChangedPaths === undefined ? {} : { filesChanged: current.validatedChangedPaths.length }),
     consecutiveFailures: decision.outcome === "failed" ? healthBefore.streak + 1 : 0,
+    ...(current.launcher === undefined ? {} : { launcher: current.launcher }),
     delivery: { status: "pending" },
   })
   await updateRunLedger(ledgerPath, { finalizePhase: "settled" })

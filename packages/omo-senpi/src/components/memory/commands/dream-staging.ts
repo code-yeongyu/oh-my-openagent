@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { readFile, stat } from "node:fs/promises"
+import { readFile, stat } from "@oh-my-opencode/memory-core/fs"
 import { resolve } from "node:path"
 
 import {

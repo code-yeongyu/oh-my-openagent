@@ -1,0 +1,19 @@
+PASS plugin manifest: plugin/package.json
+PASS extension: plugin/extensions/omo.js
+PASS lsp-daemon runtime: plugin/runtime/lsp-daemon/dist/cli.js
+PASS agent-toolkit runtime: plugin/runtime/agent-toolkit/cli.js
+PASS senpi CLI: /Users/yeongyu/tmp/omo-memorian-gate-20260909/node_modules/.bun/@code-yeongyu+senpi@2026.9.9+2ff28d72627c2638/node_modules/@code-yeongyu/senpi/dist/cli.js
+PASS senpi version 2026.9.9
+INFO omo 5.0.0-0.beta.50 (engine: senpi 2026.9.9)
+WARN engine pid 60878 (age 01-05:53:32, tty ttys001) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 8535 (age 01-06:42:12, tty ttys003) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 43351 (age 01-00:59:28, tty ttys009) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 2626 (age 01-00:06:30, tty ttys014) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 68531 (age 01-00:55:30, tty ttys015) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 4910 (age 01-02:41:47, tty ttys022) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 31748 (age 22:15:37, tty ttys025) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 34517 (age 22:15:04, tty ttys027) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 38035 (age 22:14:29, tty ttys029) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 99396 (age 06:12:50, tty ttys031) started before this payload was installed; it still runs the previous plugin copy
+WARN engine pid 51007 (age 22:12:13, tty ttys032) started before this payload was installed; it still runs the previous plugin copy
+INFO restart those sessions to pick up the installed payload; a running engine is never rewritten in place

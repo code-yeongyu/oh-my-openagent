@@ -50,6 +50,11 @@ describe("OMO Codex version coherence", () => {
   // app UI. If any manifest drifts from the single source of truth (root
   // package.json) a release can leak a placeholder version like 0.1.0, which is
   // exactly the confusion this guard exists to prevent.
+  it("#given the bundled Codex model catalog #when its version is inspected #then the Astra catalog format is used", () => {
+    const catalog = readJson(join(pluginRoot, "model-catalog.json"))
+    expect(catalog.version).toBe("2026-09-08.gpt-6-astra-600k-high")
+  })
+
   it("#given every versioned Codex manifest #when compared to root package.json #then versions match", () => {
     // given
     const expected = rootVersion()

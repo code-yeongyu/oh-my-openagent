@@ -2,89 +2,47 @@
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
 
   // Optimized for intensive coding sessions.
-  // Prioritizes deep implementation agents and fast feedback loops.
+  // Puts the strongest models on implementation categories and keeps research workers fast.
+  // The main agent runs on your session model; these blocks tune the workers it delegates to.
 
-  "[opencode]": {
-    "agents": {
-      // Primary orchestrator: aggressive parallel delegation
-      "sisyphus": {
-        "model": "kimi-for-coding/kimi-k3",
-        "ultrawork": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
-        "prompt_append": "Delegate heavily to hephaestus for implementation. Parallelize exploration.",
-      },
+  "agents": {
+    // Rapid codebase navigation
+    "explore": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
 
-      // Heavy lifter: maximum autonomy for coding tasks
-      "hephaestus": {
-        "model": "openai/gpt-5.6-sol",
-        "prompt_append": "You are the primary implementation agent. Own the codebase. Explore, decide, execute. Use LSP and AST-grep aggressively.",
-        "permission": { "edit": "allow", "bash": { "git": "allow", "test": "allow" } },
-      },
+    // Fast docs lookup
+    "librarian": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
 
-      // Lightweight planner: quick planning for coding tasks
-      "prometheus": {
-        "model": "opencode/gpt-5-nano",
-        "prompt_append": "Keep plans concise. Focus on file structure and key decisions.",
-      },
+    // Pre-planning consultant: minimal overhead for coding plans
+    "plan-consultant": { "model": "anthropic/claude-sonnet-4-6" },
 
-      // Debugging and architecture
-      "oracle": { "model": "openai/gpt-5.6-sol", "reasoning": "high" },
-
-      // Fast docs lookup
-      "librarian": { "model": "github-copilot/grok-code-fast-1" },
-
-      // Rapid codebase navigation
-      "explore": { "model": "github-copilot/grok-code-fast-1" },
-
-      // Frontend and visual work
-      "multimodal-looker": { "model": "google/gemini-3.1-pro" },
-
-      // Plan review: minimal overhead
-      "metis": { "model": "opencode/gpt-5-nano" },
-
-      // Code review focus
-      "momus": { "prompt_append": "Focus on code quality, edge cases, and test coverage." },
-
-      // Long-running coding sessions
-      "atlas": {},
-
-      // Quick fixes and small tasks
-      "sisyphus-junior": { "model": "opencode/gpt-5-nano" },
+    // Plan reviewer: code quality, edge cases, and test coverage
+    "plan-reviewer": {
+      "model": "openai/gpt-6-astra",
+      "reasoning": "high",
+      "prompt": "Focus on code quality, edge cases, and test coverage.",
     },
+  },
 
-    "categories": {
-      // Trivial changes: fastest possible
-      "quick": { "model": "opencode/gpt-5-nano" },
+  "categories": {
+    // Trivial changes: fastest possible
+    "quick": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
 
-      // Standard coding tasks: good quality, fast
-      "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
+    // Standard coding tasks: good quality, fast
+    "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
 
-      // Complex refactors: best quality
-      "unspecified-high": { "model": "openai/gpt-5.6-sol" },
+    // Complex refactors: best quality
+    "unspecified-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
-      // Visual work
-      "visual-engineering": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
+    // Visual work
+    "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
-      // Deep autonomous work
-      "deep": { "model": "openai/gpt-5.6-sol", "reasoning": "medium" },
+    // Architecture consult lane: task(category: "architect")
+    "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
-      // Architecture decisions
-      "ultrabrain": { "model": "openai/gpt-5.6-sol", "reasoning": "xhigh" },
-    },
+    // Deep autonomous work
+    "deep": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
-    // High concurrency for parallel agent work
-    "background_task": {
-      "defaultConcurrency": 8,
-      "providerConcurrency": {
-        "anthropic": 5,
-        "openai": 5,
-        "google": 10,
-        "github-copilot": 10,
-        "opencode": 15,
-      },
-    },
-
-    // Enable all coding aids
-    "hashline_edit": true,
-    "experimental": { "aggressive_truncation": true, "task_system": true },
+    // Hard reasoning problems
+    "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
   },
 }

@@ -1,4 +1,6 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+
+import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import {
   resolveAgent,
   resolveCategory,
@@ -27,15 +29,18 @@ const NO_REGISTRY_MESSAGE = "No senpi model registry is available yet to resolve
 //    against the live registry and a missing registry fails closed as model_unavailable.
 // 2. an explicit `model` alone is honored verbatim, before any registry access.
 // 3. a category (or a subagent_type naming a category) resolves against omo.json + the registry.
+// Whatever path resolved, the plan then inherits the parent's effective execution tier
+// (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
 export function createTaskChildPlanner(
   omoConfig: OmoConfig,
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
+  resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
 ): ChildPlanner {
   const availableAgents = listAvailableAgents(agents)
-  return (spec): PlanResolution => {
+  const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig)
       if (agentResolution !== undefined) return agentResolution
     }
 
@@ -66,6 +71,14 @@ export function createTaskChildPlanner(
     const resolution = resolveCategory(categoryName, omoConfig, registry)
     return toPlanResolution(categoryName, resolution, availableAgents)
   }
+  return (spec): PlanResolution => {
+    const resolution = planChild(spec)
+    if (resolution.kind !== "resolved") return resolution
+    return {
+      kind: "resolved",
+      plan: inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier()),
+    }
+  }
 }
 
 // Agent-first target handling. Unknown and disabled names may retain category fallback, but a known
@@ -75,6 +88,7 @@ function resolveAgentTarget(
   explicitModel: string | undefined,
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
+  omoConfig: OmoConfig,
 ): PlanResolution | undefined {
   const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
   if (definition?.disable === true) {
@@ -96,7 +110,7 @@ function resolveAgentTarget(
   }
 
   const registry = resolveRegistry()
-  const resolution = resolveAgent(agentName, agents, registry)
+  const resolution = resolveAgent(agentName, agents, registry, { omoConfig })
   if (resolution.kind === "resolved") {
     return { kind: "resolved", plan: toAgentPlan(resolution, undefined) }
   }

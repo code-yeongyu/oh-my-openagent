@@ -213,13 +213,14 @@ describe("memory write notice gathering", () => {
     expect(result.details.writeNotice).toBeUndefined()
   }, 60_000)
 
-  test("#given memory_apply_patch commits #when the result is built #then it carries the same notice payload shape", async () => {
+  test("#given memory apply_patch commits #when the result is built #then it carries the same notice payload shape", async () => {
     // given
     const fixture = await boundFixture()
-    const [, applyPatchTool] = toolsFor(fixture)
+    const [applyPatchTool] = toolsFor(fixture)
 
     // when
     const result = await applyPatchTool.execute("call-1", {
+      command: "apply_patch",
       reason: "Patch a new block",
       input: [
         "*** Begin Patch",
@@ -263,21 +264,25 @@ describe("memory tool result rendering", () => {
     })
     const renderResult = memoryTool.renderResult
     if (renderResult === undefined) throw new Error("memory renderResult is missing")
+    const theme = {
+      fg: (_color: string, text: string) => text,
+      bg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+    }
+    const context = {
+      args: { command: "create", file_path: "knowledge/render.md" },
+      state: {}, lastComponent: undefined, isError: false, hasResult: true,
+    }
     const collapsed = (Reflect.apply(renderResult, undefined, [
-      created,
-      { expanded: false, isPartial: false },
-      { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
-      { isError: false },
+      created, { expanded: false, isPartial: false }, theme, context,
     ]) as { render(width: number): string[] }).render(200)
     const expanded = (Reflect.apply(renderResult, undefined, [
-      created,
-      { expanded: true, isPartial: false },
-      { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
-      { isError: false },
+      created, { expanded: true, isPartial: false }, theme, context,
     ]) as { render(width: number): string[] }).render(200)
 
     // then
-    const collapsedText = collapsed.join("\n")
+    expect(collapsed[1]).toContain("memory create knowledge/render.md")
+    const collapsedText = collapsed.slice(2, -1).join("\n")
     expect(collapsedText).toContain("Memory updated")
     expect(collapsedText).not.toContain("committed locally")
     expect(collapsedText).not.toContain("create")

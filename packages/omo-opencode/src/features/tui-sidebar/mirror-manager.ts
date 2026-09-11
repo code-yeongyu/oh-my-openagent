@@ -81,6 +81,7 @@ export class TuiStateMirror {
     this.heartbeatID = setInterval(() => {
       void this.flush()
     }, HEARTBEAT_MS)
+    this.heartbeatID.unref?.()
   }
 
   stop(): void {

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { IdleReclaimerTimer } from "./port"
+
 import { AgentLimitReached } from "./errors"
 import { createTaskLifecycle } from "./create"
 import {
@@ -18,6 +20,33 @@ function iso(offsetMs: number): string {
 }
 
 describe("admitResident (residency cap + LRU eviction)", () => {
+  test("#given a terminal resident idle beyond the retention window #when the idle sweep runs #then the idle sweep evicts it", async () => {
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000009", status: "completed", residency_state: "resident", updated_at: iso(0), host_pid: process.pid })
+    const registry = new FakeRegistry()
+    const handle = fakeHandle("st_00000009", "in-process", [])
+    registry.add(handle)
+    const timer: IdleReclaimerTimer = {}
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry,
+      config: settings({ residency_max_children: 42 }),
+      now: () => 1_000_000 + 16 * 60 * 1000,
+      idleReclaimerScheduler: {
+        setInterval: (callback, delayMs) => {
+          expect(delayMs).toBe(15 * 60 * 1000)
+          return timer
+        },
+        clearInterval: () => undefined,
+      },
+    })
+
+    await lifecycle.reclaimIdleResidents?.()
+    expect(store.load("st_00000009")?.residency_state).toBe("evicted")
+    expect(handle.disposed()).toBe(true)
+    lifecycle.dispose?.()
+  })
+
   test("#given residents below the cap #when admitting #then it is admitted with no eviction", async () => {
     // given
     const store = tempStore()

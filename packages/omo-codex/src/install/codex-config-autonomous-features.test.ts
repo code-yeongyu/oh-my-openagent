@@ -40,7 +40,7 @@ describe("codex-config autonomous features", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain('network_access = "enabled"')
+    expect(content).not.toMatch(/^\s*network_access\s*=/m)
     for (const featureName of ALWAYS_ON_FEATURES) {
       expect(content).toContain(`${featureName} = true`)
     }

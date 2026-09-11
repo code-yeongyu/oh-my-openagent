@@ -4,8 +4,9 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, relative, resolve } from "node:path"
+import { join, relative, resolve } from "node:path"
 import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
+import { createPluginFixture, writeFixtureFile } from "./install-test-fixture"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const tempDirs: string[] = []
@@ -24,72 +25,10 @@ async function backupFiles(agentDir: string): Promise<readonly string[]> {
   return (await readdir(agentDir)).filter((entry) => entry.startsWith("settings.json.") && entry.endsWith(".backup"))
 }
 
-async function makePluginFixture(options: { readonly runtime?: boolean } = { runtime: true }): Promise<string> {
-  const pluginPath = await mkdtemp(join(tmpdir(), "omo-senpi-plugin-fixture-"))
+async function makePluginFixture(options?: { readonly runtime?: boolean }): Promise<string> {
+  const pluginPath = await createPluginFixture(options)
   tempDirs.push(pluginPath)
-  await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
-  await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
-  const requiredSkillNames = [
-    "ast-grep",
-    "coding-agent-sessions",
-    "debugging",
-    "frontend",
-    "git-master",
-    "init-deep",
-    "lsp-setup",
-    "programming",
-    "refactor",
-    "remove-ai-slops",
-    "review-work",
-    "ultimate-browsing",
-    "ultrawork",
-    "ulw-execute",
-    "ulw-loop",
-    "ulw-plan",
-    "ulw-research",
-    "visual-qa",
-  ]
-  for (const skillName of requiredSkillNames) {
-    await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
-  }
-  await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
-  if (options.runtime !== false) {
-    const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
-    await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
-    await chmod(astGrepRuntime, 0o755)
-    const astGrepRuntimeBytes = await readFile(astGrepRuntime)
-    await writeFixtureFile(
-      join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
-      `${JSON.stringify({
-        sha256: createHash("sha256").update(astGrepRuntimeBytes).digest("hex"),
-        mode: 0o755,
-        stagedAtUtc: "2026-08-03T00:00:00.000Z",
-      }, null, 2)}\n`,
-    )
-    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "cli.js"), "export {}\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "ulw-loop", "cli.js"), "console.log('ulw-loop')\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit"), "#!/bin/sh\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"), "@echo off\r\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "daemon-client.js"), "export {}\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "package.json"), JSON.stringify({ version: "0.1.0" }))
-    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
-  }
   return pluginPath
-}
-
-async function writeFixtureFile(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, content, "utf8")
 }
 
 afterEach(async () => {
@@ -101,7 +40,8 @@ describe("runSenpiInstaller", () => {
     // given
     const agentDir = await makeAgentDir()
     const pluginPath = await makePluginFixture()
-    const env = { SENPI_CODING_AGENT_DIR: agentDir }
+    const homeDir = await makeAgentDir()
+    const env = { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }
 
     // when
     const first = await runSenpiInstaller({ env, repoRoot, pluginPath })
@@ -119,6 +59,7 @@ describe("runSenpiInstaller", () => {
     // given
     const agentDir = await makeAgentDir()
     const pluginPath = await makePluginFixture()
+    const homeDir = await makeAgentDir()
     await writeFile(
       join(agentDir, "settings.json"),
       JSON.stringify({
@@ -129,7 +70,7 @@ describe("runSenpiInstaller", () => {
     )
 
     // when
-    await runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    await runSenpiInstaller({ env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)
@@ -158,7 +99,7 @@ describe("runSenpiInstaller", () => {
     )
 
     // when
-    await runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    await runSenpiInstaller({ env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)
@@ -174,7 +115,7 @@ describe("runSenpiInstaller", () => {
 
     // when
     const result = await runSenpiInstaller({
-      env: { SENPI_CODING_AGENT_DIR: agentDir },
+      env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
       platform: "win32",
@@ -283,6 +224,24 @@ describe("runSenpiInstaller", () => {
     expect(await backupFiles(agentDir)).toHaveLength(0)
   })
 
+  test("#given a packed plugin missing the kibitzer persona #when installing #then artifact validation fails before settings change", async () => {
+    // given: the kibitzer gate child boots from extensions/kibitzer-persona.md, so packing must
+    // validate it exactly like the sibling personas the runtime needs.
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "extensions", "kibitzer-persona.md"))
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
   test("#given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written", async () => {
     // given
     const agentDir = await makeAgentDir()
@@ -309,6 +268,20 @@ describe("runSenpiInstaller", () => {
     await expect(install).rejects.toThrow("missing required runtime artifacts")
     await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
   })
+
+  // Regression: beta.40 shipped without plugin/skills-conditional, so the bundled x-search component
+  // advertised a nonexistent skill path and senpi warned "skill path does not exist" at startup.
+  test("#given a packed plugin missing the conditional x-search skill #when installing #then artifact validation fails before settings change", async () => {
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"))
+
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
+  })
+
 })
 
 describe("runSenpiUninstaller", () => {
@@ -325,7 +298,7 @@ describe("runSenpiUninstaller", () => {
     )
 
     // when
-    const result = await runSenpiUninstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const result = await runSenpiUninstaller({ env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)

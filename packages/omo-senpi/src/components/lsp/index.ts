@@ -47,6 +47,7 @@ interface LspComponentOptions {
 		readonly runDiagnostics?: DiagnosticsRunner;
 		readonly state?: LspPostEditSessionState;
 	};
+	readonly callDaemonTool?: DaemonToolCaller;
 }
 
 const DEFAULT_POST_EDIT_SESSION_STATE = createLspPostEditSessionState();
@@ -55,11 +56,11 @@ export { createLspPostEditSessionState };
 
 export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiComponent {
 	const postEditState = options.postEdit?.state ?? createLspPostEditSessionState();
-	const runPostEditDiagnostics = options.postEdit?.runDiagnostics ?? runLspDiagnosticsForPostEdit;
 	return {
 		name: "lsp",
 		register(pi, ctx) {
 			const cwd = pi.cwd ?? process.cwd();
+			const runPostEditDiagnostics = options.postEdit?.runDiagnostics ?? createLspDiagnosticsRunner(cwd, options.callDaemonTool);
 			const formatMutation = options.formatter ?? createFormatterStep({
 				config: loadSenpiOmoConfig({ cwd }).config.formatOnMutation,
 				markers: markerCwd => listProjectMarkers(markerCwd),
@@ -76,7 +77,7 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiC
 				);
 			}
 
-			registerLspTools(pi);
+			registerLspTools(pi, cwd);
 
 			pi.on("tool_result", async (event, eventCtx) => {
 					const parsed = isToolResultLike(event) ? event : undefined;
@@ -117,7 +118,7 @@ function registerLspFlags(pi: SenpiExtensionAPI): void {
 	});
 }
 
-function registerLspTools(pi: SenpiExtensionAPI): void {
+function registerLspTools(pi: SenpiExtensionAPI, cwd: string): void {
 	for (const tool of [
 		lsp_diagnostics,
 		lsp_goto_definition,
@@ -126,7 +127,7 @@ function registerLspTools(pi: SenpiExtensionAPI): void {
 		lsp_prepare_rename,
 		lsp_rename,
 	]) {
-		pi.registerTool(withPackagedDaemonRuntime(tool));
+		pi.registerTool(withPackagedDaemonRuntime(tool, cwd));
 	}
 }
 
@@ -141,7 +142,7 @@ type LspTool = {
 	): Promise<unknown>;
 };
 
-function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
+function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool, cwd: string): TTool {
 	return {
 		...tool,
 		async execute(
@@ -152,7 +153,7 @@ function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
 			ctx?: unknown,
 		): Promise<unknown> {
 			const args = isRecord(rawParams) ? rawParams : {};
-			return callPackagedDaemonTool(tool.name, args, signal === undefined ? {} : { signal });
+			return callPackagedDaemonTool(tool.name, args, { cwd, ...(signal === undefined ? {} : { signal }) });
 		},
 	};
 }
@@ -160,7 +161,7 @@ function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
 export async function handlePostEditDiagnosticsToolResult(
 	event: unknown,
 	ctx?: unknown,
-	runDiagnostics: DiagnosticsRunner = runLspDiagnosticsForPostEdit,
+	runDiagnostics: DiagnosticsRunner = createLspDiagnosticsRunner(process.cwd()),
 	state: LspPostEditSessionState = DEFAULT_POST_EDIT_SESSION_STATE,
 ): Promise<ToolResultHandlerResult | undefined> {
 	if (!isToolResultLike(event)) return undefined;
@@ -176,9 +177,13 @@ export async function handlePostEditDiagnosticsToolResult(
 	return result?.content ? { content: result.content } : undefined;
 }
 
-async function runLspDiagnosticsForPostEdit(filePath: string): Promise<PostEditDiagnosticsOutcome> {
-	const result = await callPackagedDaemonTool("lsp_diagnostics", { filePath, severity: "error" });
-	return postEditOutcomeFromDaemonResult(result);
+type DaemonToolCaller = typeof callPackagedDaemonTool;
+
+export function createLspDiagnosticsRunner(cwd: string, callDaemonTool: DaemonToolCaller = callPackagedDaemonTool): DiagnosticsRunner {
+	return async (filePath: string): Promise<PostEditDiagnosticsOutcome> => {
+		const result = await callDaemonTool("lsp_diagnostics", { filePath, severity: "error" }, { cwd });
+		return postEditOutcomeFromDaemonResult(result);
+	};
 }
 
 function postEditOutcomeFromDaemonResult(result: {

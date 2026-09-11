@@ -1,0 +1,42 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:
+(pass) explicit ULW session follow-ups > #given active mode #when a plain follow-up is processed twice #then only one compact marker is added [1.89ms]
+(pass) explicit ULW session follow-ups > #given active mode #when compaction finishes #then full guidance is restored once [0.57ms]
+(pass) explicit ULW session follow-ups > #given combo-only expansions #when ULW state replays #then the marker and model selection persist [0.23ms]
+(pass) explicit ULW session follow-ups > #given active mode #when an attachment-only follow-up arrives #then it receives a durable ULW marker [0.19ms]
+150 |       durableIdentity: restoredImage.parts[1].id !== restoredImage.parts[0].id,
+151 |       durableModelOverride: resolveUltraworkOverride(config, "sisyphus", restoredImage, "main-session")?.modelID === "ulw-model",
+152 |       sourceByteEquality: restoredImage.parts[1].text === expectedGuidance
+153 |         && Buffer.byteLength(restoredImage.parts[1].text ?? "") === Buffer.byteLength(expectedGuidance),
+154 |       synthetic: restoredImage.parts[1].synthetic === true,
+155 |     }).toEqual({ durableIdentity: true, durableModelOverride: true, sourceByteEquality: true, synthetic: true })
+             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "durableIdentity": true,
+    "durableModelOverride": true,
+-   "sourceByteEquality": true,
++   "sourceByteEquality": false,
+    "synthetic": true,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/keyword-detector/ultrawork-followup.test.ts:155:8)
+(fail) explicit ULW session follow-ups > #given restoration is pending #when an image follows a model change #then full guidance persists before compact markers resume [0.43ms]
+(pass) explicit ULW session follow-ups > #given active mode #when model family changes #then its full guidance is refreshed [0.19ms]
+(pass) explicit ULW session follow-ups > #given explicit activation #when a follow-up has no keyword #then injection and model selection persist only in that session [0.20ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by command #then follow-ups are ordinary [0.22ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by owner #then follow-ups are ordinary [0.79ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by deleted #then follow-ups are ordinary [0.17ms]
+(pass) explicit ULW session follow-ups > #given activation #when cleared by disposed #then follow-ups are ordinary [0.11ms]
+(pass) explicit ULW session follow-ups > #given activation #when a follow-up is guarded #then no ULW is injected [0.25ms]
+(pass) explicit ULW session follow-ups > #given more than the session cap #when checking follow-ups #then oldest activation is evicted [9.40ms]
+
+ 12 pass
+ 1 fail
+ 32 expect() calls
+Ran 13 tests across 1 file. [718.00ms]

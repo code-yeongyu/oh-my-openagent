@@ -3,7 +3,7 @@
 // through the ordered terminal writes. Every failure branch names its own reason - the reason
 // is the run's diagnosis, never a guess re-derived from a message string.
 
-import { readFile } from "node:fs/promises"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {

@@ -1,0 +1,93 @@
+{
+  "task": "3 post-compact budget gpt-6-astra",
+  "changed_files": [
+    "packages/omo-codex/plugin/components/rules/src/post-compact-budget.ts",
+    "packages/omo-codex/plugin/components/rules/test/post-compact-budget.test.ts"
+  ],
+  "manual_qa": {
+    "build": {
+      "command": "cd packages/omo-codex/plugin/components/rules && bun run build",
+      "exit": 0,
+      "dist_cli_present": true
+    },
+    "setup": {
+      "scratch_cwd_outside_worktree": true,
+      "project_marker": "package.json",
+      "context_md_bytes": 20031,
+      "always_apply_omo_rules": 80,
+      "always_apply_rule_bytes_each": 12056,
+      "enabled_sources": "CONTEXT.md,.omo/rules",
+      "note": "CODEX_RULES_ENABLED_SOURCES excludes bundled Hephaestus so never-truncated variant bodies cannot mask budget truncation"
+    },
+    "transcript_bytes": 760134,
+    "retained_chars": 760000,
+    "probes": [
+      {
+        "model": "gpt-6-astra",
+        "payload_event": "PostCompact",
+        "stdout": "",
+        "exit": 0,
+        "postcompact_additionalContext_length": 0,
+        "followup": {
+          "event": "SessionStart",
+          "source": "compact",
+          "exit": 0,
+          "additionalContext_length": 4087,
+          "listed_rule_lines": 31,
+          "has_mandatory_directive": true
+        }
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "payload_event": "PostCompact",
+        "stdout": "",
+        "exit": 0,
+        "postcompact_additionalContext_length": 0,
+        "followup": {
+          "event": "SessionStart",
+          "source": "compact",
+          "exit": 0,
+          "additionalContext_length": 4087,
+          "listed_rule_lines": 31,
+          "has_mandatory_directive": true
+        }
+      },
+      {
+        "model": "unknown-model",
+        "payload_event": "PostCompact",
+        "stdout": "",
+        "exit": 0,
+        "postcompact_additionalContext_length": 0,
+        "followup": {
+          "event": "SessionStart",
+          "source": "compact",
+          "exit": 0,
+          "additionalContext_length": 665,
+          "listed_rule_lines": 2,
+          "has_mandatory_directive": true
+        }
+      }
+    ],
+    "budget_lengths": {
+      "gpt-6-astra": 4087,
+      "gpt-5.6-sol": 4087,
+      "unknown-model": 665
+    },
+    "ordering": "astra == sol (4087, 600k class / 4000 post-compact cap) > unknown-model (665, 200k fallback truncated)",
+    "ordering_ok": true,
+    "real_codex_home_config_shasum_before": "b012e531f5aa9fb1bce9003593c3eadf07081fcd",
+    "real_codex_home_config_shasum_after": "b012e531f5aa9fb1bce9003593c3eadf07081fcd",
+    "evidence_log": ".omo/evidence/20260908-lcx-astra/task-3-budget.log",
+    "limitation": "runPostCompactHook still returns empty stdout after marking compacted state. The budgeted additionalContext is emitted by the subsequent SessionStart source=compact recovery (withPostCompactBudget). Those recovery lengths are the non-zero 4087/4087/665 ordering."
+  },
+  "acceptance": [
+    "rg -c 'slug: \"gpt-6-astra\"|slug: \"gpt-6-astra-fast\"' packages/omo-codex/plugin/components/rules/src/post-compact-budget.ts -> 2",
+    "rg -n 'FALLBACK_CONTEXT_WINDOW_TOKENS = 200_000' packages/omo-codex/plugin/components/rules/src/post-compact-budget.ts -> line 22",
+    "git diff --check -> passed"
+  ],
+  "red_proof": "Executed failing-first reconstruction is recorded in task-3-red-green.log; this manual QA rerun was executed locally after dist and node_modules became available.",
+  "cleanup": [
+    "isolated CODEX_HOME and scratch cwd removed by cqa_cleanup",
+    "real ~/.codex/config.toml unchanged"
+  ]
+}

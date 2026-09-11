@@ -373,7 +373,7 @@ Don't narrate every tool call, but don't go silent for long stretches on complex
 
 Parameters to always think about:
 
-- \`run_in_background\`: \`true\` for parallel research (\`explore\`, \`librarian\`), \`false\` for synchronous work where the next step depends on the result.
+- \`run_in_background\`: \`true\` is the standard spawn; the completion notification delivers the result while you keep working or end the response. \`false\` blocks this response until the child finishes; use it only for a short child whose result gates your very next call.
 - \`load_skills\`: evaluate every available skill before each delegation. Err toward loading when the skill's domain even loosely connects to the task.
 - \`task_id\`: reuse for follow-ups. Do not start fresh sessions on continuations.
 - \`description\`: a 3-5 word label. Optional but improves observability.
@@ -384,7 +384,7 @@ Both are background pattern search with narrative synthesis. Always fire them wi
 
 ## oracle
 
-Read-only consultant. Synchronous (\`run_in_background=false\`) when its answer blocks your next step. Background (\`run_in_background=true\`) only for long-running architectural reviews you are happy to return to later. Never proceed with work Oracle was asked to decide before its result arrives.
+Read-only consultant. Run it in the background and continue with work that does not depend on its answer; never proceed with work Oracle was asked to decide before its result arrives.
 
 ## skill loading
 

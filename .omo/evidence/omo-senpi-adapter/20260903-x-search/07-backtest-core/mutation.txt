@@ -1,0 +1,41 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-core.test.mjs:
+ 7 | 
+ 8 | describe("x-search backtest core", () => {
+ 9 |   test("extracts tweet ids recursively and metrics handle empty sets", () => {
+10 |     expect(extractTweetIds({ a: "https://x.com/a/status/123", b: ["status/456", { c: "789" }] })).toEqual(["123", "456"]);
+11 |     expect(jaccard([1, 2], [2, 3])).toBeCloseTo(1 / 3);
+12 |     expect(recall([], [])).toBe(1); expect(recall([1], [])).toBe(0); expect(recall([], [1])).toBe(0);
+                                                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest-core.test.mjs:12:61)
+(fail) x-search backtest core > extracts tweet ids recursively and metrics handle empty sets [0.77ms]
+(pass) x-search backtest core > aggregates numeric values only and exposes lane statuses [0.15ms]
+(pass) x-search backtest core > fixture keys are canonical and estimates fail closed [0.32ms]
+(pass) x-search backtest core > cost guard reserves ceiling and reconciliation marks exceeded [2.36ms]
+(pass) x-search backtest core > redacts secret keys and sentinel strings recursively [0.21ms]
+(pass) x-search backtest core > web overlap normalizes words and validates queries/materializes dates [0.28ms]
+
+ 5 pass
+ 1 fail
+ 19 expect() calls
+Ran 6 tests across 1 file. [1315.00ms]
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest-core.test.mjs:
+(pass) x-search backtest core > extracts tweet ids recursively and metrics handle empty sets [1.02ms]
+(pass) x-search backtest core > aggregates numeric values only and exposes lane statuses [0.13ms]
+(pass) x-search backtest core > fixture keys are canonical and estimates fail closed [1.96ms]
+(pass) x-search backtest core > cost guard reserves ceiling and reconciliation marks exceeded [0.13ms]
+(pass) x-search backtest core > redacts secret keys and sentinel strings recursively [0.16ms]
+(pass) x-search backtest core > web overlap normalizes words and validates queries/materializes dates [0.25ms]
+
+ 6 pass
+ 0 fail
+ 20 expect() calls
+Ran 6 tests across 1 file. [537.00ms]

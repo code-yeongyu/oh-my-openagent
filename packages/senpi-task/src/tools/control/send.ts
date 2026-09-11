@@ -20,13 +20,13 @@ export type { TaskSendTeamRouting } from "./send-shutdown"
 const DESCRIPTION = [
   "Send a message to a child task or team member, keyed by to.",
   "Plain-text messages always steer a running child immediately.",
-  "A plain-text message to a finished resident child revives that same session; disposed, evicted, cancelled, and terminal-errored children are not revived.",
+  "A plain-text message to a detached terminal RPC child with a transcript lazily revives that same session for completed, error, and other finished runs; killed, cancelled, and lost children are never revived. persisted_only children resume with their session.",
   "message is required and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
-  "One-shot agents (momus) always refuse task_send in every state; spawn a new momus instead.",
+  "One-shot agents (plan-reviewer) always refuse task_send in every state; spawn a new plan-reviewer instead.",
 ].join(" ")
 
 const MEMBER_SCOPED_DESCRIPTION = [
@@ -70,7 +70,8 @@ export async function runTaskSend(
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),
     })
-    return toolResult(firstText(teamResult), { kind: "team_message", team: teamResult.details })
+    const wrapped: SendToolResult = toolResult(firstText(teamResult), { kind: "team_message", team: teamResult.details })
+    return teamResult.isError === true ? { ...wrapped, isError: true } : wrapped
   }
 
   if (params.message !== undefined) return routeStructuredMessage(params.to, params.message, params, teamRouting)

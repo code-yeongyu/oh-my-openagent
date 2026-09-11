@@ -1,0 +1,36 @@
+# C3 regression check: generate-changelog.test.ts after RELEASE_VERSION_PATTERN moved into release-latest-flag.ts
+# mengmotaMac via bunshin, hermetic /tmp/omo-rls-20260904/c3 (exit code not piped)
+# remote exit=0
+./script/generate-changelog.test.ts
+./script/generate-changelog.ts
+./script/release-latest-flag.ts
+script/generate-changelog.ts:4:import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
+script/generate-changelog.ts:25:    if (!RELEASE_VERSION_PATTERN.test(version) || releaseChannel(version) !== targetChannel ||
+script/release-latest-flag.ts:3:export const RELEASE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+script/release-latest-flag.ts:9:  return RELEASE_VERSION_PATTERN.test(version) ? version : null
+bun test v1.4.0 (34cbb9a40)
+
+script/generate-changelog.test.ts:
+(pass) selectPreviousReleaseTag > #given a beta target #when releases span channels #then the preceding beta is selected [0.42ms]
+(pass) selectPreviousReleaseTag > #given a stable target #when releases include prereleases #then the latest preceding stable is selected [0.03ms]
+(pass) isExcludedReleaseNoteSubject > #given subject "feat(senpi): add team tools" #when exclusion is checked #then excluded is true [0.08ms]
+(pass) isExcludedReleaseNoteSubject > #given subject "fix(omo-senpi): persist member sidecar" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "feat(senpi-task): wire message-durability fallbacks" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "fix(pi-goal): correct goal parsing" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "feat(pi-webfetch): add fetch retries" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "feat: improve senpi installer" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "Merge pull request #5932 from code-yeongyu/code-yeongyu/senpi-task-w3-engine" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "chore: bump internal tooling" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "test: add coverage" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "ci: tighten workflow" #when exclusion is checked #then excluded is true
+(pass) isExcludedReleaseNoteSubject > #given subject "feat(api): expose new endpoint" #when exclusion is checked #then excluded is false
+(pass) isExcludedReleaseNoteSubject > #given subject "fix(opencode): keep pinned model order" #when exclusion is checked #then excluded is false
+(pass) isExcludedReleaseNoteSubject > #given subject "feat(cli): gate install platforms" #when exclusion is checked #then excluded is false
+(pass) isExcludedReleaseNoteSubject > #given subject "fix(codex): refresh lsp runtime gate" #when exclusion is checked #then excluded is false
+
+ 16 pass
+ 0 fail
+ 16 expect() calls
+Ran 16 tests across 1 file. [12.00ms]
+EXIT=0
+

@@ -1,0 +1,77 @@
+{
+  "task": "12 ulw-execute-continuation relax + SubagentStop de-wire",
+  "changed_files": [
+    "packages/omo-codex/plugin/.codex-plugin/plugin.json",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/AGENTS.md",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/README.md",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/directive.md",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/hooks/hooks.json",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/src/codex-hook.ts",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/src/types.ts",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/test/cli.test.ts",
+    "packages/omo-codex/plugin/components/ulw-execute-continuation/test/codex-hook.test.ts",
+    "packages/omo-codex/plugin/hooks/subagent-stop-checking-ulw-execute-continuation.json",
+    "packages/omo-codex/plugin/test/aggregate-hooks.test.mjs",
+    "packages/omo-codex/plugin/test/aggregate-manifest.test.mjs",
+    "packages/omo-codex/plugin/test/component-hook-contract-cases.mjs",
+    "packages/omo-codex/plugin/test/hook-status-message.test.mjs"
+  ],
+  "red_proof": "Remote mengmotaMac RED command `bun test ./components/ulw-execute-continuation/test/codex-hook.test.ts` failed before implementation: the new active-Boulder SubagentStop assertion received `decision:block` instead of `\"\"` at codex-hook.test.ts:77; the updated manifest assertion also reported 21 !== 20 and the aggregate SubagentStop assertion reported 2 !== 1. Full captured output: .omo/evidence/20260908-lcx-gate-softening/task-12-red-correct-path.log.",
+  "tests": [
+    "cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation && bun test -> exit 0; 43 pass, 0 fail",
+    "cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin && node --test ./test/aggregate-manifest.test.mjs ./test/aggregate-hooks.test.mjs ./test/hook-status-message.test.mjs -> exit 0; 24 pass, 0 fail",
+    "tsgo --noEmit -p packages/omo-codex/tsconfig.json -> exit 0",
+    "cd /tmp/lcx-t12-20260908-2eff9a4d/omo/packages/omo-codex/plugin/components/ulw-execute-continuation && npm run build --silent -> exit 0"
+  ],
+  "manual_qa": [
+    ".omo/evidence/20260908-lcx-gate-softening/task-12-continuation.log -> original raw-pipe proof used the worktree component CLI after an installer exit=1; it did not establish installed-plugin behavior. The st_01a0813d append now records INSTALL_EXIT=0 and exact-schema Stop/SubagentStop probes against the installed 5.0.0-beta.48 component CLI, with an active Boulder outside the worktree: Stop emitted decision:block with self-review and without all five; SubagentStop stdout was exactly zero bytes. Real ~/.codex/config.toml shasum stayed b012e531f5aa9fb1bce9003593c3eadf07081fcd before and after every run",
+    ".omo/evidence/20260908-lcx-gate-softening/task-12-cleanup.log -> remote QA directory /tmp/lcx-t12-20260908-2eff9a4d reported dir REMOVED"
+  ],
+  "acceptance": [
+    "jq '.hooks|length' packages/omo-codex/plugin/.codex-plugin/plugin.json -> 20",
+    "test ! -e packages/omo-codex/plugin/hooks/subagent-stop-checking-ulw-execute-continuation.json -> yes",
+    "jq -r '.hooks|keys|join(\",\")' packages/omo-codex/plugin/components/ulw-execute-continuation/hooks/hooks.json -> Stop",
+    "rg -c 'review-work` lanes' packages/omo-codex/plugin/components/ulw-execute-continuation/directive.md || true -> no matches",
+    "git diff --check -> PASS",
+    "remote focused component and aggregate suites -> exit 0; 67 tests pass, 0 fail"
+  ],
+  "cleanup": [
+    "/tmp/lcx-t12-20260908-2eff9a4d -> REMOVED by remote `rm -rf ... && test ! -e ...` receipt",
+    "cqa isolated CODEX_HOME sandbox -> removed by common.sh EXIT cleanup; post-trap local existence check -> PASS",
+    "st_01a0813d: cqa-home.XXXXXX.2MoSz7iwMT, cqa-home.XXXXXX.xXuRVmfcXH, and cqa-home.XXXXXX.sdAP4Wv1RD under the macOS temporary directory -> REMOVED with existence checks; installer output, payloads, and hook stdout preserved in task-12-continuation.log before cleanup"
+  ],
+  "installer_diagnosis": {
+    "task_id": "st_01a0813d",
+    "head": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+    "status": "current installer and installed-plugin probes pass; historical failure cause unproven",
+    "original_exit": 1,
+    "original_failure_classification": "Indeterminate: environmental versus historical branch defect cannot be established from the preserved exit code alone. No current branch-payload defect reproduced.",
+    "evidence_gap": ".agents/skills/codex-qa/scripts/lib/common.sh:119 redirects all installer stdout/stderr into $CQA_HOME_ROOT/install.log; the EXIT trap at line 136 removes that sandbox. The original log was not copied into the evidence, and its sandbox is now absent. The separate remote missing-.git materialization error is not proof of this local failure's cause.",
+    "unmodified_recipe_exits": [0, 0],
+    "final_invocation": "OMO_SKIP_MATERIALIZE=1 cqa_install_local_omo 2>&1 | tail -60; capture PIPESTATUS[0] immediately",
+    "final_install_exit": 0,
+    "final_installed_qa_exit": 0,
+    "invocation_choice": "Use the supported OMO_SKIP_MATERIALIZE=1 switch with already-materialized inputs rather than edit product code or repeat git submodule update. This is a no-git-write invocation correction, not a proven remedy for the historical exit=1.",
+    "constraint_deviation": "The two exact-recipe runs indirectly invoked git submodule update --init --recursive via packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:21 before that side effect was identified. Tracked product files stayed unchanged; git metadata was not snapshotted and cannot be claimed untouched. The final run confirmed [materialize] skipped (OMO_SKIP_MATERIALIZE=1).",
+    "bundle_validation": {
+      "method": "Read-only digestCodexInstallerSources/parseCodexInstallerArtifact assertions via bun -e, not bun test; source digest and bundle body digest matched, so regeneration was unnecessary",
+      "source_digest": "81cf03496fa0db52b428d9e5f1d2a022f753fe60530d84f72d767af03333373f",
+      "body_digest": "d9847212c69382c8b1ef908ee03c5b079dc818a67781f34f9cc324074120ee89",
+      "tracked_installer_diff": "empty"
+    },
+    "installed_cli": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.sdAP4Wv1RD/codex/plugins/cache/sisyphuslabs/omo/5.0.0-beta.48/components/ulw-execute-continuation/dist/cli.js",
+    "stop": {"exit": 0, "decision": "block", "contains_self_review": true, "contains_all_five": false, "output_keys": ["decision", "reason"]},
+    "subagent_stop": {"exit": 0, "stdout_bytes": 0, "agent_id": "child-1"},
+    "payload_fields": "Exact required field sets from the binding plan; no extra keys; active scratch Boulder uses codex:qa outside the worktree without git init",
+    "installed_wiring": "Continuation component exposes Stop only; aggregate manifest omits subagent-stop-checking-ulw-execute-continuation",
+    "real_config_before_sha1": "b012e531f5aa9fb1bce9003593c3eadf07081fcd",
+    "real_config_after_sha1": "b012e531f5aa9fb1bce9003593c3eadf07081fcd",
+    "scope": "Only this DoneClaim and task-12-continuation.log edited; no product source edits, commits, local bun test, agentic probes, or real ~/.codex writes. Earlier remote test claims above are historical and were not rerun by this child."
+  },
+  "risks": [
+    "The full remote bun install lifecycle could not run because the required strict materialize step needs .git, while tree-transfer intentionally excludes .git; the fallback `bun install --frozen-lockfile --ignore-scripts` succeeded and the direct component build/unit suites passed. Full PR-level installer QA remains owned by todo 14.",
+    "No defects in the files owned by this todo were observed; concurrent uncommitted changes in other lanes were not modified.",
+    "The original local installer exit=1 remains historically unclassified because its error output was discarded. Current installer/probe passes close the installed-surface evidence gap, not the missing historical root cause.",
+    "The exact recipe's implicit git submodule update conflicted with the no-git-writes constraint in the first two diagnosis runs; no tracked product changes were observed, but metadata immutability is unverified. Final verification used OMO_SKIP_MATERIALIZE=1."
+  ]
+}

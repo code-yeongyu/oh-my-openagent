@@ -1,8 +1,50 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 export function componentHookContractCases(tempRoot) {
+	mkdirSync(join(tempRoot, ".omo", "evidence"), { recursive: true });
+	writeFileSync(join(tempRoot, ".omo", "evidence", "receipt.txt"), "command output PASS\n".repeat(10));
+	const spawnPayload = {
+		cwd: tempRoot, hook_event_name: "PreToolUse", model: "gpt-6-astra",
+		permission_mode: "default", session_id: "s-spawn-admission", tool_input: { message: "scan" },
+		tool_name: "spawn_agent", tool_use_id: "spawn-1", transcript_path: null, turn_id: "t-spawn",
+	};
+	const marker = join(tempRoot, "plugin-data", "spawn-breaker", "s-spawn-admission.json");
 	return [
+		{
+			name: "ulw-loop post-tool-use successful admission is silent",
+			component: "ulw-loop", event: "post-tool-use-spawn",
+			payload: { ...spawnPayload, hook_event_name: "PostToolUse", tool_response: { agent_id: "worker-1" } },
+			assertOutput(stdout) { assert.equal(stdout, ""); assert.equal(existsSync(marker), false); },
+		},
+		{
+			name: "ulw-loop post-tool-use failed admission records silently",
+			component: "ulw-loop", event: "post-tool-use-spawn",
+			payload: { ...spawnPayload, hook_event_name: "PostToolUse", tool_response: "AgentLimitReached" },
+			assertOutput(stdout) {
+				assert.equal(stdout, "");
+				const recorded = JSON.parse(readFileSync(marker, "utf8"));
+				assert.deepEqual(Object.keys(recorded).sort(), ["at", "reason"]);
+				assert.equal(recorded.reason, "AgentLimitReached");
+				assert.equal(Number.isFinite(Date.parse(recorded.at)), true);
+			},
+		},
+		{
+			name: "ulw-loop admission breaker denies without a plan",
+			component: "ulw-loop", event: "pre-tool-use-spawn", payload: spawnPayload,
+			assertOutput(stdout) {
+				const output = JSON.parse(stdout).hookSpecificOutput;
+				assert.equal(output.hookEventName, "PreToolUse");
+				assert.equal(output.permissionDecision, "deny");
+			},
+		},
+		{
+			name: "ulw-loop clean session admission is silent",
+			component: "ulw-loop", event: "pre-tool-use-spawn",
+			payload: { ...spawnPayload, session_id: "s-spawn-clean" },
+			assertOutput(stdout) { assert.equal(stdout, ""); },
+		},
 		{
 			name: "rules session-start",
 			component: "rules",
@@ -202,6 +244,28 @@ export function componentHookContractCases(tempRoot) {
 			},
 		},
 		{
+			name: "lazycodex worker verifier passes receipt with nonexistent transcript",
+			component: "lazycodex-executor-verify",
+			event: "subagent-stop",
+			payload: {
+				hook_event_name: "SubagentStop",
+				agent_type: "lazycodex-worker-medium",
+				agent_id: "agent-task12",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: join(tempRoot, "transcript.jsonl"),
+				agent_transcript_path: join(tempRoot, "agent-transcript.jsonl"),
+				cwd: tempRoot,
+				model: "gpt-6-astra",
+				permission_mode: "default",
+				stop_hook_active: true,
+				last_assistant_message: "done\nEVIDENCE_RECORDED: .omo/evidence/receipt.txt",
+			},
+			assertOutput(stdout) {
+				assert.equal(stdout, "");
+			},
+		},
+		{
 			name: "ulw-execute-continuation stop no state",
 			component: "ulw-execute-continuation",
 			event: "stop",
@@ -214,6 +278,28 @@ export function componentHookContractCases(tempRoot) {
 				model: "gpt-5.5",
 				permission_mode: "default",
 				stop_hook_active: false,
+			},
+			assertOutput(stdout) {
+				assert.equal(stdout, "");
+			},
+		},
+		{
+			name: "ulw-execute-continuation subagent-stop compatibility no-op",
+			component: "ulw-execute-continuation",
+			event: "subagent-stop",
+			payload: {
+				hook_event_name: "SubagentStop",
+				agent_id: "agent-task12",
+				agent_type: "lazycodex-worker-low",
+				session_id: "s-task12",
+				turn_id: "t-task12",
+				transcript_path: join(tempRoot, "transcript.jsonl"),
+				agent_transcript_path: join(tempRoot, "agent-transcript.jsonl"),
+				cwd: tempRoot,
+				model: "gpt-5.5",
+				permission_mode: "default",
+				stop_hook_active: false,
+				last_assistant_message: "done",
 			},
 			assertOutput(stdout) {
 				assert.equal(stdout, "");

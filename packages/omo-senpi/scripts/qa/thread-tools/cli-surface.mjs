@@ -97,7 +97,12 @@ try {
       fallbackWarning = warning
     },
   })
-  report.assert("caller-session-hosted", fallbackWarning === undefined, `fallback=${fallbackWarning?.message ?? "none"}`)
+  const fallbackCause = fallbackWarning?.cause
+  report.assert(
+    "caller-session-hosted",
+    fallbackWarning === undefined,
+    `fallback=${fallbackWarning?.message ?? "none"} cause=${fallbackCause instanceof Error ? `${fallbackCause.name}: ${fallbackCause.message}` : JSON.stringify(fallbackCause ?? null)}`,
+  )
 
   // The tool-calling side of the caller session speaks the same wire the tools use.
   const tools = await HostClient.connect(host.socket, "tools")

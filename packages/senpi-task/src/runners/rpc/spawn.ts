@@ -1,16 +1,32 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
-import { basename, delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path"
+import { basename, dirname, join, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { RpcRunnerSpec } from "../types"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
+import {
+  detectBunBinary,
+  detectCompiledEngine,
+  readRunningEngineVersion,
+  resolveSenpiLauncher,
+} from "./senpi-launcher"
+
+export {
+  detectBunBinary,
+  detectCompiledEngine,
+  readEngineVersionFromResolvePaths,
+  readRunningEngineVersion,
+  resolveSenpiExecutable,
+  resolveSenpiLauncher,
+} from "./senpi-launcher"
+export type { SenpiLauncher } from "./senpi-launcher"
 
 const require = createRequire(import.meta.url)
 
 const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
-const SENPI_BIN_ENV = "SENPI_BIN"
+export const OMO_SENPI_TASK_RPC_CHILD = "OMO_SENPI_TASK_RPC_CHILD"
 const RPC_ENTRY_SPECIFIER = "@code-yeongyu/senpi/rpc-entry"
 
 export type RpcSpawnSpec = RpcRunnerSpec & {
@@ -24,27 +40,21 @@ export type RpcSpawnDescriptor = {
   readonly env: NodeJS.ProcessEnv
 }
 
-export type SenpiLauncher = {
-  readonly command: string
-  readonly prefixArgs: readonly string[]
-}
-
 export type RpcSpawnRuntime = {
   readonly isBunBinary: boolean
+  // The running process embeds the engine (a compiled omo or senpi binary), so it IS the child engine.
+  readonly isCompiledEngine?: boolean
   readonly execPath: string
   readonly platform: NodeJS.Platform
   readonly parentEnv: NodeJS.ProcessEnv
   readonly resolveRpcEntry: () => string
   // Injectable so tests can pin the executable-vs-fallback branch; defaults to resolveSenpiExecutable.
   readonly resolveSenpiExecutable?: (runtime: RpcSpawnRuntime) => string | null
-}
-
-/**
- * Detect whether the current process is a Bun compiled binary, mirroring
- * senpi's own detection (import.meta.url carries a $bunfs / ~BUN marker).
- */
-export function detectBunBinary(metaUrl: string): boolean {
-  return metaUrl.includes("$bunfs") || metaUrl.includes("~BUN") || metaUrl.includes("%7EBUN")
+  // Running @code-yeongyu/senpi version used to reject PATH/sibling candidates of a different version.
+  // When omitted or unreadable, the parity check is skipped (candidates are accepted).
+  readonly engineVersion?: string
+  // Optional diagnostics for rejected PATH/sibling candidates. Defaults to a no-op.
+  readonly onWarning?: (message: string) => void
 }
 
 /**
@@ -56,83 +66,10 @@ export function resolveChildSessionDir(stateDir: string, taskId: string): string
   return `${join(stateDir, "sessions", taskId)}${sep}`
 }
 
-function senpiBinaryName(platform: NodeJS.Platform): string {
-  return platform === "win32" ? "senpi.exe" : "senpi"
-}
-
-function scanPathForExecutable(name: string, pathValue: string | undefined): string | null {
-  for (const dir of (pathValue ?? "").split(delimiter)) {
-    if (dir.length === 0) continue
-    const candidate = canonicalExecutable(join(dir, name))
-    if (candidate !== null) return candidate
-  }
-  return null
-}
-
-function canonicalExecutable(candidate: string): string | null {
-  try {
-    const canonical = realpathSync.native(resolve(candidate))
-    return statSync(canonical).isFile() ? canonical : null
-  } catch {
-    return null
-  }
-}
-
-/**
- * Resolve the senpi EXECUTABLE to spawn the rpc child with (`<exe> --mode rpc`). Spawning the binary
- * directly bypasses module resolution, which senpi's own loader alias HIJACKS when omo runs as a senpi
- * extension: `require.resolve("@code-yeongyu/senpi/rpc-entry")` then resolves to the running dist entry
- * instead of the child rpc entry and the child never boots. Preference order: an explicit `SENPI_BIN`
- * override, the sibling binary next to a Bun-compiled senpi, then a PATH scan. Returns null when no
- * executable is found so buildRpcSpawn can fall back to the documented `execPath + rpc-entry` path.
- */
-export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null {
-  const binaryName = senpiBinaryName(runtime.platform)
-  const override = runtime.parentEnv[SENPI_BIN_ENV]?.trim()
-  if (override !== undefined && override.length > 0) {
-    if (override.includes("/") || override.includes(sep) || isAbsolute(override)) {
-      return canonicalExecutable(override)
-    }
-    return scanPathForExecutable(override, runtime.parentEnv.PATH)
-  }
-  if (runtime.isBunBinary) {
-    return canonicalExecutable(join(dirname(runtime.execPath), binaryName))
-  }
-  return scanPathForExecutable(binaryName, runtime.parentEnv.PATH)
-}
-
-function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): SenpiLauncher | null {
-  if (runtime.platform !== "win32" || executable.toLowerCase().endsWith(".exe")) {
-    return { command: executable, prefixArgs: [] }
-  }
-  const shimDir = dirname(executable)
-  const cliCandidates = [
-    join(shimDir, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
-    join(shimDir, "..", "@code-yeongyu", "senpi", "dist", "cli.js"),
-  ]
-  const cliPath = cliCandidates.find((candidate) => existsSync(candidate))
-  return cliPath === undefined ? null : { command: runtime.execPath, prefixArgs: [cliPath] }
-}
-
-export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
-  const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
-  if (executable !== null) {
-    const normalized = normalizeSenpiLauncher(executable, runtime)
-    if (normalized !== null) return normalized
-  }
-  if (runtime.platform !== "win32") return null
-  for (const name of ["senpi.cmd", "senpi"]) {
-    const npmShim = scanPathForExecutable(name, runtime.parentEnv.PATH)
-    if (npmShim === null) continue
-    const normalized = normalizeSenpiLauncher(npmShim, runtime)
-    if (normalized !== null) return normalized
-  }
-  return null
-}
-
 /**
  * The child-facing argv tail shared by both spawn strategies: `--no-extensions` so the detached child
- * does NOT auto-load the parent's whole package set, then ONLY the threaded `-e` extensions, then the
+ * does NOT auto-load the parent's whole package set, then `--no-ask-user` so the child cannot register
+ * the parent-only question tools, then ONLY the threaded `-e` extensions, then the
  * threaded `--model` so the separate process resolves the requested provider/modelId.
  */
 function isDagOwnedChild(spec: RpcRunnerSpec): boolean {
@@ -145,7 +82,7 @@ function isDagOwnedChild(spec: RpcRunnerSpec): boolean {
 }
 
 export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
-  const args: string[] = ["--no-extensions"]
+  const args: string[] = ["--no-extensions", "--no-ask-user"]
   // The OMO launcher prepends its own extension before user/provider entries. DAG-owned tasks drop
   // that first entry so the detached child cannot boot a task engine, while provider extensions
   // and every non-DAG child's extension list remain unchanged.
@@ -186,10 +123,12 @@ function resolveRpcEntrySpecifier(): string {
 function defaultRuntime(): RpcSpawnRuntime {
   return {
     isBunBinary: detectBunBinary(import.meta.url),
+    isCompiledEngine: detectCompiledEngine(),
     execPath: process.execPath,
     platform: process.platform,
     parentEnv: process.env,
     resolveRpcEntry: resolveRpcEntrySpecifier,
+    engineVersion: readRunningEngineVersion(),
   }
 }
 
@@ -214,6 +153,7 @@ function buildChildProfile(
   for (const name of MEMBER_PROCESS_ENV_NAMES) delete env[name]
   Object.assign(env, spec.memberEnv)
   env[SESSION_DIR_ENV] = resolveChildSessionDir(spec.state_dir, spec.task_id)
+  env[OMO_SENPI_TASK_RPC_CHILD] = "1"
   const extensions = spec.memberEnv === undefined
     ? spec.extensions?.filter((entry) => basename(entry) !== MEMBER_EXTENSION_BUNDLE_NAME)
     : spec.extensions

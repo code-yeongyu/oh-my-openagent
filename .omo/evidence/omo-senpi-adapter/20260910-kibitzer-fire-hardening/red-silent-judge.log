@@ -1,0 +1,40 @@
+error: expect(received).toBe(expected)
+Expected: true
+Received: undefined
+(fail) createKibitzerNudgeTool > #given maxItems 1 #when the accepting nudge reaches the cap #then the result terminates the tool loop so the judge never has to answer with nothing [0.20ms]
+error: expect(received).toBe(expected)
+Expected: true
+Received: undefined
+(fail) createKibitzerNudgeTool > #given the cap already reached #when a further nudge is rejected #then the rejection also terminates the tool loop [0.11ms]
+error: expect(received).toEqual(expected)
+(fail) classifyJudgeTurn > #given the engine's empty-response-twice error after an accepted nudge #when classified #then the judge turn is completed, not failed [0.28ms]
+error: expect(received).toEqual(expected)
+(fail) classifyJudgeTurn > #given the engine's empty-response-twice error with no accepted nudge #when classified #then the judge turn is empty, not failed [0.12ms]
+(fail) createKibitzerNudgeTool > #given maxItems 1 #when the accepting nudge reaches the cap #then the result terminates the tool loop so the judge never has to answer with nothing [0.20ms]
+(fail) createKibitzerNudgeTool > #given the cap already reached #when a further nudge is rejected #then the rejection also terminates the tool loop [0.11ms]
+(fail) classifyJudgeTurn > #given the engine's empty-response-twice error after an accepted nudge #when classified #then the judge turn is completed, not failed [0.28ms]
+(fail) classifyJudgeTurn > #given the engine's empty-response-twice error with no accepted nudge #when classified #then the judge turn is empty, not failed [0.12ms]
+ 30 pass
+ 4 fail
+error: expect(received).toMatchObject(expected)
+-   "nudges": [
+-     {
+-       "path": "reference/kubernetes-rollouts.md",
+-     },
+-   ],
+-   "status": "nudged",
++   "candidateCount": 1,
++   "cause": "child_failed",
++   "model": "omo-mock/mock-1",
++   "reason": "Model returned an empty response twice",
++   "runId": "77a9f24f-ed47-4b1e-af03-c5460dcbb944",
++   "status": "failed",
+- Expected  - 6
++ Received  + 6
+(fail) KibitzerGateRunner > #given a judge that nudges once then settles with the empty-response-twice error #when the runner launches #then the accepted nudge is delivered as nudged [5.50ms]
+error: expect(received).toBe(expected)
+Expected: "empty"
+Received: "failed"
+(fail) KibitzerGateRunner > #given a judge that nudges nothing and settles with the empty-response-twice error #when the runner launches #then the result is empty, not failed [4.73ms]
+ 9 pass
+ 2 fail

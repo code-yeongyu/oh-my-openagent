@@ -1,5 +1,5 @@
-import { watch } from "node:fs"
-import { mkdir, readdir, writeFile } from "node:fs/promises"
+import { watch } from "@oh-my-opencode/memory-core/fs"
+import { mkdir, readdir, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 const FILESYSTEM_RECHECK_INTERVAL_MS = 25

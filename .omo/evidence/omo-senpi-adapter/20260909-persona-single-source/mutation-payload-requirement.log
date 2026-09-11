@@ -1,0 +1,32 @@
+# mutation: payload list stops requiring the gate persona (reproduces the pre-fix drift)
+15:  ...PERSONA_ASSET_FILES.filter((f) => f !== "kibitzer-persona.md").map((filename) => join("extensions", filename)),
++   "kibitzer-persona.md",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/tmp/omo-persona-20260909/script/build-omo-native.test.ts:30:23)
+(fail) runtime persona coverage > #given the runtime persona manifest #when the payload requirements are read #then every persona is required [0.95ms]
+(pass) ensurePrebuiltNativeInputs > #given both prebuilt artifacts present #when ensuring #then no root build script runs [0.21ms]
+(pass) ensurePrebuiltNativeInputs > #given no prebuilt artifacts #when ensuring #then each input builds via its root script in order [0.09ms]
+(pass) ensurePrebuiltNativeInputs > #given only the daemon dist missing #when ensuring #then only build:lsp-daemon runs [0.06ms]
+(pass) ensurePrebuiltNativeInputs > #given a root build script exits nonzero #when ensuring #then the exit code surfaces [0.14ms]
+(pass) ensurePrebuiltNativeInputs > #given the spawn itself errors #when ensuring #then the error propagates [0.10ms]
+(pass) plugin payload allowlist parity > #given the plugin files allowlist #when compared with the payload lists #then every published entry is copied [0.09ms]
+(pass) plugin payload allowlist parity > #given the conditional x-search skill #when checking the payload #then it is both copied and required [0.12ms]
+
+ 7 pass
+ 1 fail
+ 11 expect() calls
+Ran 8 tests across 1 file. [943.00ms]
+
+# after reverting the mutation
+(pass) ensurePrebuiltNativeInputs > #given the spawn itself errors #when ensuring #then the error propagates [0.07ms]
+(pass) plugin payload allowlist parity > #given the plugin files allowlist #when compared with the payload lists #then every published entry is copied [0.09ms]
+(pass) plugin payload allowlist parity > #given the conditional x-search skill #when checking the payload #then it is both copied and required [0.11ms]
+
+ 8 pass
+ 0 fail
+ 11 expect() calls
+Ran 8 tests across 1 file. [895.00ms]

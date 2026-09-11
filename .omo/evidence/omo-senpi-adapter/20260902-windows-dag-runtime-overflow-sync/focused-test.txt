@@ -1,0 +1,10 @@
+Command:
+PATH=/private/tmp/bun-1.4.0/bin:$PATH bun test packages/omo-senpi/src/components/task/dag-runtime-config.test.ts
+
+Observed:
+(pass) assembled DAG runtime configuration > #given subscriber_ring is one #when the assembled runtime emits a burst #then the shipped RPC subscriber receives a durable overflow [66.20ms]
+
+1 pass
+0 fail
+3 expect() calls
+Ran 1 test across 1 file. [2.71s]

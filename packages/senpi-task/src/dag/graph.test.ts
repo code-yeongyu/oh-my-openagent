@@ -58,7 +58,7 @@ describe("compileDag structure", () => {
     // given
     const withTargets = definition([
       node("a", [], { label: "Alpha", task_summary: "sum", description: "desc", load_skills: ["programming"] }),
-      { id: "b", prompt: "run b", subagent_type: "momus", model: "gpt-5.6", dependsOn: ["a"] },
+      { id: "b", prompt: "run b", subagent_type: "plan-reviewer", model: "gpt-5.6", dependsOn: ["a"] },
     ])
 
     // when
@@ -78,10 +78,29 @@ describe("compileDag structure", () => {
     expect(result.nodes[1]).toMatchObject({
       id: nodeId("b"),
       prompt: "run b",
-      route: { kind: "agent", agent: "momus", model: "gpt-5.6" },
+      route: { kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" },
       dependsOn: [nodeId("a")],
       state: "pending",
     })
+  })
+
+  it("#given a node with a legacy subagent_type #when compiled #then the route stores only the canonical agent and keeps the DagRoute shape", () => {
+    // given
+    const withLegacy = definition([
+      { id: "legacy", prompt: "review", subagent_type: "momus", model: "gpt-5.6" },
+      { id: "canonical", prompt: "review", subagent_type: "plan-reviewer", model: "gpt-5.6" },
+      { id: "custom", prompt: "build", subagent_type: "custom-agent" },
+    ])
+
+    // when
+    const result = compileDag(withLegacy, { at: AT })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.nodes[0]?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" })
+    expect(result.nodes[0]?.route).toEqual(result.nodes[1]?.route)
+    expect(Object.keys(result.nodes[0]?.route ?? {}).sort()).toEqual(["agent", "kind", "model"])
+    expect(result.nodes[2]?.route).toEqual({ kind: "agent", agent: "custom-agent" })
   })
 
   it("#given a downstream node #when compiled #then the prompt is never templated with upstream ids", () => {
@@ -276,5 +295,16 @@ describe("compileDag purity", () => {
     const second = JSON.stringify(compileDag(diamond, { at: AT }))
 
     expect(second).toBe(first)
+  })
+})
+
+describe("compileDag empty definitions", () => {
+  it("#given a definition with zero nodes #when compiled #then it fails with empty_graph instead of an instantly-complete run", () => {
+    // when
+    const result = compileDag(definition([]), { at: AT })
+
+    // then
+    expect(result.ok).toBe(false)
+    expect(result.errors.map((error) => error.code)).toEqual(["empty_graph"])
   })
 })

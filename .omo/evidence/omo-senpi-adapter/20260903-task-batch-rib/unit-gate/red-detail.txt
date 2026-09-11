@@ -1,0 +1,18 @@
+error: foreground batch never subscribed to its children for progress
+(fail) foreground batch progress > #given a foreground batch with two live children #when a child emits a tool event #then partial updates name every child and the event, then stop at completion [2006.53ms]
+(pass) foreground batch progress > #given a foreground batch without an update sink #when it runs #then no child subscription is opened [1.17ms]
+error: expect(received).toBe(expected)
+Expected: 0
+Received: 2
+(fail) task batch run_in_background resolution > #given every item sets run_in_background true and no top-level flag #when the batch executes #then it returns immediately as a background batch [0.64ms]
+error: expect(received).toBe(expected)
+Expected: 0
+Received: 2
+(fail) task batch run_in_background resolution > #given a top-level false and one item true #when the batch executes #then it fails typed before any child starts [0.32ms]
+error: expect(received).toBe(expected)
+Expected: 0
+Received: 2
+(fail) task batch run_in_background resolution > #given items that disagree with each other #when the batch executes #then it fails typed and names both values [0.35ms]
+(pass) task batch run_in_background resolution > #given a top-level true mirrored on one item #when the batch executes #then agreement stays a background batch [0.41ms]
+ 2 pass
+ 4 fail

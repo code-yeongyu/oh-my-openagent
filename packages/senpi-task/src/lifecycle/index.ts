@@ -1,9 +1,16 @@
 export { createTaskLifecycle } from "./create"
 export { AgentLimitReached } from "./errors"
 export type { ResidentSummary } from "./errors"
-export { getLifecycleReattachPorts, registerLifecycleReattachPorts } from "./port"
+export {
+  getLifecycleDetachedRevivalRollback,
+  getLifecycleReattachPorts,
+  registerLifecycleDetachedRevivalRollback,
+  registerLifecycleReattachPorts,
+} from "./port"
 export type {
   DestroyCause,
+  DetachedRevivalResult,
+  DetachedRevivalRollbackResult,
   LifecycleDeps,
   LifecycleReattachPorts,
   ProcessSignaller,

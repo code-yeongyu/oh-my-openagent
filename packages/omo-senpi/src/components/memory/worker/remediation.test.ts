@@ -84,6 +84,18 @@ describe("reflectionRemediation", () => {
       expect(reflectionRemediation("spawn_failed", "execvp ENOENT")).toContain("SENPI_BIN")
     })
 
+    test("#when a running child dies on a missing file #then the hint points at the child log, not SENPI_BIN", () => {
+      // given: the child started, so the executable resolved; only a file it opened was missing
+      const detail = "ENOENT: no such file or directory, open '/opt/omo-runtime/dist/modes/interactive/theme/dark.json'"
+
+      // when
+      const hint = reflectionRemediation("child_exit", detail)
+
+      // then
+      expect(hint).not.toContain("SENPI_BIN")
+      expect(hint).toContain("child-stderr.log")
+    })
+
     test("#when nothing matches #then the child log hint remains the default for post-spawn failures", () => {
       expect(reflectionRemediation("child_exit", "exit code 1")).toContain("child-stderr.log")
     })

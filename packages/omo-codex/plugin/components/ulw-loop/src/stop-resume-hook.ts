@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
 
-import { normalizeUlwLoopSessionId, ulwLoopDir } from "./paths.js";
+import { normalizeUlwLoopSessionId, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
+import { isStateLockTimeout, withStateLockSync } from "./state-lock.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
 // Turn-death recovery only: Codex emits Stop when a turn ends, so a run that
@@ -34,12 +35,13 @@ export function runStopResumeHook(input: unknown): string {
 	if (payload === null || payload.stop_hook_active) return "";
 	if (transcriptShowsContextPressure(payload.transcript_path)) return "";
 	if (boulderContinuationWillFire(payload.cwd, payload.session_id)) return "";
-	const stateDir = ulwLoopDir(payload.cwd, { sessionId: payload.session_id });
+	const scope = { sessionId: payload.session_id } as const;
+	const stateDir = ulwLoopDir(payload.cwd, scope);
 	const plan = readPlan(join(stateDir, "goals.json"));
 	if (plan === null || plan.aggregateCompletion?.status === "complete") return "";
 	const goal = resumableGoal(plan);
 	if (goal === undefined) return "";
-	if (!consumeResumeBudget(stateDir, goal.id)) return "";
+	if (!consumeResumeBudgetLocked(ulwLoopStateLockPath(payload.cwd, scope), stateDir, goal.id)) return "";
 	const output: { decision: "block"; reason: string } = {
 		decision: "block",
 		reason: renderResumeDirective(plan, goal, payload.session_id),
@@ -66,6 +68,17 @@ function resumableGoal(plan: UlwLoopPlan): UlwLoopItem | undefined {
 
 function isResumableStatus(status: UlwLoopItem["status"]): boolean {
 	return status === "pending" || status === "in_progress";
+}
+
+// A resume is a budgeted side effect; when the session lock cannot be taken the
+// hook stays silent (fail closed) instead of charging the counter unlocked.
+function consumeResumeBudgetLocked(lockPath: string, stateDir: string, goalId: string): boolean {
+	try {
+		return withStateLockSync(lockPath, () => consumeResumeBudget(stateDir, goalId));
+	} catch (error) {
+		if (isStateLockTimeout(error)) return false;
+		throw error;
+	}
 }
 
 // Two-strike cap keyed on ledger movement: an unchanged ledger.jsonl line

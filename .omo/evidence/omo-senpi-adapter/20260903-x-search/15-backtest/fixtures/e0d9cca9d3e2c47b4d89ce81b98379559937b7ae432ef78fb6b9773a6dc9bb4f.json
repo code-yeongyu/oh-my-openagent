@@ -1,0 +1,189 @@
+{
+  "queryId": "q05",
+  "lane": "api-direct",
+  "variant": "v2",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"코스피 반도체 외인 매수 since:2026-08-31 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary. Prefer the most recent posts; keep the exact since: operator inside the keyword query."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-31",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422827,
+    "completed_at": 1788422827,
+    "id": "5e72b4b2-4dd4-9d28-849e-9e776b00c18e",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_5e72b4b2-4dd4-9d28-849e-9e776b00c18e",
+        "summary": [
+          {
+            "text": "The user wants me to use x_keyword_search with a specific query: \"코스피 반도체 외인 매수 since:2026-08-31 until:2026-09-03\"\n",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-2130c04e-3fbe-4a2e-81f4-0a15abc5ddb1-0",
+        "input": "{\"query\":\"코스피 반도체 외인 매수 since:2026-08-31 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_5e72b4b2-4dd4-9d28-849e-9e776b00c18e_call-2130c04e-3fbe-4a2e-81f4-0a15abc5ddb1-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_5e72b4b2-4dd4-9d28-849e-9e776b00c18e_call-2130c04e-3fbe-4a2e-81f4-0a15abc5ddb1-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/hyakue0123waje/status/2094680652314763652 - 09/01 증시마감, 코스피 0.23% 상승, 외인·기관 매도 속 개인 매수, 반도체 대형주 반등 (@hyakue0123waje, 2026-09-01)\nhttps://x.com/jichoi18/status/2094302297643954391 - 2026-08-31 장중 코스피 강회복, 외인 반도체 매수 전환·SK하이닉스 순매수 (@jichoi18, 2026-08-31)\nhttps://x.com/n2txbf/status/2094287180013457763 - 코스피 급락 속 외인·기관 동반 순매도, 반도체주 약세 (@n2txbf, 2026-08-31)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094680652314763652",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094680652314763652"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094302297643954391",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094302297643954391"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094287180013457763",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094287180013457763"
+              }
+            ]
+          }
+        ],
+        "id": "msg_5e72b4b2-4dd4-9d28-849e-9e776b00c18e",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-31",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 69084200,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 69084200,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T08:07:03.247Z"
+}

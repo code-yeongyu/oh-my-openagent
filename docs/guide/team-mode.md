@@ -29,7 +29,7 @@ Add to the `[opencode]` block of `~/.omo/omo.jsonc` (user) or `.omo/omo.jsonc` (
 
 After enabling, restart opencode. The 12 `team_*` tools become available.
 
-> Bug-fix note: v4.2.1 adds a fresh-install regression test for this minimal config and logs the resolved `team_mode` state plus team tool count during startup. If the tools still do not appear after restart, inspect `oh-my-opencode.log` for the loaded config path and `[tool-registry] Built tool registry` entry.
+> Bug-fix note: a fresh-install regression test covers this minimal config and startup logs the resolved `team_mode` state plus team tool count (`[tool-registry] Built tool registry`). If the tools still do not appear after restart, inspect `oh-my-opencode.log` for the loaded config path and `[tool-registry] Built tool registry` entry.
 
 ## Config schema (11 fields)
 
@@ -55,29 +55,29 @@ Team specs live under `~/.omo/teams/{name}/config.json` (user scope) or `<projec
 {
   "name": "ccapi-explorers",
   "description": "Explore the ccapi project structure.",
-  "lead": { "kind": "subagent_type", "subagent_type": "sisyphus" },
   "members": [
     { "kind": "category", "name": "scout-1", "category": "deep", "prompt": "Scout the source directory for auth patterns." },
-    { "kind": "category", "name": "scout-2", "category": "quick", "prompt": "Scout tests for auth coverage." }
+    { "kind": "category", "name": "scout-2", "category": "quick", "prompt": "Scout tests for auth coverage." },
+    { "kind": "subagent_type", "name": "auditor", "subagent_type": "my-security-auditor", "prompt": "Audit the auth findings the scouts report." }
   ]
 }
 ```
 
 When both scopes define the same team name, project scope wins.
 
-`version`, `createdAt`, and `leadAgentId` are optional in config files. The loader fills them automatically. You can either write a top-level `lead: {...}` shorthand, mark one member with `isLead: true`, or omit both when the team has exactly one member.
+`version` and `createdAt` are optional in config files; the loader fills them automatically. The lead is always the current session, so there is no lead member to declare. `team_create` also accepts the same shape inline: `{ name, members: [{ name, category|subagent_type, prompt? }] }`.
 
 ## Member kinds
 
-- **`kind: "subagent_type"`** — direct agent (atlas, sisyphus, sisyphus-junior, hephaestus). `prompt` optional.
-- **`kind: "category"`** — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
+- **`kind: "category"`**: routed to the category worker, a fresh worker session configured by the category's model and skills. `prompt` REQUIRED. Unknown categories fail with `UNRESOLVABLE_CATEGORY` and the error lists the available ones.
+- **`kind: "subagent_type"`** (alias `"agent"`): a user-defined agent from `omo.json` `agents`, invoked directly. `prompt` optional. The kind is inferred from whichever field you set, so you can omit it.
 
-## Eligible agents
+## Who can be a member
 
-- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`, `hephaestus` (OpenCode grants `teammate: "allow"` by default).
-- **Hard-reject:** `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`.
+- **Eligible:** any resolvable category, and any user-defined agent.
+- **Rejected at parse:** the curated read-only agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`) and the ulw-loop reviewer trio (`omo-senpi-code-reviewer`, `omo-senpi-qa-executor`, `omo-senpi-gate-reviewer`).
 
-Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state. Use the `task` tool for those agents; its implementation module is named `delegate-task`.
+The curated agents are read-only and in-process, so they can't write mailbox state. The reviewer trio is rejected because process-mode members drop reviewer instructions and tool allowlists. Route both groups through the `task` tool instead (`packages/senpi-task/src/team/member-validator.ts`).
 
 ## Lifecycle
 
@@ -114,7 +114,7 @@ Add `"worktreePath": "../wt-scout"` to a member entry. Path is filesystem-relati
 
 Set `tmux_visualization: true`. Requires running inside a tmux session and tmux on PATH. Failures are isolated - a missing tmux never blocks team creation.
 
-When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
+When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise `process.cwd()`.
 
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
 

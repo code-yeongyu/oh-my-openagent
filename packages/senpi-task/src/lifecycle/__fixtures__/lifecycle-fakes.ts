@@ -119,6 +119,8 @@ export function fakeHandle(
 export class FakeRegistry implements ResidencyRegistry {
   readonly #handles = new Map<string, ResidentHandle>()
   readonly #pending = new Set<string>()
+  readonly #evicting = new Set<string>()
+  readonly #sends = new Map<string, number>()
   readonly forgotten: string[] = []
 
   add(handle: ResidentHandle): void {
@@ -143,7 +145,33 @@ export class FakeRegistry implements ResidencyRegistry {
   }
 
   hasPendingSends(taskId: string): boolean {
-    return this.#pending.has(taskId)
+    return this.#pending.has(taskId) || (this.#sends.get(taskId) ?? 0) > 0
+  }
+
+  tryClaimEviction(taskId: string): boolean {
+    if (this.#evicting.has(taskId) || (this.#sends.get(taskId) ?? 0) > 0) return false
+    this.#evicting.add(taskId)
+    return true
+  }
+
+  releaseEviction(taskId: string): void {
+    this.#evicting.delete(taskId)
+  }
+
+  isEvicting(taskId: string): boolean {
+    return this.#evicting.has(taskId)
+  }
+
+  tryBeginSend(taskId: string): boolean {
+    if (this.#evicting.has(taskId)) return false
+    this.#sends.set(taskId, (this.#sends.get(taskId) ?? 0) + 1)
+    return true
+  }
+
+  endSend(taskId: string): void {
+    const count = this.#sends.get(taskId) ?? 0
+    if (count <= 1) this.#sends.delete(taskId)
+    else this.#sends.set(taskId, count - 1)
   }
 }
 

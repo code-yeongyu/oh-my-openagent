@@ -59,7 +59,7 @@ describe("lazycodex executor verify CLI", () => {
 		const cwd = createWorkspace();
 		const artifactPath = join(cwd, ".omo", "evidence", "receipt.txt");
 		mkdirSync(join(cwd, ".omo", "evidence"), { recursive: true });
-		writeFileSync(artifactPath, "verified\n");
+		writeFileSync(artifactPath, "Command: verify\nExit code: 0\nOutput: all checks passed.\n");
 		const payload = JSON.stringify(
 			createPayload(cwd, { last_assistant_message: `EVIDENCE_RECORDED: ${artifactPath}` }),
 		);

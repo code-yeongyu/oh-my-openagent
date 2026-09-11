@@ -3,10 +3,15 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecordStore } from "../store"
 import { injectedLifecycleReattachPorts } from "./port"
-import type { LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
+import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
 import type { BatchAdmissionOptions } from "./residency"
 
 const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
+
+export const defaultIdleReclaimerScheduler = {
+  setInterval: (callback: () => void, delayMs: number): ReturnType<typeof setInterval> => setInterval(callback, delayMs),
+  clearInterval: (timer: ReturnType<typeof setInterval>): void => clearInterval(timer),
+}
 
 export type LifecycleContext = {
   readonly store: TaskRecordStore
@@ -19,6 +24,7 @@ export type LifecycleContext = {
   readonly dequeuePending: (taskId: string) => void
   readonly reattachPorts: LifecycleReattachPorts | undefined
   readonly reconcileAdmission: BatchAdmissionOptions
+  readonly idleReclaimerScheduler: IdleReclaimerScheduler
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
@@ -54,6 +60,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     dequeuePending: deps.dequeuePending ?? (() => {}),
     reattachPorts: injectedLifecycleReattachPorts(deps),
     reconcileAdmission: deps.reconcileAdmission ?? {},
+    idleReclaimerScheduler: deps.idleReclaimerScheduler ?? defaultIdleReclaimerScheduler,
   }
 }
 

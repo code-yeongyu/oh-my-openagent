@@ -18,7 +18,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `build-omo-native.ts` | Build the native omo runtime artifacts |
 | `ensure-vendored-lsp-daemon.ts` | Build/watch the vendored LSP daemon (daemon bin + lock-dir watch) |
 | `verify-omo-ai-payload.mjs` | omo-ai npm payload gate: required artifact list, 18-skill minimum, 30 MB unpacked cap, no nested `node_modules`/source paths |
-| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml` |
+| `test-fast.ts` | `bun run test:fast` partitioned suite: `opencode-memory` -> `senpi` -> root-rest via `bunfig.win2.toml`. Groups run detached (own process groups) and are killed with the parent on SIGINT/SIGTERM; a spawned group inherits `OMO_TEST_FAST_ACTIVE=1` and re-entry refuses to recurse |
 | `ci-fast-path.mjs` | CI skip classifier (`classifyCiMode`): platform-sensitive paths and the `ci:full-matrix` label force the full OS matrix |
 | `telemetry-schema-block.mjs` | Generate the telemetry schema doc block (`generateTelemetrySchemaBlock`) |
 | `remove-stale-self-package-tests.ts` | Prune self-package tests that reference deleted sources |
@@ -29,7 +29,8 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `build-model-capabilities.ts` | Refresh the generated model-capabilities artifact consumed by `packages/model-core/` |
 | `patch-node-require-shim.ts` | Patches `dist/index.js` for Node/Electron require compatibility |
 | `publish.ts` | Local multi-package publish alternative (platform packages + npm) |
-| `generate-changelog.ts` | Release notes from git log, filters bot commits |
+| `generate-changelog.ts` | Release notes from git log, filters bot commits (imports `RELEASE_VERSION_PATTERN` from `release-latest-flag.ts`) |
+| `release-latest-flag.ts` | Owns the GitHub **Latest** badge rule for every release-creation path (`publish.yml` omo + LazyCodex steps, `publish.ts`): `resolveLatestFlag(version, publishedTags)` -> `--latest` unless an already published tag has a higher semver, then `--latest=false`. CLI reads tags on stdin: `gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' \| bun script/release-latest-flag.ts <version>`. The pipeline never passes `--prerelease` |
 | `stats.ts` | npm + GitHub-release download counts (`gh api --paginate --slurp`; weekly `stats.yml`) |
 | `sync-lazycodex-marketplace.ts` | Copy plugin + marketplace payload into the `code-yeongyu/lazycodex` repo (publish.yml stable releases) |
 | `lazycodex-marketplace-validation.ts` | Validate the synced marketplace payload (runtime path args incl. Windows/absolute/`components/*/dist/*.js`) |

@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from "node:fs"
-import { parseJsonc } from "../../shared"
+import { parseJsonc, type PluginEntry } from "../../shared"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 
 interface ParseConfigResult {
@@ -8,7 +8,7 @@ interface ParseConfigResult {
 }
 
 export interface OpenCodeConfig {
-  plugin?: string[]
+  plugin?: PluginEntry[]
   [key: string]: unknown
 }
 

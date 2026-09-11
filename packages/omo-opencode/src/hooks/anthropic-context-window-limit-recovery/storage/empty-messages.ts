@@ -41,7 +41,3 @@ export function findEmptyMessageByIndex(sessionID: string, targetIndex: number):
   return null
 }
 
-export function findFirstEmptyMessage(sessionID: string): string | null {
-  const emptyIds = findEmptyMessages(sessionID)
-  return emptyIds.length > 0 ? emptyIds[0] : null
-}

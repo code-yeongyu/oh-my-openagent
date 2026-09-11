@@ -14,7 +14,8 @@ export async function GET() {
         },
       },
     )
-  } catch {
+  } catch (error) {
+    console.warn("Unable to refresh GitHub stats and description; using fallback data", error)
     return NextResponse.json(FALLBACK_FORMATTED_STATS, {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",

@@ -87,6 +87,9 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 		await runJsonRpcStdioServer({
 			input,
 			output,
+			// Idle stays disabled: the opencode host does not respawn a stdio MCP
+			// server that exits — transport close marks it failed until a user
+			// reconnects via /mcp — so an idle kill would strand a live session.
 			idleTimeoutMs: 0,
 			parentWatchdog: options.parentWatchdog ?? {},
 			handler: (request, requestOptions) => {

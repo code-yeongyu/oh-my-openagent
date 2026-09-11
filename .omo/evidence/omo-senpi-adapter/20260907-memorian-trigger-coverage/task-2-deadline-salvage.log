@@ -1,0 +1,139 @@
+task-2-deadline-salvage
+worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage
+branch: feat/memorian-trigger-coverage
+
+WHAT CHANGED
+- memorian-judge-run.ts: deadline in either race phase still abortAndDispose + warns
+  "memorian gate deadline exceeded" with { runId, salvaged: accepted.length }.
+  If accepted.length > 0 return { status: "completed", partial: true } WITHOUT setting
+  state.cancelled (so launchOnce does not drop salvage as cancelled). Else keep
+  { status: "failed", cause: "deadline", ... } including setup-path state.cancelled = true.
+- memorian-runner.ts: MemorianGateLaunchResult nudged variant gains readonly partial?: boolean.
+  launchOnce treats completed+partial like any completed judge: validateNudges, then the
+  existing cancelled / compaction-staleness drops, then { status: "nudged", ..., partial: true }.
+- memorian-trigger.ts: tool_call origin deadlineMs 45_000 -> 90_000 (settled path unchanged).
+- tests: salvage / empty-deadline / compaction-on-deadline in memorian-runner-completion.test.ts;
+  trigger pin 90_000.
+
+TDD: tests written first, RED captured, then implementation, GREEN captured.
+
+-------------------------------------------------------------------------------
+RED (tests only, production unchanged)
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-trigger.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-trigger.test.ts
+
+output (relevant):
+RBT_SYNCED=2
+(pass) MemorianGateRunner > #given a silent normal judge #when the runner launches #then the result is empty [201.77ms]
+...
+139 |     expect(result.status).toBe("nudged")
+error: expect(received).toBe(expected)
+      at <anonymous> (/home/user/work/packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts:139:27)
+(fail) MemorianGateRunner > #given a child that accepts one nudge then never settles #when the launch deadline fires #then the result is nudged with partial true and the accepted path [63.37ms]
+(pass) MemorianGateRunner > #given a child that never nudges and never settles #when the launch deadline fires #then the result is failed with cause deadline [60.53ms]
+173 |     expect(result).toMatchObject({ status: "dropped", cause: "compaction" })
+error: expect(received).toMatchObject(expected)
+      at <anonymous> (/home/user/work/packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts:173:20)
+(fail) MemorianGateRunner > #given an accepted nudge and a compaction epoch bump mid-flight #when the launch deadline fires #then the result is dropped with cause compaction [58.63ms]
+61 |   expect(launches).toEqual([{ deadlineMs: 90_000 }])
+error: expect(received).toEqual(expected)
+      at <anonymous> (/home/user/work/packages/omo-senpi/src/components/memory/memorian-trigger.test.ts:61:20)
+(fail) #given a tool call #when triggered #then args are captured and a deadline is passed [5.80ms]
+...
+ 14 pass
+ 3 fail
+Ran 17 tests across 2 files. [3.30s]
+RBT_RC=1
+
+salvage title RED as required. empty-deadline title stayed green.
+
+-------------------------------------------------------------------------------
+GREEN (source + tests synced)
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-judge-run.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-trigger.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-trigger.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-runner.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-trigger.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-lifecycle.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-compaction.test.ts
+
+output:
+RBT_SYNCED=5
+(pass) MemorianGateRunner > #given a compaction accepted mid-flight #when the child finishes #then the stale nudges are discarded instead of written [150.96ms]
+(pass) MemorianGateRunner > #given an unchanged compaction epoch #when the child finishes #then the result is nudged and carries the validated list [25.88ms]
+(pass) MemorianGateRunner > #given a silent normal judge #when the runner launches #then the result is empty [22.42ms]
+(pass) MemorianGateRunner > #given a rejected-only nudge then a normal stop #when the runner launches #then the result is empty [17.32ms]
+(pass) MemorianGateRunner > #given a child turn that ends with a secret-bearing provider error #when the runner launches #then child_failed is redacted and logs omit the token [21.43ms]
+(pass) MemorianGateRunner > #given loadConfig throws #when the runner launches #then the failure is launch_failed with a normalized reason [10.09ms]
+(pass) MemorianGateRunner > #given session creation throws a secret-bearing error #when the runner launches #then the creation warning is sanitized [17.71ms]
+(pass) MemorianGateRunner > #given a child that accepts one nudge then never settles #when the launch deadline fires #then the result is nudged with partial true and the accepted path [57.43ms]
+(pass) MemorianGateRunner > #given a child that never nudges and never settles #when the launch deadline fires #then the result is failed with cause deadline [58.48ms]
+(pass) MemorianGateRunner > #given an accepted nudge and a compaction epoch bump mid-flight #when the launch deadline fires #then the result is dropped with cause compaction [59.83ms]
+(pass) #given a tool call #when triggered #then args are captured and a deadline is passed [6.93ms]
+(pass) #given unchanged candidates #when triggered twice #then the second launch is skipped [1.01ms]
+(pass) #given different candidate sets #when triggered #then the new set launches [2.02ms]
+(pass) #given candidate paths in a different order #when triggered #then only one launch occurs [0.62ms]
+(pass) #given a settle trigger #when launched #then no deadline is passed [0.50ms]
+(pass) #given two hundred launches #when the 201st arrives #then the launch ceiling is logged [3.86ms]
+(pass) #given a nudged result #when launched #then accepted nudges receive the launch epoch [0.86ms]
+(pass) #given all judge slots are held #when triggered #then it logs judge_cap without launching [0.49ms]
+(pass) memorian trigger contract > #given a stale event context #when the handler returns #then detached work uses snapshots [0.82ms]
+(pass) MemorianGateRunner > #given child setup never resolves #when the whole-launch deadline fires #then the latch releases and a late handle is disposed [526.65ms]
+(pass) MemorianGateRunner > #given a runner constructed with deadlineMs 60_000, a launch input with deadlineMs 50, and a child that never settles #when the runner launches #then the result is failed with cause deadline within 2s [91.51ms]
+(pass) MemorianGateRunner > #given a child that never settles #when the deadline fires #then the child is aborted and disposed [28.32ms]
+(pass) MemorianGateRunner > #given a child in flight #when cancel is called #then it aborts and disposes without writing a late nudge [23.84ms]
+(pass) MemorianGateRunner > #given child setup is still deferred #when cancel is requested then the handle resolves #then the late handle is dropped without a pending payload [21.26ms]
+(pass) MemorianGateRunner > #given a gate child that calls nudge on a valid candidate #when the runner launches #then the result is nudged with the validated list [26.10ms]
+(pass) MemorianGateRunner > #given a snapshotted registry on the input #when the ctx behind it is already disposed #then the launch still succeeds [39.47ms]
+(pass) MemorianGateRunner > #given no registry snapshot on the input #when the runner launches #then it warns, skips and creates no child session [17.74ms]
+(pass) MemorianGateRunner > #given the quick category cannot resolve #when the runner launches #then it warns, skips and creates no child session [21.91ms]
+(pass) MemorianGateRunner > #given no quick category but another usable registry model #when the runner launches #then it warns, skips and never rides the beyond-category ladder [18.95ms]
+(pass) MemorianGateRunner > #given a launch already in flight #when a second trigger arrives #then only one child session is created [22.36ms]
+(pass) MemorianGateRunner > #given a child that nudges the same valid candidate twice #when the runner validates the result #then the result is nudged with one validated nudge [15.36ms]
+(pass) MemorianGateRunner > #given a child session that cannot be created #when the runner launches #then the failure names the creation cause [18.25ms]
+(pass) MemorianGateRunner > #given a child turn that ends with an error #when the runner launches #then the failure names the child cause [20.59ms]
+(pass) MemorianGateRunner > #given a completed run #when the runner finishes #then the run directory is kept with its auditable artifacts [16.44ms]
+(pass) MemorianGateRunner > #given an inlined launch #when the child session is created #then the judge prompt carries the inputs inline with a bare envelope [19.91ms]
+ 35 pass
+ 0 fail
+ 81 expect() calls
+Ran 35 tests across 5 files. [4.26s]
+RBT_RC=0
+
+-------------------------------------------------------------------------------
+TSGO
+command:
+  cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage && bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+result: exit 0, quiet (TSGO_RC=0)
+note: worktree had no node_modules on first attempt (error TS2688 bun-types). bun install --frozen-lockfile --ignore-scripts (595 packages, 7.92s) then tsgo clean.
+
+-------------------------------------------------------------------------------
+PURE LOC (awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//' | wc -l)
+memorian-judge-run.ts 116
+memorian-runner.ts 178
+memorian-trigger.ts 222
+memorian-runner.test.ts 173 (untouched)
+memorian-runner-completion.test.ts 124
+memorian-trigger.test.ts 135
+all <= 250
+
+-------------------------------------------------------------------------------
+SCOPE CHECK
+git diff --stat (this task):
+ memorian-judge-run.ts                         |  8 ++--
+ memorian-runner-completion.test.ts            | 49 +++++++++++++++++++++-
+ memorian-runner.ts                            |  6 ++-
+ memorian-trigger.test.ts                      |  2 +-
+ memorian-trigger.ts                           |  2 +-
+ 5 files changed, 59 insertions(+), 8 deletions(-)
+no commit, no push.
+runDir artifact writing in memorian-judge-run.ts left untouched.

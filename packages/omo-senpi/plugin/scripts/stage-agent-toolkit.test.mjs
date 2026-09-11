@@ -50,6 +50,24 @@ describe("agent-toolkit runtime staging", () => {
     assert.equal(probe.status, 0, probe.stderr)
   })
 
+  test("#given a staged toolkit #when inspecting the bundle dir #then the omo-senpi surface marker is baked next to the bundle", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+
+    const marker = JSON.parse(await readFile(join(fixture.targetDir, "ulw-loop", "surface.json"), "utf8"))
+    assert.deepEqual(marker, { surface: "omo-senpi" })
+    assert.deepEqual((await readdir(join(fixture.targetDir, "ulw-loop"))).sort(), ["cli.js", "surface.json"])
+  })
+
+  test("#given a staged toolkit missing the surface marker #when freshness is checked #then it reports stale", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
+    const fixture = await makeFixture()
+    await stageAgentToolkit({ ...fixture, buildBundle: false })
+    await rm(join(fixture.targetDir, "ulw-loop", "surface.json"))
+
+    await assert.rejects(checkAgentToolkitFresh(fixture), /missing/)
+  })
+
   test("#given a staged toolkit #when freshness is checked #then runtime artifacts and source bytes must match", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
     const fixture = await makeFixture()
     await stageAgentToolkit({ ...fixture, buildBundle: false })

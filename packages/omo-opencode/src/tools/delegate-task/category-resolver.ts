@@ -5,7 +5,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
-import { BUILTIN_CATEGORY_REQUIRES_MODEL, CATEGORY_PROMPT_APPEND_RESOLVERS } from "./constants"
+import { builtinCategoryGateModels, CATEGORY_PROMPT_APPEND_RESOLVERS } from "./constants"
 import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
@@ -90,7 +90,8 @@ export async function resolveCategoryExecution(
 
   if (!resolved) {
     const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-    const requiredModel = requirement?.requiresModel ?? BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName]
+    const requiredModels = builtinCategoryGateModels(categoryName, requirement?.requiresModel)
+    const requiredModel = requiredModels.length > 0 ? requiredModels.join('" or "') : undefined
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
     const configuredModels = userCategories?.[categoryName]?.models
 

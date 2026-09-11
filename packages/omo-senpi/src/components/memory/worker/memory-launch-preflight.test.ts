@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { resolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import { resetModelPreflightCacheForTests } from "./model-preflight"
 import { reflectionRemediation } from "./remediation"
-import type { MemoryModelChain } from "./memory-model-attempts"
+import { MemoryModelExhaustedError, type MemoryModelChain } from "./memory-model-attempts"
 import type { ReflectionChildResult } from "./spawn"
 
 const SUCCESSFUL_CHILD: ReflectionChildResult = {
@@ -38,8 +38,10 @@ async function catalog(table: string): Promise<{
 }
 
 // The second row keeps the parsed catalog non-empty when the slashed row is dropped, so a parser that
-// rejects slashed ids reaches none_visible instead of the empty-catalog path that degrades to a
-// reactive launch and would let this assertion pass for the wrong reason.
+// rejects slashed ids reaches the "catalog omits every candidate" warning instead of the empty-catalog
+// probe error. Both degrade to a reactive launch, so the slash tests below also assert that no preflight
+// warning fired - only the `filtered` verdict is silent - to keep the assertion from passing for the
+// wrong reason.
 const TABLE_WITH_SLASH_ID = [
   "provider                    model                                                     context  max-out  thinking  images",
   "apitopia                    z-ai/glm-5.2-ultrafast-unlocked                           1M       131.1K   yes       no",
@@ -60,6 +62,7 @@ describe("resolveAndPreflightMemoryLaunch", () => {
         // given
         const item = await catalog(TABLE_WITH_SLASH_ID)
         const launched: string[] = []
+        const warnings: string[] = []
 
         // when
         await resolveAndPreflightMemoryLaunch({
@@ -69,6 +72,7 @@ describe("resolveAndPreflightMemoryLaunch", () => {
           env: { PATH: process.env.PATH },
           envFlag: surface === "reflection" ? "SENPI_MEMORY_REFLECTION" : "SENPI_MEMORY_FACTS",
           configSources: [{ path: item.config, exists: true }],
+          warn: (message) => warnings.push(message),
           surfaceName: surface,
           attempt: async (candidate) => {
             launched.push(candidate.model)
@@ -78,17 +82,48 @@ describe("resolveAndPreflightMemoryLaunch", () => {
 
         // then
         expect(launched).toEqual(["apitopia/z-ai/glm-5.2-ultrafast-unlocked"])
+        expect(warnings).toEqual([])
       })
     }
   })
 
-  describe("#given a model the child genuinely cannot see", () => {
-    // The failure has to be diagnosed BEFORE a child runs. A spawned child would fail as child_exit
-    // carrying senpi's own error text, which is what produced the unbounded repeating warning.
-    test("#when the launch is preflighted #then it is rejected up front with a remediation that names the config", async () => {
+  describe("#given a freshly probed catalog that omits the only candidate", () => {
+    // `--list-models` in the discovery-disabled child intermittently omits whole providers (#7923), so
+    // a parseable-but-incomplete catalog must not fail the run closed before any child is spawned. The
+    // reactive `model_not_visible` classifier makes the final call after a real spawn.
+    test("#when the reflection surface launches #then the candidate still reaches the child instead of failing closed", async () => {
       // given
       const item = await catalog(TABLE_WITHOUT_THE_MODEL)
-      let childSpawned = false
+      const launched: string[] = []
+
+      // when
+      await resolveAndPreflightMemoryLaunch({
+        candidates: [{ model: "openai-codex/gpt-5.6-luna-fast" }] as unknown as MemoryModelChain,
+        senpiCommand: item.command,
+        senpiPrefixArgs: item.prefixArgs,
+        env: { PATH: process.env.PATH },
+        envFlag: "SENPI_MEMORY_REFLECTION",
+        configSources: [{ path: item.config, exists: true }],
+        surfaceName: "reflection",
+        attempt: async (candidate) => {
+          launched.push(candidate.model)
+          return SUCCESSFUL_CHILD
+        },
+      })
+
+      // then
+      expect(launched).toEqual(["openai-codex/gpt-5.6-luna-fast"])
+    })
+  })
+
+  describe("#given a model the child genuinely cannot see", () => {
+    // The diagnosis has to name the config, not the child log. The spawned child's own senpi error
+    // text is classified into `model_not_visible` and the chain is reported exhausted, so the
+    // remediation still points at memory.reflection instead of child-stderr.log.
+    test("#when the only candidate is launched #then the exhausted chain is rejected with a remediation that names the config", async () => {
+      // given
+      const item = await catalog(TABLE_WITHOUT_THE_MODEL)
+      let attempts = 0
 
       // when
       const launch = resolveAndPreflightMemoryLaunch({
@@ -100,17 +135,23 @@ describe("resolveAndPreflightMemoryLaunch", () => {
         configSources: [{ path: item.config, exists: true }],
         surfaceName: "reflection",
         attempt: async () => {
-          childSpawned = true
-          return SUCCESSFUL_CHILD
+          attempts += 1
+          return {
+            code: 1,
+            signal: null,
+            stdout: "",
+            stderr: 'Error: Model "apitopia/truly-absent-model" not found. Use --list-models to see available models.',
+            timedOut: false,
+          }
         },
       })
 
       // then
       const error = await launch.then(() => undefined, (reason: unknown) => reason)
-      expect(error).toBeInstanceOf(Error)
+      expect(error).toBeInstanceOf(MemoryModelExhaustedError)
       const message = error instanceof Error ? error.message : ""
-      expect(message).toContain("apitopia/truly-absent-model")
-      expect(childSpawned).toBe(false)
+      expect(message).toContain("model_not_visible:apitopia/truly-absent-model")
+      expect(attempts).toBe(1)
       const hint = reflectionRemediation("failed", message)
       expect(hint).toContain("memory.reflection")
       expect(hint).not.toContain("child-stderr.log")

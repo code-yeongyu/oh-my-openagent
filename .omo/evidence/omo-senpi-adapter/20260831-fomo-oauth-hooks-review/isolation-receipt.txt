@@ -1,0 +1,6 @@
+isolatedAgentDir=/tmp/omo-held-lock-qa.N81cMA/agent
+realSenpiUntouched=true
+lockPath=/tmp/omo-held-lock-qa.N81cMA/agent/hooks-state.json.lock
+lockKind=exact-global-hooks-writer-lock
+cleanup=pending
+cleanup=complete

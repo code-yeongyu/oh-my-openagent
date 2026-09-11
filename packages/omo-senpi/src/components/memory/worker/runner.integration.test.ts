@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, readdir } from "node:fs/promises"
+import { readFile, readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
@@ -257,7 +257,7 @@ describe("SenpiSubprocessRunner integration", () => {
     await assertWorktreesClean(item)
   }, 60_000)
 
-  test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then only the fresh verdict fails closed", async () => {
+  test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then both runs proceed reactively", async () => {
     // given
     const item = await harness({
       childMode: "commit",
@@ -266,13 +266,18 @@ describe("SenpiSubprocessRunner integration", () => {
 
     // when
     const fresh = await item.runner.launch(item.run)
+    // The first run now merges and advances the cursor, so the second reservation needs fresh backlog,
+    // and the stub child's identical commit needs a real diff against the parent to merge again.
+    await item.journal.reconcile([{ kind: "assistant", messageId: "assistant-2", textBlocks: ["Remember another fact"] }])
+    const parent = new GitMemoryRepo({ dir: item.identity.paths.repo, agentId: item.identity.id })
+    await writeFile(join(item.identity.paths.repo, "system", "reflected.md"), "---\ndescription: Edited between runs\n---\nEdited between runs.\n", "utf8")
+    await parent.commitWrite(["system/reflected.md"], "edit between runs", { agentId: item.identity.id, authorName: "Test" })
     const cached = await item.runner.launch(await item.reserveAgain())
 
     // then
-    expect(fresh).toMatchObject({ outcome: "failed", reason: "spawn_failed" })
-    expect(fresh.detail).toContain("No reflection model candidate is visible")
+    expect(fresh.outcome).toBe("merged")
     expect(cached.outcome).toBe("merged")
-    expect(item.spawnCalls).toHaveLength(1)
+    expect(item.spawnCalls).toHaveLength(2)
     expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\n")
   }, 60_000)
 

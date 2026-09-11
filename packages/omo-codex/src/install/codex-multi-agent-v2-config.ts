@@ -5,16 +5,16 @@ import {
   appendBlock,
   escapeRegExp,
   findTomlSection,
+  parseTomlDottedKey,
   removeSetting,
   replaceOrInsertSetting,
+  scanTomlMultilineLine,
+  type TomlMultilineQuote,
+  type TomlSection,
 } from "./toml-section-editor"
-import { hasTomlSetting } from "./toml-setting-reader"
 
 const CODEX_AGENTS_HEADER = "agents"
 const CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2"
-const CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY = `${CODEX_MULTI_AGENT_V2_HEADER}.max_concurrent_threads_per_session`
-const CODEX_SUBAGENT_THREAD_LIMIT = 1000
-const CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16
 
 export type CodexMultiAgentVersion = "v1" | "v2" | null
 
@@ -25,63 +25,47 @@ export type CodexMultiAgentVersion = "v1" | "v2" | null
  * catalog entry (`ModelInfo.multi_agent_version`).  Forcing `enabled = true`
  * in config breaks models whose API does not support encrypted tool
  * parameters (e.g. gpt-5.5-medium, API-key-only models, third-party
- * providers).  The installer therefore sets only the v1 and v2 tuning knobs
- * so sessions keep the high subagent cap regardless of the active runtime.
+ * providers). The installer never inserts or raises either concurrency cap;
+ * it removes only the values previously written by LazyCodex.
  *
  * When the selected model prefers V2 (catalog `multi_agent_version: "v2"`,
- * or a GPT-5.6 family model with the catalog unavailable), the installer
+ * or a GPT-5.6 or GPT-6 family model with the catalog unavailable), the installer
  * additionally skips/removes `agents.max_threads` (Codex rejects it while
  * MultiAgentV2 is enabled) and does not materialize `enabled = false` from
  * the legacy `[features]` boolean shorthand (a config-level disable
  * mismatches the reserved `collaboration.spawn_agent` schema on some Codex
  * versions - oh-my-openagent#6002 / #6008).
  *
- * When config.toml names no root model at all (Codex Desktop selects the
- * model in the UI), the installer never introduces `agents.max_threads`:
- * Codex rejects that key at thread/start while MultiAgentV2 is active. An
- * existing cap is still raised in place so the legacy low-cap repair keeps
- * working and a hand-removed key stays removed.
+ * Other user values are preserved, except that V2-preferred models still
+ * remove the incompatible `agents.max_threads` key.
  */
 export function ensureCodexMultiAgentV2Config(
   config: string,
   options: { readonly multiAgentVersion?: CodexMultiAgentVersion } = {},
 ): string {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2")
+  // Keep this V2-active rule aligned with plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs.
   const v2Preferred = options.multiAgentVersion === "v2"
-  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null
-  const agentsConfig = v2Preferred
-    ? removeAgentsMaxThreads(featureFlag.config)
-    : modelKnown
-      ? ensureAgentsMaxThreads(featureFlag.config)
-      : raiseExistingAgentsMaxThreads(featureFlag.config)
+    || isMultiAgentV2Enabled(featureFlag.config)
+  const agentsConfig = removeAgentsMaxThreads(featureFlag.config, v2Preferred)
   const preserveDisable = featureFlag.value === false && !v2Preferred
   const featureConfig = preserveDisable
     ? setMultiAgentV2Disable(agentsConfig)
     : v2Preferred
       ? removeMultiAgentV2Disable(agentsConfig)
       : agentsConfig
-  if (hasTomlSetting(featureConfig, CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY)) return featureConfig
-  const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER)
-  if (!section) {
-    const enabledSetting = preserveDisable ? "enabled = false\n" : ""
-    return appendBlock(
-      featureConfig,
-      `[${CODEX_MULTI_AGENT_V2_HEADER}]\n${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}\n`,
-    )
+  const withoutManagedLimit = removeManagedMultiAgentV2ThreadLimit(featureConfig)
+  if (preserveDisable && !findTomlSection(withoutManagedLimit, CODEX_MULTI_AGENT_V2_HEADER)) {
+    return appendBlock(withoutManagedLimit, `[${CODEX_MULTI_AGENT_V2_HEADER}]\nenabled = false`)
   }
-  return replaceOrInsertSetting(
-    featureConfig,
-    section,
-    "max_concurrent_threads_per_session",
-    CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString(),
-  )
+  return withoutManagedLimit
 }
 
 /**
  * Resolve the configured root model's multi-agent version from the Codex
  * model catalog cache (`models_cache.json` next to `config.toml`).
  * Mirrors `plugin/scripts/migrate-codex-config/multi-agent-v2-guard.mjs`:
- * catalog wins; a GPT-5.6 family model with no catalog entry counts as V2.
+ * catalog wins; GPT-5.6 and GPT-6 models with no catalog entry count as V2.
  */
 export function resolveCodexMultiAgentVersion(config: string, configPath: string): CodexMultiAgentVersion {
   const model = readRootModel(config)
@@ -89,7 +73,7 @@ export function resolveCodexMultiAgentVersion(config: string, configPath: string
   const catalogPath = resolveCatalogPath(readRootModelCatalogPath(config), configPath)
   const catalogVersion = readCatalogMultiAgentVersion(model, catalogPath)
   if (catalogVersion !== null) return catalogVersion
-  return /^gpt-5\.6\b/i.test(model) ? "v2" : null
+  return /^(?:gpt-5\.6|gpt-6)\b/i.test(model) ? "v2" : null
 }
 
 function resolveCatalogPath(configuredPath: string | null, configPath: string): string {
@@ -154,20 +138,40 @@ function removeFeatureFlagSetting(
   }
 }
 
-function ensureAgentsMaxThreads(config: string): string {
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
-  const section = findTomlSection(config, CODEX_AGENTS_HEADER)
-  if (!section) {
-    return appendBlock(config, `[${CODEX_AGENTS_HEADER}]\nmax_threads = ${maxThreadsValue}\n`)
-  }
-  return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue)
+function isMultiAgentV2Enabled(config: string): boolean {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER)
+  return section !== null && /^\s*enabled\s*=\s*true[ \t]*(?:#.*)?$/m.test(section.text)
 }
 
-function removeAgentsMaxThreads(config: string): string {
+function removeAgentsMaxThreads(config: string, v2Preferred: boolean): string {
   const section = findTomlSection(config, CODEX_AGENTS_HEADER)
   if (!section) return config
-  if (!/^\s*max_threads\s*=/m.test(section.text)) return config
-  return removeSetting(config, section, "max_threads")
+  return removeMatchingCap(config, section, "max_threads", v2Preferred ? undefined : /^1000\s*(?:#.*)?$/)
+}
+
+function removeManagedMultiAgentV2ThreadLimit(config: string): string {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER)
+  if (!section) return config
+  return removeMatchingCap(config, section, "max_concurrent_threads_per_session", /^(?:1000|16)\s*(?:#.*)?$/)
+}
+
+function removeMatchingCap(config: string, section: TomlSection, keyName: string, expectedValue?: RegExp): string {
+  let quote: TomlMultilineQuote | null = null
+  let offset = section.start
+  for (const line of section.text.match(/[^\n]*\n?/g) ?? []) {
+    const scan = scanTomlMultilineLine(line, quote)
+    quote = scan.nextQuote
+    if (!scan.wasInside) {
+      const assignment = line.indexOf("=")
+      const key = assignment < 0 ? null : parseTomlDottedKey(line.slice(0, assignment).trim())
+      if (key?.length === 1 && key[0] === keyName
+        && (expectedValue === undefined || expectedValue.test(line.slice(assignment + 1).trim()))) {
+        return config.slice(0, offset) + config.slice(offset + line.length)
+      }
+    }
+    offset += line.length
+  }
+  return config
 }
 
 function removeMultiAgentV2Disable(config: string): string {
@@ -181,13 +185,6 @@ function setMultiAgentV2Disable(config: string): string {
   const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER)
   if (!section) return config
   return replaceOrInsertSetting(config, section, "enabled", "false")
-}
-
-function raiseExistingAgentsMaxThreads(config: string): string {
-  const section = findTomlSection(config, CODEX_AGENTS_HEADER)
-  if (!section) return config
-  if (!/^\s*max_threads\s*=/m.test(section.text)) return config
-  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString())
 }
 
 function readBooleanSetting(sectionText: string, key: string): boolean | null {

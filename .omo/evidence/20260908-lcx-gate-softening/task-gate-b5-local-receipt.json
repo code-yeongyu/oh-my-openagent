@@ -1,0 +1,12 @@
+{
+  "startedAt": "2026-09-08T13:16:31.736329+00:00",
+  "head": "3451c0a8b4d872a43523a5b9b54073bbd30f850f",
+  "bunVersion": "1.4.0",
+  "installerBuildExit": 0,
+  "installerTreeUnchanged": true,
+  "requestedPluginBuildExit": 0,
+  "requestedPluginBuildNote": "Bun 1.4.0 argument order can print help only; additionally run repository-declared order.",
+  "actualPluginBuildExit": 0,
+  "gitStatusPorcelain": "",
+  "treeClean": true
+}

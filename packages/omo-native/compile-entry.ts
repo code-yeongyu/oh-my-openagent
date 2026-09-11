@@ -1,9 +1,21 @@
-import { createHash } from "node:crypto"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join } from "node:path"
 import { spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import {
+  embeddedText,
+  isProvisionedExecutable,
+  materializeProvisionedExecutable,
+  provisionEmbeddedRuntime,
+  runningExecutablePath,
+  selectRuntimeManifest,
+  shouldReexecAfterProvisioning,
+  type EmbeddedFile,
+  type EmbeddedManifest,
+} from "./compile-runtime"
+import { propagateResult, runChild } from "./bin/lib/child-process.js"
+import { buildLabel, parseBuildInfo, versionLines } from "./build-info"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
@@ -11,15 +23,11 @@ import { runDoctor } from "./bin/lib/doctor.js"
 import { detectHarnesses, needsSetupSuggestion } from "./bin/lib/setup-detect.js"
 import { printSetupReport } from "./bin/lib/setup-report.js"
 import { delimiter } from "node:path"
+import { registerBunOAuthFlows } from "../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/bun-oauth.js"
 
-type EmbeddedFile = Blob & {
-  name: string
-  arrayBuffer?: () => Promise<ArrayBuffer>
-  bytes?: () => Promise<Uint8Array>
-  text?: () => Promise<string>
-}
-export type EmbeddedManifestEntry = { relPath: string; sha256: string; mode: number; size: number }
-export type EmbeddedManifest = { omoAiVersion: string; enginePin: string; manifestSha: string; entries: EmbeddedManifestEntry[] }
+// Register statically bundled OAuth flows before loading senpi's CLI graph.
+// Bun's compiled filesystem cannot resolve the opaque dynamic cursor loader.
+registerBunOAuthFlows()
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -46,10 +54,16 @@ const doctorArtifacts = [
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
   const command = args[0]
   if (earlyCommands.has(command) || command === "update") return args
+  // `--no-extensions` is the caller owning the extension list: a memory child lists none and an
+  // RPC task child lists this plugin itself, so injecting it here would load the plugin into a
+  // bare child or load it twice.
+  if (args.includes("--no-extensions")) return args
   return ["--extension", join(execDir, "plugin"), ...args]
 }
 
-export function versionLine(packageJson: { version: string }, enginePin: string): string {
+export function versionLine(packageJson: { version: string; omoBuild?: unknown }, enginePin: string): string {
+  const info = parseBuildInfo(packageJson.omoBuild)
+  if (info !== undefined) return versionLines(info).join("\n")
   return `omo ${packageJson.version} (engine: senpi ${enginePin})`
 }
 
@@ -59,52 +73,16 @@ export function updateAssetSlug(platform: NodeJS.Platform, arch: string): string
   return platform === "win32" ? `${slug}.exe` : slug
 }
 
+/** A dev build is refreshed by rebuilding it; only release binaries come from the curl line. */
+export function updateHint(rawBuildInfo: unknown, platform: NodeJS.Platform = process.platform, arch: string = process.arch): string {
+  const info = parseBuildInfo(rawBuildInfo)
+  return info === undefined ? updateLine(platform, arch) : `rebuild with: bun run ${info.command}`
+}
+
 export function updateLine(platform: NodeJS.Platform, arch: string): string {
   const asset = updateAssetSlug(platform, arch)
   const dest = platform === "win32" ? "omo.exe" : "omo"
   return `omo is updated via curl: curl -fsSL https://github.com/code-yeongyu/oh-my-openagent/releases/latest/download/${asset} -o ${dest} && chmod +x ${dest}`
-}
-
-export function isProvisionedExecutable(execPath: string, expectedPath: string): boolean {
-  try {
-    return realpathSync(execPath) === realpathSync(expectedPath)
-  } catch {
-    return resolve(execPath) === resolve(expectedPath)
-  }
-}
-
-export function materializeProvisionedExecutable(
-  sourcePath: string,
-  destinationPath: string,
-  platform = process.platform,
-): void {
-  if (platform === "win32") {
-    if (existsSync(destinationPath)) return
-    copyFileSync(sourcePath, destinationPath)
-    chmodSync(destinationPath, 0o755)
-    return
-  }
-  const temporaryPath = `${destinationPath}.tmp-${process.pid}`
-  try {
-    rmSync(temporaryPath, { force: true })
-    copyFileSync(sourcePath, temporaryPath)
-    chmodSync(temporaryPath, 0o755)
-    renameSync(temporaryPath, destinationPath)
-  } finally {
-    rmSync(temporaryPath, { force: true })
-  }
-}
-
-export function runningExecutablePath(
-  argv0 = process.argv[0],
-  execPath = process.execPath,
-  platform = process.platform,
-): string {
-  return platform === "win32" && argv0.toLowerCase().endsWith(".exe") ? argv0 : execPath
-}
-
-export function shouldReexecAfterProvisioning(platform = process.platform): boolean {
-  return platform !== "win32"
 }
 
 export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, execDir: string): NodeJS.ProcessEnv {
@@ -115,14 +93,32 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
   const agentDir = canonicalAgentDir(env)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
+  // The engine resolves its package dir from PACKAGE_DIR before falling back to
+  // dirname(process.execPath). Provisioning can complete without a re-exec (and the
+  // size guard in materializeProvisionedExecutable makes that path common), so
+  // execPath may stay at the user's install path while the payload lives under
+  // execDir - pin the root explicitly rather than trusting the running image.
+  env.OMO_PACKAGE_DIR = execDir
+  env.SENPI_PACKAGE_DIR = execDir
   env.OMO_NATIVE = "1"
   env.SENPI_RUNTIME = process.versions.bun ? "bun" : "node"
   let displayVersion = "unknown"
-  try { displayVersion = readJson(join(execDir, "package.json")).version } catch { /* test fixtures may omit the sibling manifest */ }
+  let devCommand: string | undefined
+  let devUpdateCommand: string | undefined
+  try {
+    const stamped = readJson(join(execDir, "package.json")) as { version?: string; omoBuild?: unknown }
+    displayVersion = typeof stamped.version === "string" ? stamped.version : "unknown"
+    const info = parseBuildInfo(stamped.omoBuild)
+    if (info !== undefined) {
+      devCommand = info.command
+      devUpdateCommand = `rebuild with: bun run ${info.command}`
+      displayVersion = buildLabel(info)
+    }
+  } catch { /* test fixtures may omit the sibling manifest */ }
   env.SENPI_BRAND = JSON.stringify({
-    name: "OmO", command: "omo", displayVersion,
+    name: "OmO", command: devCommand ?? "omo", displayVersion,
     configDir: ".omo", flatLayout: false, envPrefix: "OMO", userAgent: "omo", originator: "omo",
-    update: { packageName: "omo-ai", distTag: "beta", command: updateLine(process.platform, process.arch), changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
+    update: { packageName: "omo-ai", distTag: "beta", command: devUpdateCommand ?? updateLine(process.platform, process.arch), changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
   })
   const binDir = nearestNodeBin(execDir)
   if (binDir) {
@@ -133,60 +129,6 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
   }
   env.OMO_BIN = join(execDir, process.platform === "win32" ? "omo.exe" : "omo")
   return env
-}
-
-async function embeddedText(file: EmbeddedFile): Promise<string> {
-  if (file.text) return file.text()
-  if (file.arrayBuffer) return Buffer.from(await file.arrayBuffer()).toString("utf8")
-  throw new Error(`embedded asset ${file.name} cannot be read`)
-}
-
-async function embeddedBytes(file: EmbeddedFile): Promise<Uint8Array> {
-  if (file.bytes) return file.bytes()
-  if (file.arrayBuffer) return new Uint8Array(await file.arrayBuffer())
-  throw new Error(`embedded asset ${file.name} cannot be read as bytes`)
-}
-
-export async function selectRuntimeManifest(embedded: EmbeddedFile[]): Promise<EmbeddedFile | undefined> {
-  const exact = embedded.find((file) => file.name === "omo-runtime/runtime-manifest.json")
-  if (exact) return exact
-  for (const file of embedded) {
-    if (!file.name.endsWith("runtime-manifest.json")) continue
-    try {
-      const parsed = JSON.parse(await embeddedText(file))
-      if (typeof parsed?.omoAiVersion === "string" && typeof parsed?.enginePin === "string") return file
-    } catch {
-      // Non-manifest assets with a similar name are not candidates.
-    }
-  }
-  return undefined
-}
-
-export async function provisionEmbeddedRuntime(manifest: EmbeddedManifest, embedded: EmbeddedFile[], runtimeDir: string): Promise<void> {
-  mkdirSync(runtimeDir, { recursive: true })
-  const marker = join(runtimeDir, ".provisioned")
-  if (readFileIfExists(marker)?.trim() === manifest.manifestSha) return
-  const byPath = new Map(embedded.map((file) => [
-    file.name.replace(/^\.\//, "").replace(/^omo-runtime\//, ""),
-    file,
-  ]))
-  for (const entry of manifest.entries) {
-    const file = byPath.get(entry.relPath.replace(/^\.\//, ""))
-    if (!file) throw new Error(`embedded asset missing: ${entry.relPath}`)
-    const bytes = await embeddedBytes(file)
-    if (bytes.byteLength !== entry.size || createHash("sha256").update(bytes).digest("hex") !== entry.sha256) {
-      throw new Error(`embedded asset integrity mismatch: ${entry.relPath}`)
-    }
-    const destination = join(runtimeDir, entry.relPath)
-    mkdirSync(dirname(destination), { recursive: true })
-    writeFileSync(destination, bytes, { mode: entry.mode })
-    chmodSync(destination, entry.mode)
-  }
-  writeFileSync(marker, `${manifest.manifestSha}\n`, { mode: 0o644 })
-}
-
-function readFileIfExists(path: string): string | undefined {
-  try { return readFileSync(path, "utf8") } catch { return undefined }
 }
 
 function runCompiledDoctor(inventory: Awaited<ReturnType<typeof detectHarnesses>>, execDir: string, enginePin: string): void {
@@ -200,7 +142,7 @@ function runCompiledDoctor(inventory: Awaited<ReturnType<typeof detectHarnesses>
     }
   }
   const packageJson = readJson(join(execDir, "package.json"))
-  lines.push(`INFO omo ${packageJson.version} (engine: senpi ${enginePin})`)
+  for (const line of versionLine(packageJson, enginePin).split("\n")) lines.push(`INFO ${line}`)
   if (needsSetupSuggestion(inventory)) lines.push("INFO no credentials found; run omo setup to review sibling stores")
   console.log(lines.join("\n"))
   process.exitCode = failed ? 1 : 0
@@ -214,8 +156,41 @@ function isSelfUpdate(args: string[]): boolean {
   return rest.every((arg) => arg.startsWith("-") || selfUpdateTargets.has(arg))
 }
 
+export function answerCompiledFastPath(args: string[], manifest: Pick<EmbeddedManifest, "omoAiVersion" | "enginePin" | "buildInfo">): boolean {
+  if ((args[0] === "--version" || args[0] === "-v") && args.length === 1) {
+    console.log(versionLine({ version: manifest.omoAiVersion, omoBuild: manifest.buildInfo }, manifest.enginePin))
+    return true
+  }
+  if (isSelfUpdate(args)) {
+    console.log(updateHint(manifest.buildInfo))
+    return true
+  }
+  return false
+}
+
+/**
+ * The startup banner's provenance lines. A stamped dev build renders the same full SHAs,
+ * ISO commit dates and branches as `--version` and `doctor`; anything else keeps the
+ * release one-liner.
+ */
+export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersion" | "buildInfo">): string[] {
+  const info = parseBuildInfo(manifest.buildInfo)
+  return info === undefined ? [`omo (omo-ai beta ${manifest.omoAiVersion})`] : versionLines(info)
+}
+
+export function shouldPrintCompiledBanner(args: string[], stderrIsTTY: boolean): boolean {
+  if (!stderrIsTTY) return false
+  if (args.includes("-p") || args.includes("--print") || args.includes("--mode")) return false
+  const command = args[0]
+  if (command === undefined) return true
+  if (earlyCommands.has(command)) return false
+  if (command === "update" || command === "doctor" || command === "setup" || command === "ulw-loop") return false
+  if (command === "--version" || command === "-v") return false
+  return true
+}
+
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string): Promise<boolean> {
-  const packageJson = readJson(join(execDir, "package.json"))
+  const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
   adoptLegacyFlatState()
   const command = args[0]
@@ -228,7 +203,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   if (command === "setup") { printSetupReport(await detectHarnesses()); process.exitCode = 0; return true }
   if ((command === "--version" || command === "-v") && args.length === 1) { console.log(versionLine(packageJson, enginePin ?? "unknown")); return true }
-  if (isSelfUpdate(args)) { console.log(updateLine(process.platform, process.arch)); return true }
+  if (isSelfUpdate(args)) { console.log(updateHint(packageJson.omoBuild)); return true }
   return false
 }
 
@@ -248,12 +223,21 @@ async function main(): Promise<void> {
   const runningExecutable = runningExecutablePath()
   const expected = join(homedir(), ".omo", "binary-runtime", manifest.omoAiVersion, process.platform === "win32" ? "omo.exe" : "omo")
   let execDir = dirname(runningExecutable)
-  if (!isProvisionedExecutable(runningExecutable, expected)) {
+  // Materialize the provisioned runtime BEFORE answering the informational fast-path.
+  // First-run provisioning must happen even for `--version`/`-v`: the release smoke test
+  // asserts the provisioned binary exists after `--version`, and provisioning used to be a
+  // side effect of the (now-skipped) re-exec. Only the re-exec (relocate) is deferred here,
+  // so an already-provisioned install keeps the fast-path's no-re-exec speed.
+  const needsProvisioning = !isProvisionedExecutable(runningExecutable, expected)
+  if (needsProvisioning) {
     await provisionEmbeddedRuntime(manifest, embedded, dirname(expected))
     materializeProvisionedExecutable(runningExecutable, expected)
+  }
+  if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
+  if (needsProvisioning) {
     if (shouldReexecAfterProvisioning()) {
-      const child = spawn(expected, process.argv.slice(2), { env: process.env, stdio: "inherit" })
-      await new Promise<void>((resolvePromise) => child.on("close", (code) => { process.exitCode = code ?? 1; resolvePromise() }))
+      const result = await runChild(expected, process.argv.slice(2), { env: process.env })
+      propagateResult(result)
       return
     }
     execDir = dirname(expected)
@@ -261,6 +245,9 @@ async function main(): Promise<void> {
   // Inspector and custom execArgv isolation is unsupported in compiled binaries; the provisioned
   // executable delegates to the engine in-process as required by the native startup contract.
   if (await runCompiledLauncher(process.argv.slice(2), execDir, manifest.enginePin, execDir)) return
+  if (shouldPrintCompiledBanner(process.argv.slice(2), process.stderr.isTTY === true)) {
+    for (const line of compiledBannerLines(manifest)) console.error(line)
+  }
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above

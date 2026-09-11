@@ -1,4 +1,5 @@
 export * from "./completion"
+export * from "./failure-detail"
 export * from "./health"
 export * from "./health-alert"
 export * from "./remediation"

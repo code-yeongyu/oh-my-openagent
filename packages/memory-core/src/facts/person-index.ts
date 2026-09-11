@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises"
+import { readFile, readdir } from "../fs/resilient"
 import { join } from "node:path"
 
 import { parseMemoryFile } from "../memfs"

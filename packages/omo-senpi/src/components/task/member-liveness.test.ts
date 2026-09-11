@@ -45,7 +45,7 @@ describe("team member liveness notifier", () => {
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const notifier = createTeamMemberLivenessNotifier({ pi, coordinator, isStreaming: () => true })
 
@@ -159,6 +159,29 @@ describe("team member liveness notifier", () => {
     coordinator.flushOnIdle()
     await flushMicrotasks()
     expect(deliveries).toHaveLength(2)
+  })
+
+  test("#given a retired coordinator #when a liveness notice is queued #then the refusal fails the delivery and a retry is scheduled", () => {
+    // given a coordinator retired by session_shutdown: it refuses the enqueue and owes no receipt
+    const errors: unknown[] = []
+    const retries: Array<() => void> = []
+    const coordinator = new IdleInjectionCoordinator(() => undefined)
+    coordinator.retire()
+    const notifier = createTeamMemberLivenessNotifier({
+      pi: new FakeExtensionAPI(),
+      coordinator,
+      isStreaming: () => true,
+      scheduleRetry: (retry) => retries.push(retry),
+      onError: (error) => errors.push(error),
+    })
+
+    // when
+    notifier.notifyTerminal(memberRecord())
+
+    // then the notice is not silently swallowed: the failure path runs and the retry is armed
+    expect(coordinator.pendingCount()).toBe(0)
+    expect(errors).toHaveLength(1)
+    expect(retries).toHaveLength(1)
   })
 
   test("#given the liveness epoch is already persisted #when a restarted notifier observes the terminal record #then it suppresses replay", () => {

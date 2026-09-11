@@ -1,0 +1,24 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:
+51 |     const blocked = fixture(q1, "grok-cli", "Sign in to continue", "blocked_auth");
+52 |     await writeFile(join(fixtures, `${blocked.key}.json`), JSON.stringify(blocked.value));
+53 | 
+54 |     const result = await run(["--queries", join(base, "queries.json"), "--mode", "offline", "--variants", "v1", "--carriers", "fast", "--out", out, "--report"]);
+55 |     // Write after creating the query file so CLI reads exactly the hand-made set.
+56 |     expect(result.code).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/Volumes/mengmotaStorage/local-workspaces/omo-wt/x-search/packages/omo-senpi/scripts/qa/x-search-backtest.test.mjs:56:25)
+(fail) x-search backtest CLI > offline reports blocked and missing as NA, tunes, scores holdout, and never fetches [13.95ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1.90s]
+
+EXIT_CODE=1

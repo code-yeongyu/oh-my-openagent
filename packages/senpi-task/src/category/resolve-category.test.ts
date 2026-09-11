@@ -271,7 +271,7 @@ describe("resolveCategory", () => {
     })
   })
 
-  test("#given writing's Kimi for Coding default is available #when resolved #then its canonical Kimi K3 id is selected", () => {
+  test("#given writing's Fable 5.1 default is unavailable and Kimi K3 is available #when resolved #then the K3 fallback is selected", () => {
     // given
     const models = registry([model("kimi-coding", "k3")])
 
@@ -282,8 +282,13 @@ describe("resolveCategory", () => {
     const resolved = expectResolved(result)
     expect(resolved.spec.provider).toBe("kimi-coding")
     expect(resolved.spec.modelId).toBe("k3")
-    expect(resolved.spec.variant).toBe("low")
-    expect(resolved.modelSelection.matchedFallback).toBe(false)
+    expect(resolved.spec.variant).toBe("max")
+    expect(resolved.modelSelection.matchedFallback).toBe(true)
+    expect(resolved.modelSelection.fallbackEntry).toEqual({
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
+      variant: "max",
+    })
   })
 
   test("#given writing's provider default is unavailable and Kimi K3 is available #when resolved #then the K3 fallback is selected", () => {
@@ -297,31 +302,31 @@ describe("resolveCategory", () => {
     const resolved = expectResolved(result)
     expect(resolved.spec.provider).toBe("opencode-go")
     expect(resolved.spec.modelId).toBe("kimi-k3")
-    expect(resolved.spec.variant).toBe("low")
+    expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: "kimi-k3",
-      variant: "low",
+      variant: "max",
     })
   })
 
-  test("#given visual-engineering primary is unavailable and the ZAI GLM rung is available #when resolved #then delegate-core fallback chain preserves the max variant", () => {
+  test("#given visual-engineering primary models are unavailable and Kimi K3 is available #when resolved #then delegate-core fallback chain preserves the max variant", () => {
     // given
-    const models = registry([model("zai-coding-plan", "glm-5.2")])
+    const models = registry([model("opencode-go", "kimi-k3")])
 
     // when
     const result = resolveCategory("visual-engineering", {}, models)
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("zai-coding-plan")
-    expect(resolved.spec.modelId).toBe("glm-5.2")
+    expect(resolved.spec.provider).toBe("opencode-go")
+    expect(resolved.spec.modelId).toBe("kimi-k3")
     expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["zai-coding-plan", "opencode-go"],
-      model: "glm-5.2",
+      providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
+      model: "kimi-k3",
       variant: "max",
     })
   })
@@ -472,22 +477,22 @@ describe("builtin category defaults", () => {
 
     // then: declared order plus each category's primary provider, model, and variant
     expect(defaults.map(({ config, name }) => [name, config.model, config.variant])).toEqual([
-      ["visual-engineering", "anthropic/claude-opus-5", "max"],
-      ["artistry", "anthropic/claude-fable-5", "xhigh"],
-      ["ultrabrain", "openai/gpt-5.6-sol", "max"],
-      ["deep", "openai/gpt-5.6-sol", "medium"],
+      ["visual-engineering", "anthropic/claude-fable-5-1", "max"],
+      ["artistry", "anthropic/claude-fable-5-1", "max"],
+      ["ultrabrain", "openai/gpt-6-astra", "max"],
+      ["deep", "openai/gpt-6-astra", "high"],
       ["quick", "kimi-coding/kimi-for-coding-highspeed", undefined],
       ["unspecified-low", "xai/grok-4.6", "xhigh"],
-      ["architect", "anthropic/claude-fable-5", "xhigh"],
-      ["unspecified-high", "anthropic/claude-opus-5", "xhigh"],
-      ["writing", "kimi-coding/k3", "low"],
+      ["unspecified-high", "openai/gpt-6-astra", "high"],
+      ["architect", "anthropic/claude-fable-5-1", "max"],
+      ["writing", "anthropic/claude-fable-5-1", "medium"],
     ])
 
-    // then: availability gating applies only to the model-gated builtins
+    // then: availability gating applies only to the model-gated builtins; any listed id opens the gate
     expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
-      architect: "claude-fable-5",
-      ultrabrain: "gpt-5.6-sol",
-      deep: "gpt-5.6-sol",
+      architect: ["claude-fable-5-1"],
+      ultrabrain: ["gpt-6-astra", "gpt-5.6-sol"],
+      deep: ["gpt-6-astra", "gpt-5.6-sol"],
     })
   })
 })

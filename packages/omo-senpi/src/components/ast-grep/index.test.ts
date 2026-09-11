@@ -70,7 +70,7 @@ describe("createAstGrepComponent", () => {
           type: "stdio",
           command: "/usr/local/bin/node",
           args: [entry, "mcp"],
-          env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project" },
+          env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project", BUN_BE_BUN: "1" },
           enabled: true,
           lifecycle: "lazy",
         },
@@ -89,7 +89,7 @@ describe("createAstGrepComponent", () => {
 
     await component.register(pi, fakeContext())
 
-    expect(pi.mcpServers[0]?.config.env).toEqual({ OMO_AST_GREP_PROJECT_CWD: "/explicit/project" })
+    expect(pi.mcpServers[0]?.config.env).toEqual({ OMO_AST_GREP_PROJECT_CWD: "/explicit/project", BUN_BE_BUN: "1" })
   })
 
   it("#given the staged entry is absent #when registered #then skips cleanly and warns", async () => {

@@ -7,6 +7,12 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./fs": {
+      "import": "./src/fs/resilient.ts"
+    },
+    "./personas": {
+      "import": "./src/personas/manifest.ts"
     }
   },
   "scripts": {

@@ -57,8 +57,8 @@ describe("omo-ai payload check CI job", () => {
 
     // then
     expect(runsOn).toBe("ubuntu-latest")
-    expect(stepByUses("omo-ai-payload-check", "actions/checkout@v5")).toBeDefined()
-    expect(stepByUses("omo-ai-payload-check", "actions/setup-node@v6")).toBeDefined()
+    expect(stepByUses("omo-ai-payload-check", "actions/checkout@v7")).toBeDefined()
+    expect(stepByUses("omo-ai-payload-check", "actions/setup-node@v7")).toBeDefined()
     expect(stepByUses("omo-ai-payload-check", "oven-sh/setup-bun@v2")).toBeDefined()
   })
 

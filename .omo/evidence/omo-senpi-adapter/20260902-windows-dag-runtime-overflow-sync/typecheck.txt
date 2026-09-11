@@ -1,0 +1,6 @@
+Commands:
+PATH=/private/tmp/bun-1.4.0/bin:$PATH bun x tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+PATH=/private/tmp/bun-1.4.0/bin:$PATH bun x tsgo --noEmit -p packages/senpi-task/tsconfig.json
+
+Observed:
+Both commands exited 0 with no diagnostics.

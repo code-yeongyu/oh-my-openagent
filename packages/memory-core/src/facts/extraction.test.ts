@@ -11,6 +11,8 @@ import { buildDefaultSeedFiles } from "../seeds"
 import {
   applyFactsBatch,
   parseFactsExtractionJsonl,
+  parseFactsExtractionRecord,
+  FactsExtractionValidationError,
   type FactsExtractionRecord,
 } from "./extraction"
 
@@ -92,6 +94,39 @@ async function readExplicitEntries(dir: string, slug: string): Promise<readonly 
 }
 
 describe("facts extraction JSONL validation", () => {
+  test("#given either valid record arm #when validated directly #then the record is parsed", () => {
+    // given
+    const records = [project(), person()]
+
+    // when
+    const parsed = records.map((record, index) => parseFactsExtractionRecord(record, index))
+
+    // then
+    expect(parsed).toEqual(records)
+  })
+
+  test("#given malformed direct values #when validated #then the typed validation error identifies each rejection", () => {
+    // given
+    const malformed = [
+      { scope: "project", text: "missing date" },
+      { scope: "other", text: "bad scope", date: "2026-08-10" },
+      { scope: "person", person: "not an object", text: "bad person", date: "2026-08-10" },
+    ]
+
+    // when
+    const errors = malformed.map((value, index) => {
+      try {
+        parseFactsExtractionRecord(value, index)
+        throw new Error("expected validation to fail")
+      } catch (error) {
+        return error
+      }
+    })
+
+    // then
+    expect(errors.every((error) => error instanceof FactsExtractionValidationError)).toBe(true)
+  })
+
   test("#given valid project and person arms #when parsed #then scope remains a discriminated union", () => {
     // given
     const raw = `${JSON.stringify(project())}\n${JSON.stringify(person())}\n`

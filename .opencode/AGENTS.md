@@ -16,7 +16,7 @@ Project-scope OpenCode configuration: 5 skills and 5 slash commands committed al
 | `work-with-pr-workspace/` | Iteration workspace for `work-with-pr` — captures benchmark inputs for the iteration-* subdirs. |
 | `github-triage/` | Read-only triage of issues + PRs. 1 item = 1 background task. Writes evidence-backed reports. Never takes GitHub actions. |
 | `hyperplan/` | Adversarial multi-agent planning. 5 hostile category members cross-critique, lead synthesizes. |
-| `pre-publish-review/` | Nuclear-grade 16-agent pre-publish release gate. Runs `/get-unpublished-changes`, spawns ultrabrain agents per change, oracle for synthesis. |
+| `pre-publish-review/` | Nuclear-grade 12-agent pre-publish release gate. Runs `/get-unpublished-changes`, spawns ultrabrain agents per change, oracle for synthesis. |
 
 Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `references/`, `assets/`).
 
@@ -46,6 +46,6 @@ Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `refer
 
 ## ANTI-PATTERNS
 
-- Never duplicate a built-in skill from `packages/omo-opencode/src/features/builtin-skills/` here without a clear reason.
+- Never duplicate a built-in skill from `packages/skills-loader-core/src/features/builtin-skills/` here without a clear reason.
 - Never commit `background-tasks.json` contents that include session IDs or token secrets.
 - Never write a skill that calls `session.promptAsync` directly — go through `dispatchInternalPrompt` (see root AGENTS.md "Internal message injection is dangerous").

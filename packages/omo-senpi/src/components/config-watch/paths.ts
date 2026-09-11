@@ -1,4 +1,5 @@
 import { lstatSync, statSync } from "node:fs"
+import * as nodeFs from "node:fs"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
@@ -12,7 +13,9 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 
 const MAX_ANCESTOR_WATCH_TARGETS = 128
-const SENPI_AGENT_DIR_ENV = "SENPI_CODING_AGENT_DIR"
+// WSL exposes Windows drives as Plan 9/v9fs mounts. Keep this exact value
+// distinct from nearby filesystem magic values such as tmpfs (0x01021994).
+export const PLAN9_FILE_SYSTEM_TYPE = 0x01021997
 
 // Root-anchored: senpi maps a `dir` target to a RECURSIVE watch, so unanchored
 // globs make it hash the entire subtree. A `.omo` directory also holds runtime
@@ -35,10 +38,28 @@ export interface OmoConfigWatchTarget {
   readonly filterGlobs: string[]
 }
 
+export type FileSystemTypeResolver = (path: string) => number | null
+
+type NodeStatFsSync = (path: string) => { readonly type: number }
+
+function createDefaultFileSystemTypeResolver(platform: NodeJS.Platform): FileSystemTypeResolver {
+  if (platform !== "linux") return () => null
+  const statFsSync = (nodeFs as typeof nodeFs & { statfsSync?: NodeStatFsSync }).statfsSync
+  if (typeof statFsSync !== "function") return () => null
+  return (path) => {
+    try {
+      return statFsSync(path).type
+    } catch {
+      return null
+    }
+  }
+}
+
 export interface ResolveOmoConfigWatchTargetsOptions {
   readonly cwd: string
   readonly env?: OmoConfigEnv
   readonly platform?: NodeJS.Platform
+  readonly resolveFileSystemType?: FileSystemTypeResolver
 }
 
 export interface OmoConfigWatchTargetResolution {
@@ -148,6 +169,8 @@ export function resolveOmoConfigWatchTargetResolution(
 ): OmoConfigWatchTargetResolution {
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
+  const resolveFileSystemType = options.resolveFileSystemType ?? createDefaultFileSystemTypeResolver(platform)
+  const isOnPlan9FileSystem = (path: string): boolean => resolveFileSystemType(path) === PLAN9_FILE_SYSTEM_TYPE
   const userConfigDirectory = resolveUserOmoConfigDirectory(env)
   const ancestorDirectories = findAncestorDirectories(options.cwd, resolveHomeDir(env))
   const resolvedConfigPaths = resolveOmoConfigPaths({ cwd: options.cwd, env, platform })
@@ -164,20 +187,26 @@ export function resolveOmoConfigWatchTargetResolution(
   const targets: OmoConfigWatchTarget[] = []
 
   if (isExistingDirectory(userConfigDirectory)) {
-    targets.push(configTarget(userConfigDirectory))
+    if (!isOnPlan9FileSystem(userConfigDirectory)) targets.push(configTarget(userConfigDirectory))
   } else {
     const userConfigParent = dirname(userConfigDirectory)
-    if (isExistingDirectory(userConfigParent)) targets.push(userConfigCreationTarget(userConfigParent, userConfigDirectory))
-  }
-
-  for (const ancestorDirectory of ancestorDirectories) {
-    const omoDirectory = join(ancestorDirectory, ".omo")
-    if (configuredProjectDirectories.has(omoDirectory) || isExistingNonSymlinkDirectory(omoDirectory)) {
-      targets.push(configTarget(omoDirectory))
+    if (isExistingDirectory(userConfigParent) && !isOnPlan9FileSystem(userConfigParent)) {
+      targets.push(userConfigCreationTarget(userConfigParent, userConfigDirectory))
     }
   }
 
-  for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
+  // The ancestor walk remains on the cwd's mount, so one probe covers every
+  // project config and creation target without probing potentially slow paths.
+  if (!isOnPlan9FileSystem(resolve(options.cwd))) {
+    for (const ancestorDirectory of ancestorDirectories) {
+      const omoDirectory = join(ancestorDirectory, ".omo")
+      if (configuredProjectDirectories.has(omoDirectory) || isExistingNonSymlinkDirectory(omoDirectory)) {
+        targets.push(configTarget(omoDirectory))
+      }
+    }
+
+    for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
+  }
 
   const senpiProtectedPaths = resolveSenpiProtectedPaths(env)
   const permittedTargets = targets.filter((target) => !isSenpiRestrictedTarget(target, senpiProtectedPaths))

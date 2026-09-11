@@ -132,6 +132,22 @@ describe("TuiStateMirror", () => {
     mirror.stop()
   })
 
+  it("#given a started mirror #when started #then heartbeat handle is unref'd", () => {
+    jest.useFakeTimers()
+    const mirror = createMirror()
+    const unref = jest.fn()
+    const originalSetInterval = globalThis.setInterval
+    globalThis.setInterval = jest.fn(() => ({ unref })) as unknown as typeof setInterval
+
+    try {
+      mirror.start()
+      expect(unref).toHaveBeenCalledTimes(1)
+    } finally {
+      mirror.stop()
+      globalThis.setInterval = originalSetInterval
+    }
+  })
+
   it("#given a started mirror #when stopped #then timers are cleared and no later write occurs", async () => {
     jest.useFakeTimers()
     // given

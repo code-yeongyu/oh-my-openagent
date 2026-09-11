@@ -19,7 +19,7 @@ import type {
 
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { fireDream } from "./dream-trigger-fire"
-import type { DreamGateRejection, DreamTriggerSettings } from "./dream-trigger-gates"
+import { readLastDreamAtMs, type DreamGateRejection, type DreamTriggerSettings } from "./dream-trigger-gates"
 import type { ShutdownEvaluator } from "./shutdown-drain"
 
 export * from "./dream-trigger-gates"
@@ -85,6 +85,8 @@ export interface DreamTriggerWiring {
   requestManualDream(request?: ManualDreamRequest): Promise<DreamFireOutcome>
   /** Status-refresh entrypoint for system-token pressure; bypasses idle and transcript-volume gates. */
   requestPressureDream(sessionId: string): Promise<DreamFireOutcome>
+  /** Schedules a best-effort dream check for an overdue identity at session start. */
+  reconcileSessionStart(session: DreamTriggerSession): Promise<void>
   /** Resolves once every fire started so far has finished. */
   whenIdle(): Promise<void>
 }
@@ -92,7 +94,11 @@ export interface DreamTriggerWiring {
 export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): DreamTriggerWiring {
   const now = options.now ?? Date.now
   const scheduler = options.scheduler ?? defaultScheduler
-  const timers = new Map<string, { readonly handle: unknown; readonly eventCtx: unknown }>()
+  const timers = new Map<string, {
+    readonly handle: unknown
+    readonly eventCtx: unknown
+    readonly session?: DreamTriggerSession
+  }>()
   const inFlight = new Set<Promise<void>>()
   const launch = (session: DreamTriggerSession, origin: "idle" | "shutdown" | "manual" | "pressure", request: ManualDreamRequest & {
     readonly signal?: AbortSignal
@@ -133,6 +139,16 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
     timers.set(session.conversationId, { handle, eventCtx })
   }
 
+  async function reconcileSessionStart(session: DreamTriggerSession): Promise<void> {
+    const settings = options.resolveSettings(session.identity)
+    if (!settings.enabled) return
+    const lastDreamAtMs = await readLastDreamAtMs(session.identityPaths.runtime)
+    if (lastDreamAtMs !== null && now() - lastDreamAtMs <= settings.minHoursBetween * 3_600_000) return
+    cancelTimer(session.conversationId)
+    const handle = scheduler.schedule(() => fire(session.conversationId), 60_000)
+    timers.set(session.conversationId, { handle, eventCtx: undefined, session })
+  }
+
   function resetFor(eventCtx: unknown): void {
     const session = options.resolveSession(eventCtx)
     if (session === undefined) return
@@ -143,8 +159,18 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
     const state = timers.get(conversationId)
     if (state === undefined) return
     timers.delete(conversationId)
-    if (!isIdleNow(state.eventCtx)) return
-    const session = options.resolveSession(state.eventCtx)
+    // The host retires the captured event ctx on session replacement or reload, and every probe on a
+    // retired ctx throws. This tick runs from a bare timer with no caller to catch it, so a stale-ctx
+    // throw would become an uncaughtException that kills the host: retire the tick instead. A retired
+    // ctx is the expected outcome of a replaced session and stays silent; anything else still propagates.
+    let session: DreamTriggerSession | undefined
+    try {
+      if (state.session === undefined && !isIdleNow(state.eventCtx)) return
+      session = state.session ?? options.resolveSession(state.eventCtx)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+      return
+    }
     if (session === undefined || session.conversationId !== conversationId) return
     track(async () => {
       await launch(session, "idle", {})
@@ -186,6 +212,8 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
       return launch(session, "pressure", {})
     },
 
+    reconcileSessionStart,
+
     async whenIdle(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
@@ -199,6 +227,20 @@ function isIdleNow(eventCtx: unknown): boolean {
   const hasPending = eventCtx.hasPendingMessages
   if (typeof isIdle !== "function" || typeof hasPending !== "function") return false
   return Reflect.apply(isIdle, eventCtx, []) === true && Reflect.apply(hasPending, eventCtx, []) === false
+}
+
+/**
+ * Message prefixes the extension runner throws from a retired ctx: the first comes from session
+ * replacement (newSession, fork, switchSession) and the explicit reload path, the second from the
+ * runtime's own reload, which invalidates the previous runner generation with a shorter message.
+ */
+const STALE_EXTENSION_CONTEXT_ERROR_PREFIXES = [
+  "This extension ctx is stale after session replacement or reload.",
+  "stale extension generation after reload",
+] as const
+
+function isStaleExtensionContextError(error: unknown): boolean {
+  return error instanceof Error && STALE_EXTENSION_CONTEXT_ERROR_PREFIXES.some((prefix) => error.message.startsWith(prefix))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

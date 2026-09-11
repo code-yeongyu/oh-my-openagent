@@ -75,7 +75,3 @@ export function getAgentToolRestrictions(agentName: string, options: AgentToolRe
   }
 }
 
-export function hasAgentToolRestrictions(agentName: string): boolean {
-  const restrictions = getAgentToolRestrictions(agentName)
-  return Object.keys(restrictions).length > 0
-}

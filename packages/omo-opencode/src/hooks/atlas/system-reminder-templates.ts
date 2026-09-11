@@ -139,7 +139,7 @@ Correct action — delegate via \`task()\`. Fan out in PARALLEL when multiple in
 task(
   category="quick",
   load_skills=[],
-  run_in_background=false,
+  run_in_background=true,
   prompt="[6 sections: TASK / EXPECTED OUTCOME / REQUIRED TOOLS / MUST DO / MUST NOT DO / CONTEXT]"
 )
 \`\`\`

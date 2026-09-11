@@ -10,6 +10,7 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { registerMemoryGuard } from "./guard"
 import { componentContext } from "./memory.test-support"
+import { TRANSIENT_DIRNAME } from "./transient-identity"
 import {
   type FilesystemOperation,
   type FilesystemPolicy,
@@ -223,6 +224,52 @@ describe("memory filesystem policy guard", () => {
     const setup = fixture()
 
     expect(hasFilesystemPolicySupport(setup.pi)).toBe(true)
+  })
+
+  test("#given runtime-only sibling directories #when the policy registers #then only durable identities are denied roots and the strays stay denied by the check", async () => {
+    const setup = fixture()
+    const strayPaths = buildIdentityPaths(setup.memoryRoot, "stray-run")
+    mkdirSync(join(strayPaths.transcripts, "stream-1"), { recursive: true })
+
+    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    const policy = registeredPolicy(setup)
+
+    const deniedRoots = policy.deniedRoots ?? []
+    expect(deniedRoots).toContain(canonical(setup.foreignRoot))
+    expect(deniedRoots).not.toContain(canonical(strayPaths.root))
+    const stray = canonical(strayPaths.transcripts)
+    expect(await check(policy, "read", stray)).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${stray}`,
+    })
+  })
+
+  test("#given a transient run identity #when the policy registers #then the durable agents root and other transient runs are denied while its own run root is allowed", async () => {
+    const setup = fixture()
+    const runPaths = buildIdentityPaths(join(setup.memoryRoot, TRANSIENT_DIRNAME, "token-1"), "own")
+    const otherRunPaths = buildIdentityPaths(join(setup.memoryRoot, TRANSIENT_DIRNAME, "token-2"), "other")
+    mkdirSync(join(runPaths.transcripts, "stream-1"), { recursive: true })
+    mkdirSync(join(otherRunPaths.transcripts, "stream-1"), { recursive: true })
+    const transient = createMemoryIdentityContext({
+      identity: "own",
+      identityPaths: runPaths,
+      durableRoot: setup.own.identityPaths.root,
+      binding: { identity: "own", repoPathHash: "hash", boundAt: 1 },
+    })
+
+    registerMemoryFilesystemPolicy(setup.pi, transient)
+    const policy = registeredPolicy(setup)
+
+    expect(await check(policy, "write", canonical(runPaths.transcripts), "write")).toEqual({ allow: true })
+    expect(await check(policy, "read", canonical(setup.foreignFile))).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${canonical(setup.foreignFile)}`,
+    })
+    const otherRun = canonical(otherRunPaths.transcripts)
+    expect(await check(policy, "read", otherRun)).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${otherRun}`,
+    })
   })
 
   test("#given the policy guard module source #when imports are audited #then senpi references are type-only with no runtime import or any-cast", () => {

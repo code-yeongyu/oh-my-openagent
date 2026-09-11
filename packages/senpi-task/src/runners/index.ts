@@ -7,6 +7,7 @@ export {
   mergeChildCustomTools,
 } from "./in-process"
 export type {
+  ChildCompletionPolicy,
   ChildHandle,
   ChildSession,
   ChildSessionEvent,
@@ -35,7 +36,9 @@ export type {
 export {
   buildChildArgs,
   buildRpcSpawn,
+  OMO_SENPI_TASK_RPC_CHILD,
   detectBunBinary,
+  detectCompiledEngine,
   resolveChildSessionDir,
   resolveSenpiExecutable,
   resolveSenpiLauncher,

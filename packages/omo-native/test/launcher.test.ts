@@ -38,7 +38,7 @@ function expandShortPath(path: string): string {
   }
 }
 
-function createFixture(options: { hoisted?: boolean; shim?: boolean; installLayout?: InstallLayout } = {}): Fixture {
+function createFixture(options: { hoisted?: boolean; scopedEngine?: boolean; shim?: boolean; installLayout?: InstallLayout } = {}): Fixture {
   // Windows hands back the 8.3 short form (RUNNER~1) here while the launcher reports the long path, so
   // the fixture root is canonicalized once and every derived path inherits the same spelling.
   const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
@@ -75,7 +75,10 @@ function createFixture(options: { hoisted?: boolean; shim?: boolean; installLayo
   }
 
   const modulesRoot = options.hoisted ? join(root, "node_modules") : join(packageRoot, "node_modules")
-  const senpiRoot = join(modulesRoot, "@code-yeongyu", "senpi")
+  const senpiRoot = options.scopedEngine
+    ? join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
+    : join(modulesRoot, "@code-yeongyu", "senpi")
+  if (options.scopedEngine) writeFile(join(senpiRoot, "node_modules", ".bin", "dummy"), "decoy\n", 0o755)
   writeFile(join(senpiRoot, "package.json"), JSON.stringify({
     name: "@code-yeongyu/senpi",
     version: "2026.8.9",
@@ -94,7 +97,8 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
 
   let shimPath: string | undefined
   if (options.shim !== false) {
-    shimPath = join(modulesRoot, ".bin", process.platform === "win32" ? "senpi.cmd" : "senpi")
+    const shimRoot = options.scopedEngine ? join(packageRoot, "node_modules") : modulesRoot
+    shimPath = join(shimRoot, ".bin", process.platform === "win32" ? "senpi.cmd" : "senpi")
     writeFile(shimPath, "fixture shim\n", 0o755)
     shimPath = expandShortPath(realpathSync(shimPath))
   }
@@ -193,6 +197,14 @@ describe("omo launcher", () => {
         expect(existsSync(environment.OMO_BIN ?? "")).toBe(true)
         expect((environment.OMO_BIN ?? "").replace(/\\/g, "/")).toMatch(/\/bin\/omo\.js$/)
         expect(environment.OMO_BIN).not.toBe(environment.SENPI_BIN)
+      })
+
+      test("#then scoped engine packages resolve the hoisted senpi shim", () => {
+        const fixture = createFixture({ scopedEngine: true })
+        const result = run(fixture, ["say", "hi"])
+        expect(result.status).toBe(0)
+        expect(capture(fixture).env.SENPI_BIN).toBe(fixture.shimPath)
+        expect(existsSync(capture(fixture).env.SENPI_BIN ?? "")).toBe(true)
       })
 
       test("#then SENPI_BIN stays absent when no shim exists", () => {

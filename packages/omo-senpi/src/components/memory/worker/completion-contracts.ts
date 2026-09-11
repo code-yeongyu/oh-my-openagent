@@ -1,5 +1,6 @@
 import type { EntryRenderer } from "@code-yeongyu/senpi"
 import type { DreamOrigin, ReflectionOutcome, ReflectionTrigger } from "@oh-my-opencode/memory-core"
+import type { ReflectionLauncher } from "./launcher-identity"
 
 export const REFLECTION_COMPLETION_ENTRY_TYPE = "senpi-memory.reflection-completion"
 export const REFLECTION_LAUNCHED_ENTRY_TYPE = "senpi-memory.reflection-launched"
@@ -47,6 +48,7 @@ export interface ReflectionCompletionRecord {
   readonly mergedCommitSha?: string
   readonly filesChanged?: number
   readonly consecutiveFailures?: number
+  readonly launcher?: ReflectionLauncher
   readonly delivery: {
     readonly status: "pending" | "consumed"
     readonly sessionId?: string

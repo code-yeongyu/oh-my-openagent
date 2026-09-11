@@ -1,0 +1,161 @@
+task-7-deadline-dropped
+worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage
+branch: feat/memorian-trigger-coverage
+head: c0c08abdd (plus uncommitted task-7 edits; not committed)
+
+WHAT CHANGED
+- memorian-judge-run.ts: BOTH deadline branches (setup-phase race and turn-phase race)
+  still abortAndDispose, still log "memorian gate deadline exceeded" with
+  { runId, salvaged }, still salvage accepted.length > 0 as completed+partial.
+  When accepted.length === 0 they now record { status: "dropped", cause: "deadline" }
+  (and set state.cancelled = true) instead of failed/deadline.
+- memorian-runner.ts: "deadline" removed from MemorianGateFailureCause.
+  Failed comment no longer says "outran its deadline". Dropped variant comments that
+  deadline (zero accepted nudges) is a dropped cause.
+- memorian-notice.ts: skipped/failed why-copy now says "recalled memory candidates"
+  instead of "stored memories". Dropped still returns undefined (no renderer branch change).
+- memorian-run-retention.ts: outcome { status: "dropped", cause: "deadline" } uses the
+  30-day class, same as failed / non-empty nudged.
+- AGENTS.md rows 28 and 30 only: outcome list is completed /
+  failed+{session_create_failed, child_failed, launch_failed} /
+  dropped+{cancelled, compaction, deadline}; deadline never renders a notice but still
+  appends the gate record and outcome.json.
+
+TDD: four existing pins flipped first, RED captured, then (A)-(D)/(F), GREEN captured,
+then mutation of one (A) branch back to failed, then revert GREEN.
+
+NOTE: /tmp/mtc-run-20260907/rbt.sh originally used box exec --timeout 900; the box API
+rejects timeouts > 600 (invalid_timeout) so jq printed null. The harness timeout was
+capped at 300 locally so rbt.sh could return. bun test was never run on the Mac.
+
+-------------------------------------------------------------------------------
+RED (tests only, production unchanged)
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-lifecycle.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-runner-lifecycle.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts
+
+(equivalent remote run captured as /tmp/mtc-run-20260907/red1.json after the 900s API
+reject; same two test files synced, production still failed/deadline)
+
+output:
+RBT_SYNCED=2
+----- fail lines -----
+(fail) MemorianGateRunner > #given a child that never nudges and never settles #when the launch deadline fires #then the result is dropped with cause deadline [62.86ms]
+(fail) MemorianGateRunner > #given child setup never resolves #when the whole-launch deadline fires #then the latch releases and a late handle is disposed [262.40ms]
+(fail) MemorianGateRunner > #given a runner constructed with deadlineMs 60_000, a launch input with deadlineMs 50, and a child that never settles #when the runner launches #then the result is dropped with cause deadline within 2s [58.36ms]
+(fail) MemorianGateRunner > #given a child that never settles #when the deadline fires #then the child is aborted and disposed [26.17ms]
+----- summary -----
+ 10 pass
+ 4 fail
+Ran 14 tests across 2 files. [3.35s]
+PASS_LINES=10
+RBT_RC=1
+
+Four pins RED as required (lifecycle L50/L82/L115 + completion never-nudge).
+
+-------------------------------------------------------------------------------
+GREEN (source + tests synced)
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-judge-run.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-notice.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-lifecycle.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-notice.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-wiring.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-runner-lifecycle.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-notice.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-wiring.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-observability.test.ts
+
+output:
+RBT_SYNCED=9
+ 45 pass
+ 0 fail
+Ran 45 tests across 7 files. [4.27s]
+PASS_LINES=45
+RBT_LOG=/tmp/rbt-178875909014722.log
+RBT_RC=0
+
+-------------------------------------------------------------------------------
+MUTATION PROOF
+Temporarily restored the turn-phase deadline branch in memorian-judge-run.ts to
+  return await record({ status: "failed", cause: "deadline", ... })
+then ran the completion file only.
+
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-judge-run.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts
+
+output (fail naming status):
+RBT_SYNCED=3
+(fail) MemorianGateRunner > #given a child that never nudges and never settles #when the launch deadline fires #then the result is dropped with cause deadline [63.00ms]
+ 8 pass
+ 1 fail
+Ran 9 tests across 1 file. [3.21s]
+PASS_LINES=8
+RBT_LOG=/tmp/rbt-17887591279291.log
+RBT_RC=1
+
+assertion (from that log):
+    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
+                         ^
+error: expect(received).toMatchObject(expected)
+
+  {
++   "candidateCount": 1,
+    "cause": "deadline",
+-   "status": "dropped",
++   "model": "omo-mock/mock-1",
++   "runId": "d8fd2a54-1114-4221-9ef0-897b68d5ed5d",
++   "status": "failed",
+  }
+
+- Expected  - 1
++ Received  + 4
+
+Mutation names the status: received "failed", expected "dropped".
+
+Reverted the turn-phase branch to dropped/deadline and re-ran the VERIFY set:
+
+command: same GREEN command as above, plus --sync AGENTS.md
+
+output:
+RBT_SYNCED=10
+ 45 pass
+ 0 fail
+Ran 45 tests across 7 files. [4.00s]
+PASS_LINES=45
+RBT_LOG=/tmp/rbt-178875920925417.log
+RBT_RC=0
+
+-------------------------------------------------------------------------------
+TYPECHECK / GREP / LOC
+cd worktree && bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+TSGO_RC=0
+
+grep -n '"deadline"' packages/omo-senpi/src/components/memory/memorian-runner.ts
+  (no matches; MemorianGateFailureCause has no "deadline")
+
+pure LOC (awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//' | wc -l), all <= 250:
+  134 memorian-judge-run.ts
+  179 memorian-runner.ts
+   95 memorian-notice.ts
+  215 memorian-run-retention.ts
+  178 memorian-runner-lifecycle.test.ts
+  142 memorian-runner-completion.test.ts
+   50 memorian-notice.test.ts
+   50 memorian-wiring.test.ts
+  180 memorian-run-retention.test.ts

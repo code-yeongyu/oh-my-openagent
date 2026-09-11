@@ -1,0 +1,17 @@
+bun test v1.3.14 (0d9b296a)
+
+script\npm-invocation.test.ts:
+(pass) npm spawn options > #given win32 #when npm spawn options are resolved #then a shell is requested [6.45ms]
+(pass) npm spawn options > #given linux and darwin #when npm spawn options are resolved #then no shell is requested [1.08ms]
+
+script\npm-payload-containment.test.ts:
+(pass) root npm payload containment > #given root files allowlist #when senpi containment is checked #then senpi plugin payload is not shipped [10.59ms]
+(pass) root npm payload containment > #given root files allowlist #when hygiene negations are checked #then nested node_modules and retired component residue are excluded [1.32ms]
+(pass) root npm payload containment > #given root files allowlist #when vendored MCP shipping is checked #then each ships its package.json alongside dist [1.10ms]
+(pass) lazycodex-ai publish payload containment > #given publish workflow files override #when hygiene negations are checked #then the rewritten files list carries the same exclusions [13.07ms]
+(pass) lazycodex-ai publish payload containment > #given publish workflow #when payload guards are checked #then verify-npm-payload runs before both npm publish paths [1.11ms]
+
+ 7 pass
+ 0 fail
+ 20 expect() calls
+Ran 7 tests across 2 files. [1.69s]

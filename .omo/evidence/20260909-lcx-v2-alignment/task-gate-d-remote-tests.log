@@ -1,0 +1,164 @@
+Remote unit-gate evidence
+Date: 2026-09-09
+Branch: lcx/v2-enabled-alignment
+Requested HEAD: b6eead203
+Remote HEAD: b6eead2038ed5984eacc7348a9e829866ecffc9e
+
+Branch publication
+- `git -C /Users/yeongyu/lcx-inboard-20260909/omo-wt-d push -u origin lcx/v2-enabled-alignment`: exit 0; new remote branch created and tracking configured.
+
+Machine selection
+- Initial mesh check: mengmotaMac online, load 139.54/18 (over the <=18 requirement), so it was not selected.
+- gorky online, load 10.67/8; selected per fallback rule. sionicMac was not used.
+- Remote gate uptime/load snapshot: `04:48:32 up 18 days, 23:55, 0 users, load average: 10.85, 10.58, 10.60`.
+- Remote tools: bun 1.4.0 (34cbb9a40), node v24.20.0.
+
+Remote setup
+- D=/tmp/lcx-d-gate-20260909
+- `git clone --branch lcx/v2-enabled-alignment --depth 1 https://github.com/code-yeongyu/oh-my-openagent $D/omo`: CLONE_EXIT=0
+- `bun install --frozen-lockfile`: INSTALL_EXIT=0
+- The remote job was written to a script and launched with `nohup bash`.
+
+Gate exits (TEST_EXIT)
+- [a] `bun run test:codex`: TEST_EXIT=a:1
+- [b] `bun test script/codex-install-bundle-freshness.test.ts`: TEST_EXIT=b:0
+- [c] `bun test packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts`: TEST_EXIT=c:0
+- [d] `cd packages/omo-codex/plugin/components/ulw-loop && bunx vitest run test/spawn-guard.test.ts`: TEST_EXIT=d:0
+- [e] `cd packages/omo-codex/plugin && bun run build && node --test test/*.test.mjs`: TEST_EXIT=e:0
+
+Gate [a] last-30-lines evidence
+- 467 pass, 1 skip, 1 fail; 1407 expect() calls; 469 tests across 66 files; duration 20.49s.
+- Failing test: `install-codex project-local cleanup > #given only global CODEX_HOME config under a parent directory #when installing Codex Light #then project cleanup leaves it to the global config updater`
+- Final error: `script "test:codex" exited with code 1`.
+
+Gate [b] last-30-lines evidence
+- `script/codex-install-bundle-freshness.test.ts`: 2 pass, 0 fail, 3 expect() calls; 2 tests; duration 1.83s.
+
+Gate [c] last-30-lines evidence
+- `codex MultiAgentV2 config`: 29 pass, 0 fail, 150 expect() calls; 29 tests; duration 3.03s.
+
+Gate [d] last-30-lines evidence
+- Vitest v4.1.11; `test/spawn-guard.test.ts`: 1 passed file, 41 passed tests; duration 854ms.
+
+Gate [e] last-30-lines evidence
+- `node --test`: 337 pass, 0 fail, 0 cancelled, 0 skipped, 0 todo; 337 tests; duration 8038.925187ms.
+- Build completed before the Node test run.
+
+Failure classification
+- Same-machine dev comparison was required for [a]'s failing file.
+- Dev clone: `git clone --branch dev --depth 1 https://github.com/code-yeongyu/oh-my-openagent /tmp/lcx-d-gate-20260909-dev/omo`: CLONE_EXIT=0.
+- Dev HEAD: d36aca20c85cadf300ef099715926d24996d10b4.
+- Dev `bun install --frozen-lockfile`: INSTALL_EXIT=0.
+- Dev failing-file run: `bun test packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts`: DEV_TEST_EXIT=0.
+- Dev result: 3 pass, 0 fail, 18 expect() calls; 3 tests; duration 1.84s.
+- Classification: [a] is a BRANCH FAILURE / regression, not PRE-EXISTING/ENV. The identical failing file passes on the same machine's dev clone. The known gorky `install-bin-links.test.mjs` bun-absent wrapper exception did not occur.
+
+Remote cleanup receipt
+- Main remote job recorded `ls /tmp/lcx-d-gate-20260909 -> ls: cannot access '/tmp/lcx-d-gate-20260909': No such file or directory`.
+- Dev comparison recorded `ls /tmp/lcx-d-gate-20260909-dev -> ls: cannot access '/tmp/lcx-d-gate-20260909-dev': No such file or directory`.
+- A final remote cleanup removed the receipt, launcher logs, scripts, and both temporary directories; both `ls` checks again reported No such file.
+
+Overall: gates [b], [c], [d], and [e] passed; gate [a] failed on the branch-specific project-local cleanup test. No repository files were edited by this task.
+
+Task D fixture alignment
+- `git stash push -- packages/omo-codex/src/install/codex-multi-agent-v2-config.ts`: exit 0 (`No local changes to save`); the product source was already clean. `git stash pop`: exit 1 (`No stash entries found`); source remained unchanged and the fixture was the only worktree change.
+- Old-code reasoning: at b6eead203^, `v2Preferred` only used the model-version option; gpt-5.5 resolves to null, so old code preserves `max_threads = 12`, which would fail the new `not.toMatch` assertion.
+- `bunx biome check packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts`: exit 0.
+- Commit: `fd6d546ea2dbabea0d28b8fc4be56a3da3a407ad`; `git push origin lcx/v2-enabled-alignment`: exit 0.
+- Mesh selection: mengmotaMac was over the 18 load threshold; gorky was offline, so the available low-load fallback vultr-tokyo was used. Initial gorky SDK write attempt exited 1 with a 35s hub timeout; no remote job completed there.
+- Remote job command: `BUNSHIN_REPO=/Users/yeongyu/tmp/bunshin-f3 bun run /tmp/lcx-d-remote-job.ts`: exit 0. The job was written to `/tmp/lcx-d-fixture-20260909.job.sh` and launched with `nohup bash`; it cloned `lcx/v2-enabled-alignment` to `/tmp/lcx-d-fixture-20260909`, ran `bun install --frozen-lockfile`, ran only `bun test packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts`, captured the receipt, and removed the clone. Cleanup `rm -f` completed within the successful driver run.
+- Remote receipt:
+  `TEST_EXIT=0`
+  `--- LAST 20 LINES ---`
+  `+ picomatch@4.0.7`
+  `+ posthog-node@5.51.1`
+  `+ zod@4.4.3`
+  ``
+  `599 packages installed [76.40s]`
+  `bun test v1.4.0 (34cbb9a40)`
+  ``
+  `packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts:`
+  `(pass) install-codex project-local cleanup > #given stale project-local Codex config #when installing Codex Light #then repairs the local conflict before returning success [71.53ms]`
+  `(pass) install-codex project-local cleanup > #given only global CODEX_HOME config under a parent directory #when installing Codex Light #then project cleanup leaves it to the global config updater [23.69ms]`
+  `(pass) install-codex project-local cleanup > #given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup [18.74ms]`
+  ``
+  `3 pass`
+  `0 fail`
+  `19 expect() calls`
+  `Ran 3 tests across 1 file. [1419.00ms]`
+- Old assertion: `expect(content).toMatch(/^\\s*max_threads\\s*=\\s*12$/m)`; new assertions: `expect(content).not.toMatch(/^\\s*max_threads\\s*=/m)`, `expect(content).toContain("max_depth = 5")`, and `expect(content).not.toMatch(/^\\s*max_concurrent_threads_per_session\\s*=/m)`.
+
+----- gate rerun on permitted box (vultr-tokyo rerun voided) -----
+Date: 2026-09-09
+Branch: lcx/v2-enabled-alignment
+Requested HEAD: fd6d546ea
+
+Correction and machine selection
+- The earlier targeted rerun on `vultr-tokyo` is VOIDED: that machine is deploy-only, not a permitted compute box.
+- `sionicMac` was not used. No `bun test` was run on this local machine.
+- Live mesh check initially showed `mengmotaMac` online at 40.81/18, over the required <=18 threshold, and `gorky` offline. `mengmotaHost` was then checked as the third permitted option at 25.38/14, then 16.67/14, both over its <=14 threshold.
+- A subsequent live check showed `gorky` online at 10.32/8, so the prescribed fallback selected `gorky`; it remained online for the run. The deploy-only `vultr-tokyo` was never contacted.
+- Selected machine: `gorky`, machine id `47408d4f-cbbb-4cd2-b968-61962aa741f9`.
+
+Remote setup and receipt
+- Job was written to `/tmp/lcx-d-gate2-20260909.job.sh` and launched with `nohup bash`; the driver waited for a completion sentinel rather than the receipt-file creation event.
+- D: `/tmp/lcx-d-gate2-20260909`; the job began with `rm -rf $D`, exported `$HOME/.bun/bin:$HOME/.local/bin:$PATH`, cloned the requested branch, and ran `bun install --frozen-lockfile`.
+- `REMOTE_MACHINE_ALIAS=gorky`; `REMOTE_MACHINE_ID=47408d4f-cbbb-4cd2-b968-61962aa741f9`.
+- Uptime/load snapshot: `05:27:42 up 19 days, 34 min, 0 users, load average: 10.37, 10.18, 9.99`.
+- Remote tools: `bun 1.4.0 (34cbb9a40)`, `node v24.20.0`.
+- `git clone --branch lcx/v2-enabled-alignment --depth 1 https://github.com/code-yeongyu/oh-my-openagent $D/omo`: `CLONE_EXIT=0`.
+- `REMOTE_HEAD=fd6d546ea2dbabea0d28b8fc4be56a3da3a407ad`.
+- `bun install --frozen-lockfile`: `INSTALL_EXIT=0`; 599 packages installed.
+
+Gate exits (TEST_EXIT)
+- [a] `bun run test:codex`: `TEST_EXIT_a=1`.
+- [b] `bun test script/codex-install-bundle-freshness.test.ts`: `TEST_EXIT_b=0`.
+- [c] `bun test packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts`: `TEST_EXIT_c=0`.
+- [d] `cd packages/omo-codex/plugin/components/ulw-loop && bunx vitest run test/spawn-guard.test.ts`: `TEST_EXIT_d=0`.
+- [e] `cd packages/omo-codex/plugin && bun run build && node --test test/*.test.mjs`: `TEST_EXIT_e=0`.
+
+Last-30-lines gate evidence
+- [a]: final lines show `install-bin-links.test.mjs:136` with expected `/OMO_NODE_OK --version/` but actual empty output, then `install-bin-links.test.mjs:148` with actual `0` versus expected `127`; final line `error: script "test:codex" exited with code 1`. This is the known Linux gorky bun-absent wrapper case.
+- [b]: `2 pass`, `0 fail`, `3 expect() calls`, `Ran 2 tests across 1 file. [2.43s]`.
+- [c]: `29 pass`, `0 fail`, `150 expect() calls`, `Ran 29 tests across 1 file. [2.36s]`.
+- [d]: Vitest v4.1.11; `1 passed` file; `41 passed` tests; duration `869ms`.
+- [e]: `337` tests, `337 pass`, `0 fail`, `0 cancelled`, `0 skipped`, `0 todo`; duration `8593.54863ms`; build completed before the Node test run.
+
+Same-machine dev classification
+- Because [a] failed, a matching dev comparison was run on the same `gorky` machine from `/tmp`.
+- `git clone --branch dev --depth 1 https://github.com/code-yeongyu/oh-my-openagent /tmp/lcx-d-gate2-20260909-dev/omo`: `DEV_CLONE_EXIT=0`.
+- `DEV_HEAD=84c2320b7d81f328c64c24257e04c97704b97ad`.
+- `bun install --frozen-lockfile`: `DEV_INSTALL_EXIT=0`; 599 packages installed.
+- Matching command `bun run test:codex`: `DEV_TEST_EXIT_a=1`.
+- Dev last-30-lines failure is the same `packages/omo-codex/scripts/install-bin-links.test.mjs` bun-absent wrapper pair: empty output instead of `/OMO_NODE_OK --version/`, and actual `0` instead of expected `127`; final line `error: script "test:codex" exited with code 1`.
+- Classification: [a] is `PRE-EXISTING/ENV` on Linux `gorky`, because the matching dev clone fails in the same environment. [b], [c], [d], and [e] passed.
+
+Operational notes and cleanup
+- An intermediate launcher was invalid because it waited for receipt creation rather than job completion; it was stopped before any gate ran and is not evidence.
+- A subsequent setup-only attempt had a transient install failure and a deleted-cwd dev clone failure; it is superseded by the completed rerun above and is not used for classification.
+- Final main job removed `$D` and recorded `D_AFTER_CLEANUP=ls: cannot access '/tmp/lcx-d-gate2-20260909': No such file or directory`.
+- Final dev comparison removed `/tmp/lcx-d-gate2-20260909-dev` and recorded `DEV_AFTER_CLEANUP=ls: cannot access '/tmp/lcx-d-gate2-20260909-dev': No such file or directory`.
+- Final cleanup removed the receipt, completion sentinel, job script, and launcher log; all were confirmed absent. No repository files were edited by this rerun.
+
+----- gate after dev merge (beta.50 + #7999) -----
+Date: 2026-09-09
+Requested merge HEAD before evidence amend: a76149432d1a78017629669048dc88d74a9c0b1b
+Selected machine: gorky (mengmotaMac was online but load exceeded 18; gorky was online fallback; no vultr-tokyo or sionicMac contact)
+Remote setup: job and patch written through Bunshin SDK; `nohup bash` launched; branch clone exit 0; patch apply exit 0; `bun install --frozen-lockfile` exit 0 (gorky Bun 1.3.14).
+Remote cleanup: `/tmp/lcx-d-gate3-20260909` and the dev comparison clone were removed; launcher, job, patch, receipt, and sentinel were removed.
+
+Gate exits:
+- [a] `bun run test:codex`: TEST_EXIT_a=1.
+- [b] `bun test script/codex-install-bundle-freshness.test.ts`: TEST_EXIT_b=0.
+- [c] `bun test packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts`: TEST_EXIT_c=0.
+- [d] `cd packages/omo-codex/plugin/components/ulw-loop && bunx vitest run test/spawn-guard.test.ts`: TEST_EXIT_d=0.
+- [e] `cd packages/omo-codex/plugin && bun run build && node --test test/*.test.mjs`: TEST_EXIT_e=0.
+
+[a] exact failures (same-machine dev classification):
+- `install-bin-links.test.mjs:108`: `0 !== 127` for `#given bun absent everywhere #when running the omo runtime wrapper #then fails with an actionable install hint`.
+- `install-bin-links.test.mjs:136`: expected `/OMO_NODE_OK --version/`, actual empty output, for `#given bun absent everywhere and a node CLI bundle #when running the omo runtime wrapper #then falls back to node`.
+- `install-bin-links.test.mjs:148`: `0 !== 127` for `#given bun absent and no node CLI bundle #when running the omo runtime wrapper #then the error names both runtimes`.
+- Same-machine fresh dev clone exact command: `node --test packages/omo-codex/scripts/install-bin-links.test.mjs`; DEV_INSTALL_BIN_LINKS_EXIT=1; `18 pass`, `3 fail`; it reproduced all three failures verbatim, so [a] is PRE-EXISTING/ENV on gorky (known bun-absent wrapper behavior), not a branch failure.
+- The baseline full `bun run test:codex` also had one unrelated expected V2-config assertion mismatch because dev lacks this branch's V2-enabled behavior; it does not alter the [a] environment classification.
+
+Results: [b], [c], [d], and [e] passed; [a] contained only the reproduced known environment failures. No non-environment gate failure.

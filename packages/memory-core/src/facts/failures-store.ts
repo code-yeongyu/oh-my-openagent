@@ -3,7 +3,7 @@
 // it describes can never be observed mid-update by a concurrent launcher.
 
 import { randomUUID } from "node:crypto"
-import { mkdir, open, readFile, rename, rm } from "node:fs/promises"
+import { mkdir, open, readFile, rename, rm, writeHandleAll } from "../fs/resilient"
 import { dirname, join } from "node:path"
 
 import type { MemoryIdentityPaths } from "../identity"
@@ -144,7 +144,7 @@ export class FactsFailureStore {
     const temporary = join(directory, `.failures-${process.pid}-${randomUUID()}.tmp`)
     const handle = await open(temporary, "wx", 0o600)
     try {
-      await handle.writeFile(content, "utf8")
+      await writeHandleAll(handle, content, "utf8")
       await handle.sync()
     } catch (error) {
       await handle.close()

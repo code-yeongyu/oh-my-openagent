@@ -1,0 +1,1 @@
+XDG_CONFIG_HOME=<sandbox>/config XDG_DATA_HOME=<sandbox>/data XDG_STATE_HOME=<sandbox>/state XDG_CACHE_HOME=<sandbox>/cache bun dist/cli/index.js run --json --agent general --directory <sandbox>/project --model openai/gpt-fake "Reply exactly IDLE_BOULDER_OK"

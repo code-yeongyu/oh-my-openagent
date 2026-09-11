@@ -49,7 +49,7 @@ function fakeManager(overrides: Partial<TaskManager>): TaskManager {
 }
 
 function deps(manager: TaskManager): TaskToolDeps {
-  return { manager, omoConfig: OMO_CONFIG, agents: { momus: { name: "momus", description: "Deep reasoning" } } }
+  return { manager, omoConfig: OMO_CONFIG, agents: { "plan-reviewer": { name: "plan-reviewer", description: "Deep reasoning" } } }
 }
 
 function renderedLines(component: unknown, width: number): string[] {
@@ -89,7 +89,7 @@ describe("createTaskTool", () => {
     // then
     expect(tool.description).toContain("release-crew")
     expect(tool.description).toContain("Ships the release train")
-    expect(tool.description).toContain("momus")
+    expect(tool.description).toContain("plan-reviewer")
   })
 
   test("#given the assembled tool #when parameters are read #then the shared TypeBox schema leaves prompt/tasks optional (XOR enforced in validateBatchShape)", () => {
@@ -153,7 +153,7 @@ describe("createTaskTool", () => {
 
     // when
     const component: unknown = Reflect.apply(renderCall, undefined, [
-      { prompt: "Inspect task rendering", subagent_type: "atlas", run_in_background: false },
+      { prompt: "Inspect task rendering", subagent_type: "builder", run_in_background: false },
       RENDERER_THEME,
       {},
     ])
@@ -161,7 +161,7 @@ describe("createTaskTool", () => {
 
     // then
     expect(row).toContain('task "Inspect task rendering"')
-    expect(row).not.toContain("agent:atlas")
+    expect(row).not.toContain("agent:builder")
   })
 
   test("#given a partial child progress result #when rendered #then only the last-line row renders (status lives in senpi's progress line)", () => {

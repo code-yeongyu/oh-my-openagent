@@ -1,7 +1,7 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { createSemanticPromptDedupeKey } from "../../shared/prompt-async-gate/semantic-dedupe"
+import { createSemanticPromptDedupeKey } from "@oh-my-opencode/utils/prompt-async-gate/semantic-dedupe"
 import {
   dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,

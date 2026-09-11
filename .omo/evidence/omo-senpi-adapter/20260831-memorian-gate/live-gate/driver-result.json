@@ -1,0 +1,369 @@
+{
+  "result": "FAIL",
+  "branch": "feat/memorian-gate",
+  "senpiBin": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js",
+  "senpiVersion": "2026.8.31",
+  "providedSenpiCodingAgentDir": "IGNORED",
+  "realSenpiUntouched": true,
+  "realOmoMemoryUntouched": true,
+  "realOmoMemoryFootprintBefore": {
+    "agents": 412,
+    "pendingFiles": [],
+    "tokenBearingFiles": []
+  },
+  "realOmoMemoryFootprintAfter": {
+    "agents": 412,
+    "pendingFiles": [],
+    "tokenBearingFiles": []
+  },
+  "realSenpiAgentDir": "/Users/yeongyu/.senpi/agent",
+  "sandboxRoots": [
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-T17ZT1",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-wPAS2k",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ul5Nwz",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fkYtZL",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj",
+      "exists": false
+    },
+    {
+      "root": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-qNiadH",
+      "exists": false
+    }
+  ],
+  "scenarioVerdicts": [
+    {
+      "scenario": "HAPPY",
+      "verdict": "FAIL",
+      "assertions": 13,
+      "failed": [
+        "HAPPY turn 1 settle spawned the gate child exactly once",
+        "HAPPY child argv carries the production flag set (--no-extensions + -e + --tools nudge,read)",
+        "HAPPY child env carries the memorian sentinel and the nudge sink",
+        "HAPPY candidates payload handed to the child contains the seeded note",
+        "HAPPY the validated nudge persisted to the pending store after turn 1",
+        "HAPPY turn 2 JSONL contains an omo-memorian:recall entry",
+        "HAPPY turn 2 content carries <recalled-memory source=\"[[reference/project/test-note.md]]\"",
+        "HAPPY turn 2 content carries the stub judge's hint verbatim",
+        "HAPPY the ledger marks the injected path as surfaced"
+      ]
+    },
+    {
+      "scenario": "DISABLED",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    },
+    {
+      "scenario": "NO-CANDIDATES",
+      "verdict": "PASS",
+      "assertions": 5,
+      "failed": []
+    },
+    {
+      "scenario": "INVALID-NUDGE",
+      "verdict": "FAIL",
+      "assertions": 5,
+      "failed": [
+        "INVALID-NUDGE the gate child DID spawn (the rejection is the parent validator's)"
+      ]
+    },
+    {
+      "scenario": "LOOP",
+      "verdict": "FAIL",
+      "assertions": 2,
+      "failed": [
+        "LOOP the source session really contains the injection"
+      ]
+    },
+    {
+      "scenario": "REAL-CHILD",
+      "verdict": "PASS",
+      "assertions": 4,
+      "failed": []
+    },
+    {
+      "scenario": "SINGLE-TURN",
+      "verdict": "FAIL",
+      "assertions": 5,
+      "failed": [
+        "SINGLE-TURN the gate child DID spawn (the rejection is the parent validator's)"
+      ]
+    }
+  ],
+  "total": 42,
+  "results": [
+    {
+      "name": "HAPPY corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=95904a95c5af files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "HAPPY turn 1 is the session's FIRST turn (exactly one user message)",
+      "ok": true,
+      "detail": "userTurns=1"
+    },
+    {
+      "name": "HAPPY turn 1 settle spawned the gate child exactly once",
+      "ok": false,
+      "detail": "invocations=0"
+    },
+    {
+      "name": "HAPPY child argv carries the production flag set (--no-extensions + -e + --tools nudge,read)",
+      "ok": false,
+      "detail": "[]"
+    },
+    {
+      "name": "HAPPY child env carries the memorian sentinel and the nudge sink",
+      "ok": false,
+      "detail": "sentinel=undefined nudgePath=undefined"
+    },
+    {
+      "name": "HAPPY candidates payload handed to the child contains the seeded note",
+      "ok": false,
+      "detail": "null"
+    },
+    {
+      "name": "HAPPY turn 1 carries NO recall entry (the gate advises the NEXT turn)",
+      "ok": true,
+      "detail": "count=0"
+    },
+    {
+      "name": "HAPPY the validated nudge persisted to the pending store after turn 1",
+      "ok": false,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-T17ZT1/memory/agents/project-46b0a306/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "HAPPY turn 2 JSONL contains an omo-memorian:recall entry",
+      "ok": false,
+      "detail": "count=0 shapes="
+    },
+    {
+      "name": "HAPPY turn 2 content carries <recalled-memory source=\"[[reference/project/test-note.md]]\"",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "HAPPY turn 2 content carries the stub judge's hint verbatim",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "HAPPY the pending file was consumed by the injection",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-T17ZT1/memory/agents/project-46b0a306/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "HAPPY the ledger marks the injected path as surfaced",
+      "ok": false,
+      "detail": "{\"present\":false,\"files\":[]}"
+    },
+    {
+      "name": "DISABLED corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=da04e19aa11e files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "DISABLED session ran 2 turn(s)",
+      "ok": true,
+      "detail": "userTurns=2"
+    },
+    {
+      "name": "DISABLED zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "DISABLED nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-wPAS2k/memory/agents/project-777c32bc/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "DISABLED the gate child never spawned",
+      "ok": true,
+      "detail": "invocations=0 []"
+    },
+    {
+      "name": "NO-CANDIDATES corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=4ff516a5d8ba files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "NO-CANDIDATES session ran 2 turn(s)",
+      "ok": true,
+      "detail": "userTurns=2"
+    },
+    {
+      "name": "NO-CANDIDATES zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "NO-CANDIDATES nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ul5Nwz/memory/agents/project-2d41e8c2/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "NO-CANDIDATES the gate child never spawned",
+      "ok": true,
+      "detail": "invocations=0 []"
+    },
+    {
+      "name": "INVALID-NUDGE corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=6d98479c356f files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "INVALID-NUDGE session ran 2 turn(s)",
+      "ok": true,
+      "detail": "userTurns=2"
+    },
+    {
+      "name": "INVALID-NUDGE zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "INVALID-NUDGE nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fkYtZL/memory/agents/project-d23936a0/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "INVALID-NUDGE the gate child DID spawn (the rejection is the parent validator's)",
+      "ok": false,
+      "detail": "invocations=0"
+    },
+    {
+      "name": "LOOP no facts/reflection projection derives from the injected nudge",
+      "ok": true,
+      "detail": "projections=4 recallDerived=0 []"
+    },
+    {
+      "name": "LOOP the source session really contains the injection",
+      "ok": false,
+      "detail": "count=0"
+    },
+    {
+      "name": "REAL-CHILD production argv keeps --no-extensions alongside the explicit -e extension",
+      "ok": true,
+      "detail": "[\"/Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-gate/node_modules/@code-yeongyu/senpi/dist/cli.js\",\"-p\",\"--system-prompt\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj/memorian-run/memorian-persona.md\",\"--tools\",\"nudge,read\",\"-e\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj/memorian-run/nudge-extension.ts\",\"--no-extensions\",\"--no-skills\",\"--no-prompt-templates\",\"--no-context-files\",\"--session-dir\",\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj/memorian-run\",\"--model\",\"omo-mock/mock-1\",\"Read /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj/memorian-run/candidates.json and /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj/memorian-run/transcript-window.txt, then follow the system prompt.\"]"
+    },
+    {
+      "name": "REAL-CHILD production argv restricts tools to nudge,read",
+      "ok": true,
+      "detail": "--tools nudge,read"
+    },
+    {
+      "name": "REAL-CHILD the real child booted and exited cleanly",
+      "ok": true,
+      "detail": "status=0 stderr="
+    },
+    {
+      "name": "REAL-CHILD the real child's NDJSON line matches the scripted nudge EXACTLY",
+      "ok": true,
+      "detail": "lines=1 first={\"path\":\"reference/project/test-note.md\",\"hint\":\"Rebase the oldest reviewed branch first so the dependent stack never inverts.\"}"
+    },
+    {
+      "name": "SINGLE-TURN corpus note committed at HEAD",
+      "ok": true,
+      "detail": "HEAD=57855904adff files=reference/project/test-note.md,skills/memory-discipline/SKILL.md,system/facts.md,system/human.md,system/persona.md"
+    },
+    {
+      "name": "SINGLE-TURN session ran 1 turn(s)",
+      "ok": true,
+      "detail": "userTurns=1"
+    },
+    {
+      "name": "SINGLE-TURN zero omo-memorian:recall entries",
+      "ok": true,
+      "detail": "count=0 []"
+    },
+    {
+      "name": "SINGLE-TURN nothing pending for a later turn",
+      "ok": true,
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-qNiadH/memory/agents/project-a1ffae3d/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "SINGLE-TURN the gate child DID spawn (the rejection is the parent validator's)",
+      "ok": false,
+      "detail": "invocations=0"
+    },
+    {
+      "name": "isolation: real ~/.senpi/agent untouched (volatile paths excluded)",
+      "ok": true,
+      "detail": "4a361868d294 vs 4a361868d294"
+    },
+    {
+      "name": "isolation: real ~/.omo/memory has no QA-attributable pending nudge or corpus file",
+      "ok": true,
+      "detail": "before={\"agents\":412,\"pendingFiles\":[],\"tokenBearingFiles\":[]} after={\"agents\":412,\"pendingFiles\":[],\"tokenBearingFiles\":[]}"
+    },
+    {
+      "name": "cleanup: every sandbox removed",
+      "ok": true,
+      "detail": "[{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-T17ZT1\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-wPAS2k\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-ul5Nwz\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-fkYtZL\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-1iidzj\",\"exists\":false},{\"root\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-qNiadH\",\"exists\":false}]"
+    }
+  ],
+  "failures": [
+    {
+      "name": "HAPPY turn 1 settle spawned the gate child exactly once",
+      "detail": "invocations=0"
+    },
+    {
+      "name": "HAPPY child argv carries the production flag set (--no-extensions + -e + --tools nudge,read)",
+      "detail": "[]"
+    },
+    {
+      "name": "HAPPY child env carries the memorian sentinel and the nudge sink",
+      "detail": "sentinel=undefined nudgePath=undefined"
+    },
+    {
+      "name": "HAPPY candidates payload handed to the child contains the seeded note",
+      "detail": "null"
+    },
+    {
+      "name": "HAPPY the validated nudge persisted to the pending store after turn 1",
+      "detail": "{\"dir\":\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-T17ZT1/memory/agents/project-46b0a306/runtime/recall/pending\",\"files\":[]}"
+    },
+    {
+      "name": "HAPPY turn 2 JSONL contains an omo-memorian:recall entry",
+      "detail": "count=0 shapes="
+    },
+    {
+      "name": "HAPPY turn 2 content carries <recalled-memory source=\"[[reference/project/test-note.md]]\"",
+      "detail": ""
+    },
+    {
+      "name": "HAPPY turn 2 content carries the stub judge's hint verbatim",
+      "detail": ""
+    },
+    {
+      "name": "HAPPY the ledger marks the injected path as surfaced",
+      "detail": "{\"present\":false,\"files\":[]}"
+    },
+    {
+      "name": "INVALID-NUDGE the gate child DID spawn (the rejection is the parent validator's)",
+      "detail": "invocations=0"
+    },
+    {
+      "name": "LOOP the source session really contains the injection",
+      "detail": "count=0"
+    },
+    {
+      "name": "SINGLE-TURN the gate child DID spawn (the rejection is the parent validator's)",
+      "detail": "invocations=0"
+    }
+  ]
+}

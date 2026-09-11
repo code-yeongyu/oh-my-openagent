@@ -1,0 +1,279 @@
+{
+  "queryId": "q11",
+  "lane": "web",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Cloudflare Workers outage since:2026-09-01 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-09-01",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421457,
+    "completed_at": 1788421457,
+    "id": "f0045b98-7fa3-919b-b9c7-92ca33c5e8bb",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "id": "ws_f0045b98-7fa3-919b-b9c7-92ca33c5e8bb_call-c66910b6-51c6-4f24-9b8f-334fa79d53d3-0",
+        "type": "web_search_call",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "Cloudflare Workers outage",
+          "sources": [
+            {
+              "type": "url",
+              "url": "https://www.cloudflarestatus.com/incidents/bpz4p8wxt2lw"
+            },
+            {
+              "type": "url",
+              "url": "https://blog.cloudflare.com/code-orange-fail-small-complete/"
+            },
+            {
+              "type": "url",
+              "url": "https://blog.cloudflare.com/18-november-2025-outage/"
+            },
+            {
+              "type": "url",
+              "url": "https://www.cloudflarestatus.com/incidents/km4651q3bfdf"
+            },
+            {
+              "type": "url",
+              "url": "https://isdown.app/status/cloudflare-workers/outage-history"
+            },
+            {
+              "type": "url",
+              "url": "https://www.cloudflarestatus.com/incidents/lmsfz6pcb65c"
+            },
+            {
+              "type": "url",
+              "url": "https://community.cloudflare.com/t/workers-ai-experiencing-degraded-availability-in-some-models/934080"
+            },
+            {
+              "type": "url",
+              "url": "https://isdown.app/status/cloudflare/incidents/582667-workers-api-issue"
+            },
+            {
+              "type": "url",
+              "url": "https://www.bleepingcomputer.com/news/security/cloudflare-outage-not-caused-by-security-incident-data-is-safe/"
+            },
+            {
+              "type": "url",
+              "url": "https://community.cloudflare.com/t/cloudflare-workers-issues/842539"
+            },
+            {
+              "type": "url",
+              "url": "https://www.cloudflarestatus.com/incidents/1g51jr94stsm"
+            },
+            {
+              "type": "url",
+              "url": "https://isdown.app/status/cloudflare/incidents/590650-workers-ai-availability-issues"
+            },
+            {
+              "type": "url",
+              "url": "https://blog.cloudflare.com/cloudflare-service-outage-june-12-2025/"
+            },
+            {
+              "type": "url",
+              "url": "https://flarewarden.com/status/cloudflare"
+            },
+            {
+              "type": "url",
+              "url": "https://isdown.app/status/cloudflare-workers/reports-map"
+            }
+          ]
+        }
+      },
+      {
+        "id": "tco_f0045b98-7fa3-919b-b9c7-92ca33c5e8bb_call-c66910b6-51c6-4f24-9b8f-334fa79d53d3-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Cloudflare Workers has experienced multiple outages and incidents over the past year**, with dozens of reported events tracked by monitoring sites. There is no single massive global outage dominating current headlines as of September 2026, but several recent or notable ones stand out.[[1]](https://isdown.app/status/cloudflare-workers/outage-history)\n\n### Recent and Ongoing Incidents (2026)\n- **September 2, 2026 – Workers Issues in Narita (Japan)**: Increased errors for customers running Workers scripts in the Narita location. The issue was identified, a fix implemented, and it was resolved within about 1.5 hours (from ~1:02 AM to 2:24 AM UTC).[[2]](https://www.cloudflarestatus.com/incidents/lmsfz6pcb65c)\n- **July 17, 2026 – Workers API Issues**: Errors when interacting with the Workers API and dashboard configuration (especially deploying scripts). Production Workers were unaffected. Resolved in under 30 minutes.[[3]](https://www.cloudflarestatus.com/incidents/km4651q3bfdf)\n- **June 2026 – Workers AI Issues**: Errors specifically with inference requests to the `@cf/google/gemma-4-26b-a4b-it` model. Resolved after monitoring a fix (incident spanned late June 25 to early June 26 UTC).[[4]](https://www.cloudflarestatus.com/incidents/bpz4p8wxt2lw)\n- **April 2026 incidents** (multiple minor ones):\n  - Elevated 502 errors in some locations (28 minutes).\n  - API latency affecting Workers Builds (about 2 hours).\n  - Prolonged KV API latency and timeouts plus Assets errors (nearly 19–20 hours).[[1]](https://isdown.app/status/cloudflare-workers/outage-history)\n\nOther 2026 incidents involved degraded AI model availability (e.g., certain Moonshot models in June), API failures, and location-specific problems.[[5]](https://community.cloudflare.com/t/workers-ai-experiencing-degraded-availability-in-some-models/934080)\n\n### Major Historical Outages (2025)\nCloudflare had several high-impact global incidents in 2025 that heavily affected Workers and related services:\n- **November 18, 2025**: A change in database permissions caused Bot Management to generate excessive data, leading to widespread HTTP 5xx errors, failures in core CDN/security services, Turnstile, Workers KV, and more. This triggered a major post-incident overhaul called “Code Orange: Fail Small,” which segments Workers runtime deployments by customer cohorts (starting with free users) and adds automatic rollback to limit blast radius.[[6]](https://blog.cloudflare.com/18-november-2025-outage/)\n- **June 12, 2025**: A significant ~2.5-hour outage triggered by a third-party cloud provider failure affecting the underlying storage for **Workers KV**. This cascaded to Workers AI, WARP, Access, Gateway, Images, Stream, Dashboard, and other services (90%+ failure rate on uncached KV operations). Cloudflare accelerated migration of KV’s central store to its own R2 storage to reduce third-party dependency.[[7]](https://blog.cloudflare.com/cloudflare-service-outage-june-12-2025/)\n\n### Current Status (as of September 3, 2026)\nMonitoring sites report **Cloudflare is currently up** across checked regions, with high uptime (99.98–99.99% in recent periods) and no widespread Workers outage. Some unrelated or minor issues (e.g., HTTP/3 problems with R2 custom domains in various locations) are noted, but they do not appear to broadly impact Workers.[[8]](https://flarewarden.com/status/cloudflare)\n\nFor the **most up-to-date information**, check:\n- Official **Cloudflare Status** page: https://www.cloudflarestatus.com\n- IsDown outage history: https://isdown.app/status/cloudflare-workers/outage-history\n\nCloudflare has invested heavily in resiliency improvements since the 2025 incidents, including segmented deployments and reduced reliance on single vendors, which has helped contain most recent issues to minor or regional scope. If you're experiencing problems right now, provide more details (e.g., error messages, locations, or affected services) for more targeted help.",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://isdown.app/status/cloudflare-workers/outage-history",
+                "start_index": 287,
+                "end_index": 353,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.cloudflarestatus.com/incidents/lmsfz6pcb65c",
+                "start_index": 653,
+                "end_index": 715,
+                "title": "2"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.cloudflarestatus.com/incidents/km4651q3bfdf",
+                "start_index": 928,
+                "end_index": 990,
+                "title": "3"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.cloudflarestatus.com/incidents/bpz4p8wxt2lw",
+                "start_index": 1203,
+                "end_index": 1265,
+                "title": "4"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://isdown.app/status/cloudflare-workers/outage-history",
+                "start_index": 1512,
+                "end_index": 1578,
+                "title": "1"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://community.cloudflare.com/t/workers-ai-experiencing-degraded-availability-in-some-models/934080",
+                "start_index": 1727,
+                "end_index": 1836,
+                "title": "5"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://blog.cloudflare.com/18-november-2025-outage/",
+                "start_index": 2426,
+                "end_index": 2485,
+                "title": "6"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://blog.cloudflare.com/cloudflare-service-outage-june-12-2025/",
+                "start_index": 2896,
+                "end_index": 2970,
+                "title": "7"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://flarewarden.com/status/cloudflare",
+                "start_index": 3339,
+                "end_index": 3387,
+                "title": "8"
+              }
+            ]
+          }
+        ],
+        "id": "msg_f0045b98-7fa3-919b-b9c7-92ca33c5e8bb",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "medium"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 169915000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 1,
+        "x_search_calls": 0,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 169915000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 1,
+      "x_search_calls": 0,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:44:17.167Z"
+}

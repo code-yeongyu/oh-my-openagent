@@ -7,7 +7,8 @@ export type RegistryFallbackCandidate = {
 
 const NON_CHAT_ID = /embed|image|audio|tts|whisper|rerank|moderation/i
 const FAST_TIER_ID = /fast|flash|mini|lite|haiku|turbo|highspeed/i
-const MIN_CONTEXT_WINDOW = 65_536
+// Reflection ships a <=128 KiB payload chunk (~32k tokens) plus ~21 working turns; a 64k model cannot hold it.
+const MIN_CONTEXT_WINDOW = 131_072
 const MAX_CANDIDATES = 3
 
 type RegistryCandidate = {
@@ -33,6 +34,11 @@ export function selectRegistryFallbackModels(available: unknown): readonly Regis
   }))
 }
 
+export function readModelContextWindow(entry: unknown): number | undefined {
+  if (!isRecord(entry) || typeof entry.contextWindow !== "number") return undefined
+  return entry.contextWindow
+}
+
 export function readModelPricing(entry: unknown): ReflectionModelPricing | undefined {
   if (!isRecord(entry) || !isRecord(entry.cost)) return undefined
   const input = entry.cost.input
@@ -52,7 +58,7 @@ function parseCandidate(entry: unknown, order: number): RegistryCandidate | unde
   if (typeof provider !== "string" || provider.length === 0) return undefined
   if (typeof id !== "string" || id.length === 0) return undefined
   const cost = readModelPricing(entry)
-  const contextWindow = typeof entry.contextWindow === "number" ? entry.contextWindow : undefined
+  const contextWindow = readModelContextWindow(entry)
   return { provider, id, inputCost: cost?.input, cost, contextWindow, order }
 }
 

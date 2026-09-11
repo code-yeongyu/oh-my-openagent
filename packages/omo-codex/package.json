@@ -1,6 +1,6 @@
 {
 	"name": "@oh-my-opencode/omo-codex",
-	"version": "5.0.0-beta.24",
+	"version": "5.0.0-beta.53",
 	"type": "module",
 	"private": true,
 	"description": "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -31,9 +31,10 @@
 		"sync:skills": "node plugin/scripts/sync-skills.mjs"
 	},
 	"dependencies": {
+		"@oh-my-opencode/shared-skills": "workspace:*",
 		"@oh-my-opencode/utils": "workspace:*"
 	},
 	"devDependencies": {
-		"bun-types": "1.4.0"
+		"bun-types": "1.4.2"
 	}
 }

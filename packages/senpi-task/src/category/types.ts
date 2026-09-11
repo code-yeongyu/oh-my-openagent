@@ -10,7 +10,8 @@ export type BuiltinCategoryDefinition = {
   readonly callerGuidance?: string
   readonly promptAppend: string
   readonly resolvePromptAppend?: (model: string | undefined) => string
-  readonly requiresModel?: string
+  // One model id, or several ids any one of which satisfies the gate (see builtins.ts).
+  readonly requiresModel?: string | readonly string[]
 }
 
 export type SenpiModelPort = {

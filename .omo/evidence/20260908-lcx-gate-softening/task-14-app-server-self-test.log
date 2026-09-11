@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "01a0814e-2be1-7af2-a8fb-6862aeba8965",
+  "turnId": "01a0814e-2c61-79c2-b20a-3a2d6efe7e56",
+  "expectHook": [],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [],
+  "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/tmp\" (codex_home: AbsolutePathBuf(\"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/tmp/cqa-home.rU8E4T/codex\"))\n\u001b[2m2026-09-08T13:56:18.965493Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Project-local config, hooks, and exec policies are disabled in the following folders until the project is trusted, but skills still load.\n    1. /Volumes/mengmotaStorage/local-workspaces/omo-wt/lcx-gate-softening/.codex\n       To load project-local config, hooks, and exec policies, add /Volumes/mengmotaStorage/local-workspaces/omo as a trusted project in /private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/tmp/cqa-home.rU8E4T/codex/config.toml.\n\n"
+}
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+PASS: app-server turn completed; assistant text: Hello from the codex-qa mock model.
+/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.xKHTI4mcG4/scripts/lib/common.sh: line 136: 45339 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$fifo" 2> "$CQA_HOME_ROOT/mock.stderr"

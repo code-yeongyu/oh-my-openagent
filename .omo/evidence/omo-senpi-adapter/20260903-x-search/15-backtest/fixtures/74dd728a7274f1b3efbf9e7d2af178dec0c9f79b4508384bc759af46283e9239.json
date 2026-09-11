@@ -1,0 +1,244 @@
+{
+  "queryId": "q13",
+  "lane": "api-direct",
+  "variant": "v1",
+  "carrier": "reasoning",
+  "request": {
+    "model": "grok-4.6",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false,
+    "reasoning": {
+      "effort": "low"
+    }
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788422033,
+    "completed_at": 1788422033,
+    "id": "1aff6e0d-6b15-9b43-8c7f-1ba998283f27",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.6",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_1aff6e0d-6b15-9b43-8c7f-1ba998283f27",
+        "summary": [
+          {
+            "text": "The user wants me to use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"Grok latest release since:2026-08-19 until:2026-09-03\". Return up to 10 X posts, one per li...",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-e7d8b302-658c-4862-9446-ac19bfb86d9e-0",
+        "input": "{\"query\":\"Grok latest release since:2026-08-19 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_1aff6e0d-6b15-9b43-8c7f-1ba998283f27_call-e7d8b302-658c-4862-9446-ac19bfb86d9e-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_1aff6e0d-6b15-9b43-8c7f-1ba998283f27_call-e7d8b302-658c-4862-9446-ac19bfb86d9e-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2095184212768747692 - US CPI inflation increased to 3.4% YoY as of July 2026, with August data due Sept 11 (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095131808304132139 - No official pricing yet for Gemini 3.8 Flash, though it appears in Google Cloud metrics (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095018119957794904 - Elizabeth Holmes projected prison release date is December 30, 2031 per BOP data (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094992579615957039 - ABS data confirms Australia first-half 2026 GDP growth of 0.7% driven by private demand (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991346473779600 - Unconfirmed rumors of OpenAI Astra possible release this week or mid-September (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094991036552548614 - OpenAI plans to make Astra available soon with limited initial cybersecurity access (@grok, 2026-09-02)\nhttps://x.com/grok/status/2094880585948746211 - Texas Roadhouse Q3 2026 comparable sales up 6.2% in first five weeks, no August figures yet (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094870657263624455 - NYT review of latest DOJ Epstein files found 38,000+ Trump-related references, no evidence of wrongdoing (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094860609548382248 - Ghislaine Maxwell remains at FPC Bryan, projected release 2037 after denied bid to vacate conviction (@grok, 2026-09-01)\nhttps://x.com/grok/status/2094838052388471110 - NYT analysis of Epstein files shows 38,000+ references to Trump circle, no direct messages or evidence against him (@grok, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095184212768747692",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095184212768747692"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094880585948746211",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094880585948746211"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094870657263624455",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094870657263624455"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094838052388471110",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094838052388471110"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095131808304132139",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095131808304132139"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991346473779600",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991346473779600"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094860609548382248",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094860609548382248"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094991036552548614",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094991036552548614"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095018119957794904",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095018119957794904"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094992579615957039",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094992579615957039"
+              }
+            ]
+          }
+        ],
+        "id": "msg_1aff6e0d-6b15-9b43-8c7f-1ba998283f27",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-19",
+        "to_date": "2026-09-03",
+        "allowed_x_handles": [
+          "grok"
+        ]
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 78196200,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e41c6060b2628547"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 78196200,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:53:49.667Z"
+}

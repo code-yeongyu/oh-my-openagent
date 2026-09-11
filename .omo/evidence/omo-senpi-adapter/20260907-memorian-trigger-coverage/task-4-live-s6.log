@@ -1,0 +1,13 @@
+Evidence log (note #3 final)
+
+Freshness proof (per note #3): node packages/omo-senpi/plugin/scripts/build-extension.mjs --check -> exit 0; grep -c toolTexts packages/omo-senpi/plugin/extensions/omo.js -> 1; ls -la omo.js -> mtime Sep 7 15:15, size 1036398. MAX_TOOL_SINGLE_TERMS grep=0 is expected (numeric constant inlining), not treated as stale.
+
+Fixture end-state verified in source: S6_PROMPT="please continue with the checklist" (scenarios line 19); fixture check asserts length>=300 AND exactly one seed token rollout.md (line 204), no tool=bash requirement; zero kubernetes-rollouts literals in the scenario file. Note #3 described an earlier snapshot for both; no edit was needed.
+
+RED-2 (note #3 redefinition: two-kept-term prompt vs beta.45, no harvest): bun packages/omo-senpi/scripts/qa/memorian-tool-boundary-e2e.mjs --scenario s6 --plugin-root /Users/yeongyu/.bun/install/global/node_modules/omo-ai/plugin --evidence-dir <EV>/red-s6 -> exit 1; ok:false; s6 FAIL; s6.judge-launched=false (recallRuns=0, judgeRequests=0); s6.tool-fixture PASS (tool=eval codeLength=580 token=rollout.md). This doubles as the beta.45 RED; the unit RED lives in task-8 log.
+
+GREEN: bun packages/omo-senpi/scripts/qa/memorian-tool-boundary-e2e.mjs --scenario all --evidence-dir <EV>/green -> exit 0; ok:true; S3/S4/S5/S6 PASS; failures:[]; s6 judgeRequests=2, candidates.json contains reference/kubernetes-rollouts.md, mid-turn recall between first tool result and second tool call, parentRequests=3, realSenpiUntouched=true for s3/s4/s5/s6.
+
+Positive control from correction #2 (worktree bundle pre-rebuild, same fixture, s6 PASS) retained at <EV>/s6-worktree-pre-rebuild-control (renamed from red-s6-stale-bundle; the stale-bundle framing is superseded by note #3).
+Cleanup: driver teardown reported server closed and sandbox removed for every scenario in every run.
+Superseded exploratory artifacts remain under initial-bash/ and green-s6-debug*/; not part of this verdict.

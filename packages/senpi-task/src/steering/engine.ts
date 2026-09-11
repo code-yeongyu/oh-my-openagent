@@ -1,6 +1,5 @@
 import { log } from "@oh-my-opencode/utils"
 
-import { interactionPolicyForAgent } from "../agents"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { messageability } from "../state"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
@@ -15,11 +14,21 @@ import {
   type SteeringEngine,
   type SteeringPort,
 } from "./types"
+import {
+  deliveryUncertain,
+  messageSha256,
+  notContinuableReason,
+  oneShotPolicyDenial,
+  scopeDenied,
+} from "./engine-policy"
+import { reviveDetachedTerminalOnSend, reviveTerminal } from "./revive"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 
 export function createSteeringEngine(port: SteeringPort): SteeringEngine {
+  const pendingSends = new Map<string, number>()
+
   // Prelaunch steering is DURABLE: messages sent to a still-pending (queued) child append to the
   // record's pending_steering via store.mutate, so the queue survives a process restart (and a
   // session shutdown that suspends the pending child) and drains, in persisted order, when the
@@ -58,13 +67,25 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
 
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
+    if (port.isEvicting?.(record.task_id) === true) return evictionRefusal(record.task_id)
 
-    const mode = messageability(record.status, record.residency_state)
+    const mode = messageability(record.status, record.residency_state, record.execution_mode, record.killed)
     if (mode === "not-continuable") {
       return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: TASK_OUTPUT_SUGGESTION }
     }
+    const uncertain = record.revive_delivery_uncertain
+    if (
+      record.status === "running" &&
+      uncertain?.run_epoch === record.notification.run_epoch &&
+      uncertain.message_sha256 === messageSha256(input.message)
+    ) {
+      return deliveryUncertain(record, record.notification.run_epoch)
+    }
     const handle = port.liveHandle(record.task_id)
     if (handle === undefined) {
+      if (record.residency_state === "rpc_detached" && record.execution_mode === "process") {
+        return reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend)
+      }
       return {
         kind: "not_continuable",
         task_id: record.task_id,
@@ -72,14 +93,27 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
         suggestion: TASK_OUTPUT_SUGGESTION,
       }
     }
+    if (handle.hasExited?.() === true) {
+      return {
+        kind: "not_continuable",
+        task_id: record.task_id,
+        reason: `Task ${record.task_id} exited before its last message was acknowledged.`,
+        suggestion: "Inspect task_output before resending.",
+      }
+    }
 
     if (mode === "steer") return steerRunning(record, handle, input.message, deliverAs)
-    return reviveTerminal(record, handle, input.message)
+    return reviveTerminal(port, record, handle, input.message, nowIso, beginSend, endSend)
   }
 
   async function steerRunning(record: TaskRecord, handle: ManagedChildHandle, message: string, deliverAs: SendDelivery): Promise<SendOutcome> {
-    if (deliverAs === "steer") await handle.steer(message)
-    else await handle.followUp(message)
+    if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
+    try {
+      if (deliverAs === "steer") await handle.steer(message)
+      else await handle.followUp(message)
+    } finally {
+      endSend(record.task_id)
+    }
     // The run epoch scopes this send to the run it steered: a later revive starts a fresh epoch,
     // and counting sends per epoch is what keeps a new run's messages off the prior run's tally.
     port.store.appendEvent(record.task_id, {
@@ -87,25 +121,6 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       payload: { delivered: deliverAs, run_epoch: record.notification.run_epoch },
     })
     return { kind: "steered", task_id: record.task_id, status: record.status, delivered: deliverAs }
-  }
-
-  async function reviveTerminal(record: TaskRecord, handle: ManagedChildHandle, message: string): Promise<SendOutcome> {
-    const reservation = port.reserveForRevive(record.task_id)
-    if (!reservation.ok) {
-      return { kind: "capacity_deferred", task_id: record.task_id, reason: "Task capacity is full; retry explicitly." }
-    }
-    try {
-      // Revive is a follow-up prompt on the SAME session (codex followup_task), not a fresh child.
-      await handle.followUp(message)
-      const revived = buildRevived(record, nowIso())
-      port.store.replace(revived)
-      port.store.appendEvent(record.task_id, { type: "revived", payload: { run_epoch: revived.notification.run_epoch } })
-      reservation.commit()
-      return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
-    } catch (error) {
-      reservation.release()
-      throw error
-    }
   }
 
   function enqueuePending(record: TaskRecord, message: string, deliverAs: SendDelivery): SendOutcome {
@@ -128,6 +143,32 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       payload: { queue_position: position, deliverAs, run_epoch: updated.notification.run_epoch },
     })
     return { kind: "queued", task_id: record.task_id, queue_position: position }
+  }
+
+  function beginSend(taskId: string): boolean {
+    if (port.tryBeginSend?.(taskId) === false) return false
+    pendingSends.set(taskId, (pendingSends.get(taskId) ?? 0) + 1)
+    return true
+  }
+
+  function endSend(taskId: string): void {
+    const count = pendingSends.get(taskId) ?? 0
+    if (count <= 1) pendingSends.delete(taskId)
+    else pendingSends.set(taskId, count - 1)
+    port.endSend?.(taskId)
+  }
+
+  function hasPendingSends(taskId: string): boolean {
+    return (pendingSends.get(taskId) ?? 0) > 0 || (tryLoad(taskId)?.pending_steering?.length ?? 0) > 0
+  }
+
+  function evictionRefusal(taskId: string): SendOutcome {
+    return {
+      kind: "not_continuable",
+      task_id: taskId,
+      reason: `Task ${taskId} is being evicted; send was not started.`,
+      suggestion: TASK_OUTPUT_SUGGESTION,
+    }
   }
 
   function dropPending(taskId: string): void {
@@ -154,7 +195,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   async function notifyStarted(taskId: string): Promise<void> {
     // Drain from the FRESH record (not a cached copy): a restarted engine must see exactly what
     // was persisted, in persisted order. Malformed entries never reach here - the store parser
-    // already dropped them with a diagnostic (todo-2 entry-drop policy).
+    // already dropped them with a diagnostic.
     const fresh = tryLoad(taskId)
     const queue = fresh?.pending_steering
     if (fresh === undefined || queue === undefined || queue.length === 0) return
@@ -169,7 +210,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
           payload: { delivered: entry.deliver_as, queued: true, run_epoch: fresh.notification.run_epoch },
         })
       } catch (error) {
-        log("senpi-task steering queued delivery failed", { taskId, error: String(error) })
+        log("senpi-task steering queued delivery failed", {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
     clearPersistedQueue(taskId, new Set(queue.map((entry) => entry.id)))
@@ -241,7 +285,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       try {
         await handle.abort()
       } catch (error) {
-        log("senpi-task steering cancel abort rejected", { taskId: record.task_id, error: String(error) })
+        log("senpi-task steering cancel abort rejected", {
+          taskId: record.task_id,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
     port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
@@ -264,49 +311,5 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     })
   }
 
-  return { sendToTask, interruptTask, cancelTask, notifyStarted, dropPending }
-}
-
-function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined {
-  const agentType = record.agent_type
-  if (agentType === undefined) return undefined
-  const policy = interactionPolicyForAgent(agentType)
-  if (policy?.oneShot !== true) return undefined
-  return { kind: "one_shot_agent", task_id: record.task_id, agent: agentType, message: policy.sendDenialReminder }
-}
-
-function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {
-  if (input.callerSessionId === undefined || input.allScope === true) return undefined
-  const caller = input.callerSessionId
-  if (caller === record.parent_session_id || caller === record.root_session_id) return undefined
-  return {
-    kind: "scope_denied",
-    task_id: record.task_id,
-    owning_session_id: record.parent_session_id,
-    reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`,
-  }
-}
-
-function notContinuableReason(record: TaskRecord): string {
-  // Suspended (session shutdown) is NOT terminal: the record is continuable, just not from this
-  // process. No lazy revive-on-send - resuming the session is the wake-up path (user decision).
-  if (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached") {
-    return `Task ${record.task_id} is suspended - resumes when its session is resumed.`
-  }
-  if (record.residency_state === "disposed") return `Task ${record.task_id} was disposed and can no longer be continued.`
-  if (record.residency_state === "evicted") return `Task ${record.task_id} was evicted from residency and can no longer be continued.`
-  return `Task ${record.task_id} is ${record.status} and can no longer be continued.`
-}
-
-function buildRevived(record: TaskRecord, timestamp: string): TaskRecord {
-  // run_stats describes the FINISHED run; carrying it into the revived one would let a later
-  // terminal transition report stale throughput for a run that produced nothing yet.
-  const { final_response: _final, error_message: _error, run_stats: _stats, ...rest } = record
-  return {
-    ...rest,
-    status: "running",
-    residency_state: "resident",
-    updated_at: timestamp,
-    notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
-  }
+  return { sendToTask, interruptTask, cancelTask, notifyStarted, hasPendingSends, dropPending }
 }

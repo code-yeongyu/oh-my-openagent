@@ -7,6 +7,10 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { detectHarnesses, needsSetupSuggestion } from "../bin/lib/setup-detect.js"
 import { formatSetupReport } from "../bin/lib/setup-report.js"
+
+function sqlLiteral(value: string | null): string {
+  return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`
+}
 import { teardownRoots, withDatabase } from "./teardown.test-support"
 
 // Older Bun runtimes ship no node:sqlite at all, so the module loads lazily and the fixtures that
@@ -54,8 +58,12 @@ async function createDatabase(path: string, version: number, rows: Array<[string
         data TEXT NOT NULL, disabled_cause TEXT DEFAULT NULL
       );
     `)
-    const insert = db.prepare("INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (?, ?, ?, ?)")
-    for (const [provider, type, disabled] of rows) insert.run(provider, type, "SQLITE-SECRET", disabled)
+    // exec() with literal values: a prepared INSERT would leave this writer's handle open past
+    // close() under Bun 1.4 (oven-sh/bun#40001), and the reader that opens the same file next
+    // would then block on the Windows file lock.
+    for (const [provider, type, disabled] of rows) {
+      db.exec(`INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, 'SQLITE-SECRET', ${sqlLiteral(disabled)})`)
+    }
   })
 }
 
@@ -69,25 +77,23 @@ function createFixture(): Fixture {
   return { root, home, agentDir, xdg }
 }
 
-type StoreKey = "senpi" | "opencode" | "oh-my-pi" | "gajae-code"
-
-async function populateAll(fixture: Fixture, skip?: StoreKey): Promise<void> {
-  if (skip !== "senpi") write(join(fixture.agentDir, "auth.json"), JSON.stringify({
+async function populateAll(fixture: Fixture): Promise<void> {
+  write(join(fixture.agentDir, "auth.json"), JSON.stringify({
     "senpi-beta": { type: "oauth", access: "SENPI-SECRET" },
     "senpi-alpha": { type: "api_key", key: "SENPI-SECRET" },
   }))
   write(join(fixture.agentDir, "models.json"), JSON.stringify({ providers: {
     "senpi-model-b": {}, "senpi-model-a": {},
   } }))
-  if (skip !== "opencode") write(join(fixture.xdg, "opencode", "auth.json"), JSON.stringify({
+  write(join(fixture.xdg, "opencode", "auth.json"), JSON.stringify({
     "open-oauth": { type: "oauth", access: "OPENCODE-SECRET" },
     "open-api": { type: "api", key: "OPENCODE-SECRET" },
   }))
-  if (skip !== "oh-my-pi") await createDatabase(join(fixture.home, ".omp", "agent", "agent.db"), 7, [
+  await createDatabase(join(fixture.home, ".omp", "agent", "agent.db"), 7, [
     ["omp-api", "api_key", null], ["omp-disabled", "oauth", "expired"],
   ])
   write(join(fixture.home, ".omp", "agent", "models.db"), "models-fixture")
-  if (skip !== "gajae-code") await createDatabase(join(fixture.home, ".gjc", "agent", "agent.db"), 4, [
+  await createDatabase(join(fixture.home, ".gjc", "agent", "agent.db"), 4, [
     ["gjc-oauth", "oauth", null],
   ])
   write(join(fixture.home, ".gjc", "agent", "config.yml"), [
@@ -223,11 +229,9 @@ describe("omo setup sibling detection", () => {
       ] as const
       for (const [name, storePath] of cases) {
         const fixture = createFixture()
-        // Never create this harness's store, rather than creating it and deleting it back out.
-        // Deleting was the weaker fixture: it depended on Windows releasing a just-closed SQLite
-        // handle, which it refuses to do for both unlink and rename while an exited child's handle
-        // lingers. "Absent" is what this test means, so build it absent.
-        await populateAll(fixture, name)
+        // This case proves absence, so keep every store absent. Populating the three unrelated
+        // stores would open six SQLite handles across the four iterations without strengthening
+        // the contract, and can consume the entire test timeout when the root suite is saturated.
         expect(existsSync(storePath(fixture))).toBe(false)
         const report = formatSetupReport(await detect(fixture))
         expect(report).toContain(`${name} | no | none | none |`)

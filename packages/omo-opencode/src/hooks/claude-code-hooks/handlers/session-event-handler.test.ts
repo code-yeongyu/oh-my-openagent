@@ -1,8 +1,13 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 
 import { ContextCollector } from "../../../features/context-injector"
 import { cacheToolInput, getToolInput, stopToolInputCacheCleanup } from "../tool-input-cache"
-import { buildTranscriptFromSession, hasTranscriptCacheEntry } from "../transcript"
+import { buildTranscriptFromSession, hasTranscriptCacheEntry, stopTranscriptCacheCleanup } from "../transcript"
+import {
+  clearAllSessionHookState,
+  sessionFirstMessageProcessed,
+} from "../session-hook-state"
+import { getStopHookActive, setStopHookActive } from "../stop"
 import { createSessionEventHandler, disposeSessionEventHandler } from "./session-event-handler"
 
 function createMockClient() {
@@ -16,6 +21,11 @@ function createMockClient() {
 }
 
 describe("createSessionEventHandler", () => {
+  afterEach(() => {
+    clearAllSessionHookState()
+    stopTranscriptCacheCleanup()
+  })
+
   test("#given deleted session with retained caches #when session deleted arrives #then per-session resources are cleared", async () => {
     //#given
     const collector = new ContextCollector()
@@ -135,5 +145,35 @@ describe("createSessionEventHandler", () => {
 
     //#then
     expect(getCallCount).toBe(2)
+  })
+
+  test("#given first-message and stop-hook flags #when session.deleted arrives #then both session-id sets are drained", async () => {
+    //#given
+    sessionFirstMessageProcessed.add("ses_end_flags")
+    setStopHookActive("ses_end_flags", true)
+    const handler = createSessionEventHandler(createMockClient() as never, {})
+
+    //#when
+    await handler({
+      event: { type: "session.deleted", properties: { info: { id: "ses_end_flags" } } },
+    })
+
+    //#then
+    expect(sessionFirstMessageProcessed.has("ses_end_flags")).toBe(false)
+    expect(getStopHookActive("ses_end_flags")).toBe(false)
+  })
+
+  test("#given first-message already processed #when session.idle arrives #then the first-message flag stays set", async () => {
+    //#given
+    sessionFirstMessageProcessed.add("ses_idle_flags")
+    const handler = createSessionEventHandler(createMockClient() as never, {})
+
+    //#when
+    await handler({
+      event: { type: "session.idle", properties: { sessionID: "ses_idle_flags" } },
+    })
+
+    //#then
+    expect(sessionFirstMessageProcessed.has("ses_idle_flags")).toBe(true)
   })
 })

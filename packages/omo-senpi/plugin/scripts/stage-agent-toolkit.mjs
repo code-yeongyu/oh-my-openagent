@@ -12,12 +12,9 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = resolve(packageRoot, "..", "..")
 const codexPluginRoot = join(repoRoot, "packages", "omo-codex", "plugin")
-const codexPluginNodeModules = join(codexPluginRoot, "node_modules")
-const defaultSourceEntry = join(codexPluginRoot, "components", "ulw-loop", "dist", "cli.js")
+const defaultSourceEntry = process.env.OMO_AGENT_TOOLKIT_SOURCE_ENTRY ?? join(codexPluginRoot, "components", "ulw-loop", "dist", "cli.js")
 const defaultDirectiveEntry = join(codexPluginRoot, "components", "ulw-loop", "directive.md")
-const defaultTargetDir = join(pluginRoot, "runtime", "agent-toolkit")
-const packageLock = join(codexPluginRoot, "package-lock.json")
-const installedPackageLock = join(codexPluginRoot, "node_modules", ".package-lock.json")
+const defaultTargetDir = process.env.OMO_AGENT_TOOLKIT_TARGET ?? join(pluginRoot, "runtime", "agent-toolkit")
 
 const dispatcher = `import { spawnSync } from "node:child_process"
 import { dirname, join } from "node:path"
@@ -39,8 +36,12 @@ process.exit(result.status ?? 1)
 `
 const posixShim = "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n"
 const windowsShim = "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n"
+// The staged bundle serves the omo-senpi surface; the marker switches the ulw-loop quality gate to
+// the omo-senpi reviewer identities (the unmarked Codex layout defaults to lazycodex-*).
+const surfaceMarker = `${JSON.stringify({ surface: "omo-senpi" })}\n`
 const stagedTopLevelEntries = ["cli.js", "directive.md", "omo-agent-toolkit", "omo-agent-toolkit.cmd", "ulw-loop"]
-const stagedArtifactPaths = ["cli.js", "directive.md", join("ulw-loop", "cli.js"), "omo-agent-toolkit", "omo-agent-toolkit.cmd"]
+const stagedUlwLoopEntries = ["cli.js", "surface.json"]
+const stagedArtifactPaths = ["cli.js", "directive.md", join("ulw-loop", "cli.js"), join("ulw-loop", "surface.json"), "omo-agent-toolkit", "omo-agent-toolkit.cmd"]
 
 export async function stageAgentToolkit(options = {}) {
   const sourceEntry = resolve(options.sourceEntry ?? defaultSourceEntry)
@@ -62,6 +63,7 @@ export async function stageAgentToolkit(options = {}) {
   try {
     await mkdir(join(tempDir, "ulw-loop"), { recursive: true })
     await copyFile(sourceEntry, join(tempDir, "ulw-loop", "cli.js"))
+    await writeFile(join(tempDir, "ulw-loop", "surface.json"), surfaceMarker, "utf8")
     await copyFile(directiveEntry, join(tempDir, "directive.md"))
     await writeFile(join(tempDir, "cli.js"), dispatcher, "utf8")
     await writeFile(join(tempDir, "omo-agent-toolkit"), posixShim, "utf8")
@@ -113,7 +115,7 @@ async function stagedToolkitMatches(tempDir, targetDir) {
       readdir(join(targetDir, "ulw-loop")),
     ])
     if (topLevelEntries.toSorted().join("\n") !== stagedTopLevelEntries.join("\n")) return false
-    if (ulwLoopEntries.join("\n") !== "cli.js") return false
+    if (ulwLoopEntries.toSorted().join("\n") !== stagedUlwLoopEntries.join("\n")) return false
     const matches = await Promise.all(
       stagedArtifactPaths.map((path) => filesEqual(join(tempDir, path), join(targetDir, path))),
     )
@@ -133,6 +135,7 @@ export async function checkAgentToolkitFresh(options = {}) {
     dispatcher: join(targetDir, "cli.js"),
     directive: join(targetDir, "directive.md"),
     bundle: join(targetDir, "ulw-loop", "cli.js"),
+    surface: join(targetDir, "ulw-loop", "surface.json"),
     posix: join(targetDir, "omo-agent-toolkit"),
     windows: join(targetDir, "omo-agent-toolkit.cmd"),
   }
@@ -141,6 +144,7 @@ export async function checkAgentToolkitFresh(options = {}) {
   await Promise.all(Object.values(paths).map((path) => validateFile(path, "staged agent-toolkit artifact")))
   if (!(await readFile(paths.directive)).equals(await readFile(directiveEntry))) throw new Error(`agent-toolkit runtime stale: directive content differs: ${paths.directive}`)
   if (await readFile(paths.dispatcher, "utf8") !== dispatcher) throw new Error(`agent-toolkit runtime stale: dispatcher content differs: ${paths.dispatcher}`)
+  if (await readFile(paths.surface, "utf8") !== surfaceMarker) throw new Error(`agent-toolkit runtime stale: surface marker differs: ${paths.surface}`)
   if (await readFile(paths.posix, "utf8") !== posixShim) throw new Error(`agent-toolkit runtime stale: POSIX shim content differs: ${paths.posix}`)
   if (await readFile(paths.windows, "utf8") !== windowsShim) throw new Error(`agent-toolkit runtime stale: Windows shim content differs: ${paths.windows}`)
   if (process.platform !== "win32" && ((await stat(paths.posix)).mode & 0o777) !== 0o755) {
@@ -154,25 +158,15 @@ export async function checkAgentToolkitFresh(options = {}) {
 }
 
 async function buildAggregateBundle() {
-  // The lockfile comparison alone is not enough: a pruned or partially installed tree can match the lock
-  // and still be missing the compiler the component build shells out to.
-  const compiler = join(codexPluginRoot, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc")
-  const needsInstall = !(await filesEqual(packageLock, installedPackageLock)) || !(await fileExists(compiler))
-  if (needsInstall) {
-    // The root `bun install` links this plugin's workspaces before its prepare script reaches this
-    // build, and `npm ci` aborts on those pre-existing links with
-    // `EEXIST: file already exists, symlink '../../components/teammode'` rather than replacing them.
-    // Removing the tree first makes the install deterministic whoever populated it.
-    await rm(codexPluginNodeModules, { recursive: true, force: true })
-    run("npm", ["--prefix", "packages/omo-codex/plugin", "ci"])
-  }
+  // Bundle directly from source so native staging never mutates the shared Codex workspace dist tree.
+  // The repository install owns the dependencies; this path deliberately performs no npm install.
   // Only the ulw-loop bundle is staged here. Building every codex component instead would couple this
   // staging step to unrelated components, and one of them failing to emit its dist takes the whole
   // senpi plugin build down with it.
-  run("npm", ["--prefix", "packages/omo-codex/plugin", "run", "--workspace", "components/ulw-loop", "build"])
-  // The component build only runs tsc, whose output still imports its siblings by relative path. The
-  // staged runtime is copied out on its own, so it has to be bundled into a single self-contained file
-  // exactly like build-components.mjs does after each component build.
+  // Bun resolves the TypeScript entry directly and emits the self-contained file in the shared
+  // component location; the caller supplies an invocation-specific output root when needed.
+  // The staged runtime is copied out on its own, so it has to be bundled into a single self-contained
+  // file exactly like build-components.mjs does after each component build.
   run("bun", [
     "build",
     join(codexPluginRoot, "components", "ulw-loop", "src", "cli.ts"),

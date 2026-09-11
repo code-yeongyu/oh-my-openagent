@@ -1,6 +1,6 @@
 import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process"
-import { readdirSync, watch, writeFileSync } from "node:fs"
-import { readFile } from "node:fs/promises"
+import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
+import { readFile } from "@oh-my-opencode/memory-core/fs"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void

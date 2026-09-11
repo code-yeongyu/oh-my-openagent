@@ -1,0 +1,63 @@
+{
+  "rollup": {
+    "variant": "old",
+    "request": "r3",
+    "samples": 3,
+    "background": 0,
+    "foreground_or_mixed": 3,
+    "no_task_call": 0,
+    "reclassified_offline_at": "2026-09-05T06:34:27.241Z",
+    "parser_fix": "completed.output empty -> response.output_item.done items"
+  },
+  "rows": [
+    {
+      "sample": 1,
+      "http": 200,
+      "verdict": "foreground",
+      "task_calls": [
+        {
+          "run_in_background": "absent",
+          "batch": false,
+          "target": "ultrabrain"
+        }
+      ],
+      "other_tool_calls": [],
+      "message_text": "I read this as a two-stage design-and-implementation decision - I'll have ultrabrain choose the tombstone design, then deep implement that exact design and verify it. I'll stop when both delegation results are complete and reported.",
+      "reasoning": "**Preparing routing line**",
+      "usage": 199
+    },
+    {
+      "sample": 2,
+      "http": 200,
+      "verdict": "foreground",
+      "task_calls": [
+        {
+          "run_in_background": "absent",
+          "batch": false,
+          "target": "ultrabrain"
+        }
+      ],
+      "other_tool_calls": [],
+      "message_text": "I read this as a design decision followed by implementation - I’ll have ultrabrain choose the tombstone storage design, then delegate that design to deep and verify both results. I’ll stop when the decision rationale and the implemented, checked change are complete.",
+      "reasoning": "**Preparing ultrabrain delegation**",
+      "usage": 217
+    },
+    {
+      "sample": 3,
+      "http": 200,
+      "verdict": "foreground",
+      "task_calls": [
+        {
+          "run_in_background": "absent",
+          "batch": false,
+          "target": "ultrabrain"
+        }
+      ],
+      "other_tool_calls": [],
+      "message_text": "I read this as a design-then-implementation task - I’ll have ultrabrain choose the tombstone design, then have deep implement that choice and verify it. I’ll stop when the decision and completed implementation are both reported with validation evidence.",
+      "reasoning": "**Preparing the routing line**",
+      "usage": 203
+    }
+  ],
+  "request_text": "We are in the oh-my-openagent monorepo. We must choose between two designs for task tombstones in packages/senpi-task/src/store: inline tombstone rows in the JSONL record file, or a sidecar index file. Have the ultrabrain category decide with reasons. Once it has decided, delegate the implementation of the winning design to the deep category. Report to me when both are done."
+}

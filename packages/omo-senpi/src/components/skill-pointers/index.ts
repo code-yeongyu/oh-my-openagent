@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
+import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
+import { stripQuotedRegions } from "./strip-quoted-regions"
 
 export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
@@ -17,21 +19,27 @@ interface SkillPointerTarget {
   readonly pattern: RegExp
   readonly expandedBlockPattern: RegExp
   readonly instruction: string
-  readonly extra?: string
+  readonly extra?: (sessionScope: string | null) => string
 }
 
-// One uniform keyword table, no cross-keyword exceptions: every pattern matches
-// independently and overlapping mentions all fire ("mass ulw-loop" injects the mass-ulw
+// After quoted regions are removed, patterns match independently and overlapping
+// mentions all fire ("mass ulw-loop" injects the mass-ulw
 // AND ulw-loop pointers while the ultrawork component arms on the same text). `\b` on
 // both edges is the only boundary rule; `[\s-]*` accepts spaced, hyphenated, and fused
 // spellings alike.
+//
+// The mass aliases that carry no literal "ulw" (`mulw`, `meth`) and the reversed spelling
+// (`ulw mass`) leave no `ulw <skill>` for the per-skill patterns to match, so each of them
+// also stands in for the `ulw` half: "mulw research" names the same composite as
+// "mass ulw research" and loads both skills.
+const MASS_ALIAS = String.raw`(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw|meth)`
 const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "mass-ulw",
     customType: MASS_ULW_CUSTOM_TYPE,
-    pattern: /\b(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw|meth)\b/i,
+    pattern: new RegExp(String.raw`\b${MASS_ALIAS}\b`, "i"),
     expandedBlockPattern: /<skill\s+name="mass-ulw"/i,
-    instruction: "orchestrate the requested work as a dependency graph of child agents with the dag tool",
+    instruction: "dispatch each phase's dependency-ordered lanes as one run of the workflow tool composed in an eval cell, start a new run per phase rather than one graph for the whole job, and when a ulw-loop or ulw-execute contract is active let it own the goal",
   },
   {
     skillName: "ulw-plan",
@@ -46,12 +54,12 @@ const TARGETS: readonly SkillPointerTarget[] = [
     pattern: /\bulw[\s-]*loop\b/i,
     expandedBlockPattern: /<skill\s+name="ulw-loop"/i,
     instruction: "run the goal-driven ultrawork loop with evidence-bound execution",
-    extra: ulwLoopCliShimSentence(),
+    extra: ulwLoopCliShimSentence,
   },
   {
     skillName: "ulw-research",
     customType: ULW_RESEARCH_CUSTOM_TYPE,
-    pattern: /\bulw[\s-]*research\b/i,
+    pattern: new RegExp(String.raw`\b(?:ulw|${MASS_ALIAS})[\s-]*research\b`, "i"),
     expandedBlockPattern: /<skill\s+name="ulw-research"/i,
     instruction: "orchestrate team-first maximum-saturation research",
   },
@@ -67,19 +75,27 @@ interface SenpiInputEvent {
 type SenpiInputEventResult = { action: "continue" } | { action: "transform"; text: string }
 
 export function matchedSkillPointerNames(text: string): string[] {
-  return TARGETS.filter((target) => target.pattern.test(text)).map((target) => target.skillName)
+  const visible = stripQuotedRegions(text)
+  return TARGETS.filter((target) => target.pattern.test(visible)).map((target) => target.skillName)
 }
 
 export function createSkillPointersComponent(): OmoSenpiComponent {
   return {
     name: "skill-pointers",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      pi.on("input", (payload: unknown): SenpiInputEventResult => handleInput(pi, payload, ctx))
+      pi.on("input", (payload: unknown, eventCtx: unknown): SenpiInputEventResult =>
+        handleInput(pi, payload, ctx, resolveUlwLoopSessionScope(eventCtx)),
+      )
     },
   }
 }
 
-function handleInput(pi: SenpiExtensionAPI, payload: unknown, ctx: ComponentContext): SenpiInputEventResult {
+function handleInput(
+  pi: SenpiExtensionAPI,
+  payload: unknown,
+  ctx: ComponentContext,
+  sessionScope: string | null,
+): SenpiInputEventResult {
   if (ctx.config.getFlag(SKILL_POINTERS_DISABLED_FLAG) === true) {
     return { action: "continue" }
   }
@@ -92,10 +108,13 @@ function handleInput(pi: SenpiExtensionAPI, payload: unknown, ctx: ComponentCont
     return { action: "continue" }
   }
 
+  // Structural dedup keys on the injected markup itself, so it reads the RAW text; only the keyword
+  // test runs against the text with quoted and relayed regions removed.
   const commandSkillName = skillCommandName(payload.text)
+  const visible = stripQuotedRegions(payload.text)
   const targets = TARGETS.filter(
     (target) =>
-      target.pattern.test(payload.text) &&
+      target.pattern.test(visible) &&
       target.skillName !== commandSkillName &&
       !target.expandedBlockPattern.test(payload.text),
   )
@@ -108,14 +127,14 @@ function handleInput(pi: SenpiExtensionAPI, payload: unknown, ctx: ComponentCont
   // through senpi's one-at-a-time queue drain; appending keeps a leading `/skill:` command
   // expandable.
   if (payload.streamingBehavior !== undefined) {
-    const pointers = targets.map((target) => skillPointer(target))
+    const pointers = targets.map((target) => skillPointer(target, sessionScope))
     return { action: "transform", text: [payload.text, ...pointers].join("\n") }
   }
 
   for (const target of targets) {
     pi.sendMessage({
       customType: target.customType,
-      content: skillPointer(target),
+      content: skillPointer(target, sessionScope),
       display: false,
     })
   }
@@ -127,15 +146,20 @@ function ulwLoopCliShimPath(): string {
   return fileURLToPath(new URL("../runtime/agent-toolkit/omo-agent-toolkit", import.meta.url))
 }
 
-function ulwLoopCliShimSentence(): string {
+// Eval kernels lack the session env; pass the proven scope explicitly instead of using global state.
+function ulwLoopCliShimSentence(sessionScope: string | null): string {
   const abs = ulwLoopCliShimPath().replaceAll("\\", "/")
-  return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand>\`.`
+  if (sessionScope === null) {
+    return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand>\`.`
+  }
+  return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand> --session-id ${sessionScope}\` (this session's state lives under .omo/ulw-loop/${sessionScope}/; the eval kernel does not inherit the session env, so always pass the flag).`
 }
 
-function skillPointer(target: SkillPointerTarget): string {
+// A keyword proves a mention, not a request to run the workflow.
+function skillPointer(target: SkillPointerTarget, sessionScope: string | null): string {
   const skillsRoot = getBuiltinSkillsRoot()
-  const extra = target.extra ?? ""
-  return `<omo-${target.skillName}-pointer>The user asked for ${target.skillName}. Read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}.${extra}</omo-${target.skillName}-pointer>`
+  const extra = target.extra?.(sessionScope) ?? ""
+  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. If ${target.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.${extra}</omo-${target.skillName}-pointer>`
 }
 
 function skillCommandName(text: string): string | undefined {

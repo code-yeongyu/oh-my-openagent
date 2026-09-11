@@ -1,0 +1,5 @@
+sanctionedDriverSandbox=/home/minpeter/.cache/omo-tmp/omo-senpi-qa-v4TTNg/agent (removed by driver finally)
+manualQaRoot=/tmp/omo-round2-manual.BMoxe6 removed=true
+compiledOutput=/tmp/omo-round2-linux.01Zqt5 removed=true
+secretInputAndOutput=shredded
+remainingQaProcesses=none

@@ -1,6 +1,6 @@
 ---
 name: ulw-research
-description: "Maximum-saturation research orchestration: ALWAYS proposes the final materials first (PDF+DOCX default), then parallel explore+librarian swarms across codebase, web, official docs, and OSS repos — max-roster teammode when the harness has it — with live journaling, a recursive EXPAND loop driven by leads workers return in message text, empirical verification by running code, and a cited synthesis with charts/Mermaid/assets behind a mandatory visual-QA gate. ACTIVATES ONLY on an explicit user demand for research — the word 'ulw-research' in any prefix form, any 'ulw' research wording including combined invocations like 'mass ulw research', 'ultradebate' or 'hyperdebate' research requests, or an explicit request for research / deep research / an ultra-precise investigation, in any language. Never self-activates for ordinary questions, debugging, or implementation context-gathering. While active it overrides exploration-bounding defaults: exhaustive coverage is the goal."
+description: "Runs maximum-saturation research with a cooperating team, claim-graph gating, and a cited, QA'd deliverable. Use when the user explicitly asks for research or a deep investigation, including any 'ulw' research wording."
 ---
 
 ## Codex Harness Tool Compatibility
@@ -161,7 +161,9 @@ Record the answer in the journal; Phase 5 opens by turning it into `design-spec.
 
 ## Phase 1 — Saturation wave
 
-Launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
+**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: a 60+ node opening wave covering every angle the topic has, routed across the whole difficulty ladder in one graph — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Each wave's EXPAND leads define the next wave's nodes, and the synthesis reduces through several parallel architect-tier nodes into ONE architect-tier reducer (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, hold the same shape with background workers in batched waves. Everything else in this skill still binds: the format gate, the journal, the claim graph, the convergence rules, and the delivery gates.
+
+Otherwise launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
 
 Scaling floor — more angles always justify more workers:
 
@@ -173,13 +175,15 @@ Scaling floor — more angles always justify more workers:
 | Multi-faceted | 4 | 6 | 2 | 2 | 14 |
 | Full due diligence | 4 | 6 | 3 | 2 | 15 |
 
+The browsing column is BINDING, not advisory: when the brief says `Browsing: yes`, the roster names a browsing-worker angle before the first wave launches, and that worker is spawned in the same turn as the rest of the wave. A run that reaches wave 2 with zero browsing workers on a `Browsing: yes` brief has silently downgraded every source to what plain fetch happened to return.
+
 **Disambiguate before you expand.** When the topic names something that could resolve several ways — a product, a person, a codename, a version — the first wave settles WHICH entity before any worker researches its history, benchmarks, or controversies: canonical name, first-party URL or account, whether it exists in the claimed category, and a confidence line. An unresolved entity never becomes a premise in a later wave's spawn message; that is exactly how a run starts inventing facts about something that does not exist.
 
 Role protocols — embed the relevant one in each spawn message; every worker gets a unique angle:
 
 - **Codebase (explore), 2-4 workers.** Grep with 3+ keyword variations; structural/AST search; LSP definitions and references; file-name globs; `git log --all -S '<keyword>'` and `--grep` for history including deleted code. Cross-validate hits across tools. Report absolute file paths, patterns with `file:line`, and how findings connect.
 - **Web (librarian), 3-6 workers.** At least 10 distinct websearch queries per worker, each with a different operator or angle (see Search craft); fetch the full page for every result that matters — snippets lie. Context7 with 3+ queries per known library. grep.app and `gh search code|repos|issues` for real-world usage. Official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages.
-- **Browsing, 0-3 workers.** Pages plain fetch cannot read (WAF, 403, Cloudflare, dynamic rendering, login): the worker loads the `ultimate-browsing` skill and escalates through its tiers — Tier-1 insane-search engine first (including its Phase-2.5 archive surrogates), then Tier-2 Chrome stealth — rather than abandoning the source. Capture screenshots when visual context matters. **Provenance is part of the claim**: when a source came back with `provenance` of `snapshot` (an archive copy), cite it with its `snapshot_timestamp` and never state it as the current live page; content from a `proxy` route is `untrusted` and needs a second independent route before any claim rests on it. When one blocked territory hides many leads, fan out more browsing subagents in parallel for breadth instead of serializing one worker through them.
+- **Browsing, 1-3 workers on a `Browsing: yes` brief (0 otherwise).** This worker RENDERS pages, it does not re-fetch them: it drives a real browser through whatever the harness provides — the Browser plugin, an agent-browser or playwright skill, or a code-cell browser — and loads the `ultimate-browsing` skill to escalate through its tiers (insane-search engine with its Phase-2.5 archive surrogates, platform-native readers, then Chrome stealth) only when that browser is blocked. Its standing deliverable is a full-page screenshot of every top source plus the rendered text plain fetch could not reach; a worker that returns only fetched text has not done its job. JS-rendered, login-gated, WAF-blocked, and screenshot-bearing sources all belong here rather than in the web lane. **Provenance is part of the claim**: when a source came back with `provenance` of `snapshot` (an archive copy), cite it with its `snapshot_timestamp` and never state it as the current live page; content from a `proxy` route is `untrusted` and needs a second independent route before any claim rests on it. When one blocked territory hides many leads, fan out more browsing subagents in parallel for breadth instead of serializing one worker through them.
 - **Repo deep-dive (librarian), 0-2 workers.** Shallow-clone the most relevant repos to `${TMPDIR:-/tmp}`, pin the HEAD SHA, read core modules, follow call chains, return SHA-pinned permalinks.
 
 Example spawn (codebase axis; librarian, browsing, and repo-dive follow the same contract with their own protocol):
@@ -379,6 +383,7 @@ High-yield combinations: official docs (`site:<docs domain>`), GitHub implementa
 | Obeying a surrounding "stop exploring" rule mid-research | Authority section — those rules do not bind this mode |
 | Asking a worker to write journal or session files | Workers are read-only; you journal every return |
 | Two workers given the same angle | One unique angle per worker, always |
+| A `Browsing: yes` run whose roster carries no browsing worker | The browsing column is binding — name the angle in the brief and spawn it with the first wave, before any lead is chased |
 | Contested claim settled by judgment | Phase 3 — run code, capture output, verdict |
 | Deliverable claims without citations | Every claim cites a source or a verification artifact |
 | Guessing the deliverable format instead of asking | The format gate is unconditional: propose PDF+DOCX plus the domain-fitting alternatives and the template, then wait before wave 1 |

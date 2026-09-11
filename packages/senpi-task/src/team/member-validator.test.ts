@@ -138,7 +138,7 @@ describe("validateSenpiTeamMembers", () => {
   test("#given a curated read-only agent #when validated #then it is rejected before the known-agent check", () => {
     // given
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "momus" }] },
+      { members: [{ kind: "agent", subagent_type: "explore" }] },
       "curated-agent-team",
     )
 
@@ -155,7 +155,105 @@ describe("validateSenpiTeamMembers", () => {
     if (caught instanceof SenpiTeamSpecError) {
       expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
       expect(caught.message).toBe(
-        'curated read-only agent "momus" cannot be a team member; delegate via the task tool instead',
+        'curated read-only agent "explore" cannot be a team member; delegate via the task tool instead',
+      )
+    }
+  })
+
+  test("#given a member with a legacy subagent_type #when validated #then the canonical id drives every check", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "momus" }, { kind: "agent", subagent_type: "metis" }] },
+      "legacy-agent-team",
+    )
+    const ports: SenpiTeamMemberPorts = {
+      isCategoryResolvable: () => true,
+      isKnownAgent: () => false,
+    }
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, ports)
+    } catch (error) {
+      caught = error
+    }
+
+    // then: the first member is rejected with the canonical id in the message, never the legacy id
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.message).toBe(
+        'curated read-only agent "plan-reviewer" (requested as "momus") cannot be a team member; delegate via the task tool instead',
+      )
+    }
+
+    // when: a spec whose first member is the metis alias
+    const metisSpec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "metis" }] },
+      "legacy-agent-team",
+    )
+    let metisCaught: unknown
+    try {
+      validateSenpiTeamMembers(metisSpec, ports)
+    } catch (error) {
+      metisCaught = error
+    }
+
+    // then
+    expect(metisCaught).toBeInstanceOf(SenpiTeamSpecError)
+    if (metisCaught instanceof SenpiTeamSpecError) {
+      expect(metisCaught.message).toBe(
+        'curated read-only agent "plan-consultant" (requested as "metis") cannot be a team member; delegate via the task tool instead',
+      )
+    }
+  })
+
+  test("#given a curated read-only agent requested by its legacy id #when validated #then the rejection names the canonical id and the requested legacy id", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "momus" }] },
+      "legacy-curated-team",
+    )
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, allowAll)
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
+      expect(caught.message).toBe(
+        'curated read-only agent "plan-reviewer" (requested as "momus") cannot be a team member; delegate via the task tool instead',
+      )
+    }
+  })
+
+  test("#given an ulw reviewer agent #when validated #then it is rejected before the known-agent check", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "omo-senpi-code-reviewer" }] },
+      "reviewer-agent-team",
+    )
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, allowAll)
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
+      expect(caught.message).toBe(
+        'ulw reviewer agent "omo-senpi-code-reviewer" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead',
       )
     }
   })

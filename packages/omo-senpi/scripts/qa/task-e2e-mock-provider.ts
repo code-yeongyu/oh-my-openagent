@@ -74,6 +74,7 @@ interface Message {
 interface Context {
   cwd?: string
   messages?: Message[]
+  tools?: Array<{ name?: string; description?: string }>
 }
 
 interface SimpleStreamOptions {
@@ -257,6 +258,14 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
     const systemPrompt = (context as { systemPrompt?: unknown }).systemPrompt
     const rendered = typeof systemPrompt === "string" ? systemPrompt : JSON.stringify(systemPrompt ?? null)
     appendFileSync(dumpTarget, `\n=== model=${streamModel.id} cwd=${context.cwd ?? process.cwd()} ===\n${rendered}\n`)
+  }
+  // Tool descriptions exist only on the model request, so a driver that asserts on wording
+  // (plan-gated-agents-e2e.mjs `description` scenario) reads them from this dump: one JSON array
+  // of {name, description} per parent turn.
+  const toolsDumpTarget = env.MOCK_DUMP_TOOLS
+  if (typeof toolsDumpTarget === "string" && toolsDumpTarget.length > 0 && !isChild) {
+    const tools = (context.tools ?? []).map((tool) => ({ name: tool.name, description: tool.description }))
+    appendFileSync(toolsDumpTarget, `${JSON.stringify(tools)}\n`)
   }
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount

@@ -1,4 +1,5 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -7,7 +8,7 @@ import type { LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
-import { wireTaskRpcBridge } from "./task-rpc-bridge"
+import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
@@ -18,6 +19,11 @@ type EventBridgeState = {
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
   // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
   readonly dagReloadSource?: ReloadGuardDagSource
+}
+
+// Test-only seams; production wiring omits this and every dependency falls back to its real default.
+type EventBridgeDeps = {
+  readonly taskRpc?: TaskRpcBridgeDeps
 }
 
 // Session start runs the durable recovery chain in strict order: flush/drop buffered completions
@@ -33,15 +39,17 @@ export function wireEventBridge(
   statusUi: TaskStatusUi,
   transitions: SessionTransitionBridge,
   state: EventBridgeState,
+  deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
-  const taskRpc = wireTaskRpcBridge(pi, engine)
+  const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
+    if (process.env[OMO_SENPI_TASK_RPC_CHILD] === "1" && sessionId === undefined) return
     transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
@@ -104,6 +112,7 @@ export function wireEventBridge(
     const shutdownEvent = payload as SessionShutdownEvent
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason
+    engine.lifecycle.dispose?.()
     if (parentSessionId === undefined || typeof reason !== "string") {
       ctx.logger.warn(
         "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",

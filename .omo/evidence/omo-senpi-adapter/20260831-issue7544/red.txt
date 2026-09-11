@@ -1,0 +1,12 @@
+Command:
+bun test packages/omo-senpi/src/components/task/event-bridge-session-lifecycle.test.ts --test-name-pattern "RPC child marker"
+
+Machine: gorky
+Bun: 1.4.0
+State: pre-fix worktree transferred to /tmp/ulw-7544-red
+Result: exit 1
+Observed assertion:
+Expected length: 0
+Received length: 1
+
+This was the intended failing-first proof that the unguarded event-bridge session_start invoked reconciliation for the child marker. Remote cleanup removed /tmp/ulw-7544-red and left no task-owned process.

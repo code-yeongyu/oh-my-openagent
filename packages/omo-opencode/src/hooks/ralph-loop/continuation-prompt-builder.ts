@@ -18,6 +18,7 @@ REQUIRED NOW:
 - Ask Oracle to verify whether the original task is actually complete
 - Include the original task in the Oracle request
 - Explicitly tell Oracle to review skeptically and critically, and to look for reasons the task may still be incomplete or wrong
+- If the Oracle spawn fails because its model/agent is unavailable, spawn a verifier with the identical verification instructions using task(category: "deep", load_skills=[], run_in_background=false, ...), then retry with category: "unspecified-high", then category: "unspecified-low" on the same failure; require its reply to end with the literal line \`Agent: gate-verifier\` immediately above the promise tag
 - The system will inspect the Oracle session directly for the verification result
 - If Oracle does not verify, continue fixing the task and do not consider it complete
 
@@ -34,6 +35,7 @@ REQUIRED NOW:
 - Do not claim completion early or argue with the failed verification
 - After fixing the remaining issues, request Oracle review again using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
 - Include the original task in the Oracle request and tell Oracle to review skeptically and critically
+- If the Oracle spawn fails because its model/agent is unavailable, spawn a verifier with the identical verification instructions using task(category: "deep", load_skills=[], run_in_background=false, ...), then retry with category: "unspecified-high", then category: "unspecified-low" on the same failure; require its reply to end with the literal line \`Agent: gate-verifier\` immediately above the promise tag
 - Only when the work is ready for review again, output: <promise>{{PROMISE}}</promise>
 
 Original task:

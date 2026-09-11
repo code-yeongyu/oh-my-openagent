@@ -1,0 +1,7 @@
+realAgentDir=/home/minpeter/.senpi/agent
+hashScope=auth.json,settings.json,models-store.json
+beforeSha256=ab2a9177b1b2100c89879b27113bd44a351735e631c5c993008ab61c630a232d
+afterSha256=ab2a9177b1b2100c89879b27113bd44a351735e631c5c993008ab61c630a232d
+untouched=true
+isolatedVersion=omo 5.0.0-0.beta.30 (engine: senpi 2026.8.30-3)
+binarySha256=4cc2143805d67378d86e6d95a6d2434b580dafb70a18c691e4cae8fcfcf817e7

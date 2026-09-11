@@ -1,6 +1,7 @@
 import {
   clearSessionAgent,
   getMainSessionID,
+  handedBackSyncSessions,
   setMainSession,
   subagentSessions,
   syncSubagentSessions,
@@ -134,6 +135,8 @@ export async function handleSessionDeletedEvent(args: {
   await args.managers.monitorManager?.stopSessionMonitors(sessionID);
   const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
   clearSessionAgent(sessionID);
+  handedBackSyncSessions.delete(sessionID);
+  subagentSessions.delete(sessionID);
   args.clearModelFallbackSession(sessionID);
   resetMessageCursor(sessionID);
   clearBackgroundOutputConsumptionsForParentSession(sessionID);
@@ -145,7 +148,7 @@ export async function handleSessionDeletedEvent(args: {
   if (!isBtwSideSession) {
     await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
   }
-  if (wasSyncSubagentSession) subagentSessions.delete(sessionID);
+  void wasSyncSubagentSession;
   deleteSessionTools(sessionID);
   await args.managers.skillMcpManager.disconnectSession(sessionID);
   if (args.tmuxIntegrationEnabled && !isBtwSideSession) {

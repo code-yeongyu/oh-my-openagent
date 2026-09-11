@@ -1,0 +1,32 @@
+CI failure text:
+"MemorianGateRunner upstream fail-fast > #given a pending turn that emits nothing #when the gate awaits it #then the deadline backstop ..."
+"MemorianGateRunner upstream fail-fast > #given a pending turn that emits a non-provider error #when the gate awaits it #then ..."
+Both failed on toMatchObject({ status: "failed", cause: "deadline" }).
+
+Diff:
+--- packages/omo-senpi/src/components/memory/memorian-runner.test.ts
++++ packages/omo-senpi/src/components/memory/memorian-runner.test.ts
+@@ -330,11 +330,11 @@
+-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
++    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
+@@
+-  test("#given a pending turn that emits nothing #when the gate awaits it #then the deadline backstop fires", async () => {
++  test("#given a pending turn that emits nothing #when the gate awaits it #then the deadline backstop drops", async () => {
+@@ -346,6 +346,6 @@
+-    expect(result).toMatchObject({ status: "failed", cause: "deadline" })
++    expect(result).toMatchObject({ status: "dropped", cause: "deadline" })
+
+GREEN run:
+RBT_RC=0
+RBT_SYNCED=1
+29 pass
+0 fail
+Ran 29 tests across 3 files. [5.45s]
+PASS_LINES=29
+
+Grep verification:
+The requested rg pattern still matches pre-existing unrelated in-process-memory-child test/source lines:
+packages/omo-senpi/src/components/memory/in-process-memory-child.test.ts:72
+packages/omo-senpi/src/components/memory/in-process-memory-child.test.ts:106
+packages/omo-senpi/src/components/memory/in-process-memory-child.ts:98
+Those files were not changed because scope permits writing only memorian-runner.test.ts. The target memorian-runner.test.ts contains no remaining status: "failed", cause: "deadline" pins.

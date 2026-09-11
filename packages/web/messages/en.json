@@ -1,296 +1,311 @@
 {
   "metadata": {
     "title": "Oh My OpenAgent",
-    "description": "The Best Agent Harness. Meet Sisyphus: The Batteries-Included Agent that codes like you."
+    "description": "The Best Agent Harness. Meet OmO: the batteries-included agent harness that codes like you."
   },
   "nav": {
     "brand": "Oh My OpenAgent",
-    "features": "Features",
     "agents": "Agents",
     "docs": "Docs",
     "manifesto": "Manifesto",
-    "starOnGitHub": "Star on GitHub"
+    "install": "Install",
+    "githubStars": "{count} stars on GitHub",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "primary": "Primary"
   },
   "footer": {
     "brand": "Oh My OpenAgent",
-    "copyright": "© {year} Oh My OpenAgent. Open source under SUL-1.0.",
+    "copyright": "© {year} Sisyphus Labs · Source-available under SUL-1.0",
+    "product": "Product",
+    "community": "Community",
+    "legal": "Legal",
+    "docs": "Docs",
+    "manifesto": "Manifesto",
+    "releases": "Releases",
     "github": "GitHub",
     "discord": "Discord",
-    "documentation": "Documentation",
-    "manifesto": "Manifesto"
+    "x": "X @justsisyphus",
+    "privacy": "Privacy",
+    "terms": "Terms"
   },
   "landing": {
     "hero": {
-      "title": "The Best ",
-      "titleHighlight": "Agent Harness",
-      "subtitle": "{stars} stars. {downloads} downloads. Battle-tested and production-proven.",
-      "githubStars": "{count} GitHub Stars",
-      "specializedAgents": "{count} Specialized Agents",
-      "totalDownloads": "{count} Total Downloads",
-      "monthlyDownloads": "{count} Monthly Downloads",
-      "lifecycleHooks": "{count} Lifecycle Hooks",
-      "installCommand": "bunx oh-my-openagent install",
-      "codexInstallCommand": "npx lazycodex-ai install",
-      "codexLabel": "Codex CLI Edition",
-      "getStarted": "Get Started",
-      "viewOnGitHub": "View on GitHub"
+      "eyebrow": "The agent harness",
+      "title": "Type mass ulw.",
+      "titleHighlight": "Own the graph.",
+      "getStarted": "Get started",
+      "readManifesto": "Read the manifesto",
+      "rail": {
+        "wave1": {
+          "index": "01",
+          "label": "The orchestrator leads"
+        },
+        "wave2": {
+          "index": "02",
+          "label": "Planners and gates"
+        },
+        "wave3": {
+          "index": "03",
+          "label": "Workers execute"
+        }
+      },
+      "modelsLabel": "Every model at once",
+      "modelsHint": "Any job, however complex. Feed it tokens; the graph routes each node to the model that fits."
+    },
+    "installTabs": {
+      "opencode": "OpenCode",
+      "opencodeCommand": "bunx oh-my-openagent install",
+      "codex": "Codex",
+      "codexCommand": "npx lazycodex-ai install",
+      "senpi": "Senpi",
+      "senpiCommand": "npm i -g omo-ai@beta"
+    },
+    "command": {
+      "tabsLabel": "Install target",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyAria": "Copy install command"
+    },
+    "proof": {
+      "label": "Live numbers",
+      "githubStars": "GitHub Stars",
+      "totalDownloads": "Total Downloads",
+      "monthlyDownloads": "Monthly Downloads",
+      "agents": "agents",
+      "agentCount": "11"
+    },
+    "ulw": {
+      "eyebrow": "The magic word",
+      "title": "Any job. Every model. One graph.",
+      "description": "Feed it tokens. mass ulw turns the whole job into a dependency graph, runs every wave with the right model for each node — Claude, GPT, Kimi, Grok, GLM side by side — and verifies the result before it stops."
     },
     "editions": {
-      "title": "Two Editions, One Brain",
-      "subtitle": "Same orchestration engine. Pick your harness.",
+      "eyebrow": "Three editions",
+      "title": "Three editions, one brain.",
+      "subtitle": "Same orchestration engine. Pick the host you already use.",
       "ultimate": {
         "name": "Ultimate",
         "platform": "OpenCode",
-        "description": "Full plugin with 11 agents, Team Mode, background tasks, 3-tier MCP, and 60+ lifecycle hooks.",
+        "description": "Full plugin with 11 agents, Team Mode, background tasks, 3-tier MCP, and 55 lifecycle hooks.",
         "install": "bunx oh-my-openagent install"
       },
       "light": {
         "name": "Light",
         "platform": "Codex CLI",
-        "description": "8 components — comment-checker, git-bash, LSP, rules, ulw-execute-continuation, telemetry, ultrawork, ulw-loop — wired to Codex events.",
+        "description": "11 components — bootstrap, comment-checker, git-bash, lazycodex-executor-verify, LSP, rules, teammode, telemetry, ultrawork, ulw-execute-continuation, ulw-loop — wired to Codex events.",
         "install": "npx lazycodex-ai install"
-      }
-    },
-    "ulw": {
-      "badge": "The Magic Word",
-      "title": "ulw",
-      "headline": "Type Three Letters. Walk Away.",
-      "description": "Ultra Work mode triggers maximum precision: auto-planning, deep research, parallel agents, and self-correction loops. The system doesn't stop until it's done. You don't babysit.",
-      "autoPlanning": "Auto-Planning",
-      "deepResearch": "Deep Research",
-      "selfCorrection": "Self-Correction",
-      "parallelAgents": "Parallel Agents",
-      "terminalTitle": "sisyphus — -zsh — 80x24",
-      "terminalInput": "ulw add authentication to the API",
-      "steps": {
-        "scanning": "Scanning codebase...",
-        "context": "Launching 3 explore agents...",
-        "planning": "Building execution plan...",
-        "delegating": "Deploying 4 parallel agents...",
-        "verifying": "Running verification suite...",
-        "complete": "Done. 847 lines changed, 0 issues."
       },
-      "tagline": "Zero intervention. Full autonomy. Just results."
-    },
-    "sisyphus": {
-      "badge": "Primary Orchestrator",
-      "title": "Sisyphus",
-      "headline": "The CTO Who Never Sleeps",
-      "description": "Named after the mythological figure rolling his boulder uphill forever. Sisyphus parses implicit requirements, adapts to your codebase's maturity, and delegates to specialists. Interrupted? The boulder system resumes exactly where you left off.",
-      "phases": {
-        "intent": {
-          "title": "Intent Gate",
-          "description": "Parses what you meant, not just what you typed"
-        },
-        "explore": {
-          "title": "Codebase Assessment",
-          "description": "Maps your architecture before touching a line"
-        },
-        "delegate": {
-          "title": "Smart Delegation",
-          "description": "Routes to the right specialist agent"
-        },
-        "verify": {
-          "title": "Independent Verification",
-          "description": "Trusts nothing. Verifies everything."
-        }
+      "senpi": {
+        "name": "Senpi",
+        "platform": "Standalone beta",
+        "description": "Native omo command with the OMO extension built in. Standalone — no OpenCode or Codex host. Beta channel only.",
+        "install": "npm i -g omo-ai@beta"
       },
-      "boulderTitle": "Session Continuity",
-      "boulderDescription": "Active work tracked in boulder.json. Power outage? System crash? Doesn't matter. Pick up exactly where you stopped.",
-      "model": "Claude Opus 5 High"
-    },
-    "prometheusAtlas": {
-      "badge": "Orchestration Workflow",
-      "title": "Think, Then Act",
-      "headline": "Planning and Execution Are Different Jobs",
-      "prometheus": {
-        "name": "Prometheus",
-        "role": "Strategic Planner",
-        "model": "Claude Fable 5 XHigh",
-        "description": "The architect. Interviews you, explores your codebase, and creates detailed battle plans. Never writes code. Uses Metis and Momus as quality gates.",
-        "features": [
-          "Intelligent interview mode",
-          "Multi-agent codebase exploration",
-          "Gap analysis with Metis",
-          "Ruthless review with Momus"
-        ]
-      },
-      "atlas": {
-        "name": "Atlas",
-        "role": "Master Executor",
-        "model": "Claude Sonnet 4.6",
-        "description": "The builder. Reads verified plans, delegates to specialized agents via category+skills system. Tracks learnings across tasks. Verifies independently — never trusts subagent claims.",
-        "features": [
-          "Intent-based task routing",
-          "Wisdom accumulation across tasks",
-          "Boulder session continuity",
-          "Independent result verification"
-        ]
-      },
-      "metis": {
-        "name": "Metis",
-        "description": "Catches ambiguities before they become bugs."
-      },
-      "momus": {
-        "name": "Momus",
-        "description": "Only says OKAY when the plan is actually perfect."
-      },
-      "workflow": {
-        "step1": "Describe your work to Prometheus",
-        "step2": "Metis analyzes for gaps",
-        "step3": "Momus validates ruthlessly",
-        "step4": "Atlas delegates to specialists",
-        "step5": "Independent verification on everything"
-      },
-      "whyItWorks": "The planner doesn't code. The executor follows verified plans. Intelligence lives in the system, not individual agents."
-    },
-    "hephaestus": {
-      "badge": "Deep Worker",
-      "title": "Hephaestus",
-      "headline": "Give Him a Goal, Not a Recipe",
-      "description": "Named after the Greek god of the forge. Methodical, thorough, obsessive. Fires 2-5 parallel explore agents before writing any code. Built for deep architectural reasoning, complex debugging, and cross-domain synthesis.",
-      "loop": {
-        "explore": "EXPLORE — Map the terrain",
-        "plan": "PLAN — Chart the course",
-        "decide": "DECIDE — Commit to the path",
-        "execute": "EXECUTE — Build with precision",
-        "verify": "VERIFY — Prove it works"
-      },
-      "tagline": "For when good enough isn't.",
-      "model": "GPT 5.6 Sol Medium"
-    },
-    "teamMode": {
-      "badge": "v4.0+",
-      "title": "Team Mode",
-      "headline": "Multiple Agents. Side-by-Side. In Parallel.",
-      "description": "A lead agent orchestrates a team of category-specialized members, all running in parallel and communicating through dedicated tools. Watch every member work simultaneously in tmux. Opt-in — flip team_mode.enabled and restart.",
-      "features": {
-        "lead": {
-          "title": "Lead Orchestration",
-          "description": "One coordinator. Multiple specialists. Real-time messaging via team_send_message and team_task_create."
-        },
-        "parallel": {
-          "title": "True Parallelism",
-          "description": "Up to 8 members work simultaneously. No waiting, no queues — every angle covered at once."
-        },
-        "tmux": {
-          "title": "Tmux Visualization",
-          "description": "Focus and grid windows let you zoom into one teammate without losing the bigger picture."
-        },
-        "tools": {
-          "title": "team_* Tool Family",
-          "description": "12 dedicated tools (team_create, team_status, team_send_message, ...) gated behind team_mode.enabled."
-        }
-      },
-      "poweredBy": "Powered by Team Mode",
-      "skills": {
-        "hyperplan": {
-          "name": "hyperplan",
-          "description": "5 hostile agents tear apart your plan from orthogonal angles before a single line of code is written."
-        },
-        "securityResearch": {
-          "name": "security-research",
-          "description": "3 vulnerability hunters + 2 PoC engineers audit your codebase. Severity calibrated by actual exploitability."
-        }
-      },
-      "optIn": "team_mode.enabled = true → restart opencode",
-      "tagline": "Off by default. Devastating when on."
+      "tagAgents": "11 roles",
+      "tagHooks": "55 lifecycle hooks",
+      "tagComponents": "Light: 11 components",
+      "tagBeta": "Senpi: beta channel"
     },
     "agents": {
-      "title": "Specialized Agents",
-      "subtitle": "Eight built-in agents for common workflows. Plus a dynamic system that assembles custom agents on demand.",
-      "oracle": {
-        "name": "Oracle",
-        "role": "Architecture Consultant",
-        "model": "GPT 5.5 High",
-        "description": "Complex debugging and architectural decisions. When the path forward isn't obvious."
+      "eyebrow": "The roster",
+      "title": "Eleven roles, one graph.",
+      "subtitle": "A directed graph of 11 roles scheduled in waves: the orchestrator leads, the planner, gap analysis and plan review gate the work, categories and curated agents execute. Click a node in the graph to find its cell here.",
+      "orchestrator": {
+        "name": "Orchestrator",
+        "role": "The main agent",
+        "model": "Profiles: Capable · Simple work · Deep work",
+        "description": "Runs in your session, on your model. Parses what you meant, maps the codebase before touching a line, delegates by category and verifies every result independently. Interrupted runs resume from boulder.json exactly where they stopped."
       },
-      "librarian": {
-        "name": "Librarian",
-        "role": "Docs & Code Search",
-        "model": "GPT 5.6 Luna Fast",
-        "description": "Finds real GitHub examples and official docs. Evidence-based, with permalinks."
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan planning interview",
+        "model": "Runs in the main session"
+      },
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "Gap analysis",
+        "model": "Claude Sonnet 4.6"
+      },
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "Plan review gate",
+        "model": "GPT 6 Astra xHigh"
+      },
+      "kibitzer": {
+        "name": "Kibitzer",
+        "role": "Post-turn memory advisor",
+        "model": "Quick category"
+      },
+      "architect": {
+        "name": "Architect",
+        "role": "Architecture consult lane",
+        "model": "Claude Fable 5.1 Max"
+      },
+      "deep": {
+        "name": "Deep",
+        "role": "Deep autonomous problem-solving",
+        "model": "GPT 6 Astra High"
+      },
+      "quick": {
+        "name": "Quick",
+        "role": "Small, single-file changes",
+        "model": "Kimi For Coding Highspeed"
+      },
+      "visualEngineering": {
+        "name": "Visual Engineering",
+        "role": "UI, styling and design systems",
+        "model": "Claude Fable 5.1 Max"
       },
       "explore": {
         "name": "Explore",
-        "role": "Codebase Grep",
-        "model": "GPT 5.6 Luna Fast",
-        "description": "Blazing fast codebase search. Cheap, parallel, always background."
+        "role": "Codebase grep",
+        "model": "GPT 5.6 Luna Fast"
       },
-      "metis": {
-        "name": "Metis",
-        "role": "Plan Consultant",
-        "model": "Claude Sonnet 4.6",
-        "description": "Catches ambiguities in plans before they become production bugs."
+      "librarian": {
+        "name": "Librarian",
+        "role": "Docs and code search",
+        "model": "GPT 5.6 Luna Fast"
       },
-      "momus": {
-        "name": "Momus",
-        "role": "Plan Reviewer",
-        "model": "GPT 5.6 Sol xHigh",
-        "description": "Ruthless validation. Only approves when the plan is bulletproof."
-      },
-      "atlas": {
-        "name": "Atlas",
-        "role": "Parallel Task Executor",
-        "model": "Claude Sonnet 4.6",
-        "description": "Orchestrates multi-step plans with dependency tracking. Delegates to specialists and verifies independently."
-      },
-      "sisyphusJunior": {
-        "name": "Sisyphus-Junior",
-        "role": "Focused Task Executor",
-        "model": "Per-category",
-        "description": "Same discipline as Sisyphus, no delegation. Executes single tasks end-to-end with evidence-bound QA."
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "Media Analysis",
-        "model": "GPT 5.5 Medium",
-        "description": "Extracts information from PDFs, images, and diagrams. Quick summary extraction without full reads."
-      },
-      "dynamicSystem": {
+      "dynamic": {
         "name": "Dynamic Agent",
         "role": "Assembled for the task at hand",
-        "description": "Matches your request to the right model, loads the necessary skills, and builds an agent in real-time."
+        "model": "Per-category"
       }
     },
-    "architecture": {
-      "title": "Built Different",
-      "subtitle": "Design decisions that actually matter.",
-      "principles": {
-        "specialization": {
-          "title": "Specialization",
-          "description": "Each agent does one thing exceptionally well. No jacks of all trades."
-        },
-        "trustVerify": {
-          "title": "Trust But Verify",
-          "description": "Orchestrator runs independent verification on everything. Subagents don't get a free pass."
-        },
-        "wisdom": {
-          "title": "Wisdom Accumulation",
-          "description": "Learnings from each task passed to all subsequent tasks. The system gets smarter as it works."
-        },
-        "modelOptimization": {
-          "title": "Model Optimization",
-          "description": "Expensive models for planning and complex decisions. Cheap models for routine work. Maximum output per dollar."
-        },
-        "categories": {
-          "title": "Category System",
-          "description": "Intent-based routing. Say what you need — ultrabrain, visual-engineering, quick — and the right model handles it."
-        },
-        "continuity": {
-          "title": "Session Continuity",
-          "description": "Boulder system: interrupted work resumes exactly where it stopped. Zero context loss."
-        }
+    "profiles": {
+      "eyebrow": "Profiles",
+      "title": "Pick the intent, not the model.",
+      "subtitle": "A profile is an ordered chain of models. Set model_profile once and omo starts your session on the first model your providers serve; a literal provider/model in the same key pins it instead.",
+      "capable": {
+        "name": "Capable",
+        "role": "The strongest generalist available — the default when you do not want to think about models.",
+        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
+      },
+      "simpleWork": {
+        "name": "Simple work",
+        "role": "Fast and cheap for small, well-specified edits.",
+        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
+      },
+      "deepWork": {
+        "name": "Deep work",
+        "role": "Maximum reasoning for hard problems — the same chain the deep category runs.",
+        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
       }
+    },
+    "orchestration": {
+      "eyebrow": "Orchestration",
+      "title": "Think, then act.",
+      "subtitle": "Planning and execution are different jobs. The planner never writes code; the executor follows a plan two reviewers already passed.",
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan",
+        "model": "Runs in the main session",
+        "description": "Interviews you, explores the codebase, writes the plan. Never writes code.",
+        "features": ["Interview mode", "Multi-agent codebase exploration"]
+      },
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "Gap analysis",
+        "model": "Claude Sonnet 4.6",
+        "description": "Reads the plan for ambiguities before they become bugs.",
+        "features": ["Missing requirements", "Unstated assumptions"]
+      },
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "Plan review",
+        "model": "GPT 6 Astra xHigh",
+        "description": "Approves only when the plan holds up. Otherwise it goes back.",
+        "features": ["Hostile review", "OKAY or a list of reasons"]
+      },
+      "executor": {
+        "name": "Executor",
+        "role": "/ulw-execute",
+        "model": "Runs in the main session",
+        "description": "Executes the approved plan in the same session, delegates by category and skills, verifies every result itself.",
+        "features": ["Boulder state", "Independent verification"]
+      }
+    },
+    "teamMode": {
+      "eyebrow": "Team Mode · opt-in",
+      "title": "Multiple agents, side by side.",
+      "description": "A lead agent runs a team of category-specialised members in parallel. They talk through dedicated tools and you watch every member work in tmux.",
+      "features": {
+        "lead": {
+          "title": "Lead orchestration",
+          "description": "One coordinator, many specialists. Messaging via team_send_message and team_task_create."
+        },
+        "parallel": {
+          "title": "True parallelism",
+          "description": "Up to 8 members work at the same time. No queue."
+        },
+        "tmux": {
+          "title": "tmux visualisation",
+          "description": "Focus and grid windows: zoom into one teammate without losing the whole board."
+        },
+        "tools": {
+          "title": "team_* tool family",
+          "description": "12 dedicated tools (team_create, team_status, team_send_message, ...) gated behind team_mode.enabled."
+        }
+      },
+      "optIn": "team_mode.enabled = true → restart opencode",
+      "mockup": {
+        "title": "tmux — team · grid",
+        "status": "3 running",
+        "paneLead": "lead",
+        "statusLead": "team_status: 3 members busy",
+        "lineLead": "> team_task_create dashboard-ui",
+        "paneImpl": "member · visual-engineering",
+        "statusImpl": "editing app/dashboard/page.tsx",
+        "lineImpl": "> team_send_message lead \"layout done\"",
+        "paneReview": "member · ultrabrain",
+        "statusReview": "reviewing plan.md",
+        "lineReview": "> reading 14 files",
+        "paneTest": "member · quick",
+        "statusTest": "running e2e",
+        "lineTest": "> 42 passed",
+        "caption": "Off by default. Enable it when the work splits cleanly across people."
+      }
+    },
+    "principles": {
+      "eyebrow": "Design decisions",
+      "title": "Built different.",
+      "subtitle": "Six decisions that decide how the harness behaves.",
+      "specialization": {
+        "title": "Specialization",
+        "description": "Each agent does one thing well. Skills are injected per task instead of one agent knowing everything."
+      },
+      "trustVerify": {
+        "title": "Trust, but verify",
+        "description": "The orchestrator runs independent verification on everything. Subagent claims are not results."
+      },
+      "wisdom": {
+        "title": "Wisdom accumulation",
+        "description": "Learnings from each task are passed to all subsequent tasks in the run."
+      },
+      "modelOptimization": {
+        "title": "Model optimization",
+        "description": "Expensive models for planning and hard decisions. Cheap models for routine work."
+      },
+      "categories": {
+        "title": "Category system",
+        "description": "Intent-based routing. Say what you need — ultrabrain, visual-engineering, quick — and the matching model handles it."
+      },
+      "continuity": {
+        "title": "Session continuity",
+        "description": "Interrupted work resumes exactly where it stopped. Nothing is lost between sessions."
+      },
+      "boulderEvidence": "$ cat boulder.json\n{ \"plan\": \"dashboard\", \"wave\": 3, \"status\": \"resuming\" }"
     },
     "reviews": {
-      "title": "What Devs Actually Say",
+      "eyebrow": "From users",
+      "title": "What developers say.",
       "review1": {
         "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
         "author": "Arthur Guiot"
       },
       "review2": {
-        "text": "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour.",
+        "text": "If Claude Code does in 7 days what a human does in 3 months, OmO does it in 1 hour.",
         "author": "B, Quant Researcher"
       },
       "review3": {
@@ -311,11 +326,34 @@
       }
     },
     "cta": {
-      "title": "Stop Writing Boilerplate",
-      "subtitle": "Install Oh My OpenAgent and let the agents handle it. Your first ulw command is 30 seconds away.",
+      "eyebrow": "Install",
+      "title": "Stop writing boilerplate.",
+      "subtitle": "Install Oh My OpenAgent, open your project, type mass ulw. Any job, however complex — every model at once, as a graph.",
       "installCommand": "bunx oh-my-openagent install",
-      "installNow": "Install Now",
-      "readTheDocs": "Read the Docs"
+      "installNow": "Install now",
+      "readTheDocs": "Read the docs"
+    },
+    "dag": {
+      "region": "OmO desktop with the workflow graph open",
+      "windowTitle": "OmO — ship the dashboard",
+      "threads": "Threads",
+      "thread1": "ship the dashboard",
+      "thread2": "fix flaky e2e",
+      "thread3": "migrate auth",
+      "workflow": "Workflow",
+      "status": {
+        "pending": "queued",
+        "running": "running",
+        "completed": "completed"
+      },
+      "assistantPlanning": "planning 10 nodes across 5 waves",
+      "assistantRunning": "running",
+      "assistantDone": "run complete — 10/10 verified",
+      "wave": "Wave",
+      "done": "done",
+      "running": "running",
+      "fit": "Fit graph",
+      "center": "Center active wave"
     }
   },
   "docs": {
@@ -382,14 +420,14 @@
         },
         "footer": "Zero intervention. Full autonomy. Just results."
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "Approach 2",
-        "title": "Prometheus + Atlas",
+        "title": "Planner + Executor",
         "subtitle": "When you want strategic control.",
-        "prometheusTitle": "Prometheus",
-        "prometheusDescription": "Conducts interview, researches context, and generates a detailed YAML plan.",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "Executes the plan, delegates to sub-agents, manages waves, and tracks progress.",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "Runs the interview, researches context, and writes a detailed work plan.",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "Executes the approved plan in the same session, delegates by category, manages waves, and tracks progress.",
         "footer": "You architect. Agents execute. Full transparency."
       }
     },
@@ -410,16 +448,16 @@
     "coreLoop": {
       "title": "The Core Loop",
       "features": {
-        "prometheus": {
-          "feature": "Prometheus",
+        "planner": {
+          "feature": "Planning interview",
           "purpose": "Extract intent through intelligent interview"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "Plan consultant",
           "purpose": "Catch ambiguities before they become bugs"
         },
-        "momus": {
-          "feature": "Momus",
+        "planReviewer": {
+          "feature": "Plan review gate",
           "purpose": "Verify plans are complete before execution"
         },
         "orchestrator": {

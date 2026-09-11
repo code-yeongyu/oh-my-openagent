@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { isFableFiveModel, isMessageEndEvent, isModelSelectEvent, isRefusalLikeMessage } from "./detection"
+import {
+  EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC,
+  isFableFiveModel,
+  isMessageEndEvent,
+  isModelSelectEvent,
+  isRefusalLikeMessage,
+} from "./detection"
 
 function assistant(message: Record<string, unknown>): Record<string, unknown> {
   return { role: "assistant", ...message }
@@ -41,6 +47,32 @@ describe("fallback-architect detection", () => {
             "This request triggered restrictions on output content and was blocked under Anthropic's Usage Policy",
         })
         expect(isRefusalLikeMessage(message)).toBe(true)
+      })
+    })
+  })
+
+  describe("#given the host demoted an empty tool-use turn to stop", () => {
+    const demotion = { type: EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC, timestamp: 0, details: {} }
+
+    describe("#when the demoted turn kept its refusal details", () => {
+      it("#then the diagnostic admits it as refusal-like", () => {
+        const message = assistant({ stopReason: "stop", content: [], diagnostics: [demotion], stopDetails: { type: "refusal" } })
+        expect(isRefusalLikeMessage(message)).toBe(true)
+      })
+    })
+
+    describe("#when the demoted turn carries no refusal signal", () => {
+      it("#then it stays a continuable stop", () => {
+        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", content: [], diagnostics: [demotion] }))).toBe(false)
+      })
+    })
+
+    describe("#when a plain stop carries refusal details without the demotion diagnostic", () => {
+      it("#then the stop reason still wins", () => {
+        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [] }))).toBe(false)
+        expect(
+          isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [{ type: "other" }] })),
+        ).toBe(false)
       })
     })
   })

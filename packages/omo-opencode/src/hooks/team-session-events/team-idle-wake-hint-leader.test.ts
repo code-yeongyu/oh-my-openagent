@@ -1,8 +1,11 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, setDefaultTimeout, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
+
+// Windows CI runners can exceed the 5 s Bun default on fs-heavy team-mode tests.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 10_000)
 import { tmpdir } from "node:os"
 import path from "node:path"
 

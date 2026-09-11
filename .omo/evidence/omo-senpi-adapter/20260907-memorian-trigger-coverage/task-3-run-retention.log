@@ -1,0 +1,87 @@
+task-3-run-retention
+worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage
+branch: feat/memorian-trigger-coverage
+
+WHAT CHANGED
+- memorian-run-retention.ts: writeMemorianRunOutcome writes <runDir>/outcome.json
+  (version 1, runId, status, cause?, nudged, finishedAt) mode 0o600, best-effort warn.
+  pruneMemorianRuns ages <recallDir>/runs by newest inner file mtime; missing/unparseable
+  outcome.json uses 7d; non-empty nudged or status "failed" uses 30d; rename to .prune-<name>
+  then remove; leftover .prune-* tombstones swept; ENOENT tolerated.
+  createThrottledPrune is fire-and-forget, hourly .last-prune marker, in-flight coalesce.
+- memorian-judge-run.ts: writeMemorianRunOutcome at every terminal classification
+  (completed / completed+partial salvage / failed deadline|child_failed|session_create_failed
+  / dropped cancelled) with accepted nudge paths. candidates.json and transcript-window.txt
+  untouched.
+- wiring-memorian.ts: one throttled prune per composition keyed by identity recall dir;
+  wrap trigger.onSettled so prune fires after trigger capture. memorian-trigger.ts untouched.
+- memorian-runner.ts: line-17 comment now describes retention (one sentence). No config keys.
+
+TDD: tests written first, RED captured, then implementation, GREEN captured.
+
+-------------------------------------------------------------------------------
+RED (tests only, production unchanged)
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts
+
+output (relevant):
+RBT_SYNCED=2
+error: Cannot find module './memorian-run-retention' from '/home/user/work/packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts'
+(pass) MemorianGateRunner > #given a silent normal judge #when the runner launches #then the result is empty
+...
+(fail) MemorianGateRunner > #given a completed scripted run #when the runner launches #then outcome.json records status completed [20.64ms]
+ 8 pass
+ 2 fail
+ 1 error
+Ran 10 tests across 2 files. [3.15s]
+RBT_RC=1
+
+-------------------------------------------------------------------------------
+GREEN (implementation + tests)
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-judge-run.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner.ts \
+    --sync packages/omo-senpi/src/components/memory/wiring-memorian.ts \
+    --sync packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+    -- packages/omo-senpi/src/components/memory/memorian-run-retention.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner-completion.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-runner.test.ts \
+       packages/omo-senpi/src/components/memory/memorian-wiring.test.ts
+
+output (relevant):
+RBT_SYNCED=6
+(pass) writeMemorianRunOutcome > #given a completed status with nudged paths #when writeMemorianRunOutcome runs #then outcome.json records them
+(pass) pruneMemorianRuns > #given an 8-day-old dir with no outcome.json #when pruning #then the dir is removed
+(pass) pruneMemorianRuns > #given a 29-day-old nudged dir #when pruning at 29 then 31 days #then it is kept then removed
+(pass) pruneMemorianRuns > #given a 6-day-old failed dir #when pruning #then the dir is kept
+(pass) pruneMemorianRuns > #given a dir whose newest file is 1 minute old #when pruning #then the dir is skipped
+(pass) pruneMemorianRuns > #given a stale .prune-x tombstone #when pruning #then the tombstone is removed
+(pass) pruneMemorianRuns > #given a remove seam that throws ENOENT #when pruning #then it does not throw
+(pass) createThrottledPrune > #given a throttled prune #when called twice within an hour then after the interval #then the second call is skipped and the later call runs
+(pass) MemorianGateRunner > #given a completed scripted run #when the runner launches #then outcome.json records status completed
+ 30 pass
+ 0 fail
+Ran 30 tests across 4 files. [3.37s]
+RBT_RC=0
+
+-------------------------------------------------------------------------------
+TSGO
+command: cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage && bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+result: exit 0, quiet
+
+-------------------------------------------------------------------------------
+PURE-LOC (awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//' | wc -l)
+memorian-run-retention.ts                 215
+memorian-run-retention.test.ts            159
+memorian-judge-run.ts                     133
+memorian-runner.ts                        178
+wiring-memorian.ts                        121
+memorian-runner-completion.test.ts        141
+all <= 250

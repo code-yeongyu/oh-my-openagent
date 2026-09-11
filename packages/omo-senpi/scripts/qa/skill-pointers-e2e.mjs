@@ -18,7 +18,7 @@ const SCENARIOS = [
     name: "overlap-mass-ulw-loop",
     prompt: "mass ulw-loop ship the refactor",
     expectHidden: [
-      { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md", "dag tool"] },
+      { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md", "workflow tool"] },
       { customType: "omo-ulw-loop:skill-pointer", markers: [ULW_LOOP_MARKER, "ulw-loop/SKILL.md", "read tool"] },
     ],
     forbidMarkers: [ULW_PLAN_MARKER, ULW_RESEARCH_MARKER],

@@ -1,0 +1,100 @@
+task-1-planner-tokens
+worktree: /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage
+scope: recall-query-planner-tools.ts + recall-query-planner-tools.test.ts
+
+================================================================
+1. RED — tests only (implementation not synced)
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh --sync packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts -- packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts
+
+output:
+  RBT_SYNCED=1
+  (pass) toolArgTexts > extracts read paths and path words [3.26ms]
+  (pass) toolArgTexts > extracts command tokens without flags [0.74ms]
+  (pass) toolArgTexts > keeps grep patterns [0.37ms]
+  (pass) toolArgTexts > removes secret-bearing strings [0.30ms]
+  (pass) toolArgTexts > ignores unknown keys and nested objects [0.44ms]
+  (pass) toolArgTexts > filters export secret command [0.47ms]
+  33 |     expect(toolArgTexts("bash", { command: "export TOKEN=abc123secretvalue00000" })).toEqual([])
+  38 |     expect(texts).toContain("memorian-trigger.ts")
+  error: expect(received).toContain(expected)
+        at <anonymous> (/home/user/work/packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts:38:19)
+  (fail) toolArgTexts > #given eval code reading a file path #when toolArgTexts harvests it #then the file name and path words are kept [1.25ms]
+  44 |     expect(command.length).toBeGreaterThanOrEqual(300)
+  45 |     expect(toolArgTexts("bash", { command })).toContain("deep-file.ts")
+  error: expect(received).toContain(expected)
+        at <anonymous> (/home/user/work/packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts:45:47)
+  (fail) toolArgTexts > #given a bash command longer than 120 characters #when toolArgTexts harvests it #then the trailing path file name is kept [0.91ms]
+  (pass) toolArgTexts > #given eval code assigning an API key #when toolArgTexts harvests it #then secret material is absent [0.34ms]
+  56 |     expect(texts).toContain("x.ts")
+  error: expect(received).toContain(expected)
+        at <anonymous> (/home/user/work/packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts:56:19)
+  (fail) toolArgTexts > #given an eval summary mentioning a file #when toolArgTexts harvests it #then the summary and file name are kept [0.63ms]
+  (pass) toolArgTexts > #given eval code with 100 distinct path tokens #when toolArgTexts harvests them #then at most 32 tokens are returned [0.46ms]
+  (pass) ToolArgWindow > keeps newest eight pushes and clears [0.58ms]
+   9 pass
+   3 fail
+   17 expect() calls
+  Ran 12 tests across 1 file. [2.58s]
+  RBT_RC=1
+
+notes:
+  - Three new harvest assertions failed on pre-change code (code key ignored, long command dropped by whole-argument isUsable, summary key ignored).
+  - Secret-absence and MAX_TOKENS<=32 assertions passed vacuously on [] (old code never read `code`). They are regression guards for the new harvester, not independent RED proofs.
+
+================================================================
+2. GREEN — source + tests synced
+================================================================
+command:
+  bash /tmp/mtc-run-20260907/rbt.sh --sync packages/omo-senpi/src/components/memory/recall-query-planner-tools.ts --sync packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts -- packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts
+
+output:
+  RBT_SYNCED=2
+  (pass) toolArgTexts > extracts read paths and path words [3.40ms]
+  (pass) toolArgTexts > extracts command tokens without flags [1.18ms]
+  (pass) toolArgTexts > keeps grep patterns [0.40ms]
+  (pass) toolArgTexts > removes secret-bearing strings [0.35ms]
+  (pass) toolArgTexts > ignores unknown keys and nested objects [0.38ms]
+  (pass) toolArgTexts > filters export secret command [0.41ms]
+  (pass) toolArgTexts > #given eval code reading a file path #when toolArgTexts harvests it #then the file name and path words are kept [0.65ms]
+  (pass) toolArgTexts > #given a bash command longer than 120 characters #when toolArgTexts harvests it #then the trailing path file name is kept [1.21ms]
+  (pass) toolArgTexts > #given eval code assigning an API key #when toolArgTexts harvests it #then secret material is absent [0.38ms]
+  (pass) toolArgTexts > #given an eval summary mentioning a file #when toolArgTexts harvests it #then the summary and file name are kept [0.55ms]
+  (pass) toolArgTexts > #given eval code with 100 distinct path tokens #when toolArgTexts harvests them #then at most 32 tokens are returned [1.03ms]
+  (pass) ToolArgWindow > keeps newest eight pushes and clears [0.75ms]
+   12 pass
+   0 fail
+   19 expect() calls
+  Ran 12 tests across 1 file. [2.33s]
+  RBT_RC=0
+
+================================================================
+3. tsgo
+================================================================
+command:
+  cd /Volumes/mengmotaStorage/local-workspaces/omo-wt/memorian-trigger-coverage && bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+
+result: TSGO_RC=0 (quiet)
+
+================================================================
+4. pure LOC
+================================================================
+command:
+  awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//' packages/omo-senpi/src/components/memory/recall-query-planner-tools.ts | wc -l
+  awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\/\//' packages/omo-senpi/src/components/memory/recall-query-planner-tools.test.ts | wc -l
+
+PURE_LOC_SRC=93
+PURE_LOC_TEST=61
+ceiling: 250 (ok)
+
+================================================================
+5. implementation summary
+================================================================
+- command/code: commandTexts on the full string (any length). Split on |, &&, ;, newline.
+- isUsable (length<=120, secret-like drop) applies to extracted tokens, not the whole argument.
+- secret-bearing segments are skipped so flag-like and secret tokens never appear (keeps "filters export secret command" === []).
+- quoted path chunks inside JS/eval tokens are expanded via pathWords (memorian-trigger.ts / memorian).
+- summary: whole string when isUsable, plus pathWords of path-like words.
+- PATH_KEYS, ARRAY_KEYS, MAX_TOKENS=32, ToolArgWindow unchanged.
+- no other keys read.

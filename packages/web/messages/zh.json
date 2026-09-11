@@ -1,296 +1,311 @@
 {
   "metadata": {
     "title": "Oh My OpenAgent",
-    "description": "最佳 Agent harness。遇见 Sisyphus：开箱即用的 Agent，像你一样编程。"
+    "description": "最佳 Agent harness。遇见 OmO：开箱即用、像你一样编程的智能体 harness。"
   },
   "nav": {
     "brand": "Oh My OpenAgent",
-    "features": "功能特性",
     "agents": "Agents",
     "docs": "文档",
     "manifesto": "宣言",
-    "starOnGitHub": "在 GitHub 上标星"
+    "install": "安装",
+    "githubStars": "GitHub {count} 星标",
+    "openMenu": "打开菜单",
+    "closeMenu": "关闭菜单",
+    "primary": "主菜单"
   },
   "footer": {
     "brand": "Oh My OpenAgent",
-    "copyright": "© {year} Oh My OpenAgent。基于 SUL-1.0 开源许可。",
+    "copyright": "© {year} Sisyphus Labs · 依据 SUL-1.0 源码可用",
+    "product": "产品",
+    "community": "社区",
+    "legal": "法律",
+    "docs": "文档",
+    "manifesto": "宣言",
+    "releases": "发布",
     "github": "GitHub",
     "discord": "Discord",
-    "documentation": "文档",
-    "manifesto": "宣言"
+    "x": "X @justsisyphus",
+    "privacy": "隐私政策",
+    "terms": "服务条款"
   },
   "landing": {
     "hero": {
-      "title": "最强 ",
-      "titleHighlight": "Agent Harness",
-      "subtitle": "{stars} Stars、{downloads} 下载。实战验证，生产级品质。",
-      "githubStars": "{count} GitHub Stars",
-      "specializedAgents": "{count} 个专业 Agent",
-      "totalDownloads": "累计 {count}+ 下载",
-      "monthlyDownloads": "月度 {count}+ 下载",
-      "lifecycleHooks": "{count}+ 生命周期 Hooks",
-      "installCommand": "bunx oh-my-openagent install",
-      "codexInstallCommand": "npx lazycodex-ai install",
-      "codexLabel": "Codex CLI 版本",
+      "eyebrow": "智能体框架",
+      "title": "输入 mass ulw。",
+      "titleHighlight": "掌控整张图。",
       "getStarted": "开始使用",
-      "viewOnGitHub": "在 GitHub 上查看"
+      "readManifesto": "阅读宣言",
+      "rail": {
+        "wave1": {
+          "index": "01",
+          "label": "编排器领队"
+        },
+        "wave2": {
+          "index": "02",
+          "label": "规划与把关"
+        },
+        "wave3": {
+          "index": "03",
+          "label": "执行者动手"
+        }
+      },
+      "modelsLabel": "所有模型同时上",
+      "modelsHint": "再复杂的任务，投入 token 就能完成。图会把每个节点路由到最合适的模型。"
+    },
+    "installTabs": {
+      "opencode": "OpenCode",
+      "opencodeCommand": "bunx oh-my-openagent install",
+      "codex": "Codex",
+      "codexCommand": "npx lazycodex-ai install",
+      "senpi": "Senpi",
+      "senpiCommand": "npm i -g omo-ai@beta"
+    },
+    "command": {
+      "tabsLabel": "安装目标",
+      "copy": "复制",
+      "copied": "已复制",
+      "copyAria": "复制安装命令"
+    },
+    "proof": {
+      "label": "实时数据",
+      "githubStars": "GitHub 星标",
+      "totalDownloads": "总下载量",
+      "monthlyDownloads": "月下载量",
+      "agents": "个智能体",
+      "agentCount": "11"
+    },
+    "ulw": {
+      "eyebrow": "魔法词",
+      "title": "任何任务。所有模型。一张图。",
+      "description": "投入 token 即可。mass ulw 把整个任务变成依赖图，为每个节点选用合适的模型 — Claude、GPT、Kimi、Grok、GLM 并行工作 — 按波次执行，验证结果后才停止。"
     },
     "editions": {
-      "title": "两个版本，一个大脑",
-      "subtitle": "同一个编排引擎。选择你的 harness。",
+      "eyebrow": "三个版本",
+      "title": "三个版本，一个大脑。",
+      "subtitle": "同一套编排引擎。选你正在用的宿主。",
       "ultimate": {
         "name": "Ultimate",
         "platform": "OpenCode",
-        "description": "完整插件，包含 11 个 Agent、Team Mode、后台任务、3-tier MCP、60+ 生命周期 Hook。",
+        "description": "完整插件：11 个智能体、Team Mode、后台任务、三层 MCP 以及 55 个生命周期钩子。",
         "install": "bunx oh-my-openagent install"
       },
       "light": {
         "name": "Light",
         "platform": "Codex CLI",
-        "description": "8 个组件 — comment-checker、git-bash、LSP、rules、ulw-execute-continuation、telemetry、ultrawork、ulw-loop — 接入 Codex 事件。",
+        "description": "11 个组件 — bootstrap、comment-checker、git-bash、lazycodex-executor-verify、LSP、rules、teammode、telemetry、ultrawork、ulw-execute-continuation、ulw-loop — 接入 Codex 事件。",
         "install": "npx lazycodex-ai install"
-      }
-    },
-    "ulw": {
-      "badge": "魔法咒语",
-      "title": "ulw",
-      "headline": "敲三个字母。走人。",
-      "description": "Ultra Work 模式触发最大精度：自动规划、深度研究、并行 Agent、自我纠正循环。系统直到完成才会停止。你不需要盯梢。",
-      "autoPlanning": "自动规划",
-      "deepResearch": "深度研究",
-      "selfCorrection": "自我纠错",
-      "parallelAgents": "并行 Agent",
-      "terminalTitle": "sisyphus — -zsh — 80x24",
-      "terminalInput": "ulw add authentication to the API",
-      "steps": {
-        "scanning": "正在扫描代码库...",
-        "context": "正在启动 3 个 explore agent...",
-        "planning": "正在构建执行计划...",
-        "delegating": "正在部署 4 个并行 agent...",
-        "verifying": "正在运行验证测试...",
-        "complete": "完成。847 行更改，0 个问题。"
       },
-      "tagline": "零干预。完全自主。只看结果。"
-    },
-    "sisyphus": {
-      "badge": "主编排器",
-      "title": "Sisyphus",
-      "headline": "永不眠的 CTO",
-      "description": "以神话人物命名——永远推着巨石上山。Sisyphus 解析隐含需求，适应代码库成熟度，并委派给专家。被中断了？boulder 系统会从你停下的地方精确恢复。",
-      "phases": {
-        "intent": {
-          "title": "Intent Gate",
-          "description": "解析你真正的意图，而不只是你输入的内容"
-        },
-        "explore": {
-          "title": "Codebase Assessment",
-          "description": "在碰任何一行代码之前先映射架构"
-        },
-        "delegate": {
-          "title": "Smart Delegation",
-          "description": "路由到正确的专家 agent"
-        },
-        "verify": {
-          "title": "Independent Verification",
-          "description": "不相信任何东西。验证一切。"
-        }
+      "senpi": {
+        "name": "Senpi",
+        "platform": "独立运行 测试版",
+        "description": "内置 OMO 扩展的原生 omo 命令。独立运行，无需 OpenCode 或 Codex 宿主。仅限测试版渠道。",
+        "install": "npm i -g omo-ai@beta"
       },
-      "boulderTitle": "Session Continuity",
-      "boulderDescription": "活跃工作被记录在 boulder.json 中。停电？系统崩溃？没关系。从你停下的地方精确恢复。",
-      "model": "Claude Opus 5 High"
-    },
-    "prometheusAtlas": {
-      "badge": "编排工作流",
-      "title": "先想，再动",
-      "headline": "规划和执行是不同的工作",
-      "prometheus": {
-        "name": "Prometheus",
-        "role": "Strategic Planner",
-        "model": "Claude Fable 5 XHigh",
-        "description": "架构师。与你访谈，探索代码库，并创建详细的执行计划。从不写代码。使用 Metis 和 Momus 作为质量关卡。",
-        "features": [
-          "智能访谈模式",
-          "多 agent 代码库探索",
-          "与 Metis 进行差距分析",
-          "与 Momus 进行严苛审查"
-        ]
-      },
-      "atlas": {
-        "name": "Atlas",
-        "role": "Master Executor",
-        "model": "Claude Sonnet 4.6",
-        "description": "构建者。阅读已验证的计划，通过 category+skills 系统委派给专业 agent。跨任务追踪学习。独立验证 — 从不相信子 agent 的说法。",
-        "features": [
-          "基于意图的任务路由",
-          "跨任务的智慧积累",
-          "Boulder 会话连续性",
-          "独立的结果验证"
-        ]
-      },
-      "metis": {
-        "name": "Metis",
-        "description": "在歧义变成 Bug 之前捕获它们。"
-      },
-      "momus": {
-        "name": "Momus",
-        "description": "只有当计划真正完美时才说 OKAY。"
-      },
-      "workflow": {
-        "step1": "向 Prometheus 描述你的工作",
-        "step2": "Metis 分析差距",
-        "step3": "Momus 严苛验证",
-        "step4": "Atlas 委派给专家",
-        "step5": "对一切进行独立验证"
-      },
-      "whyItWorks": "规划者不编码。执行者遵循已验证的计划。智能存在于系统中，而非单个 agent。"
-    },
-    "hephaestus": {
-      "badge": "深度工作者",
-      "title": "Hephaestus",
-      "headline": "给他目标，不是菜谱",
-      "description": "以希腊锻造之神命名。有条不紊、彻底、执着。在写任何代码前启动 2-5 个并行 explore agent。专为深度架构推理、复杂调试和跨领域综合而设计。",
-      "loop": {
-        "explore": "EXPLORE — 绘制地形",
-        "plan": "PLAN — 规划路线",
-        "decide": "DECIDE — 确定路径",
-        "execute": "EXECUTE — 精确构建",
-        "verify": "VERIFY — 证明有效"
-      },
-      "tagline": "当足够好还不够时。",
-      "model": "GPT 5.6 Sol Medium"
-    },
-    "teamMode": {
-      "badge": "v4.0+",
-      "title": "Team Mode",
-      "headline": "多个 Agent。并排运行。真正并行。",
-      "description": "一个领导 Agent 协调一队按类别专业化的成员，全部并行运行，通过专用工具实时通信。在 tmux 中同时观察每个成员工作。选择性启用 — 翻转 team_mode.enabled 并重启。",
-      "features": {
-        "lead": {
-          "title": "领导编排",
-          "description": "一个协调者，多个专家。通过 team_send_message 和 team_task_create 进行实时消息传递。"
-        },
-        "parallel": {
-          "title": "真正的并行",
-          "description": "最多 8 个成员同时工作。无等待，无队列 — 所有角度一次覆盖。"
-        },
-        "tmux": {
-          "title": "Tmux 可视化",
-          "description": "Focus 和 grid 窗口让你聚焦一名队员的同时不失全局视野。"
-        },
-        "tools": {
-          "title": "team_* 工具家族",
-          "description": "12 个专用工具(team_create、team_status、team_send_message、…)，在 team_mode.enabled 后启用。"
-        }
-      },
-      "poweredBy": "由 Team Mode 驱动",
-      "skills": {
-        "hyperplan": {
-          "name": "hyperplan",
-          "description": "5 个敌对 Agent 在写一行代码前，从正交角度撕碎你的计划。"
-        },
-        "securityResearch": {
-          "name": "security-research",
-          "description": "3 个漏洞猎手 + 2 个 PoC 工程师审计你的代码库。严重性按实际可利用性校准。"
-        }
-      },
-      "optIn": "team_mode.enabled = true → 重启 opencode",
-      "tagline": "默认关闭。开启时具有毁灭性。"
+      "tagAgents": "11 个角色",
+      "tagHooks": "55 个生命周期钩子",
+      "tagComponents": "Light：11 个组件",
+      "tagBeta": "Senpi：测试版渠道"
     },
     "agents": {
-      "title": "Specialized Agents",
-      "subtitle": "八个专用 Agent 覆盖常见任务，外加按需动态构建的 Agent 系统。",
-      "oracle": {
-        "name": "Oracle",
-        "role": "Architecture Consultant",
-        "model": "GPT 5.5 High",
-        "description": "复杂调试和架构决策。当前路不明时。"
+      "eyebrow": "阵容",
+      "title": "十一个角色，一张图。",
+      "subtitle": "按波次调度的 11 个角色有向图：编排器领队，规划器、缺口分析与计划评审负责把关，类别与精选智能体动手执行。点击图中的节点即可找到对应格子。",
+      "orchestrator": {
+        "name": "编排器",
+        "role": "主智能体",
+        "model": "模型配置: Capable · Simple work · Deep work",
+        "description": "在你的会话里、用你的模型运行。读懂你的意图，动手前先摸清代码库，按类别委派并独立验证每个结果。中断的运行会从 boulder.json 记录的位置精确恢复。"
       },
-      "librarian": {
-        "name": "Librarian",
-        "role": "Docs & Code Search",
-        "model": "GPT 5.6 Luna Fast",
-        "description": "寻找真正的 GitHub 示例和官方文档。基于证据，附带永久链接。"
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan 规划访谈",
+        "model": "在主会话中运行"
+      },
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "缺口分析",
+        "model": "Claude Sonnet 4.6"
+      },
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "计划评审关卡",
+        "model": "GPT 6 Astra xHigh"
+      },
+      "kibitzer": {
+        "name": "Kibitzer",
+        "role": "回合结束后的记忆顾问",
+        "model": "Quick 类别"
+      },
+      "architect": {
+        "name": "Architect",
+        "role": "架构咨询通道",
+        "model": "Claude Fable 5.1 Max"
+      },
+      "deep": {
+        "name": "Deep",
+        "role": "深度自主问题求解",
+        "model": "GPT 6 Astra High"
+      },
+      "quick": {
+        "name": "Quick",
+        "role": "小型单文件改动",
+        "model": "Kimi For Coding Highspeed"
+      },
+      "visualEngineering": {
+        "name": "Visual Engineering",
+        "role": "UI、样式与设计系统",
+        "model": "Claude Fable 5.1 Max"
       },
       "explore": {
         "name": "Explore",
-        "role": "Codebase Grep",
-        "model": "GPT 5.6 Luna Fast",
-        "description": "超高速代码库搜索。便宜、并行、始终在后台运行。"
+        "role": "代码库 grep",
+        "model": "GPT 5.6 Luna Fast"
       },
-      "metis": {
-        "name": "Metis",
-        "role": "Plan Consultant",
-        "model": "Claude Sonnet 4.6",
-        "description": "在计划中的歧义变成生产 Bug 之前捕获它们。"
+      "librarian": {
+        "name": "Librarian",
+        "role": "文档与代码搜索",
+        "model": "GPT 5.6 Luna Fast"
       },
-      "momus": {
-        "name": "Momus",
-        "role": "Plan Reviewer",
-        "model": "GPT 5.6 Sol xHigh",
-        "description": "严苛验证。只有当计划无懈可击时才批准。"
-      },
-      "atlas": {
-        "name": "Atlas",
-        "role": "并行任务执行者",
-        "model": "Claude Sonnet 4.6",
-        "description": "编排多步骤计划，跟踪依赖关系。委派给专家并独立验证。"
-      },
-      "sisyphusJunior": {
-        "name": "Sisyphus-Junior",
-        "role": "专注任务执行者",
-        "model": "Per-category",
-        "description": "与 Sisyphus 相同的纪律，不委派。端到端执行单个任务，带有证据绑定 QA。"
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "媒体分析",
-        "model": "GPT 5.5 Medium",
-        "description": "从 PDF、图片和图表中提取信息。无需完整阅读即可快速摘要。"
-      },
-      "dynamicSystem": {
+      "dynamic": {
         "name": "Dynamic Agent",
-        "role": "随需而造",
-        "description": "根据请求自动匹配最佳模型、注入所需技能，并实时构建专属 Agent。"
+        "role": "按任务即时组装",
+        "model": "Per-category"
       }
     },
-    "architecture": {
-      "title": "与众不同的设计",
-      "subtitle": "真正重要的设计决策。",
-      "principles": {
-        "specialization": {
-          "title": "Specialization",
-          "description": "每个 agent 把一件事做到极致。没有万事通。"
-        },
-        "trustVerify": {
-          "title": "Trust But Verify",
-          "description": "编排器对一切进行独立验证。子 agent 没有免费通行证。"
-        },
-        "wisdom": {
-          "title": "Wisdom Accumulation",
-          "description": "每个任务的学习传递给后续所有任务。系统在工作时变得更聪明。"
-        },
-        "modelOptimization": {
-          "title": "Model Optimization",
-          "description": "昂贵的模型用于规划和复杂决策。便宜的模型用于日常工作。每美元最大产出。"
-        },
-        "categories": {
-          "title": "Category System",
-          "description": "基于意图的路由。说出你需要什么 — ultrabrain、visual-engineering、quick — 正确的模型来处理。"
-        },
-        "continuity": {
-          "title": "Session Continuity",
-          "description": "Boulder 系统：中断的工作从你停下的地方精确恢复。零上下文丢失。"
-        }
+    "profiles": {
+      "eyebrow": "模型配置",
+      "title": "选意图，不选模型。",
+      "subtitle": "一个配置就是一条有序的模型链。设一次 model_profile，omo 就会用你的提供商能提供的第一个模型启动会话；在同一个键里直接写 provider/model 则固定为该模型。",
+      "capable": {
+        "name": "Capable",
+        "role": "可用的最强通用模型 — 不想纠结模型时的默认选择。",
+        "models": ["Claude Fable 5.1", "Claude Opus 5", "Kimi K3", "GLM 5.3"]
+      },
+      "simpleWork": {
+        "name": "Simple work",
+        "role": "为小而明确的修改提供快速且便宜的选择。",
+        "models": ["GPT-5.6 Luna Fast", "DeepSeek V4 Flash", "Claude Haiku 4.5"]
+      },
+      "deepWork": {
+        "name": "Deep work",
+        "role": "为难题提供最大推理能力 — 与 deep 类别使用同一条链。",
+        "models": ["GPT-6 Astra", "GPT-5.6 Sol"]
       }
+    },
+    "orchestration": {
+      "eyebrow": "编排",
+      "title": "先想，再做。",
+      "subtitle": "规划和执行是两件事。规划者不写代码；执行者只跟随已通过两位评审的计划。",
+      "planner": {
+        "name": "Ultrawork Planner",
+        "role": "/ulw-plan",
+        "model": "在主会话中运行",
+        "description": "访谈你，探索代码库，写出计划。从不写代码。",
+        "features": ["访谈模式", "多智能体代码库探索"]
+      },
+      "planConsultant": {
+        "name": "Plan Consultant",
+        "role": "缺口分析",
+        "model": "Claude Sonnet 4.6",
+        "description": "在歧义变成 bug 之前把它从计划里读出来。",
+        "features": ["缺失的需求", "未说明的假设"]
+      },
+      "planReviewer": {
+        "name": "Plan Reviewer",
+        "role": "计划评审",
+        "model": "GPT 6 Astra xHigh",
+        "description": "只有计划站得住才批准，否则退回。",
+        "features": ["对抗式评审", "OKAY 或一列理由"]
+      },
+      "executor": {
+        "name": "执行者",
+        "role": "/ulw-execute",
+        "model": "在主会话中运行",
+        "description": "在同一会话中执行已批准的计划，按类别与技能委派，亲自验证每个结果。",
+        "features": ["Boulder 状态", "独立验证"]
+      }
+    },
+    "teamMode": {
+      "eyebrow": "Team Mode · 可选开启",
+      "title": "多个智能体并排工作。",
+      "description": "一个领队智能体并行驱动一组按类别专精的成员。它们通过专用工具沟通，你在 tmux 里看着每个成员干活。",
+      "features": {
+        "lead": {
+          "title": "领队编排",
+          "description": "一个协调者，多位专家。通过 team_send_message 与 team_task_create 通信。"
+        },
+        "parallel": {
+          "title": "真正的并行",
+          "description": "最多 8 个成员同时工作，没有队列。"
+        },
+        "tmux": {
+          "title": "tmux 可视化",
+          "description": "聚焦与网格窗口：放大一个成员而不丢失全局。"
+        },
+        "tools": {
+          "title": "team_* 工具族",
+          "description": "12 个专用工具（team_create、team_status、team_send_message……），由 team_mode.enabled 控制。"
+        }
+      },
+      "optIn": "team_mode.enabled = true → restart opencode",
+      "mockup": {
+        "title": "tmux — team · grid",
+        "status": "3 个运行中",
+        "paneLead": "lead",
+        "statusLead": "team_status: 3 个成员忙碌",
+        "lineLead": "> team_task_create dashboard-ui",
+        "paneImpl": "member · visual-engineering",
+        "statusImpl": "正在编辑 app/dashboard/page.tsx",
+        "lineImpl": "> team_send_message lead \"layout done\"",
+        "paneReview": "member · ultrabrain",
+        "statusReview": "正在评审 plan.md",
+        "lineReview": "> 正在读取 14 个文件",
+        "paneTest": "member · quick",
+        "statusTest": "正在运行 e2e",
+        "lineTest": "> 42 passed",
+        "caption": "默认关闭。当工作能按人清晰拆分时再开启。"
+      }
+    },
+    "principles": {
+      "eyebrow": "设计决策",
+      "title": "生来不同。",
+      "subtitle": "决定这套框架如何行事的六个决策。",
+      "specialization": {
+        "title": "专精",
+        "description": "每个智能体只把一件事做好。技能按任务注入，而不是让一个智能体无所不知。"
+      },
+      "trustVerify": {
+        "title": "信任，但要验证",
+        "description": "编排者对一切进行独立验证。子智能体的说法不等于结果。"
+      },
+      "wisdom": {
+        "title": "经验积累",
+        "description": "每个任务的经验都会传递给本次运行中的后续任务。"
+      },
+      "modelOptimization": {
+        "title": "模型优化",
+        "description": "昂贵模型用于规划和艰难决策，便宜模型用于常规工作。"
+      },
+      "categories": {
+        "title": "类别系统",
+        "description": "基于意图的路由。说出你需要什么 — ultrabrain、visual-engineering、quick — 对应的模型来处理。"
+      },
+      "continuity": {
+        "title": "会话连续",
+        "description": "中断的工作从停下的位置精确恢复。会话之间不丢任何东西。"
+      },
+      "boulderEvidence": "$ cat boulder.json\n{ \"plan\": \"dashboard\", \"wave\": 3, \"status\": \"resuming\" }"
     },
     "reviews": {
-      "title": "开发者们怎么说",
+      "eyebrow": "来自用户",
+      "title": "开发者怎么说。",
       "review1": {
         "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
         "author": "Arthur Guiot"
       },
       "review2": {
-        "text": "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour.",
+        "text": "If Claude Code does in 7 days what a human does in 3 months, OmO does it in 1 hour.",
         "author": "B, Quant Researcher"
       },
       "review3": {
@@ -311,11 +326,34 @@
       }
     },
     "cta": {
-      "title": "别写样板代码了",
-      "subtitle": "安装 Oh My OpenAgent，让 agent 来处理。距离你的第一个 ulw 命令只需 30 秒。",
+      "eyebrow": "安装",
+      "title": "别再写样板代码。",
+      "subtitle": "安装 Oh My OpenAgent，打开项目，输入 mass ulw。再复杂的任务 — 所有模型同时工作，以图的形式。",
       "installCommand": "bunx oh-my-openagent install",
       "installNow": "立即安装",
       "readTheDocs": "阅读文档"
+    },
+    "dag": {
+      "region": "打开工作流图的 OmO 桌面端",
+      "windowTitle": "OmO — ship the dashboard",
+      "threads": "会话",
+      "thread1": "ship the dashboard",
+      "thread2": "fix flaky e2e",
+      "thread3": "migrate auth",
+      "workflow": "工作流",
+      "status": {
+        "pending": "排队",
+        "running": "运行中",
+        "completed": "已完成"
+      },
+      "assistantPlanning": "正在规划 5 个波次、10 个节点",
+      "assistantRunning": "运行中 ·",
+      "assistantDone": "运行完成 — 10/10 已验证",
+      "wave": "Wave",
+      "done": "完成",
+      "running": "运行中",
+      "fit": "适配图形",
+      "center": "定位活动波次"
     }
   },
   "docs": {
@@ -382,14 +420,14 @@
         },
         "footer": "零干预。完全自主。只看结果。"
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "方法 2",
-        "title": "Prometheus + Atlas",
+        "title": "规划器 + 执行器",
         "subtitle": "当你需要战略性控制时。",
-        "prometheusTitle": "Prometheus",
-        "prometheusDescription": "进行访谈、研究上下文并生成详细的 YAML 计划。",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "执行计划，委派给子 Agent，管理波次并跟踪进度。",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "进行访谈、研究上下文并写出详细的工作计划。",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "在同一会话中执行已批准的计划，按类别委派，管理波次并跟踪进度。",
         "footer": "你设计架构。Agent 执行。完全透明。"
       }
     },
@@ -410,16 +448,16 @@
     "coreLoop": {
       "title": "核心循环",
       "features": {
-        "prometheus": {
-          "feature": "Prometheus",
+        "planner": {
+          "feature": "规划访谈",
           "purpose": "通过智能访谈提取意图"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "计划顾问",
           "purpose": "在歧义变成 Bug 之前捕获它们"
         },
-        "momus": {
-          "feature": "Momus",
+        "planReviewer": {
+          "feature": "计划评审关卡",
           "purpose": "在执行前验证计划完整性"
         },
         "orchestrator": {

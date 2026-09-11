@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs"
-import { rm } from "node:fs/promises"
+import { existsSync } from "../fs/resilient"
+import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"

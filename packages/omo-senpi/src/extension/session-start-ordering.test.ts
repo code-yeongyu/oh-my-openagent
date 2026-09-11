@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, mock as mockFn, spyOn, test } from "bun:test"
 
-import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { createInitDeepAdvisorComponent, processStartTime } from "../components/init-deep-advisor"
 import {
   makeCoverageRepo,
@@ -47,7 +47,7 @@ describe("session_start component ordering", () => {
     const logger = createLogger()
     const scheduledFlushes: Array<() => void> = []
     const idleCoordinator = new IdleInjectionCoordinator(() => undefined, {
-      scheduleFlush: (flush) => scheduledFlushes.push(flush),
+      scheduleFlush: (flush) => { scheduledFlushes.push(flush) },
     })
     const enqueue = spyOn(idleCoordinator, "enqueue")
     const scheduleFlush = spyOn(idleCoordinator, "scheduleFlush")
@@ -70,7 +70,7 @@ describe("session_start component ordering", () => {
         runCommand: async () => ({ code: 0, stdout: activeStatus() }),
         // This fixture asserts handler ordering; seeding a real `.omo` ledger would also flip the
         // onboarding/advisor state the test pins, so the plan lookup is stubbed active instead.
-        planDirExists: () => true,
+        planExists: () => true,
       }),
     ]
     for (const component of components) await component.register(pi, componentContext)
@@ -91,7 +91,7 @@ describe("session_start component ordering", () => {
     expect(select).not.toHaveBeenCalled()
 
     // when
-    await pi.dispatch("agent_end", { type: "agent_end" }, eventCtx)
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx)
 
     // then
     expect(enqueue).toHaveBeenCalled()

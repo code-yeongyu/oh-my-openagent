@@ -1,0 +1,125 @@
+{
+  "ok": true,
+  "checks": [
+    {
+      "name": "turn-1.diagnostic-record-count",
+      "ok": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "turn-1.notification-count",
+      "ok": true,
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "name": "turn-2.diagnostic-record-count",
+      "ok": true,
+      "actual": 2,
+      "expected": 2
+    },
+    {
+      "name": "turn-2.notification-count",
+      "ok": true,
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "name": "turn-3.diagnostic-record-count",
+      "ok": true,
+      "actual": 3,
+      "expected": 3
+    },
+    {
+      "name": "turn-3.notification-count",
+      "ok": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "turn-4.diagnostic-record-count",
+      "ok": true,
+      "actual": 4,
+      "expected": 4
+    },
+    {
+      "name": "turn-4.notification-count",
+      "ok": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "turn-5.diagnostic-record-count",
+      "ok": true,
+      "actual": 4,
+      "expected": 4
+    },
+    {
+      "name": "turn-5.notification-count",
+      "ok": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "turn-6.diagnostic-record-count",
+      "ok": true,
+      "actual": 5,
+      "expected": 5
+    },
+    {
+      "name": "turn-6.notification-count",
+      "ok": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "turn-7.diagnostic-record-count",
+      "ok": true,
+      "actual": 6,
+      "expected": 6
+    },
+    {
+      "name": "turn-7.notification-count",
+      "ok": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "turn-8.diagnostic-record-count",
+      "ok": true,
+      "actual": 7,
+      "expected": 7
+    },
+    {
+      "name": "turn-8.notification-count",
+      "ok": true,
+      "actual": 2,
+      "expected": 2
+    },
+    {
+      "name": "notification-thresholds",
+      "ok": true,
+      "actual": [
+        3,
+        3
+      ],
+      "expected": [
+        3,
+        3
+      ]
+    },
+    {
+      "name": "mock-provider-exercised",
+      "ok": true,
+      "actual": true,
+      "expected": true
+    }
+  ],
+  "cleanup": [
+    "pid 89386 exited",
+    "server closed",
+    "sandbox removed"
+  ],
+  "sandboxRoot": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-senpi-qa-BnP03g"
+}

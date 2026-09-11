@@ -30,6 +30,7 @@ import {
   isTerminalRecord,
   nowIso,
   promotedBackgroundMode,
+  recordSpawnedChildSession,
   recordSpawnedPid,
 } from "./manager-helpers"
 import { createOutcomeTracker, type OutcomeTracker } from "./manager-outcome"
@@ -100,6 +101,30 @@ function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
   return join(ownerDir, digest)
 }
 
+/**
+ * The safe, structured slice of a start failure for the internal event log.
+ *
+ * `publicStartFailureMessage` reduces every failure to one fixed sentence, pinned by
+ * start-failure-security.test.ts, because `RunnerFailure.message` is stderr-derived untrusted child
+ * output and `store/redaction.ts` only redacts by KEY name - a free-text value carrying a credential
+ * would be persisted verbatim. So the message stays collapsed, and only these closed enums and
+ * numbers are recorded. `rejected_while` is captured by RpcProcessRunner BEFORE cleanup: `alive`
+ * means the command rejected while the child was live, while `exited` means the child had already
+ * supplied the real exit outcome. That ordering prevents cleanup's kill from being misreported as
+ * the rejection cause.
+ */
+function startFailureFacts(error: unknown): Record<string, unknown> | undefined {
+  if (!RunnerError.is(error)) return undefined
+  const { kind, rejected_while: rejectedWhile, exit } = error.failure
+  return {
+    failure_kind: kind,
+    ...(rejectedWhile === undefined ? {} : { rejected_while: rejectedWhile }),
+    ...(exit === undefined
+      ? {}
+      : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
+  }
+}
+
 function publicStartFailureMessage(error: unknown): string {
   try {
     if (!RunnerError.is(error)) return GENERIC_START_FAILURE_MESSAGE
@@ -139,6 +164,8 @@ class TaskManagerImpl implements TaskManager {
   readonly #released = new Map<string, number>()
   readonly #waiters = new Map<string, TaskWaiter[]>()
   readonly #background = new Set<string>()
+  readonly #evicting = new Set<string>()
+  readonly #sendCounts = new Map<string, number>()
   readonly #steering: SteeringEngine
   readonly #outcome: OutcomeTracker
 
@@ -168,6 +195,9 @@ class TaskManagerImpl implements TaskManager {
     })
     const port: SteeringPort = {
       store: options.store,
+      tryBeginSend: (taskId) => this.tryBeginSend(taskId),
+      endSend: (taskId) => this.endSend(taskId),
+      isEvicting: (taskId) => this.isEvicting(taskId),
       liveHandle: (taskId) => this.#live.get(taskId)?.handle,
       dequeuePending: (taskId) => {
         const rec = this.#tryLoad(taskId)
@@ -178,6 +208,7 @@ class TaskManagerImpl implements TaskManager {
         return removed
       },
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
+      reserveForDetachedRevive: (record) => this.#reserveForDetachedRevive(record),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       now: this.#now,
@@ -190,7 +221,8 @@ class TaskManagerImpl implements TaskManager {
       tryLoad: (taskId) => this.#tryLoad(taskId),
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
       releaseSlot: (taskId, model, epoch) => this.#releaseSlot(taskId, model, epoch),
-      settleWaiters: (taskId) => this.#settleWaiters(taskId),
+      forget: (taskId) => this.forget(taskId),
+      settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
     })
     registerLifecycleReattachPorts(options.store, {
@@ -462,6 +494,36 @@ class TaskManagerImpl implements TaskManager {
     return this.#tryLoad(taskId) ?? undefined
   }
 
+  hasPendingSends(taskId: string): boolean {
+    return (this.#sendCounts.get(taskId) ?? 0) > 0 || (this.#steering.hasPendingSends(taskId) ?? false)
+  }
+
+  tryClaimEviction(taskId: string): boolean {
+    if ((this.#sendCounts.get(taskId) ?? 0) > 0 || this.#evicting.has(taskId)) return false
+    this.#evicting.add(taskId)
+    return true
+  }
+
+  releaseEviction(taskId: string): void {
+    this.#evicting.delete(taskId)
+  }
+
+  isEvicting(taskId: string): boolean {
+    return this.#evicting.has(taskId)
+  }
+
+  tryBeginSend(taskId: string): boolean {
+    if (this.#evicting.has(taskId)) return false
+    this.#sendCounts.set(taskId, (this.#sendCounts.get(taskId) ?? 0) + 1)
+    return true
+  }
+
+  endSend(taskId: string): void {
+    const count = this.#sendCounts.get(taskId) ?? 0
+    if (count <= 1) this.#sendCounts.delete(taskId)
+    else this.#sendCounts.set(taskId, count - 1)
+  }
+
   list(scope: ListScope): readonly ListedTask[] {
     const records = this.#options.store.list().records
     const filtered = scope.scope === "all" ? records : records.filter((record) => inSession(record, scope.session_id))
@@ -535,6 +597,14 @@ class TaskManagerImpl implements TaskManager {
       stateDir: this.#options.store.stateDir,
       runners: this.#options.runners,
       rpcRunner: this.#rpcRespawnRunner,
+      beforeLaunch: () => {
+        // Respawn bypasses start's status transition; persist the same durable launch boundary
+        // without changing the status or epoch that lifecycle reattachment owns.
+        const stamped = this.#options.store.mutate(record.task_id, (fresh) =>
+          fresh.started_at === undefined ? { ...fresh, started_at: nowIso(this.#now) } : fresh,
+        )
+        if (stamped === null) throw new Error(`Task record not found before respawn: ${record.task_id}`)
+      },
       ...(this.#options.trustedRespawnLaunch === undefined
         ? {}
         : { trustedLaunch: this.#options.trustedRespawnLaunch }),
@@ -559,6 +629,8 @@ class TaskManagerImpl implements TaskManager {
         unsubscribe()
         if (this.#live.get(taskId)?.handle === attachedHandle) this.#live.delete(taskId)
       },
+      destroyAttached: (taskId: string) =>
+        (this.#options.destruction ?? NOOP_DESTRUCTION).destroyResidentTask(taskId, "revive_failure"),
       armOutcome: (fresh, attachedHandle, epoch) => {
         this.#outcome.trackOutcome(fresh.task_id, attachedHandle, fresh.model, epoch)
         void this.#steering.notifyStarted(fresh.task_id)
@@ -623,7 +695,10 @@ class TaskManagerImpl implements TaskManager {
       const message = publicStartFailureMessage(error)
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#options.store.transition(record.task_id, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
-      this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })
+      this.#options.store.appendEvent(record.task_id, {
+        type: "task_start_failed",
+        payload: { error_message: message, ...startFailureFacts(error) },
+      })
       this.#steering.dropPending(record.task_id)
       this.#settleWaiters(record.task_id)
       return { ok: false, error: message }
@@ -653,9 +728,6 @@ class TaskManagerImpl implements TaskManager {
     return { ok: true }
   }
 
-  // Persist the spawned child's OS pid onto the running record so task_output(status) and session_start
-  // reconciliation can see (and, for an orphan, signal) the live process. The pure decision lives in
-  // recordSpawnedPid; in-process children (no pid) and already-terminal records are left untouched.
   #attachChildSubscribers(taskId: string, handle: ManagedChildHandle): void {
     const subscribers = this.#childSubscribers.get(taskId)
     if (subscribers === undefined) return
@@ -669,17 +741,22 @@ class TaskManagerImpl implements TaskManager {
     }
   }
 
+  // Persist spawn-time facts onto the running record: OS pid (rpc children) and the child's own
+  // session id (both modes) so task_output, session_start reconciliation, and external readers
+  // (omo-desktop) can join a grandchild session back to this task. Pure folds live in
+  // recordSpawnedPid / recordSpawnedChildSession; already-terminal records are left untouched.
   #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
     const current = this.#tryLoad(taskId)
     if (current === null || isTerminalRecord(current)) return
     const withPid = recordSpawnedPid(current, handle.pid) ?? current
+    const withSession = recordSpawnedChildSession(withPid, handle.sessionId) ?? withPid
     const spawnSpec = handle.spawnSpec
     // A v1 spawn_spec persisted at spawn is authoritative: the rpc echo would rewrite it as the
     // legacy {cwd, extensions, member_env} shape, dropping the rebuild facts v1 carries.
     const updated: TaskRecord = spawnSpec === undefined || (current.spawn_spec !== undefined && isSpawnSpecV1(current.spawn_spec))
-      ? withPid
+      ? withSession
       : {
-          ...withPid,
+          ...withSession,
           spawn_spec: {
             cwd: spawnSpec.cwd,
             ...(spawnSpec.extensions === undefined ? {} : { extensions: spawnSpec.extensions }),
@@ -834,6 +911,12 @@ class TaskManagerImpl implements TaskManager {
         timestamp: nowIso(this.#now),
         error_message: message,
       })
+      // The primary launch path records this breadcrumb; a fallback launch that dies must not be the
+      // one failure that leaves the event log with no cause at all.
+      this.#options.store.appendEvent(context.record.task_id, {
+        type: "task_start_failed",
+        payload: { error_message: message, ...startFailureFacts(error) },
+      })
       this.#settleWaiters(context.record.task_id)
       return
     }
@@ -880,6 +963,30 @@ class TaskManagerImpl implements TaskManager {
     }
   }
 
+  #reserveForDetachedRevive(record: TaskRecord): { readonly ok: false } | { readonly ok: true; commit(): void; release(): void } {
+    const epoch = record.notification.run_epoch + 1
+    if (!this.#concurrency.tryAcquire(record.model, record.task_id, epoch)) return { ok: false }
+    let released = false
+    const release = (): void => {
+      if (released) return
+      released = true
+      this.#concurrency.releaseLease(record.task_id, epoch)
+    }
+    return {
+      ok: true,
+      release,
+      commit: () => {
+        const live = this.#live.get(record.task_id)
+        if (live === undefined) {
+          release()
+          return
+        }
+        this.#runStats.set(record.task_id, createRunStatsTracker(this.#now(), this.#now))
+        this.#outcome.trackOutcome(record.task_id, live.handle, live.model, epoch)
+      },
+    }
+  }
+
   #reserveForReattach(record: TaskRecord): { readonly ok: false } | { readonly ok: true; release(): void } {
     if (isTerminalRecord(record)) return { ok: true, release: () => undefined }
     const epoch = record.notification.run_epoch + 1
@@ -909,8 +1016,10 @@ class TaskManagerImpl implements TaskManager {
     this.#concurrency.remove(record.model, taskId)
   }
 
-  #settleWaiters(taskId: string): void {
-    const record = this.#tryLoad(taskId)
+  // `terminal` overrides the store read for the one case where the on-disk record cannot be terminal:
+  // the terminal write itself failed (#8050) and the tracker synthesized the record the waiters are owed.
+  #settleWaiters(taskId: string, terminal?: TaskRecord): void {
+    const record = terminal ?? this.#tryLoad(taskId)
     if (record === null || record === undefined || !isTerminalRecord(record)) return
     const waiters = this.#waiters.get(taskId)
     if (waiters === undefined) return

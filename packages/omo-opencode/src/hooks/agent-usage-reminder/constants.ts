@@ -15,14 +15,12 @@ export const TARGET_TOOLS = new Set([
   "context7_resolve-library-id",
   "context7_query-docs",
   "websearch_web_search_exa",
-  "context7_get-library-docs",
   "grep_app_searchgithub",
 ]);
 
 export const AGENT_TOOLS = new Set([
   "task",
   "call_omo_agent",
-  "task",
 ]);
 
 export const REMINDER_MESSAGE = `

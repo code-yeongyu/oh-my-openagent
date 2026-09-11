@@ -1,0 +1,18 @@
+COMMAND: node <built-ulw-loop-cli> hook post-tool-use-spawn
+PAYLOAD={"session_id": "gate-b-qa1", "turn_id": "t1", "transcript_path": "/dev/null", "cwd": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/st_01a080f0-hook-qa-h0bdhr0t", "hook_event_name": "PostToolUse", "model": "gpt-6-astra", "permission_mode": "default", "tool_use_id": "call-1", "tool_name": "spawn_agent", "tool_input": {"message": "scan"}, "tool_response": "AgentLimitReached"}
+EXIT=0
+STDOUT=''
+STDERR=''
+RECORDER_MARKER={"reason": "AgentLimitReached", "at": "2026-09-08T12:05:08.384Z"}
+COMMAND: node <built-ulw-loop-cli> hook pre-tool-use-spawn
+PAYLOAD={"session_id": "gate-b-qa1", "turn_id": "t1", "transcript_path": "/dev/null", "cwd": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/st_01a080f0-hook-qa-h0bdhr0t", "hook_event_name": "PreToolUse", "model": "gpt-6-astra", "permission_mode": "default", "tool_use_id": "call-1", "tool_name": "spawn_agent", "tool_input": {"message": "scan"}}
+EXIT=0
+STDOUT='{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Subagent admission failed earlier in this session (AgentLimitReached). Do not spawn more workers or reviewers; report the capacity block and wait for the user.","additionalContext":"Subagent admission failed earlier in this session (AgentLimitReached). Do not spawn more workers or reviewers; report the capacity block and wait for the user."}}\n'
+STDERR=''
+COMMAND: node <built-ulw-loop-cli> hook pre-tool-use-spawn
+PAYLOAD={"session_id": "gate-b-qa2", "turn_id": "t1", "transcript_path": "/dev/null", "cwd": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/st_01a080f0-hook-qa-h0bdhr0t", "hook_event_name": "PreToolUse", "model": "gpt-6-astra", "permission_mode": "default", "tool_use_id": "call-1", "tool_name": "spawn_agent", "tool_input": {"message": "scan"}}
+EXIT=0
+STDOUT=''
+STDERR=''
+MANUAL_QA=PASS: recorder is silent, failed-admission session denied before plan lookup, clean session silent
+LOCAL_QA_REMOVAL_RECEIPT=true

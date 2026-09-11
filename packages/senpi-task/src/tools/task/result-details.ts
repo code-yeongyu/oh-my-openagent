@@ -43,6 +43,7 @@ export function startedDetails(
   params: SingleSpawnParams,
   executionMode: ExecutionMode,
   skills?: TaskSkillSummary,
+  legacySubagentType?: string,
 ): TaskToolDetails {
   return {
     task_id: started.task_id,
@@ -52,6 +53,9 @@ export function startedDetails(
     name: started.name,
     category: params.category,
     subagent_type: params.subagent_type,
+    // Additive, in-memory only (the todo-1 pattern): the retired id the caller submitted rides
+    // next to the canonical subagent_type without widening TaskToolDetails.
+    ...(legacySubagentType !== undefined && { legacy_subagent_type: legacySubagentType }),
     execution_mode: executionMode,
     model: params.model,
     resolved_model: started.resolved_model,
@@ -67,6 +71,7 @@ export function partialDetails(
   executionMode: ExecutionMode,
   progress: ToolProgressDetails,
   skills?: TaskSkillSummary,
+  legacySubagentType?: string,
 ): TaskToolDetails & ToolProgressDetails {
-  return { ...startedDetails(started, params, executionMode, skills), ...progress }
+  return { ...startedDetails(started, params, executionMode, skills, legacySubagentType), ...progress }
 }

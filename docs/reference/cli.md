@@ -49,7 +49,7 @@ bunx oh-my-opencode
 | `worktree-sweep` | Report (and optionally remove) stale linked git worktrees: SWEEP when merged into the default branch and clean, KEEP when locked/external/unmerged/dirty, PRUNE when the path is gone. Dry-run by default; `--apply` removes with `git worktree remove` (never forced) and prunes; `--older-than <days>` adds an age fallback, `--repo <path>` is repeatable, `--json` emits machine-readable output |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
 | `update` | `lazycodex` / `lazycodex-ai` bins only: refresh the installed Codex Light edition in place (`--dry-run`, `--repo-root <path>`) |
-| `boulder` | Inspect Sisyphus boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
+| `boulder` | Inspect boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
 
@@ -83,7 +83,7 @@ bunx oh-my-openagent install
 | `--minimax-cn-coding-plan <value>` | MiniMax Coding Plan through minimaxi.com: `no`, `yes` (Ultimate only) |
 | `--minimax-coding-plan <value>` | MiniMax Coding Plan through minimax.io: `no`, `yes` (Ultimate only) |
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
-| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
+| `--codex-autonomous` | Default for Light/Both installs: writes `approval_policy = "never"` and `sandbox_mode = "danger-full-access"` (and removes a legacy top-level `network_access` key) unless `--no-codex-autonomous` is passed; passing this flag explicitly is redundant |
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
@@ -194,7 +194,6 @@ bunx oh-my-openagent run <message>
 1. `--agent`
 2. `OPENCODE_DEFAULT_AGENT`
 3. `default_run_agent` in plugin config
-4. `Sisyphus`
 
 ---
 

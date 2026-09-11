@@ -73,18 +73,12 @@ const EXPECTED_CONFIG = {
       reasoning: "xhigh",
     },
   },
-  codegraph: {
-    auto_provision: true,
-    daemon: true,
-    enabled: true,
-    telemetry: false,
-  },
   task: {
     default_concurrency: 5,
     global_concurrency: Math.max(8, availableParallelism() * 2),
     default_execution_mode: "in-process",
     max_depth: 1,
-    residency_max_children: Math.max(8, availableParallelism() * 3),
+    residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
     resume_children: true,
     team: {
       max_members: 8,

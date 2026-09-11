@@ -23,10 +23,10 @@
 | Aggregate wiring | `aggregate-{manifest,hooks,build,mcp,agents,model-catalog}.test.mjs` |
 | Bootstrap | `bootstrap-{hooks,setup,binlinks,orchestration,ps-guard}.test.mjs` |
 | Update flow | `auto-update{,-state-persistence,-restart-notice,-release-notes}.test.mjs` |
-| Migration | `migrate-codex-config.test.mjs` (1,242 LOC — densest), `migrate-omo-sot`, `multi-agent-v2-regression`, `subagent-limit-migration` |
+| Migration | `migrate-codex-config.test.mjs` (1,242 LOC — densest), `multi-agent-v2-regression`, `subagent-limit-migration` |
 | Skills sync | `sync-skills{,-codex-compatibility}.test.mjs`, `ulw-plan`/`ulw-research`/`ulw-loop` skill contracts |
 | Teammode | `teammode-{transport,communication,worktree,safety,thread-links,thread-title,archive-ambiguity}.test.mjs` |
-| Component CLIs | `component-{bundled-cli,bin-names,codegraph-mcp-smoke}.test.mjs`, `lsp-prebuild-layouts` |
+| Component CLIs | `component-{bundled-cli,bin-names}.test.mjs`, `lsp-prebuild-layouts` |
 
 ## CONVENTIONS
 

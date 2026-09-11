@@ -68,6 +68,10 @@ export type ManagerStartSpec = {
   readonly model?: string
   readonly name?: string
   readonly description?: string
+  readonly team_run_id?: string
+  readonly team_name?: string
+  readonly team_member_name?: string
+  readonly team_role?: "member"
   readonly cwd?: string
   readonly instructions?: string
   readonly allowed_subagents?: readonly string[]
@@ -211,6 +215,12 @@ export type TaskManager = {
   interruptTask(idOrName: string): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
+  hasPendingSends?(taskId: string): boolean
+  tryClaimEviction?(taskId: string): boolean
+  releaseEviction?(taskId: string): void
+  isEvicting?(taskId: string): boolean
+  tryBeginSend?(taskId: string): boolean
+  endSend?(taskId: string): void
   list(scope: ListScope): readonly ListedTask[]
   waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>
   // Live read of the manager-owned run-stats accumulator. Snapshot and live TUI surfaces need

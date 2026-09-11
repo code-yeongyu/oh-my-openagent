@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { isGpt5_5Model, isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
+import { isGpt5_5Model, isGpt6Model, isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
 import {
   getSessionAgent,
   resolveRegisteredAgentName,
@@ -32,6 +32,7 @@ function showToast(ctx: PluginInput, sessionID: string): void {
 
 function getNativeSisyphusGptVariant(model: { providerID: string; modelID: string }): string | undefined {
   if (isGpt5_5Model(model.modelID)) return "medium"
+  if (isGpt6Model(model.modelID)) return "high"
 
   const chain = AGENT_MODEL_REQUIREMENTS["sisyphus"]?.fallbackChain ?? []
   const exactMatch = chain.find((entry) =>
@@ -61,7 +62,7 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
         agentKey === "sisyphus"
         && input.model
         && modelID
-        && isGptNativeSisyphusModel(modelID)
+        && (isGptNativeSisyphusModel(modelID) || isGpt6Model(modelID))
         && output?.message
         && output.message.variant === undefined
       ) {
@@ -71,7 +72,7 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
         }
       }
 
-      if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGptNativeSisyphusModel(modelID)) {
+      if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGptNativeSisyphusModel(modelID) && !isGpt6Model(modelID)) {
         showToast(ctx, input.sessionID)
         input.agent = resolveRegisteredAgentName("hephaestus") ?? "hephaestus"
         if (output?.message) {

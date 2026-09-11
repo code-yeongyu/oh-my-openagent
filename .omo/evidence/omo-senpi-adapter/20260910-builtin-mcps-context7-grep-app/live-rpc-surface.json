@@ -1,0 +1,84 @@
+{
+"note": "three isolated live runs of the real senpi runtime in --mode rpc with the built plugin/extensions/omo.js loaded via -e; each object is the driver output",
+"runs": [
+{
+ "scenario": "anonymous",
+ "sandbox": "/tmp/omo-senpi-mcp-surface-lNfFPS",
+ "agentDir": "/tmp/omo-senpi-mcp-surface-lNfFPS/agent",
+ "context7KeyProvided": false,
+ "mcpServers": [
+  {
+   "name": "context7",
+   "toolCount": 2,
+   "status": "connected",
+   "authStatus": "unsupported"
+  },
+  {
+   "name": "grep_app",
+   "toolCount": 1,
+   "status": "connected",
+   "authStatus": "unsupported"
+  }
+ ],
+ "omoExtensionLoaded": true,
+ "realSenpiAgentDirUnchanged": true,
+ "realOmoAgentDirUnchanged": false,
+ "stderrTail": "omo-senpi ast-grep skipped: staged MCP runtime is missing {\n  component: \"ast-grep\",\n  entry: \"/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js\",\n}\n"
+}
+,
+{
+ "scenario": "placeholder",
+ "sandbox": "/tmp/omo-senpi-mcp-surface-eTokc2",
+ "agentDir": "/tmp/omo-senpi-mcp-surface-eTokc2/agent",
+ "context7KeyProvided": true,
+ "mcpServers": [
+  {
+   "name": "context7",
+   "toolCount": 2,
+   "status": "connected",
+   "authStatus": "unsupported"
+  },
+  {
+   "name": "grep_app",
+   "toolCount": 1,
+   "status": "connected",
+   "authStatus": "unsupported"
+  }
+ ],
+ "omoExtensionLoaded": true,
+ "realSenpiAgentDirUnchanged": true,
+ "realOmoAgentDirUnchanged": false,
+ "stderrTail": "omo-senpi ast-grep skipped: staged MCP runtime is missing {\n  component: \"ast-grep\",\n  entry: \"/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js\",\n}\n"
+}
+,
+{
+ "scenario": "disabled-by-mcp-json",
+ "sandbox": "/tmp/omo-senpi-mcp-surface-CYSMlf",
+ "agentDir": "/tmp/omo-senpi-mcp-surface-CYSMlf/agent",
+ "context7KeyProvided": false,
+ "mcpServers": [
+  {
+   "name": "context7",
+   "toolCount": 0,
+   "status": "disabled",
+   "authStatus": "unsupported"
+  },
+  {
+   "name": "grep_app",
+   "toolCount": 1,
+   "status": "connected",
+   "authStatus": "unsupported"
+  }
+ ],
+ "omoExtensionLoaded": true,
+ "realSenpiAgentDirUnchanged": true,
+ "realOmoAgentDirUnchanged": false,
+ "stderrTail": "omo-senpi ast-grep skipped: staged MCP runtime is missing {\n  component: \"ast-grep\",\n  entry: \"/private/tmp/ulw-d48/impl-feat/native-context7-grep-app-mcp-parity/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js\",\n}\n"
+}
+],
+"realOmoAgentDirIdleDigestControl": 
+{
+ "note": "no sandbox child running; this host IS a live OmO Native session writing into ~/.omo/agent",
+ "idleDigestStable": false
+}
+}

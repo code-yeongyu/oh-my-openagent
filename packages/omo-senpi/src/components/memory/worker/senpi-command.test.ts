@@ -4,7 +4,11 @@ import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { resolveSenpiLaunch, type SenpiLaunchRuntime } from "./senpi-command"
+import { resolveSenpiLaunch, type SenpiLaunchRuntime, withoutForeignPackageDirEnv } from "./senpi-command"
+
+// Windows resolution scans PATH for `senpi.exe`; an extension-less `senpi` there is an npm shim,
+// not an executable, so a fixture using the POSIX name proves nothing about the PATH branch.
+const SENPI_BINARY = process.platform === "win32" ? "senpi.exe" : "senpi"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) =>
@@ -20,6 +24,7 @@ async function tempRoot(): Promise<string> {
 function runtime(overrides: Partial<SenpiLaunchRuntime> = {}): SenpiLaunchRuntime {
   return {
     isBunBinary: false,
+    isCompiledEngine: false,
     execPath: process.execPath,
     platform: process.platform,
     argv: [...process.argv],
@@ -28,7 +33,97 @@ function runtime(overrides: Partial<SenpiLaunchRuntime> = {}): SenpiLaunchRuntim
   }
 }
 
+describe("withoutForeignPackageDirEnv", () => {
+  test("#given a launcher outside the package root #when the child env is built #then the package-dir variables are dropped", () => {
+    // given: the omo binary exports its own root, but the child resolves to a separate npm install
+    const engineRoot = join("/opt", "omo-runtime")
+    const env = {
+      OMO_PACKAGE_DIR: engineRoot,
+      SENPI_PACKAGE_DIR: engineRoot,
+      PATH: "/usr/bin",
+    }
+
+    // when
+    const next = withoutForeignPackageDirEnv(env, {
+      command: "/usr/local/bin/bun",
+      prefixArgs: [join("/home", "u", ".bun", "install", "global", "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")],
+    })
+
+    // then
+    expect(next.OMO_PACKAGE_DIR).toBeUndefined()
+    expect(next.SENPI_PACKAGE_DIR).toBeUndefined()
+    expect(next.PATH).toBe("/usr/bin")
+  })
+
+  test("#given the embedded engine as launcher #when the child env is built #then the package-dir variables survive", () => {
+    // given
+    const engineRoot = join("/opt", "omo-runtime")
+    const env = { OMO_PACKAGE_DIR: engineRoot, SENPI_PACKAGE_DIR: engineRoot }
+
+    // when
+    const next = withoutForeignPackageDirEnv(env, { command: join(engineRoot, "omo"), prefixArgs: [] })
+
+    // then
+    expect(next.OMO_PACKAGE_DIR).toBe(engineRoot)
+    expect(next.SENPI_PACKAGE_DIR).toBe(engineRoot)
+  })
+
+  test("#given no package-dir variables #when the child env is built #then the environment is unchanged", () => {
+    // given
+    const env = { PATH: "/usr/bin" }
+
+    // when
+    const next = withoutForeignPackageDirEnv(env, { command: "/usr/local/bin/senpi", prefixArgs: [] })
+
+    // then
+    expect(next).toEqual({ PATH: "/usr/bin" })
+  })
+})
+
 describe("resolveSenpiLaunch", () => {
+  test("#given the running engine is a compiled omo binary and PATH carries a senpi #when resolved #then the child is that same binary", async () => {
+    // given: the binary embeds the engine; the PATH senpi is a different install with its own assets
+    const root = await tempRoot()
+    const execPath = join(root, "omo")
+    const foreign = join(root, "path", SENPI_BINARY)
+    await mkdir(dirname(foreign), { recursive: true })
+    await writeFile(execPath, "")
+    await writeFile(foreign, "")
+
+    // when
+    const launch = resolveSenpiLaunch({ PATH: dirname(foreign) }, runtime({ isCompiledEngine: true, execPath }))
+
+    // then
+    expect(launch).toEqual({ command: realpathSync.native(execPath), prefixArgs: [] })
+  }, 30_000)
+
+  test("#given a compiled omo binary with no senpi on PATH, no installed CLI and no entry script #when resolved #then it still launches itself", async () => {
+    // given
+    const root = await tempRoot()
+    const execPath = join(root, "omo")
+    await writeFile(execPath, "")
+
+    // when
+    const launch = resolveSenpiLaunch({ PATH: "" }, runtime({ isCompiledEngine: true, execPath, argv: [execPath] }))
+
+    // then
+    expect(launch).toEqual({ command: realpathSync.native(execPath), prefixArgs: [] })
+  }, 30_000)
+
+  test("#given a script-hosted engine and a senpi on PATH #when resolved #then the PATH senpi is still chosen", async () => {
+    // given: the non-compiled parent keeps today's resolution order
+    const root = await tempRoot()
+    const onPath = join(root, "path", SENPI_BINARY)
+    await mkdir(dirname(onPath), { recursive: true })
+    await writeFile(onPath, "")
+
+    // when
+    const launch = resolveSenpiLaunch({ PATH: dirname(onPath) }, runtime())
+
+    // then
+    expect(launch).toEqual({ command: realpathSync.native(onPath), prefixArgs: [] })
+  }, 30_000)
+
   test("#given a Windows npm shim #when resolved #then Node launches the adjacent Senpi CLI", async () => {
     // given
     const root = await tempRoot()

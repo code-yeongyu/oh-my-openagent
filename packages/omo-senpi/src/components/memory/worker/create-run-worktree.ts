@@ -1,4 +1,4 @@
-import { mkdir, rm } from "node:fs/promises"
+import { mkdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {

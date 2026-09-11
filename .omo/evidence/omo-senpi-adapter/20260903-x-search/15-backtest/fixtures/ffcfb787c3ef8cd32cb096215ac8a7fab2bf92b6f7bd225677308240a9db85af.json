@@ -1,0 +1,210 @@
+{
+  "queryId": "q09",
+  "lane": "api-direct",
+  "variant": "v1",
+  "carrier": "fast",
+  "request": {
+    "model": "grok-4.20-0309-non-reasoning",
+    "input": [
+      {
+        "role": "user",
+        "content": "Use the x_search tool with x_keyword_search only, mode=Latest. Run exactly this query: \"xAI Grok CLI since:2026-08-30 until:2026-09-03\". Return up to 10 X posts, one per line as \"URL - one-line summary (@handle, YYYY-MM-DD)\". Posts only, no commentary."
+      }
+    ],
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-30",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "tool_choice": "required",
+    "max_turns": 1,
+    "parallel_tool_calls": false,
+    "max_output_tokens": "<redacted>",
+    "store": false
+  },
+  "status": "ok",
+  "response": {
+    "created_at": 1788421415,
+    "completed_at": 1788421415,
+    "id": "0a483913-ea4a-9289-af5c-01478b26beb1",
+    "max_output_tokens": "<redacted>",
+    "model": "grok-4.20-0309-non-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "call_id": "xs_call-607fd5c9-902d-4f17-82dc-497b06b73044-0",
+        "input": "{\"query\":\"xAI Grok CLI since:2026-08-30 until:2026-09-03\",\"limit\":\"10\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_0a483913-ea4a-9289-af5c-01478b26beb1_call-607fd5c9-902d-4f17-82dc-497b06b73044-0",
+        "status": "completed"
+      },
+      {
+        "id": "tco_0a483913-ea4a-9289-af5c-01478b26beb1_call-607fd5c9-902d-4f17-82dc-497b06b73044-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "https://x.com/grok/status/2095246132909625411 - Grok Build CLI authenticates with SuperGrok or X Premium+ (or XAI_API_KEY); Cursor subs don't unlock standalone CLI (@grok, 2026-09-02)\nhttps://x.com/grok/status/2095161786462855169 - Grok 4.6 in official Grok Build CLI with plan/act modes and slash commands; Cline supports xAI models (@grok, 2026-09-02)\nhttps://x.com/aloft_ai/status/2095152666330505612 - Grok Build CLI lacks Fast Mode while Cursor Pro+ has speed flag and API has priority tier (@aloft_ai, 2026-09-02)\nhttps://x.com/cgnot996/status/2094831268785791080 - Grok App is open-source desktop workbench for local Grok Build CLI with sessions/plugins/MCP (@cgnot996, 2026-09-01)\nhttps://x.com/grok/status/2094777884137209977 - Grok Build CLI sessions saved locally in ~/.grok/sessions/; use grok sessions list/export for transcripts (@grok, 2026-09-01)\nhttps://x.com/showmybrain/status/2094774420921549215 - How to use grok cli through cpa with multiple accounts via specific env var order and logout (@showmybrain, 2026-09-01)\nhttps://x.com/russwyte/status/2094754181500346596 - Grok's Beard is VS Code/Cursor client for Grok CLI with sidebar chat and review-before-write (@russwyte, 2026-09-01)\nhttps://x.com/posterly_/status/2094712559408722048 - Grok Imagine joins AI Images and AI Video in v1.88.0 with same storage/credits/API/MCP/CLI workflow (@posterly_, 2026-09-01)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094774420921549215",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094774420921549215"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095152666330505612",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095152666330505612"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094712559408722048",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094712559408722048"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095161786462855169",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095161786462855169"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2095246132909625411",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2095246132909625411"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094754181500346596",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094754181500346596"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094777884137209977",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094777884137209977"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2094831268785791080",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2094831268785791080"
+              }
+            ]
+          }
+        ],
+        "id": "msg_0a483913-ea4a-9289-af5c-01478b26beb1",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": false,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "required",
+    "tools": [
+      {
+        "type": "x_search",
+        "from_date": "2026-08-30",
+        "to_date": "2026-09-03"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": "<redacted>",
+      "input_tokens_details": "<redacted>",
+      "output_tokens": "<redacted>",
+      "output_tokens_details": "<redacted>",
+      "total_tokens": "<redacted>",
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 1,
+      "cost_in_usd_ticks": 94884500,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 1,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": "<redacted>",
+        "output_tokens": "<redacted>"
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {
+      "system_fingerprint": "fp_e309ea75b5"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "errors": [],
+  "usage": {
+    "input_tokens": "<redacted>",
+    "input_tokens_details": "<redacted>",
+    "output_tokens": "<redacted>",
+    "output_tokens_details": "<redacted>",
+    "total_tokens": "<redacted>",
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 94884500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0,
+      "image_generation_calls": 0
+    },
+    "context_details": {
+      "input_tokens": "<redacted>",
+      "output_tokens": "<redacted>"
+    }
+  },
+  "recordedAt": "2026-09-03T07:43:35.282Z"
+}

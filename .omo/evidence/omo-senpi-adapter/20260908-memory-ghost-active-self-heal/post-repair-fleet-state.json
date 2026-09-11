@@ -1,0 +1,19 @@
+{
+  "sisyphuslabs-d5fbf349": {
+    "systemHumanMdBytes": {
+      "before": 121041,
+      "after": 3163
+    },
+    "systemTokenEstimate": {
+      "before": 31834,
+      "after": 2532,
+      "advisory": 30000,
+      "pressureThreshold": 24000
+    },
+    "completionRecordsPostRepair": 15,
+    "note": "12 step-count reflection runs completed within 20 minutes of the repair (several merged); pressure resolved by the normal pipeline"
+  },
+  "userdata-a676c9d8": {
+    "note": "runs 6-13 processed post-repair incl. a restart-mid-reservation reclaim (run-8 superseded; run-10 live under the new desktop server)"
+  }
+}

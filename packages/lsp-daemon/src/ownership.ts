@@ -141,9 +141,9 @@ async function validateExistingOwner(
 		}
 		if (ping) continue;
 		if (isProcessAlive(owner.pid)) throw new DaemonStartupDeferredError("owner_pid_live_unreachable");
+		// Compare the two file reads only: a live socket stat drifts across reboots (st_dev, tmpfs) while the pid is dead.
 		const reread = readDaemonOwner(paths);
-		const endpoint = endpointIdentity(owner.endpoint.path);
-		if (!reread || reread.nonce !== owner.nonce || !sameEndpoint(endpoint, owner.endpoint)) {
+		if (!reread || !sameOwner(reread, owner)) {
 			throw new DaemonStartupDeferredError("owner_changed_during_cleanup");
 		}
 		cleanupDeadOwner(paths, owner);

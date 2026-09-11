@@ -1,34 +1,28 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import Image from "next/image"
-import { Section } from "@/components/ui/section"
+import { LedgerRow } from "@/components/ledger/ledger-row"
+import { ManifestoSection } from "@/components/manifesto/manifesto-section"
+
+const PRINCIPLES = [
+  { key: "predictable", index: "01" },
+  { key: "continuous", index: "02" },
+  { key: "delegatable", index: "03" },
+] as const
 
 export async function PrinciplesSection(): Promise<JSX.Element> {
   const t = await getTranslations("manifesto")
-  const principles = ["predictable", "continuous", "delegatable"] as const
 
   return (
-    <Section data-section="manifesto-principles" className="mx-auto max-w-6xl">
-      <div className="grid gap-8 md:grid-cols-3">
-        {principles.map((key) => (
-          <div
-            key={key}
-            className="bg-secondary/10 border-border/30 rounded-xl border p-6 text-center transition-colors"
-          >
-            <div className="mb-4 flex justify-center">
-              <Image
-                src={`/images/${key}.png`}
-                alt={key}
-                width={64}
-                height={64}
-                className="rounded-lg"
-              />
-            </div>
-            <h3 className="mb-3 text-xl font-bold">{t(`principles.${key}.title`)}</h3>
-            <p className="text-muted-foreground">{t(`principles.${key}.description`)}</p>
-          </div>
+    <ManifestoSection data-section="manifesto-principles">
+      <div className="[&>*:first-child]:border-t-0">
+        {PRINCIPLES.map(({ key, index }) => (
+          <LedgerRow key={key} index={index} title={t(`principles.${key}.title`)}>
+            <p className="max-w-[68ch] text-base leading-[1.6]">
+              {t(`principles.${key}.description`)}
+            </p>
+          </LedgerRow>
         ))}
       </div>
-    </Section>
+    </ManifestoSection>
   )
 }

@@ -26,6 +26,24 @@ describe("createPluginDispose", () => {
     expect(shutdownSpy).toHaveBeenCalledTimes(1)
   })
 
+  test("#given plugin with a TUI mirror #when dispose() is called #then the mirror is stopped", async () => {
+    // given
+    const tuiStateMirror = { stop: (): void => {} }
+    const stopSpy = spyOn(tuiStateMirror, "stop")
+    const dispose = createPluginDispose({
+      backgroundManager: { shutdown: async (): Promise<void> => {} },
+      skillMcpManager: { disconnectAll: async (): Promise<void> => {} },
+      tuiStateMirror,
+      disposeHooks: (): void => {},
+    })
+
+    // when
+    await dispose()
+
+    // then
+    expect(stopSpy).toHaveBeenCalledTimes(1)
+  })
+
   test("#given plugin with active MCP connections #when dispose() is called #then skillMcpManager.disconnectAll() is called", async () => {
     // given
     const backgroundManager = {

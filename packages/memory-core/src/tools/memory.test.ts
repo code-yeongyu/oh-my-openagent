@@ -71,6 +71,27 @@ async function git(repo: GitMemoryRepo, args: string[]): Promise<string> {
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
 describe("runMemoryTool", () => {
+  it("#given a codex patch #when apply_patch runs #then it applies and commits through the memory tool", async () => {
+    const setup = await fixture()
+    const result = await run(setup, {
+      command: "apply_patch",
+      reason: "add patch note",
+      input: [
+        "*** Begin Patch",
+        "*** Add File: reference/patch.md",
+        "+---",
+        "+description: Patch note",
+        "+---",
+        "+written through memory",
+        "*** End Patch",
+      ].join("\n"),
+    })
+
+    expect(result.message).toMatch(/^Memory apply_patch committed locally \([0-9a-f]{7}\)\.$/)
+    expect(await body(setup.repo, "reference/patch.md")).toBe("written through memory")
+    expect(setup.domains).toEqual(["memory-write"])
+  })
+
   it("#given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local", async () => {
     const setup = await fixture()
     const result = await run(setup, {

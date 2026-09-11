@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { mapOmoConfigAgents } from "./omo-config-agents"
+import { decideDepthPolicy } from "../manager/depth-policy"
+
+import { legacyOmoConfigAgentKeys, mapOmoConfigAgents } from "./omo-config-agents"
 
 function config(agents: NonNullable<OmoConfig["agents"]>): OmoConfig {
   return { agents }
@@ -81,5 +83,88 @@ describe("mapOmoConfigAgents", () => {
 
     // then
     expect(agents).toEqual({})
+  })
+})
+describe("mapOmoConfigAgents legacy keys", () => {
+  test("#given a legacy omo.json agent key #when mapped #then it lands on the canonical key", () => {
+    // given
+    const source = config({ momus: { prompt: "You are a reviewer." } })
+
+    // when
+    const agents = mapOmoConfigAgents(source)
+
+    // then
+    expect(Object.keys(agents)).toEqual(["plan-reviewer"])
+    expect(agents["plan-reviewer"]).toMatchObject({ name: "plan-reviewer", prompt: "You are a reviewer." })
+  })
+
+  test("#given both the legacy and the canonical key #when mapped #then the canonical definition wins", () => {
+    // given
+    const source = config({
+      momus: { prompt: "You are the legacy reviewer." },
+      "plan-reviewer": { prompt: "You are the canonical reviewer." },
+    })
+
+    // when
+    const agents = mapOmoConfigAgents(source)
+
+    // then
+    expect(Object.keys(agents)).toEqual(["plan-reviewer"])
+    expect(agents["plan-reviewer"]).toMatchObject({ name: "plan-reviewer", prompt: "You are the canonical reviewer." })
+  })
+
+  test("#given allowed_subagents naming a legacy id #when mapped #then every entry is canonicalized", () => {
+    // given
+    const source = config({ foreman: { allowed_subagents: ["momus", "metis", "explore"] } })
+
+    // when
+    const agents = mapOmoConfigAgents(source)
+
+    // then
+    expect(agents.foreman?.allowedSubagents).toEqual(["plan-reviewer", "plan-consultant", "explore"])
+  })
+})
+
+describe("legacyOmoConfigAgentKeys", () => {
+  test("#given a config with legacy keys #when listed #then each legacy key pairs with its canonical key", () => {
+    // given
+    const source = config({
+      momus: {},
+      metis: {},
+      "plan-reviewer": {},
+      explore: {},
+    })
+
+    // when
+    const pairs = legacyOmoConfigAgentKeys(source)
+
+    // then
+    expect(pairs).toEqual([
+      { legacy: "metis", canonical: "plan-consultant" },
+      { legacy: "momus", canonical: "plan-reviewer" },
+    ])
+  })
+
+test("#given allowed_subagents naming a legacy id #when the depth policy runs against the canonical target #then the canonical entry admits it", () => {
+    // given
+    const source = config({ foreman: { allowed_subagents: ["momus"], max_depth: 1 } })
+    const agents = mapOmoConfigAgents(source)
+
+    // when: a child targets the canonical id at a depth beyond maxDepth
+    const decision = decideDepthPolicy({
+      childDepth: 5,
+      maxDepth: 1,
+      targetAgentType: "plan-reviewer",
+      allowedSubagents: agents.foreman?.allowedSubagents,
+    })
+
+    // then: the canonicalized entry admits it
+    expect(decision).toEqual({ allowed: true, reason: "allowed-subagent" })
+  })
+
+  test("#given a config with only canonical keys #when listed #then the result is empty", () => {
+    // given / when / then
+    expect(legacyOmoConfigAgentKeys(config({ "plan-reviewer": {}, explore: {} }))).toEqual([])
+    expect(legacyOmoConfigAgentKeys({})).toEqual([])
   })
 })

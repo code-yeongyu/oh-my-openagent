@@ -17,6 +17,7 @@ import { type UlwLoopScope, ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { addUlwLoopGoal, createUlwLoopPlan, startNextUlwLoop, summarizeUlwLoopPlan } from "./plan-crud.js";
 import { readUlwLoopPlan } from "./plan-io.js";
 import { recordFinalReviewBlockers } from "./review-blockers.js";
+import { statusNextActions } from "./status-next-actions.js";
 import { steerUlwLoop } from "./steering.js";
 import { steerUlwLoopBatch } from "./steering-batch.js";
 import type { UlwLoopItem } from "./types.js";
@@ -73,6 +74,7 @@ export async function status(repoRoot: string, json: boolean, scope?: UlwLoopSco
 			plan,
 			summary: summarizeUlwLoopPlan(plan),
 			...(currentAttemptDir === undefined ? {} : { currentAttemptDir }),
+			nextActions: statusNextActions(plan),
 		});
 	} else printStatus(plan);
 	return 0;
@@ -201,6 +203,8 @@ export async function reviewBlockers(
 			blockedGoal: result.blockedGoal,
 			goal: result.newGoal,
 			ledgerEntries: result.ledgerEntries,
+			nextActions: result.nextActions,
+			warnings: result.warnings,
 			summary: summarizeUlwLoopPlan(result.plan),
 		});
 	} else {

@@ -1,5 +1,12 @@
 import { isAbsolute, join, relative, sep } from "node:path";
-import { ULW_LOOP_BRIEF, ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER } from "./types.js";
+import {
+	ULW_LOOP_BRIEF,
+	ULW_LOOP_DIR,
+	ULW_LOOP_GOALS,
+	ULW_LOOP_LEDGER,
+	ULW_LOOP_STATE_LOCK,
+	UlwLoopError,
+} from "./types.js";
 
 export interface UlwLoopScope {
 	readonly sessionId?: string | null;
@@ -63,6 +70,12 @@ export function ulwLoopLedgerPath(repoRoot: string, scope?: UlwLoopScope): strin
 	return join(ulwLoopDir(repoRoot, scope), ULW_LOOP_LEDGER);
 }
 
+// One lock per state directory covers goals.json, ledger.jsonl, and the hook
+// counters beside them; the CLI mutations and the Codex hooks all take it.
+export function ulwLoopStateLockPath(repoRoot: string, scope?: UlwLoopScope): string {
+	return join(ulwLoopDir(repoRoot, scope), ULW_LOOP_STATE_LOCK);
+}
+
 export function repoRelative(absolutePath: string, repoRoot: string): string {
 	const slashPrefix = `${repoRoot}/`;
 	const backslashPrefix = `${repoRoot}\\`;
@@ -73,9 +86,17 @@ export function repoRelative(absolutePath: string, repoRoot: string): string {
 }
 
 // Both the status --json emitter and the checkpoint enforcement resolve the attempt dir through
-// this function; a second resolution path would let the gate reject its own advertised directory.
+// this function from the scope alone; a second resolution path (env, a literal placeholder)
+// would let the gate reject its own advertised directory.
 export function ulwLoopAttemptEvidenceDir(goalId: string, attempt: number, scope?: UlwLoopScope): string {
-	const sessionId = normalizeUlwLoopSessionId(scope?.sessionId) ?? resolveUlwLoopSessionIdFromEnv() ?? "session";
+	const sessionId = normalizeUlwLoopSessionId(scope?.sessionId);
+	if (sessionId === null) {
+		throw new UlwLoopError(
+			`Evidence for ${goalId} attempt ${attempt} needs a session scope; pass --session-id <id> so the attempt directory lives under .omo/evidence/ulw/<id>/.`,
+			"ULW_LOOP_SESSION_SCOPE_REQUIRED",
+			{ details: { goalId, attempt } },
+		);
+	}
 	return `.omo/evidence/ulw/${sessionId}/${goalId}/a${attempt}`;
 }
 

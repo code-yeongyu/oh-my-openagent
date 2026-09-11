@@ -135,6 +135,11 @@ describe("getHephaestusPromptSource", () => {
     expect(source2).toBe("gpt-5-5");
   });
 
+  test("returns 'gpt-5-6' for GPT-6 Astra models", () => {
+    expect(getHephaestusPromptSource("openai/gpt-6-astra")).toBe("gpt-5-6")
+    expect(getHephaestusPromptSource("github-copilot/gpt-6-astra-fast")).toBe("gpt-5-6")
+  })
+
   test("returns 'gpt-5-6' for gpt-5.6 family models", () => {
     // given
     const model1 = "openai/gpt-5.6";

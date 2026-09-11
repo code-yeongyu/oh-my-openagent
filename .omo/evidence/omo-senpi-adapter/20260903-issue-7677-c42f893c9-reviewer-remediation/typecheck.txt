@@ -1,0 +1,3 @@
+Command: bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+Source head: c42f893c953df103a38c42820568ccde34fcc215
+Exit: 0

@@ -3,16 +3,17 @@ import { join } from "node:path"
 
 import { parseJsoncSafe } from "./jsonc-parser"
 import { getOpenCodeConfigPaths } from "./opencode-config-dir"
+import { getPluginEntryName, type PluginEntry } from "./plugin-entry-shape"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
 
 interface OpenCodeConfig {
-  plugin?: string[]
+  plugin?: PluginEntry[]
 }
 
 export interface LegacyPluginCheckResult {
   hasLegacyEntry: boolean
   hasCanonicalEntry: boolean
-  legacyEntries: string[]
+  legacyEntries: PluginEntry[]
   configPath: string | null
 }
 
@@ -32,12 +33,14 @@ function getOpenCodeConfigPath(overrideConfigDir?: string): string | null {
   return null
 }
 
-function isLegacyPluginEntry(entry: string): boolean {
-  return entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+function isLegacyPluginEntry(entry: PluginEntry): boolean {
+  const name = getPluginEntryName(entry)
+  return name === LEGACY_PLUGIN_NAME || name.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
-function isCanonicalPluginEntry(entry: string): boolean {
-  return entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)
+function isCanonicalPluginEntry(entry: PluginEntry): boolean {
+  const name = getPluginEntryName(entry)
+  return name === PLUGIN_NAME || name.startsWith(`${PLUGIN_NAME}@`)
 }
 
 export function checkForLegacyPluginEntry(overrideConfigDir?: string): LegacyPluginCheckResult {

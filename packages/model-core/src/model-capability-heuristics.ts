@@ -40,6 +40,14 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     supportsTemperature: false,
   },
   {
+    family: "gpt-6",
+    includes: ["gpt-6"],
+    variants: ["low", "medium", "high", "xhigh", "max"],
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    reasoningEffortAliases: { none: "low", minimal: "low" },
+    supportsTemperature: false,
+  },
+  {
     family: "gpt-5",
     includes: ["gpt-5"],
     variants: ["low", "medium", "high", "xhigh"],

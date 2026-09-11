@@ -7,8 +7,8 @@
 // removes. Deletion is never allowed to rewrite or fail a published outcome: an unlink error
 // warns and stops there, and ENOENT is success.
 
-import { existsSync } from "node:fs"
-import { readdir, rm } from "node:fs/promises"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import { describe } from "./facts-run-storage"

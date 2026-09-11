@@ -70,6 +70,9 @@ export async function runMcpStdioServer(input: Readable, output: Writable, optio
     output,
     handler: handleGitBashMcpRequest,
     handlerOptions: options,
+    // Idle stays disabled: the codex host (win32) only auto-reconnects its own
+    // codex_apps server; an exited user-configured stdio server stays down
+    // until codex restarts, so an idle kill would break a live session.
     idleTimeoutMs: 0,
     parentWatchdog: options.parentWatchdog ?? {},
     log: options.lifecycleLog,

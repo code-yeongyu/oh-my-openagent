@@ -6,6 +6,7 @@ import type { UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "../src/t
 
 const NOW = "2026-05-23T00:00:00.000Z";
 const FINAL_REVIEW_ROLES = ["lazycodex-code-reviewer", "lazycodex-qa-executor", "lazycodex-gate-reviewer"] as const;
+const SENPI_REVIEW_ROLES = ["omo-senpi-code-reviewer", "omo-senpi-qa-executor", "omo-senpi-gate-reviewer"] as const;
 const QUALITY_GATE_SECTIONS = ["codeReview", "manualQa", "gateReview", "iteration", "criteriaCoverage"] as const;
 
 function makeCriterion(overrides: Partial<UlwLoopSuccessCriterion> = {}): UlwLoopSuccessCriterion {
@@ -92,6 +93,40 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 		expect(text).toContain("update_goal");
 		expect(text).toContain("record-review-blockers");
 		expect(text).toContain("checkpoint");
+	});
+
+	it("#given a final story on the omo-senpi surface #when rendering instructions #then teaches the single-gate category chain", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: true,
+			surface: "omo-senpi",
+		});
+
+		expectTextToContainAll(text, [
+			"main-session",
+			'category: "deep"',
+			"unspecified-high",
+			"unspecified-low",
+			"gateReview.by",
+			"category:<name>",
+			"--print-template",
+		]);
+		for (const role of [...FINAL_REVIEW_ROLES, ...SENPI_REVIEW_ROLES]) expect(text).not.toContain(role);
+		expect(text).toMatch(/model_unavailable/);
+		expect(text).not.toContain("attempted_chain");
+	});
+
+	it("#given a final story with the explicit lazycodex surface #when rendering instructions #then keeps the lazycodex reviewers", () => {
+		const { text } = buildCodexGoalInstruction({
+			plan: makePlan({ codexGoalMode: "aggregate" }),
+			goal: makeGoal(),
+			isFinal: true,
+			surface: "lazycodex",
+		});
+
+		expectTextToContainAll(text, FINAL_REVIEW_ROLES);
+		for (const role of SENPI_REVIEW_ROLES) expect(text).not.toContain(role);
 	});
 
 	it("#given a scoped plan #when rendering final commands #then includes the session id option", () => {

@@ -193,9 +193,10 @@ type RuntimeFixtureOptions = {
   readonly coordinator?: IdleInjectionCoordinator
   readonly attach?: boolean
   readonly awaitAttach?: boolean
-  // Session id the fixture's engine reports; defaults to the module-wide sessionId. An adoption
-  // test attaches under a DIFFERENT id to model fork/compaction/restart re-homing (#7316).
+  // A fork attaches under a different id; its own session file header declares the source.
   readonly sessionId?: string
+  readonly sessionFile?: string
+  readonly startEvent?: { readonly reason: "fork"; readonly previousSessionFile: string }
 }
 
 type RuntimeFixture = {
@@ -240,7 +241,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   engine.runtime.captureFrom({
     mode: "tui",
     ui: fakeUi(widgetCalls),
-    sessionManager: { getSessionId: () => options.sessionId ?? sessionId },
+    sessionManager: { getSessionId: () => options.sessionId ?? sessionId, getSessionFile: () => options.sessionFile },
     isIdle: () => options.idle ?? false,
   })
   const bridgeTimers = new ManualTimers()
@@ -260,7 +261,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   } finally {
     createStore.mockRestore()
   }
-  const attached = options.attach === false ? Promise.resolve() : runtime.attach()
+  const attached = options.attach === false ? Promise.resolve() : runtime.attach(options.startEvent)
   if (options.attach !== false && options.awaitAttach !== false) await attached
 
   return {
@@ -314,9 +315,8 @@ function events(fixture: RuntimeFixture, runId: DagRunId): readonly DagRunEvent[
   return fixture.runtime.manager.history({ runId, parentSessionId: sessionId, limit: 256 }).events
 }
 
-function pauseForShutdown(runtime: DagRuntime): void {
-  const candidate: Partial<Pick<DagRuntime, "pauseForShutdown">> = runtime
-  candidate.pauseForShutdown?.()
+async function pauseForShutdown(runtime: DagRuntime): Promise<void> {
+  await runtime.pauseForShutdown()
 }
 
 async function seedPendingRun(project: string, runId: DagRunId): Promise<void> {
@@ -466,7 +466,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const first = await runtimeFixture({ project, attach: false })
 
     // when
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
 
     // then
@@ -497,26 +497,34 @@ describe("assembled DAG lifecycle end to end", () => {
     restarted.runtime.dispose()
   })
 
-  test("#given a paused run whose owner session is gone #when a fresh session id attaches over a dead lease #then it adopts, re-homes, and completes the run", async () => {
+  test("#given a paused run whose owner session is gone #when its fork attaches over a dead lease #then it adopts, re-homes, and completes the run", async () => {
     // given a run paused by its original session, whose process has since died (#7316)
     const project = fs.mkdtempSync(join(tmpdir(), "omo-dag-lifecycle-adopt-"))
     cleanupRoots.push(project)
     const runId = "dag-lifecycle-adopt" as DagRunId
     await seedPendingRun(project, runId)
     const first = await runtimeFixture({ project, attach: false })
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
     if (paused === null) throw new Error("expected paused checkpoint")
     store.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
 
-    // when a session with a NEW id attaches (fork / compaction / restart under a new id)
+    const previousSessionFile = join(project, "fork-source.jsonl")
+    fs.writeFileSync(previousSessionFile, JSON.stringify({ type: "session", id: sessionId }) + "\n")
+    const adopterSessionFile = join(project, "fork-adopter.jsonl")
+    fs.writeFileSync(adopterSessionFile, JSON.stringify({ type: "session", id: "session-adopter", parentSession: previousSessionFile }) + "\n")
+
+    // when a real fork from the paused source attaches under a new id
     const adopterRunner = new ControlledRunner()
-    const adopter = await runtimeFixture({ project, runner: adopterRunner, sessionId: "session-adopter", awaitAttach: false })
+    const adopter = await runtimeFixture({
+      project, runner: adopterRunner, sessionId: "session-adopter", sessionFile: adopterSessionFile, awaitAttach: false,
+      startEvent: { reason: "fork", previousSessionFile },
+    })
     const adopted = await Promise.race([
       adopterRunner.whenStarted(1).then(() => true),
-      // Today attach resolves WITHOUT adopting the foreign run, so the race falls through false.
+      // Skipping the source resolves attach without starting its node.
       adopter.attached.then(() => false),
     ])
 
@@ -539,7 +547,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const runId = "dag-lifecycle-first-snapshot" as DagRunId
     await seedPendingRun(project, runId)
     const first = await runtimeFixture({ project, attach: false })
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
@@ -636,7 +644,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const first = await fixture.start("wake-first")
@@ -667,7 +675,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const runId = await fixture.start("wake-detached")

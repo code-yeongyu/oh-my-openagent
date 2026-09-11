@@ -119,7 +119,7 @@ describe("playwright browser skill facade", () => {
 
   test("#given agent-browser source markdown #when exposed through the split skill #then frontmatter is stripped and tool markers stay stable", async () => {
     // given
-    const agentBrowserSkillFile = await Bun.file("packages/omo-opencode/src/features/builtin-skills/agent-browser/SKILL.md").text()
+    const agentBrowserSkillFile = await Bun.file("packages/skills-loader-core/src/features/builtin-skills/agent-browser/SKILL.md").text()
     const { data, body, hadFrontmatter } = parseFrontmatter<{ readonly name: string; readonly description: string }>(agentBrowserSkillFile)
 
     // when

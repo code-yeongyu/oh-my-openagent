@@ -3,7 +3,6 @@
  *
  * Routing logic:
  * 1. Planner agents (prometheus, plan) → planner.ts
- * 2. GPT 5.4 models → gpt5.4.ts
  * 3. Gemini models → gemini.ts
  * 4. GLM models → glm.ts
  * 5. Everything else (Claude, etc.) → default.ts

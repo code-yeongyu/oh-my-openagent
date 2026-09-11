@@ -79,11 +79,11 @@ Token efficiency matters. But not at the cost of work quality or human cognitive
 
 Two approaches achieve this:
 
-### Approach 1: Prometheus (Interview Mode)
+### Approach 1: /ulw-plan (Interview Mode)
 
 You say: "I want to add authentication."
 
-Prometheus:
+The Ultrawork Planner:
 - Researches your codebase to understand existing patterns
 - Asks clarifying questions based on actual findings
 - Surfaces edge cases you hadn't considered
@@ -125,7 +125,7 @@ The output should be consistent. Not random, not surprising, not "creative" in w
 ### Continuous
 
 Work should survive interruptions:
-- Session crash on a Prometheus plan? Resume with `/ulw-execute` (Atlas + boulder). Otherwise use `/handoff` for a new session or `/goal resume` for a paused goal
+- Session crash on a ulw-plan work plan? Resume with `/ulw-execute` (the main agent picks the work plan back up in the same session, tracked by boulder). Otherwise use `/handoff` for a new session or `/goal resume` for a paused goal
 - Need to step away? Progress is tracked
 - Multi-day project? Context is preserved
 
@@ -138,7 +138,7 @@ Just like you can assign a task to a capable team member and trust them to handl
 This means:
 - Clear acceptance criteria, verified independently
 - Self-correcting behavior when something goes wrong
-- Escalation (to Oracle, to user) only when truly needed
+- Escalation (to the architect consult, to the user) only when truly needed
 - Complete work, not "mostly done"
 
 ---
@@ -156,9 +156,9 @@ Everything in Oh My OpenAgent is designed to make this loop work:
 
 | Feature | Purpose |
 |---------|---------|
-| Prometheus | Extract intent through intelligent interview |
-| Metis | Catch ambiguities before they become bugs |
-| Momus | Verify plans are complete before execution |
+| Ultrawork Planner | Extract intent through intelligent interview |
+| Plan Consultant | Catch ambiguities before they become bugs |
+| Plan Reviewer | Verify plans are complete before execution |
 | Orchestrator | Coordinate work without human micromanagement |
 | Todo Continuation | Force completion, prevent "I'm done" lies |
 | Category System | Route to optimal model without human decision |

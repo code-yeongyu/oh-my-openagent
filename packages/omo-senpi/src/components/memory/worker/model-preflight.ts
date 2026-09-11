@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { stat } from "node:fs/promises"
+import { stat } from "@oh-my-opencode/memory-core/fs"
 
 import type { SenpiLauncher } from "@oh-my-opencode/senpi-task"
 
@@ -25,10 +25,6 @@ export type ModelPreflightResult =
   | {
       readonly kind: "filtered"
       readonly candidates: MemoryModelChain
-      readonly rejected: readonly ModelPreflightRejection[]
-    }
-  | {
-      readonly kind: "none_visible"
       readonly rejected: readonly ModelPreflightRejection[]
     }
   | {
@@ -76,9 +72,14 @@ export async function preflightMemoryModels(input: ModelPreflightInput): Promise
     .filter((candidate) => !visible.has(candidate.model))
     .map((candidate): ModelPreflightRejection => ({ model: candidate.model, cause: "model_not_visible" }))
   if (candidates.length === 0) {
-    return current === undefined
-      ? { kind: "none_visible", rejected }
-      : { kind: "unavailable", candidates: input.candidates }
+    // A parseable catalog that lists none of the candidates is not proof the child cannot run
+    // them: `--list-models` in the discovery-disabled child intermittently omits whole providers
+    // (#7923), and the cached-negative branch already treats the same snapshot as inconclusive.
+    // The reactive `model_not_visible` classifier makes the final call after a real spawn.
+    input.warn?.("memory child model catalog omits every candidate; falling back to reactive model retries", {
+      rejected,
+    })
+    return { kind: "unavailable", candidates: input.candidates }
   }
   return { kind: "filtered", candidates: asMemoryModelChain(candidates), rejected }
 }

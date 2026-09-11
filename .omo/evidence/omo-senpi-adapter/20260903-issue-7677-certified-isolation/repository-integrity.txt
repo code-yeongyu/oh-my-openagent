@@ -1,0 +1,35 @@
+Reviewed exact head: d2489baeeb51973d456d0f6ea06b758a75961a81
+Original source fix commit: a0aff6422546ac1267b88dd1b0ff8144421e5483
+Certified source head: 509929c8266467ce1a8a07f4ea5a027461436149
+Reviewed-head source identity: d2489baeeb51973d456d0f6ea06b758a75961a81 is evidence-only relative to a0aff6422546ac1267b88dd1b0ff8144421e5483 for all source-bearing paths.
+
+Actual ancestry verification for the reviewed head:
+  git merge-base d2489baeeb51973d456d0f6ea06b758a75961a81 origin/dev
+  output: 05a1fbcc7ce310734d6646cdee2d80855bdb3506
+  git merge-base --is-ancestor 05a1fbcc7ce310734d6646cdee2d80855bdb3506 d2489baeeb51973d456d0f6ea06b758a75961a81
+  exit: 0
+
+Source-only identity verification for the reviewed evidence refresh:
+  git diff --name-only a0aff6422546ac1267b88dd1b0ff8144421e5483 d2489baeeb51973d456d0f6ea06b758a75961a81 -- packages script scripts package.json bun.lock patches .github/workflows
+  output: (empty)
+  exit: 0
+
+Restricted checks from the actual origin/dev ancestor 05a1fbcc7ce310734d6646cdee2d80855bdb3506 through reviewed head d2489baeeb51973d456d0f6ea06b758a75961a81:
+script/**: 0
+scripts/**: 0
+packages/native/**: 0
+package manifests: 0
+lock/pins/patches: 0
+OAuth: 0
+CI workflows: 0
+generated bundles: 0
+unrelated source outside the issue #7677 QA paths: 0
+
+Final source delta from reviewed head d2489baeeb51973d456d0f6ea06b758a75961a81 through certified source 509929c8266467ce1a8a07f4ea5a027461436149:
+packages/omo-senpi/scripts/qa/isolation-file-readers.mjs
+packages/omo-senpi/scripts/qa/isolation-review-blockers.test.mjs
+packages/omo-senpi/scripts/qa/isolation-state.mjs
+packages/omo-senpi/scripts/qa/isolation-state-races.test.mjs
+packages/omo-senpi/scripts/qa/isolation-state.test.mjs
+
+git diff --check 05a1fbcc7ce310734d6646cdee2d80855bdb3506 509929c8266467ce1a8a07f4ea5a027461436149: PASS

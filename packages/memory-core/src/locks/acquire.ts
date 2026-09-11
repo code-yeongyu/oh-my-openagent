@@ -1,11 +1,29 @@
 import { randomUUID } from "node:crypto"
-import { link, mkdir, open, readFile, stat, unlink } from "node:fs/promises"
+import {
+  EINTR_RETRY_CAP,
+  link,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeHandleAll,
+} from "../fs/resilient"
+
+import type { FileHandle } from "../fs/resilient"
 import { hostname } from "node:os"
 import path from "node:path"
 
+import {
+  CANDIDATE_UNLINK_ATTEMPTS,
+  forgetLeakedCandidate,
+  sweepStaleLockCandidates,
+  trackLeakedCandidate,
+} from "./candidate-sweep"
 import type { LockRecord } from "./lock-record"
 import { parseLockRecord } from "./lock-record"
-import { getPidLiveness, getProcessStartIdentity } from "./process-identity"
+import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "./process-identity"
 
 export type AcquireLockOptions = {
   readonly waitTimeoutMs?: number
@@ -35,6 +53,40 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
+function isUnlinkSharingError(error: unknown, override?: (error: unknown) => boolean): boolean {
+  if (override !== undefined) return override(error)
+  if (process.platform !== "win32") return false
+  const code = errorCode(error)
+  return code === "EBUSY" || code === "EPERM" || code === "EACCES"
+}
+
+async function unlinkCandidate(candidatePath: string): Promise<boolean> {
+  for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {
+    try {
+      await (candidateFs.unlink ?? unlink)(candidatePath)
+      forgetLeakedCandidate(candidatePath)
+      return true
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") {
+        forgetLeakedCandidate(candidatePath)
+        return true
+      }
+      const sharing = isUnlinkSharingError(error, candidateFs.isSharingError)
+      if (!sharing) {
+        trackLeakedCandidate(candidatePath)
+        rearmCandidateSweep(path.dirname(candidatePath))
+        throw error
+      }
+      if (attempt + 1 === CANDIDATE_UNLINK_ATTEMPTS) {
+        trackLeakedCandidate(candidatePath)
+        rearmCandidateSweep(path.dirname(candidatePath))
+        return false
+      }
+    }
+  }
+  return false
+}
+
 function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
@@ -61,13 +113,30 @@ async function readOwner(lockPath: string): Promise<OwnerSnapshot | null> {
   }
 }
 
+// Exclusive creates are ambiguous under EINTR (the candidate may exist afterwards), and the
+// candidate name is a per-attempt UUID, so recovery is simply: discard that name and retry
+// with a fresh one. Anything the interrupted open did create is unlinked best-effort.
+async function openFreshCandidate(
+  lockPath: string,
+): Promise<{ readonly candidatePath: string; readonly handle: FileHandle }> {
+  for (let attempt = 0; ; attempt += 1) {
+    const candidatePath = `${lockPath}.candidate-${randomUUID()}`
+    try {
+      return { candidatePath, handle: await open(candidatePath, "wx", 0o600) }
+    } catch (error) {
+      const removed = await unlinkCandidate(candidatePath)
+      if (!removed) rearmCandidateSweep(path.dirname(lockPath))
+      if (errorCode(error) !== "EINTR" || attempt >= EINTR_RETRY_CAP) throw error
+    }
+  }
+}
+
 async function publishExclusive(lockPath: string, record: LockRecord): Promise<boolean> {
   await mkdir(path.dirname(lockPath), { recursive: true, mode: 0o700 })
-  const candidatePath = `${lockPath}.candidate-${randomUUID()}`
+  const { candidatePath, handle } = await openFreshCandidate(lockPath)
   try {
-    const handle = await open(candidatePath, "wx", 0o600)
     try {
-      await handle.writeFile(`${JSON.stringify(record)}\n`, "utf8")
+      await writeHandleAll(handle, `${JSON.stringify(record)}\n`, "utf8")
       await handle.sync()
     } finally {
       await handle.close()
@@ -77,14 +146,40 @@ async function publishExclusive(lockPath: string, record: LockRecord): Promise<b
       await link(candidatePath, lockPath)
       return true
     } catch (error) {
-      if (errorCode(error) === "EEXIST") return false
+      if (isCandidatePublishRace(error)) return false
       throw error
     }
   } finally {
-    await unlink(candidatePath).catch((error: unknown) => {
-      if (errorCode(error) !== "ENOENT") throw error
-    })
+    if (!(await unlinkCandidate(candidatePath))) rearmCandidateSweep(path.dirname(lockPath))
   }
+}
+
+// EEXIST: another contender published first. ENOENT: this candidate vanished mid-publish,
+// which only another process's stale-candidate sweep can cause after CANDIDATE_STALE_AGE_MS;
+// both are lost races the caller retries with a fresh candidate, never protocol failures.
+export function isCandidatePublishRace(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === "EEXIST" || code === "ENOENT"
+}
+
+const sweptLockDirectories = new Set<string>()
+
+export interface LockCandidateFs {
+  readonly unlink?: (path: string) => Promise<void>
+  readonly isSharingError?: (error: unknown) => boolean
+}
+
+let candidateFs: LockCandidateFs = {}
+
+/** Test seam for deterministic Windows sharing-failure coverage; production uses resilient fs. */
+export function setLockCandidateFsForTests(next: LockCandidateFs | undefined): () => void {
+  const previous = candidateFs
+  candidateFs = next ?? {}
+  return () => { candidateFs = previous }
+}
+
+function rearmCandidateSweep(lockDirectory: string): void {
+  sweptLockDirectories.delete(lockDirectory)
 }
 
 async function isProvenDead(owner: LockRecord): Promise<boolean> {
@@ -95,7 +190,47 @@ async function isProvenDead(owner: LockRecord): Promise<boolean> {
 
   const actualStart = await getProcessStartIdentity(owner.pid)
   if (actualStart === null || owner.process_start === "unavailable") return false
-  return actualStart !== owner.process_start
+  return startIdentitiesConflict(owner.process_start, actualStart)
+}
+
+// The recovery lock's only remover is its holder's nonce-matched releaseLock, so a holder
+// SIGKILLed inside recoverDeadOwner leaks a file that would otherwise block every future
+// eviction of the primary. Apply the same proven-dead test the primary gets; no age-based
+// reaping, and an unparsable record fails closed exactly as it does for the primary.
+//
+// rename-then-inspect instead of unlink: rename is atomic, so exactly one reaper obtains the
+// inode. If the bytes it obtained are not the dead record it saw, another contender already
+// reaped that record and published a fresh live holder in between, so the file is handed back
+// with link (EEXIST means yet another contender republished first, and nothing is lost).
+// The tombstone name must not match LEAKED_CANDIDATE_NAME in candidate-sweep.ts, otherwise a
+// concurrent stale-candidate sweep could delete it while it is still being inspected.
+async function reclaimDeadRecoveryLock(recoveryPath: string): Promise<boolean> {
+  const stale = await readOwner(recoveryPath)
+  if (stale === null || stale.record === null || !(await isProvenDead(stale.record))) return false
+
+  const tombstonePath = `${recoveryPath}.reaping-${randomUUID()}`
+  try {
+    await rename(recoveryPath, tombstonePath)
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return false
+    // Windows refuses to rename a file another process holds open; leave it to that holder.
+    if (isUnlinkSharingError(error)) return false
+    throw error
+  }
+
+  const moved = await readOwner(tombstonePath)
+  if (moved !== null && moved.raw === stale.raw) {
+    await unlink(tombstonePath)
+    return true
+  }
+
+  try {
+    await link(tombstonePath, recoveryPath)
+  } catch (error) {
+    if (errorCode(error) !== "EEXIST") throw error
+  }
+  await unlink(tombstonePath)
+  return false
 }
 
 async function recoverDeadOwner(
@@ -112,13 +247,23 @@ async function recoverDeadOwner(
     created_at: new Date().toISOString(),
     purpose: `${contender.purpose}:recovery`,
   }
-  if (!(await publishExclusive(recoveryPath, recoveryRecord))) return false
+  // Bounded to one reclaim and one re-publish so a waitTimeoutMs: 0 caller (the bind-time
+  // reconcile path) recovers a doubly-stale lock in a single pass without introducing a spin.
+  for (let attempt = 0; ; attempt += 1) {
+    if (await publishExclusive(recoveryPath, recoveryRecord)) break
+    if (attempt > 0 || !(await reclaimDeadRecoveryLock(recoveryPath))) return false
+  }
 
   try {
     const current = await readOwner(lockPath)
     if (current === null) return true
     if (current.raw !== snapshot.raw || current.record === null) return false
     if (!(await isProvenDead(current.record))) return false
+    // Fence: only unlink the primary while this contender still owns the recovery lock. A
+    // reaper that grabbed our live record and handed it back may have lost that hand-back to
+    // a third contender's publish; in that case the critical section is no longer ours.
+    const fence = await readOwner(recoveryPath)
+    if (fence === null || fence.record?.nonce !== recoveryRecord.nonce) return false
     await unlink(lockPath)
     return true
   } finally {
@@ -134,6 +279,19 @@ export async function acquireLock(
   const waitTimeoutMs = options.waitTimeoutMs ?? 0
   const retryDelayMs = options.retryDelayMs ?? 25
   if (waitTimeoutMs < 0 || retryDelayMs <= 0) throw new Error("lock wait options must be positive")
+  const lockDirectory = path.dirname(lockPath)
+  if (!sweptLockDirectories.has(lockDirectory)) {
+    sweptLockDirectories.add(lockDirectory)
+    // Opportunistic hygiene, once per process per directory: a failed sweep must never
+    // block or fail the acquisition it rides on. Failed candidate cleanup re-arms this memo.
+    await sweepStaleLockCandidates(lockDirectory, Date.now, {
+      ...(candidateFs.unlink === undefined ? {} : { unlink: candidateFs.unlink }),
+      ...(candidateFs.isSharingError === undefined ? {} : { isSharingError: candidateFs.isSharingError }),
+      onFailure: () => rearmCandidateSweep(lockDirectory),
+    }).catch(() => {
+      rearmCandidateSweep(lockDirectory)
+    })
+  }
   const deadline = Date.now() + waitTimeoutMs
 
   for (;;) {

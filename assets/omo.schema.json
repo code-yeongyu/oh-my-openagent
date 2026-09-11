@@ -5,6 +5,47 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "formatOnMutation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "best-effort",
+          "type": "string",
+          "enum": [
+            "off",
+            "best-effort",
+            "required"
+          ]
+        },
+        "languages": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "maxFileBytes": {
+          "default": 1048576,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timeoutMs": {
+          "default": 3000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "mode",
+        "maxFileBytes",
+        "timeoutMs"
+      ],
+      "additionalProperties": false
+    },
     "$schema": {
       "type": "string"
     },
@@ -762,51 +803,6 @@
         "additionalProperties": false
       }
     },
-    "codegraph": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "default": true,
-          "type": "boolean"
-        },
-        "auto_provision": {
-          "default": true,
-          "type": "boolean"
-        },
-        "daemon": {
-          "default": true,
-          "type": "boolean"
-        },
-        "telemetry": {
-          "default": false,
-          "type": "boolean"
-        },
-        "install_dir": {
-          "type": "string"
-        },
-        "watch_debounce_ms": {
-          "type": "number",
-          "minimum": 0
-        },
-        "excluded_roots": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "session_start_cooldown_ms": {
-          "type": "number",
-          "minimum": 60000
-        }
-      },
-      "required": [
-        "enabled",
-        "auto_provision",
-        "daemon",
-        "telemetry"
-      ],
-      "additionalProperties": false
-    },
     "git_master": {
       "type": "object",
       "properties": {
@@ -1306,6 +1302,148 @@
         "additionalProperties": false
       }
     },
+    "model_profiles": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "reasoning": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max",
+                            "auto"
+                          ]
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 2
+                    },
+                    "top_p": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "max_tokens": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "provider_options": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "variant": {
+                      "type": "string"
+                    },
+                    "reasoningEffort": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max",
+                            "auto"
+                          ]
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "thinking": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "enabled",
+                            "disabled"
+                          ]
+                        },
+                        "budgetTokens": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "textVerbosity": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "maxTokens": {
+                      "type": "number"
+                    },
+                    "providerOptions": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "model"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "model_profile": {
+      "type": "string"
+    },
     "memory": {
       "type": "object",
       "properties": {
@@ -1317,14 +1455,6 @@
           "default": "auto",
           "type": "string",
           "minLength": 1
-        },
-        "tool_exposure": {
-          "default": "direct",
-          "type": "string",
-          "enum": [
-            "direct",
-            "search"
-          ]
         },
         "reflection": {
           "default": {
@@ -1609,6 +1739,30 @@
           ],
           "additionalProperties": false
         },
+        "recall": {
+          "default": {
+            "enabled": true,
+            "max_items": 2
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_items": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "enabled",
+            "max_items"
+          ],
+          "additionalProperties": false
+        },
         "compile_warn_tokens": {
           "default": 30000,
           "type": "integer",
@@ -1797,6 +1951,20 @@
                 },
                 "additionalProperties": false
               },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -1810,7 +1978,6 @@
       "required": [
         "enabled",
         "agent",
-        "tool_exposure",
         "reflection",
         "nudge",
         "facts",
@@ -1820,6 +1987,7 @@
         "write_notice",
         "sync",
         "search",
+        "recall",
         "compile_warn_tokens",
         "agents"
       ],
@@ -1930,7 +2098,7 @@
           "type": "boolean"
         },
         "telemetry": {
-          "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry.",
+          "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable.",
           "type": "boolean"
         },
         "model_fallback": {
@@ -11073,6 +11241,11 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
+            "maxLiveDescendantsPerRoot": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "staleTimeoutMs": {
               "type": "number",
               "minimum": 60000
@@ -11381,50 +11554,6 @@
             "ring_max_lines",
             "line_max_bytes",
             "pattern_max_length"
-          ],
-          "additionalProperties": false
-        },
-        "codegraph": {
-          "type": "object",
-          "properties": {
-            "auto_init": {
-              "default": true,
-              "type": "boolean"
-            },
-            "auto_provision": {
-              "default": true,
-              "type": "boolean"
-            },
-            "daemon": {
-              "default": true,
-              "type": "boolean"
-            },
-            "enabled": {
-              "default": true,
-              "type": "boolean"
-            },
-            "excluded_roots": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "install_dir": {
-              "type": "string"
-            },
-            "telemetry": {
-              "type": "boolean"
-            },
-            "watch_debounce_ms": {
-              "type": "number",
-              "minimum": 0
-            }
-          },
-          "required": [
-            "auto_init",
-            "auto_provision",
-            "daemon",
-            "enabled"
           ],
           "additionalProperties": false
         },
@@ -11789,6 +11918,39 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -12543,41 +12705,6 @@
             "additionalProperties": false
           }
         },
-        "codegraph": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "auto_provision": {
-              "type": "boolean"
-            },
-            "daemon": {
-              "type": "boolean"
-            },
-            "telemetry": {
-              "type": "boolean"
-            },
-            "install_dir": {
-              "type": "string"
-            },
-            "watch_debounce_ms": {
-              "type": "number",
-              "minimum": 0
-            },
-            "excluded_roots": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "session_start_cooldown_ms": {
-              "type": "number",
-              "minimum": 60000
-            }
-          },
-          "additionalProperties": false
-        },
         "git_master": {
           "type": "object",
           "properties": {
@@ -12994,6 +13121,148 @@
             "additionalProperties": false
           }
         },
+        "model_profiles": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "display_name": {
+                "type": "string"
+              },
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "reasoning": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "temperature": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 2
+                        },
+                        "top_p": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "max_tokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "provider_options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "variant": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "thinking": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "enabled",
+                                "disabled"
+                              ]
+                            },
+                            "budgetTokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "textVerbosity": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "maxTokens": {
+                          "type": "number"
+                        },
+                        "providerOptions": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "model_profile": {
+          "type": "string"
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -13003,13 +13272,6 @@
             "agent": {
               "type": "string",
               "minLength": 1
-            },
-            "tool_exposure": {
-              "type": "string",
-              "enum": [
-                "direct",
-                "search"
-              ]
             },
             "reflection": {
               "type": "object",
@@ -13173,6 +13435,20 @@
               "properties": {
                 "enabled": {
                   "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "recall": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
                 }
               },
               "additionalProperties": false
@@ -13359,6 +13635,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -13390,6 +13680,39 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "formatOnMutation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "best-effort",
+                "required"
+              ]
+            },
+            "languages": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "maxFileBytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -14144,41 +14467,6 @@
             "additionalProperties": false
           }
         },
-        "codegraph": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "auto_provision": {
-              "type": "boolean"
-            },
-            "daemon": {
-              "type": "boolean"
-            },
-            "telemetry": {
-              "type": "boolean"
-            },
-            "install_dir": {
-              "type": "string"
-            },
-            "watch_debounce_ms": {
-              "type": "number",
-              "minimum": 0
-            },
-            "excluded_roots": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "session_start_cooldown_ms": {
-              "type": "number",
-              "minimum": 60000
-            }
-          },
-          "additionalProperties": false
-        },
         "git_master": {
           "type": "object",
           "properties": {
@@ -14595,6 +14883,148 @@
             "additionalProperties": false
           }
         },
+        "model_profiles": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "display_name": {
+                "type": "string"
+              },
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "reasoning": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "temperature": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 2
+                        },
+                        "top_p": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "max_tokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "provider_options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "variant": {
+                          "type": "string"
+                        },
+                        "reasoningEffort": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "thinking": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "enabled",
+                                "disabled"
+                              ]
+                            },
+                            "budgetTokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "textVerbosity": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "maxTokens": {
+                          "type": "number"
+                        },
+                        "providerOptions": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "model_profile": {
+          "type": "string"
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -14604,13 +15034,6 @@
             "agent": {
               "type": "string",
               "minLength": 1
-            },
-            "tool_exposure": {
-              "type": "string",
-              "enum": [
-                "direct",
-                "search"
-              ]
             },
             "reflection": {
               "type": "object",
@@ -14774,6 +15197,20 @@
               "properties": {
                 "enabled": {
                   "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "recall": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
                 }
               },
               "additionalProperties": false
@@ -14960,6 +15397,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -14997,6 +15448,39 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "formatOnMutation": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "best-effort",
+                  "required"
+                ]
+              },
+              "languages": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              "maxFileBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
           "categories": {
             "type": "object",
             "propertyNames": {
@@ -15751,41 +16235,6 @@
               "additionalProperties": false
             }
           },
-          "codegraph": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "type": "boolean"
-              },
-              "auto_provision": {
-                "type": "boolean"
-              },
-              "daemon": {
-                "type": "boolean"
-              },
-              "telemetry": {
-                "type": "boolean"
-              },
-              "install_dir": {
-                "type": "string"
-              },
-              "watch_debounce_ms": {
-                "type": "number",
-                "minimum": 0
-              },
-              "excluded_roots": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "session_start_cooldown_ms": {
-                "type": "number",
-                "minimum": 60000
-              }
-            },
-            "additionalProperties": false
-          },
           "git_master": {
             "type": "object",
             "properties": {
@@ -16202,6 +16651,148 @@
               "additionalProperties": false
             }
           },
+          "model_profiles": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "reasoning": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "off",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max",
+                                  "auto"
+                                ]
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "temperature": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 2
+                          },
+                          "top_p": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "max_tokens": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "provider_options": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          "variant": {
+                            "type": "string"
+                          },
+                          "reasoningEffort": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "off",
+                                  "minimal",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max",
+                                  "auto"
+                                ]
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "thinking": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "enabled",
+                                  "disabled"
+                                ]
+                              },
+                              "budgetTokens": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "textVerbosity": {
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          },
+                          "maxTokens": {
+                            "type": "number"
+                          },
+                          "providerOptions": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "model"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "model_profile": {
+            "type": "string"
+          },
           "memory": {
             "type": "object",
             "properties": {
@@ -16211,13 +16802,6 @@
               "agent": {
                 "type": "string",
                 "minLength": 1
-              },
-              "tool_exposure": {
-                "type": "string",
-                "enum": [
-                  "direct",
-                  "search"
-                ]
               },
               "reflection": {
                 "type": "object",
@@ -16381,6 +16965,20 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "recall": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
                   }
                 },
                 "additionalProperties": false
@@ -16571,6 +17169,20 @@
                       },
                       "additionalProperties": false
                     },
+                    "recall": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "max_items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "compile_warn_tokens": {
                       "type": "integer",
                       "exclusiveMinimum": 0,
@@ -16684,7 +17296,7 @@
                 "type": "boolean"
               },
               "telemetry": {
-                "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry.",
+                "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable.",
                 "type": "boolean"
               },
               "model_fallback": {
@@ -25827,6 +26439,11 @@
                     "minimum": 1,
                     "maximum": 9007199254740991
                   },
+                  "maxLiveDescendantsPerRoot": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "staleTimeoutMs": {
                     "type": "number",
                     "minimum": 60000
@@ -26135,50 +26752,6 @@
                   "ring_max_lines",
                   "line_max_bytes",
                   "pattern_max_length"
-                ],
-                "additionalProperties": false
-              },
-              "codegraph": {
-                "type": "object",
-                "properties": {
-                  "auto_init": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "auto_provision": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "daemon": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "enabled": {
-                    "default": true,
-                    "type": "boolean"
-                  },
-                  "excluded_roots": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "install_dir": {
-                    "type": "string"
-                  },
-                  "telemetry": {
-                    "type": "boolean"
-                  },
-                  "watch_debounce_ms": {
-                    "type": "number",
-                    "minimum": 0
-                  }
-                },
-                "required": [
-                  "auto_init",
-                  "auto_provision",
-                  "daemon",
-                  "enabled"
                 ],
                 "additionalProperties": false
               },
@@ -26543,6 +27116,39 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -27297,41 +27903,6 @@
                   "additionalProperties": false
                 }
               },
-              "codegraph": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "auto_provision": {
-                    "type": "boolean"
-                  },
-                  "daemon": {
-                    "type": "boolean"
-                  },
-                  "telemetry": {
-                    "type": "boolean"
-                  },
-                  "install_dir": {
-                    "type": "string"
-                  },
-                  "watch_debounce_ms": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "excluded_roots": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "session_start_cooldown_ms": {
-                    "type": "number",
-                    "minimum": 60000
-                  }
-                },
-                "additionalProperties": false
-              },
               "git_master": {
                 "type": "object",
                 "properties": {
@@ -27748,6 +28319,148 @@
                   "additionalProperties": false
                 }
               },
+              "model_profiles": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "reasoning": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "off",
+                                      "minimal",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "xhigh",
+                                      "max",
+                                      "auto"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "top_p": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "max_tokens": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "provider_options": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "off",
+                                      "minimal",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "xhigh",
+                                      "max",
+                                      "auto"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "thinking": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "enabled",
+                                      "disabled"
+                                    ]
+                                  },
+                                  "budgetTokens": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "textVerbosity": {
+                                "type": "string",
+                                "enum": [
+                                  "low",
+                                  "medium",
+                                  "high"
+                                ]
+                              },
+                              "maxTokens": {
+                                "type": "number"
+                              },
+                              "providerOptions": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "model_profile": {
+                "type": "string"
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -27757,13 +28470,6 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "tool_exposure": {
-                    "type": "string",
-                    "enum": [
-                      "direct",
-                      "search"
-                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -27927,6 +28633,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -28113,6 +28833,20 @@
                           "properties": {
                             "enabled": {
                               "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
                             }
                           },
                           "additionalProperties": false
@@ -28144,6 +28878,39 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "formatOnMutation": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "best-effort",
+                      "required"
+                    ]
+                  },
+                  "languages": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "maxFileBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -28898,41 +29665,6 @@
                   "additionalProperties": false
                 }
               },
-              "codegraph": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "auto_provision": {
-                    "type": "boolean"
-                  },
-                  "daemon": {
-                    "type": "boolean"
-                  },
-                  "telemetry": {
-                    "type": "boolean"
-                  },
-                  "install_dir": {
-                    "type": "string"
-                  },
-                  "watch_debounce_ms": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "excluded_roots": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "session_start_cooldown_ms": {
-                    "type": "number",
-                    "minimum": 60000
-                  }
-                },
-                "additionalProperties": false
-              },
               "git_master": {
                 "type": "object",
                 "properties": {
@@ -29349,6 +30081,148 @@
                   "additionalProperties": false
                 }
               },
+              "model_profiles": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "reasoning": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "off",
+                                      "minimal",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "xhigh",
+                                      "max",
+                                      "auto"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "temperature": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "top_p": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "max_tokens": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "provider_options": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              },
+                              "variant": {
+                                "type": "string"
+                              },
+                              "reasoningEffort": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "off",
+                                      "minimal",
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "xhigh",
+                                      "max",
+                                      "auto"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "thinking": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "enabled",
+                                      "disabled"
+                                    ]
+                                  },
+                                  "budgetTokens": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "textVerbosity": {
+                                "type": "string",
+                                "enum": [
+                                  "low",
+                                  "medium",
+                                  "high"
+                                ]
+                              },
+                              "maxTokens": {
+                                "type": "number"
+                              },
+                              "providerOptions": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "model_profile": {
+                "type": "string"
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -29358,13 +30232,6 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "tool_exposure": {
-                    "type": "string",
-                    "enum": [
-                      "direct",
-                      "search"
-                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -29528,6 +30395,20 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "recall": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
                       }
                     },
                     "additionalProperties": false
@@ -29714,6 +30595,20 @@
                           "properties": {
                             "enabled": {
                               "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "recall": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
                             }
                           },
                           "additionalProperties": false

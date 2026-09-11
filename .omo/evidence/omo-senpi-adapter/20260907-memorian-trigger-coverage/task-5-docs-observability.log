@@ -1,0 +1,29 @@
+Task 5 docs/observability evidence
+
+Changed files:
+- packages/omo-senpi/src/components/memory/AGENTS.md (intro, rows 25/26/27, design note item 65 only)
+- packages/omo-senpi/src/components/memory/memorian-observability.test.ts
+
+RED-first pin:
+- Temporarily asserted gateEntries length 1 for the salvaged partial launch pin.
+- RBT result: 9 pass, 1 fail (the salvaged launch test), RBT_RC=1; expected red behavior confirmed.
+- Restored the real assertion requiring exactly zero gate entries.
+
+Green validation:
+- bash /tmp/mtc-run-20260907/rbt.sh --sync packages/omo-senpi/src/components/memory/memorian-observability.test.ts -- packages/omo-senpi/src/components/memory/memorian-observability.test.ts packages/omo-senpi/src/components/memory/memorian-notice.test.ts
+- RBT_RC=0; 10 pass, 0 fail across 2 files.
+- bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+- Clean, no output.
+
+Pins added:
+- Salvaged { status: "nudged", partial: true } produces one normal nudged entry and no gate entry.
+- { status: "dropped", cause: "deadline" } produces one deadline gate outcome and renderMemorianGateEntry returns undefined.
+
+Scope audit:
+- Final diff names only the two requested source files; pre-existing unrelated worktree modifications were not touched.
+Task 5 memorian docs/observability verification
+RBT: RBT_RC=0; 10 pass, 0 fail across memorian-observability.test.ts and memorian-notice.test.ts
+tsgo: bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json exited 0
+forbidden cast scan: grep -c ' as ' memorian-observability.test.ts = 0
+Observability pins: salvaged partial produces one normal nudged entry and no gate entry; dropped deadline retains gate status/cause deadline, with notice rendering characterized by memorian-notice.test.ts.
+Docs rows updated: AGENTS.md rows 3, 25, 26, 27, 65 only.

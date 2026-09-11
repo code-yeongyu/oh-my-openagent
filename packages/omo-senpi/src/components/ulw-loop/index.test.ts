@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { ULW_LOOP_FOOTER_FRAMES } from "./footer-status"
 import { createUlwLoopComponent } from "./index"
 import { toSpawnTarget } from "./omo-command"
@@ -62,7 +62,7 @@ describe("omo-senpi ulw-loop continuation", () => {
       config: { getFlag: () => false },
     })
     const inputResults = await pi.dispatch("input", { type: "input", text: "hello", source: "user" }, sessionEventCtx("/repo"))
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(inputResults).toEqual([{ action: "continue" }])
     expect(pi.userMessages).toEqual([])
@@ -108,7 +108,7 @@ describe("omo-senpi ulw-loop continuation", () => {
   it("#given incomplete goals #when continuation agent_end fires #then sends exactly one hidden followUp", async () => {
     const { pi } = await registerWithRunner([activeStatus()])
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(pi.userMessages).toEqual([])
     expect(pi.messages).toEqual([
@@ -127,7 +127,7 @@ describe("omo-senpi ulw-loop continuation", () => {
     const { pi, logger } = await registerWithRunner(changingActiveStatuses(9))
 
     for (let index = 0; index < 9; index += 1) {
-      await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
     }
 
     expect(pi.messages).toHaveLength(8)
@@ -143,10 +143,10 @@ describe("omo-senpi ulw-loop continuation", () => {
     const { pi } = await registerWithRunner(changingActiveStatuses(10))
 
     for (let index = 0; index < 8; index += 1) {
-      await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
     }
     await pi.dispatch("input", { type: "input", text: "still working", source: "interactive" }, sessionEventCtx("/repo"))
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(pi.messages).toHaveLength(9)
   })
@@ -155,9 +155,9 @@ describe("omo-senpi ulw-loop continuation", () => {
     const status = activeStatus("G001")
     const { pi, calls } = await registerWithRunner([status, status, status])
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
     await pi.dispatch("input", { type: "input", text: "resume after user input", source: "interactive" }, sessionEventCtx("/repo"))
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(calls).toHaveLength(2)
     expect(pi.messages).toHaveLength(2)
@@ -168,8 +168,8 @@ describe("omo-senpi ulw-loop continuation", () => {
     const status = activeStatus("G001")
     const { pi, logger } = await registerWithRunner([status, status])
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(pi.messages).toHaveLength(1)
     expect(logger.entries).toContainEqual({
@@ -201,10 +201,10 @@ describe("omo-senpi ulw-loop continuation", () => {
     const { pi, calls } = await registerWithRunner(changingActiveStatuses(9))
 
     for (let index = 0; index < 8; index += 1) {
-      await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
     }
     await pi.dispatch("input", { type: "input", text: "ulw-loop", source: "extension" }, sessionEventCtx("/repo"))
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(calls).toHaveLength(8)
     expect(pi.messages).toHaveLength(8)
@@ -213,13 +213,13 @@ describe("omo-senpi ulw-loop continuation", () => {
   it("#given status reports all complete #when continuation fires #then no followUp is sent", async () => {
     const { pi } = await registerWithRunner([completeStatus()])
 
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
 
     expect(pi.userMessages).toEqual([])
   })
 
   it("#given goal active before ulw-loop #when a shell tool result activates the run #then the footer starts immediately", async () => {
-    for (const toolName of ["bash", "interactive_bash"]) {
+    for (const toolName of ["bash", "interactive_bash", "eval"]) {
       const pi = new FakeExtensionAPI()
       const outputs = [completeStatus(), activeStatus()]
       const calls: Array<{ bin: string; args: readonly string[]; cwd: string }> = []
@@ -230,7 +230,7 @@ describe("omo-senpi ulw-loop continuation", () => {
           calls.push({ bin, args, cwd: options.cwd })
           return { code: 0, stdout: outputs.shift() ?? activeStatus() }
         },
-        planDirExists: () => true,
+        planExists: () => true,
         footerStatus: {
           isGoalActive: () => true,
           timers: {

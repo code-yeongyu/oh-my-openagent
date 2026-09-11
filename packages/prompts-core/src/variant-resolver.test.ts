@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { atlasPromptVariants } from "./atlas-prompts"
 import type { PromptSource, VariantTable } from "./types"
 import { resolveVariant } from "./variant-resolver"
 
@@ -53,6 +54,22 @@ describe("resolveVariant", () => {
     expect(resolveVariant({ modelID: "kimi-for-coding/k3p1", variants: orderedVariants })).toBe("kimi-k3")
     expect(resolveVariant({ modelID: "kimi-k2.7", variants: orderedVariants })).toBe("kimi-k2-7")
     expect(resolveVariant({ modelID: "kimi-k2-6", variants: orderedVariants })).toBe("kimi")
+  })
+
+  test("#given a Devin SWE-2 model #then resolves the SWE-2 variant", () => {
+    const orderedVariants = {
+      "swe-2": promptSource("/prompts/swe-2"),
+      "kimi-k3": promptSource("/prompts/kimi-k3"),
+      kimi: promptSource("/prompts/kimi"),
+      default: promptSource("/prompts/default"),
+    } satisfies VariantTable
+
+    expect(resolveVariant({ modelID: "devin/swe-2-high", variants: orderedVariants })).toBe("swe-2")
+    expect(resolveVariant({ modelID: "devin/swe-1-7", variants: orderedVariants })).toBe("default")
+  })
+
+  test("#given Atlas SWE-2 #then uses the exact Kimi K3 system prompt", () => {
+    expect(atlasPromptVariants["swe-2"]).toEqual(atlasPromptVariants["kimi-k3"])
   })
 
   test("#given GLM model #then resolves glm variant", () => {

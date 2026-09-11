@@ -14,7 +14,6 @@ import {
   CATEGORY_PROMPT_APPEND_RESOLVERS,
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
-  categoryGateModel,
   isCategoryChainRungResolvable,
   isCategoryChainViable,
   isCategoryGateSatisfied,

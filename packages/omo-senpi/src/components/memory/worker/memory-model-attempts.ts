@@ -55,9 +55,11 @@ export async function runMemoryModelAttempts(
 function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAttempt[]): string {
   const modelIds = attempts.flatMap(({ miss }) => miss.kind === "model_not_visible" ? [miss.id] : [])
   const providers = attempts.flatMap(({ miss }) => miss.kind === "auth_missing" ? [miss.provider] : [])
+  const overflows = attempts.flatMap(({ miss }) => miss.kind === "context_overflow" ? [miss.detail] : [])
   const outages = attempts.flatMap(({ miss }) => miss.kind === "provider_unavailable" ? [miss.detail] : [])
   return [
     modelIds.length === 0 ? undefined : `model_not_visible:${modelIds.join(",")}`,
+    overflows.length === 0 ? undefined : `context_overflow:${overflows.join(" | ")}`,
     providers.length === 0 ? undefined : `auth_missing:${providers.join(",")}`,
     outages.length === 0 ? undefined : `provider_unavailable:${outages.join(" | ")}`,
     `attempted:${attempts.map(({ candidate }) => candidate.model).join(",")}`,

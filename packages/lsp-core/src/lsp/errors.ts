@@ -69,6 +69,21 @@ export class LspProcessSpawnError extends Error {
 	override readonly name = "LspProcessSpawnError";
 }
 
+export class LspClientRespawnBudgetExceededError extends Error {
+	override readonly name = "LspClientRespawnBudgetExceededError";
+
+	constructor(
+		readonly serverId: string,
+		readonly root: string,
+		readonly retryLimit: number,
+	) {
+		super(
+			`LSP server ${serverId} at ${root} failed to stay alive; respawn budget exhausted ` +
+				`(${retryLimit} consecutive dead generations). Retrying after the cooldown may succeed.`,
+		);
+	}
+}
+
 export function isLspDeadConnectionError(err: unknown): err is LspConnectionClosedError | LspProcessExitedError {
 	return err instanceof LspConnectionClosedError || err instanceof LspProcessExitedError;
 }

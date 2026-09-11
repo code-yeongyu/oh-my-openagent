@@ -83,11 +83,13 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
   const customTools = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
     ? [...mergedCustomTools.filter((tool) => tool.name !== "bash"), createCuratedReadonlyBashTool(spec.cwd)]
     : mergedCustomTools
-  const settingsManager = createRuntimeFallbackSettings(spec.selectedModel, spec.fallbackModels)
+  const settingsManager = createRuntimeFallbackSettings(spec.selectedModel, spec.fallbackModels, spec.retry)
   return {
     cwd: spec.cwd,
     sessionManager,
-    resourceLoader: createChildResourceLoader(),
+    resourceLoader: createChildResourceLoader(
+      spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt },
+    ),
     customTools,
     ...(spec.agentDir !== undefined && { agentDir: spec.agentDir }),
     ...(spec.authStorage !== undefined && { authStorage: spec.authStorage }),

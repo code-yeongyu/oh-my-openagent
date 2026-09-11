@@ -1,0 +1,17 @@
+# Pre-existing failures on base dev (7c839408e), reproduced on mengmotaMac BEFORE any edit of this branch.
+# Command: git checkout -q 7c839408e && bun test packages/senpi-task/src/tools/task/gated-categories.test.ts
+# These two tests pin the OLD gate annotation "(requires gpt-5.6-sol)"; the shipped annotation on dev is
+# already "(requires gpt-6-astra or gpt-5.6-sol)" from the GPT-6 Astra category work. NOT caused by this PR
+# and NOT touched here (packages/senpi-task/src/category/* + its task-tool gate belong to another session).
+
+(fail) gated category listing > #given a builtin-only gated category > #when the categories are listed #then ultrabrain carries its required model annotation
+(fail) gated category listing > #given a builtin-only gated category > #when the categories are listed #then deep carries its required model annotation
+
+expect(received).toContain(expected)
+Expected to contain: "(requires gpt-5.6-sol)"
+Received: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call - multiple goals must fan out as parallel `deep` calls, never bundled into one. (requires gpt-6-astra or gpt-5.6-sol)"
+
+ 4 pass
+ 2 fail
+ 7 expect() calls
+Ran 6 tests across 1 file.

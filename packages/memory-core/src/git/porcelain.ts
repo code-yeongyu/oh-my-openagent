@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "../fs/resilient"
 import { join } from "node:path"
 
 export function describeDirtyMarkdownEncodingIssues(root: string, porcelain: string): string[] {

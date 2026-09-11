@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-ulw-loop",
-	"version": "5.0.0-beta.24",
+	"version": "5.0.0-beta.53",
 	"description": "Codex plugin: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -38,7 +38,7 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",

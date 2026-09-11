@@ -64,12 +64,6 @@ export function saveTodoFile(sessionId: string, file: TodoFile): void {
    writeFileSync(path, JSON.stringify(claudeCodeFormat, null, 2))
 }
 
-export function saveOpenCodeTodos(sessionId: string, todos: OpenCodeTodo[]): void {
-   ensureTodoDir()
-   const path = getTodoPath(sessionId)
-   const claudeCodeFormat: ClaudeCodeTodoItem[] = todos.map(toClaudeCodeFormat)
-   writeFileSync(path, JSON.stringify(claudeCodeFormat, null, 2))
-}
 
 export function deleteTodoFile(sessionId: string): void {
    const path = getTodoPath(sessionId)

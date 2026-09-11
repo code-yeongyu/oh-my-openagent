@@ -53,9 +53,6 @@ export class TaskToastManager {
     this.showTaskListToast(trackedTask)
   }
 
-  /**
-   * Update task status
-   */
   updateTask(id: string, status: TaskStatus): void {
     const task = this.tasks.get(id)
     if (task) {
@@ -63,9 +60,6 @@ export class TaskToastManager {
     }
   }
 
-  /**
-   * Update model info for a task by session ID
-   */
   updateTaskModelBySession(sessionID: string, modelInfo: ModelFallbackInfo): void {
     if (!sessionID) return
     const task = Array.from(this.tasks.values()).find((t) => t.sessionID === sessionID)
@@ -75,16 +69,10 @@ export class TaskToastManager {
     this.showTaskListToast(task)
   }
 
-  /**
-   * Remove completed/error task
-   */
   removeTask(id: string): void {
     this.tasks.delete(id)
   }
 
-  /**
-   * Get all running tasks (newest first)
-   */
   getRunningTasks(): TrackedTask[] {
     const running = Array.from(this.tasks.values())
       .filter((t) => t.status === "running")
@@ -92,18 +80,12 @@ export class TaskToastManager {
     return running
   }
 
-  /**
-   * Get all queued tasks
-   */
   getQueuedTasks(): TrackedTask[] {
     return Array.from(this.tasks.values())
       .filter((t) => t.status === "queued")
       .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
   }
 
-  /**
-   * Format duration since task started
-   */
   private formatDuration(startedAt: Date): string {
     const seconds = Math.floor((Date.now() - startedAt.getTime()) / 1000)
     if (seconds < 60) return `${seconds}s`
@@ -180,9 +162,6 @@ export class TaskToastManager {
     return lines.join("\n")
   }
 
-  /**
-   * Show consolidated toast with all running/queued tasks
-   */
   private showTaskListToast(newTask: TrackedTask): void {
     const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
@@ -205,9 +184,6 @@ export class TaskToastManager {
     }).catch(() => {})
   }
 
-  /**
-   * Show task completion toast
-   */
   showCompletionToast(task: { id: string; description: string; duration: string }): void {
     const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return

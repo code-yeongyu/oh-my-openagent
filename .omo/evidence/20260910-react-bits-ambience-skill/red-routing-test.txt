@@ -1,0 +1,50 @@
+RED — packages/shared-skills/frontend-ambience-routing.test.ts run on a fleet compute node (bun 1.4.2, ~/.bun-1.4.2/bin) at branch commit 831c46c30, BEFORE ambience-skill.md / manifest / gitignore existed.
+Worktree: /tmp/omo-ambience-20260910 (git worktree of the repository checkout), bun install --frozen-lockfile.
+
+1.4.2
+INSTALL_EXIT=0
++ zod@4.4.3
+
+595 packages installed [57.27s]
+=== RED ===
+
+      at <anonymous> (/private/tmp/omo-ambience-20260910/packages/shared-skills/frontend-ambience-routing.test.ts:28:21)
+(fail) #given the frontend skill routes hero atmosphere and typographic motion to the react-bits catalog > #when the manifest is read #then ambience-skill.md is a project-original design file [6.36ms]
+30 | 
+31 | 	test("#when the skill gitignore is read #then ambience-skill.md is un-ignored", () => {
+32 | 		// given the gitignore that ignores references/design/*.md wholesale
+33 | 		const gitignore = readFileSync(join(repoRoot, frontendSkillRel, ".gitignore"), "utf8");
+34 | 		// then the react-bits routing doc is explicitly re-included
+35 | 		expect(gitignore).toContain(`!references/design/${AMBIENCE}`);
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "!references/design/ambience-skill.md"
+Received: "# Frontend third-party references are materialized at build time from the\n# submodules under packages/shared-skills/upstreams/ (DMCA-safe: the repo holds\n# zero third-party copies; the build/npm-pack materializes them into the\n# published package). Keep the section-5 project-original files committed.\n\n# Brand + taste-skill design references (open-design, taste-skill upstreams).\nreferences/design/*.md\n\n# Project-original design docs (ATTRIBUTION section 5) stay committed.\n!references/design/README.md\n!references/design/_INDEX.md\n!references/design/aside.md\n!references/design/clone-from-url.md\n!references/design/design-system-architecture.md\n!references/design/interaction-skill.md\n!references/design/layout-skill.md\n!references/design/lazyweb.md\n!references/design/print-paged-media.md\n!references/design/react-dev-tooling-skill.md\n!references/design/stylegallery.md\n\n# UI/UX intelligence database (ui-ux-pro-max upstream), entirely materialized.\nreferences/ui-ux-db/\n\n# designpowers role/ruleset corpus, materialized from the pinned upstream.\nreferences/designpowers/vendor/\n"
+
+      at <anonymous> (/private/tmp/omo-ambience-20260910/packages/shared-skills/frontend-ambience-routing.test.ts:35:21)
+(fail) #given the frontend skill routes hero atmosphere and typographic motion to the react-bits catalog > #when the skill gitignore is read #then ambience-skill.md is un-ignored [0.17ms]
+37 | 
+38 | 	test("#when git lists the design references #then ambience-skill.md is tracked", () => {
+39 | 		// given the committed design reference tree
+40 | 		const tracked = trackedFrontendDesignFiles();
+41 | 		// then the react-bits routing doc ships in the repository, not via a submodule
+42 | 		expect(tracked).toContain(AMBIENCE);
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "ambience-skill.md"
+Received: [
+  "README.md", "_INDEX.md", "aside.md", "clone-from-url.md", "design-system-architecture.md",
+  "interaction-skill.md", "layout-skill.md", "lazyweb.md", "print-paged-media.md", "react-dev-tooling-skill.md",
+  "stylegallery.md"
+]
+
+      at <anonymous> (/private/tmp/omo-ambience-20260910/packages/shared-skills/frontend-ambience-routing.test.ts:42:19)
+(fail) #given the frontend skill routes hero atmosphere and typographic motion to the react-bits catalog > #when git lists the design references #then ambience-skill.md is tracked [19.07ms]
+
+ 0 pass
+ 3 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [1314.00ms]
+TEST_EXIT=1

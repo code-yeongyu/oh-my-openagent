@@ -1,0 +1,38 @@
+{
+  "title": "Memorian nudged - live two-turn TUI",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "senpi interactive, omo plugin, mock provider, stub gate child via SENPI_BIN"
+  },
+  "interaction": [
+    "remind me about the zebra-quokka rebase ordering rule before I restack the branches",
+    "{Enter}",
+    "{End}",
+    "{End}",
+    "{End}",
+    "{End}",
+    "{End}",
+    "{End}",
+    "now walk me through the restack steps one by one",
+    "{Enter}"
+  ],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 140,
+    "rows": 44
+  },
+  "cleanup": "pty pid 27773 killed",
+  "files": {
+    "png": "/tmp/memorian-live-tui-1788342076002/live2/terminal.png",
+    "text": "/tmp/memorian-live-tui-1788342076002/live2/terminal.txt",
+    "ansi": "/tmp/memorian-live-tui-1788342076002/live2/terminal-ansi.txt",
+    "metadata": "/tmp/memorian-live-tui-1788342076002/live2/metadata.json"
+  }
+}

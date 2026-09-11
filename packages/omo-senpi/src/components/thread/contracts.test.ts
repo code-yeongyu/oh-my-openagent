@@ -137,6 +137,7 @@ describe("thread error taxonomy", () => {
       "unsupported",
       "overloaded",
       "transport_closed",
+      "host_unavailable",
       "internal_error",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)

@@ -154,7 +154,16 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   })
   const agents = resolveTaskAgents(deps.omoConfig)
 
-  const parentNotifier = createParentNotifier(deps.pi, deps.coordinator, () => runtime.parentState().kind === "streaming")
+  // The coordinator's async receipt closes the loop on batched delivery: a completion the coordinator
+  // accepted but never delivered (failed flush, or a batch window dropped when /reload retires it)
+  // rolls notified_epoch back and stamps the failure, so the post-reload session_start reconcile
+  // redelivers it instead of skipping the record forever.
+  const parentNotifier = createParentNotifier(
+    deps.pi,
+    deps.coordinator,
+    () => runtime.parentState().kind === "streaming",
+    (taskIds, error) => notifier.recordDeliveryFailure({ taskIds, error }),
+  )
   const notifier = createCompletionNotifier({
     notifier: parentNotifier,
     store: baseStore,
@@ -201,7 +210,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
   const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
   const basePlanner = createGenerationObservingPlanner({
-    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry),
+    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier()),
     omoConfig: deps.omoConfig,
     resolveRegistry,
     generations: categoryConfigGenerations,

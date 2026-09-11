@@ -1,0 +1,6 @@
+JSON/JSONL validation: PASS
+Secret assignment scan: PASS
+git diff --check: PASS
+script/** diff vs origin/dev: 0 bytes
+package manifests, Senpi pin/patch, CI, generated plugin/compile/OAuth/install runtime, and omo-senpi source diff: empty
+Named CRLF artifacts: raw blob hashes equal HEAD; unstaged and uncommitted

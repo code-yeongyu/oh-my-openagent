@@ -16,8 +16,30 @@ function toCompleted(harness: SteeringHarness, record: TaskRecord): void {
 }
 
 describe("steering engine one-shot agent refusal", () => {
-  test("#given a running resident momus child #when sent #then the outcome is one_shot_agent with the registry reminder and nothing is delivered", async () => {
+  test("#given a running resident plan-reviewer child #when sent #then the outcome is one_shot_agent with the registry reminder and nothing is delivered", async () => {
     // given
+    const harness = makeHarness()
+    const record = harness.seedRecord({ agent_type: "plan-reviewer" })
+    toRunning(harness, record)
+    const fake = makeFakeHandle(record.task_id, "in-process")
+    harness.setLive(record.task_id, fake.handle)
+
+    // when
+    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "steer attempt", deliverAs: "steer" })
+
+    // then
+    if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
+    expect(outcome.task_id).toBe(record.task_id)
+    expect(outcome.agent).toBe("plan-reviewer")
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
+    expect(fake.steerCalls).toEqual([])
+    expect(fake.followUpCalls).toEqual([])
+  })
+
+  test("#given a record persisted with the retired momus id #when sent #then the one-shot refusal still applies through the alias", async () => {
+    // given
+    // A task record persisted before the rename carries the retired id as agent_type; the alias
+    // lookup must keep refusing task_send for the deprecation window instead of loosening the gate.
     const harness = makeHarness()
     const record = harness.seedRecord({ agent_type: "momus" })
     toRunning(harness, record)
@@ -29,31 +51,30 @@ describe("steering engine one-shot agent refusal", () => {
 
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
-    expect(outcome.task_id).toBe(record.task_id)
     expect(outcome.agent).toBe("momus")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(fake.steerCalls).toEqual([])
     expect(fake.followUpCalls).toEqual([])
   })
 
-  test("#given a pending momus child #when sent #then the outcome is one_shot_agent and nothing is queued", async () => {
+  test("#given a pending plan-reviewer child #when sent #then the outcome is one_shot_agent and nothing is queued", async () => {
     // given
     const harness = makeHarness()
-    const record = harness.seedRecord({ agent_type: "momus" })
+    const record = harness.seedRecord({ agent_type: "plan-reviewer" })
 
     // when
     const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "pre-launch note" })
 
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(harness.store.load(record.task_id)?.pending_steering ?? []).toEqual([])
   })
 
-  test("#given a completed resident momus child #when sent #then the outcome is one_shot_agent and no revive occurs", async () => {
+  test("#given a completed resident plan-reviewer child #when sent #then the outcome is one_shot_agent and no revive occurs", async () => {
     // given
     const harness = makeHarness()
-    const record = harness.seedRecord({ agent_type: "momus" })
+    const record = harness.seedRecord({ agent_type: "plan-reviewer" })
     toCompleted(harness, record)
     const fake = makeFakeHandle(record.task_id, "in-process")
     harness.setLive(record.task_id, fake.handle)
@@ -63,7 +84,7 @@ describe("steering engine one-shot agent refusal", () => {
 
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(fake.followUpCalls).toEqual([])
     expect(harness.reviveCalls).toEqual([])
     expect(harness.store.load(record.task_id)?.status).toBe("completed")
@@ -71,10 +92,10 @@ describe("steering engine one-shot agent refusal", () => {
 })
 
 describe("steering engine one-shot refusal vs scope ordering", () => {
-  test("#given a foreign-owned momus child #when sent without all_scope #then the scope denial wins and the one-shot classification is not leaked", async () => {
+  test("#given a foreign-owned plan-reviewer child #when sent without all_scope #then the scope denial wins and the one-shot classification is not leaked", async () => {
     // given
     const harness = makeHarness()
-    const record = harness.seedRecord({ agent_type: "momus", parent_session_id: "parent-1", root_session_id: "parent-1" })
+    const record = harness.seedRecord({ agent_type: "plan-reviewer", parent_session_id: "parent-1", root_session_id: "parent-1" })
     toRunning(harness, record)
     harness.setLive(record.task_id, makeFakeHandle(record.task_id, "in-process").handle)
 
@@ -86,10 +107,10 @@ describe("steering engine one-shot refusal vs scope ordering", () => {
     expect(outcome.owning_session_id).toBe("parent-1")
   })
 
-  test("#given a foreign-owned momus child #when sent with all_scope #then the one-shot refusal applies", async () => {
+  test("#given a foreign-owned plan-reviewer child #when sent with all_scope #then the one-shot refusal applies", async () => {
     // given
     const harness = makeHarness()
-    const record = harness.seedRecord({ agent_type: "momus", parent_session_id: "parent-1", root_session_id: "parent-1" })
+    const record = harness.seedRecord({ agent_type: "plan-reviewer", parent_session_id: "parent-1", root_session_id: "parent-1" })
     toRunning(harness, record)
     const fake = makeFakeHandle(record.task_id, "in-process")
     harness.setLive(record.task_id, fake.handle)
@@ -99,7 +120,7 @@ describe("steering engine one-shot refusal vs scope ordering", () => {
 
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
-    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(outcome.message).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(fake.steerCalls).toEqual([])
   })
 })

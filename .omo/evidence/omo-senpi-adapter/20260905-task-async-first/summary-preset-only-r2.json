@@ -1,0 +1,272 @@
+{
+  "rollup": {
+    "variant": "new",
+    "request": "r2",
+    "samples": 3,
+    "background": 2,
+    "foreground_or_mixed": 1,
+    "no_task_call": 0,
+    "http_errors": 0
+  },
+  "rows": [
+    {
+      "sample": 1,
+      "ms": 13323,
+      "http": 200,
+      "status": "completed",
+      "usage": {
+        "attribution": {
+          "items": {
+            "msg_06e8a5f651bafdd7016a9bbb74983887d0ae4e63769b5ef628": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "content": [
+                {
+                  "cache_write_tokens": 0,
+                  "cached_tokens": 0,
+                  "input_tokens": 79,
+                  "output_tokens": 0
+                }
+              ],
+              "input_tokens": 79,
+              "output_tokens": 0
+            },
+            "rs_06e8a5f651bafdd7016a9bbb755f4087d096a29b230f2269b2": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 2,
+              "output_tokens": 57
+            },
+            "msg_06e8a5f651bafdd7016a9bbb79342c87d0b598ea433396d153": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "content": [
+                {
+                  "cache_write_tokens": 0,
+                  "cached_tokens": 0,
+                  "input_tokens": 0,
+                  "output_tokens": 49
+                }
+              ],
+              "input_tokens": 0,
+              "output_tokens": 49
+            },
+            "fc_06e8a5f651bafdd7016a9bbb79433887d096deaf4c655f500b": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 0,
+              "output_tokens": 275
+            }
+          },
+          "request_fields": {
+            "tools": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 2427,
+              "output_tokens": 0
+            },
+            "instructions": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 3858,
+              "output_tokens": 0
+            }
+          }
+        },
+        "input_tokens": 6366,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 381,
+        "output_tokens_details": {
+          "reasoning_tokens": 57
+        },
+        "total_tokens": 6747
+      },
+      "other_tool_calls": [],
+      "task_calls": [
+        {
+          "run_in_background": true,
+          "batch": false,
+          "target": "deep"
+        }
+      ],
+      "verdict": "background",
+      "message_text": "I read this as a scheduler bug fix - I’ll delegate investigation and implementation to one deep task, then run the DAG test suite myself and stop when the fix is applied and the suite’s result is reported."
+    },
+    {
+      "sample": 2,
+      "ms": 14477,
+      "http": 200,
+      "status": "completed",
+      "usage": {
+        "attribution": {
+          "items": {
+            "msg_08e5ccc043fbb4e7016a9bbb82231087d0b411baee2cfde697": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "content": [
+                {
+                  "cache_write_tokens": 0,
+                  "cached_tokens": 0,
+                  "input_tokens": 79,
+                  "output_tokens": 0
+                }
+              ],
+              "input_tokens": 79,
+              "output_tokens": 0
+            },
+            "rs_08e5ccc043fbb4e7016a9bbb840e3887d0a5a16d3b7a5bf647": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 2,
+              "output_tokens": 72
+            },
+            "msg_08e5ccc043fbb4e7016a9bbb89339087d09de93f122c0b28c8": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "content": [
+                {
+                  "cache_write_tokens": 0,
+                  "cached_tokens": 0,
+                  "input_tokens": 0,
+                  "output_tokens": 64
+                }
+              ],
+              "input_tokens": 0,
+              "output_tokens": 64
+            },
+            "fc_08e5ccc043fbb4e7016a9bbb89479887d08276ec48027e7ef8": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 0,
+              "output_tokens": 238
+            }
+          },
+          "request_fields": {
+            "tools": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 2427,
+              "output_tokens": 0
+            },
+            "instructions": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 3858,
+              "output_tokens": 0
+            }
+          }
+        },
+        "input_tokens": 6366,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 374,
+        "output_tokens_details": {
+          "reasoning_tokens": 72
+        },
+        "total_tokens": 6740
+      },
+      "other_tool_calls": [],
+      "task_calls": [
+        {
+          "run_in_background": true,
+          "batch": false,
+          "target": "deep"
+        }
+      ],
+      "verdict": "background",
+      "message_text": "I read this as a delegated concurrency bug fix - I'll have the deep agent investigate and implement the scheduler fix, then I’ll run the DAG tests myself and report whether it holds. I'll stop when the agent’s change is verified by the DAG test suite or a concrete failure is reported."
+    },
+    {
+      "sample": 3,
+      "ms": 8869,
+      "http": 200,
+      "status": "completed",
+      "usage": {
+        "attribution": {
+          "items": {
+            "msg_02fddfc496309735016a9bbb907d0487d0a53722ad83b1ee52": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "content": [
+                {
+                  "cache_write_tokens": 0,
+                  "cached_tokens": 0,
+                  "input_tokens": 79,
+                  "output_tokens": 0
+                }
+              ],
+              "input_tokens": 79,
+              "output_tokens": 0
+            },
+            "rs_02fddfc496309735016a9bbb915d5487d0909fc0e699eaa48b": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 2,
+              "output_tokens": 40
+            },
+            "msg_02fddfc496309735016a9bbb945c9887d080a11468f69a7118": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "content": [
+                {
+                  "cache_write_tokens": 0,
+                  "cached_tokens": 0,
+                  "input_tokens": 0,
+                  "output_tokens": 48
+                }
+              ],
+              "input_tokens": 0,
+              "output_tokens": 48
+            },
+            "fc_02fddfc496309735016a9bbb9469e487d0965f7a975789e47f": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 0,
+              "output_tokens": 139
+            }
+          },
+          "request_fields": {
+            "tools": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 2427,
+              "output_tokens": 0
+            },
+            "instructions": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0,
+              "input_tokens": 3858,
+              "output_tokens": 0
+            }
+          }
+        },
+        "input_tokens": 6366,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "output_tokens": 227,
+        "output_tokens_details": {
+          "reasoning_tokens": 40
+        },
+        "total_tokens": 6593
+      },
+      "other_tool_calls": [],
+      "task_calls": [
+        {
+          "run_in_background": "absent",
+          "batch": false,
+          "target": "deep"
+        }
+      ],
+      "verdict": "foreground",
+      "message_text": "I read this as a scheduler race investigation and fix - I'll delegate the full repair, then run the DAG test suite myself. I'll stop when the fix is applied and the suite result is verified and reported."
+    }
+  ],
+  "request_text": "We are in the oh-my-openagent monorepo. packages/senpi-task/src/dag/scheduler.ts has a flaky admission bug under parallel load (nodes occasionally start before every dependsOn node completed). Hand the investigation and the fix to the deep category as one task. When it reports back, run the dag test suite yourself and tell me whether the fix holds."
+}

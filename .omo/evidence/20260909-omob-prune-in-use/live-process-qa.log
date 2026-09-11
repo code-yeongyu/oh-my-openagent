@@ -1,0 +1,4 @@
+$ bun /tmp/omob-live-qa.ts (mengmotaHost, real ps listing, child spawned from <root>/0.0.0-omob.live000.live000/omo)
+pruned dev runtime 0.0.0-omob.idle000.idle000
+kept in-use dev runtime 0.0.0-omob.live000.live000
+{"kept":["0.0.0-omob.live000.live000"],"liveExists":true,"idleExists":false,"childPid":21850}

@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 import {
+	canonicalUltraworkDirectiveRelativePath,
 	componentSkillSources,
 	expectedSkills,
 	listSkillFiles,
@@ -93,6 +94,10 @@ test("#given aggregate Codex skills #when source wiring is inspected #then share
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/skills"), true);
 	assert.equal(sharedSkillDependency, "file:../../shared-skills");
 	assert.match(syncScript, /from "@oh-my-opencode\/shared-skills"/);
+	assert.match(syncScript, /from "@oh-my-opencode\/shared-skills\/skill-source-filter"/);
+	// A checkout-relative path dangles once the installer flattens plugin/ into
+	// <CODEX_HOME>/plugins/cache/<marketplace>/omo/<version> (see canonical-ultrawork-directive.mjs).
+	assert.doesNotMatch(syncScript, /from "\.\.\/\.\.\/\.\.\/shared-skills\//);
 	assert.doesNotMatch(syncScript, /shared-skills",\s*"skills"/);
 });
 
@@ -174,6 +179,18 @@ test("#given component skill sources #when aggregate Codex component skills are 
 			);
 		}
 	}
+});
+
+test("#given the canonical prompts-core directive #when the aggregate ultrawork skill is inspected #then it wraps the canonical bytes in skill frontmatter", async () => {
+	// given
+	const canonical = await readFile(join(repoRoot, canonicalUltraworkDirectiveRelativePath), "utf8");
+
+	// when
+	const skill = await readFile(join(root, "skills", "ultrawork", "SKILL.md"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: ultrawork\r?\n/);
+	assert.equal(removeCodexCompatibilityGuidance(skill).endsWith(canonical), true);
 });
 
 test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ulw-loop alias", async () => {

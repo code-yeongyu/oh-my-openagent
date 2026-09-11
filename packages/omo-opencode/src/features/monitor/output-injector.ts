@@ -6,7 +6,7 @@ import {
 } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
-import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptDispatchArgs, InternalPromptDispatchResult, PromptAsyncInput } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { formatMonitorBatch } from "./envelope"
 import {
   hasAcceptedMessageAfterDispatchedMonitorOutput,

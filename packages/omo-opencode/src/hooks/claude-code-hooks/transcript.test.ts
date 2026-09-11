@@ -4,6 +4,7 @@ import {
   buildTranscriptFromSession,
   deleteTempTranscript,
   clearTranscriptCache,
+  stopTranscriptCacheCleanup,
 } from "./transcript"
 
 function createMockClient(messages: unknown[] = []) {
@@ -20,7 +21,7 @@ function createMockClient(messages: unknown[] = []) {
 
 describe("transcript caching", () => {
   afterEach(() => {
-    clearTranscriptCache()
+    stopTranscriptCacheCleanup()
   })
 
   // #given same session called twice

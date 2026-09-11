@@ -1,0 +1,6 @@
+installing local omo build into /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.VX8YLNZ2XR/tmp/cqa-home.eFKJ0p/codex (this builds the plugin)...
+
+PASS: real ~/.codex/config.toml unchanged (b012e531f5aa9fb1bce9003593c3eadf07081fcd)
+PASS: app-server turn completed; assistant text: 
+PASS: hooks fired: 
+/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/lcx-task14.XXXXXX.VX8YLNZ2XR/scripts/lib/common.sh: line 136: 38661 Terminated: 15          node "$lib_dir/mock-model.mjs" > "$fifo" 2> "$CQA_HOME_ROOT/mock.stderr"

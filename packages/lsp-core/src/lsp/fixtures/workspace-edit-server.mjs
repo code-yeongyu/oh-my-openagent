@@ -8,6 +8,7 @@ let nextServerRequestId = 10_000;
 let renameIndex = 0;
 let diagnosticIndex = 0;
 const pendingServerRequests = new Map();
+const releasedDiagnosticResponses = [];
 
 function record(event) {
 	appendFileSync(eventsPath, `${JSON.stringify(event)}\n`, "utf-8");
@@ -146,8 +147,7 @@ function handleRequest(message) {
 			setTimeout(() => process.exit(0), delay);
 			return;
 		}
-		const delay = Number(step?.delayMs ?? 0);
-		setTimeout(() => {
+		const sendDiagnosticResponse = () => {
 			if (step?.error) {
 				record({ type: "serverError", method: "textDocument/diagnostic", error: step.error });
 				sendError(message.id, step.error.code, step.error.message);
@@ -156,7 +156,13 @@ function handleRequest(message) {
 			const result = step?.report ?? { items: scenario.diagnostics ?? [] };
 			record({ type: "serverResponse", method: "textDocument/diagnostic", result });
 			sendResponse(message.id, result);
-		}, delay);
+		};
+		if (step?.releaseOnDidChange === true) {
+			releasedDiagnosticResponses.push(sendDiagnosticResponse);
+		} else {
+			const delay = Number(step?.delayMs ?? 0);
+			setTimeout(sendDiagnosticResponse, delay);
+		}
 		return;
 	}
 	if (message.method === "shutdown") {
@@ -190,6 +196,7 @@ function handleNotification(message) {
 	}
 	if (message.method === "textDocument/didChange") {
 		applyPublishSteps("didChange", message.params.textDocument.uri, message.params.textDocument.version);
+		for (const release of releasedDiagnosticResponses.splice(0)) release();
 	}
 	if (message.method === "exit") process.exit(0);
 }
