@@ -1,0 +1,16 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\utils\src\command-executor\execute-hook-command.test.ts:
+(pass) executeHookCommand > #given allowedEnvVars provided #when executing command #then only allowed vars are in process.env [114.87ms]
+(pass) executeHookCommand > #given no allowedEnvVars #when executing command #then full env is available [77.79ms]
+(pass) executeHookCommand > #given command ignores normal completion #when timeout expires #then returns timeout instead of hanging [687.70ms]
+(pass) executeHookCommand > #given pluginRoot option #when executing command #then CLAUDE_PLUGIN_ROOT is exported into env [114.57ms]
+(pass) executeHookCommand > #given pluginRoot option with allowedEnvVars #when executing command #then CLAUDE_PLUGIN_ROOT survives the env scrub [98.23ms]
+(pass) executeHookCommand > #given pluginRoot option #when command references ${CLAUDE_PLUGIN_ROOT} #then it is substituted before spawn [89.69ms]
+(pass) executeHookCommand > #given a redirected home #when a hook resolves the user directory #then it sees the redirected one [93.19ms]
+
+ 7 pass
+ 0 fail
+ 16 expect() calls
+Ran 7 tests across 1 file. [3.00s]
+EXIT=0

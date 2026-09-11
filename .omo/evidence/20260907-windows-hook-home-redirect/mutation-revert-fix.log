@@ -1,0 +1,29 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\utils\src\command-executor\execute-hook-command.test.ts:
+(pass) executeHookCommand > #given allowedEnvVars provided #when executing command #then only allowed vars are in process.env [115.85ms]
+(pass) executeHookCommand > #given no allowedEnvVars #when executing command #then full env is available [101.92ms]
+(pass) executeHookCommand > #given command ignores normal completion #when timeout expires #then returns timeout instead of hanging [820.39ms]
+(pass) executeHookCommand > #given pluginRoot option #when executing command #then CLAUDE_PLUGIN_ROOT is exported into env [77.48ms]
+(pass) executeHookCommand > #given pluginRoot option with allowedEnvVars #when executing command #then CLAUDE_PLUGIN_ROOT survives the env scrub [69.93ms]
+(pass) executeHookCommand > #given pluginRoot option #when command references ${CLAUDE_PLUGIN_ROOT} #then it is substituted before spawn [77.76ms]
+148 | 			// when
+149 | 			const result = await executeHookCommand(command, "", tempDirectory)
+150 | 
+151 | 			// then
+152 | 			expect(result.exitCode).toBe(0)
+153 | 			expect(result.stdout?.trim()).toBe(sandboxHome)
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "C:\Users\LilMG\AppData\Local\Temp\omo-hook-home-TIpBqT"
+Received: "C:\Users\LilMG\AppData\Local\Temp\omo-hook-decoy-HVLFxc"
+
+      at <anonymous> (C:\Users\LilMG\Desktop\oh-my-openagent\packages\utils\src\command-executor\execute-hook-command.test.ts:153:34)
+(fail) executeHookCommand > #given a redirected home #when a hook resolves the user directory #then it sees the redirected one [93.09ms]
+
+ 6 pass
+ 1 fail
+ 16 expect() calls
+Ran 7 tests across 1 file. [3.23s]
+EXIT=1

@@ -130,6 +130,36 @@ describe("executeHookCommand", () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain("rooted=/tmp/plugin-z/scripts/foo.sh")
   })
+
+	test("#given a redirected home #when a hook resolves the user directory #then it sees the redirected one", async () => {
+		// given
+		const sandboxHome = mkdtempSync(join(tmpdir(), "omo-hook-home-"))
+		const decoyProfile = mkdtempSync(join(tmpdir(), "omo-hook-decoy-"))
+		const previousHome = process.env.HOME
+		const previousUserProfile = process.env.USERPROFILE
+		process.env.HOME = sandboxHome
+		process.env.USERPROFILE = decoyProfile
+		const command = nodeCommand(
+			tempDirectory,
+			'process.stdout.write(require("node:os").homedir())'
+		)
+
+		try {
+			// when
+			const result = await executeHookCommand(command, "", tempDirectory)
+
+			// then
+			expect(result.exitCode).toBe(0)
+			expect(result.stdout?.trim()).toBe(sandboxHome)
+		} finally {
+			if (previousHome === undefined) delete process.env.HOME
+			else process.env.HOME = previousHome
+			if (previousUserProfile === undefined) delete process.env.USERPROFILE
+			else process.env.USERPROFILE = previousUserProfile
+			rmSync(sandboxHome, { recursive: true, force: true })
+			rmSync(decoyProfile, { recursive: true, force: true })
+		}
+	})
 })
 
 export {}

@@ -1,0 +1,19 @@
+real homedir()   = C:\Users\LilMG
+sandbox HOME     = C:\Users\LilMG\AppData\Local\Temp\hookhome-uLG6wP
+
+--- as shipped: allowlist branch sets HOME and PATH only ---
+  exit 0
+  child homedir()  = C:\Users\LilMG
+  child HOME       = C:\Users\LilMG\AppData\Local\Temp\hookhome-uLG6wP
+  child USERPROFILE= C:\Users\LilMG
+  child APPDATA    = <unset>
+  child SystemRoot = C:\Windows
+
+--- with USERPROFILE set alongside HOME ---
+  exit 0
+  child homedir()  = C:\Users\LilMG\AppData\Local\Temp\hookhome-uLG6wP
+  child HOME       = C:\Users\LilMG\AppData\Local\Temp\hookhome-uLG6wP
+  child USERPROFILE= C:\Users\LilMG\AppData\Local\Temp\hookhome-uLG6wP
+  child APPDATA    = <unset>
+  child SystemRoot = C:\Windows
+EXIT=0

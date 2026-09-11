@@ -76,7 +76,7 @@ export async function executeHookCommand(
 
     // Keys that are always set from normalized sources and must not be
     // overwritten by ambient process.env values during the allowlist merge.
-    const PROTECTED_ENV_KEYS = new Set(["HOME", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT"]);
+    const PROTECTED_ENV_KEYS = new Set(["HOME", "USERPROFILE", "CLAUDE_PROJECT_DIR", "CLAUDE_PLUGIN_ROOT"]);
 
     let env: Record<string, string | undefined>;
     if (options?.allowedEnvVars) {
@@ -93,6 +93,10 @@ export async function executeHookCommand(
       }
     } else {
       env = { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: cwd };
+    }
+
+    if (isWin32) {
+      env.USERPROFILE = home;
     }
 
     if (pluginRoot) {

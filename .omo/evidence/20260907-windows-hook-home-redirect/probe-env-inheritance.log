@@ -1,0 +1,5 @@
+env = {} (empty)                     -> {"USERPROFILE":"C:\\Users\\LilMG","SystemRoot":"C:\\Windows","HOME":null,"count":11}
+env = {PATH}                         -> {"USERPROFILE":"C:\\Users\\LilMG","SystemRoot":"C:\\Windows","HOME":null,"count":11}
+env = {PATH, HOME:sandbox}           -> {"USERPROFILE":"C:\\Users\\LilMG","SystemRoot":"C:\\Windows","HOME":"C:\\sandbox","count":12}
+env = {PATH, HOME, USERPROFILE}      -> {"USERPROFILE":"C:\\sandbox","SystemRoot":"C:\\Windows","HOME":"C:\\sandbox","count":12}
+EXIT=0
