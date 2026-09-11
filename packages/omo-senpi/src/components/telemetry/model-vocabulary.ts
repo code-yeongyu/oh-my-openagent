@@ -20,7 +20,7 @@ export const KNOWN_MODELS = Object.freeze({
   "bailian-coding-plan": Object.freeze(["qwen3.6-flash"]),
   // senpi's Claude subscription lane serves the anthropic ids verbatim (#8051).
   "claude-sdk-oauth": Object.freeze(["claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"]),
-  deepseek: Object.freeze(["deepseek-v4-flash", "deepseek-v4-pro"]),
+  deepseek: Object.freeze(["deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro"]),
   google: Object.freeze(["gemini-3.1-pro", "gemini-3.6-flash"]),
   "github-copilot": Object.freeze([
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5", "gemini-3.1-pro",
@@ -41,7 +41,7 @@ export const KNOWN_MODELS = Object.freeze({
   "qwen-token-plan": Object.freeze(["qwen3.6-flash", "qwen3.8-max-preview"]),
   "qwen-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
   vercel: Object.freeze([
-    "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5", "deepseek-v4-flash",
+    "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5", "deepseek-flash", "deepseek-v4-flash",
     "deepseek-v4-pro", "gemini-3.1-pro", "gemini-3.6-flash", "glm-5.2", "gpt-5.6-sol",
     "gpt-5.6-terra", "gpt-6-astra", "grok-4.6", "kimi-k3", "mimo-v2.5-pro", "minimax-m2.7",
     "minimax-m3", "qwen3.6-flash",

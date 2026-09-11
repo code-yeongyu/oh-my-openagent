@@ -144,6 +144,13 @@ describe("OmO Native product identity", () => {
     })
   })
 
+  test("#given the DeepSeek V4.1 Flash canonical id #when masked #then it exports as deepseek-flash instead of custom", () => {
+    expect(maskProviderAndModel("deepseek", "deepseek-flash")).toEqual({
+      provider: "deepseek",
+      model_id: "deepseek-flash",
+    })
+  })
+
   test("#given a publicly known model routed through an unknown gateway provider #when masked #then the model id is exported while the provider stays custom", () => {
     // given: users route shipped models through OpenRouter, LiteLLM, or a self-hosted gateway.
     // The gateway name is user-configured and private; the model id is a public product name.
