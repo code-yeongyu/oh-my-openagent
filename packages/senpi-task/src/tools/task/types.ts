@@ -2,7 +2,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition, SkillInvocationState } from "../../agents"
 import type { TaskManager } from "../../manager"
-import type { ResolvedModelRecord, TaskRunStats } from "../../state"
+import type { ResolvedModelRecord, RetainTranscriptMark, TaskRunStats } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
 // The narrow slice of senpi's ExtensionContext the task tool reads. ExtensionContext satisfies it
@@ -76,6 +76,7 @@ type ResolvedSpawnItemBase = {
   readonly name?: string
   readonly model?: string
   readonly load_skills: readonly string[]
+  readonly retain_transcript?: RetainTranscriptMark
 }
 
 export type ResolvedSpawnItem =

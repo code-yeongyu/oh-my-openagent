@@ -335,3 +335,113 @@ describe("OmoTaskSettingsLayerSchema dag block", () => {
     expect(issue !== undefined && issue.code === "unrecognized_keys" ? issue.keys : []).toEqual(["nope"])
   })
 })
+
+describe("OmoTaskSettingsSchema transcript_retention block", () => {
+  test("#given no transcript_retention key #when task settings parse #then the block stays absent (retention off)", () => {
+    // given
+    const input = {}
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.transcript_retention).toBeUndefined()
+  })
+
+  test("#given an empty transcript_retention block #when task settings parse #then every documented default fills in", () => {
+    // given
+    const input = { transcript_retention: {} }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.transcript_retention).toEqual({
+      enabled: false,
+      categories: ["deep"],
+      ttl_ms: 604800000,
+      max_bytes: 262144,
+      success_sample_denominator: 4,
+      metadata_only_paths: [],
+    })
+  })
+
+  test("#given explicit transcript_retention values #when task settings parse #then the overrides win", () => {
+    // given
+    const input = {
+      transcript_retention: {
+        enabled: true,
+        categories: ["deep", "ultrabrain"],
+        ttl_ms: 3600000,
+        max_bytes: 4096,
+        success_sample_denominator: 1,
+        metadata_only_paths: ["/home/dev/clinical-assessment-android"],
+      },
+    }
+
+    // when
+    const parsed: OmoTaskSettings = OmoTaskSettingsSchema.parse(input)
+
+    // then
+    expect(parsed.transcript_retention).toEqual(input.transcript_retention)
+  })
+
+  test("#given a partial transcript_retention override #when the layer parses #then only the given keys appear", () => {
+    // given
+    const input = { transcript_retention: { enabled: true } }
+
+    // when
+    const parsed = OmoTaskSettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed.transcript_retention).toEqual({ enabled: true })
+  })
+
+  test("#given an unknown key inside transcript_retention #when task settings parse #then the strict schema rejects it", () => {
+    // given
+    const input = { transcript_retention: { enabled: true, wat: 1 } }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected an unknown transcript_retention key to fail")
+    const issue = result.error.issues.find((candidate) => candidate.path.join(".") === "transcript_retention")
+    expect(issue?.code).toBe("unrecognized_keys")
+    expect(issue !== undefined && issue.code === "unrecognized_keys" ? issue.keys : []).toEqual(["wat"])
+  })
+
+  test("#given a non-positive transcript_retention bound #when task settings parse #then validation fails", () => {
+    // given
+    const input = { transcript_retention: { ttl_ms: 0 } }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given a non-string metadata_only_paths entry #when task settings parse #then validation fails", () => {
+    // given
+    const input = { transcript_retention: { metadata_only_paths: [42] } }
+
+    // when
+    const result = OmoTaskSettingsSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given a partial metadata_only_paths override #when the settings layer parses #then only the given keys appear", () => {
+    // given
+    const input = { transcript_retention: { metadata_only_paths: ["/clinic"] } }
+
+    // when
+    const parsed = OmoTaskSettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed.transcript_retention).toEqual({ metadata_only_paths: ["/clinic"] })
+  })
+})

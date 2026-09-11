@@ -1,4 +1,5 @@
 import { canonicalAgentName } from "../../agents/legacy-agent-names"
+import type { RetainTranscriptMark } from "../../state"
 
 import type { ResolvedSpawnItem } from "./types"
 
@@ -29,6 +30,7 @@ type SpawnItemInput = TargetInput & {
   readonly model?: string
   readonly load_skills?: readonly string[]
   readonly run_in_background?: boolean
+  readonly retain_transcript?: RetainTranscriptMark
 }
 
 type SpawnParamsInput = TargetInput & {
@@ -38,6 +40,7 @@ type SpawnParamsInput = TargetInput & {
   readonly model?: string
   readonly load_skills?: readonly string[]
   readonly run_in_background?: boolean
+  readonly retain_transcript?: RetainTranscriptMark
   readonly tasks?: readonly SpawnItemInput[]
 }
 
@@ -172,6 +175,7 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
             ...(params.task_summary === undefined ? {} : { task_summary: params.task_summary }),
             ...(params.description === undefined ? {} : { description: params.description }),
             ...(params.name === undefined ? {} : { name: params.name }),
+            ...(params.retain_transcript === undefined ? {} : { retain_transcript: params.retain_transcript }),
           },
         ])
   const items: ResolvedSpawnItem[] = []
@@ -205,6 +209,11 @@ export function resolveSpawnItems(params: SpawnParamsInput): ResolveSpawnItemsRe
       ...(input.task_summary === undefined ? {} : { task_summary: input.task_summary }),
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.name === undefined ? {} : { name: input.name }),
+      ...(input.retain_transcript === undefined
+        ? params.retain_transcript === undefined
+          ? {}
+          : { retain_transcript: params.retain_transcript }
+        : { retain_transcript: input.retain_transcript }),
       ...(model === undefined ? {} : { model }),
     }
     if (target.kind === "category") {

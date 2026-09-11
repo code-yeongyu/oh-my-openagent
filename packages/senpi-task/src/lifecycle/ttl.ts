@@ -1,4 +1,5 @@
 import type { TaskRecord } from "../state"
+import { log } from "@oh-my-opencode/utils"
 import { TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { CleanupResult } from "./types"
@@ -32,11 +33,34 @@ export async function cleanupExpiredRecords(context: LifecycleContext): Promise<
     deleted.push(taskId)
   }
 
+  // Archive expiry rides the same sweep: a retained transcript is TTL-bounded exactly like the
+  // record it replaced. A failure here never blocks the record sweep below.
+  if (context.transcriptArchive !== undefined) {
+    try {
+      context.transcriptArchive.expireExpired()
+    } catch (error) {
+      log("senpi-task transcript archive expiry failed", { error: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
   const cutoff = context.now() - context.config.ttl_ms
   for (const record of context.store.list().records) {
     if (shouldRetain(context, record, cutoff)) {
       retained.push(record.task_id)
       continue
+    }
+    // Archive BEFORE the tombstone: a crashed sweep between the two leaves the archive written
+    // and the record still visible, so the next sweep either re-archives idempotently (same
+    // deterministic file name) or tombstones. Retention failures never block cleanup.
+    if (context.transcriptArchive !== undefined) {
+      try {
+        context.transcriptArchive.archiveRecord(record)
+      } catch (error) {
+        log("senpi-task transcript archive write failed", {
+          taskId: record.task_id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
     // Phase 1: atomic re-validate + tombstone. A revival claim that landed after the scan is seen
     // by the locked re-read and the record is retained instead of deleted underneath its new owner.

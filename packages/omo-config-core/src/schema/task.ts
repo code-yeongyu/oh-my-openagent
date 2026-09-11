@@ -40,6 +40,24 @@ export const OmoTaskDagSettingsSchema = z.object({
   max_prompt_bytes: z.number().int().positive().default(262144),
 }).strict()
 
+// Bounded opt-in retention of selected task transcripts. The whole block is optional and ABSENT
+// by default: nothing is ever archived until the user explicitly enables it, because archived
+// transcripts can carry sensitive content. Selection is per-task (the task tool's
+// retain_transcript param: true = full, "metadata" = metadata-only) or by category rule;
+// failed/cancelled selected runs are always kept while successful ones go through a
+// deterministic sample so the archive stays bounded. metadata_only_paths downgrades ANY selected
+// task running inside a listed directory to a metadata-only archive (no transcript content) -
+// the lever for protected trees such as clinical repositories. ttl_ms mirrors
+// task.dag.retention_days so a retained transcript lives as long as the DAG run referencing it.
+export const OmoTaskTranscriptRetentionSchema = z.object({
+  enabled: z.boolean().default(false),
+  categories: z.array(z.string()).default(["deep"]),
+  ttl_ms: z.number().int().positive().default(604800000),
+  max_bytes: z.number().int().positive().default(262144),
+  success_sample_denominator: z.number().int().positive().default(4),
+  metadata_only_paths: z.array(z.string()).default([]),
+}).strict()
+
 export const OmoTaskSettingsSchema = z.object({
   default_execution_mode: z.enum(["in-process", "process"]).default("in-process"),
   default_concurrency: z.number().int().nonnegative().default(5),
@@ -60,6 +78,7 @@ export const OmoTaskSettingsSchema = z.object({
     max_wall_clock_minutes: 120,
   }),
   dag: OmoTaskDagSettingsSchema.optional(),
+  transcript_retention: OmoTaskTranscriptRetentionSchema.optional(),
 }).strict()
 
 export const OmoTaskDagSettingsLayerSchema = z.object({
@@ -71,6 +90,15 @@ export const OmoTaskDagSettingsLayerSchema = z.object({
   history_max_limit: z.number().int().positive().optional(),
   retention_days: z.number().int().positive().optional(),
   max_prompt_bytes: z.number().int().positive().optional(),
+}).strict()
+
+export const OmoTaskTranscriptRetentionLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+  categories: z.array(z.string()).optional(),
+  ttl_ms: z.number().int().positive().optional(),
+  max_bytes: z.number().int().positive().optional(),
+  success_sample_denominator: z.number().int().positive().optional(),
+  metadata_only_paths: z.array(z.string()).optional(),
 }).strict()
 
 export const OmoTaskWaitLayerSchema = z.object({
@@ -105,9 +133,11 @@ export const OmoTaskSettingsLayerSchema = z.object({
   wait: OmoTaskWaitLayerSchema.optional(),
   team: OmoTaskTeamSettingsLayerSchema.optional(),
   dag: OmoTaskDagSettingsLayerSchema.optional(),
+  transcript_retention: OmoTaskTranscriptRetentionLayerSchema.optional(),
 }).strict()
 
 export type OmoTaskDagSettings = z.infer<typeof OmoTaskDagSettingsSchema>
+export type OmoTaskTranscriptRetention = z.infer<typeof OmoTaskTranscriptRetentionSchema>
 export type OmoTaskSettings = z.infer<typeof OmoTaskSettingsSchema>
 export type OmoTaskSettingsLayer = z.infer<typeof OmoTaskSettingsLayerSchema>
 

@@ -48,6 +48,7 @@ export function buildRecordInput(input: {
     ...(category !== undefined ? { category } : {}),
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
     ...(plan.toolDenylist !== undefined ? { tool_deny: plan.toolDenylist } : {}),
+    ...(spec.retain_transcript !== undefined ? { retain_transcript: spec.retain_transcript } : {}),
   }
 }
 

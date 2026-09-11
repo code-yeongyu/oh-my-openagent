@@ -3,6 +3,7 @@ import {
   RESIDENCY_STATES,
   TASK_STATUSES,
   type BackgroundMode,
+  type RetainTranscriptMark,
   type TaskRecord,
 } from "../state"
 import { parseTaskId } from "../state/id"
@@ -65,6 +66,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const taskSeq = readOptionalNumber(value, "task_seq")
   const configGeneration = readOptionalNumber(value, "config_generation")
   const backgroundMode = readOptionalBackgroundMode(value)
+  const retainTranscript = readOptionalRetainTranscriptMark(value)
   const reviveDeliveryUncertain = parseOptionalReviveDeliveryUncertainty(value)
 
   return {
@@ -112,6 +114,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(taskSeq === undefined ? {} : { task_seq: taskSeq }),
     ...(configGeneration === undefined ? {} : { config_generation: configGeneration }),
     ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
+    ...(retainTranscript === undefined ? {} : { retain_transcript: retainTranscript }),
     ...(reviveDeliveryUncertain === undefined ? {} : { revive_delivery_uncertain: reviveDeliveryUncertain }),
   }
 }
@@ -167,4 +170,11 @@ function readResidencyState(record: Record<string, unknown>): TaskRecord["reside
     default:
       throw new Error(`Invalid residency state [REDACTED]; expected one of ${RESIDENCY_STATES.join(", ")}`)
   }
+}
+
+function readOptionalRetainTranscriptMark(record: Record<string, unknown>): RetainTranscriptMark | undefined {
+  const mark = record["retain_transcript"]
+  if (mark === undefined) return undefined
+  if (mark === true || mark === false || mark === "metadata") return mark
+  throw new Error("retain_transcript is not a boolean or \"metadata\"")
 }

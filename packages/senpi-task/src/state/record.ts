@@ -30,6 +30,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     task_seq,
     config_generation,
     background_mode,
+    retain_transcript,
   } = input
   return {
     task_id: nowMs === undefined ? createTaskId() : createTaskId(nowMs),
@@ -67,5 +68,6 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     ...(task_seq === undefined ? {} : { task_seq }),
     ...(config_generation === undefined ? {} : { config_generation }),
     ...(background_mode === undefined ? {} : { background_mode }),
+    ...(retain_transcript === undefined ? {} : { retain_transcript }),
   }
 }

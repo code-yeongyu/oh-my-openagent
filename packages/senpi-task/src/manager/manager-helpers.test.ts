@@ -19,6 +19,38 @@ function spawnSpec(overrides: Partial<ManagerStartSpec>): ManagerStartSpec {
   }
 }
 
+describe("buildRecordInput retain_transcript", () => {
+  test("#given a spawn spec with retain_transcript true #when the record input is built #then the explicit retention mark is carried onto the record", () => {
+    // given / when
+    const input = buildRecordInput({
+      spec: spawnSpec({ retain_transcript: true }),
+      plan: PLAN,
+      name: "auditor",
+      executionMode: "in-process",
+      taskSeq: 0,
+    })
+
+    // then
+    expect(input.retain_transcript).toBe(true)
+  })
+
+  test("#given a spawn spec with retain_transcript false #when the record input is built #then the exclusion mark is carried onto the record", () => {
+    // given / when
+    const input = buildRecordInput({ spec: spawnSpec({ retain_transcript: false }), plan: PLAN, name: "auditor", executionMode: "in-process", taskSeq: 0 })
+
+    // then
+    expect(input.retain_transcript).toBe(false)
+  })
+
+  test("#given no retain_transcript #when the record input is built #then the field stays absent and the category rule decides later", () => {
+    // given / when
+    const input = buildRecordInput({ spec: spawnSpec({}), plan: PLAN, name: "auditor", executionMode: "in-process", taskSeq: 0 })
+
+    // then
+    expect("retain_transcript" in input).toBe(false)
+  })
+})
+
 describe("buildRecordInput task_summary", () => {
   test("#given a spawn spec with a task_summary #when the record input is built #then the summary is carried onto the record facts", () => {
     // given / when

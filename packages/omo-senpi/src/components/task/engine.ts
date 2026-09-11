@@ -43,6 +43,7 @@ import { createTeamMemberLivenessNotifier, type TeamMemberLivenessNotifier } fro
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "./terminal-observers"
+import { resolveTranscriptArchiveDir } from "./transcript-archive"
 
 export interface TaskEngine {
   readonly manager: TaskManager
@@ -204,7 +205,15 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   })
 
   const registry = createManagerResidencyRegistry(getManager)
-  const lifecycle = createTaskLifecycle({ store: storeChain.store, registry, config: settings })
+  // Bounded transcript retention: the archive lives in the Senpi agent dir's sessions tree so the
+  // existing session finder discovers it. Undefined when task.transcript_retention is off.
+  const transcriptArchiveDir = resolveTranscriptArchiveDir(settings, process.env)
+  const lifecycle = createTaskLifecycle({
+    store: storeChain.store,
+    registry,
+    config: settings,
+    ...(transcriptArchiveDir !== undefined ? { transcriptArchiveDir } : {}),
+  })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
