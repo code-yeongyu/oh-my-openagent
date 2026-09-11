@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync, statSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDoctor } from "./doctor.js"
@@ -57,8 +57,53 @@ function engineVersion() {
   }
 }
 
+/**
+ * Identity of an executable file, not the spelling that reached us: a symlink, a relative path and
+ * a Windows case alias all name the same file. dev+ino answers that exactly wherever the
+ * filesystem reports an inode; the case-folded real path is the fallback for the filesystems that
+ * report none. A path that is not a regular file has no identity here and is rejected.
+ */
+function executableIdentity(candidate) {
+  let real
+  let stats
+  try {
+    real = realpathSync(candidate)
+    stats = statSync(real)
+  } catch {
+    return undefined
+  }
+  if (!stats.isFile()) return undefined
+  const key = stats.ino > 0 ? `${stats.dev}:${stats.ino}` : real.replaceAll("\\", "/").toLowerCase()
+  return { path: real, key }
+}
+
+function launcherIdentityKeys() {
+  const keys = new Set()
+  for (const candidate of [process.argv[1], join(packageRoot, "bin", "omo.js")]) {
+    if (!candidate) continue
+    const identity = executableIdentity(candidate)
+    if (identity) keys.add(identity.key)
+  }
+  return keys
+}
+
+/**
+ * An explicit SENPI_BIN is the user's answer to which engine binary runs, so it survives the
+ * scrub instead of being replaced by the packaged shim. The one value that cannot survive is a
+ * path pointing back at this launcher: spawning it would re-enter omo forever, and comparing path
+ * strings alone lets a symlink or a Windows case alias walk straight into that recursion.
+ */
+function configuredSenpiBin() {
+  const configured = process.env.SENPI_BIN?.trim()
+  if (!configured) return undefined
+  const identity = executableIdentity(configured)
+  if (identity === undefined) return undefined
+  return launcherIdentityKeys().has(identity.key) ? undefined : identity.path
+}
+
 function senpiEnvironment(senpiRoot) {
   const env = { ...process.env }
+  const configuredBin = configuredSenpiBin()
   delete env.OMO_BIN
   delete env.SENPI_BIN
   env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
@@ -83,6 +128,8 @@ function senpiEnvironment(senpiRoot) {
     const shim = join(binDir, process.platform === "win32" ? "senpi.cmd" : "senpi")
     if (existsSync(shim)) env.SENPI_BIN = shim
   }
+  // The user's explicit choice outranks the packaged shim, so it is applied after it.
+  if (configuredBin) env.SENPI_BIN = configuredBin
   // Anything resolving the product by name must re-enter through this launcher, otherwise it
   // would reach the engine directly and lose the brand.
   env.OMO_BIN = join(packageRoot, "bin", "omo.js")
