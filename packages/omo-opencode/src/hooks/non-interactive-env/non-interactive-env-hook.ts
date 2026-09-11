@@ -1,5 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
+import {
+  HOOK_NAME,
+  NON_INTERACTIVE_ENV,
+  SHELL_COMMAND_PATTERNS,
+  WINDOWS_BACKGROUND_COMMAND_MESSAGE,
+} from "./constants"
 import { log, buildEnvPrefix, replaceToolArgs } from "../../shared"
 import { detectShellType, type ShellType } from "../../shared/shell-env"
 
@@ -10,6 +15,7 @@ export * from "./types"
 const BANNED_COMMAND_PATTERNS = SHELL_COMMAND_PATTERNS.banned
   .filter((command) => !command.includes("("))
   .map((cmd) => new RegExp(`\\b${cmd}\\b`))
+const WINDOWS_BACKGROUND_COMMAND_PATTERN = /(?:^|[^&])&\s*$/s
 
 function detectBannedCommand(command: string): string | undefined {
   for (let i = 0; i < BANNED_COMMAND_PATTERNS.length; i++) {
@@ -18,6 +24,10 @@ function detectBannedCommand(command: string): string | undefined {
     }
   }
   return undefined
+}
+
+function isWindowsBackgroundCommand(command: string): boolean {
+  return process.platform === "win32" && WINDOWS_BACKGROUND_COMMAND_PATTERN.test(command)
 }
 
 function detectWindowsShellType(shellPath: string | undefined): ShellType | undefined {
@@ -78,6 +88,10 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       const command = output.args.command as string | undefined
       if (!command) {
         return
+      }
+
+      if (isWindowsBackgroundCommand(command)) {
+        throw new Error(WINDOWS_BACKGROUND_COMMAND_MESSAGE)
       }
 
       const bannedCmd = detectBannedCommand(command)
