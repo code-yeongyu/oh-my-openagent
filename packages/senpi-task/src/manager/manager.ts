@@ -108,15 +108,21 @@ function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
  * start-failure-security.test.ts, because `RunnerFailure.message` is stderr-derived untrusted child
  * output and `store/redaction.ts` only redacts by KEY name - a free-text value carrying a credential
  * would be persisted verbatim. So the message stays collapsed, and only these closed enums and
- * numbers are recorded. That is enough to tell "crashed with code 1" from "spawn_error" from
- * "killed", which is what a bare `status=error` could never distinguish.
+ * numbers are recorded. `rejected_while` is captured by RpcProcessRunner BEFORE cleanup: `alive`
+ * means the command rejected while the child was live, while `exited` means the child had already
+ * supplied the real exit outcome. That ordering prevents cleanup's kill from being misreported as
+ * the rejection cause.
  */
 function startFailureFacts(error: unknown): Record<string, unknown> | undefined {
   if (!RunnerError.is(error)) return undefined
-  const { kind, exit } = error.failure
-  return exit === undefined
-    ? { failure_kind: kind }
-    : { failure_kind: kind, exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }
+  const { kind, rejected_while: rejectedWhile, exit } = error.failure
+  return {
+    failure_kind: kind,
+    ...(rejectedWhile === undefined ? {} : { rejected_while: rejectedWhile }),
+    ...(exit === undefined
+      ? {}
+      : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
+  }
 }
 
 function publicStartFailureMessage(error: unknown): string {

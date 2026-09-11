@@ -39,9 +39,15 @@ export type RunnerFailure = {
    * exactly that reason. These are closed enums and numbers, which cannot carry a credential, so they
    * can be persisted and finally answer WHY a child died instead of only THAT it died.
    *
+   * `rejected_while` is captured by the RPC runner before unstarted-handle cleanup: `alive` means
+   * the initial command rejected while the child was still live, while `exited` means the child had
+   * already produced the exit outcome. It is intentionally separate from `exit`, because cleanup
+   * terminates a still-live child and must never be mistaken for the rejection's cause.
+   *
    * Shape is inlined rather than imported from `../types`: that module imports RunnerOutcome from this
    * one, so importing back would close a cycle.
    */
+  readonly rejected_while?: "alive" | "exited"
   readonly exit?: {
     readonly kind: "clean" | "killed" | "crashed" | "spawn_error"
     readonly code: number | null

@@ -29,6 +29,11 @@ export const atlasPromptVariants = {
     content: kimiK3Prompt,
     filePath: "packages/prompts-core/prompts/atlas/kimi-k3.md",
   },
+  "swe-2": {
+    kind: "bundled",
+    content: kimiK3Prompt,
+    filePath: "packages/prompts-core/prompts/atlas/kimi-k3.md",
+  },
   "kimi-k2-7": {
     kind: "bundled",
     content: kimiK27Prompt,

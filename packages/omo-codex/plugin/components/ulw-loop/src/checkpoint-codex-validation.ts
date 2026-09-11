@@ -1,22 +1,13 @@
 import {
-	canReconcileActiveFinalTaskScopedAggregateSnapshot,
-	canReconcileCompletedTaskScopedAggregateSnapshot,
-	codexSnapshotMismatchError,
-} from "./checkpoint-reconciliation.js";
-import { readCodexGoalSnapshotInput, reconcileCodexGoalSnapshot } from "./codex-goal-snapshot.js";
-import {
-	codexGoalMode,
-	compatibleCodexObjectives,
-	expectedCodexObjective,
-	isFinalRunCompletionCandidate,
-} from "./goal-status.js";
+	CodexGoalSnapshotError,
+	formatCodexGoalReconciliation,
+	readCodexGoalSnapshotInput,
+	reconcileCodexGoalSnapshot,
+} from "./codex-goal-snapshot.js";
+import { codexGoalMode, compatibleCodexObjectives, expectedCodexObjective } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 import { UlwLoopError } from "./types.js";
-
-function normalizeObjective(value: string): string {
-	return value.replace(/\s+/g, " ").trim();
-}
 
 export async function validateCheckpointCodexGoal(input: {
 	readonly repoRoot: string;
@@ -25,53 +16,21 @@ export async function validateCheckpointCodexGoal(input: {
 	readonly raw: string | undefined;
 	readonly evidence: string;
 	readonly scope?: UlwLoopScope;
-}): Promise<unknown> {
-	const aggregate = codexGoalMode(input.plan) === "aggregate";
-	const final = isFinalRunCompletionCandidate(input.plan, input.goal);
+}): Promise<{ readonly raw: unknown; readonly nextActions: readonly string[]; readonly warnings: readonly string[] }> {
 	const snapshot = await readCodexGoalSnapshotInput(input.raw, input.repoRoot);
-	const expectedObjective = expectedCodexObjective(input.plan, input.goal);
+	const expected = expectedCodexObjective(input.plan, input.goal);
 	const reconciliation = reconcileCodexGoalSnapshot(snapshot, {
-		expectedObjective,
-		...(aggregate ? { acceptedObjectives: compatibleCodexObjectives(input.plan) } : {}),
-		allowedStatuses: aggregate ? (final ? ["complete"] : ["active"]) : ["complete"],
-		requireSnapshot: true,
-		requireComplete: !aggregate || final,
+		expectedObjective: expected,
+		...(codexGoalMode(input.plan) === "aggregate"
+			? { acceptedObjectives: compatibleCodexObjectives(input.plan) }
+			: {}),
 	});
-	if (reconciliation.ok) return reconciliation.snapshot.raw;
-	const objective = snapshot?.objective;
-	const mismatchedTaskObjective =
-		snapshot?.available === true &&
-		objective !== undefined &&
-		normalizeObjective(objective) !== normalizeObjective(expectedObjective);
-	const completedTaskScoped =
-		mismatchedTaskObjective &&
-		snapshot.status === "complete" &&
-		(await canReconcileCompletedTaskScopedAggregateSnapshot(
-			input.repoRoot,
-			input.plan,
-			input.goal,
-			objective,
-			input.evidence,
-			input.scope,
-		));
-	const activeFinalTaskScoped =
-		mismatchedTaskObjective &&
-		snapshot.status === "active" &&
-		(await canReconcileActiveFinalTaskScopedAggregateSnapshot(
-			input.repoRoot,
-			input.plan,
-			input.goal,
-			objective,
-			input.evidence,
-			input.scope,
-		));
-	if (completedTaskScoped || activeFinalTaskScoped) return reconciliation.snapshot.raw;
-	throw codexSnapshotMismatchError({
-		reconciliation,
-		snapshot,
-		expectedObjective,
-		taskScopedHint: { goal: input.goal, aggregate, final },
-	});
+	if (!reconciliation.ok) throw new CodexGoalSnapshotError(formatCodexGoalReconciliation(reconciliation));
+	return {
+		raw: snapshot?.raw,
+		nextActions: reconciliation.warnings,
+		warnings: reconciliation.warnings.filter((warning) => warning.startsWith("driver_objective_differs")),
+	};
 }
 
 export function combineCheckpointValidationErrors(codexError: UlwLoopError, gateError: UlwLoopError): UlwLoopError {

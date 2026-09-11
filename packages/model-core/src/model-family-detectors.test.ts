@@ -16,6 +16,7 @@ import {
   isKimiK27Model,
   isKimiK3Model,
   isMiniMaxModel,
+  isSWE2Model,
 } from "./model-family-detectors"
 
 describe("model family detectors", () => {
@@ -61,6 +62,15 @@ describe("model family detectors", () => {
     expect(isKimiK3Model("kimi-for-coding/k2p7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p5")).toBe(false)
     expect(isKimiK3Model("anthropic/claude-opus-4-7")).toBe(false)
+  })
+
+  test("#given Devin SWE-2 model ids #then detects SWE-2 effort lanes only", () => {
+    expect(isSWE2Model("devin/swe-2-low")).toBe(true)
+    expect(isSWE2Model("devin/swe-2-high")).toBe(true)
+    expect(isSWE2Model("devin/swe-2-max")).toBe(true)
+    expect(isSWE2Model("swe-2")).toBe(true)
+    expect(isSWE2Model("devin/swe-1-7")).toBe(false)
+    expect(isSWE2Model("devin/swe-20")).toBe(false)
   })
 
   test("#given GLM model ids #then detects GLM family only", () => {
