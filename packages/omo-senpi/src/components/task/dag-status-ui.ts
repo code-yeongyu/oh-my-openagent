@@ -1,5 +1,5 @@
 import type { CapturedUi } from "./runtime-context"
-import { runRows, type DagStatusRunSnapshot } from "./dag-status-row-format"
+import { runRows, type DagRunRowsOptions, type DagStatusRunSnapshot } from "./dag-status-row-format"
 
 export type {
   DagStatusNode,
@@ -53,6 +53,7 @@ export interface DagStatusUiTimers {
 
 export interface DagStatusUiDeps {
   readonly manager: DagStatusUiManager
+  readonly taskRecord?: DagRunRowsOptions["taskRecord"]
   readonly runtime: DagStatusUiRuntime
   readonly debounceMs?: number
   readonly timers?: DagStatusUiTimers
@@ -112,9 +113,13 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
       return
     }
     const runs = liveRuns()
-    const maxWidth = deps.terminalWidth?.() ?? process.stdout.columns
+    const terminalWidth = deps.terminalWidth?.() ?? process.stdout.columns
+    // Senpi renders string widgets with one column of Text padding on each side.
+    const maxWidth = terminalWidth === undefined ? undefined : Math.max(1, terminalWidth - 2)
     const renderedAt = now()
-    const rows = runs.flatMap((run) => runRows(run, liveActivity.get(run.runId), { maxWidth, now: renderedAt }))
+    const rows = runs.flatMap((run) => runRows(run, liveActivity.get(run.runId), {
+      maxWidth, now: renderedAt, taskRecord: deps.taskRecord,
+    }))
     pruneActivity(runs)
     if (rows.length === 0) {
       // Blanking is only honest when nothing is live. A run the manager still lists but whose

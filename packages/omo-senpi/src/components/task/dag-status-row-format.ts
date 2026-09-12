@@ -1,4 +1,5 @@
 import { formatDurationHuman } from "@oh-my-opencode/utils"
+import { formatTargetWithModel, type TaskRecord } from "@oh-my-opencode/senpi-task"
 import { excerptRendererText, normalizeRendererText, rendererVisibleWidth } from "@oh-my-opencode/senpi-task/renderer-text"
 
 const MAX_NODE_ROWS = 12
@@ -22,6 +23,7 @@ export type DagStatusRoute =
 export interface DagStatusNode {
   readonly id: string
   readonly label?: string
+  readonly taskId?: string
   readonly state: string
   readonly route: DagStatusRoute
   readonly dependsOn: readonly string[]
@@ -55,6 +57,7 @@ export interface DagRunRowsOptions {
   readonly maxWidth?: number
   // Rendering time for live elapsed labels; defaults to Date.now().
   readonly now?: number
+  readonly taskRecord?: (taskId: string) => Pick<TaskRecord, "resolved_model" | "model"> | undefined
   // Liveness probe for the resume lease holder; defaults to a signal-0 existence check.
   readonly isProcessAlive?: (pid: number) => boolean
 }
@@ -94,11 +97,10 @@ const NODE_ICONS: Readonly<Record<string, string>> = {
 const PAUSED_RUN_ICON = "·"
 
 export function runRows(run: DagStatusRunSnapshot, activity: ReadonlyMap<string, string> | undefined, options?: DagRunRowsOptions): string[] {
-  const renderedAt = options?.now ?? Date.now()
-  const maxWidth = boundedRowWidth(options?.maxWidth)
+  const rowOptions = { ...options, now: options?.now ?? Date.now(), maxWidth: boundedRowWidth(options?.maxWidth) }
   const rows = [runHeaderRow(run, options?.isProcessAlive ?? isProcessAlive)]
   const shown = selectNodeRows(run.nodes)
-  for (const node of shown) rows.push(nodeRow(node, activity, renderedAt, maxWidth))
+  for (const node of shown) rows.push(nodeRow(node, activity, rowOptions))
   const overflow = run.nodes.length - shown.length
   if (overflow > 0) rows.push(`  +${overflow} more`)
   return rows
@@ -219,13 +221,19 @@ function waitingLabel(node: DagStatusNode, now: number): string | undefined {
 
 // Assembles `  <icon> <label> · <route> · [xN] · [<activity>] · [<elapsed>]` within maxWidth,
 // mirroring the task widget's formatLiveBackgroundRow budget: every part keeps a floor, the
-// activity absorbs the slack (the plan's point: long latest-activity lines get the room), then
-// route, then label up to LABEL_MAX.
-function nodeRow(node: DagStatusNode, activity: ReadonlyMap<string, string> | undefined, now: number, maxWidth: number): string {
+// route keeps its model detail before activity absorbs the slack, then label up to LABEL_MAX.
+function nodeRow(node: DagStatusNode, activity: ReadonlyMap<string, string> | undefined, options: DagRunRowsOptions & { readonly now: number; readonly maxWidth: number }): string {
+  const { now, maxWidth } = options
+  const record = node.taskId === undefined ? undefined : options.taskRecord?.(node.taskId)
+  const route = formatTargetWithModel({
+    category: node.route.kind === "category" ? node.route.category : undefined,
+    agentType: node.route.kind === "agent" ? node.route.agent : undefined,
+    resolvedModel: record?.resolved_model,
+    model: record?.model ?? (node.route.kind === "agent" ? node.route.model : undefined),
+  }) ?? routeLabel(node.route)
   const icon = NODE_ICONS[node.state] ?? "○"
   const head = `  ${icon} `
   const label = normalizeRendererText(node.label ?? node.id)
-  const route = routeLabel(node.route)
   // A re-run node is the exception worth a badge; a first attempt stays unmarked.
   const attempt = (node.attempt ?? 1) > 1 ? `x${node.attempt}` : undefined
   const elapsed = elapsedLabel(node, now)
@@ -243,13 +251,13 @@ function nodeRow(node: DagStatusNode, activity: ReadonlyMap<string, string> | un
     ...(elapsed === undefined ? [] : [elapsed]),
   ]
   let remaining = Math.max(0, maxWidth - rendererVisibleWidth(head + floorParts.join(SEPARATOR)))
+  const routeWidth = Math.min(rendererVisibleWidth(route), ROUTE_MIN + remaining)
+  remaining -= Math.max(0, routeWidth - ROUTE_MIN)
   let activityWidth = 0
   if (showActivity) {
     activityWidth = Math.min(rendererVisibleWidth(activityText), ACTIVITY_MIN + remaining)
     remaining -= Math.max(0, activityWidth - ACTIVITY_MIN)
   }
-  const routeWidth = Math.min(rendererVisibleWidth(route), ROUTE_MIN + remaining)
-  remaining -= Math.max(0, routeWidth - ROUTE_MIN)
   const labelWidth = Math.min(LABEL_MAX, LABEL_MIN + remaining)
   const parts = [
     excerptRendererText(label, labelWidth),

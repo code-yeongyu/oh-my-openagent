@@ -1,3 +1,9 @@
+## 2026-09-12 - Show attached task models in native DAG rows
+
+Native DAG rows now read the attached task record on every paint and use the ordinary task target syntax, including resolved model and effort when present. Finished nodes retain their last attached task metadata; retries follow the new task ID; taskless waiting nodes remain category-only. Model detail takes width before activity, and the widget reserves the host's horizontal padding to keep elapsed time on the same row. Routing and model selection are unchanged.
+
+Task metadata also consumes the accepted native fallback `model_changed` event's effective thinking level. The subsequent model-only fallback receipt no longer erases that level; missing state never borrows effort from category defaults or another model.
+
 ## 2026-09-09 - Suspend native DAG runs on committed session switches (#8020)
 
 OMO no longer cancels DAG nodes from the vetoable `session_before_switch` hook. Committed shutdown first retires scheduler admission and settlement, awaits in-flight admission and journal delivery, then persists the pause before task-child suspension. Returning in the same process can reclaim an explicitly released own lease; active self claims and live foreign holders remain protected. Completed output is reused, running children reconcile through their durable task owners, and pending dependents are admitted once. Deliberate workflow cancellation remains destructive. `/session` information and `/resume` selector cancellation are unchanged. External terminal-hosted controllers are outside this native DAG lifecycle fix.

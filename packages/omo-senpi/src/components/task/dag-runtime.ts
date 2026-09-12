@@ -307,6 +307,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
 
   const statusUi = createDagStatusUi({
     manager: queryManager,
+    taskRecord: (taskId) => deps.engine.manager.get(taskId),
     runtime: deps.engine.runtime,
     logger: deps.logger,
     ...(deps.statusUiTimers === undefined ? {} : { timers: deps.statusUiTimers }),

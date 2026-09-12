@@ -282,6 +282,59 @@ describe("assembled DAG runtime", () => {
     runtime.dispose()
   }, { timeout: 15_000 })
 
+  test("#given an attached DAG task #when its model falls back #then the widget repaints the applied model and effort", async () => {
+    // given
+    const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-model-"))
+    cleanupRoots.push(cwd)
+    const runner = new ScriptedRunner()
+    const attached = deferred<void>()
+    const pi = Object.assign(new FakeExtensionAPI(), {
+      rpc: {
+        emit: (name: string, data: unknown) => {
+          if (name === "omo.dag.event" && typeof data === "object" && data !== null &&
+            "type" in data && data.type === "dag.node.task-attached") attached.resolve()
+        },
+        handle: () => undefined,
+      },
+    })
+    const engine = composeTaskEngine({
+      pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [],
+      runnerFactories: { inProcess: () => runner, process: () => runner },
+    })
+    const widgetRows: string[][] = []
+    engine.runtime.captureFrom({
+      mode: "tui", ui: fakeUi(widgetRows),
+      sessionManager: { getSessionId: () => "session-model" },
+    })
+    const timers = new ManualTimers()
+    const runtime = createDagRuntime({ pi, engine, logger: logger(), statusUiTimers: timers })
+    await runtime.attach()
+    const started = await runtime.manager.start({
+      parentSessionId: "session-model", rootSessionId: "session-model",
+      definition: {
+        key: "model", name: "model",
+        nodes: [{ id: "active", prompt: "work", subagent_type: "explore", model: "omo-mock/mock-1" }],
+      },
+    })
+    await within(attached.promise, STEP_BUDGET_MS, "model task attached")
+    try {
+      // when
+      runner.handles[0]?.emit({
+        type: "retry_fallback_applied", to: "omo-mock/mock-2:low",
+      })
+      timers.flush(250)
+      timers.flush(1_000)
+
+      // then
+      expect(widgetRows.at(-1)?.[1]?.split(" · ")[1]).toBe("agent:explore(omo-mock/mock-2:low)")
+      expect(widgetRows.at(-1)?.[1]).not.toContain("mock-1")
+    } finally {
+      runner.handles[0]?.settle("done")
+      await within(runtime.wait(started.snapshot.runId, "session-model"))
+      runtime.dispose()
+    }
+  })
+
   test("#given an unknown node skill #when the assembled runtime creates the run #then snapshot records missing_skill and dispatch keeps the prompt", async () => {
     // given
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-missing-skill-"))

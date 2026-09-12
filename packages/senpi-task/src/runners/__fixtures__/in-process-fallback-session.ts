@@ -6,6 +6,7 @@ import type { AgentSessionEvent, createAgentSession } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
+import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
 import { createRuntimeFallbackSettings } from "../in-process/runtime-fallback-settings"
 
 type StopReason = "stop" | "error"
@@ -42,7 +43,10 @@ export type FallbackSessionHarness = {
   dispose(): void
 }
 
-export async function createFallbackSessionHarness(errorMessage: string): Promise<FallbackSessionHarness> {
+export async function createFallbackSessionHarness(errorMessage: string, options: {
+  readonly fallbackEffort?: SenpiThinkingLevel
+  readonly scheduleResponse?: (model: string, respond: () => void) => void
+} = {}): Promise<FallbackSessionHarness> {
   const {
     createAgentSession,
     ModelRegistry,
@@ -59,15 +63,17 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
     baseUrl: "file://runtime-fallback-test",
     apiKey: "test-key",
     models: [
-      testModel("dead-primary"),
-      testModel("healthy-fallback"),
+      testModel("dead-primary", options.fallbackEffort !== undefined),
+      testModel("healthy-fallback", options.fallbackEffort !== undefined),
     ],
     streamSimple(model: { readonly id: string }) {
       calls.push(model.id)
+      const scheduleResponse = options.scheduleResponse
       return streamMessage(
         model.id === "dead-primary"
           ? assistant(model.id, "error", "", errorMessage)
           : assistant(model.id, "stop", "fallback completed"),
+        scheduleResponse === undefined ? queueMicrotask : (respond) => scheduleResponse(model.id, respond),
       )
     },
   }
@@ -81,6 +87,7 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
       provider: "runtime-fallback-test",
       model_id: "healthy-fallback",
       display: "runtime-fallback-test/healthy-fallback",
+      ...(options.fallbackEffort === undefined ? {} : { reasoning_effort: options.fallbackEffort }),
     }],
   )
   if (settingsManager === undefined) throw new Error("fallback settings missing")
@@ -114,11 +121,11 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
   }
 }
 
-function testModel(id: string) {
+function testModel(id: string, reasoning: boolean) {
   return {
     id,
     name: id,
-    reasoning: false,
+    reasoning,
     input: ["text"] as Array<"text">,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 200_000,
@@ -152,7 +159,7 @@ function assistant(
   }
 }
 
-function streamMessage(message: AssistantMessage): EventStream {
+function streamMessage(message: AssistantMessage, schedule: (respond: () => void) => void): EventStream {
   const queue: unknown[] = []
   const waiters: Array<(value: IteratorResult<unknown>) => void> = []
   let done = false
@@ -184,7 +191,7 @@ function streamMessage(message: AssistantMessage): EventStream {
       }
     },
   }
-  queueMicrotask(() => {
+  schedule(() => {
     const event = message.stopReason === "error"
       ? { type: "error", reason: "error", error: message }
       : { type: "done", reason: "stop", message }
