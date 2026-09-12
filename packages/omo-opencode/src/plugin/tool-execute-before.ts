@@ -2,6 +2,7 @@ import type { PluginContext } from "./types"
 
 import { isTrackedBtwSideSession } from "../features/btw-side"
 import { getMainSessionID } from "../features/claude-code-session-state"
+import { truncateObjective } from "../hooks/goal/validation"
 import { log, replaceToolArgs } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
@@ -156,7 +157,15 @@ export function createToolExecuteBeforeHandler(args: {
             ? output.args.arguments.trim()
             : ""
         if (rawArgs.length > 0) {
-          hooks.goal.setGoal(sessionID, rawArgs)
+          const objective = truncateObjective(rawArgs)
+          if (objective.length !== rawArgs.length) {
+            log("[goal] Skill /goal objective exceeded length limit; truncated", {
+              sessionID,
+              originalLength: rawArgs.length,
+              truncatedLength: objective.length,
+            })
+          }
+          hooks.goal.setGoal(sessionID, objective)
         }
       }
 

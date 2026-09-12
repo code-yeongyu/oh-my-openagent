@@ -1,5 +1,6 @@
 import type { CreatedHooks } from "../create-hooks"
 import { parseGoalCommand } from "../hooks/goal/command-arguments"
+import { truncateObjective } from "../hooks/goal/validation"
 import { log } from "../shared/logger"
 import { stopContinuation } from "./stop-continuation"
 
@@ -70,9 +71,18 @@ export function createCommandExecuteBeforeHandler(args: {
     if (hooks.goal && sessionID && normalizedCommand === "goal") {
       const parsed = parseGoalCommand(input.arguments)
       switch (parsed.kind) {
-        case "setObjective":
-          hooks.goal.setGoal(sessionID, parsed.objective)
+        case "setObjective": {
+          const objective = truncateObjective(parsed.objective)
+          if (objective.length !== parsed.objective.length) {
+            log("[goal] Command objective exceeded length limit; truncated", {
+              sessionID,
+              originalLength: parsed.objective.length,
+              truncatedLength: objective.length,
+            })
+          }
+          hooks.goal.setGoal(sessionID, objective)
           break
+        }
         case "setStatus":
           if (parsed.status === "paused") {
             hooks.goal.pauseGoal(sessionID)

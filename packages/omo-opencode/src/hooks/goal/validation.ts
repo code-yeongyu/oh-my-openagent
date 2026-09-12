@@ -1,4 +1,4 @@
-const MAX_OBJECTIVE_LENGTH = 2000
+export const MAX_OBJECTIVE_LENGTH = 2000
 
 export class InvalidObjectiveError extends Error {
   constructor(message: string) {
@@ -21,4 +21,8 @@ export function validateObjective(objective: string): string {
   }
 
   return trimmed
+}
+
+export function truncateObjective(objective: string): string {
+  return objective.trim().slice(0, MAX_OBJECTIVE_LENGTH)
 }
