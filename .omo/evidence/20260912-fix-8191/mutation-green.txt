@@ -1,0 +1,8 @@
+# same test file with the fix applied
+
+bun test v1.4.2 (744846f84)
+
+ 6 pass
+ 0 fail
+ 14 expect() calls
+Ran 6 tests across 1 file. [521.00ms]
