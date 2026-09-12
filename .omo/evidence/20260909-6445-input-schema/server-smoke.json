@@ -1,0 +1,8 @@
+{
+  "pass": true,
+  "healthy": true,
+  "call_omo_agent": true,
+  "version": "1.18.4",
+  "serverExited": true,
+  "status": "PASS"
+}

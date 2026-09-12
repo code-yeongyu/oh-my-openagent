@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "fixture": {
+      "[opencode]": {
+        "model_fallback": false
+      }
+    }
+  }
+}

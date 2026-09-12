@@ -1,0 +1,12 @@
+unknown format "uri" ignored in schema at path "#/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/model_capabilities/properties/source_url"
+.omo/evidence/20260909-6445-input-schema/valid-flat.json invalid
+[
+  {
+    instancePath: '',
+    schemaPath: '#/required',
+    keyword: 'required',
+    params: { missingProperty: 'git_master' },
+    message: "must have required property 'git_master'"
+  }
+]

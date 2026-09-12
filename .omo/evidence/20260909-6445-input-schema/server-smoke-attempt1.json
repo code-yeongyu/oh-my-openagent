@@ -1,0 +1,10 @@
+{
+  "pass": false,
+  "healthy": true,
+  "call_omo_agent": false,
+  "version": "1.18.4",
+  "error": "The operation was aborted due to timeout",
+  "serverExited": true,
+  "status": "FAIL",
+  "stderr": "timestamp=2026-09-09T12:50:22.988Z level=INFO run=c999868c message=loading path=/qa/config/opencode/config.json\ntimestamp=2026-09-09T12:50:22.991Z level=INFO run=c999868c message=loading path=/qa/config/opencode/opencode.json\ntimestamp=2026-09-09T12:50:22.991Z level=INFO run=c999868c message=loading path=/qa/config/opencode/opencode.jsonc\ntimestamp=2026-09-09T12:50:23.158Z level=INFO run=c999868c message=\"creating instance\" directory=/qa/project\ntimestamp=2026-09-09T12:50:23.159Z level=INFO run=c999868c message=fromDirectory directory=/qa/project\ntimestamp=2026-09-09T12:50:23.164Z level=INFO run=c999868c message=bootstrapping directory=/qa/project\ntimestamp=2026-09-09T12:50:23.175Z level=INFO run=c999868c message=loading path=/qa/config/opencode/config.json\ntimestamp=2026-09-09T12:50:23.175Z level=INFO run=c999868c message=loading path=/qa/config/opencode/opencode.json\ntimestamp=2026-09-09T12:50:23.176Z level=INFO run=c999868c message=loading path=/qa/config/opencode/opencode.jsonc\n"
+}

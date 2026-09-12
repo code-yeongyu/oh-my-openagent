@@ -1,0 +1,31 @@
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+.omo/evidence/20260909-6445-input-schema/valid-unified-migrated.json invalid
+[
+  {
+    instancePath: '',
+    schemaPath: '#/required',
+    keyword: 'required',
+    params: { missingProperty: 'profiles' },
+    message: "must have required property 'profiles'"
+  },
+  {
+    instancePath: '/[opencode]',
+    schemaPath: '#/properties/%5Bopencode%5D/required',
+    keyword: 'required',
+    params: { missingProperty: 'git_master' },
+    message: "must have required property 'git_master'"
+  }
+]
+.omo/evidence/20260909-6445-input-schema/valid-unified-profile.json invalid
+[
+  {
+    instancePath: '/profiles/fixture/[opencode]',
+    schemaPath: '#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/required',
+    keyword: 'required',
+    params: { missingProperty: 'git_master' },
+    message: "must have required property 'git_master'"
+  }
+]

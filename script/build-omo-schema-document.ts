@@ -15,7 +15,7 @@ function requiredRecord(value: unknown, path: string): Record<string, unknown> {
 }
 
 export function createOmoJsonSchema(): Record<string, unknown> {
-  const jsonSchema = z.toJSONSchema(OmoConfigSchema, {
+  const jsonSchema = z.toJSONSchema(OmoConfigSchema.partial({ profiles: true }), {
     target: "draft-7",
     unrepresentable: "any",
   }) as Record<string, unknown>
@@ -24,6 +24,7 @@ export function createOmoJsonSchema(): Record<string, unknown> {
   const profile = requiredRecord(profiles.additionalProperties, "properties.profiles.additionalProperties")
   const profileProperties = requiredRecord(profile.properties, "properties.profiles.additionalProperties.properties")
   const openCodeSchema = createOhMyOpenCodeJsonSchema()
+  delete openCodeSchema.$id
 
   properties["[opencode]"] = openCodeSchema
   profileProperties["[opencode]"] = openCodeSchema
