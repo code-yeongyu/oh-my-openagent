@@ -40,4 +40,4 @@ export const HOOK_NAME = "runtime-fallback"
  * practice) yet much shorter than the 30-minute outer poll timeout that
  * would otherwise be the only safety net.
  */
-export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 90_000
+export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 180_000

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import { DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { createFirstPromptWatchdog, observeEventForWatchdog, type FirstPromptWatchdog } from "./first-prompt-watchdog"
 
 const WATCHDOG_MS = 100
@@ -154,6 +155,10 @@ const PLUGIN_CONFIG_WITH_FALLBACK = {
 
 describe("first-prompt-watchdog", () => {
   let fakeTimers: FakeTimers | undefined
+
+  it("uses a three-minute default so slow first tokens can arrive before fallback", () => {
+    expect(DEFAULT_FIRST_PROMPT_WATCHDOG_MS).toBe(180_000)
+  })
 
   function getFakeTimers(): FakeTimers {
     if (!fakeTimers) {
