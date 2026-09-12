@@ -1,0 +1,25 @@
+{
+  // Written by run-sandbox.sh into $XDG_CONFIG_HOME/opencode/opencode.jsonc of a
+  // throwaway XDG sandbox. Placeholders are substituted at run time:
+  //   __PLUGIN_ENTRY__ - absolute path of the plugin entry under test
+  //   __PROBE_ENTRY__  - absolute path of listener-probe.mjs
+  //   __FAKE_PORT__    - port of fake-openai-server.mjs (OpenAI-compatible)
+  "plugin": ["file://__PLUGIN_ENTRY__", "file://__PROBE_ENTRY__"],
+  "model": "openai/gpt-fake",
+  "provider": {
+    "openai": {
+      "options": {
+        "apiKey": "fake-key",
+        "baseURL": "http://127.0.0.1:__FAKE_PORT__/v1",
+        "timeout": 30000
+      },
+      "models": {
+        "gpt-fake": {
+          "tool_call": true,
+          "limit": { "context": 200000, "output": 8192 }
+        }
+      }
+    }
+  },
+  "permission": { "bash": "allow", "call_omo_agent": "allow" }
+}
