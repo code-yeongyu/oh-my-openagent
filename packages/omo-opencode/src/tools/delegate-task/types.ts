@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { OhMyOpenCodeConfig } from "../../config"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
@@ -51,7 +52,7 @@ export interface OmoAgentClient {
   }
 }
 
-export type OpencodeClient = OmoAgentClient
+export type OpencodeClient = OmoAgentClient & PluginInput["client"]
 
 export interface DelegateTaskArgs {
   description: string
