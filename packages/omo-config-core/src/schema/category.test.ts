@@ -37,4 +37,16 @@ describe("OmoCategoryConfigSchema warn_unavailable", () => {
     if (result.success) throw new Error("Expected category parsing to fail")
     expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("warn_unavailable")
   })
+
+  test("#given camelCase topP #when category parses #then it normalizes to top_p", () => {
+    // given
+    const input = { topP: 0.9 }
+
+    // when
+    const parsed = OmoCategoryConfigSchema.parse(input)
+
+    // then
+    expect(parsed.top_p).toBe(0.9)
+    expect("topP" in parsed).toBe(false)
+  })
 })
