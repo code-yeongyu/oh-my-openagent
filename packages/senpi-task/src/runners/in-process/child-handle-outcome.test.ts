@@ -75,6 +75,20 @@ function toolUseEnd(): ChildSessionEvent {
   }
 }
 
+function narratedToolUseEnd(text: string): ChildSessionEvent {
+  return {
+    type: "message_end",
+    message: {
+      role: "assistant",
+      content: [
+        { type: "text", text },
+        { type: "toolCall", id: "c1", name: "bash", arguments: {} },
+      ],
+      stopReason: "toolUse",
+    },
+  }
+}
+
 function emptyTextEnd(): ChildSessionEvent {
   return {
     type: "message_end",
@@ -83,6 +97,39 @@ function emptyTextEnd(): ChildSessionEvent {
 }
 
 describe("createChildHandle turn outcomes", () => {
+  test('#given completion "turn" and a terminating tool call with narration #when the prompt settles #then the policy completes with empty text', async () => {
+    const fake = createEmittingSession()
+    const handle = createChildHandle({
+      taskId: "task-1",
+      session: fake.session,
+      promptText: "judge",
+      completion: "turn",
+    })
+
+    fake.lastText.value = "The cap has been reached."
+    fake.emit(narratedToolUseEnd(fake.lastText.value))
+    fake.resolvePrompt()
+
+    expect(await handle.waitForIdle()).toEqual({ status: "completed", finalResponse: "" })
+  })
+
+  test("#given narration attached to an unfinished tool call #when the prompt settles without a later assistant response #then the narration is not accepted as the final response", async () => {
+    const fake = createEmittingSession()
+    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "finish the work" })
+
+    fake.lastText.value = "Running the bounded wait:"
+    fake.emit(narratedToolUseEnd(fake.lastText.value))
+    fake.resolvePrompt()
+
+    expect(await handle.waitForIdle()).toEqual({
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "child turn ended after a tool call without a terminal assistant response",
+      },
+    })
+  })
+
   test('#given completion "turn" and a toolUse message_end followed by a stop message_end with an empty text part #when the prompt resolves #then the outcome is completed with empty finalResponse', async () => {
     const fake = createEmittingSession()
     const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })

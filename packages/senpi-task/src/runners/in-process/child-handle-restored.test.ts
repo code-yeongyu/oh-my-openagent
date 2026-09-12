@@ -6,6 +6,7 @@ type FakeSessionControls = {
   readonly session: ChildSession
   readonly followUpCalls: string[]
   readonly lastText: { value: string | undefined }
+  readonly messages: { value: readonly unknown[] | undefined }
   promptCalls: () => number
   resolvePrompt: () => void
 }
@@ -15,10 +16,14 @@ type FakeSessionControls = {
 function createFakeSession(sessionId = "restored-session-1"): FakeSessionControls {
   const followUpCalls: string[] = []
   const lastText = { value: undefined as string | undefined }
+  const messages = { value: undefined as readonly unknown[] | undefined }
   const counters = { promptCalls: 0 }
   let settle: (() => void) | undefined
   const session: ChildSession = {
     sessionId,
+    get messages() {
+      return messages.value
+    },
     prompt() {
       counters.promptCalls += 1
       return new Promise<void>((resolve) => {
@@ -42,12 +47,36 @@ function createFakeSession(sessionId = "restored-session-1"): FakeSessionControl
     session,
     followUpCalls,
     lastText,
+    messages,
     promptCalls: () => counters.promptCalls,
     resolvePrompt: () => settle?.(),
   }
 }
 
 describe("createRestoredChildHandle", () => {
+  test("#given a restored transcript ending on narrated tool use #when waitForIdle drains it #then the dangling narration is not accepted as completion", async () => {
+    const fake = createFakeSession()
+    fake.lastText.value = "Running the final command:"
+    fake.messages.value = [{
+      role: "assistant",
+      content: [
+        { type: "text", text: fake.lastText.value },
+        { type: "toolCall", id: "call-1", name: "bash", arguments: {} },
+      ],
+      stopReason: "toolUse",
+    }]
+
+    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session })
+
+    expect(await handle.waitForIdle()).toEqual({
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "restored session ended after a tool call without a terminal assistant response",
+      },
+    })
+  })
+
   test('#given completion "turn" and a restored session without assistant output #when waitForIdle is awaited #then it settles completed with empty text instead of child-turn-failed', async () => {
     const fake = createFakeSession()
     const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session, completion: "turn" })

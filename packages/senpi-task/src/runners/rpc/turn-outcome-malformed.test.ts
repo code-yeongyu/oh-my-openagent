@@ -9,6 +9,34 @@ function malformedAgentEnd(overrides: Record<string, unknown>): AgentEndEvent {
 }
 
 describe("agentEndOutcome hostile wire payloads", () => {
+  describe("#given narration attached to the final assistant tool call", () => {
+    it("#when agent_end settles without a later assistant response #then the narration is not accepted as the final response", () => {
+      // given
+      const event = malformedAgentEnd({
+        messages: [{
+          role: "assistant",
+          stopReason: "toolUse",
+          content: [
+            { type: "text", text: "Now update the lifecycle class:" },
+            { type: "toolCall", id: "call-1", name: "edit", arguments: {} },
+          ],
+        }],
+      })
+
+      // when
+      const outcome = agentEndOutcome(event, undefined, "Now update the lifecycle class:")
+
+      // then
+      expect(outcome).toEqual({
+        status: "error",
+        failure: {
+          kind: "child-turn-failed",
+          message: "RPC child turn ended after a tool call without a terminal assistant response",
+        },
+      })
+    })
+  })
+
   describe("#given an agent_end whose messages field is absent", () => {
     it("#when the outcome is derived #then it degrades to a terminal error instead of throwing", () => {
       // given
