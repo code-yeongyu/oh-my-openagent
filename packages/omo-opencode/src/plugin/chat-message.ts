@@ -10,6 +10,7 @@ import {
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
+import { extractPromptText as extractGoalPromptText } from "./chat-message/prompt-text"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runUlwExecuteHookIfApplicable } from "./chat-message/ulw-execute-message"
@@ -107,6 +108,7 @@ export function createChatMessageHandler(args: {
       updateSessionAgent(input.sessionID, input.agent)
     }
 
+    const originalPromptText = extractGoalPromptText(output.parts)
     const slashCommand = detectSlashCommand(extractPromptText(output.parts))
     if (slashCommand?.command === "stop-continuation") {
       stopContinuation({
@@ -145,6 +147,7 @@ export function createChatMessageHandler(args: {
       isFirstMessage,
       pluginConfig,
       nativeGoalCommand,
+      originalPromptText,
     })
     await applyUltraworkModelOverrideOnMessage(
       pluginConfig,
