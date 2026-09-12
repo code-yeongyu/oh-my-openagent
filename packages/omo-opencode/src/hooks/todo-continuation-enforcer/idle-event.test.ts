@@ -4,8 +4,8 @@ import { describe, expect, it } from "bun:test"
 
 import { FAILURE_RESET_WINDOW_MS, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { handleSessionIdle } from "./idle-event"
-import type { SessionStateStore } from "./session-state"
-import type { ContinuationProgressUpdate, SessionState } from "./types"
+import type { ContinuationProgressUpdate, SessionStateStore } from "./session-state"
+import type { SessionState } from "./types"
 
 function createStateStore(): {
   store: SessionStateStore
