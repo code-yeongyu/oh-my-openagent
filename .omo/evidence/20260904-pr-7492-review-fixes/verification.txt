@@ -1,0 +1,87 @@
+Focused tests: 49 pass, 0 fail, 82 assertions.
+OpenCode adapter typecheck: exit 0.
+Full plugin build: exit 0.
+opencode-qa common self-check: PASS.
+opencode-qa SSE self-test: PASS, server.connected observed.
+Post-merge focused tests, typecheck, build, and real OpenCode QA: PASS.
+Final focused discovery tests: 53 pass, 0 fail, 89 assertions.
+Final related tests: 212 pass, 0 fail, 462 assertions across 24 files.
+Final OpenCode adapter typecheck: exit 0.
+Final full plugin build: exit 0.
+Final OpenCode QA common self-check and SSE self-test: PASS.
+Final real OpenCode explicit-config warning: PASS.
+Post-merge dev@07e30350b related tests: 212 pass, 0 fail, 462 assertions.
+Post-merge adapter typecheck and full build: PASS.
+Post-merge real OpenCode warning and database isolation: PASS.
+Late review failing-first tests: 0 pass, 3 fail.
+Late review focused tests: 3 pass, 0 fail, 4 assertions.
+Final related diagnostics tests: 60 pass, 0 fail, 97 assertions across 4 files.
+Final adapter typecheck and full build: PASS.
+Final OpenCode QA common self-check and SSE self-test: PASS.
+Final real inline-content and profile-scoped warning runs: PASS.
+Final real database sessions: 8072 before, 8072 after both runs.
+Hermetic-scanner failing-first suite: 22 pass, 1 fail, 55 assertions.
+Hermetic-scanner corrected focused suites: 26 pass, 0 fail, 59 assertions.
+Hermetic-scanner adapter typecheck and full build: PASS.
+Hermetic-scanner OpenCode QA common self-check and SSE self-test: PASS.
+Hermetic-scanner real OpenCode run and sandbox containment: PASS.
+Home-boundary failing-first suite: 4 pass, 1 fail, 7 assertions.
+Home-boundary corrected focused suites: 28 pass, 0 fail, 62 assertions.
+Home-boundary adapter typecheck and full build: PASS.
+Home-boundary OpenCode QA common self-check and SSE self-test: PASS.
+Home-boundary real OpenCode run and sandbox containment: PASS.
+JSON-target failing-first suite: 5 pass, 2 fail, 10 assertions.
+JSON-target corrected focused suites: 30 pass, 0 fail, 66 assertions.
+JSON-target adapter typecheck and full build: PASS.
+JSON-target OpenCode QA common self-check and SSE self-test: PASS.
+JSON-target real OpenCode run and sandbox containment: PASS.
+Symlink-target failing-first suite: 7 pass, 2 fail, 14 assertions.
+Symlink-target corrected focused suites: 32 pass, 0 fail, 69 assertions.
+Symlink-target adapter typecheck and full build: PASS.
+Symlink-target OpenCode QA common self-check and SSE self-test: PASS.
+Symlink-target final real OpenCode run and sandbox containment: PASS.
+Scope-precedence failing-first suite: 9 pass, 2 fail, 17 assertions.
+Dual-home parity failing-first suite: 11 pass, 1 fail, 21 assertions.
+Scope-precedence corrected focused suites: 35 pass, 0 fail, 77 assertions.
+Scope-precedence adapter typecheck and full build: PASS.
+Scope-precedence OpenCode QA common self-check and SSE self-test: PASS.
+Scope-precedence real OpenCode run and sandbox containment: PASS.
+Lexical-ancestry failing-first suite: 12 pass, 1 fail, 23 assertions.
+Lexical-ancestry corrected focused suites: 36 pass, 0 fail, 79 assertions.
+Lexical-ancestry adapter typecheck and full build: PASS.
+Lexical-ancestry OpenCode QA common self-check and SSE self-test: PASS.
+Lexical-ancestry final real OpenCode run and sandbox containment: PASS.
+Initialization documentation review: PASS.
+Complete loader-parity failing-first suite: 11 pass, 8 fail, 31 assertions.
+Complete loader-parity custom legacy failing-first suite: 18 pass, 1 fail, 34 assertions.
+Complete loader-parity corrected focused suites: 43 pass, 0 fail, 94 assertions.
+Complete loader-parity adapter typecheck and full build: PASS.
+Complete loader-parity OpenCode QA common self-check and SSE self-test: PASS.
+Real profile precedence and harness-key OpenCode run: PASS.
+Real disabled-project-config OpenCode run: PASS.
+Real dual-format and legacy-source OpenCode run: PASS.
+Complete loader-parity real database sessions: 8072 before, 8072 after all runs.
+Profile/global scope failing-first suite: 19 pass, 1 fail, 40 assertions.
+Profile/global scope corrected focused suites: 44 pass, 0 fail, 97 assertions.
+Profile/global scope adapter typecheck and full build: PASS.
+Profile/global scope OpenCode QA helper gate: PASS.
+Profile/global scope real OpenCode run and sandbox containment: PASS.
+Dotted profile key failing-first suite: 20 pass, 1 fail, 42 assertions.
+Dotted profile key corrected focused suites: 45 pass, 0 fail, 98 assertions.
+Dotted profile key adapter typecheck and full build: PASS.
+Dotted profile key OpenCode QA helper gate: PASS.
+Dotted profile key real OpenCode run and sandbox containment: PASS.
+Desktop edition and unified-home failing-first suite: 21 pass, 2 fail, 44 assertions.
+Desktop edition and unified-home corrected suites: 47 pass, 0 fail, 103 assertions.
+Desktop edition and unified-home adapter typecheck and full build: PASS.
+Desktop edition and unified-home OpenCode QA helper gate: PASS.
+Desktop edition and unified-home real OpenCode run: PASS.
+Related suite count revalidation: 183 pass, 0 fail, 429 assertions, 23 files.
+Ubuntu shard 1 stale Desktop assertion: reproduced from CI.
+Corrected config-directory suite: 31 pass, 0 fail, 36 assertions.
+Post-repair diagnostic suites: 47 pass, 0 fail, 103 assertions.
+Runtime-host failing-first suite: 0 pass, 1 fail, 1 import error.
+Final six affected suites: 91 pass, 0 fail, 171 assertions.
+Final runtime-host adapter typecheck and full build: PASS.
+Final runtime-host OpenCode QA helper gate: PASS.
+CLI, stable Desktop, and dev Desktop real OpenCode lanes: PASS.

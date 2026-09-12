@@ -1,0 +1,8 @@
+COMMAND: bun run build
+EXIT: 0
+
+JSON schemas generated.
+OpenCode plugin bundle generated.
+Declaration output generated.
+Senpi extension payload generated.
+build: all steps completed

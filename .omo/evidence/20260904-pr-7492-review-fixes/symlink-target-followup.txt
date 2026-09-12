@@ -1,0 +1,45 @@
+FAILING FIRST
+scenario=symlinked project config file and symlinked project .omo directory
+result=7 pass, 2 fail, 14 assertions
+observed=diagnostics targeted paths the unified loader rejects
+
+PASSING
+focused=32 pass, 0 fail, 69 assertions across 2 files
+symlinked_config_selects_loadable_sibling=PASS
+symlinked_directory_requires_replacement=PASS
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE
+capture_id=pr7492-symlink-final-a98c4019e-20260904T213003Z
+captured_at_utc=2026-09-04T21:30:03Z
+tested_base_commit=a98c4019ea428f57fbe78a8f7d2c7e38d5e983b6-plus-working-tree-fix
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+active_user_config=<sandbox>/home/.omo/omo.json
+observed=[oh-my-openagent] OMO ignores "categories" in OPENCODE_CONFIG_CONTENT; move it to ~/.omo/omo.json.
+resolved_home=<sandbox>/home
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+post_broken_link_refinement_focused=32 pass, 0 fail, 69 assertions
+post_broken_link_refinement_typecheck=PASS
+post_broken_link_refinement_build=PASS
+post_broken_link_refinement_real_qa=PASS
+post_broken_link_refinement_real_db_before=8072
+post_broken_link_refinement_real_db_after=8072
+
+WHY ENOUGH
+Real filesystem symlink fixtures exercise the loader-aligned destination
+selection in focused tests. The real OpenCode run proves the production
+default scanner and warning surface remain functional after the correction.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

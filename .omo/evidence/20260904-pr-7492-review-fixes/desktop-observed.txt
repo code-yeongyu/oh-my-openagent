@@ -1,0 +1,6 @@
+[oh-my-openagent] OMO ignores "categories" in <desktop-config>/opencode.jsonc; move it to ~/.omo/omo.jsonc.
+status=0 real_db_sessions_before=8072 real_db_sessions_after=8072
+sandbox_xdg_data_home=<sandbox>/data
+sandbox_db=<sandbox>/data/opencode/opencode.db
+sandbox_db_sessions=0
+sandbox_db_inside_xdg_data_home=true

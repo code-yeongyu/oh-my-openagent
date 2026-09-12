@@ -1,0 +1,78 @@
+FAILING FIRST
+result=11 pass, 8 fail, 31 assertions
+invalid_profile_harness_key=FAIL
+profile_precedence=FAIL
+dual_format_and_legacy_sources=FAIL
+home_opencode_source=FAIL
+project_disable_semantics=FAIL
+worktree_boundary=FAIL
+project_depth_limit=FAIL
+host_discovery_isolation=FAIL
+
+PASSING
+custom_legacy_failing_first=18 pass, 1 fail, 34 assertions
+focused=43 pass, 0 fail, 94 assertions across 2 files
+profile_resolver_precedence=PASS
+literal_opencode_harness_key=PASS
+dual_json_jsonc_enumeration=PASS
+legacy_config_json_enumeration=PASS
+home_opencode_discovery=PASS
+project_disable_semantics=PASS
+worktree_boundary=PASS
+project_depth_limit_256=PASS
+test_discovery_environment_isolation=PASS
+startup_worktree_forwarding=PASS
+production_source_modules=58 and 200 lines
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE PROFILE
+capture_id=pr7492-complete-profile-e4f63202d-20260904T220958Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+configured_dir_profile=focused
+OMO_PROFILE=other
+observed=[oh-my-openagent] OMO ignores "categories" in <profile-config>/opencode.jsonc; move it to ~/.omo/omo.jsonc under profiles.other."[opencode]".categories.
+profile_precedence=PASS
+harness_key=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+REAL OPENCODE SOURCE ENUMERATION
+capture_id=pr7492-source-enum-e4f63202d-20260904T2218Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+loaded_json_warning=PASS
+default_legacy_config_warning=PASS
+custom_legacy_config_warning_absent=PASS
+warning_count=2
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+REAL OPENCODE DISABLED PROJECT CONFIG
+capture_id=pr7492-disable-project-e4f63202d-20260904T2210Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+OPENCODE_DISABLE_PROJECT_CONFIG=true
+plugin_loaded=PASS
+project_warning_absent=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+Focused tests cover every scanner branch against the unified loader and
+OpenCode discovery contracts. The three real OpenCode runs prove profile
+targeting, disabled-project behavior, and exact source enumeration through
+plugin startup.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

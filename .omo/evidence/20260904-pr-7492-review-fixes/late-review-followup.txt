@@ -1,0 +1,49 @@
+FAILING FIRST
+inline_content=false
+symlink_profile=false
+harness_scoped_profile=false
+0 pass, 3 fail
+
+PASSING
+focused=3 pass, 0 fail, 4 assertions
+related=60 pass, 0 fail, 97 assertions across 4 files
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE INLINE SOURCE
+capture_id=pr7492-inline-a0e86726f-20260904T205201Z
+captured_at_utc=2026-09-04T20:52:01Z
+tested_commit=a0e86726f347b07b04287f5cdf6247452383b0cf
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+[oh-my-openagent] OMO ignores "categories" in OPENCODE_CONFIG_CONTENT; move it to ~/.omo/omo.jsonc.
+resolved_home=<sandbox>/home-inline-proof
+resolved_db=<sandbox>/data-inline-proof/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+status=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+
+REAL OPENCODE PROFILE SOURCE
+capture_id=pr7492-profile-a0e86726f-20260904T205221Z
+captured_at_utc=2026-09-04T20:52:21Z
+tested_commit=a0e86726f347b07b04287f5cdf6247452383b0cf
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+[oh-my-openagent] OMO ignores "categories" in <profile-config>/opencode.jsonc; move it to ~/.omo/omo.jsonc under profiles.focused."[opencode]".categories.
+resolved_home=<sandbox>/home-profile-proof
+resolved_db=<sandbox>/data-profile-proof/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+status=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+
+OMITTED
+Resolved configuration JSON, credentials, auth headers, private user config,
+full environment dumps, and host-specific sandbox paths were not retained.

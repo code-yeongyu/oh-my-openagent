@@ -1,0 +1,41 @@
+FAILING FIRST
+scenario=project below HOME with misplaced OpenCode config above HOME
+result=4 pass, 1 fail, 7 assertions
+observed=above-HOME source was diagnosed with an unresolvable project target
+
+PASSING
+focused=28 pass, 0 fail, 62 assertions across 2 files
+inside_home_boundary=PASS
+outside_home_root_walk=PASS
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+
+REAL OPENCODE
+capture_id=pr7492-home-boundary-05d320ffb-20260904T2114Z
+captured_at_utc=2026-09-04T21:14Z
+tested_base_commit=05d320ffbebd0c3f1e41693996d4a35fd20d38ab-plus-working-tree-fix
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+project_location=<sandbox>/home/project
+misplaced_source_location=<sandbox>/opencode.jsonc
+plugin_loaded=PASS
+above_home_warning_absent=PASS
+resolved_home=<sandbox>/home
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The deterministic tests match unified OMO discovery for projects both inside
+and outside HOME. The real OpenCode run proves the built production plugin
+does not emit an impossible migration instruction for an above-HOME source.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

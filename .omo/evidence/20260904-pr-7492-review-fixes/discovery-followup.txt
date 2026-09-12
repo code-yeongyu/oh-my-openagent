@@ -1,0 +1,24 @@
+FAILING FIRST
+profile_hint=18 pass, 1 fail; invalid profiles.focused.opencode.categories observed
+explicit_and_ancestor=19 pass, 2 fail; both undiscovered
+windows_appdata=30 pass, 1 fail; APPDATA/opencode absent
+multiple_sources=21 pass, 1 fail; only first source reported
+
+PASSING
+focused_discovery=53 pass, 0 fail, 89 assertions
+related_startup_and_config=212 pass, 0 fail, 462 assertions, 24 files
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+real_opencode_warning=PASS
+real_database_sessions_before=8072
+real_database_sessions_after=8072
+sandbox_database=<sandbox>/data/opencode/opencode.db
+sandbox_database_inside_xdg_data_home=true
+post_merge_dev=07e30350b
+post_merge_related=212 pass, 0 fail, 462 assertions, 24 files
+post_merge_typecheck=PASS
+post_merge_build=PASS
+post_merge_real_opencode=PASS
+post_merge_real_database_sessions=8072 before, 8072 after

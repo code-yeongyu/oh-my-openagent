@@ -1,0 +1,46 @@
+FAILING FIRST
+scenario=simultaneous stable and dev Desktop configs plus divergent HOME and USERPROFILE
+result=21 pass, 2 fail, 44 assertions
+observed=both Desktop editions were scanned and the account home replaced unified HOME
+
+PASSING
+focused=47 pass, 0 fail, 103 assertions across 2 files
+active_desktop_edition=PASS
+unified_home_resolution=PASS
+startup_version_forwarding=PASS
+production_source_modules=63 and 200 lines
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_helpers=PASS
+
+REAL OPENCODE
+capture_id=pr7492-active-desktop-afc9bf9-20260904T2315Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+stable_source=<sandbox>/home/Library/Application Support/ai.opencode.desktop/opencode.jsonc
+inactive_dev_source=<sandbox>/home/Library/Application Support/ai.opencode.desktop.dev/opencode.jsonc
+unified_home_source=<sandbox>/home/.opencode/opencode.jsonc
+stable_scanned=PASS
+inactive_dev_absent=PASS
+unified_home_scanned=PASS
+warning_count=2
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+host_fixture_cleanup=PASS
+status=0
+
+SUPERSEDED
+This historical run exposed that a CLI process still scanned a Desktop source.
+The final host-aware behavior and replacement real runs are recorded in
+runtime-host-scope-followup.txt.
+
+WHY ENOUGH
+The deterministic regressions pin edition selection, startup version
+forwarding, and the shared loader's HOME precedence. The real OpenCode run
+proves the stable and unified-home sources are diagnosed while the stale dev
+source is ignored, without touching the host database.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

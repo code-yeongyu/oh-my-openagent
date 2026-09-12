@@ -1,0 +1,38 @@
+FAILING FIRST
+scenario=project cwd beneath a symlinked lexical ancestor
+result=12 pass, 1 fail, 23 assertions
+observed=physical-parent traversal missed the lexical HOME config source
+
+PASSING
+focused=36 pass, 0 fail, 79 assertions across 2 files
+lexical_parent_traversal=PASS
+canonical_boundary_comparison=PASS
+canonical_duplicate_reconciliation=PASS
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_common=PASS
+opencode_qa_sse=PASS
+initialization_docs=PASS
+
+REAL OPENCODE
+surface=opencode debug config --print-logs
+source=<sandbox>/project/.opencode/opencode.jsonc
+observed=[oh-my-openagent] OMO ignores "categories" in <sandbox>/project/.opencode/opencode.jsonc; move it to <sandbox>/project/.omo/omo.jsonc.
+project_target_observed=PASS
+resolved_home=<sandbox>/home
+resolved_db=<sandbox>/data/opencode/opencode.db
+home_inside_sandbox=PASS
+db_inside_sandbox=PASS
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The real-filesystem test pins lexical ancestry across a directory symlink.
+The real OpenCode run proves the production scanner still emits the correct
+project-scoped warning after the traversal correction.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

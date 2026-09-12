@@ -1,0 +1,20 @@
+COMMAND: bun test packages/omo-opencode/src/testing/create-plugin-module.test.ts packages/omo-opencode/src/config
+EXIT: 0
+
+176 pass
+0 fail
+417 expect() calls
+Ran 176 tests across 23 files.
+
+REVALIDATED ON FINAL REVIEW HEAD
+COMMAND: bun test packages/omo-opencode/src/testing/create-plugin-module.test.ts packages/omo-opencode/src/config
+EXIT: 0
+
+183 pass
+0 fail
+429 expect() calls
+Ran 183 tests across 23 files.
+
+The Bun 1.4.0 runner itself reports 23 discovered files for this command, so
+the recorded file count is retained rather than replaced by a manual filename
+estimate.

@@ -1,4 +1,5 @@
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
+import { join } from "node:path"
 import type { HookName } from "../config"
 import { validatePluginConfig } from "../config/validate"
 import { initConfigContext } from "../cli/config-manager/config-context"
@@ -41,6 +42,7 @@ import {
 } from "../shared/live-server-route"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
 import { runOpenCodeStartupMigration } from "../startup-migration"
+import { getMisplacedCategoryConfigDiagnostics } from "./misplaced-category-config"
 
 type StartupToastClient = {
   readonly tui?: {
@@ -72,6 +74,7 @@ export type PluginModuleDeps = {
   warmLiveServerProbe: typeof warmLiveServerProbe
   loadConfigChain: typeof validatePluginConfig
   loadPluginConfig: typeof loadPluginConfig
+  getMisplacedCategoryConfigDiagnostics: typeof getMisplacedCategoryConfigDiagnostics
   recordPluginTelemetry: typeof recordPluginTelemetry
   initI18n: typeof initI18n
   initializeOpenClaw: typeof initializeOpenClaw
@@ -106,6 +109,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   warmLiveServerProbe,
   loadConfigChain: validatePluginConfig,
   loadPluginConfig,
+  getMisplacedCategoryConfigDiagnostics,
   recordPluginTelemetry,
   initI18n,
   initializeOpenClaw,
@@ -151,8 +155,14 @@ function startupToastBody(input: {
   if (input.error !== undefined) {
     return { title: "Configuration migration failed", message: `${input.error}${diagnostics}`, variant: "error" }
   }
+  if (diagnostics.length > 0) {
+    return {
+      title: "Configuration diagnostics",
+      message: `${summary}${conflicts}${diagnostics}`.trim(),
+      variant: "warning",
+    }
+  }
   if (summary.length > 0) return { title: "Configuration migrated", message: `${summary}${conflicts}${diagnostics}`, variant: "success" }
-  if (diagnostics.length > 0) return { title: "Configuration diagnostics", message: input.diagnostics.join(" "), variant: "warning" }
   return undefined
 }
 
@@ -169,7 +179,18 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.migrateLegacyWorkspaceDirectory(input.directory)
     startupMigration ??= deps.runOpenCodeStartupMigration({ cwd: input.directory })
     const startupValidation = deps.loadConfigChain(input.directory)
-    const startupDiagnostics = startupValidation.valid ? [] : startupValidation.messages
+    const misplacedCategoryConfigs = deps.getMisplacedCategoryConfigDiagnostics(
+      input.directory,
+      { worktreeDirectory: input.worktree },
+    )
+    for (const misplacedCategoryConfig of misplacedCategoryConfigs) {
+      console.warn(`[oh-my-openagent] ${misplacedCategoryConfig}`)
+      deps.log("[config] ignored misplaced category overrides", { diagnostic: misplacedCategoryConfig })
+    }
+    const startupDiagnostics = [
+      ...(startupValidation.valid ? [] : startupValidation.messages),
+      ...misplacedCategoryConfigs,
+    ]
     deps.log("[config-migration] startup completed", {
       error: startupMigration.error,
       journalResumed: startupMigration.journalResumed,

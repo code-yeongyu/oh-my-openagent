@@ -1,0 +1,48 @@
+REVIEW: Preserve project scope in the migration hint
+
+FAILING-FIRST COMMAND:
+bun test packages/omo-opencode/src/testing/create-plugin-module.test.ts
+EXIT: 1
+
+Expected message to contain: <project>/.omo/omo.jsonc
+Received message: OMO ignores "categories" in <project>/.opencode/opencode.jsonc; move it to ~/.omo/omo.jsonc.
+
+16 pass
+1 fail
+42 expect() calls
+Ran 17 tests across 1 file.
+
+PASSING FOCUSED COMMAND:
+bun test packages/omo-opencode/src/testing/create-plugin-module.test.ts
+EXIT: 0
+
+17 pass
+0 fail
+44 expect() calls
+Ran 17 tests across 1 file.
+
+RELATED COMMAND:
+bun test packages/omo-opencode/src/testing/create-plugin-module.test.ts packages/omo-opencode/src/config
+EXIT: 0
+
+176 pass
+0 fail
+417 expect() calls
+Ran 176 tests across 23 files.
+
+TYPECHECK:
+bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+EXIT: 0
+
+BUILD:
+bun run build
+EXIT: 0
+OUTPUT: build: all steps completed
+
+OPENCODE QA:
+- common self-check: PASS
+- isolated TUI smoke: PASS
+- real OpenCode 1.18.27 health: healthy
+- observed warning target: <project>/.omo/omo.jsonc
+- host session count before/after: 8067 / 8067
+- server curl status after teardown: 7

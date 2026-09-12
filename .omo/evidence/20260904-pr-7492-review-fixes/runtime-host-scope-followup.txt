@@ -1,0 +1,62 @@
+FAILING FIRST
+scenario=runtime host identity and cross-host configuration discovery
+result=0 pass, 1 fail, 1 import error
+observed=getOpenCodeRuntimeConfigOptions did not exist
+
+PASSING
+affected=91 pass, 0 fail, 171 assertions across 6 files
+cli_excludes_desktop=PASS
+stable_desktop_excludes_dev=PASS
+dev_desktop_excludes_stable=PASS
+desktop_state_identity_beats_conflicting_channel=PASS
+direct_factory_scanner_isolation=PASS
+production_source_modules=197, 18, 69, and 200 lines
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_helpers=PASS
+
+REAL OPENCODE
+capture_id=pr7492-runtime-host-5b31043-20260905T0015Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+
+lane=cli
+home_source=PASS
+stable_desktop_source=ABSENT
+dev_desktop_source=ABSENT
+warning_count=1
+sandbox_sessions=0
+
+lane=desktop-stable
+official_client_signal=desktop
+state_identity=ai.opencode.desktop
+conflicting_channel=dev
+home_source=PASS
+stable_desktop_source=PASS
+dev_desktop_source=ABSENT
+warning_count=2
+sandbox_sessions=0
+
+lane=desktop-dev
+official_client_signal=desktop
+state_identity=ai.opencode.desktop.dev
+channel=prod
+home_source=PASS
+stable_desktop_source=ABSENT
+dev_desktop_source=PASS
+warning_count=2
+sandbox_sessions=0
+
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The deterministic suites pin official host-signal interpretation, active-root
+selection, diagnostic behavior, and factory isolation. Three real OpenCode
+processes prove cross-host sources are excluded and the active Desktop
+identity wins over a conflicting channel hint.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

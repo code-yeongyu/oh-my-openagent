@@ -1,0 +1,42 @@
+FAILING FIRST
+scenario=active profile with simultaneous profile-local and global OpenCode sources
+result=19 pass, 1 fail, 40 assertions
+observed=global source incorrectly inherited the active profile target
+
+PASSING
+focused=44 pass, 0 fail, 97 assertions across 2 files
+profile_local_target=PASS
+global_base_target=PASS
+project_base_target=PASS
+base_opencode_harness_scope=PASS
+production_source_modules=58 and 200 lines
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_helpers=PASS
+
+REAL OPENCODE
+capture_id=pr7492-profile-global-2f3c4e157-20260904T2230Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+profile_source=<sandbox>/profiles/focused/opencode.jsonc
+global_source=<sandbox>/xdg/opencode/opencode.jsonc
+OMO_PROFILE=other
+profile_observed=[oh-my-openagent] OMO ignores "categories" in <profile-source>; move it to ~/.omo/omo.jsonc under profiles.other."[opencode]".categories.
+global_observed=[oh-my-openagent] OMO ignores "categories" in <global-source>; move it to ~/.omo/omo.jsonc under "[opencode]".categories.
+profile_target=PASS
+global_target=PASS
+global_profile_absent=PASS
+warning_count=2
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The deterministic suite pins source-specific profile qualification and base
+OpenCode harness scope. The real OpenCode run proves both warnings coexist
+with distinct, loadable OMO destinations.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.

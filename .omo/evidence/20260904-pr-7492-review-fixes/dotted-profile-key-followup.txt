@@ -1,0 +1,40 @@
+FAILING FIRST
+scenario=profile name containing a dot
+result=20 pass, 1 fail, 42 assertions
+observed=profiles.client.prod described two nested keys instead of one profile key
+
+PASSING
+focused=45 pass, 0 fail, 98 assertions across 2 files
+dotted_profile_key=PASS
+global_base_target=PASS
+production_source_modules=58 and 200 lines
+adapter_typecheck=PASS
+full_build=PASS
+opencode_qa_helpers=PASS
+
+REAL OPENCODE
+capture_id=pr7492-dotted-profile-8c6c0eb-20260904T2245Z
+runner=opencode-1.18.28-darwin-arm64-local
+driver=opencode debug config --print-logs
+profile_source=<sandbox>/profiles/focused/opencode.jsonc
+global_source=<sandbox>/xdg/opencode/opencode.jsonc
+OMO_PROFILE=client.prod
+profile_observed=[oh-my-openagent] OMO ignores "categories" in <profile-source>; move it to ~/.omo/omo.jsonc under profiles."client.prod"."[opencode]".categories.
+global_observed=[oh-my-openagent] OMO ignores "categories" in <global-source>; move it to ~/.omo/omo.jsonc under "[opencode]".categories.
+dotted_target=PASS
+nested_target_absent=PASS
+global_target=PASS
+warning_count=2
+sandbox_sessions=0
+real_db_sessions_before=8072
+real_db_sessions_after=8072
+status=0
+
+WHY ENOUGH
+The deterministic regression proves arbitrary profile names are emitted as one
+configuration key. The real OpenCode run proves the quoted profile and base
+global destinations coexist without touching the host database.
+
+OMITTED
+Absolute temporary paths, resolved configuration JSON, credentials, auth
+headers, private user configuration, and unrelated logs were not retained.
