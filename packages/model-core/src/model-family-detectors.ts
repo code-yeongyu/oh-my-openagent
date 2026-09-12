@@ -85,7 +85,7 @@ export function isKimiK3Model(model: string): boolean {
 
 export function isSWE2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
-  return /^swe-2(?:[-.]|$)/.test(modelName)
+  return /^(?:ocx-devin-)?swe-2(?:[-.]|$)/.test(modelName)
 }
 
 export function isMiniMaxModel(model: string): boolean {
