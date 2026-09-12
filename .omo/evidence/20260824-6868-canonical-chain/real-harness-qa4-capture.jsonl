@@ -1,0 +1,16 @@
+{"event":"listening","line":"fake-openai listening on 37837"}
+{"call":1,"model":"gpt-fake","api":"responses","isTitle":true,"hasToolResult":false,"rosterHasChainPrimary":false,"bytes":2463}
+{"call":2,"model":"claude-opus-4-8","api":"chat-completions","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":false,"bytes":181859}
+{"call":3,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146933}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":4,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146933}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":5,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146933}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":6,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146933}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":7,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146933}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":8,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146933}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":9,"model":"claude-opus-4-8","api":"chat-completions","isTitle":false,"hasToolResult":true,"rosterHasChainPrimary":false,"bytes":182447}

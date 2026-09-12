@@ -1,0 +1,289 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin-handlers/prometheus-agent-config-builder.test.ts:
+315 |         userCategories: undefined,
+316 |         currentModel: undefined,
+317 |       });
+318 | 
+319 |       // then
+320 |       expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
+                                            ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+@@ -1,5 +1,36 @@
+  [
+-   ObjectContaining {
+-     "intent": ObjectContaining {
+-       "userModel": "custom-provider/custom-model",
++   {
++     "constraints": {
++       "availableModels":       Set {},
++     },
++     "intent": {
++       "categoryDefaultModel": undefined,
++       "uiSelectedModel": undefined,
++       "userModel": undefined,
++     },
++     "policy": {
++       "fallbackChain": [
++         {
++           "model": "claude-fable-5",
++           "providers": [
++             "anthropic",
++             "github-copilot",
++             "opencode",
++             "vercel",
++           ],
++           "variant": "xhigh",
++         },
++         {
++           "model": "kimi-k3",
++           "providers": [
++             "opencode-go",
++             "kimi-for-coding",
++             "moonshotai",
++             "opencode",
++             "vercel",
++           ],
++           "variant": "max",
++         },
++       ],
++       "systemDefaultModel": undefined,
+      },
+
+- Expected  - 3
++ Received  + 34
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/plugin-handlers/prometheus-agent-config-builder.test.ts:320:39)
+(fail) buildPrometheusAgentConfig > #given a canonical models chain on the override (issue #6868) > chain primary becomes userModel and the tail becomes fallback_models [1.40ms]
+342 |         userCategories: { "test-category": { models: ["cat-provider/cat-model", "cat-provider/cat-backup"] } },
+343 |         currentModel: undefined,
+344 |       });
+345 | 
+346 |       // then
+347 |       expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
+                                            ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+@@ -1,5 +1,36 @@
+  [
+-   ObjectContaining {
+-     "intent": ObjectContaining {
+-       "categoryDefaultModel": "cat-provider/cat-model",
++   {
++     "constraints": {
++       "availableModels":       Set {},
++     },
++     "intent": {
++       "categoryDefaultModel": undefined,
++       "uiSelectedModel": undefined,
++       "userModel": undefined,
++     },
++     "policy": {
++       "fallbackChain": [
++         {
++           "model": "claude-fable-5",
++           "providers": [
++             "anthropic",
++             "github-copilot",
++             "opencode",
++             "vercel",
++           ],
++           "variant": "xhigh",
++         },
++         {
++           "model": "kimi-k3",
++           "providers": [
++             "opencode-go",
++             "kimi-for-coding",
++             "moonshotai",
++             "opencode",
++             "vercel",
++           ],
++           "variant": "max",
++         },
++       ],
++       "systemDefaultModel": undefined,
+      },
+
+- Expected  - 3
++ Received  + 34
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/plugin-handlers/prometheus-agent-config-builder.test.ts:347:39)
+(fail) buildPrometheusAgentConfig > #given a canonical models chain on the category (issue #6868) > chain primary feeds categoryDefaultModel and the tail is materialized as fallback_models [1.31ms]
+
+packages/omo-opencode/src/plugin-handlers/plan-model-inheritance.test.ts:
+139 | 
+140 |     //#when
+141 |     const result = buildPlanDemoteConfig(prometheusConfig, undefined)
+142 | 
+143 |     //#then
+144 |     expect(result.models).toEqual([
+                                ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "model": "anthropic/claude-fable-5",
+-     "reasoning": "xhigh",
+-   },
+-   "opencode-go/kimi-k3",
+- ]
++ undefined
+
+- Expected  - 7
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/plugin-handlers/plan-model-inheritance.test.ts:144:27)
+(fail) buildPlanDemoteConfig > carries a canonical models chain from prometheus through to the demoted plan config (issue #6868) [0.32ms]
+158 | 
+159 |     //#when
+160 |     const result = buildPlanDemoteConfig(prometheusConfig, planOverride)
+161 | 
+162 |     //#then
+163 |     expect(result.models).toEqual(["openai/gpt-5.4"])
+                                ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "openai/gpt-5.4",
+- ]
++ undefined
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/plugin-handlers/plan-model-inheritance.test.ts:163:27)
+(fail) buildPlanDemoteConfig > plan override models win over prometheus models [0.18ms]
+
+packages/omo-opencode/src/plugin/available-categories.test.ts:
+33 |     //#when
+34 |     const categories = createAvailableCategories(pluginConfig)
+35 | 
+36 |     //#then
+37 |     const quick = categories.find((category) => category.name === "quick")
+38 |     expect(quick?.model).toBe("opencode-go/deepseek-v4-pro")
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode-go/deepseek-v4-pro"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/plugin/available-categories.test.ts:38:26)
+(fail) createAvailableCategories > #given a category configured with a canonical models chain #when the roster is built #then the chain primary is exposed instead of undefined (issue #6868) [0.29ms]
+
+packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts:
+183 | 		//#when
+184 | 		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined)
+185 | 
+186 | 		//#then - the explicitly written model leads; the chain shifts into the fallbacks
+187 | 		expect(result.error).toBeUndefined()
+188 | 		expect(result.actualModel).toBe("legacy/primary")
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "legacy/primary"
+Received: "openai/gpt-5.4"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts:188:30)
+(fail) resolveCategoryExecution > merges the legacy model into the canonical chain head and preserves per-entry reasoning (issue #6868) [0.64ms]
+
+packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts:
+60 |     //#when
+61 |     const presentation = createDelegateTaskPresentation({ userCategories })
+62 | 
+63 |     //#then
+64 |     const quick = presentation.availableCategories.find((category) => category.name === "quick")
+65 |     expect(quick?.model).toBe("opencode-go/deepseek-v4-pro")
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode-go/deepseek-v4-pro"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts:65:26)
+(fail) createDelegateTaskPresentation > #given a user category with a canonical models chain #when presentation is built #then the roster row shows the chain primary (issue #6868) [0.32ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts:
+160 | 
+161 |     //#when
+162 |     const result = getFallbackModelsForSession(sessionID, undefined, pluginConfig)
+163 | 
+164 |     //#then
+165 |     expect(result).toEqual(["anthropic/claude-opus-4-7"])
+                         ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "anthropic/claude-opus-4-7",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts:165:20)
+(fail) runtime-fallback fallback-models > uses the tail of a category models chain when session category is registered (issue #6868) [0.34ms]
+180 | 
+181 |     //#when
+182 |     const result = getFallbackModelsForSession(sessionID, undefined, pluginConfig)
+183 | 
+184 |     //#then - the merged head is primary, everything after it is retry fallback
+185 |     expect(result).toEqual(["quotio/second", "quotio/third"])
+                         ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "quotio/second",
+-   "quotio/third",
+- ]
++ []
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts:185:20)
+(fail) runtime-fallback fallback-models > merges a legacy model written beside a canonical chain into the chain head [0.19ms]
+197 | 
+198 |     //#when
+199 |     const result = getFallbackModelsForSession("ses_runtime_fallback_agent_chain", "oracle", pluginConfig)
+200 | 
+201 |     //#then
+202 |     expect(result).toEqual(["anthropic/claude-opus-4-7"])
+                         ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "anthropic/claude-opus-4-7",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts:202:20)
+(fail) runtime-fallback fallback-models > uses the tail of an agent models chain when agent is resolved [0.15ms]
+217 | 
+218 |     //#when
+219 |     const result = getFallbackModelsForSession("ses_runtime_fallback_agent_category_chain", "oracle", pluginConfig)
+220 | 
+221 |     //#then
+222 |     expect(result).toEqual(["anthropic/claude-opus-4-7"])
+                         ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "anthropic/claude-opus-4-7",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6868/packages/omo-opencode/src/hooks/runtime-fallback/fallback-models.test.ts:222:20)
+(fail) runtime-fallback fallback-models > uses the tail of the agent category models chain when the agent has no own chain [0.15ms]
+
+ 63 pass
+ 11 fail
+ 179 expect() calls
+Ran 74 tests across 7 files. [564.00ms]

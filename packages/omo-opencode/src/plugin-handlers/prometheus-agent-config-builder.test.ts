@@ -303,6 +303,58 @@ describe("buildPrometheusAgentConfig", () => {
     });
   });
 
+  describe("#given a canonical models chain on the override (issue #6868)", () => {
+    test("chain primary becomes userModel and the tail becomes fallback_models", async () => {
+      // given
+      const overrideModels = ["custom-provider/custom-model", "other-provider/backup"];
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { models: overrideModels },
+        userCategories: undefined,
+        currentModel: undefined,
+      });
+
+      // then
+      expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          intent: expect.objectContaining({
+            userModel: "custom-provider/custom-model",
+          }),
+        })
+      );
+      expect(result.fallback_models).toEqual(["other-provider/backup"]);
+    });
+  });
+
+  describe("#given a canonical models chain on the category (issue #6868)", () => {
+    test("chain primary feeds categoryDefaultModel and the tail is materialized as fallback_models", async () => {
+      // given
+      resolveCategoryConfigSpy.mockReturnValue({
+        models: ["cat-provider/cat-model", "cat-provider/cat-backup"],
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { category: "test-category" },
+        userCategories: { "test-category": { models: ["cat-provider/cat-model", "cat-provider/cat-backup"] } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          intent: expect.objectContaining({
+            categoryDefaultModel: "cat-provider/cat-model",
+          }),
+        })
+      );
+      expect(result.fallback_models).toEqual(["cat-provider/cat-backup"]);
+    });
+  });
+
   describe("#given no currentModel and no explicit config", () => {
     test("falls through to fallback chain", async () => {
       // given - no currentModel, no explicit config

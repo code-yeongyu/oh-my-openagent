@@ -1,0 +1,7 @@
+{"event":"listening","line":"fake-openai listening on 36143"}
+{"call":1,"model":"gpt-fake","api":"responses","isTitle":true,"hasToolResult":false,"rosterHasChainPrimary":false,"bytes":2463}
+{"call":2,"model":"claude-opus-4-8","api":"chat-completions","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":false,"bytes":181847}
+{"call":3,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146921}
+{"event":"inject-500","model":"gpt-fake-a"}
+{"call":4,"model":"gpt-fake-a","api":"responses","isTitle":false,"hasToolResult":false,"rosterHasChainPrimary":true,"bytes":146921}
+{"call":5,"model":"claude-opus-4-8","api":"chat-completions","isTitle":false,"hasToolResult":true,"rosterHasChainPrimary":true,"bytes":182765}

@@ -4,7 +4,8 @@ import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { resolveEffectiveModelChain } from "../../shared/effective-model-chain"
 
 /**
  * Returns fallback model strings for the runtime-fallback system.
@@ -43,9 +44,11 @@ function getRawFallbackModelsForSession(
 ): (string | FallbackModelObject)[] | undefined {
   const sessionCategory = SessionCategoryRegistry.get(sessionID)
   if (sessionCategory && pluginConfig.categories?.[sessionCategory]) {
-    const categoryConfig = pluginConfig.categories[sessionCategory]
-    if (categoryConfig?.fallback_models) {
-      return normalizeFallbackModels(categoryConfig.fallback_models)
+    const categoryFallbacks = resolveEffectiveModelChain(
+      pluginConfig.categories[sessionCategory],
+    ).fallbackEntries
+    if (categoryFallbacks !== undefined) {
+      return categoryFallbacks
     }
   }
 
@@ -53,15 +56,18 @@ function getRawFallbackModelsForSession(
     const agentConfig = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]
     if (!agentConfig) return undefined
 
-    if (agentConfig?.fallback_models) {
-      return normalizeFallbackModels(agentConfig.fallback_models)
+    const agentFallbacks = resolveEffectiveModelChain(agentConfig).fallbackEntries
+    if (agentFallbacks !== undefined) {
+      return agentFallbacks
     }
 
     const agentCategory = agentConfig?.category
     if (agentCategory && pluginConfig.categories?.[agentCategory]) {
-      const categoryConfig = pluginConfig.categories[agentCategory]
-      if (categoryConfig?.fallback_models) {
-        return normalizeFallbackModels(categoryConfig.fallback_models)
+      const categoryFallbacks = resolveEffectiveModelChain(
+        pluginConfig.categories[agentCategory],
+      ).fallbackEntries
+      if (categoryFallbacks !== undefined) {
+        return categoryFallbacks
       }
     }
 
