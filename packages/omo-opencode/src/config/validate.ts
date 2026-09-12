@@ -42,7 +42,7 @@ function schemaMessages(configPath: string, rawConfig: Record<string, unknown>):
   return [...validationMessages, ...unknownKeyMessages]
 }
 
-function parseConfig(rawConfig: Record<string, unknown>): Partial<OhMyOpenCodeConfig> {
+function parseConfigWithoutDefaults(rawConfig: Record<string, unknown>): Partial<OhMyOpenCodeConfig> {
   let config: Partial<OhMyOpenCodeConfig> = {}
   for (const [key, value] of Object.entries(rawConfig)) {
     const result = OhMyOpenCodeConfigSchema.safeParse({ [key]: value })
@@ -55,7 +55,7 @@ function parseConfig(rawConfig: Record<string, unknown>): Partial<OhMyOpenCodeCo
 
 function parseConfigView(path: string, rawConfig: Record<string, unknown>): LoadedConfigView {
   return {
-    config: parseConfig(rawConfig),
+    config: parseConfigWithoutDefaults(rawConfig),
     messages: schemaMessages(path, rawConfig),
     path,
   }
@@ -188,7 +188,7 @@ export function validatePluginConfig(
   const messages = [...chainMessages, ...views.flatMap((view) => view.messages)]
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]
-  const userConfig = parseConfig(chain.protectedUserView)
+  const userConfig = parseConfigWithoutDefaults(chain.protectedUserView)
   const config = applyDisabledProviders(materializeAgentModelChains(
     protectUserFields(mergeViews(views), userConfig),
   ))
