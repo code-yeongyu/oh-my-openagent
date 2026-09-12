@@ -33,6 +33,7 @@ describe("TuiRuntimeSnapshotSchema", () => {
         blocked: 1,
         activeGoal: "Render sidebar",
       },
+      lspClients: [],
     }
 
     // when
@@ -47,12 +48,13 @@ describe("TuiRuntimeSnapshotSchema", () => {
   it("#given a version mismatch #when parsed #then it returns null", () => {
     // given
     const raw = {
-      version: 2,
+      version: 1,
       projectDir: "/tmp/project",
       updatedAt: 1,
       activeAgents: [],
       jobBoard: [],
       loop: null,
+      lspClients: [],
     }
 
     // when
@@ -70,6 +72,7 @@ describe("TuiRuntimeSnapshotSchema", () => {
       activeAgents: [],
       jobBoard: [],
       loop: null,
+      lspClients: [],
     }
 
     // when

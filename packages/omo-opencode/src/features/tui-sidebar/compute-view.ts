@@ -5,6 +5,7 @@ import type {
   JobBoardState,
   LoopLive,
   LoopState,
+  LspState,
   RosterState,
   SidebarView,
 } from "./state-types"
@@ -15,6 +16,7 @@ export type ComputeViewSections = {
   readonly agents: AgentsState
   readonly jobs: JobBoardState
   readonly loop: LoopState
+  readonly lsp: LspState
 }
 
 export function computeView(sections: ComputeViewSections): SidebarView {
@@ -24,6 +26,7 @@ export function computeView(sections: ComputeViewSections): SidebarView {
       loop: sections.loop,
       agents: sections.agents,
       jobs: sections.jobs,
+      lsp: sections.lsp,
       configBanner: sections.config.kind === "invalid" ? { kind: "invalid" } : { kind: "none" },
     }
   }
@@ -32,7 +35,7 @@ export function computeView(sections: ComputeViewSections): SidebarView {
     return { kind: "broken", messages: sections.config.messages }
   }
 
-  return { kind: "idle", roster: sections.roster }
+  return { kind: "idle", roster: sections.roster, lsp: sections.lsp }
 }
 
 export function viewKey(view: SidebarView): string {
@@ -43,12 +46,13 @@ export function viewKey(view: SidebarView): string {
         loopKeyParts(view.loop),
         agentsKeyParts(view.agents),
         jobsKeyParts(view.jobs),
+        lspKeyParts(view.lsp),
         ["configBanner", view.configBanner.kind],
       ])
     case "broken":
       return stableKey(["broken", [...view.messages]])
     case "idle":
-      return stableKey(["idle", rosterKeyParts(view.roster)])
+      return stableKey(["idle", rosterKeyParts(view.roster), lspKeyParts(view.lsp)])
     default:
       return assertNever(view)
   }
@@ -107,6 +111,17 @@ function loopKeyParts(loop: LoopState): readonly unknown[] {
       return ["loop", "live", liveLoopKeyParts(loop)]
     default:
       return assertNever(loop)
+  }
+}
+
+function lspKeyParts(lsp: LspState): readonly unknown[] {
+  switch (lsp.kind) {
+    case "none":
+      return ["lsp", "none"]
+    case "list":
+      return ["lsp", "list", lsp.clients.map((client) => [client.serverId, client.root, client.state, client.refCount])]
+    default:
+      return assertNever(lsp)
   }
 }
 

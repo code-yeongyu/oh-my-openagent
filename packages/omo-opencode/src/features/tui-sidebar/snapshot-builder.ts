@@ -2,9 +2,10 @@ import { getLastAgentFromSession } from "../../hooks/atlas/session-last-agent"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { MIRROR_SCHEMA_VERSION } from "./constants"
 import { readActiveLoop } from "./loop-reader"
+import { readLspDaemonStatus } from "./lsp-status-reader"
 import { canonicalProjectDir } from "./mirror-path"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
-import type { AgentStatus, JobRow } from "./state-types"
+import type { AgentStatus, JobRow, LspClientRow } from "./state-types"
 import type { BackgroundTaskSnapshot } from "../background-agent/types"
 
 export type TuiMirrorClient = {
@@ -32,6 +33,7 @@ export type BuildTuiRuntimeSnapshotInput = {
   readonly backgroundManager: TuiBackgroundSnapshotProvider
   readonly getStatuses?: () => Promise<SessionStatusMap>
   readonly sessionAgentResolver?: SessionAgentResolver
+  readonly lspStatusReader?: () => readonly LspClientRow[]
 }
 
 type ActiveAgentStatus = Extract<AgentStatus, "busy" | "retry" | "running">
@@ -49,6 +51,7 @@ export async function buildTuiRuntimeSnapshot(
     activeAgents: await activeAgentsFromStatuses(statuses, input.client, input.sessionAgentResolver ?? getLastAgentFromSession),
     jobBoard: input.backgroundManager.getTasksSnapshot().map(toJobRow),
     loop: loop.kind === "live" ? redactLoopText(loop) : null,
+    lspClients: [...(input.lspStatusReader?.() ?? readLspDaemonStatus())],
   }
 }
 

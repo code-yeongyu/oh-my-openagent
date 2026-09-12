@@ -10,6 +10,7 @@ import type {
   TuiMirrorClient,
 } from "./snapshot-builder"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
+import type { LspClientRow } from "./state-types"
 
 export type TuiStateMirrorInput = {
   readonly client: TuiMirrorClient
@@ -17,6 +18,7 @@ export type TuiStateMirrorInput = {
   readonly backgroundManager: TuiBackgroundSnapshotProvider
   readonly getStatuses?: () => Promise<SessionStatusMap>
   readonly sessionAgentResolver?: SessionAgentResolver
+  readonly lspStatusReader?: () => readonly LspClientRow[]
   readonly reportFlushError?: (error: Error) => void
 }
 
