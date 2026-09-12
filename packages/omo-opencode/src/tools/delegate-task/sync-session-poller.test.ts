@@ -28,6 +28,41 @@ describe("pollSyncSession", () => {
   })
 
   describe("native finish-based completion", () => {
+    test("returns terminal child error immediately when only the anchor user turn exists", async () => {
+      // given: the provider fails before an assistant message is created
+      const { pollSyncSession } = require("./sync-session-poller")
+      const terminalError = "Model not found: opencode/gpt-5-nano"
+      let statusCallCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [{ info: { id: "msg_anchor", role: "user" } }],
+          }),
+          status: async () => {
+            statusCallCount++
+            return { data: { ses_untracked: { type: "idle" } } }
+          },
+          abort: async () => ({}),
+        },
+      }
+
+      // when: polling the failed child with the existing shortened timing
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_untracked",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        anchorMessageID: "msg_anchor",
+        anchorMessageCount: 1,
+        getTerminalChildError: (sessionID: string) => sessionID === "ses_untracked" ? terminalError : null,
+      }, 100)
+
+      // then: the provider error surfaces without repeated status polling
+      expect(result).toBe(terminalError)
+      expect(result).not.toContain("Poll inactivity timeout reached")
+      expect(statusCallCount).toBeLessThanOrEqual(1)
+    })
+
     test("returns terminal session error when assistant message contains info.error", async () => {
       // given: error in assistant message
       const { pollSyncSession } = require("./sync-session-poller")

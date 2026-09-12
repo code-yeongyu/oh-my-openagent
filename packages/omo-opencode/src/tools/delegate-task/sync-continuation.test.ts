@@ -64,6 +64,49 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 		resetToastManager = null
   })
 
+  test("passes bound manager callbacks when polling a continuation", async () => {
+    //#given
+    const { executeSyncContinuation } = require("./sync-continuation")
+    const manager = {
+      sessionID: "ses_callback_continuation",
+      hasActiveChildTasks(sessionID: string) { return sessionID === this.sessionID },
+      hasPendingParentWake(sessionID: string) { return sessionID === this.sessionID },
+      getTerminalChildError(sessionID: string) { return sessionID === this.sessionID ? "terminal failure" : null },
+    }
+    const client = {
+      session: {
+        messages: async () => ({ data: [] }),
+        promptAsync: async () => ({}),
+        status: async () => ({ data: {} }),
+      },
+    }
+    const pollSyncSession = mock(async (
+      ..._args: Parameters<import("./sync-continuation-deps").SyncContinuationDeps["pollSyncSession"]>
+    ) => "terminal failure")
+
+    //#when
+    await executeSyncContinuation({
+      task_id: manager.sessionID,
+      prompt: "continue",
+      description: "callback wiring",
+      load_skills: [],
+      run_in_background: false,
+    }, { sessionID: "parent-session", callID: "callback-call", metadata: () => {} }, {
+      client, manager,
+    }, { sessionID: "parent-session", messageID: "parent-message" }, {
+      pollSyncSession,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "result" }),
+    })
+
+    //#then
+    expect(pollSyncSession).toHaveBeenCalledTimes(1)
+    const input = pollSyncSession.mock.calls[0]?.[2]
+    expect(input?.getTerminalChildError).toEqual(expect.any(Function))
+    expect(input?.getTerminalChildError?.(manager.sessionID)).toBe("terminal failure")
+    expect(input?.hasActiveChildBackgroundTasks?.(manager.sessionID)).toBe(true)
+    expect(input?.hasPendingParentWake?.(manager.sessionID)).toBe(true)
+  })
+
   test("removes toast when fetchSyncResult throws", async () => {
     const mockClient = {
       session: {
