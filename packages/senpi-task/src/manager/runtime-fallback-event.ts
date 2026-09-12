@@ -1,4 +1,5 @@
 import type { ResolvedModelRecord, TaskRecord } from "../state"
+import { asSenpiThinkingLevel } from "../senpi/thinking-level"
 import type { ManagedChildEvent } from "./child-handle"
 
 export type RuntimeFallbackStore = {
@@ -11,12 +12,22 @@ export function applyRuntimeFallbackEvent(
   taskId: string,
   event: ManagedChildEvent,
 ): void {
-  if (event.type !== "retry_fallback_applied" || store.load === undefined || store.replace === undefined) return
-  const selector = readEventString(event, "to")
+  if (store.load === undefined || store.replace === undefined) return
+  const selector = event.type === "retry_fallback_applied"
+    ? readEventString(event, "to")
+    : admittedFallbackSelector(event)
+  if (selector === undefined) return
   const record = store.load(taskId)
-  if (selector === undefined || record == null) return
+  if (record == null) return
   const resolvedModel = parseModelSelector(selector, record.resolved_model?.source ?? "category")
   if (resolvedModel === undefined) return
+  // Senpi emits model_changed with the effective level AFTER admission, on both runners.
+  // Its following bare retry_fallback_applied is a receipt, not a new effort selection.
+  if (
+    event.type === "retry_fallback_applied"
+    && resolvedModel.reasoning === undefined
+    && resolvedModel.display === record.resolved_model?.display
+  ) return
   const fallbackModels = remainingFallbacks(record.fallback_models, resolvedModel)
   const fallbackAttempts = appendFallbackAttempts(
     record.fallback_attempts,
@@ -31,6 +42,17 @@ export function applyRuntimeFallbackEvent(
     updated_at: new Date().toISOString(),
     ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
   })
+}
+
+function admittedFallbackSelector(event: ManagedChildEvent): string | undefined {
+  if (event.type !== "model_changed" || readEventString(event, "source") !== "fallback") return undefined
+  const model: unknown = Reflect.get(event, "model")
+  if (typeof model !== "object" || model === null) return undefined
+  const provider: unknown = Reflect.get(model, "provider")
+  const id: unknown = Reflect.get(model, "id")
+  if (typeof provider !== "string" || provider.length === 0 || typeof id !== "string" || id.length === 0) return undefined
+  const thinking = asSenpiThinkingLevel(readEventString(event, "thinkingLevel"))
+  return `${provider}/${id}${thinking === undefined ? "" : `:${thinking}`}`
 }
 
 function parseModelSelector(
