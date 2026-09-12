@@ -107,7 +107,6 @@ function runSenpiPluginBuild(outputDir: string): void {
         OMO_AST_GREP_MCP_ENTRY: astSource,
         OMO_AST_GREP_MCP_TARGET: join(buildRoot, "plugin", "runtime", "ast-grep-mcp", "cli.js"),
         OMO_AGENT_TOOLKIT_SOURCE_ENTRY: join(buildRoot, "codex", "ulw-loop", "cli.js"),
-        OMO_AGENT_TOOLKIT_TARGET: join(buildRoot, "plugin", "runtime", "agent-toolkit"),
         OMO_SENPI_PLUGIN_OUTPUT: join(buildRoot, "plugin"),
         OMO_SKIP_MATERIALIZE: "1",
       },

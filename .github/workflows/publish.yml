@@ -1592,9 +1592,15 @@ jobs:
             )
           }
 
+          # Same wall-clock budget as the omo-ai readiness loop above: npm exposes a freshly published
+          # version 4-5 minutes after `npm publish` returns, and a 12 x 10 s budget failed a successful
+          # lazycodex-ai publish in beta.31, beta.34, and 5.0.0-beta.57 (#8182).
+          SMOKE_READINESS_INTERVAL_SECONDS=15
+          SMOKE_READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
+
           smoke_lazycodex_package() {
             package_spec="$1"
-            for attempt in $(seq 1 12); do
+            for attempt in $(seq 1 "$SMOKE_READINESS_ATTEMPTS"); do
               SMOKE_DIR=$(mktemp -d)
               export HOME="$SMOKE_DIR/home"
               export CODEX_HOME="$SMOKE_DIR/codex"
@@ -1606,18 +1612,18 @@ jobs:
               expected_doctor_hint="Use \$omo:lcx-doctor"
 
               if ! registry_version=$(npm view "$package_spec" version --silent 2>"$SMOKE_DIR/registry-error"); then
-                echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/12)"
+                echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/${SMOKE_READINESS_ATTEMPTS}, ${SMOKE_READINESS_INTERVAL_SECONDS}s)"
                 cd "$GITHUB_WORKSPACE"
                 rm -rf "$SMOKE_DIR"
-                sleep 10
+                sleep "$SMOKE_READINESS_INTERVAL_SECONDS"
                 continue
               fi
 
               if [[ "$package_spec" != *"@latest" && "$registry_version" != "${package_spec##*@}" ]]; then
-                echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/12; visible=${registry_version})"
+                echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/${SMOKE_READINESS_ATTEMPTS}, ${SMOKE_READINESS_INTERVAL_SECONDS}s; visible=${registry_version})"
                 cd "$GITHUB_WORKSPACE"
                 rm -rf "$SMOKE_DIR"
-                sleep 10
+                sleep "$SMOKE_READINESS_INTERVAL_SECONDS"
                 continue
               fi
 
@@ -1689,7 +1695,7 @@ jobs:
               rm -rf "$SMOKE_DIR"
               return 0
             done
-            echo "::error::Published LazyCodex smoke failed for ${package_spec}"
+            echo "::error::${package_spec} never became visible on the registry within $((SMOKE_READINESS_ATTEMPTS * SMOKE_READINESS_INTERVAL_SECONDS)) s; the publish itself may have succeeded (check npm before rerunning), this is registry propagation, not a broken package"
             return 1
           }
 

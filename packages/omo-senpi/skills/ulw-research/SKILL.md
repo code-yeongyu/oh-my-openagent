@@ -93,7 +93,7 @@ This is `$SESSION_DIR`. Write `brief.md` into it: the analysis block, the axis l
 
 ### Run it as a loop, and journal in real time
 
-ulw-loop is ON by default for this mode: register the research axes as loop goals (`omo-agent-toolkit ulw-loop create-goals`, then `create_goal` from the printed handoff) so the run has durable state and survives a compaction. The session directory's timestamp is the run's start clock — the closing briefing is computed from it, so create it once and never rename it. From that point every finding, source, quote, number, and lead is written into `$SESSION_DIR` **the instant it lands** — never held in the conversation for an end-of-run dump. After any context loss, re-read the brief, the journal, and `omo-agent-toolkit ulw-loop status --json` before doing anything else, then resume from the open wave.
+ulw-loop is ON by default for this mode: register the research axes as loop goals (tool.omo_agent_toolkit({ operation: "create-goals" }), then `create_goal` from the printed handoff) so the run has durable state and survives a compaction. The session directory's timestamp is the run's start clock — the closing briefing is computed from it, so create it once and never rename it. From that point every finding, source, quote, number, and lead is written into `$SESSION_DIR` **the instant it lands** — never held in the conversation for an end-of-run dump. After any context loss, re-read the brief, the journal, and tool.omo_agent_toolkit({ operation: "status" }) before doing anything else, then resume from the open wave.
 
 ### Format-proposal gate — ALWAYS ask, before the team exists
 
@@ -228,7 +228,7 @@ The Phase 0 core question is the fixed goal of the run and never drifts. An excu
 
 Interest alone is not a trigger. Anything without one stays a queued lead in `expansion-log.md`, and the wave plan continues.
 
-**Budget the dive before you take it.** State the lane or member count and the probe count for this level in the ENTER row. An excursion may spawn at most ONE nested sub-excursion; a third level means the thing has become its own research question — surface immediately and either promote it to a real axis with its own member (`omo-agent-toolkit ulw-loop steer --kind add_subgoal --title "<axis>" --objective "<what it must answer>" --evidence "<what surfaced it>" --rationale "<why the plan changes>"`) or record it as an out-of-scope gap in `SYNTHESIS.md`.
+**Budget the dive before you take it.** State the lane or member count and the probe count for this level in the ENTER row. An excursion may spawn at most ONE nested sub-excursion; a third level means the thing has become its own research question — surface immediately and either promote it to a real axis with its own member (tool.omo_agent_toolkit({ operation: "steer" })) or record it as an out-of-scope gap in `SYNTHESIS.md`.
 
 **EXIT (surface) the moment any of these holds** — you do not need all of them:
 
@@ -237,7 +237,7 @@ Interest alone is not a trigger. Anything without one stays a queued lead in `ex
 - The finding stops moving any claim's status — diminishing return is an exit, not a reason to push harder.
 - The level's stated budget is spent.
 
-**Fold back on the way out.** Every EXIT writes one line saying what the excursion changed in the top-level answer, and `none — <reason>` is a legitimate, required outcome; an excursion whose result is silently dropped is a lost run. Update the parent claim node or axis digest with the result, then mirror the whole excursion into the loop ledger: `omo-agent-toolkit ulw-loop steer --kind annotate_ledger --evidence "<what the excursion observed>" --rationale "<what it changed, or none>"`, and when it settled a success criterion, `omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "<artifact>"`. After a compaction, `omo-agent-toolkit ulw-loop status --json` plus `excursion-log.md` tell you which excursions are still open.
+**Fold back on the way out.** Every EXIT writes one line saying what the excursion changed in the top-level answer, and `none — <reason>` is a legitimate, required outcome; an excursion whose result is silently dropped is a lost run. Update the parent claim node or axis digest with the result, then mirror the whole excursion into the loop ledger: tool.omo_agent_toolkit({ operation: "steer" }), and when it settled a success criterion, tool.omo_agent_toolkit({ operation: "record-evidence" }). After a compaction, tool.omo_agent_toolkit({ operation: "status" }) plus `excursion-log.md` tell you which excursions are still open.
 
 **Anti-drift.** After every EXIT, re-read the core question in `brief.md` and confirm the run still answers it. Three consecutive excursions that changed nothing end excursions for the run: converge on what you have.
 

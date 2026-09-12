@@ -194,7 +194,7 @@ describe("omo-senpi skill-pointers component", () => {
       expect(content).toEndWith("</omo-mass-ulw-pointer>")
     })
 
-    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop includes the resolved CLI shim", async () => {
+    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop points at the registered toolkit tool", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -208,10 +208,9 @@ describe("omo-senpi skill-pointers component", () => {
       if (typeof massContent !== "string" || typeof loopContent !== "string") {
         throw new Error("expected string skill-pointer messages")
       }
-      expect(loopContent).toContain("runtime/agent-toolkit/omo-agent-toolkit")
-      expect(loopContent).toContain("ulw-loop <subcommand>")
-      expect(loopContent).not.toContain("--session-id")
-      expect(massContent).not.toContain("runtime/agent-toolkit")
+      expect(loopContent).toContain("tool.omo_agent_toolkit")
+      expect(loopContent).not.toContain("runtime/agent-toolkit")
+      expect(massContent).not.toContain("tool.omo_agent_toolkit")
     })
 
     it("#when overlapping keywords are mentioned #then one pointer per skill is injected in table order", async () => {
@@ -351,7 +350,7 @@ describe("omo-senpi skill-pointers component", () => {
 
       expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
       const content = pi.messages[0]?.message["content"]
-      expect(content).toContain("--session-id session-a-weird")
+      expect(content).toContain("tool.omo_agent_toolkit")
       expect(content).toContain(".omo/ulw-loop/session-a-weird/")
     })
 
@@ -370,8 +369,8 @@ describe("omo-senpi skill-pointers component", () => {
       expect(result.action).toBe("transform")
       if (result.action !== "transform") throw new Error("expected transform")
       expect(result.text).toStartWith(`${prompt}\n<omo-ulw-loop-pointer>`)
-      expect(result.text).toContain("--session-id new-session")
-      expect(result.text).not.toContain("--session-id previous-session")
+      expect(result.text).toContain(".omo/ulw-loop/new-session/")
+      expect(result.text).not.toContain(".omo/ulw-loop/previous-session/")
       expect(pi.messages).toHaveLength(1)
     })
 

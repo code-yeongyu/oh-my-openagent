@@ -130,7 +130,7 @@ describe("compiled omo entry launcher parity", () => {
 
   test("package-root environment values point into the provisioned runtime", () => {
     const env = remapSenpiEnvironment({ OMO_BIN: "/old", SENPI_BIN: "/old-senpi", PATH: "/bin" }, "/provisioned")
-    expect(env.OMO_AGENT_TOOLKIT_BIN).toBe(join("/provisioned", "plugin", "runtime", "agent-toolkit", process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit"))
+    expect(env.OMO_AGENT_TOOLKIT_BIN).toBeUndefined()
     expect(env.OMO_BIN).toBe(join("/provisioned", process.platform === "win32" ? "omo.exe" : "omo"))
     expect(env.OMO_CODING_AGENT_DIR).toBeDefined()
   })
@@ -304,7 +304,7 @@ describe("embedded runtime provisioning", () => {
   test("compiled doctor resolves package artifacts from the provided execDir", async () => {
     const root = temp()
     writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
-    for (const artifact of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js", "plugin/runtime/agent-toolkit/cli.js"]) {
+    for (const artifact of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js"]) {
       const path = join(root, artifact)
       mkdirSync(join(path, ".."), { recursive: true })
       writeFileSync(path, "fixture\n")

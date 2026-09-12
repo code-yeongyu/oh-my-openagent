@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
@@ -54,7 +53,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
     pattern: /\bulw[\s-]*loop\b/i,
     expandedBlockPattern: /<skill\s+name="ulw-loop"/i,
     instruction: "run the goal-driven ultrawork loop with evidence-bound execution",
-    extra: ulwLoopCliShimSentence,
+    extra: ulwLoopToolSentence,
   },
   {
     skillName: "ulw-research",
@@ -142,17 +141,12 @@ function handleInput(
   return { action: "continue" }
 }
 
-function ulwLoopCliShimPath(): string {
-  return fileURLToPath(new URL("../runtime/agent-toolkit/omo-agent-toolkit", import.meta.url))
-}
-
-// Eval kernels lack the session env; pass the proven scope explicitly instead of using global state.
-function ulwLoopCliShimSentence(sessionScope: string | null): string {
-  const abs = ulwLoopCliShimPath().replaceAll("\\", "/")
-  if (sessionScope === null) {
-    return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand>\`.`
-  }
-  return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand> --session-id ${sessionScope}\` (this session's state lives under .omo/ulw-loop/${sessionScope}/; the eval kernel does not inherit the session env, so always pass the flag).`
+// Native no longer ships a toolkit CLI: the loop is driven by the registered tool. The session id
+// still travels explicitly because an eval kernel does not inherit the session env.
+function ulwLoopToolSentence(sessionScope: string | null): string {
+  const base = ' Drive every ulw-loop operation with the registered tool, for example `tool.omo_agent_toolkit({ operation: "status" })`; do not spawn a CLI.'
+  if (sessionScope === null) return base
+  return `${base} This session's state lives under .omo/ulw-loop/${sessionScope}/.`
 }
 
 // A keyword proves a mention, not a request to run the workflow.

@@ -236,6 +236,10 @@ describe("checkExtensionCurrent", () => {
 
     expect(main).toContain('import("#omo-task-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
-    expect(manifest.imports).toEqual({ "#omo-task-runtime": "./extensions/omo-task.js" })
+    expect(main).toContain('import("#omo-agent-toolkit-runtime")')
+    expect(manifest.imports).toEqual({
+      "#omo-task-runtime": "./extensions/omo-task.js",
+      "#omo-agent-toolkit-runtime": "./extensions/omo-agent-toolkit.js",
+    })
   })
 })

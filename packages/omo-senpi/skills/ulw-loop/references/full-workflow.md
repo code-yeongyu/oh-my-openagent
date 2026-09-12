@@ -53,8 +53,8 @@ omo-senpi subagent reliability:
 - `.omo/ulw-loop/goals.json`: goals with embedded `successCriteria` per goal.
 - `.omo/ulw-loop/ledger.jsonl`: append-only audit trail.
 - Read artifacts before resuming, steering, or checkpointing.
-- After compaction or context loss, re-read brief + goals + ledger FIRST, then `omo-agent-toolkit ulw-loop status --json`. Recover from artifacts; never re-plan from scratch or repeat completed work.
-- Never invent state outside `.omo/ulw-loop` artifacts or `omo-agent-toolkit ulw-loop status --json`.
+- After compaction or context loss, re-read brief + goals + ledger FIRST, then tool.omo_agent_toolkit({ operation: "status" }). Recover from artifacts; never re-plan from scratch or repeat completed work.
+- Never invent state outside `.omo/ulw-loop` artifacts or tool.omo_agent_toolkit({ operation: "status" }).
 
 ## Bootstrap
 Do all three steps before execution. No edits, goal tools, or checkpointing before bootstrap completes.
@@ -64,14 +64,14 @@ Resolve the CLI from the ulw-loop skill-pointer message: it carries the resolved
 
 Run one form:
 ```sh
-omo-agent-toolkit ulw-loop create-goals --session-id <id> --brief "<brief>" [--validation-batch-json <json-or-path>] --json
-omo-agent-toolkit ulw-loop create-goals --session-id <id> --brief-file <path> [--validation-batch-json <json-or-path>] --json
-cat <brief> | omo-agent-toolkit ulw-loop create-goals --session-id <id> --from-stdin [--validation-batch-json <json-or-path>] --json
+tool.omo_agent_toolkit({ operation: "create-goals" }) --session-id <id> --brief "<brief>" [--validation-batch-json <json-or-path>] --json
+tool.omo_agent_toolkit({ operation: "create-goals" }) --session-id <id> --brief-file <path> [--validation-batch-json <json-or-path>] --json
+cat <brief> | tool.omo_agent_toolkit({ operation: "create-goals" }) --session-id <id> --from-stdin [--validation-batch-json <json-or-path>] --json
 ```
 Every state subcommand runs against exactly one session scope: pass `--session-id <id>` on every call (the ulw-loop skill-pointer message carries this session's id next to the CLI path; `PI_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`, or `OMO_ULW_LOOP_SESSION_ID` in the environment also resolve it). The CLI refuses with `ULW_LOOP_SESSION_SCOPE_REQUIRED` when neither is present instead of touching the shared `.omo/ulw-loop` root, because eval kernels, subprocesses, and hooks do not inherit the session env and every session in the directory would otherwise read and overwrite the same plan. Mutations are serialized across processes by `.omo/ulw-loop/<id>/.state.lock`, so parallel `record-evidence` calls from several workers are safe; `ULW_LOOP_LOCK_TIMEOUT` means another live process held the state for more than 10s — retry, never delete the lock while that process is alive.
 If this session's aggregate is already complete, do not steer or force the
 completed state for unrelated new work. Start a fresh run with
-`omo-agent-toolkit ulw-loop create-goals --session-id <new-id> ...` and keep passing
+tool.omo_agent_toolkit({ operation: "create-goals" }) and keep passing
 that id on every later call; the host's automatic continuation follows only the
 session's own id, so a run under a custom id is resumed by hand. Use `--force`
 only when deliberately overwriting completed evidence.
@@ -93,14 +93,14 @@ Use channel-table evidence verbs — not vibes.
 Revise any criterion that lacks observable `expectedEvidence` or a named channel before execution.
 
 ### 3. Inspect state
-Run `omo-agent-toolkit ulw-loop status --session-id <id> --json`.
+Run tool.omo_agent_toolkit({ operation: "status" }).
 Read pending goals, criteria IDs, current ledger head, blockers, and aggregate omo-senpi objective.
 
 ## Execution Loop
 Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures at 3.
 
 ### Acquire Next Goal
-1. Run `omo-agent-toolkit ulw-loop complete-goals --json` and read the handoff, including criteria. After the first goal starts, a successful complete checkpoint normally prints the next goal instruction directly; use `complete-goals` as the manual fallback/resume path.
+1. Run tool.omo_agent_toolkit({ operation: "complete-goals" }) and read the handoff, including criteria. After the first goal starts, a successful complete checkpoint normally prints the next goal instruction directly; use `complete-goals` as the manual fallback/resume path.
 2. Call `get_goal` and inspect active omo-senpi state.
 3. Apply this table exactly:
 
@@ -109,7 +109,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 | no active goal | You MUST call `create_goal` — goal registration goes through the tool, never prose — with objective only from `instruction.json.objective`; do not copy lifecycle fields such as `status`. |
 | same aggregate objective active | Continue the current ulw-loop story. |
 | different goal active | STOP. Checkpoint blocked and surface the conflict. |
-4. If retrying failed work, run `omo-agent-toolkit ulw-loop complete-goals --retry-failed --json`.
+4. If retrying failed work, run tool.omo_agent_toolkit({ operation: "complete-goals" }).
 5. Never create a second omo-senpi goal for the same aggregate objective.
 
 ### Per-Criterion Cycle
@@ -121,9 +121,9 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 6. CAPTURE: collect the observable artifact path: transcript, stdout, screenshot, assertion, status+body, diff, or parsed dump. No artifact written at the evidence path — not done; record BLOCKED and respawn QA.
 7. CLEAN (PAIRED, NEVER SKIP): tear down every runtime artifact step 5 spawned BEFORE recording — server PIDs (`kill`, verify `kill -0` fails), `tmux` sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`), browser / Playwright contexts (`.close()`), containers (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env vars, AND cancel any runaway child with `task_cancel` while allowing completed children to end normally. Register each teardown as its own todo the moment the QA spawns the resource (scripts, tmux assets, browsers / agent-browser sessions, PIDs, ports) so none is forgotten. Embed a one-line cleanup receipt in the evidence string, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo; rm -rf /tmp/ulw.aB12cD; task_cancel <runaway-id>`. Missing receipt → record BLOCKED, not PASS.
 8. RECORD one result immediately from the artifact you just wrote — never from memory or a later turn — stamping the capture tree `$(git rev-parse --short "HEAD^{tree}")` into the evidence:
-   - PASS: `omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass --evidence "<observable> @tree:<short-tree> | <cleanup receipt>" --json`
-   - FAIL: `omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status fail --evidence "<observable> @tree:<short-tree> | <cleanup receipt>" --notes "<diagnosis>" --json`
-   - BLOCKED: `omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status blocked --evidence "<observable>" --notes "<safety/blocker/leftover-state>" --json`
+   - PASS: tool.omo_agent_toolkit({ operation: "record-evidence" })
+   - FAIL: tool.omo_agent_toolkit({ operation: "record-evidence" })
+   - BLOCKED: tool.omo_agent_toolkit({ operation: "record-evidence" })
 9. If actual does not match expected, diagnose, respawn the right-sized worker with the failure context to fix at the root cause, and rerun the SAME criterion (including a fresh cleanup).
 10. After 3 same-criterion failures, exit the goal with diagnosis.
 11. After 5 cycles on one goal without required criteria passing, checkpoint failed.
@@ -132,7 +132,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ### Goal Completion
 1. Non-final aggregate goal: confirm every `essential` criterion is `pass`; non-essential criteria may remain pending. Final aggregate goal: confirm every criterion across the whole plan is `pass`.
 2. Call `get_goal` for a fresh snapshot.
-3. Confirm the goal's worktree has landed on the integration base per the repository's flow, then run `omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidence "<criteria evidence summary>" --codex-goal-json <snapshot> --json`; on success it auto-starts and prints the next eligible goal unless `--no-advance` is passed.
+3. Confirm the goal's worktree has landed on the integration base per the repository's flow, then run tool.omo_agent_toolkit({ operation: "checkpoint" }); on success it auto-starts and prints the next eligible goal unless `--no-advance` is passed.
 4. If blocked or failed, checkpoint with `--status blocked` or `--status failed` and include diagnosis evidence.
 5. If this is the final goal, run the final quality gate first and pass `--quality-gate-json`.
 
@@ -140,15 +140,15 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 For the final story, follow this exact checkpoint sequence:
 
 ```sh
-omo-agent-toolkit ulw-loop status --json
+tool.omo_agent_toolkit({ operation: "status" })
 # Read nextActions and currentAttemptDir.
-omo-agent-toolkit ulw-loop record-evidence --goal-id <g> --criterion-id <c> --status pass --evidence "..."
+tool.omo_agent_toolkit record-evidence --goal-id <g> --criterion-id <c> --status pass --evidence "..."
 # Repeat record-evidence once per criterion.
 # Then use the harness update_goal tool with status complete.
-omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --print-template --json
+tool.omo_agent_toolkit checkpoint --goal-id <g> --print-template --json
 # Fill the printed template: replace every placeholder and use real artifact paths under currentAttemptDir.
-omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --status complete --evidence "..." --codex-goal-json <path> --quality-gate-json <path>
-omo-agent-toolkit ulw-loop complete-goals
+tool.omo_agent_toolkit checkpoint --goal-id <g> --status complete --evidence "..." --codex-goal-json <path> --quality-gate-json <path>
+tool.omo_agent_toolkit complete-goals
 ```
 
 The omo-senpi gate uses the four sections shown in the sample below; it intentionally has no `codeReview` section.
@@ -161,17 +161,17 @@ Trigger only for the final aggregate goal after every criterion in every goal is
 3b. Spawn ONE gate reviewer with `task({ category: "deep", run_in_background: true })`, passing the brief, goals, diff, evidence, and QA artifact paths. If the task returns `model_unavailable`, retry with `category: "unspecified-high"`, then `category: "unspecified-low"`; never mention the attempted chain in the gate. Set `gateReview.by` to the exact category literal used for the successful reviewer.
 3c. On omo-senpi the ledger has TWO lanes only: hands-on QA and goal/gate verification. The gate approval binds to the frozen tree and full commit SHA. Record one durable ledger entry per lane with its lane name, SHA, verdict, and report artifact/source. A later fix restarts the freeze and requires fresh evidence and gate review.
 4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Any fix restarts the freeze at the new HEAD: re-run only the proofs it invalidated and stamp the fresh output; never relabel stale output to HEAD. Re-review the delta at most twice, then record-review-blockers and surface to the user.
-5. If review remains blocked, run `omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
+5. If review remains blocked, run tool.omo_agent_toolkit({ operation: "record-review-blockers" }).
 6. If clean, checkpoint final completion:
 ```sh
-omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e evidence + manual QA notes>" --codex-goal-json <snapshot> --quality-gate-json <json-or-path> --json
+tool.omo_agent_toolkit checkpoint --goal-id <id> --status complete --evidence "<e2e evidence + manual QA notes>" --codex-goal-json <snapshot> --quality-gate-json <json-or-path> --json
 ```
 `--quality-gate-json` shape. In `manualQa.artifactRefs`, `kind` must be one of `cli-transcript`, `log`, `screenshot`, `image`, `http-dump`, or `data-diff`; review and QA reports belong in `codeReview.reportPath` or `gateReview.reportPath`, not `artifactRefs`. `surfaceEvidence.surface` must be one of `cli`, `http`, `tmux`, `browser`, `gui`, or `data`. Compatibility is `cli`/`tmux` -> `cli-transcript`/`log`, `http` -> `http-dump`, `browser`/`gui` -> `screenshot`/`image`, and `data` -> `data-diff`.
 
 `--quality-gate-json` shape:
 ```json
 {
-  "manualQa":{"by":"main-session","status":"passed","evidence":"Ran CLI and data QA myself.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"omo-agent-toolkit ulw-loop checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-pass"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"test/fixtures/artifacts/rejection.txt"},{"id":"artifact-data-pass","kind":"data-diff","description":"Data diff artifact.","path":"test/fixtures/artifacts/data-diff.txt"}]},
+  "manualQa":{"by":"main-session","status":"passed","evidence":"Ran CLI and data QA myself.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"tool.omo_agent_toolkit checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-pass"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"test/fixtures/artifacts/rejection.txt"},{"id":"artifact-data-pass","kind":"data-diff","description":"Data diff artifact.","path":"test/fixtures/artifacts/data-diff.txt"}]},
   "gateReview":{"by":"category:deep","recommendation":"APPROVE","reportPath":"test/fixtures/artifacts/gate-review.md","evidence":"Verified the goal and gate evidence.","blockers":[]},
   "iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bunx vitest run test/quality-gate-doc.test.ts"],"evidence":"Focused rerun passed."},
   "criteriaCoverage":{"totalCriteria":3,"passCount":3,"originalIntent":"User wanted artifact-backed completion.","desiredOutcome":"Behavior ships with hands-on QA and goal/gate verification.","userOutcomeReview":"The artifacts show the requested behavior from the user's perspective.","adversarialClassesCovered":["malformed_input","stale_state"]}
@@ -193,10 +193,10 @@ Use steering only for structured evidence-backed mutation. Reject natural-langua
 | annotate_ledger | Audit-only note | `--evidence`, `--rationale` |
 | mark_blocked_superseded | Old story replaced by new evidence | `--goal-id`, `--replacements?`, `--evidence`, `--rationale` |
 
-Command form: `omo-agent-toolkit ulw-loop steer --kind <kind> [<kind-specific-fields>] --evidence "<...>" --rationale "<...>" --json`. For multiple evidence-backed plan-shape changes discovered together, pass `--proposals-json <json-or-path>` with an array of proposals; the batch applies atomically or rejects without partial plan mutation.
+Command form: tool.omo_agent_toolkit({ operation: "steer" }). For multiple evidence-backed plan-shape changes discovered together, pass `--proposals-json <json-or-path>` with an array of proposals; the batch applies atomically or rejects without partial plan mutation.
 
 Validation batches are optional aggregate-mode review boundaries declared at create time with `--validation-batch-json`. A batch-final member requires all other members resolved, all member criteria pass, and a member-spanning quality gate; split/supersede steering keeps batch membership updated.
-Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-loop.steer: {...}`, `omo-agent-toolkit ulw-loop steer: {...}`.
+Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-loop.steer: {...}`, tool.omo_agent_toolkit({ operation: "steer:" }).
 
 ## Constraints
 1. NEVER call `update_goal` mid-aggregate; only on final story after the quality gate passes.

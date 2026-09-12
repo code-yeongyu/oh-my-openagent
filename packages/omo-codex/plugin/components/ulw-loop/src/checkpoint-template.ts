@@ -11,6 +11,10 @@ export interface CheckpointTemplate {
 	readonly guidance?: string;
 }
 
+export interface CheckpointTemplateDependencies {
+	readonly surface?: UlwLoopToolkitSurface;
+}
+
 function artifactPath(base: string, name: string): string {
 	return `${base}/${name}`;
 }
@@ -97,8 +101,10 @@ export async function checkpointTemplate(
 	repoRoot: string,
 	scope?: UlwLoopScope,
 	goalId?: string,
+	dependencies?: CheckpointTemplateDependencies,
 ): Promise<CheckpointTemplate> {
 	const plan: UlwLoopPlan = await readUlwLoopPlan(repoRoot, scope);
+	const surface = dependencies?.surface ?? resolveToolkitSurface();
 	const targetId = goalId ?? plan.activeGoalId;
 	const active = plan.goals.find((goal) => goal.id === targetId);
 	if (goalId !== undefined && active === undefined)
@@ -110,7 +116,7 @@ export async function checkpointTemplate(
 		"Fill every <replace:...> value with plausible non-empty evidence and use real, non-empty artifact files.",
 		'Passing codex-goal-json example: {"goal":{"objective":"<plan codexObjective verbatim>","status":"complete"}}.',
 		'Passing quality-gate-json example requires gateReview {"by":"category:deep","recommendation":"APPROVE","evidence":"review passed","reportPath":"<attemptDir>/gate-review.md","blockers":[],"notes":[]}, manualQa.artifactRefs objects, iteration, and criteriaCoverage.',
-		...(resolveToolkitSurface() === "lazycodex"
+		...(surface === "lazycodex"
 			? [
 					"Self-review defaults: manualQa.by and gateReview.by are main-session. Alternatives: manualQa.by accepts lazycodex-qa-executor; gateReview.by accepts lazycodex-gate-reviewer, category:deep, category:unspecified-high, or category:unspecified-low. Optional codeReview.by accepts lazycodex-code-reviewer or main-session.",
 				]
@@ -118,7 +124,7 @@ export async function checkpointTemplate(
 		...(hasAttempt ? [] : ["This plan is evidence-layout v1; artifacts go under .omo/evidence/."]),
 	].join(" ");
 	return {
-		qualityGateTemplate: gateTemplate(resolveToolkitSurface(), attemptDir),
+		qualityGateTemplate: gateTemplate(surface, attemptDir),
 		codexGoalTemplate: {
 			goal: { objective: plan.codexObjective ?? "<replace:codex objective>", status: "complete" },
 		},

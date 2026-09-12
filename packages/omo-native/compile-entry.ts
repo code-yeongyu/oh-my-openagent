@@ -48,7 +48,6 @@ const doctorArtifacts = [
   ["plugin manifest", "plugin/package.json"],
   ["extension", "plugin/extensions/omo.js"],
   ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-  ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
 ] as const
 
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
@@ -89,7 +88,6 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
   const env = { ...source }
   delete env.OMO_BIN
   delete env.SENPI_BIN
-  env.OMO_AGENT_TOOLKIT_BIN = join(execDir, "plugin", "runtime", "agent-toolkit", process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit")
   const agentDir = canonicalAgentDir(env)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
@@ -202,7 +200,13 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   migrateLegacyBunGlobalManifest(execDir)
   adoptLegacyFlatState()
   const command = args[0]
-  if (command === "ulw-loop") { spawn(process.execPath, [join(execDir, "plugin/runtime/agent-toolkit/ulw-loop/cli.js"), ...args.slice(1)], { stdio: "inherit" }); return true }
+  // The toolkit CLI is no longer shipped in the Native payload: the loop runs in-process behind the
+  // omo_agent_toolkit tool. Answer with a named result instead of an ENOENT spawn failure.
+  if (command === "ulw-loop") {
+    process.stderr.write("omo ulw-loop is unavailable in this build: use the omo_agent_toolkit tool inside a session (Codex keeps the standalone CLI).\n")
+    process.exitCode = 2
+    return true
+  }
   if (command === "doctor") {
     const inventory = await detectHarnesses()
     if (compiledPackageRoot) runCompiledDoctor(inventory, compiledPackageRoot, enginePin)

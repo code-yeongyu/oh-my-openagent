@@ -5,7 +5,8 @@
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
   "imports": {
-    "#omo-task-runtime": "./src/extension/omo-task.ts"
+    "#omo-task-runtime": "./src/extension/omo-task.ts",
+    "#omo-agent-toolkit-runtime": "./src/extension/omo-agent-toolkit.ts"
   },
   "exports": {
     ".": {

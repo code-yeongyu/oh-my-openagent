@@ -17,7 +17,7 @@ import {
 	sameBlockerOccurrences,
 	validateQualityGate,
 } from "./quality-gate.js";
-import { resolveToolkitSurface } from "./surface.js";
+import { resolveToolkitSurface, type UlwLoopToolkitSurface } from "./surface.js";
 import type {
 	UlwLoopAggregateCompletion,
 	UlwLoopItem,
@@ -34,6 +34,9 @@ export interface CheckpointUlwLoopArgs {
 	readonly evidence: string;
 	readonly codexGoalJson?: string;
 	readonly qualityGateJson?: string;
+}
+export interface CheckpointUlwLoopDependencies {
+	readonly surface?: UlwLoopToolkitSurface;
 }
 export interface CheckpointUlwLoopResult {
 	readonly plan: UlwLoopPlan;
@@ -151,6 +154,7 @@ export async function checkpointUlwLoop(
 	repoRoot: string,
 	args: CheckpointUlwLoopArgs,
 	scope?: UlwLoopScope,
+	dependencies?: CheckpointUlwLoopDependencies,
 ): Promise<CheckpointUlwLoopResult> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
 		const plan = await readUlwLoopPlan(repoRoot, scope);
@@ -198,7 +202,7 @@ export async function checkpointUlwLoop(
 					qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), {
 						repoRoot,
 						fs: QUALITY_GATE_FS,
-						reviewerSurface: resolveToolkitSurface(),
+						reviewerSurface: dependencies?.surface ?? resolveToolkitSurface(),
 						...(plan.evidenceLayoutVersion === 2
 							? { currentAttemptDir: ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope) }
 							: {}),

@@ -15,6 +15,7 @@ const BUNDLE_FILES = [
   "omo-member.js",
   "memory-run-supervisor.mjs",
   "omo-init-deep-advisor.js",
+  "omo-agent-toolkit.js",
 ] as const
 
 type LazyBarrel = {

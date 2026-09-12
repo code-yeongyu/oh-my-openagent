@@ -282,6 +282,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo.js"),
   join4("extensions", "omo-task.js"),
   join4("extensions", "omo-member.js"),
+  join4("extensions", "omo-agent-toolkit.js"),
   join4("extensions", "memory-run-supervisor.mjs"),
   ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
   join4("skills", "ast-grep", "SKILL.md"),
@@ -304,10 +305,6 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("skills", "visual-qa", "SKILL.md"),
   join4("skills-conditional", "x-search", "SKILL.md"),
   join4("runtime", "ast-grep-mcp", "cli.js"),
-  join4("runtime", "agent-toolkit", "cli.js"),
-  join4("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
-  join4("runtime", "agent-toolkit", "omo-agent-toolkit"),
-  join4("runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
   join4("runtime", "lsp-daemon", "dist", "cli.js"),
   join4("runtime", "lsp-daemon", "dist", "index.js"),
   join4("runtime", "lsp-daemon", "dist", "index.d.ts"),
@@ -325,7 +322,6 @@ async function ensurePluginArtifacts(context) {
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot });
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot });
     await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], { cwd: context.repoRoot });
   }
   if (await hasMissingPluginArtifact(context.pluginPath)) {

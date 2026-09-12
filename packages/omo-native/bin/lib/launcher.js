@@ -77,7 +77,6 @@ function senpiEnvironment(senpiRoot) {
   const env = { ...process.env }
   delete env.OMO_BIN
   delete env.SENPI_BIN
-  env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
   // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
   // tool inherits the same state instead of falling back to its own home.
   const agentDir = canonicalAgentDir(env)
@@ -150,8 +149,11 @@ export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
   reportLegacyFlatAdoption()
   const command = args[0]
+  // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
+  // omo_agent_toolkit tool. Report that plainly instead of failing on a missing file.
   if (command === "ulw-loop") {
-    await spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
+    console.error("omo ulw-loop is unavailable in this build: use the omo_agent_toolkit tool inside a session (Codex keeps the standalone CLI).")
+    process.exitCode = 2
     return
   }
   if (command === "doctor") {

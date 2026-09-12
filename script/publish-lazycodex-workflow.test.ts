@@ -315,7 +315,8 @@ describe("LazyCodex publish workflow", () => {
     const smokesReleaseVersion = smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"')
     const smokesStableLatestOnly = smokeStep.includes('if [ -z "$DIST_TAG" ]; then') &&
       smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
-    const retriesRegistryPropagation = smokeStep.includes("for attempt in $(seq 1 12)") &&
+    const retriesRegistryPropagation = smokeStep.includes('for attempt in $(seq 1 "$SMOKE_READINESS_ATTEMPTS")') &&
+      smokeStep.includes('sleep "$SMOKE_READINESS_INTERVAL_SECONDS"') &&
       smokeStep.includes("registry propagation")
     const distinguishesVisibleInstallFailure =
       smokeStep.includes('npm view "$package_spec" version --silent') &&
