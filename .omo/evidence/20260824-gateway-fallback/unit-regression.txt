@@ -1,0 +1,21 @@
+=== unit regression (adapter alias) ===
+bun test v1.3.14 (0d9b296a)
+
+ 5 pass
+ 0 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [173.00ms]
+=== classifier unit ===
+bun test v1.3.14 (0d9b296a)
+
+ 8 pass
+ 0 fail
+ 34 expect() calls
+Ran 8 tests across 1 file. [160.00ms]
+=== model-fallback chain-head ===
+bun test v1.3.14 (0d9b296a)
+
+ 15 pass
+ 0 fail
+ 34 expect() calls
+Ran 15 tests across 1 file. [172.00ms]

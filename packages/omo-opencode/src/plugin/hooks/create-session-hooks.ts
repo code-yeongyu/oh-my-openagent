@@ -38,6 +38,8 @@ import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
 import { isTmuxIntegrationEnabled } from "../../create-runtime-tmux-config"
 import { createModelFallbackTitleUpdater } from "./model-fallback-title-updater"
+import { parseFallbackModelEntry } from "@oh-my-opencode/model-core"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 export type SessionHooks = {
   preemptiveCompaction: ReturnType<typeof createPreemptiveCompactionHook> | null
@@ -123,6 +125,19 @@ export function createSessionHooks(args: {
         },
         onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
         controllerAccessor: modelFallbackControllerAccessor,
+        resolveUserConfiguredPrimary: (agentName) => {
+          const agentKey = getAgentConfigKey(agentName)
+          const override = pluginConfig.agents?.[agentKey]
+          if (!override) return undefined
+          const primaryModel = override.models?.[0]
+          if (typeof primaryModel === "string") {
+            return parseFallbackModelEntry(primaryModel, undefined) ?? undefined
+          }
+          if (override.model) {
+            return parseFallbackModelEntry(override.model, undefined) ?? undefined
+          }
+          return undefined
+        },
       }))
     : null
 
