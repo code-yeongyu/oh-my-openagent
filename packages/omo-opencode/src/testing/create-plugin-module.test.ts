@@ -380,6 +380,71 @@ describe("createPluginModule()", () => {
   })
 
   describe("#given startup migration consumes legacy configuration", () => {
+    it("#given conflicting overrides #then startup logs the dropped keys", async () => {
+      // given
+      const skippedConflict = "skipped: agents.sisyphus.model legacy=\"anthropic/legacy\" kept=\"opencode/gpt-5-nano\""
+      const log = mock(() => {})
+      const pluginModule = createTestPluginModule({
+        log,
+        runOpenCodeStartupMigration: () => ({
+          journalResumed: false,
+          migratedFrom: ["/home/alice/.config/opencode/oh-my-opencode.json"],
+          reloadRequired: true,
+          results: [{
+            diagnostics: ["migration completed", skippedConflict],
+            journalResumed: false,
+            status: "migrated",
+          }],
+          skippedConflictCount: 1,
+        }),
+      })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(log).toHaveBeenCalledWith("[config-migration] startup completed", expect.objectContaining({
+        skippedConflictCount: 1,
+        skippedConflictPaths: ["agents.sisyphus.model"],
+      }))
+    })
+
+    it("#given a conflicting override holds a credential #then only the key path is logged", async () => {
+      // given
+      const log = mock(() => {})
+      const pluginModule = createTestPluginModule({
+        log,
+        runOpenCodeStartupMigration: () => ({
+          journalResumed: false,
+          migratedFrom: ["/home/alice/.config/opencode/oh-my-opencode.json"],
+          reloadRequired: true,
+          results: [{
+            diagnostics: ["skipped: openclaw.discordBotToken legacy=\"legacy-secret\" kept=\"kept-secret\""],
+            journalResumed: false,
+            status: "migrated",
+          }],
+          skippedConflictCount: 1,
+        }),
+      })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      const startupCall = log.mock.calls.find((call) => call[0] === "[config-migration] startup completed")
+      expect(startupCall?.[1]).toMatchObject({ skippedConflictPaths: ["openclaw.discordBotToken"] })
+      expect(JSON.stringify(startupCall?.[1])).not.toContain("legacy-secret")
+      expect(JSON.stringify(startupCall?.[1])).not.toContain("kept-secret")
+    })
+
     it("#then startup reloads the config and emits one migration summary toast", async () => {
       // given
       const runOpenCodeStartupMigration = mock(() => ({
