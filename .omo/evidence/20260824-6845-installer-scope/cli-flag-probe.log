@@ -1,0 +1,8 @@
+$ bun packages/omo-opencode/src/cli/index.ts install --help | grep -A1 config-scope
+                                    both (choices: "opencode", "codex", "both")
+  --config-scope <scope>            Where to register the plugin when a custom
+                                    OpenCode config dir is active: active,
+                                    global (choices: "active", "global")
+
+$ bun ... install --config-scope=both --no-tui
+error: option '--config-scope <scope>' argument 'both' is invalid. Allowed choices are active, global.
