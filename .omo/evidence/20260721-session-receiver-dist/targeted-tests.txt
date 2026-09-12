@@ -1,0 +1,9 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/background-agent/session-activity.test.ts:
+(pass) getSessionActivityFromClient > preserves the session API receiver [7.09ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [301.00ms]
