@@ -1,0 +1,39 @@
+Shipped bundle evaluated against the live cmux host, rebased head (b4e794e41), 2026-09-02
+
+$ bun run build            # exit 0, dist/index.js
+
+Detector as it appears in dist/index.js (verbatim):
+
+  function isCmuxCompatEnvironment(environment = process.env) {
+    const tmuxEnvironment = environment.TMUX;
+    if (!tmuxEnvironment)
+      return Boolean(environment.CMUX_SOCKET_PATH);
+    if (!hasCmuxSocketPath(tmuxEnvironment))
+      return false;
+    return Boolean(environment.CMUX_SOCKET_PATH) || environment.CMUX_AGENT_LAUNCH_KIND === CMUX_OMO_LAUNCH_KIND;
+  }
+
+Driven straight out of the bundle (no source imports):
+
+  live process environment (this shell is a cmux omo pane)
+    TMUX                       = /tmp/cmux-omo/97BEE327-9847-42AE-B98C-8848BA583ECE,EEC79E0A-E474-4386-B185-8B6652A9E55F,1632462732908491017
+    CMUX_SOCKET_PATH           = /Users/Yoonki/.local/state/cmux/cmux-501.sock
+    CMUX_AGENT_LAUNCH_KIND     = omo
+    >>> isCmuxCompatEnvironment() = true
+  
+    ok   tmux  | real tmux outside cmux
+    ok   tmux  | real tmux nested in a cmux pane
+    ok   cmux  | cmux pane (both signals)
+    ok   cmux  | cmux pane, socket scrubbed
+    ok   tmux  | cmux pane, launch kind only=claude
+    ok   tmux  | launch kind alone
+    ok   cmux  | headless cmux (no TMUX)
+    ok   tmux  | nothing set
+  
+  PASS: shipped bundle matches the source detector on every guard
+
+The two rows that carry the reconciliation are "cmux pane, socket scrubbed"
+(true only because the launch kind stands in for the missing credential) and
+"launch kind only=claude" / "launch kind alone" (false because the launch kind
+is neither exact nor corroborated). The nested-real-tmux row stays native tmux
+in the shipped bundle, not just in source.

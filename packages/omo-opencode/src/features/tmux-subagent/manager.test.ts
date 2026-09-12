@@ -1081,8 +1081,8 @@ describe('TmuxSessionManager', () => {
       // given — cmux environment triggers eager attach
       const savedTmux = process.env.TMUX
       const savedCmuxSocket = process.env.CMUX_SOCKET_PATH
-      process.env.TMUX = '/tmp/cmuxterm-test.sock,1234,0'
-      delete process.env.CMUX_SOCKET_PATH
+      process.env.TMUX = '/tmp/cmux-omo/workspace,surface,pane'
+      process.env.CMUX_SOCKET_PATH = '/tmp/cmux.sock'
       try {
         mockIsInsideTmux.mockReturnValue(true)
         // force capacity-full so the session defers (mirror the FIFO deferred test setup)
@@ -1141,7 +1141,7 @@ describe('TmuxSessionManager', () => {
     })
 
     test('marks deferred inline attach as attachActivated=false when not cmux (regression guard)', async () => {
-      // given — standard tmux (no cmuxterm)
+      // given — standard tmux (no CMUX_SOCKET_PATH)
       const savedTmux = process.env.TMUX
       const savedCmuxSocket = process.env.CMUX_SOCKET_PATH
       process.env.TMUX = '/tmp/tmux-1000/default,1234,0'

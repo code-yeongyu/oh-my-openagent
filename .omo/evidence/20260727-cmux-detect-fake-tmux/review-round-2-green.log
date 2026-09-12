@@ -1,0 +1,37 @@
+# review-round-2 GREEN — cmuxterm branch removal
+# bun 1.3.13
+
+=== packages/tmux-core ===
+
+ 110 pass
+ 0 fail
+ 225 expect() calls
+Ran 110 tests across 17 files. [2.14s]
+
+=== packages/omo-opencode/src/shared/tmux ===
+
+ 89 pass
+ 0 fail
+ 172 expect() calls
+Ran 89 tests across 18 files. [1.91s]
+
+=== packages/omo-opencode/src/tools/interactive-bash ===
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 2 files. [91.00ms]
+
+=== packages/omo-opencode/src/features/tmux-subagent ===
+
+ 166 pass
+ 0 fail
+ 413 expect() calls
+Ran 166 tests across 17 files. [123.00ms]
+
+=== packages/openclaw-core ===
+
+ 67 pass
+ 0 fail
+ 150 expect() calls
+Ran 67 tests across 15 files. [2.68s]

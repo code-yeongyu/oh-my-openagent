@@ -1,0 +1,5 @@
+ 47 pass
+ 31 fail
+ 178 expect() calls
+Ran 78 tests across 25 files. [5.34s]
+error: script "test:codex" exited with code 1

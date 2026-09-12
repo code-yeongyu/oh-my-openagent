@@ -1,0 +1,35 @@
+Live signal inheritance on a real cmux host, measured 2026-09-02
+
+Why this matters: it decides whether CMUX_AGENT_LAUNCH_KIND may outrank the
+TMUX socket shape. It may not - it is inherited, the socket shape is not.
+
+1. cmux omo pane (the agent process itself)
+     CMUX_AGENT_LAUNCH_KIND=omo
+     CMUX_OMO_CMUX_BIN=/Applications/cmux.app/Contents/Resources/bin/cmux
+     CMUX_SOCKET_PATH=/Users/Yoonki/.local/state/cmux/cmux-501.sock
+     TMUX=/tmp/cmux-omo/97BEE327-9847-42AE-B98C-8848BA583ECE,EEC79E0A-E474-4386-B185-8B6652A9E55F,1632462732908491017
+
+2. real tmux server started from inside that same cmux pane
+     $ /opt/homebrew/bin/tmux -L omo-pr6390-evidence new-session -d -s probe 'env > ...'
+     CMUX_AGENT_LAUNCH_KIND=omo
+     CMUX_OMO_CMUX_BIN=/Applications/cmux.app/Contents/Resources/bin/cmux
+     CMUX_SOCKET_PATH=/Users/Yoonki/.local/state/cmux/cmux-501.sock
+     TMUX=/private/tmp/tmux-501/omo-pr6390-evidence,69868,0
+
+CMUX_AGENT_LAUNCH_KIND and CMUX_SOCKET_PATH are byte-identical across the two.
+Only TMUX changes, from the cmux shim socket to the real tmux socket under
+tmux-<uid>. The socket shape is therefore the only signal that tracks which
+server a tmux command would actually reach, which is what the detector must
+answer. See red-6-launch-kind-precedence.log for the three matrix rows that
+break when the launch kind is promoted above it.
+
+3. tmux shim cmux puts on PATH (confirms the CMUX_OMO_CMUX_BIN contract)
+     $ cat $(which tmux)
+     #!/usr/bin/env bash
+     set -euo pipefail
+     # Only match -V/-v as the first arg (top-level tmux flag).
+     # -v inside subcommands (e.g. split-window -v) is a vertical split flag.
+     case "${1:-}" in
+       -V|-v) echo "tmux 3.4"; exit 0 ;;
+     esac
+     exec "${CMUX_OMO_CMUX_BIN:-cmux}" __tmux-compat "$@"

@@ -1,0 +1,8 @@
+panic(main thread): Segmentation fault at address 0x4A
+oh no: Bun has crashed. This indicates a bug in Bun, not your code.
+
+To send a redacted crash report to Bun's team,
+please file a GitHub issue using the link below:
+
+ https://bun.report/1.3.12/Mt1700fc11iDukgoS_+l5ouC263ouC+4kpuCmmn2B__27u9gDmok9gDu7szgD+9u7pC+q2G+swnf232nfu+3nf+vrybm00kc+jthXunoI2yv/PA2A0E
+

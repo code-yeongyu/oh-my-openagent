@@ -26,6 +26,7 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 const isInsideTmuxMock = mock((): boolean => true)
 const isServerRunningMock = mock(async (): Promise<boolean> => true)
 const getTmuxPathMock = mock(async (): Promise<string | null> => "sh")
+const isCmuxCompatEnvironmentMock = mock((): boolean => false)
 const logMock = mock(() => undefined)
 
 function toStringArray(value: unknown): string[] {
@@ -68,6 +69,7 @@ function createDeps(): NonNullable<Parameters<typeof import("./pane-spawn").spaw
 		isInsideTmux: isInsideTmuxMock,
 		isServerRunning: isServerRunningMock,
 		getTmuxPath: getTmuxPathMock,
+		isCmuxCompatEnvironment: isCmuxCompatEnvironmentMock,
 	}
 }
 
@@ -83,6 +85,8 @@ describe("spawnTmuxPane runner integration", () => {
 		isInsideTmuxMock.mockClear()
 		isServerRunningMock.mockClear()
 		getTmuxPathMock.mockClear()
+		isCmuxCompatEnvironmentMock.mockClear()
+		isCmuxCompatEnvironmentMock.mockReturnValue(false)
 		logMock.mockClear()
 
 		const tmuxCommandResults: TmuxCommandResult[] = [

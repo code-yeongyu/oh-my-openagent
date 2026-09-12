@@ -1,0 +1,1 @@
+packages/senpi-task/src/tools/team/lifecycle.test.ts(2,23): error TS2307: Cannot find module 'typebox/value' or its corresponding type declarations.
