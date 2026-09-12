@@ -1,12 +1,19 @@
 import { spawn } from "node:child_process"
-import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+} from "@oh-my-opencode/memory-core/fs"
 import { mkdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
   readRunJson,
+  readRunTextTail,
   runOutcomeMatchesLedger,
   writeRunJsonAtomic,
+  writeRunTextAtomic,
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
@@ -27,9 +34,35 @@ import type {
 
 const DEFAULT_GRACE_MS = 5_000
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024
+const MAX_DISTILLED_SUPERVISOR_CAUSE_CHARS = 240
+const SUPERVISOR_ERROR_LINE = /^(?:[A-Za-z][A-Za-z]*Error|error):\s*(.+)$/u
+// A sealed tail can start mid-line and slice the "error:" prefix the distiller matches on.
+// Look past the sealed budget far enough to reach the beginning of the retained error line.
+const SUPERVISOR_CAUSE_READ_SLACK_BYTES = MAX_DISTILLED_SUPERVISOR_CAUSE_CHARS + 16
 // Publication can still be waiting for the terminal gate after the child deadline expires.
 // Keep the parent alive for one additional default grace window so the durable outcome can land.
 const OUTCOME_PUBLICATION_MARGIN_MS = 5_000
+
+async function readSupervisorFailureCause(path: string, maxBytes: number): Promise<string | undefined> {
+  return distillSupervisorFailure(await readRunTextTail(path, maxBytes + SUPERVISOR_CAUSE_READ_SLACK_BYTES))
+}
+
+async function boundSupervisorStderr(path: string, maxBytes: number): Promise<void> {
+  await writeRunTextAtomic(path, await readRunTextTail(path, maxBytes))
+}
+
+function distillSupervisorFailure(stderr: string): string | undefined {
+  for (const rawLine of stderr.split(/\r?\n/u)) {
+    const line = rawLine.trim()
+    const match = SUPERVISOR_ERROR_LINE.exec(line)
+    if (!match?.[1]) continue
+    const cause = match[1].trim()
+    if (!cause) continue
+    if (cause.length <= MAX_DISTILLED_SUPERVISOR_CAUSE_CHARS) return cause
+    return `${cause.slice(0, MAX_DISTILLED_SUPERVISOR_CAUSE_CHARS - 3)}...`
+  }
+  return undefined
+}
 
 export async function runReflectionChild(
   spawnArgs: ReflectionSpawnArgs,
@@ -123,6 +156,7 @@ async function runSupervisedChild(input: {
   await mkdir(input.runDir, { recursive: true, mode: 0o700 })
   const stdoutPath = join(input.runDir, "child-stdout.log")
   const stderrPath = join(input.runDir, "child-stderr.log")
+  const supervisorStderrPath = join(input.runDir, "supervisor-stderr.log")
   const launch: RunLaunchManifest = {
     version: 1,
     runId: input.runId,
@@ -151,14 +185,20 @@ async function runSupervisedChild(input: {
   await writeRunJsonAtomic(join(input.runDir, "ledger.json"), ledger)
   await writeRunJsonAtomic(join(input.runDir, "launch.json"), launch)
 
-  const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
-    env: { ...process.env, ...input.env, BUN_BE_BUN: "1" },
-    detached: true,
-    stdio: "ignore",
-    // win32 gives a detached child its own console, which flashes an empty terminal window on the
-    // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
-    windowsHide: true,
-  })
+  const supervisorStderrFd = openSync(supervisorStderrPath, "w", 0o600)
+  let supervisor: ReturnType<typeof spawn>
+  try {
+    supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
+      env: { ...process.env, ...input.env, BUN_BE_BUN: "1" },
+      detached: true,
+      stdio: ["ignore", "ignore", supervisorStderrFd],
+      // win32 gives a detached child its own console, which flashes an empty terminal window on the
+      // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
+      windowsHide: true,
+    })
+  } finally {
+    closeSync(supervisorStderrFd)
+  }
   supervisor.unref()
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
@@ -208,7 +248,12 @@ async function runSupervisedChild(input: {
   })
   if (result.kind === "error" && !hasCompleteOutcome()) throw result.error
   if (result.kind === "close" && !hasCompleteOutcome()) {
-    throw new Error(`memory run supervisor exited with ${result.exit.code ?? result.exit.signal ?? "unknown status"}`)
+    // Read the cause before sealing the log: the bounded tail can slice the error line's prefix.
+    const cause = await readSupervisorFailureCause(supervisorStderrPath, input.maxOutputBytes)
+    await boundSupervisorStderr(supervisorStderrPath, input.maxOutputBytes)
+    throw new Error(
+      `memory run supervisor exited with ${result.exit.code ?? result.exit.signal ?? "unknown status"}${cause ? `: ${cause}` : ""}`,
+    )
   }
   if (result.kind === "outcome" && result.result === "timeout") {
     throw new Error("memory run supervisor did not publish an outcome before its deadline")
