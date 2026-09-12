@@ -4,6 +4,7 @@ import { PACKAGE_NAME } from "../constants"
 import { getConfigPaths } from "./config-paths"
 import { stripJsonComments } from "./jsonc-strip"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { getPluginEntryName } from "../../../shared/plugin-entry-shape"
 
 export interface PluginEntryInfo {
   entry: string
@@ -23,7 +24,8 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
       const config = JSON.parse(stripJsonComments(content)) as OpencodeConfig
       const plugins = config.plugin ?? []
 
-      for (const entry of plugins) {
+      for (const pluginEntry of plugins) {
+        const entry = getPluginEntryName(pluginEntry)
         for (const pluginName of MATCH_PLUGIN_NAMES) {
           if (entry === pluginName) {
             return { entry, isPinned: false, pinnedVersion: null, configPath }

@@ -1,3 +1,4 @@
+import type { PluginEntry } from "../../shared/plugin-entry-shape"
 import type { ModelCapabilitiesConfig } from "../../config/schema/model-capabilities"
 
 export interface NpmDistTags {
@@ -6,7 +7,7 @@ export interface NpmDistTags {
 }
 
 export interface OpencodeConfig {
-  plugin?: string[]
+  plugin?: PluginEntry[]
   [key: string]: unknown
 }
 

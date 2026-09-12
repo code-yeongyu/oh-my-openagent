@@ -1,0 +1,10 @@
+{
+  "currentVersion": "5.0.0-beta.43",
+  "latestVersion": null,
+  "isUpToDate": false,
+  "isLocalDev": false,
+  "isPinned": true,
+  "pinnedVersion": "4.19.4",
+  "status": "pinned-mismatch"
+}
+EXIT=0

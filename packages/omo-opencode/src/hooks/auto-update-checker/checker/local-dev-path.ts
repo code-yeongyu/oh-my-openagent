@@ -4,6 +4,7 @@ import type { OpencodeConfig } from "../types"
 import { ACCEPTED_PACKAGE_NAMES } from "../constants"
 import { getConfigPaths } from "./config-paths"
 import { stripJsonComments } from "./jsonc-strip"
+import { getPluginEntryName } from "../../../shared/plugin-entry-shape"
 
 export function isLocalDevMode(directory: string): boolean {
   return getLocalDevPath(directory) !== null
@@ -17,7 +18,8 @@ export function getLocalDevPath(directory: string): string | null {
       const config = JSON.parse(stripJsonComments(content)) as OpencodeConfig
       const plugins = config.plugin ?? []
 
-      for (const entry of plugins) {
+      for (const pluginEntry of plugins) {
+        const entry = getPluginEntryName(pluginEntry)
         if (!entry.startsWith("file://")) continue
         if (!ACCEPTED_PACKAGE_NAMES.some(name => entry.includes(name))) continue
         try {
