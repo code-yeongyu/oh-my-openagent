@@ -31,6 +31,10 @@ const activeSections: ComputeViewSections = {
     blocked: 0,
     activeGoal: "g1",
   },
+  lsp: {
+    kind: "list",
+    clients: [{ serverId: "typescript", root: "/workspace/project", state: "alive", refCount: 1 }],
+  },
 }
 
 describe("tui sidebar renderView", () => {
@@ -51,6 +55,8 @@ describe("tui sidebar renderView", () => {
     expect(description).toContain("fail 1")
     expect(description).toContain("fixer")
     expect(description).toContain("explore repo")
+    expect(description.indexOf("Jobs")).toBeLessThan(description.indexOf("LSP"))
+    expect(description).toContain("typescript alive /workspace/project refs=1")
     expect(nodes[0]?.kind).toBe("box")
   })
 
@@ -77,6 +83,7 @@ describe("tui sidebar renderView", () => {
       agents: { kind: "none" },
       jobs: { kind: "none" },
       loop: { kind: "none" },
+      lsp: { kind: "none" },
     })
 
     // when
@@ -94,6 +101,7 @@ describe("tui sidebar renderView", () => {
     const view: SidebarView = {
       kind: "idle",
       roster: { kind: "rows", rows: [{ label: "sisyphus", model: "gpt-5.5" }] },
+      lsp: { kind: "none" },
     }
 
     // when
@@ -104,5 +112,18 @@ describe("tui sidebar renderView", () => {
     expect(description).toContain("sisyphus")
     expect(description).toContain("gpt-5.5")
     expect(nodes[0]?.kind).toBe("box")
+  })
+
+  it("#given idle LSP clients #when rendering #then it keeps Models first and appends LSP", () => {
+    const view: SidebarView = {
+      kind: "idle",
+      roster: { kind: "empty" },
+      lsp: { kind: "list", clients: [{ serverId: "eslint", root: "/workspace", state: "initializing", refCount: 2 }] },
+    }
+
+    const description = describeView(view)
+
+    expect(description.indexOf("No configured models")).toBeLessThan(description.indexOf("LSP"))
+    expect(description).toContain("eslint initializing /workspace refs=2")
   })
 })

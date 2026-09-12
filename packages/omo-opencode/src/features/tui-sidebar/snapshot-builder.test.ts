@@ -131,6 +131,7 @@ describe("buildTuiRuntimeSnapshot", () => {
         },
       ]),
       sessionAgentResolver: resolveTestSessionAgent,
+      lspStatusReader: () => [{ serverId: "typescript", root: "/tmp", state: "alive", refCount: 1 }],
     })
 
     // then
@@ -153,6 +154,7 @@ describe("buildTuiRuntimeSnapshot", () => {
       blocked: 0,
       activeGoal: null,
     })
+    expect(snapshot.lspClients).toEqual([{ serverId: "typescript", root: "/tmp", state: "alive", refCount: 1 }])
     expect(Date.now() - snapshot.updatedAt).toBeLessThan(LOOP_FRESH_MS)
   })
 

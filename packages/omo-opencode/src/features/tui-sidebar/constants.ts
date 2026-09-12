@@ -1,5 +1,5 @@
 export const MIRROR_DIR_NAME = "tui-state"
-export const MIRROR_SCHEMA_VERSION = 1
+export const MIRROR_SCHEMA_VERSION = 2
 export const STALE_MS = 6_000
 export const LOOP_FRESH_MS = 120_000
 export const POLL_INTERVAL_MS = 1_000
@@ -7,4 +7,8 @@ export const HEARTBEAT_MS = 2_000
 export const WRITE_DEBOUNCE_MS = 250
 export const MAX_AGENTS = 12
 export const MAX_JOBS = 12
+export const MAX_LSP_CLIENTS = 12
+export const LSP_STATUS_STALE_MS = 15_000
+export const LSP_STATUS_SCHEMA_VERSION = 1
+export const LSP_STATUS_FILE_NAME = "status.json"
 export const LABEL_MAX = 24

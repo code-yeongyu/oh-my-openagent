@@ -15,6 +15,7 @@ import {
 import type { DaemonPaths } from "./paths.js";
 import { handleDaemonMessage } from "./request-routing.js";
 import { createLineDecoder, encodeJsonLine } from "./socket-jsonrpc.js";
+import { startStatusMirror } from "./status-mirror.js";
 import { reapStaleDaemonVersions } from "./version-reap.js";
 
 export { DaemonAlreadyRunningError, DaemonStartupDeferredError } from "./ownership.js";
@@ -81,6 +82,7 @@ export async function startDaemonServer(
 		throw error;
 	}
 	lease.lock.release();
+	const stopStatusMirror = startStatusMirror(paths);
 
 	// Best-effort cross-version reap: the daemon now owns its version, so older
 	// sibling versions may be reaped. Never block or crash startup on failure.
@@ -91,6 +93,7 @@ export async function startDaemonServer(
 		if (closed) return;
 		closed = true;
 		clearInterval(idleTimer);
+		stopStatusMirror();
 		for (const socket of connections) socket.destroy();
 		connections.clear();
 		await closeServer(server);
@@ -106,6 +109,7 @@ export async function startDaemonServer(
 		}
 		if (Date.now() - lastActiveAt < idleShutdownMs) return;
 		if (options.onIdleShutdown) {
+			stopStatusMirror();
 			options.onIdleShutdown();
 			return;
 		}

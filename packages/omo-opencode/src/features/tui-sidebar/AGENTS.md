@@ -4,13 +4,13 @@
 
 ## OVERVIEW
 
-24 .ts files (12 impl + 12 co-located tests). Two halves connected only by a JSON mirror file on disk: the plugin process writes runtime snapshots (`TuiStateMirror`), the TUI process polls the mirror, derives section states, and renders sidebar nodes. Gated on `tui.sidebar.enabled` (on unless explicitly `false`).
+26 .ts files (13 impl + 13 co-located tests). Two halves connected only by a JSON mirror file on disk: the plugin process writes runtime snapshots (`TuiStateMirror`), the TUI process polls the mirror, derives section states, and renders sidebar nodes. Gated on `tui.sidebar.enabled` (on unless explicitly `false`).
 
 ## DATA FLOW
 
 ```
 plugin side:  events/heartbeat → TuiStateMirror.flush() → buildTuiRuntimeSnapshot() → writeMirror() (atomic JSON)
-TUI side:     1s poll → readMirror() → derivers → computeView() → viewKey diff → buildViewNodes() → sidebar_content
+TUI side:     1s poll → readMirror() + lsp-status-reader.ts → derivers → computeView() → viewKey diff → buildViewNodes() → sidebar_content (including LSP)
 ```
 
 ## STRUCTURE
@@ -19,18 +19,19 @@ TUI side:     1s poll → readMirror() → derivers → computeView() → viewKe
 |------|---------|
 | `mirror-manager.ts` | `TuiStateMirror` — debounced (250ms) flush, 2s heartbeat, single in-flight write, start/stop lifecycle |
 | `snapshot-builder.ts` | `buildTuiRuntimeSnapshot` — active agents from session statuses, job board from `BackgroundManager.getTasksSnapshot()`, loop state; redacts `activeGoal` text before write |
-| `snapshot-schema.ts` | Zod schema `TuiRuntimeSnapshotSchema` (version literal 1) + `parseSnapshot` |
+| `snapshot-schema.ts` | Zod schema `TuiRuntimeSnapshotSchema` (version literal 2, including LSP clients) + `parseSnapshot` |
 | `mirror-io.ts` | `writeMirror` (atomic, mode 0600) / `readMirror` — rejects unparseable, wrong-project, or stale (>6s) snapshots |
 | `mirror-path.ts` | XDG data dir + sha1(projectDir) prefix filename; `canonicalProjectDir` via realpath |
 | `loop-reader.ts` | Reads `.omo/ulw-loop/*/goals.json` (v1 schema) + legacy `.omo/loop/goals.json`, freshest live loop wins; stale after 120s |
+| `lsp-status-reader.ts` | Reads fresh LSP daemon `v*/status.json` snapshots, selecting the newest `updatedAt` and degrading invalid input to no clients |
 | `derivers.ts` | Snapshot → section states; jobs sorted by status priority (running first), caps MAX_AGENTS/MAX_JOBS = 12 |
 | `compute-view.ts` | `computeView` picks active/broken/idle; `viewKey` gives stable string for re-render diffing |
-| `render-view.ts` | `buildViewNodes` (themed box/text tree) + `describeView` (plain lines); 24-char label truncation |
+| `render-view.ts` | `buildViewNodes` (themed box/text tree) + `describeView` (plain lines), including the active/idle LSP section; 24-char label truncation |
 | `state-types.ts` | Discriminated-union section states (`kind` tags) + `assertNever` |
 | `roster-resolver.ts` | Idle-view model roster from config via doctor's model resolution |
 | `element-helpers.ts` | `ViewNode` type + `box`/`text` constructors (renderer-agnostic) |
 | `config-validator.ts` | Re-export of `validatePluginConfig` |
-| `constants.ts` | All timing/size knobs: STALE_MS 6s, HEARTBEAT_MS 2s, POLL_INTERVAL_MS 1s, WRITE_DEBOUNCE_MS 250ms, LOOP_FRESH_MS 120s |
+| `constants.ts` | All timing/size knobs: STALE_MS 6s, HEARTBEAT_MS 2s, POLL_INTERVAL_MS 1s, WRITE_DEBOUNCE_MS 250ms, LOOP_FRESH_MS 120s, LSP freshness 15s, LSP cap 12 |
 
 ## KEY EXPORTS
 
