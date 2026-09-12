@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0-beta.59] - 2026-09-12
+
 ### Engine: senpi 2026.9.12-2
 
 **Cursor keeps the whole conversation.** Admission used to enforce a fixed 50 KB aggregate budget on every Cursor request and delete the oldest whole turns when blanking tool results was not enough: a conversation with zero tool calls could lose its first turn, and a nominal 1M-token window was reduced to roughly 6K tokens of retained history. Admission now caps each tool result, blanks the oldest tool bodies if the model input still exceeds the effective window, and never deletes a turn. The effective window follows the ceiling Cursor itself reports for the model on every conversation checkpoint — recorded per model id, persisted across restarts, and applied to context usage and compaction thresholds — with the committed capability table as the bootstrap. An oversized history is admitted, logged, and answered by overflow compaction instead of being silently shortened (senpi #1603, #1624).
