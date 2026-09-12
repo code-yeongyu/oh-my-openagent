@@ -11,7 +11,6 @@ import {
   generateCodeChallenge,
   generateCodeVerifier,
   runAuthorizationCodeRedirect,
-  startCallbackServer,
 } from "./oauth-authorization-flow"
 
 export type McpOAuthProviderOptions = {
@@ -106,7 +105,7 @@ export class McpOAuthProvider {
     return this.storedCodeVerifier
   }
 
-  async redirectToAuthorization(metadata: OAuthServerMetadata): Promise<{ code: string }> {
+  async redirectToAuthorization(metadata: OAuthServerMetadata): Promise<{ code: string; authorizationUrl: string }> {
     const clientInfo = this.clientInformation()
     if (!clientInfo) {
       throw new Error("No client information available. Run login() or register a client first.")
@@ -126,7 +125,7 @@ export class McpOAuthProvider {
     })
 
     this.saveCodeVerifier(result.verifier)
-    return { code: result.code }
+    return { code: result.code, authorizationUrl: result.authorizationUrl }
   }
 
   async login(): Promise<OAuthTokenData> {

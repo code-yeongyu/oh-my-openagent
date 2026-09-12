@@ -1,0 +1,20 @@
+=== GATES PASS 2 (final tree) - 2026-08-26T00:57:06Z ===
+
+$ bun test packages/mcp-client-core packages/omo-opencode/src/features/mcp-oauth packages/omo-opencode/src/cli/mcp-oauth
+ 107 pass
+ 0 fail
+ 191 expect() calls
+Ran 107 tests across 16 files. [1.78s]
+
+$ bunx tsgo --noEmit -p packages/mcp-client-core/tsconfig.json
+exit: 0
+
+$ bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+exit: 0
+
+$ GIT_MASTER=1 git diff --check
+exit: 0 (clean)
+
+hygiene scan (as any / @ts-ignore / @ts-expect-error / non-null assertions / filler words / emojis): 0 hits
+
+GATES PASS 1 (identical commands, pre-evidence-freeze): all green, see transcript history - tests 107 pass/0 fail, tsgo x2 exit 0, diff-check clean, hygiene 0 hits

@@ -1,0 +1,43 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/mcp-client-core/src/mcp-oauth/oauth-authorization-flow.test.ts:
+15 | }
+16 | 
+17 | function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+18 |   let timer: ReturnType<typeof setTimeout> | null = null
+19 |   const watchdog = new Promise<never>((_, reject) => {
+20 |     timer = setTimeout(() => reject(new Error(`flow did not complete within ${timeoutMs}ms`)), timeoutMs)
+                                             ^
+error: flow did not complete within 5000ms
+      at <anonymous> (/home/viprix/projects/oom-wt-6724/packages/mcp-client-core/src/mcp-oauth/oauth-authorization-flow.test.ts:20:41)
+(fail) runAuthorizationCodeRedirect > #given an injected browser opener > #when the redirect flow completes #then the opener receives exactly the returned authorization url [5029.54ms]
+15 | }
+16 | 
+17 | function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+18 |   let timer: ReturnType<typeof setTimeout> | null = null
+19 |   const watchdog = new Promise<never>((_, reject) => {
+20 |     timer = setTimeout(() => reject(new Error(`flow did not complete within ${timeoutMs}ms`)), timeoutMs)
+                                             ^
+error: flow did not complete within 5000ms
+      at <anonymous> (/home/viprix/projects/oom-wt-6724/packages/mcp-client-core/src/mcp-oauth/oauth-authorization-flow.test.ts:20:41)
+(fail) runAuthorizationCodeRedirect > #given an injected browser opener > #when the opener is invoked #then the callback server already accepts http requests [5028.59ms]
+108 |         }),
+109 |         5_000,
+110 |       )
+111 | 
+112 |       // then
+113 |       await expect(flowResult).rejects.toThrow(/Open the URL manually: http:\/\/127\.0\.0\.1:\d+\/callback/)
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /Open the URL manually: http:\/\/127\.0\.0\.1:\d+\/callback/
+Received message: "flow did not complete within 5000ms"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6724/packages/mcp-client-core/src/mcp-oauth/oauth-authorization-flow.test.ts:113:40)
+(fail) runAuthorizationCodeRedirect > #given a browser opener that fails > #when the flow attempts the browser open #then the flow rejects with the authorization url and closes the server [5022.88ms]
+
+ 0 pass
+ 3 fail
+ 1 expect() calls
+Ran 3 tests across 1 file. [16.43s]
+exit:1

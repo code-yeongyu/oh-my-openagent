@@ -1,0 +1,22 @@
+=== starting mock oauth server ===
+mock port: 42369
+=== run 1: default platform opener via PATH-stubbed xdg-open ===
+opener-recorded-url: https://127.0.0.1:38061/authorize?response_type=code&client_id=qa-client-03349bf1&redirect_uri=http%3A%2F%2F127.0.0.1%3A19877%2Fcallback&code_challenge=I4uYymJ8P0hsPk5M1gyuun6_48W2nDWq1DMPxdHdeMQ&code_challenge_method=S256&state=33d274dc4864bebab53280b02e25677d&resource=https%3A%2F%2F127.0.0.1%3A38061%2Fmcp
+byte-equality opener-vs-mock-received: PASS
+callback validated + PKCE token exchange: PASS
+token persisted under sandboxed OPENCODE_CONFIG_DIR: PASS
+QA-PASS(default-opener)
+default-mode exit: 0
+=== run 2: injected opener seam ===
+returned authorizationUrl === opener argument (byte-for-byte): PASS
+callback code accepted, state validated: code=c1d7112f... verifierLen=43
+QA-PASS(injected-opener)
+injected-mode exit: 0
+=== sandbox tree (isolation proof) ===
+/tmp/opencode/issue-6724/sandbox/cache/bun/@t@/78ff5695248ab9fa.pile
+/tmp/opencode/issue-6724/sandbox/cache/bun/@t@/7a87559fbb4087c4.pile
+/tmp/opencode/issue-6724/sandbox/cache/bun/@t@/cf86f20c120ce818.pile
+/tmp/opencode/issue-6724/sandbox/opencode-config/mcp-oauth/61a67b70258800a234733da5fedaa5f2.json
+/tmp/opencode/issue-6724/sandbox/opencode-config/mcp-oauth/index.json
+QA-OVERALL-PASS
+qa-run exit:0
