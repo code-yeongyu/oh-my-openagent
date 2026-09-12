@@ -144,6 +144,10 @@ describe("compile-safe engine preparation", () => {
           join(root, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js"),
           'const claudeCodeVersion = "2.1.251";\n',
         )
+        write(
+          join(root, "dist", "main.js"),
+          "created.session.setSessionThinkingLevel(created.session.thinkingLevel);\n",
+        )
         const result = spawnSync("node", [PATCH_SCRIPT], {
           encoding: "utf8",
           env: { ...process.env, OMO_SENPI_PATCH_ROOT: root },
