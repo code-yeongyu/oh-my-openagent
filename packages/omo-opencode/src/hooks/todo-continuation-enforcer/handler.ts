@@ -1,3 +1,4 @@
+import { isRuntimeFallbackRetryableError } from "@oh-my-opencode/model-core"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
@@ -8,6 +9,7 @@ import {
 import { log } from "../../shared/logger"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 
+import { DEFAULT_CONFIG as RUNTIME_FALLBACK_DEFAULT_CONFIG } from "../runtime-fallback/constants"
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { armCompactionGuard } from "./compaction-guard"
 import type { SessionStateStore } from "./session-state"
@@ -55,6 +57,10 @@ function extractSessionErrorInfo(error: unknown): { name?: string; message?: str
   return { name, message: messageParts.join(" ") || undefined }
 }
 
+function isRetryableProviderError(error: unknown): boolean {
+  return isRuntimeFallbackRetryableError(error, RUNTIME_FALLBACK_DEFAULT_CONFIG.retry_on_errors)
+}
+
 export function createTodoContinuationHandler(args: {
   ctx: PluginInput
   sessionStateStore: SessionStateStore
@@ -78,6 +84,7 @@ export function createTodoContinuationHandler(args: {
       if (!sessionID) return
 
       const error = extractSessionErrorInfo(props?.error)
+      const existingState = sessionStateStore.getExistingState(sessionID)
       let shouldCancelCountdown = false
       if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
         const state = sessionStateStore.getState(sessionID)
@@ -91,6 +98,7 @@ export function createTodoContinuationHandler(args: {
         state.pendingUserMessageID = undefined
         state.stagnationCount = 0
         state.consecutiveFailures = 0
+        state.consecutiveProviderFailures = 0
         shouldCancelCountdown = true
         log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
       } else if (isTokenLimitError(error)) {
@@ -104,6 +112,14 @@ export function createTodoContinuationHandler(args: {
         shouldCancelCountdown = true
         log(`[${HOOK_NAME}] Non-retryable request error detected via session.error`, {
           sessionID,
+          errorName: error?.name,
+          errorMessage: error?.message,
+        })
+      } else if (existingState?.awaitingPostInjectionProgressCheck && isRetryableProviderError(props?.error)) {
+        existingState.consecutiveProviderFailures = (existingState.consecutiveProviderFailures ?? 0) + 1
+        log(`[${HOOK_NAME}] Retryable provider error after continuation dispatch`, {
+          sessionID,
+          consecutiveProviderFailures: existingState.consecutiveProviderFailures,
           errorName: error?.name,
           errorMessage: error?.message,
         })
