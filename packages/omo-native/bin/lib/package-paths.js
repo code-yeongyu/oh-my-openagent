@@ -12,8 +12,10 @@ export function packageManifest() {
   return readJson(join(packageRoot, "package.json"))
 }
 
-function quotePosix(value) {
-  return `'${value.replaceAll("'", "'\\''")}'`
+export function quoteShellArgument(value, platform = process.platform) {
+  return platform === "win32"
+    ? `"${value.replaceAll("\\", "/")}"`
+    : `'${value.replaceAll("'", "'\\''")}'`
 }
 
 export function updateTarget(root = packageRoot, platform = process.platform) {
@@ -21,8 +23,8 @@ export function updateTarget(root = packageRoot, platform = process.platform) {
   const normalizedRoot = updateCwd.replaceAll("\\", "/")
   if (normalizedRoot.endsWith("/install/global/node_modules/omo-ai")) {
     const quotedCwd = platform === "win32"
-      ? `"${normalizedRoot}"`
-      : quotePosix(updateCwd)
+      ? quoteShellArgument(normalizedRoot, platform)
+      : quoteShellArgument(updateCwd, platform)
     return {
       manager: "bun",
       command: `bun add --cwd ${quotedCwd} -g omo-ai@beta`,

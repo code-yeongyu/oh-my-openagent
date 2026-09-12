@@ -1,0 +1,8 @@
+bun test packages/omo-native/test/launcher.test.ts
+bun test packages/omo-native/test
+bunx tsc -p packages/omo-native/tsconfig.json --noEmit
+bun run build:omo-native
+node packages/omo-native/bin/omo.js --version
+node packages/omo-native/bin/omo.js --help
+OMO_CODING_AGENT_DIR="$PWD/.omo/evidence/20260829-issue-7471-session-resume-diagnostics/sandbox-agent" node packages/omo-native/bin/omo.js --session 01a048ce-c465-776b-959c-dcb362446db7 --help
+node packages/omo-native/bin/omo.js --session-id 'bad/id' --print

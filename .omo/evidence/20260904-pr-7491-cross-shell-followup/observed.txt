@@ -1,0 +1,14 @@
+focused_red=missing sessionResumeSuggestion export
+focused_green=44 pass, 0 fail, 156 assertions
+omo_native_suite=271 pass, 0 fail, 776 assertions, 27 files
+typecheck=PASS
+build_omo_native=PASS, 37 required artifacts
+version=omo 5.0.0-0.beta.42 (engine: senpi 2026.9.4-3)
+help=PASS
+posix_mismatch=header ID plus single-quoted path alternative
+windows_mismatch=header ID only, no path alternative
+post_merge_dev=07e30350b
+post_merge_suite=271 pass, 0 fail, 776 assertions, 27 files
+post_merge_typecheck=PASS
+post_merge_build=PASS, 37 required artifacts
+post_merge_help_and_version=PASS

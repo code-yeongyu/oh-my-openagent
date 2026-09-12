@@ -1,0 +1,245 @@
+omo: searched /Users/sungsoopark/Documents/GitHub/oh-my-openagent-7491/.omo/evidence/20260829-issue-7471-session-resume-diagnostics/sandbox-agent/sessions
+omo: candidate /Users/sungsoopark/Documents/GitHub/oh-my-openagent-7491/.omo/evidence/20260829-issue-7471-session-resume-diagnostics/sandbox-agent/sessions/project/2026-08-28T14-38-25-381Z_01a048ce-c465-776b-959c-dcb362446db7.jsonl was rejected because its header id is '01a0464c-0661-73a1-8d6c-cc1df9f27972', not filename id '01a048ce-c465-776b-959c-dcb362446db7'
+omo: retry with `omo --session 01a0464c-0661-73a1-8d6c-cc1df9f27972` or `omo --session /Users/sungsoopark/Documents/GitHub/oh-my-openagent-7491/.omo/evidence/20260829-issue-7471-session-resume-diagnostics/sandbox-agent/sessions/project/2026-08-28T14-38-25-381Z_01a048ce-c465-776b-959c-dcb362446db7.jsonl`
+x-search skipped: no xAI credential { component: 'x-search' }
+OmO - AI coding assistant with read, bash, edit, write tools
+
+Usage:
+  OmO [options] [--] [@files...] [messages...]
+
+Commands:
+  OmO install <source> [-l]     Install extension source and add to settings
+  OmO remove <source> [-l]      Remove extension source from settings
+  OmO uninstall <source> [-l]   Alias for remove
+  OmO update [source|self|OmO]   Update OmO, extensions, or model catalogs
+  OmO list [--approve|--no-approve]
+                                 List installed extensions from settings
+  OmO config [--no-approve]
+                                 Open TUI to enable/disable package resources (Tab switches scope)
+  OmO app-server [--listen <url>]
+                                 Serve agent sessions over the Codex app-server protocol
+  OmO app-server daemon <start|stop|status|restart> [--listen <url>]
+                                 Manage the app-server daemon
+  OmO auth <command>            Print credentials or check provider readiness
+  OmO <command> --help          Show help for install/remove/uninstall/update/list/config/auth
+
+Options:
+  --provider <name>              Provider name (default: google)
+  --model <pattern>              Model pattern or ID (supports "provider/id" and optional ":<thinking>")
+  --api-key <key>                API key (defaults to env vars)
+  --system-prompt <text>         System prompt (default: coding assistant prompt)
+  --append-system-prompt <text>  Append text or file contents to the system prompt (can be used multiple times)
+  --mode <mode>                  Output mode: text (default), json, or rpc
+  --print, -p                    Non-interactive mode: process prompt and exit
+  --continue, -c                 Continue previous session
+  --resume, -r                   Select a session to resume
+  --session <path|id>            Use specific session file or partial UUID
+  --session-id <id>              Use exact project session ID, creating it if missing
+  --fork <path|id>               Fork specific session file or partial UUID into a new session
+  --session-dir <dir>            Directory for session storage and lookup
+  --no-session                   Don't save session (ephemeral)
+  --name, -n <name>              Set session display name
+  --models <patterns>            Comma-separated model patterns for Ctrl+P cycling
+                                 Supports globs (anthropic/*, *sonnet*) and fuzzy matching
+  --no-tools, -nt                Disable all tools by default (built-in and extension)
+  --no-builtin-tools, -nbt       Disable built-in tools by default but keep extension/custom tools enabled
+  --tools, -t <tools>            Comma-separated allowlist of tool names to enable
+                                 Applies to built-in, extension, and custom tools
+  --exclude-tools, -xt <tools>   Comma-separated denylist of tool names to disable
+                                 Applies to built-in, extension, and custom tools
+  --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max
+  --extension, -e <path>         Load an extension file (can be used multiple times)
+  --no-extensions, -ne           Disable extension discovery (explicit -e paths still work)
+  --skill <path>                 Load a skill file or directory (can be used multiple times)
+  --no-skills, -ns               Disable skills discovery and loading
+  --prompt-template <path>       Load a prompt template file or directory (can be used multiple times)
+  --no-prompt-templates, -np     Disable prompt template discovery and loading
+  --theme <path>                 Register a theme file or directory (can be used multiple times; does not select it)
+  --use-theme <name[/name]>      Set the initial interactive theme for this run
+  --no-themes                    Disable theme discovery and loading
+  --no-context-files, -nc        Disable AGENTS.md and CLAUDE.md discovery and loading
+  --export <file>                Export session file to HTML and exit
+  --list-models [search]         List available models (with optional fuzzy search)
+  --list-tips                    List all tips as JSON
+  --verbose                      Force verbose startup (overrides quietStartup setting)
+  --tui-mode <mode>              TUI mode: regular (default) or fullscreen
+  --approve, -a                  Trust project-local files for this run
+  --no-approve, -na              Ignore project-local files for this run
+  --offline                      Disable startup network operations (same as PI_OFFLINE=1)
+  --multi-session               Serve multiple routed RPC sessions
+  --listen <address>            RPC listener: stdio://, unix://, unix:///path, or a socket path
+  --auto-title-sessions         Auto-generate session titles outside interactive mode
+  --help, -h                     Show this help
+  --version, -v                  Show version number
+
+Extensions can register additional flags (e.g., --plan from plan-mode extension).
+Extension CLI Flags:
+  --permission <value>        Set permission rules (format: tool=action or tool:pattern=action)
+  --permission-preset <value> Set permission preset (full-access, workspace, read-only, or ask)
+  --no-model-fallback         Disable retry model fallback for this run.
+  --no-recommended-models     Disable recommended model selection for this run.
+  --no-nested-agents          Disable nested AGENTS.md context injection.
+  --pi-rules-disabled         Disable pi-rules hooks.
+  --pi-rules-mode <value>     Rule injection mode: static, dynamic, both, or off.
+  --ttsr-disabled             Disable TTSR stream-rule detection.
+  --ttsr-rules-disabled <value>Comma-separated TTSR rule names to disable.
+  --claude-account <value>    Pin Claude SDK OAuth account for this session.
+  --omo-senpi-disabled        Disable all omo-senpi components.
+  --omo-senpi-config-startup-disabledDisable the omo-senpi config-startup component.
+  --omo-senpi-native-badge-disabledDisable the omo-senpi native-badge component.
+  --omo-senpi-onboarding-disabledDisable the omo-senpi onboarding component.
+  --omo-senpi-init-deep-advisor-disabledDisable the omo-senpi init-deep-advisor component.
+  --omo-senpi-telemetry-disabledDisable the omo-senpi telemetry component.
+  --omo-senpi-ultrawork-disabledDisable the omo-senpi ultrawork component.
+  --omo-senpi-skill-pointers-disabledDisable the omo-senpi skill-pointers component.
+  --omo-senpi-ulw-execute-continuation-disabledDisable the omo-senpi ulw-execute-continuation component.
+  --omo-senpi-ulw-loop-disabledDisable the omo-senpi ulw-loop component.
+  --omo-senpi-todo-fanout-reminder-disabledDisable the omo-senpi todo-fanout-reminder component.
+  --omo-senpi-git-master-attribution-disabledDisable the omo-senpi git-master-attribution component.
+  --omo-senpi-fallback-architect-disabledDisable the omo-senpi fallback-architect component.
+  --omo-senpi-ast-grep-disabledDisable the omo-senpi ast-grep component.
+  --omo-senpi-lsp-disabled    Disable the omo-senpi lsp component.
+  --omo-senpi-x-search-disabledDisable the omo-senpi x-search component.
+  --omo-senpi-comment-checker-disabledDisable the omo-senpi comment-checker component.
+  --omo-senpi-task-disabled   Disable the omo-senpi task component.
+  --omo-senpi-memory-disabled Disable the omo-senpi memory component.
+  --omo-senpi-config-watch-disabledDisable the omo-senpi config-watch component.
+  --onboard                   Force the onboarding flow on startup.
+  --omo-senpi-lsp-tools-enabledEnable omo-senpi LSP tools.
+  --omo-senpi-lsp-post-edit-diagnostics-enabledEnable omo-senpi post-edit LSP diagnostics.
+  --omo-task                  Enable the omo-senpi task engine (use --no-omo-task to disable).
+  --omo-task-usage-hint       Inject once-per-session omo-senpi task usage guidance.
+
+
+Examples:
+  # Print a provider API key for an external client
+  OmO auth print-api-key --provider openai
+
+  # Print an OAuth bearer token for an external client (refreshes if expired)
+  OmO auth print-bearer-token --provider openai-codex
+
+  # Interactive mode
+  OmO
+
+  # Interactive mode with initial prompt
+  OmO "List all .ts files in src/"
+
+  # Include files in initial message
+  OmO @prompt.md @image.png "What color is the sky?"
+
+  # Non-interactive mode (process and exit)
+  OmO -p "List all .ts files in src/"
+
+  # Prompt beginning with a dash
+  OmO -p -- "- Summarize these points"
+
+  # Multiple messages (interactive)
+  OmO "Read package.json" "What dependencies do we have?"
+
+  # Continue previous session
+  OmO --continue "What did we discuss?"
+
+  # Start a named session
+  OmO --name "Refactor auth module"
+
+  # Use different model
+  OmO --provider openai --model gpt-4o-mini "Help me refactor this code"
+
+  # Use model with provider prefix (no --provider needed)
+  OmO --model openai/gpt-4o "Help me refactor this code"
+
+  # Use model with thinking level shorthand
+  OmO --model sonnet:high "Solve this complex problem"
+
+  # Limit model cycling to specific models
+  OmO --models claude-sonnet,claude-haiku,gpt-4o
+
+  # Limit to a specific provider with glob pattern
+  OmO --models "github-copilot/*"
+
+  # Cycle models with fixed thinking levels
+  OmO --models sonnet:high,haiku:low
+
+  # Start with a specific thinking level
+  OmO --thinking high "Solve this complex problem"
+
+  # Read-only mode (no file modifications possible)
+  OmO --tools read,grep,find,ls -p "Review the code in src/"
+
+  # Disable one tool while keeping the rest available
+  OmO --exclude-tools ask_question
+
+  # Export a session file to HTML
+  OmO --export ~/.omo/agent/sessions/--path--/session.jsonl
+  OmO --export session.jsonl output.html
+
+  # Start Codex app-server protocol scaffolding
+  OmO app-server --listen stdio://
+  OmO app-server --listen ws://127.0.0.1:18991
+
+Environment Variables:
+  ANTHROPIC_AUTH_TOKEN             - Anthropic bearer auth token
+  ANTHROPIC_API_KEY                - Anthropic Claude API key
+  ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key)
+  ANT_LING_API_KEY                 - Ant Ling API key
+  OPENAI_API_KEY                   - OpenAI GPT API key
+  OLLAMA_API_KEY                   - Ollama Cloud API key
+  AZURE_OPENAI_API_KEY             - Azure OpenAI API key
+  AZURE_OPENAI_BASE_URL            - Azure OpenAI/Cognitive Services base URL (e.g. https://{resource}.openai.azure.com)
+  AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL)
+  AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1)
+  AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated)
+  DEEPSEEK_API_KEY                 - DeepSeek API key
+  NVIDIA_API_KEY                   - NVIDIA NIM API key
+  GEMINI_API_KEY                   - Google Gemini API key
+  GROQ_API_KEY                     - Groq API key
+  CEREBRAS_API_KEY                 - Cerebras API key
+  XAI_API_KEY                      - xAI Grok API key
+  FIREWORKS_API_KEY                - Fireworks API key
+  TOGETHER_API_KEY                 - Together AI API key
+  BASETEN_API_KEY                  - Baseten API key
+  OPENROUTER_API_KEY               - OpenRouter API key
+  AI_GATEWAY_API_KEY               - Vercel AI Gateway API key
+  OPENGATEWAY_API_KEY              - OpenGateway API key (https://opengateway.ai/api-keys)
+  ZAI_API_KEY                      - ZAI Coding Plan API key (Global)
+  ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China)
+  MISTRAL_API_KEY                  - Mistral API key
+  MINIMAX_API_KEY                  - MiniMax API key
+  MOONSHOT_API_KEY                 - Moonshot AI API key
+  OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key
+  KIMI_API_KEY                     - Kimi For Coding API key
+  CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway)
+  CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both)
+  CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway)
+  QWEN_TOKEN_PLAN_API_KEY          - Qwen Token Plan API key (international region)
+  QWEN_TOKEN_PLAN_CN_API_KEY       - Qwen Token Plan API key (China region)
+  XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing)
+  XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region)
+  XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region)
+  XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region)
+  ALIBABA_TOKEN_PLAN_API_KEY       - Alibaba Cloud Model Studio Token Plan API key (ap-southeast-1)
+  AWS_PROFILE                      - AWS profile for Amazon Bedrock
+  AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock
+  AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock
+  AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token)
+  AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1)
+  OMO_CODING_AGENT_DIR             - Config directory (default: ~/.omo/agent)
+  OMO_CODING_AGENT_SESSION_DIR     - Session storage directory (overridden by --session-dir)
+  PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths)
+  PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes
+  PI_RULES_DISABLED                - Disable built-in rules when set to 1/true/yes/on
+  PI_RULES_MAX_RULE_CHARS          - Per-rule formatted payload character cap (default: 12000)
+  PI_RULES_MAX_RESULT_CHARS        - Complete static/dynamic block character cap (default: 40000)
+  PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no
+  PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/)
+
+Built-in Tool Names:
+  read       - Read file contents
+  bash       - Execute bash commands
+  powershell - Execute PowerShell commands on Windows
+  edit       - Edit files with find/replace
+  write      - Write files (creates/overwrites)
+  grep       - Search file contents (read-only, off by default)
+  find       - Find files by glob pattern (read-only, off by default)
+  ls         - List directory contents (read-only, off by default)
+

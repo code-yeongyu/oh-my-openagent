@@ -1,0 +1,2 @@
+Error: Session id must be non-empty, contain only alphanumeric characters, '-', '_', and '.', and start and end with an alphanumeric character
+exit=1

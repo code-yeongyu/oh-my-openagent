@@ -1,0 +1,5 @@
+omo (omo-ai beta 5.0.0-0.beta.42)
+omo: searched /tmp/oh-my-openagent-7491-final/.omo/evidence/20260904-pr-7491-review-fixes/spaced agent/sessions
+omo: candidate /tmp/oh-my-openagent-7491-final/.omo/evidence/20260904-pr-7491-review-fixes/spaced agent/sessions/project/2026-08-28T14-38-25-381Z_01a048ce-c465-776b-959c-dcb362446db7.jsonl was rejected because its header id is '01a0464c-0661-73a1-8d6c-cc1df9f27972', not filename id '01a048ce-c465-776b-959c-dcb362446db7'
+omo: retry with `omo --session 01a0464c-0661-73a1-8d6c-cc1df9f27972` or `omo --session '/tmp/oh-my-openagent-7491-final/.omo/evidence/20260904-pr-7491-review-fixes/spaced agent/sessions/project/2026-08-28T14-38-25-381Z_01a048ce-c465-776b-959c-dcb362446db7.jsonl'`
+help_exit=0

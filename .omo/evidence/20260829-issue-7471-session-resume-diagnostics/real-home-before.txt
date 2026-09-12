@@ -1,0 +1,12 @@
+44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a  /Users/sungsoopark/.omo/agent/auth.json
+MISSING  /Users/sungsoopark/.omo/agent/settings.json
+MISSING  /Users/sungsoopark/.omo/agent/models.json
+44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a  /Users/sungsoopark/.omo/agent/models-store.json
+MISSING  /Users/sungsoopark/.omo/agent/trust.json
+MISSING  /Users/sungsoopark/.omo/agent/hooks-state.json
+391c2fdc4205b99e2a04bfb57f64a1ccc3196e9e46b551dcb738ef9848854be4  /Users/sungsoopark/.senpi/agent/auth.json
+1d7614aa30be51ec48e6450ec730c3eebfa037fce257e0828d819e0828ef9b75  /Users/sungsoopark/.senpi/agent/settings.json
+85dfe09a9dc2ed96d671cde9a95bfe8492159dcc629e33581a0065041c09a581  /Users/sungsoopark/.senpi/agent/models.json
+222e77befedab2694eb54121d6dba7506198ad577c24b230e414ecfe5396bcf0  /Users/sungsoopark/.senpi/agent/models-store.json
+b7fc9dfe1ae6762ca1768a1ffaa8223dde955f66901333683daef794c3ee8877  /Users/sungsoopark/.senpi/agent/trust.json
+MISSING  /Users/sungsoopark/.senpi/agent/hooks-state.json

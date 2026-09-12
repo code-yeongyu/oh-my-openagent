@@ -1,0 +1,3 @@
+default_store_diagnostic=absent
+help_exit=0
+OMO_CODING_AGENT_SESSION_DIR preserved by launcher boundary test.

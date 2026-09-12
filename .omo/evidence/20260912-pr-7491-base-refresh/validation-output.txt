@@ -1,0 +1,445 @@
+toolchain-corrected.txt
+v24.18.0
+1.4.0
+<bun-install>/bun
+
+
+checks-corrected.txt
+v24.18.0
+1.4.0
+native tsgo exit: 0
+native staged whitespace check exit: 0
+
+
+native-tests-bun140.txt
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-native/test/anthropic-tool-search-compat.test.ts:
+(pass) anthropic tool-search compatibility > #given the committed omo-ai publish surface > #when every shipped file is scanned for engine-owned tool-search tokens > #then the scan reads the real launcher sources [6.75ms]
+(pass) anthropic tool-search compatibility > #given the committed omo-ai publish surface > #when every shipped file is scanned for engine-owned tool-search tokens > #then no shipped file re-declares the Anthropic native tool-search contract [9.85ms]
+
+packages/omo-native/test/launcher.test.ts:
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then the packaged extension precedes user extension arguments [265.21ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then a filename and header ID mismatch explains the rejected session candidate [106.51ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then an indexed matching header suppresses a filename mismatch diagnostic [106.49ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then session-like prompt text after the option separator stays diagnostic-free [183.28ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then a prompt-side session directory cannot suppress an earlier resume diagnostic [184.25ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then a spaced agent directory is quoted in the resume suggestion [106.50ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then Windows omits a path alternative that cannot be portable across shells [0.20ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then an environment session directory suppresses the default-store diagnostic [105.26ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then a unique partial filename ID explains a header mismatch [105.93ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then an underscored filename ID explains a header mismatch [110.79ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then an ambiguous partial filename ID stays silent [105.68ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then launcher environment points to existing hoisted shims [119.36ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then scoped engine packages resolve the hoisted senpi shim [143.81ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then SENPI_BIN stays absent when no shim exists [130.90ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then the brand profile names the product, its home and its update channel [122.61ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then a launcher running on node tells the engine SENPI_RUNTIME=node [181.52ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then a launcher running on bun tells the engine SENPI_RUNTIME=bun [107.30ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then OMO_BIN names this launcher, so the product never resolves to the bare engine [126.99ms]
+(pass) omo launcher > #given a fake senpi package > #when the version is requested on its own > #then the product version is reported with its engine version, without spawning senpi [78.00ms]
+(pass) omo launcher > #given a fake senpi package > #when the version is requested on its own > #then a compound invocation still reaches senpi [128.02ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then update --self is answered with the product's own update command [65.24ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then update self is answered with the product's own update command [60.28ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then update senpi is answered with the product's own update command [60.59ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then updating extensions still passes through to senpi [97.80ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then install passes through without an extension argument [99.76ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then remove passes through without an extension argument [97.10ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then list passes through without an extension argument [128.83ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then config passes through without an extension argument [105.35ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then auth passes through without an extension argument [105.50ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then app-server passes through without an extension argument [113.36ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with flags passes through without an extension argument [97.98ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with a source passes through without an extension argument [110.67ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then npm beta guidance is printed without spawning senpi [57.93ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Bun-managed install uses a clean package cwd [69.05ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Bun path with shell metacharacters is quoted for the host [78.12ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Windows-style Bun path uses shell-compatible forward slashes [0.36ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then an npm-managed install keeps the npm update command [80.55ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then an unknown install layout fails safe to npm [74.43ms]
+(pass) omo launcher > #given a fake senpi package > #given a legacy Bun global manifest contains the empty dot dependency > #then launching omo removes only the invalid dependency entry [82.07ms]
+(pass) omo launcher > #given a fake senpi package > #given a legacy Bun global manifest contains the empty dot dependency > #then a different empty dependency value is preserved [79.75ms]
+(pass) omo launcher > #given a fake senpi package > #given a legacy Bun global manifest contains the empty dot dependency > #then malformed JSON is preserved [80.11ms]
+(pass) omo launcher > #given a fake senpi package > #when ulw-loop is requested > #then the staged runtime CLI receives the remaining arguments [116.51ms]
+(pass) omo launcher > #given a fake senpi package > #when the committed agent-toolkit delegate is launched > #then the staged dispatcher receives all arguments [103.31ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then exit zero and exit seven propagate [192.32ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then SIGINT is re-raised by the launcher [101.82ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then child stdio remains inherited [100.24ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then resolution fails with actionable reinstall guidance [60.95ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then a missing dependency fails with the same reinstall guidance [82.19ms]
+
+packages/omo-native/test/senpi-pin.test.ts:
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-ai pins the exact senpi version [1.79ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then omo-senpi peer and dev pins match [0.12ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then the root devDependency pin matches [0.10ms]
+(pass) senpi dependency pin > #given the three manifests that pin @code-yeongyu/senpi > #when their pins are read > #then senpi-task pins match [0.42ms]
+
+packages/omo-native/test/compile-entry.test.ts:
+(pass) compiled OMO OAuth module identity > registers the loader in the same nested pi-ai graph used by the provider [0.27ms]
+(pass) compiled OMO OAuth module identity > derives OpenAI Codex request auth from a stored OAuth credential [0.19ms]
+(pass) compiled omo entry launcher parity > uses the launched Windows executable path for self-provisioning identity [0.13ms]
+(pass) compiled omo entry launcher parity > strips Linux procfs deleted suffix but preserves it on other platforms [0.09ms]
+(pass) compiled omo entry launcher parity > recognizes a deleted Linux executable as the provisioned path [0.54ms]
+(pass) compiled omo entry launcher parity > re-exec source contract uses signal-aware child execution [0.17ms]
+(pass) compiled omo entry launcher parity > pins the engine package dir to the provisioned root [0.35ms]
+(pass) compiled omo entry launcher parity > early commands pass through without an extension [0.10ms]
+(pass) compiled omo entry launcher parity > main commands prepend the provisioned plugin extension [0.09ms]
+(pass) compiled omo entry launcher parity > --no-extensions leaves the caller's extension list untouched [0.08ms]
+(pass) compiled omo entry launcher parity > version line reads the sibling package version and pinned engine [0.10ms]
+(pass) compiled omo entry launcher parity > realpath-equivalent executable and expected paths skip re-exec [0.57ms]
+(pass) compiled omo entry launcher parity > self-update prints the curl reinstall command [0.08ms]
+(pass) compiled omo entry launcher parity > package-root environment values point into the provisioned runtime [0.13ms]
+(pass) pre-provisioning fast paths > answers --version from the embedded manifest before provisioning [0.17ms]
+(pass) pre-provisioning fast paths > -v answers while --version with extra arguments falls through [0.11ms]
+(pass) pre-provisioning fast paths > self-update spellings answer with the curl line while engine updates fall through [0.14ms]
+(pass) pre-provisioning fast paths > ordinary commands never fast-path [0.08ms]
+(pass) pre-provisioning fast paths > fast-path version line matches the provisioned launcher's line for the same stamp [0.63ms]
+(pass) pre-provisioning fast paths > banner gate requires a tty and an interactive-default launch [0.12ms]
+(pass) embedded runtime provisioning > materializes the executable directly on Windows [0.84ms]
+(pass) embedded runtime provisioning > does not overwrite an existing Windows provisioned executable [0.52ms]
+(pass) embedded runtime provisioning > skips re-copying an identical provisioned executable on POSIX [0.68ms]
+(pass) embedded runtime provisioning > still replaces a provisioned executable whose contents differ on POSIX [0.74ms]
+(pass) embedded runtime provisioning > materializes the executable through a temporary non-executable path on POSIX [0.63ms]
+(pass) embedded runtime provisioning > keeps an existing destination when the deleted Linux source cannot be read [1.03ms]
+(pass) embedded runtime provisioning > still throws when the deleted Linux source and destination are both absent [0.33ms]
+(pass) embedded runtime provisioning > selects the omo manifest when senpi also embeds an unrelated manifest [0.21ms]
+(pass) embedded runtime provisioning > compiled doctor resolves package artifacts from the provided execDir [2.86ms]
+(pass) embedded runtime provisioning > version uses the manifest engine pin without a provisioned senpi package [0.46ms]
+(pass) embedded runtime provisioning > materializes files whose embedded names carry the omo-runtime prefix [2.44ms]
+(pass) embedded runtime provisioning > materializes non-utf8 embedded bytes without a text round-trip [1.56ms]
+(pass) embedded runtime provisioning > materializes files with sha256 and mode, then skips on matching marker [1.19ms]
+(pass) omob branded build labels > versionLine prints full shas and commit dates for dev builds [1.13ms]
+(pass) omob branded build labels > remapSenpiEnvironment brands dev builds with the label and command [17.93ms]
+(pass) omob provenance degrades sanely > remapSenpiEnvironment falls back to the plain version and omo command for malformed build info [54.92ms]
+(pass) omob provenance degrades sanely > versionLine falls back to the release one-liner for malformed build info [0.25ms]
+(pass) omob provenance degrades sanely > updateHint tells dev builds to rebuild and release builds to curl [0.12ms]
+(pass) compiledBannerLines > #given a stamped dev build #when the banner renders #then it prints the same provenance as --version [0.16ms]
+(pass) compiledBannerLines > #given a release build with no build info #when the banner renders #then it keeps the release one-liner [0.08ms]
+(pass) compiledBannerLines > #given malformed build info #when the banner renders #then it degrades to the release one-liner [0.08ms]
+(pass) compiledBannerLines > #given a build stamped with another command name #when the banner renders #then it uses that name [0.09ms]
+
+packages/omo-native/test/bun-bin-shim.test.ts:
+(pass) bun launcher bin shim > #given the generated shim script > #then it execs bun on the entrypoint and falls back to the entrypoint's own shebang [0.27ms]
+(pass) bun launcher bin shim > #given the generated shim script > #then a path containing a single quote stays one shell word [0.10ms]
+(pass) bun launcher bin shim > #given a stock bun bin symlink pointing at this install > #then it is replaced by an executable shim through an atomic rename [0.66ms]
+(pass) bun launcher bin shim > #given a stock bun bin symlink pointing at this install > #then an already-current shim writes nothing [0.17ms]
+(pass) bun launcher bin shim > #given a stock bun bin symlink pointing at this install > #then a shim from an older generator version is rewritten [0.13ms]
+(pass) bun launcher bin shim > #given the bin path is not ours to touch > #then a symlink into another package is left alone [0.12ms]
+(pass) bun launcher bin shim > #given the bin path is not ours to touch > #then a file without the shim marker is left alone [0.11ms]
+(pass) bun launcher bin shim > #given the bin path is not ours to touch > #then a missing bin path is a no-op, not a creation [0.17ms]
+(pass) bun launcher bin shim > #given the launch context rules the repair out > #then Windows never repairs, whatever it finds [0.09ms]
+(pass) bun launcher bin shim > #given the launch context rules the repair out > #then a launcher already running on bun skips the check entirely [0.09ms]
+(pass) bun launcher bin shim > #given the launch context rules the repair out > #then an npm-layout install skips the check entirely [0.10ms]
+(pass) bun launcher bin shim > #given the launch context rules the repair out > #then a machine without bun has nothing to optimize with [0.10ms]
+(pass) bun launcher bin shim > #given the repair path fails > #then the failure is swallowed and never breaks the launch [0.12ms]
+(pass) bun launcher bin shim > #given the repair path fails > #then OMO_DEBUG narrates the swallowed failure [0.15ms]
+(pass) bun launcher bin shim > #given a real synthetic bun global tree driven by node > #then the first launch replaces the symlink and hands later launches to bun [1288.11ms]
+(pass) bun launcher bin shim > #given a real synthetic bun global tree driven by node > #then OMO_RUNTIME=node stays on node end to end [1149.74ms]
+(pass) bun launcher bin shim > #given a real synthetic bun global tree driven by node > #then a bun add -g update that restores the symlink is healed on the next launch [569.09ms]
+(pass) bun launcher bin shim > #given a real synthetic bun global tree driven by node > #then a current shim is not rewritten by later node boots [560.77ms]
+(pass) bun launcher bin shim > #given a real synthetic bun global tree driven by node > #then an unwritable bin dir never breaks the launch [181.85ms]
+
+packages/omo-native/test/packed-install.test.ts:
+(pass) omo-ai packed install > ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively [8080.11ms]
+
+packages/omo-native/test/compile-safe-engine.test.ts:
+(pass) compile-safe engine preparation > #given an engine whose css-tree resolves its data through createRequire > #when the engine is prepared for bun compile > #then no css-tree module reaches for a file at runtime [4.39ms]
+(pass) compile-safe engine preparation > #given an engine whose css-tree resolves its data through createRequire > #when the engine is prepared for bun compile > #then the inlined modules still expose the exact upstream data [176.81ms]
+(pass) compile-safe engine preparation > #given an engine whose css-tree resolves its data through createRequire > #when the preparation runs a second time > #then every prepared file stays byte-identical [4.53ms]
+(pass) compile-safe engine preparation > #given a css-tree whose data module matches no known shape > #when the engine is prepared > #then preparation fails loud instead of shipping a broken binary [3.84ms]
+(pass) compile-safe engine preparation > #given an engine that does not bundle css-tree > #when the engine is prepared > #then preparation is a no-op [4.54ms]
+(pass) compile-safe engine preparation > #given the patch script runs as postinstall does > #when the installed engine still resolves css-tree data dynamically > #then the script prepares css-tree along with the pi-ai floor [91.30ms]
+
+packages/omo-native/test/payload.test.ts:
+(pass) build:omo-native staged payload > #given an empty staging directory > #when the completeness check runs > #then it exits 1 naming the first missing artifact [33.57ms]
+(pass) build:omo-native staged payload > #given a full plugin build > #when the payload is staged to a temp output dir > #then every required artifact is present with preserved modes and no dev clutter [6732.57ms]
+(pass) build:omo-native staged payload > #then mode 411 and a commented Windows invocation are rejected as non-launchable [0.16ms]
+(pass) staged payload harness identity > #given the staged omo-ai payload > #when every shipped text file is scanned > #then no file claims to be the senpi harness [67.88ms]
+(pass) staged payload harness identity > #given the staged omo-ai payload > #when every shipped text file is scanned > #then the guard actually detects an identity claim [0.18ms]
+
+packages/omo-native/test/setup-detect.test.ts:
+(pass) omo setup sibling detection > #given all four harness stores > #when detected #then the exact report contains ids and types but no values [9.54ms]
+(pass) omo setup sibling detection > #given all four harness stores > #when detection runs twice #then every source hash and directory listing stays identical [10.30ms]
+(pass) omo setup sibling detection > #given each store is absent in turn > #when detected #then that harness reports installed no without crashing [1.68ms]
+(pass) omo setup sibling detection > #given an unknown sqlite auth schema > #when detected #then it reports detection-only and parses no credentials [2.90ms]
+(pass) omo setup sibling detection > #given node:sqlite is unavailable > #when detected #then sqlite stores degrade to file presence and remain successful [5.32ms]
+(pass) omo setup sibling detection > #given no credentials found and a sibling is installed > #when suggestion state is checked #then only that exact condition is true [1.45ms]
+(pass) omo setup sibling detection > #given no credentials found and a sibling is installed > #when doctor runs #then the INFO line fires only while the engine store is empty [1479.06ms]
+(pass) omo setup sibling detection > #given no credentials found and a sibling is installed > #when default launch is on a TTY #then the hint is answered from the cache, cold first then warm [701.69ms]
+(pass) omo setup sibling detection > #given malformed auth JSON > #when setup runs #then it warns, exits zero, and never prints the partial value [73.44ms]
+(pass) setup detection > #given credentials in the canonical branded agent directory > #when no agent directory is configured > #then the canonical directory is the one detected [1.15ms]
+
+packages/omo-native/test/engine-integrity.test.ts:
+(pass) engine install integrity > #given a partially reified install missing the brand contract module > #when the launcher resolves the engine > #then it refuses with the missing path, the partial-install diagnosis, and the reinstall command [1.71ms]
+(pass) engine install integrity > #given a partially reified install missing the brand contract module > #when the launcher resolves the engine > #then win32 adds the locked-native-module hint [1.30ms]
+(pass) engine install integrity > #given a partially reified install missing the brand contract module > #when the launcher resolves the engine > #then posix keeps the message free of the windows hint [1.28ms]
+(pass) engine install integrity > #given an intact engine install > #when the launcher resolves the engine > #then it hands back the cli path and package root unchanged [1.84ms]
+(pass) engine install integrity > #given an install missing the engine CLI entirely > #when the launcher resolves the engine > #then the established missing-CLI message is preserved [1.79ms]
+
+packages/omo-native/test/doctor-edition.test.ts:
+(pass) omo doctor edition summary > #given a complete packaged installation > #when diagnostics run > #then the summary names Native edition, the installed version with engine, and Latest [32.29ms]
+(pass) omo doctor edition summary > #given a complete packaged installation > #when diagnostics run > #then the update command is the next line and is copyable on its own [1.33ms]
+(pass) omo doctor edition summary > #given bun versus npm install layouts > #then an npm-managed install prints the npm update command [750.92ms]
+(pass) omo doctor edition summary > #given bun versus npm install layouts > #then a Bun-managed install prints the bun update command for that layout [706.37ms]
+(pass) omo doctor edition summary > #given the installed channel > #then a beta install reads the beta dist-tag [0.16ms]
+(pass) omo doctor edition summary > #given the installed channel > #then a stable install reads the latest dist-tag [0.09ms]
+(pass) omo doctor edition summary > #given the registry cannot be reached > #then Latest is could not check and diagnostics still pass [1.03ms]
+(pass) omo doctor edition summary > #given the registry cannot be reached > #then a refused registry fetch returns no dist-tags [0.18ms]
+(pass) omo doctor edition summary > #given the npm registry answers > #then dist-tags are read from registry.npmjs.org with a bounded timeout [0.15ms]
+
+packages/omo-native/test/sqlite-rows.test.ts:
+(pass) sqlite-rows > #given a seeded store #when rows are read #then every projected column comes back keyed by name, in order [3.10ms]
+(pass) sqlite-rows > #given rows were read #when the database is closed #then no file handle survives close() [2.87ms]
+(pass) sqlite-rows > #given an empty result #when rows are read #then an empty array and undefined row come back [2.52ms]
+
+packages/omo-native/test/agent-dir.test.ts:
+(pass) omo agent directory > #given no explicit override > #when the agent directory is resolved > #then it is the canonical branded location [0.44ms]
+(pass) omo agent directory > #given an explicit override > #when the agent directory is resolved > #then the brand-prefixed name wins over the legacy names [0.29ms]
+(pass) omo agent directory > #given an explicit override > #when the agent directory is resolved > #then each legacy name is honored in order [0.24ms]
+(pass) omo agent directory > #given an explicit override > #when the agent directory is resolved > #then a blank value falls back to the canonical location [0.32ms]
+(pass) omo agent directory > #given a home whose only engine state sits in the legacy flat directory > #when the launcher adopts it > #then the settings land in the canonical directory and the original is untouched [1.96ms]
+(pass) omo agent directory > #given a home whose only engine state sits in the legacy flat directory > #when the launcher adopts it > #then a second launch is a no-op and never resurrects removed state [1.19ms]
+(pass) omo agent directory > #given canonical settings that lost keys the flat file still holds > #when the launcher adopts the legacy state > #then only the missing keys are backfilled and nothing present is overwritten [1.59ms]
+(pass) omo agent directory > #given a home the adoption must not touch > #when the launcher runs > #then an explicit override is respected and nothing is adopted [0.60ms]
+(pass) omo agent directory > #given a home the adoption must not touch > #when the launcher runs > #then a home without legacy state stays empty [0.33ms]
+(pass) omo agent directory > #given a home the adoption must not touch > #when the launcher runs > #then malformed legacy settings never break startup [0.99ms]
+
+packages/omo-native/test/bun-version-probe.test.ts:
+(pass) bun version floor > #given the bun version floor > #then 1.4.0 and anything newer satisfy it [0.17ms]
+(pass) bun version floor > #given the bun version floor > #then older, missing and unparseable versions do not [0.11ms]
+(pass) bun version floor > #given the bun version probe > #then it asks the discovered binary for --version and returns the trimmed answer [0.42ms]
+(pass) bun version floor > #given the bun version probe > #then a binary that fails to answer reports no version instead of throwing [0.18ms]
+
+packages/omo-native/test/doctor-transient-memory.test.ts:
+(pass) omo doctor transient memory identities > #given identity directories with and without repo/ #when counted #then only the repo-less ones are transient [0.21ms]
+(pass) omo doctor transient memory identities > #given no memory root on disk #when counted #then the report stays silent instead of inventing zeros [0.14ms]
+(pass) omo doctor transient memory identities > #given a counted memory root #when formatted #then one INFO line reports the transient count [0.11ms]
+(pass) omo doctor transient memory identities > #given a memory root holding dead transient identities #when doctor runs #then the transient count is reported [720.42ms]
+
+packages/omo-native/test/teardown.test-support.test.ts:
+(pass) rmSyncEbusyTolerant > #given rmSync throws EBUSY once then succeeds #when teardown runs #then the path is removed [0.27ms]
+(pass) rmSyncEbusyTolerant > #given rmSync always throws ENOTEMPTY #when teardown runs #then the original error is rethrown immediately [0.13ms]
+(pass) rmSyncEbusyTolerant > #given rmSync always throws EBUSY #when the retry budget is exhausted #then the error message starts with teardown-failure: [0.32ms]
+(pass) withDatabase > #given the body throws #when it exits #then the handle is still closed exactly once [0.15ms]
+(pass) withDatabase > #given a handle that fails to close #when teardown sweeps #then the failure does not escape [0.10ms]
+(pass) teardownRoots > #given populated roots #when teardown runs #then the list is drained and every tree is gone [0.77ms]
+
+packages/omo-native/test/package-shape.test.ts:
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then it exposes exactly the omo command pointing at bin/omo.js [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the bin map is audited > #then omo-agent-toolkit is absent from the bin map [0.31ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the files array is audited > #then it ships the launcher, plugin, and published Senpi patch installer [0.10ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the engines field is audited > #then node requires version 24 or higher [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then it declares exactly the engine and codemode parser runtime dependencies [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the codemode parser dependency is exactly pinned [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the dependencies are audited > #then the senpi pin is exact with no range operator [0.12ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the repository field is audited > #then it points at the canonical github url [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the private flag is audited > #then the package is publishable (private absent or false) [0.08ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then no prepack lifecycle hook exists [0.07ms]
+(pass) omo-ai published package shape > #given the omo-native package manifest > #when the scripts are audited > #then postinstall applies the shipped Senpi patch [0.07ms]
+
+packages/omo-native/test/provider-map-registry.test.ts:
+(pass) #given the installed Senpi pin #when builtin providers are derived #then the provider map is exact [0.54ms]
+
+packages/omo-native/test/setup-import.test.ts:
+(pass) omo setup credential inheritance > #given opencode api oauth mapped and gateway entries #when accepted #then only safe api ids import [90.41ms]
+(pass) omo setup credential inheritance > #given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed [182.54ms]
+(pass) omo setup credential inheritance > #given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical [70.11ms]
+(pass) omo setup credential inheritance > #given a pre-existing auth file #when import writes #then mode backup and idempotency are exact [120.31ms]
+(pass) omo setup credential inheritance > #given dry-run #when setup runs #then auth remains absent [67.90ms]
+(pass) omo setup credential inheritance > #given declined consent #when setup runs #then auth remains absent [117.92ms]
+(pass) omo setup credential inheritance > #given malformed senpi auth #when accepted #then it warns and skips all writes [68.04ms]
+(pass) omo setup credential inheritance > #given detected harness models #when setup reports #then guide and catalog template are emitted without model writes [70.25ms]
+(pass) omo setup import > #given no agent directory is configured > #when credentials are imported > #then they land in the canonical branded directory [68.25ms]
+
+packages/omo-native/test/doctor-stale-engines.test.ts:
+(pass) omo doctor stale engine detection > #given a process list containing every engine shape > #when the engines are classified > #then only reparented interactive engines count as stale [0.24ms]
+(pass) omo doctor stale engine detection > #given a process list containing every engine shape > #when the engines are classified > #then the launcher's own descendants are never reported as stale [0.09ms]
+(pass) omo doctor stale engine detection > #given stale engines were found > #when the report is rendered > #then each line carries pid, age, tty and the explicit reap command [0.11ms]
+(pass) omo doctor stale engine detection > #given stale engines were found > #when the report is rendered > #then no stale engines render no lines at all [0.08ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is a reparented interactive engine > #then exactly that pid is signaled [0.26ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is an attached or managed engine > #then an rpc engine is refused and nothing is signaled [0.10ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is an attached or managed engine > #then an app-server engine is refused and nothing is signaled [0.07ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is an attached or managed engine > #then a live attached engine is refused and nothing is signaled [0.07ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the named pid is not an omo engine at all > #then it is refused rather than killed [0.09ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when no pid is given > #then nothing is signaled and the explicit form is explained [0.08ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when the real launcher is asked to reap a live non-engine pid > #then it refuses, exits non-zero, and leaves the process alone [240.96ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when several pids are named and one is unsafe > #then the safe pid is still reaped and the unsafe one is refused [0.24ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "0" is refused before any process lookup [0.11ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "-1" is refused before any process lookup [0.07ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "abc" is refused before any process lookup [0.07ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "12.5" is refused before any process lookup [0.07ms]
+(pass) omo doctor stale engine detection > #given an explicit reap request > #when a pid is spelled as something other than a positive integer > #then "" is refused before any process lookup [0.07ms]
+
+packages/omo-native/test/bun-runtime-decision.test.ts:
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when the process already runs on bun > #then it stays, so a re-exec can never loop [0.28ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when OMO_RUNTIME pins node > #then it stays although a current bun is installed [0.12ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when OMO_RUNTIME pins node > #then it stays even inside the bun global tree [0.10ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when no bun binary exists anywhere > #then it stays on node without probing anything [0.12ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when a bun binary is reachable from any install > #then an npm global install re-execs under a bun that meets the floor [0.12ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when a bun binary is reachable from any install > #then the probe is asked about the binary that was discovered [0.13ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when a bun binary is reachable from any install > #then a bun older than the floor leaves the process on node [0.10ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when a bun binary is reachable from any install > #then a bun that cannot report its version leaves the process on node [0.11ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when a bun binary is reachable from any install > #then a PATH-only bun is enough [0.15ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when OMO_RUNTIME asks for bun > #then it re-execs without consulting the version floor [0.10ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when OMO_RUNTIME asks for bun > #then a missing bun binary leaves the process on node [0.09ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when the script is installed in the bun global tree > #then it re-execs under the bun that installed it without a probe [0.12ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when the script is installed in the bun global tree > #then a relocated BUN_INSTALL tree is honored [0.15ms]
+(pass) bun runtime re-exec decision > #given the re-exec decision table > #when the script is installed in the bun global tree > #then a tree without any bun binary stays on node [0.10ms]
+(pass) bun runtime re-exec decision > #given the executing re-exec entry point > #then the script and its arguments are handed to bun with inherited stdio [0.28ms]
+(pass) bun runtime re-exec decision > #given the executing re-exec entry point > #then a user option separator survives bun argument parsing [0.13ms]
+(pass) bun runtime re-exec decision > #given the executing re-exec entry point > #then a stay decision spawns nothing and lets the caller continue [0.10ms]
+(pass) bun runtime re-exec decision > #given the executing re-exec entry point > #then a bun process already running never re-execs itself [0.11ms]
+
+packages/omo-native/test/senpi-patch.test.ts:
+(pass) senpi-patch claudeCodeVersion floor > #given a bundled pi-ai claudeCodeVersion below the 2.1.251 floor > #when the patch script runs as postinstall does > #then the version is rewritten to the floor [83.06ms]
+(pass) senpi-patch claudeCodeVersion floor > #given a bundled pi-ai claudeCodeVersion already at the floor > #when the patch script runs > #then the bundled file stays byte-identical [80.70ms]
+(pass) senpi-patch claudeCodeVersion floor > #given a bundled pi-ai claudeCodeVersion above the floor > #when the patch script runs > #then the bundled file is never downgraded and stays byte-identical [81.68ms]
+(pass) senpi-patch claudeCodeVersion floor > #given the patch script already rewrote a below-floor version > #when it runs again > #then the rewritten file is left unchanged and the exit stays clean [159.19ms]
+(pass) senpi-patch claudeCodeVersion floor > #given the bundled file has no claudeCodeVersion declaration > #when the patch script runs > #then it fails with the unsupported-Senpi error naming the relative path [82.86ms]
+
+packages/omo-native/test/doctor-retired-payload.test.ts:
+(pass) parseElapsedSeconds > #given ps etime spellings #when parsed #then minutes, hours and days are all accepted [0.20ms]
+(pass) parseElapsedSeconds > #given an unparsable etime #when parsed #then it yields undefined instead of a wrong number [0.09ms]
+(pass) classifyRetiredPayloadEngines > #given an engine older than the payload it loads #when classified #then it is reported as retired [0.18ms]
+(pass) classifyRetiredPayloadEngines > #given an engine started after its payload was written #when classified #then it is left alone [0.09ms]
+(pass) classifyRetiredPayloadEngines > #given two installs on one machine #when classified #then each engine is judged against its own payload [0.10ms]
+(pass) classifyRetiredPayloadEngines > #given an unparsable age, a non-engine process, no payload flag or an unreadable payload #when classified #then none is reported [0.10ms]
+(pass) formatRetiredPayloadLines > #given no retired engine #when formatted #then the report stays silent [0.07ms]
+(pass) formatRetiredPayloadLines > #given a retired engine #when formatted #then the pid is named with a restart instruction and no reap hint [0.10ms]
+
+packages/omo-native/test/brand-contract-pin.test.ts:
+(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then it is an exact version, never a range [0.09ms]
+(pass) senpi brand contract pin > #given the engine build the launcher spawns > #when the pin is inspected > #then a brand-aware pin must ship the brand resolver [0.38ms]
+
+packages/omo-native/test/doctor.test.ts:
+(pass) omo doctor > #given a complete packaged installation > #when diagnostics run > #then every required check passes [787.56ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing plugin manifest fails diagnostics and names the path [681.21ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing extension fails diagnostics and names the path [1404.02ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing lsp-daemon runtime fails diagnostics and names the path [869.98ms]
+(pass) omo doctor > #given a required packaged artifact is missing > #then missing agent-toolkit runtime fails diagnostics and names the path [701.88ms]
+(pass) omo doctor > #given the installed senpi version differs from the packaged pin > #then the version check fails with both versions [713.86ms]
+(pass) omo doctor > #given settings contain the legacy package entry > #then the string shape warns without changing settings [922.58ms]
+(pass) omo doctor > #given settings contain the legacy package entry > #then the object shape warns without changing settings [831.73ms]
+(pass) omo doctor > #given settings JSON is malformed > #then diagnostics warn and continue without changing settings [785.05ms]
+(pass) omo doctor > #given SENPI_CODING_AGENT_DIR points to an alternate agent directory > #then doctor reads settings from that directory first [1117.75ms]
+(pass) omo doctor > #given no agent directory is configured > #when diagnostics run > #then the canonical branded directory is the one inspected [1588.21ms]
+
+packages/omo-native/test/bun-runtime.test.ts:
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then it is recognized as a bun global install [3.22ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then a symlinked bun root is resolved before comparing [0.12ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then an unresolvable bun root falls back to its literal spelling [0.25ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then BUN_INSTALL relocates the tree that counts [0.20ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then redundant separators in BUN_INSTALL still match [0.09ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then a trailing separator in BUN_INSTALL still matches [0.08ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits inside the default bun global tree > #then a Windows backslash path still matches the tree [0.12ms]
+(pass) bun runtime detection > #given a script path and an injected home > #when the script sits in an npm global layout > #then it is not a bun global install [0.08ms]
+(pass) bun runtime detection > #given a bun binary lookup > #when BUN_INSTALL names an existing binary > #then that binary wins over the home default [0.26ms]
+(pass) bun runtime detection > #given a bun binary lookup > #when only PATH holds a bun binary > #then the PATH entry is used [0.14ms]
+(pass) bun runtime detection > #given a bun binary lookup > #when the host is Windows > #then the .exe spelling is discovered [0.11ms]
+(pass) bun runtime detection > #given a bun binary lookup > #when the host is Windows > #then semicolon-delimited PATH entries are searched [0.11ms]
+(pass) bun runtime detection > #given a bun binary lookup > #when no bun binary exists anywhere > #then the lookup reports nothing instead of throwing [0.12ms]
+(pass) bun runtime detection > #given a Windows PATH that only carries an npm-installed bun.cmd shim > #then the shim is not a bun the launcher can run and lookup reports absence [0.29ms]
+(pass) bun runtime detection > #given a Windows PATH that only carries an npm-installed bun.cmd shim > #then a real bun.exe next to the shim is still found [0.19ms]
+(pass) bun runtime detection > #given a bun probe whose spawn throws synchronously > #then the probe resolves undefined instead of rejecting [0.19ms]
+
+packages/omo-native/test/build-info.test.ts:
+(pass) omob build info > round-trips a stamped build info object [0.81ms]
+(pass) omob build info > rejects malformed payloads [0.34ms]
+(pass) omob build info > labels carry short shas and human commit dates [0.12ms]
+(pass) omob build info > version lines carry full shas, ISO commit dates, and branches [0.14ms]
+(pass) omob build info > shortSha truncates to seven characters [0.33ms]
+
+packages/omo-native/test/sqlite-import-discipline.test.ts:
+(pass) node:sqlite import discipline > #given the packaged test suite > #when each test module is scanned > #then no suite imports node:sqlite statically [8.87ms]
+
+packages/omo-native/test/setup-detect-cache.test.ts:
+(pass) setup suggestion cache > #given a cache entry shaped like the refresh child writes it > #when the inputs are unchanged #then the read is fresh and answers the cached suggestion [19.14ms]
+(pass) setup suggestion cache > #given a cache entry shaped like the refresh child writes it > #when an input changed after the entry was written #then the read is stale but keeps the cached suggestion [16.69ms]
+(pass) setup suggestion cache > #given a cache entry shaped like the refresh child writes it > #when the entry is older than the TTL #then the read is stale but keeps the cached suggestion [34.25ms]
+(pass) setup suggestion cache > #given a cache entry shaped like the refresh child writes it > #when the entry is exactly at the TTL boundary #then the read is still fresh [32.14ms]
+(pass) setup suggestion cache > #given an unusable cache > #when read #then every shape misses without throwing and behaves as no-siblings [50.89ms]
+(pass) setup suggestion cache > #given a fresh cache > #when an interactive launch runs #then the hint appears and the launcher never rewrites the cache [390.02ms]
+(pass) setup suggestion cache > #given no cache at all > #when an interactive launch runs #then it never blocks, prints no hint, and the detached refresh writes the cache [1675.32ms]
+(pass) setup suggestion cache > #given no cache at all > #when a non-interactive launch runs #then no cache is created [294.18ms]
+(pass) setup suggestion cache > #given a cache whose fingerprint no longer matches > #when an interactive launch runs #then this launch answers from the cache and the refresh child rewrites it [291.20ms]
+(pass) setup suggestion cache > #given a warm cache that disagrees with live state > #when doctor runs #then it answers from live detection and leaves the cache alone [882.68ms]
+(pass) setup suggestion cache > #given a warm cache that disagrees with live state > #when setup runs #then it reports live harnesses and never reads the cached suggestion [88.87ms]
+(pass) setup suggestion cache > #given a warm cache that disagrees with live state > #when the cache claims a suggestion live state cannot support #then doctor stays silent [796.34ms]
+
+packages/omo-native/test/child-process-signal.test.ts:
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGTERM > #then the child receives SIGTERM and drains before the launcher exits [398.14ms]
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGTERM > #then a child that ignores SIGTERM still ends the launcher by SIGTERM after the grace window [504.76ms]
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGHUP > #then the child receives SIGHUP and drains before the launcher exits [396.79ms]
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGHUP > #then a child that ignores SIGHUP still ends the launcher by SIGHUP after the grace window [527.09ms]
+(pass) launcher child signal forwarding > #given a launcher waiting on an engine child #when the launcher receives SIGINT > #then the launcher never forwards it a second time and still waits for the child [615.48ms]
+(pass) launcher child signal forwarding > #given an engine child that exits on its own #when it returns a non-zero code > #then the launcher exits with the same code [91.13ms]
+(pass) launcher child signal forwarding > #given an engine child killed by a signal #when the launcher propagates the result > #then the launcher dies by that same signal [140.14ms]
+(pass) launcher child signal forwarding > #given a launcher that re-execed itself under bun #when the launcher receives SIGTERM > #then the re-exec layer forwards it to the runtime child too [304.70ms]
+
+packages/omo-native/test/pirate-badge-absence.test.ts:
+(pass) omo native footer badge absence for omo-ai installs > #given the published omo-ai payload > #when the shipped file set is inspected > #then the payload ships only bin and plugin, never a workspace packages tree [0.17ms]
+(pass) omo native footer badge absence for omo-ai installs > #given the published omo-ai payload > #when the shipped file set is inspected > #then no shipped directory carries a senpi badge gate manifest [19.23ms]
+
+ 304 pass
+ 0 fail
+ 871 expect() calls
+Ran 304 tests across 31 files. [50.52s]
+
+
+build-bun140.txt
+$ bun run script/build-omo-native.ts
+$ node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-agent-toolkit.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+Staged Senpi LSP runtime: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/runtime/ast-grep-mcp/cli.js
+Bundled 44 modules in 14ms
+
+  cli.js  183.1 KB  (entry point)
+
+Usage:
+  omo-agent-toolkit hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)
+  omo-agent-toolkit help | --help | -h                          (this message)
+  omo-agent-toolkit ulw-loop help
+  omo-agent-toolkit ulw-loop create-goals --brief "..." [--brief-file <path>] [--from-stdin] [--codex-goal-mode aggregate|per_story] [--validation-batch-json <json-or-path>] [--force] [--json]
+  omo-agent-toolkit ulw-loop status [--json]
+  omo-agent-toolkit ulw-loop complete-goals [--retry-failed] [--json]
+  omo-agent-toolkit ulw-loop criteria --goal-id <id> [--json]
+  omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "..." [--notes "..."] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --print-template [--goal-id <id>] [--json]
+  omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete|failed|blocked --evidence "..." --codex-goal-json <...> [--quality-gate-json <...>] [--no-advance] [--json]
+  omo-agent-toolkit ulw-loop steer --kind <kind> ... --evidence "..." --rationale "..." [--proposals-json <json-or-path>] [--json]
+  omo-agent-toolkit ulw-loop add-goal --title "..." --objective "..." [--json]
+  omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "..." --objective "..." --evidence "..." --codex-goal-json <...> [--json]
+
+Every state subcommand needs a session scope: [--session-id <id>] or the session env (OMO_ULW_LOOP_SESSION_ID / CODEX_SESSION_ID / CODEX_THREAD_ID / PI_SESSION_ID); state lives under .omo/ulw-loop/<id>/ and the unscoped root is never used implicitly. status --json exposes the currentAttemptDir; put all quality-gate artifacts under it.
+Every subcommand accepts --help | -h to print its own usage line.
+Staged Senpi agent-toolkit runtime: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/runtime/agent-toolkit
+Staged x-search conditional skill: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/skills-conditional/x-search/SKILL.md
+Bundled 947 modules in 92ms
+
+  omo.js  1.71 MB  (entry point)
+
+Bundled 690 modules in 34ms
+
+  omo-task.js  1.0 MB  (entry point)
+
+Bundled 213 modules in 14ms
+
+  omo-member.js  177.80 KB  (entry point)
+
+Bundled 144 modules in 20ms
+
+  memory-run-supervisor.mjs  41.67 KB  (entry point)
+
+Bundled 158 modules in 20ms
+
+  omo-init-deep-advisor.js  85.23 KB  (entry point)
+
+Built omo-senpi extensions: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/extensions/omo.js, /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/extensions/omo-task.js, /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/extensions/omo-member.js, /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/extensions/memory-run-supervisor.mjs, /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/skills
+generated directive is current: <worktree>/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 7 modules in 4ms
+
+  install.mjs  20.97 KB  (entry point)
+
+Built omo-senpi installer: /var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/omo-native-build-dOVMpd/plugin/scripts/install.mjs
+omo-native payload complete at <worktree>/packages/omo-native/plugin (40 required artifacts present)

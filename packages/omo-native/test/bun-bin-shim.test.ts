@@ -227,7 +227,7 @@ describe("bun launcher bin shim", () => {
       const script = bunBinShimScript("/opt/x/bin/omo.js", "/home/dev/.bun/bin/bun")
       // when / then
       expect(script.split("\n")[0]).toBe("#!/bin/sh")
-      expect(script).toContain(`exec '/home/dev/.bun/bin/bun' '/opt/x/bin/omo.js' "$@"`)
+      expect(script).toContain(`exec '/home/dev/.bun/bin/bun' '/opt/x/bin/omo.js' -- "$@"`)
       // The fallback re-execs the entrypoint, whose `#!/usr/bin/env node` line is the exact path
       // the stock symlink used, so OMO_RUNTIME=node and a vanished bun both stay on node.
       expect(script.trimEnd().split("\n").at(-1)).toBe(`exec '/opt/x/bin/omo.js' "$@"`)

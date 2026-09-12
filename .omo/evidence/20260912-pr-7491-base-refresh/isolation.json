@@ -1,0 +1,44 @@
+{
+  "protectedWorkingCopies": {
+    "oh-my-openagent": true,
+    "oh-my-openagent-7471": true,
+    "oh-my-openagent-7491": true,
+    "commonIdentity": true
+  },
+  "protectedConfigsUnchanged": true,
+  "realHomesExcludedFromChildEnv": true,
+  "protectedBefore": {
+    "<real-home>/.omo/agent/settings.json": null,
+    "<real-home>/.omo/agent/auth.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "<real-home>/.omo/agent/models.json": null,
+    "<real-home>/.omo/agent/models-store.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "<real-home>/.omo/agent/mcp.json": null,
+    "<real-home>/.omo/agent/trust.json": null,
+    "<real-home>/.senpi/agent/settings.json": "7946f4c62671ebe827dbcc909521fe4ba1cf64d62b5c5acb3109f885495c1dfe",
+    "<real-home>/.senpi/agent/auth.json": "6dfd31c99917e8deae53411eeedb70397867825653ec4184d03df322932a8432",
+    "<real-home>/.senpi/agent/models.json": "85dfe09a9dc2ed96d671cde9a95bfe8492159dcc629e33581a0065041c09a581",
+    "<real-home>/.senpi/agent/models-store.json": "222e77befedab2694eb54121d6dba7506198ad577c24b230e414ecfe5396bcf0",
+    "<real-home>/.senpi/agent/mcp.json": null,
+    "<real-home>/.senpi/agent/trust.json": "b7fc9dfe1ae6762ca1768a1ffaa8223dde955f66901333683daef794c3ee8877",
+    "<real-home>/.omo/omo.json": null,
+    "<real-home>/.omo/omo.jsonc": "599fa14eb52520bf7f046f1b5334f577d391ff43036f982c96844d88f826f010",
+    "<real-home>/.codex/config.toml": "2f0687ad36db1876646f8d60c0062bfffe63fa69e3c4b7254e258b02b1ad345e"
+  },
+  "protectedAfter": {
+    "<real-home>/.omo/agent/settings.json": null,
+    "<real-home>/.omo/agent/auth.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "<real-home>/.omo/agent/models.json": null,
+    "<real-home>/.omo/agent/models-store.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "<real-home>/.omo/agent/mcp.json": null,
+    "<real-home>/.omo/agent/trust.json": null,
+    "<real-home>/.senpi/agent/settings.json": "7946f4c62671ebe827dbcc909521fe4ba1cf64d62b5c5acb3109f885495c1dfe",
+    "<real-home>/.senpi/agent/auth.json": "6dfd31c99917e8deae53411eeedb70397867825653ec4184d03df322932a8432",
+    "<real-home>/.senpi/agent/models.json": "85dfe09a9dc2ed96d671cde9a95bfe8492159dcc629e33581a0065041c09a581",
+    "<real-home>/.senpi/agent/models-store.json": "222e77befedab2694eb54121d6dba7506198ad577c24b230e414ecfe5396bcf0",
+    "<real-home>/.senpi/agent/mcp.json": null,
+    "<real-home>/.senpi/agent/trust.json": "b7fc9dfe1ae6762ca1768a1ffaa8223dde955f66901333683daef794c3ee8877",
+    "<real-home>/.omo/omo.json": null,
+    "<real-home>/.omo/omo.jsonc": "599fa14eb52520bf7f046f1b5334f577d391ff43036f982c96844d88f826f010",
+    "<real-home>/.codex/config.toml": "2f0687ad36db1876646f8d60c0062bfffe63fa69e3c4b7254e258b02b1ad345e"
+  }
+}

@@ -1,0 +1,47 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-native/test/launcher.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then the packaged extension precedes user extension arguments [169.39ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then a filename and header ID mismatch explains the rejected session candidate [71.32ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then launcher environment points to existing hoisted shims [70.45ms]
+(pass) omo launcher > #given a fake senpi package > #when the default command is launched > #then SENPI_BIN stays absent when no shim exists [63.63ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then the brand profile names the product, its home and its update channel [61.01ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then a launcher running on node tells the engine SENPI_RUNTIME=node [61.66ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then a launcher running on bun tells the engine SENPI_RUNTIME=bun [61.45ms]
+(pass) omo launcher > #given a fake senpi package > #when the product identity is handed to the engine > #then OMO_BIN names this launcher, so the product never resolves to the bare engine [63.91ms]
+(pass) omo launcher > #given a fake senpi package > #when the version is requested on its own > #then the product version is reported with its engine version, without spawning senpi [37.63ms]
+(pass) omo launcher > #given a fake senpi package > #when the version is requested on its own > #then a compound invocation still reaches senpi [61.12ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then update --self is answered with the product's own update command [34.92ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then update self is answered with the product's own update command [35.13ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then update senpi is answered with the product's own update command [34.59ms]
+(pass) omo launcher > #given a fake senpi package > #when a self-update is requested > #then updating extensions still passes through to senpi [57.49ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then install passes through without an extension argument [58.40ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then remove passes through without an extension argument [59.65ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then list passes through without an extension argument [57.94ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then config passes through without an extension argument [58.02ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then auth passes through without an extension argument [58.31ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then app-server passes through without an extension argument [57.98ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with flags passes through without an extension argument [58.74ms]
+(pass) omo launcher > #given a fake senpi package > #when an early senpi command is launched > #then update with a source passes through without an extension argument [60.52ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then npm beta guidance is printed without spawning senpi [35.27ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Bun-managed install uses a clean package cwd [37.82ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Bun path with shell metacharacters is quoted for the host [34.86ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then a Windows-style Bun path uses shell-compatible forward slashes [0.19ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then an npm-managed install keeps the npm update command [34.95ms]
+(pass) omo launcher > #given a fake senpi package > #when bare update is requested > #then an unknown install layout fails safe to npm [37.52ms]
+(pass) omo launcher > #given a fake senpi package > #given a legacy Bun global manifest contains the empty dot dependency > #then launching omo removes only the invalid dependency entry [38.29ms]
+(pass) omo launcher > #given a fake senpi package > #given a legacy Bun global manifest contains the empty dot dependency > #then a different empty dependency value is preserved [35.08ms]
+(pass) omo launcher > #given a fake senpi package > #given a legacy Bun global manifest contains the empty dot dependency > #then malformed JSON is preserved [35.59ms]
+(pass) omo launcher > #given a fake senpi package > #when ulw-loop is requested > #then the staged runtime CLI receives the remaining arguments [60.61ms]
+(pass) omo launcher > #given a fake senpi package > #when the committed agent-toolkit delegate is launched > #then the staged dispatcher receives all arguments [51.88ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then exit zero and exit seven propagate [109.26ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then SIGINT is re-raised by the launcher [58.33ms]
+(pass) omo launcher > #given a fake senpi package > #when the child terminates > #then child stdio remains inherited [95.27ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then resolution fails with actionable reinstall guidance [40.14ms]
+(pass) omo launcher > #given a fake senpi package > #given the senpi CLI is missing > #then a missing dependency fails with the same reinstall guidance [38.20ms]
+
+ 38 pass
+ 0 fail
+ 138 expect() calls
+Ran 38 tests across 1 file. [84.33s]
