@@ -881,6 +881,7 @@ Current composition counts:
 | **edit-error-recovery**         | PostToolUse              | Recovers from edit tool failures.                                                         |
 | **write-existing-file-guard**   | PreToolUse               | Prevents accidental overwrites of existing files without reading them first.              |
 | **hashline-read-enhancer**      | PostToolUse              | Enhances read output with hash-anchored line markers for the hashline edit tool.          |
+| **verification-reminder**       | PostToolUse + Event      | Prompts user to verify alignment after file edits. Configurable via `verification_reminder` in config. |
 
 #### Recovery & Stability
 
@@ -966,6 +967,38 @@ Disable specific hooks in config:
 ```json
 {
   "disabled_hooks": ["comment-checker"]
+}
+```
+
+### Verification Reminder
+
+The verification-reminder hook prompts users to verify that code changes align with their original request after file edits. This helps catch misalignment early before the agent declares work complete.
+
+**How it works:**
+1. Tracks when you use edit/write tools (configurable)
+2. When the agent goes idle after edits, uses the `question` tool to ask if you want to verify alignment
+3. If you select "Yes", spawns a deep agent with the `verify-alignment` skill to check changes against the original request
+4. If you select "No", continues normally
+5. Resets when new edits are made (cycle repeats)
+
+**Configuration:**
+
+```jsonc
+{
+  "verification_reminder": {
+    "enabled": true,                              // Default: true (can also use disabled_hooks)
+    "tracked_tools": ["edit", "write", "bash"],   // Customize which tools trigger verification
+    "custom_prompt": "Did you verify the changes?", // Custom verification prompt (must use question tool)
+    "settle_ms": 200                              // Delay before prompting (default: 150ms)
+  }
+}
+```
+
+**Disable verification reminder:**
+
+```json
+{
+  "disabled_hooks": ["verification-reminder"]
 }
 ```
 

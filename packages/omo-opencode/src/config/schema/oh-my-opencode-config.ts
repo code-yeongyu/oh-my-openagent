@@ -27,6 +27,7 @@ import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
 import { TuiConfigSchema } from "./tui"
 import { UlwExecuteConfigSchema } from "./ulw-execute"
+import { VerificationReminderConfigSchema } from "./verification-reminder"
 import { WebsearchConfigSchema } from "./websearch"
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -101,6 +102,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   ulw_execute: UlwExecuteConfigSchema.optional(),
   /** Deprecated compatibility shim. Old \`start_work\` key is parsed and migrated to \`ulw_execute\` in validate.ts. */
   start_work: UlwExecuteConfigSchema.optional(),
+  /** Verification reminder settings (post-edit alignment checks) */
+  verification_reminder: VerificationReminderConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
