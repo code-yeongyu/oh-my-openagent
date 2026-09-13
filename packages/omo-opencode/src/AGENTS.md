@@ -83,13 +83,14 @@ createHooks()
   │   │                             noHephaestusNonGpt, hephaestusAgentsMdInjector,
   │   │                             questionLabelTruncator, taskResumeInfo,
   │   │                             runtimeFallback, legacyPluginToast
-  │   ├─ createToolGuardHooks()   # 17 [+1 with team-mode]: commentChecker, toolOutputTruncator,
+  │   ├─ createToolGuardHooks()   # 18 [+1 with team-mode]: commentChecker, toolOutputTruncator,
   │   │                             directoryAgentsInjector, directoryReadmeInjector,
   │   │                             emptyTaskResponseDetector, rulesInjector, tasksTodowriteDisabler,
   │   │                             writeExistingFileGuard, bashFileReadGuard, hashlineReadEnhancer,
   │   │                             jsonErrorRecovery, readImageResizer, todoDescriptionOverride,
   │   │                             webfetchRedirectGuard, fsyncSkipWarning,
-  │   │                             notepadWriteGuard, planFormatValidator [+ teamToolGating]
+  │   │                             notepadWriteGuard, planFormatValidator, verificationReminder
+  │   │                             [+ teamToolGating]
   │   └─ createTransformHooks()   # 4 [+2 team-mode, +1 monitor-gated]: claudeCodeHooks,
   │                                  keywordDetector, contextInjectorMessagesTransform,
   │                                  toolPairValidator [+ teamModeStatusInjector,
@@ -104,7 +105,7 @@ createHooks()
     team-member-error-handler, team-member-status-handler
 ```
 
-Total: 54 base, 61 with team-mode, 62 with monitor enabled. Authoritative per-tier breakdown: [`hooks/AGENTS.md`](hooks/AGENTS.md). Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
+Total: 55 base, 62 with team-mode, 63 with monitor enabled. Authoritative per-tier breakdown: [`hooks/AGENTS.md`](hooks/AGENTS.md). Each tier produces an object whose values are `(input, output) => void` handlers; the matching OpenCode handler invokes them in registration order via `safeHook()` wrappers.
 
 ## SUBSYSTEM INVENTORY
 
