@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createRequire } from "node:module"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 
@@ -29,6 +29,12 @@ describe("omo-ai packed install", () => {
       expect(readFileSync(installedScript, "utf8")).toContain("claudeCodeVersionFloor")
 
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
+      expect(realpathSync(consumerRequire.resolve("@code-yeongyu/comment-checker"))).toStartWith(realpathSync(consumer) + sep)
+      const checker: unknown = consumerRequire("@code-yeongyu/comment-checker")
+      if (typeof checker !== "object" || checker === null || !("getBinaryPath" in checker) || typeof checker.getBinaryPath !== "function") {
+        throw new Error("Installed comment-checker does not export getBinaryPath")
+      }
+      expect(existsSync(checker.getBinaryPath())).toBe(true)
       const searchPaths = consumerRequire.resolve.paths("@code-yeongyu/senpi") ?? []
       const senpiRoot = searchPaths.map((searchPath) => join(searchPath, "@code-yeongyu", "senpi")).find((candidate) => existsSync(join(candidate, "package.json")))
       expect(senpiRoot).toBeDefined()

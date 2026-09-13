@@ -212,6 +212,7 @@
       },
       "dependencies": {
         "@babel/parser": "8.0.4",
+        "@code-yeongyu/comment-checker": "0.8.0",
         "@code-yeongyu/senpi": "2026.9.13",
       },
     },
