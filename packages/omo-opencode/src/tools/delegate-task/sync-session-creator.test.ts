@@ -35,4 +35,32 @@ describe("createSyncSession", () => {
       ],
     })
   })
+
+  test("prefixes the category in the child session title", async () => {
+    // given
+    const createCalls: Array<Record<string, unknown>> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child" } }
+        },
+      },
+    }
+    const input = {
+      parentSessionID: "ses_parent",
+      agentToUse: "explore",
+      description: "test task",
+      defaultDirectory: "/fallback",
+      category: "quick",
+    }
+
+    // when
+    await createSyncSession(client as never, input)
+
+    // then
+    const body = createCalls[0]?.body as Record<string, unknown> | undefined
+    expect(body?.title).toBe("[quick] test task (@explore subagent)")
+  })
 })

@@ -9,6 +9,7 @@ export async function createSyncSession(
     agentToUse: string
     description: string
     defaultDirectory: string
+    category?: string
     categoryModel?: DelegatedModelConfig
   }
 ): Promise<{ ok: true; sessionID: string; parentDirectory: string } | { ok: false; error: string }> {
@@ -18,7 +19,7 @@ export async function createSyncSession(
   const createResult = await client.session.create({
     body: {
       parentID: input.parentSessionID,
-      title: `${input.description} (@${input.agentToUse} subagent)`,
+      title: `${input.category ? `[${input.category}] ` : ""}${input.description} (@${input.agentToUse} subagent)`,
       permission: QUESTION_DENIED_SESSION_PERMISSION,
       ...(input.categoryModel
         ? {
