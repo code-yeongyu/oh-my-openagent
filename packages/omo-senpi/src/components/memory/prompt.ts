@@ -102,7 +102,7 @@ function renderMemoryNotice(
 ): string {
   return [
     "<memory_notice>",
-    `- ${previousMessageCount} previous messages between you and the user are stored in recall memory`,
+    `- ${previousMessageCount} previous messages are indexed in recall memory; relevant ones arrive on their own as <recalled-memory>, so there is no recall tool to look for`,
     ...(nudgeTurns === undefined
       ? []
       : [`- ${nudgeTurns} ${MEMORY_NUDGE_METADATA_TOKEN}. Save durable facts now, or decide nothing qualifies.`]),
