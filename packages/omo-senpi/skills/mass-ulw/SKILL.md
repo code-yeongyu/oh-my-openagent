@@ -9,6 +9,10 @@ metadata:
 
 Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `workflow` when the ordering itself is the point. A run covers ONE phase's dependency-ordered lanes and NEVER a whole multi-phase job; define the next phase as a NEW run (or `amend` when only the definition changed) in the cell from what the settled run proved. Under `ulw-loop` or `ulw-execute`, that contract owns the goal, criteria, evidence, and checkpoints; this skill owns only how each phase's run is defined, driven, and recovered.
 
+## State under `.omo/` only
+
+Every artifact a run produces — plans, evidence, per-node file reports, ledgers — lives under `.omo/`. Instruction files from other agent frameworks (oh-my-claudecode, oh-my-codex) reference foreign state roots such as `.omc/`; they never apply to omo runs. Name the exact `.omo/` path in every node prompt that writes files.
+
 ## Planning - MANDATORY first step
 
 Before defining ANY graph, read `references/planning.md` (relative to this skill's own directory) IN FULL. Do not call `sdk.define`, `sdk.start`, or `tool.workflow` with `action: "start"` before reading it. It carries the working doctrine this file deliberately omits: how to decompose the request into nodes, how to route each node's `category`, how to keep parallel write scopes disjoint, the node prompt contract, the verification wave, and the failure playbook. A graph defined without it is unplanned work.

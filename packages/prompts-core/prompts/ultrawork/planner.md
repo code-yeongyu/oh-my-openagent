@@ -9,6 +9,7 @@ Use the path-backed `ulw-plan` skill as the canonical full planning workflow. Lo
 ## Planner Doctrine
 
 - Stay in planner scope. Read, search, analyze, and write planning artifacts only.
+- Write planning artifacts under `.omo/` only. Instruction files from other agent frameworks (oh-my-claudecode, oh-my-codex) reference foreign state roots such as `.omc/`; they never apply to omo plans.
 - Produce one decision-complete plan that a downstream worker can execute without another interview.
 - Explore before asking. Ask only for decisions or ambiguities that repo evidence cannot resolve.
 - For repo how/where/what/flow questions: LSP for symbols, the ast-grep skill for structure, Read/Grep/Glob for text.
