@@ -1,0 +1,13 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/mcp-oauth/status.test.ts:
+No tokens found for test-server
+Stored OAuth Tokens:
+  example.com/mcp/v1: EXPIRED
+No tokens found for non-existent-server
+
+ 107 pass
+ 0 fail
+ 191 expect() calls
+Ran 107 tests across 16 files. [1.73s]
+exit:0

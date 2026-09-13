@@ -7,6 +7,7 @@ export {
   generateCodeVerifier,
   runAuthorizationCodeRedirect,
 } from "./oauth-authorization-flow"
+export type { OAuthBrowserOpener } from "./oauth-authorization-flow"
 export * from "./provider"
 export * from "./refresh-mutex"
 export * from "./resource-indicator"
