@@ -1,0 +1,32 @@
+Command:
+npx --yes bun@1.3.12 test packages/omo-opencode/src/hooks/keyword-detector/ultrawork-edge-trigger.test.ts
+
+Tree-under-test:
+e199029e1be0bc10bd10c5fbae8e60e3523c967d plus the regression-test-only working-tree diff
+
+Exit code: 1
+
+Observed summary:
+bun test v1.3.12 (700fc117)
+5 pass
+1 fail
+18 expect() calls
+Ran 6 tests across 1 file.
+
+Failing assertion:
+Test: #given ulw-plan and ulw-research skill names #when chat.message fires #then ultrawork stays inactive
+Expected toastCalls length: 0
+Received toastCalls length: 1
+Location: packages/omo-opencode/src/hooks/keyword-detector/ultrawork-edge-trigger.test.ts:160
+
+Control observation:
+The new `ulw-loop` boundary test passed, as did all four pre-existing standalone `ulw` / `ultrawork` trigger tests.
+
+Interpretation:
+The regression test reaches the real OpenCode keyword hook and reproduces the false activation before any production code change. This is a behavioral RED, not an infrastructure failure.
+
+Environment note:
+The worktree initially lacked node_modules. A frozen Bun 1.3.12 install populated dependencies. Its prepare build reached the unrelated Windows-only lsp-tools-mcp `rm` portability failure; the focused test itself then executed normally. The one generated tracked installer artifact produced during prepare was restored to HEAD before implementation.
+
+Secrets/omissions:
+No environment dump, credentials, auth headers, or tokens are included.
