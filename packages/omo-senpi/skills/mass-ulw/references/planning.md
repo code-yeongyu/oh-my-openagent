@@ -138,6 +138,7 @@ A node prompt is the ONLY thing the worker sees. It has no conversation history,
 Rules that make node prompts obeyed:
 
 - **Self-contained, always.** Paste exact paths, facts, and constraints INTO the prompt. "As discussed above" and "the issue mentioned earlier" are dangling references - the node sees neither.
+- **Artifact paths live under `.omo/`.** Every file a node writes - reports, ledgers, evidence - goes under `.omo/`, and the prompt names the exact path. Instruction files from other agent frameworks (oh-my-claudecode, oh-my-codex) reference foreign state roots such as `.omc/`; they never apply to omo runs.
 - **Minimum sufficient context.** Every pasted fact must change what the node does. Context the node cannot act on steals attention from the instructions it must follow.
 - **Binary observables.** PASS/FAIL must be decidable from the prompt alone: "exit code 0 and `dist/index.js` exists", never "check it works" or "make sure it's fine".
 - **Positive framing.** Tell the node what to do, not what to avoid. Negative instructions compete with the worker's priors and lose; reserve NEVER/ONLY for true invariants (do not commit, do not edit outside scope).
