@@ -163,6 +163,71 @@ Both attributions ship enabled by default. To opt out of the co-author trailer:
 
 The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Senpi harness.
 
+### `side_panel` (Senpi harness)
+
+The optional `side_panel` block controls the omo side panel (`schema/side-panel.ts`): a right-hand
+column in the Senpi TUI carrying session, context, usage, subagent, tool, git and memory state. The
+transcript reflows into the remaining width instead of being covered. The panel is **off by
+default** because it rearranges the whole screen.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `enabled` | boolean | `false` | Render the panel. |
+| `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
+| `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
+| `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
+| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval, and a floor rather than a ceiling: each provider keeps its own freshness window (five minutes for Anthropic, two and a half for Codex), so a smaller value does not poll faster than that. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
+| `sections` | object | all `true` | Per-section switches: `session`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. |
+
+Rows are clickable because the fullscreen renderer already captures the mouse and activates OSC 8
+hyperlinks; the panel paints its rows as links to a private scheme and claims the renderer's URL
+callback while it is mounted, handing every other URL straight back. Clicking a file opens its diff;
+clicking a subagent opens its card followed by everything that child recorded, rendered by the task
+engine itself - the same text `task_output` would give you. `/side-panel-diff` reaches the file
+viewer by name.
+
+The viewer scrolls with the wheel as well as with the arrow keys, and while it is open the wheel
+belongs to it: the host routes a wheel event to whatever sits under the pointer in its layout, and
+an overlay is not part of that layout, so without this the wheel would scroll the transcript behind
+the popup instead. Text selection is untouched either way, because the renderer activates a link
+only on a press and release inside one cell with no drag - dragging still selects, and double or
+triple clicks still take a word or a line.
+
+The `usage` section is the only part of omo that reaches the network on its own: it reads the
+subscription windows your plan publishes (`api.anthropic.com/api/oauth/usage` for a Claude
+subscription, `chatgpt.com/backend-api/wham/usage` for Codex) with the same account the session
+is serving from, and nothing else is sent. Set `sections.usage` to `false` to keep the panel
+entirely offline; the poller is never created when it is off. The answers land in one cache file
+per machine (`$XDG_CACHE_HOME/omo-senpi/side-panel-usage.json`), so parallel sessions share both
+the numbers and the backoff instead of each asking on its own.
+
+```jsonc
+{
+  "side_panel": {
+    "enabled": true,
+    "width": "24%",
+    "sections": { "usage": false }
+  }
+}
+```
+
+`--omo-side-panel` forces the panel on for one run. It cannot force it off: senpi sets a boolean
+extension flag to `true` whatever value follows it (`--omo-side-panel=false` still turns it on) and
+rejects a `--no-` form as an unknown option, so `enabled` in `omo.json` is the switch that can say no.
+
+The reflowing column needs the fullscreen TUI (`--tui-mode fullscreen`, or `tuiMode: "fullscreen"` in
+senpi's settings): only that renderer owns a layout root to wrap. In the default regular mode - and on
+any host that does not expose the layout seam - the same rows render as a block above the editor
+instead, and a headless run renders nothing.
+
+The `files` section lists the working copy as `git status` sees it, both status columns included.
+Clicking a row opens that file's diff in a scrollable read-only viewer, and `/side-panel-diff`
+reaches the same viewer by name - for keyboards, and for a host that hands out no URL hook. No
+keyboard chord is registered by default.
+
+The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the
+normal resolution order.
+
 ### `models` (shared catalog)
 
 A record of short name to catalog entry (`schema/model-catalog.ts`). The canonical strict shape is `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs remain accepted and are normalized to `reasoning`; other tuning fields are not catalog-entry keys.

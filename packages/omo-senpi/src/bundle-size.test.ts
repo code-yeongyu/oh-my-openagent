@@ -55,7 +55,13 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // it is a devDependency oracle only). bundle-purity stays green and no third-party dependency was
 // inlined. Measured 1,144,862 bytes after minification on top of dev's 1,136,265 (linux/amd64, bun
 // 1.4.2); 1,180,000 keeps ~3% headroom rather than the failing value.
-const BUDGET_BYTES = 1_180_000
+// Raised 1,180,000 -> 1,220,000 for the opt-in side panel (PR #8092): pure row builders, a git
+// status/diff reader driven through the host's own exec, the subscription-usage poller with its
+// machine-wide cache, and one framed popup reached by click or command - first-party only,
+// bundle-purity stays green and nothing third-party was inlined. Measured 1,180,100 bytes after
+// minification on top of dev's 1,144,862, so the panel costs 35,238; 1,220,000 keeps ~3.3%
+// headroom rather than the failing value.
+const BUDGET_BYTES = 1_220_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

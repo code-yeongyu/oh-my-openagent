@@ -1,0 +1,107 @@
+# Real senpi 2026.9.10, --tui-mode fullscreen, 200x50.
+# Clicked row 19 (screen coords, 1-based), column 161: 'M README.md  +3/-2'
+# Click delivered as ESC[<0;161;19M then ...m into the pane's stdin.
+
+=== BEFORE THE CLICK ===
+                                                                                                                                                    SESSION
+Optimized system prompt applied: claude-opus-5                                                                                                      model   claude-opus-5
+ Tip: Insert a newline without sending with shift+enter/ctrl+j.                                                                                     elapsed 0s
+ ↳ Want the full story on any tip? Ask about it — the give-me-tips skill has the tour.
+                                                                                                                                                    CONTEXT  0/1M
+                                                                                                                                                    used    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+[Context]
+  AGENTS.md                                                                                                                                         USAGE  57s ago
+                                                                                                                                                    claude
+[Skills]                                                                                                                                            5h      ███████████████████████░░░░┊  82%  2m
+  ast-grep, cli-anything-obsidian, cli-hub-meta-skill, codex-qa, coding-agent-sessions, computer-use, dag-library, data-scientist, debugging,       7d      ████▊┊░░░░░░░░░░░░░░░░░░░░░░  17%  Wed 08:00
+frontend, get-unpublished-changes, git-master, github-triage, give-me-tips, gpt-image-gen, hyperplan, init-deep, lsp-setup, mass-ulw,               Fable   ░░░░░┊░░░░░░░░░░░░░░░░░░░░░░   0%  Wed 08:00
+memory-discipline, omomomo, onboarding, opencode-qa, orca-cli, orca-emulator-android, orca-per-workspace-env, orchestration, pre-publish-review,    account work
+programming, publish, refactor, remove-ai-slops, remove-deadcode, review-work, security-research, senpi-qa, tech-debt-audit, ultimate-browsing,     codex
+ultrawork, ulw-execute, ulw-loop, ulw-plan, ulw-research, vault-curator, visual-qa, work-with-pr                                                    5h      ▉░░░░░░░░░░░░░░░░░░░░░░░░░┊░   3%  14m
+                                                                                                                                                    7d      █▏░░░░░░░┊░░░░░░░░░░░░░░░░░░   4%  Tue 09:12
+[Extensions]
+  account, anthropic-bash, anthropic-web-search, ask-user, bash-timeout, btw, cache-keepalive, claude-sdk-oauth, compaction, config-reload,         FILES  30 changed · +22 more
+cursor-cli-oauth, diff.js, files.js, goal, gpt-account, gpt-apply-patch, help, history-search, hooks, imagegen, import-repro, look-at, loop,         M README.md  +3/-2
+loop-guard, mcp, model-fallback, nested-agents-md, omo.js, openai-image-gen, openai-web-search, permission-system, prompt-preset,                    M omo.schema.json  +20/-0
+prompt-url-widget.js, reasoning, recommended-models, redraws, rules, service-tier, src, terminal, todo, tool-pair-guard, tool-search, tps.js, ttsr,  M omo-json.md  +12/-4
+video-in, webfetch, websearch                                                                                                                        M side-panel.ts  +4/-0
+                                                                                                                                                     M AGENTS.md  +1/-1
+[Themes]                                                                                                                                             M omo-task.js  +2/-2
+  catppuccin-mocha, dracula, github-dark, night-owl, one-dark-pro, tokyo-night                                                                       M omo.js  +2/-2
+                                                                                                                                                     M body.test.ts  +41/-6
+
+ Skill conflicts                                                                                                                                    ~/_code/omo-side-panel · feat/senpi-side-panel-usage
+ Conflicting or invalid loaded resources were found.
+   "hyperplan" collision:
+     ✓ auto (project) ~/_code/omo-side-panel/.agents/skills/hyperplan/SKILL.md
+     ✗ ~/_code/omo-side-panel/packages/omo-senpi/plugin/skills/hyperplan/SKILL.md (skipped)
+   auto (user) ~/.agents/skills/orchestration/SKILL.md
+     description exceeds 1024 characters (1038)
+
+
+
+ Settings: settings.json (JSON)
+
+ Warning: tmux is not fully configured. Add to ~/.tmux.conf and restart tmux:
+
+   set -g extended-keys on            # modified Enter keys (Shift+Enter, ...)
+   set -g extended-keys-format csi-u  # Pi works best with csi-u
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/_code/omo-side-panel • feat/senpi-side-panel-usage • 0/1M (0.0%) (auto)                                (claude-sdk-oauth@work) claude-opus-5:xhigh
+(😺 OmO Native) mem:omo-side-panel-e157adfe 1h ago
+
+=== AFTER THE CLICK ===
+                                                                                                                                                    SESSION
+Optimized system prompt applied: claude-opus-5                                                                                                      model   claude-opus-5
+ Tip: Insert a newline without sending with shift+enter/ctrl+j.                                                                                     elapsed 26s
+ ↳ Want the full story on any tip? Ask about it — the give-me-tips skill has the tour.
+                                                                                                                                                    CONTEXT  0/1M
+                                                                                                                                                    used    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+[Context]
+  AGENTS.md                                                                                                                                         USAGE  1m23 ago
+                                                                                                                                                    claude
+[Skills]                                                                                                                                            5h      ███████████████████████░░░░┊  82%  2m
+  ast-grep, cli-anything-obsidian, cli-hub-meta-skill, codex-qa, coding-agent-sessions, computer-use, dag-library, data-scientist, debugging,       7d      ████▊┊░░░░░░░░░░░░░░░░░░░░░░  17%  Wed 08:00
+frontend, get-unpublished-changes, git-master, github-triage, give-me-tips, gpt-image-gen, hyperplan, init-deep, lsp-setup, mass-ulw,               Fable   ░░░░░┊░░░░░░░░░░░░░░░░░░░░░░   0%  Wed 08:00
+memory-discipline, omomomo, onboarding, opencode-qa, orca-cli, orca-emulator-android, orca-per-workspace-env, orchestration, pre-publish-review,    account work
+programming, publish, refactor, remove-ai-slops, remove-deadcode, review-work, security-research, senpi-qa, tech-debt-audit, ultimate-browsing,     codex
+ultrawork, ulw-execute, ulw-loop, ulw-plan, ulw-research, vault-curator, visual-qa, work-with-pr                                                    5h      ▉░░░░░░░░░░░░░░░░░░░░░░░░░┊░   3%  13m
+                              ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐░░░░░░░░░░░░░░   4%  Tue 09:12
+[Extensions]                  │ .omo/evidence/omo-senpi-adapter/20260910-senpi-side-panel/README.md  (diff, read-only)                                                   │
+  account, anthropic-bash, ant│ diff --git a/.omo/evidence/omo-senpi-adapter/20260910-senpi-side-panel/README.md b/.omo/evidence/omo-senpi-adapter/20260910-senpi-side-… │2 more
+cursor-cli-oauth, diff.js, fil│ index 68c210c0..61b494a0 100644                                                                                                          │
+loop-guard, mcp, model-fallbac│ --- a/.omo/evidence/omo-senpi-adapter/20260910-senpi-side-panel/README.md                                                                │0/-0
+prompt-url-widget.js, reasonin│ +++ b/.omo/evidence/omo-senpi-adapter/20260910-senpi-side-panel/README.md                                                                │
+video-in, webfetch, websearch │ @@ -157,7 +157,8 @@ screenshot, and the reflow was verified by measuring transcript line length in t                                     │0
+                              │  - No model traffic: the runs use the repo's offline mock provider and `PI_OFFLINE=1`, so this proves                                    │
+[Themes]                      │    startup, layout and teardown - not behaviour during a live turn. The panel renders no                                                 │
+  catppuccin-mocha, dracula, g│    turn-dependent data yet (M1 ships the location row only).                                                                             │
+                              │ -- Mouse interaction is not covered because it is not implemented yet (M3, and it depends on a                                           │6
+                              │ -  non-public seam).                                                                                                                     │
+ Skill conflicts              │ +- Mouse interaction is not covered because it did not exist at this commit. The claim that it                                           │ · feat/senpi-side-panel-usage
+ Conflicting or invalid loaded│ +  needs a non-public seam turned out to be wrong: it was added later on                                                                 │
+   "hyperplan" collision:     │ +  `feat/senpi-side-panel-usage`, see `.omo/evidence/omo-senpi-adapter/20260910-side-panel-clicks/`.                                     │
+     ✓ auto (project) ~/_code/│  - The `write EIO` lines in the sandbox's `senpi-debug.log` are this driver killing the tmux session                                     │
+     ✗ ~/_code/omo-side-panel/│    under a running TUI, not a panel fault; their timestamps match the `tmux kill-session` calls.                                         │
+   auto (user) ~/.agents/skill│                                                                                                                                esc close │
+     description exceeds 1024 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+ Settings: settings.json (JSON)
+
+ Warning: tmux is not fully configured. Add to ~/.tmux.conf and restart tmux:
+
+   set -g extended-keys on            # modified Enter keys (Shift+Enter, ...)
+   set -g extended-keys-format csi-u  # Pi works best with csi-u
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/_code/omo-side-panel • feat/senpi-side-panel-usage • 0/1M (0.0%) (auto)                                (claude-sdk-oauth@work) claude-opus-5:xhigh
+(😺 OmO Native) mem:omo-side-panel-e157adfe 1h ago

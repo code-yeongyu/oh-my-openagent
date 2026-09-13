@@ -1,0 +1,11 @@
+Sandbox root: /tmp/omo-panel-smoke-g7jb97zo
+Every run pinned OMO_/SENPI_/PI_CODING_AGENT_DIR at the sandbox agent dir, plus HOME and XDG_* inside the sandbox.
+
+Real senpi agent dir:
+/home/kirill.ohapkin/.senpi/agent
+
+Files under ~/.senpi modified in the last 90 minutes (the smoke window):
+  (none)
+
+Note: ~/.omo/agent is this developer session's own live agent dir and is written continuously by it,
+so it is not a usable isolation signal here; the smoke never pointed any agent-dir variable at it.

@@ -1,0 +1,50 @@
+   way out was a dead end until the line was cleared by hand.                                                                                       SESSION
+                                                                                                                                                    model   mock-1
+ - An extension calling ctx.shutdown() while the session is idle now shuts down immediately instead of waiting for an agent_settled event that an   elapsed 49s
+   idle session never emits, which previously stranded the request until the user happened to run another turn.
+                                                                                                                                                    CONTEXT  0/200K
+ - Interactive quit now keeps stderr capture installed while session shutdown handlers drain during runtime disposal, so shutdown-time diagnostics  used    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+   (for example memory drain warnings) are recorded in the debug log instead of printing raw beside the resume hint. The TUI still stops first to
+   avoid final-frame repaints, and stderr is restored after disposal even when disposal fails.                                                      FILES  5 changed
+                                                                                                                                                     D gone.txt  +0/-1
+ - Multi-session RPC hosts launched with SENPI_RPC_CLIENT_CAPABILITIES (for example extension_events) now apply those capabilities to               R  renamed-new.txt  +0/-0
+   connection-owned session bindings when the client never sends set_client_info. Previously the launch capabilities were advertised through         M tracked.txt  +2/-1
+   get_protocol_info but dropped at binding creation, so undeclared clients received no extension_event frames (breaking downstream                 M  with space.txt  +1/-0
+   task/DAG/monitor liveness in omo-desktop-app). An explicit set_client_info declaration, including an empty capability list, still overrides the  ?? brand-new.txt
+   launch default.
+                                                                                                                                                    /tmp/omo-panel-smoke-g7jb97zo/project · main
+ - RPC abort acknowledgements are now sent immediately after the abort signal is dispatched instead of waiting for full session quiescence,
+   preventing desktop stop requests from hitting their 10-second bounded-ack timeout under host load.
+ ### New Features
+                              ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+ - RPC clients can opt into na│ tracked.txt  (diff, read-only)                                                                                                           │
+   title through session_info_│ diff --git a/tracked.txt b/tracked.txt                                                                                                   │
+                              │ index de98044..dcaf2c1 100644                                                                                                            │
+ ### Breaking Changes         │ --- a/tracked.txt                                                                                                                        │
+                              │ +++ b/tracked.txt                                                                                                                        │
+ ### Added                    │ @@ -1,3 +1,4 @@                                                                                                                          │
+                              │  a                                                                                                                                       │
+ ### Changed                  │ -b                                                                                                                                       │
+                              │ +B-EDIT                                                                                                                                  │
+ ### Fixed                    │  c                                                                                                                                       │
+                              │ +d                                                                                                                                       │
+ ### Removed                  │                                                                                                                                esc close │
+                              └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Settings: settings.json (JSON)
+
+ Warning: tmux is not fully configured. Add to ~/.tmux.conf and restart tmux:
+
+   set -g extended-keys on            # modified Enter keys (Shift+Enter, ...)
+   set -g extended-keys-format csi-u  # Pi works best with csi-u
+
+
+ /side-panel-diff
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/tmp/omo-panel-smoke-g7jb97zo/project • main • 0/200K (0.0%) (auto)                                                                           mock-1
+(😺 OmO Native)

@@ -1,0 +1,8 @@
+attach: ctor= typeof=function own=false
+patched: roundTrips=false own=false
+click: omo-panel:probe/0
+
+# Produced by a throwaway probe that painted every row as an OSC 8 link and replaced
+# openUrl with a logger. The probe was reverted; it is not part of the change.
+# `ctor=` is empty and `own=false` because the renderer arrives as a proxy whose get trap
+# wraps every function read - which is also why the real code parks the host callback in a box.

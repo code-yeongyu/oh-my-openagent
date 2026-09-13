@@ -1,0 +1,103 @@
+=== OPENED ===
+                                                                                                                                                    SESSION
+Optimized system prompt applied: claude-opus-5                                                                                                      model   claude-opus-5
+ Tip: Use /tree to revisit earlier points and switch between session branches.                                                                      elapsed 20s
+ ↳ Want the full story on any tip? Ask about it — the give-me-tips skill has the tour.
+                                                                                                                                                    CONTEXT  0/1M
+[Skills]                                                                                                                                            used    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+  ast-grep, cli-anything-obsidian, cli-hub-meta-skill, coding-agent-sessions, computer-use, dag-library, data-scientist, debugging, frontend,
+git-master, give-me-tips, gpt-┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+orca-per-workspace-env, orches│ notes.txt  (diff, read-only)                                                                                                             │
+ulw-plan, ulw-research, vault-│ diff --git a/notes.txt b/notes.txt                                                                                                       │░░░░░░░░░░░░░░   5%  4h31
+                              │ index 3258cf2..13ca06b 100644                                                                                                            │░░░░░░░░░░░░░░  18%  Wed 08:00
+[Extensions]                  │ --- a/notes.txt                                                                                                                          │░░░░░░░░░░░░░░   0%  Wed 08:00
+  account, anthropic-bash, ant│ +++ b/notes.txt                                                                                                                          │
+cursor-cli-oauth, diff.js, fil│ @@ -1,200 +1,200 @@                                                                                                                      │
+loop-guard, mcp, model-fallbac│ -original 001                                                                                                                            │░░░░░░░░░░░░░░   0%  4h45
+prompt-url-widget.js, reasonin│ -original 002                                                                                                                            │░░░░░░░░░░░░░░   4%  Tue 09:12
+video-in, webfetch, websearch │ -original 003                                                                                                                            │
+                              │ -original 004                                                                                                                            │
+[Themes]                      │ -original 005                                                                                                                            │0
+  catppuccin-mocha, dracula, g│ -original 006                                                                                                                            │
+                              │ -original 007                                                                                                                            │tzlik6 · main
+                              │ -original 008                                                                                                                            │
+ Skill conflicts              │ -original 009                                                                                                                            │
+ Conflicting or invalid loaded│ -original 010                                                                                                                            │
+   auto (user) ~/.agents/skill│ -original 011                                                                                                                            │
+     description exceeds 1024 │ -original 012                                                                                                                            │
+                              │ -original 013                                                                                                                            │
+                              │ -original 014                                                                                                                            │
+                              │ -original 015                                                                                                                            │
+ Settings: settings.json (JSON│ -original 016                                                                                                                            │
+                              │ -original 017                                                                                                                            │
+ Warning: tmux is not fully co│ -original 018                                                                                                                            │
+                              │ -original 019                                                                                                                            │
+   set -g extended-keys on    │ -original 020                                                                                                                            │
+   set -g extended-keys-format│ -original 021                                                                                                                            │
+                              │ -original 022                                                                                                                            │
+                              │ -original 023                                                                                                                            │
+                              │ -original 024                                                                                                                            │
+                              │ -original 025                                                                                                                            │
+                              │ -original 026                                                                                                                            │
+                              │ -original 027                                                                                                                            │
+                              │                                                                                                           1-32/405  ↑↓ scroll  esc close │
+                              └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/tmp/omo-wheel-repo-m0tzlik6 • main • 0/1M (0.0%) (auto)                                                 (claude-sdk-oauth@work) claude-opus-5:xhigh
+(😺 OmO Native)
+
+=== AFTER WHEEL DOWN ===
+                                                                                                                                                    SESSION
+Optimized system prompt applied: claude-opus-5                                                                                                      model   claude-opus-5
+ Tip: Use /tree to revisit earlier points and switch between session branches.                                                                      elapsed 24s
+ ↳ Want the full story on any tip? Ask about it — the give-me-tips skill has the tour.
+                                                                                                                                                    CONTEXT  0/1M
+[Skills]                                                                                                                                            used    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%
+  ast-grep, cli-anything-obsidian, cli-hub-meta-skill, coding-agent-sessions, computer-use, dag-library, data-scientist, debugging, frontend,
+git-master, give-me-tips, gpt-┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+orca-per-workspace-env, orches│ notes.txt  (diff, read-only)                                                                                                             │
+ulw-plan, ulw-research, vault-│ -original 005                                                                                                                            │░░░░░░░░░░░░░░   5%  4h31
+                              │ -original 006                                                                                                                            │░░░░░░░░░░░░░░  18%  Wed 08:00
+[Extensions]                  │ -original 007                                                                                                                            │░░░░░░░░░░░░░░   0%  Wed 08:00
+  account, anthropic-bash, ant│ -original 008                                                                                                                            │
+cursor-cli-oauth, diff.js, fil│ -original 009                                                                                                                            │
+loop-guard, mcp, model-fallbac│ -original 010                                                                                                                            │░░░░░░░░░░░░░░   0%  4h45
+prompt-url-widget.js, reasonin│ -original 011                                                                                                                            │░░░░░░░░░░░░░░   4%  Tue 09:12
+video-in, webfetch, websearch │ -original 012                                                                                                                            │
+                              │ -original 013                                                                                                                            │
+[Themes]                      │ -original 014                                                                                                                            │0
+  catppuccin-mocha, dracula, g│ -original 015                                                                                                                            │
+                              │ -original 016                                                                                                                            │tzlik6 · main
+                              │ -original 017                                                                                                                            │
+ Skill conflicts              │ -original 018                                                                                                                            │
+ Conflicting or invalid loaded│ -original 019                                                                                                                            │
+   auto (user) ~/.agents/skill│ -original 020                                                                                                                            │
+     description exceeds 1024 │ -original 021                                                                                                                            │
+                              │ -original 022                                                                                                                            │
+                              │ -original 023                                                                                                                            │
+                              │ -original 024                                                                                                                            │
+ Settings: settings.json (JSON│ -original 025                                                                                                                            │
+                              │ -original 026                                                                                                                            │
+ Warning: tmux is not fully co│ -original 027                                                                                                                            │
+                              │ -original 028                                                                                                                            │
+   set -g extended-keys on    │ -original 029                                                                                                                            │
+   set -g extended-keys-format│ -original 030                                                                                                                            │
+                              │ -original 031                                                                                                                            │
+                              │ -original 032                                                                                                                            │
+                              │ -original 033                                                                                                                            │
+                              │ -original 034                                                                                                                            │
+                              │ -original 035                                                                                                                            │
+                              │ -original 036                                                                                                                            │
+                              │                                                                                                          10-41/405  ↑↓ scroll  esc close │
+                              └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/tmp/omo-wheel-repo-m0tzlik6 • main • 0/1M (0.0%) (auto)                                                 (claude-sdk-oauth@work) claude-opus-5:xhigh
+(😺 OmO Native)

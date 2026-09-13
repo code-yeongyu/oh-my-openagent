@@ -49,6 +49,12 @@ export interface SenpiExtensionAPI {
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
+  exec?(
+    command: string,
+    args: string[],
+    options?: { cwd?: string; timeout?: number },
+  ): Promise<{ stdout: string; stderr: string; code: number }>
 }
 
 export interface ComponentLogger {

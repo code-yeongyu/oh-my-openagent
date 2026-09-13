@@ -2131,6 +2131,106 @@
       ],
       "additionalProperties": false
     },
+    "side_panel": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "width": {
+          "default": "26%",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 24,
+              "maximum": 160
+            },
+            {
+              "type": "string",
+              "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+            }
+          ]
+        },
+        "min_columns": {
+          "default": 120,
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 400
+        },
+        "clickable": {
+          "default": true,
+          "type": "boolean"
+        },
+        "usage_poll_seconds": {
+          "default": 150,
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        },
+        "sections": {
+          "default": {
+            "session": true,
+            "context": true,
+            "usage": true,
+            "agents": true,
+            "tools": true,
+            "files": true,
+            "memory": true
+          },
+          "type": "object",
+          "properties": {
+            "session": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "default": true,
+              "type": "boolean"
+            },
+            "usage": {
+              "default": true,
+              "type": "boolean"
+            },
+            "agents": {
+              "default": true,
+              "type": "boolean"
+            },
+            "tools": {
+              "default": true,
+              "type": "boolean"
+            },
+            "files": {
+              "default": true,
+              "type": "boolean"
+            },
+            "memory": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session",
+            "context",
+            "usage",
+            "agents",
+            "tools",
+            "files",
+            "memory"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "enabled",
+        "width",
+        "min_columns",
+        "clickable",
+        "usage_poll_seconds",
+        "sections"
+      ],
+      "additionalProperties": false
+    },
     "[opencode]": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
@@ -13888,6 +13988,68 @@
             }
           },
           "additionalProperties": false
+        },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -15737,6 +15899,68 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -17595,6 +17819,68 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "side_panel": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "width": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 24,
+                    "maximum": 160
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                  }
+                ]
+              },
+              "min_columns": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 400
+              },
+              "clickable": {
+                "type": "boolean"
+              },
+              "usage_poll_seconds": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 3600
+              },
+              "sections": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "type": "boolean"
+                  },
+                  "context": {
+                    "type": "boolean"
+                  },
+                  "usage": {
+                    "type": "boolean"
+                  },
+                  "agents": {
+                    "type": "boolean"
+                  },
+                  "tools": {
+                    "type": "boolean"
+                  },
+                  "files": {
+                    "type": "boolean"
+                  },
+                  "memory": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -29356,6 +29642,68 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -31205,6 +31553,68 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
