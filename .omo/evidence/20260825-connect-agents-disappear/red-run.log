@@ -1,0 +1,8 @@
+error: Cannot find module './registry-snapshot' from '/home/viprix/projects/oom-wt-4856/packages/omo-opencode/src/features/agent-registry-recovery/registry-snapshot.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 2 fail
+ 2 errors
+Ran 2 tests across 2 files. [962.00ms]

@@ -16,6 +16,7 @@ import {
   clearRegisteredAgentNames,
   registerAgentName,
 } from "../features/claude-code-session-state";
+import { recordAppliedRegistry } from "../features/agent-registry-recovery";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
 import { getConfiguredDefaultAgent } from "./agent-config-assembly";
 
@@ -139,6 +140,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             agents: cloneAgentConfig(agentResult),
           };
     }
+
+    recordAppliedRegistry(Object.keys(agentResult));
 
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
