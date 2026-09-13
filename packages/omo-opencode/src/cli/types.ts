@@ -1,10 +1,12 @@
 export type ClaudeSubscription = "no" | "yes" | "max20"
 export type BooleanArg = "no" | "yes"
 export type InstallPlatform = "opencode" | "codex" | "both" | "senpi"
+export type InstallConfigScope = "active" | "global"
 
 export interface InstallArgs {
   tui: boolean
   platform?: InstallPlatform
+  configScope?: InstallConfigScope
   claude?: ClaudeSubscription
   openai?: BooleanArg
   gemini?: BooleanArg

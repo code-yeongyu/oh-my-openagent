@@ -1,3 +1,4 @@
+import { join } from "node:path"
 import { getOpenCodeConfigPaths } from "../../shared"
 import { resolveUserOmoConfigPath } from "@oh-my-opencode/omo-config-core"
 import type {
@@ -12,6 +13,7 @@ export interface ConfigContext {
 }
 
 let configContext: ConfigContext | null = null
+let configDirOverride: string | null = null
 
 export function initConfigContext(binary: OpenCodeBinaryType, version: string | null): void {
   const paths = getOpenCodeConfigPaths({ binary, version })
@@ -23,11 +25,26 @@ export function getConfigContext(): ConfigContext {
     const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
     configContext = { binary: "opencode", version: null, paths }
   }
-  return configContext
+  return { ...configContext, paths: applyConfigDirOverride(configContext.paths) }
 }
 
 export function resetConfigContext(): void {
   configContext = null
+  configDirOverride = null
+}
+
+export function setConfigDirOverride(configDir: string | null): void {
+  configDirOverride = configDir
+}
+
+function applyConfigDirOverride(paths: OpenCodeConfigPaths): OpenCodeConfigPaths {
+  if (!configDirOverride || configDirOverride === paths.configDir) return paths
+  return {
+    configDir: configDirOverride,
+    configJson: join(configDirOverride, "opencode.json"),
+    configJsonc: join(configDirOverride, "opencode.jsonc"),
+    packageJson: join(configDirOverride, "package.json"),
+  }
 }
 
 export function getConfigDir(): string {

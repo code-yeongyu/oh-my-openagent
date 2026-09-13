@@ -11,12 +11,14 @@ import {
 } from "./config-manager"
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
-import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
+import { promptInstallConfig, promptInstallConfigScope, promptInstallPlatform } from "./tui-install-prompts"
+import { applyInstallConfigScope, resolveDistinctConfigRoots } from "./install-config-scope"
 import { detectCodexInstallation, formatCodexInstallationWarning, runCodexInstaller } from "./install-codex"
 import { runSenpiInstaller } from "./install-senpi"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
+import { getConfigDir } from "./config-manager/config-context"
 import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -29,6 +31,17 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   if (!selectedPlatform) return 1
 
   const hasOpenCode = selectedPlatform === "opencode" || selectedPlatform === "both"
+
+  if (hasOpenCode) {
+    const scopeRoots = resolveDistinctConfigRoots()
+    if (scopeRoots) {
+      const scope = await promptInstallConfigScope(scopeRoots)
+      if (!scope) return 1
+      const scopedDir = applyInstallConfigScope(scope, scopeRoots)
+      p.log.info(`Config scope: ${scope} ${color.dim(scopedDir)}`)
+    }
+  }
+
   const detected = hasOpenCode
     ? detectCurrentConfig()
     : {
@@ -93,7 +106,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     }
     spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
     try {
-      ensureTuiPluginEntry()
+      ensureTuiPluginEntry({ configDir: getConfigDir() })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       p.log.warn(`Could not update OpenCode TUI config: ${message}`)
