@@ -450,6 +450,9 @@ jobs:
         run: |
           set -euo pipefail
           node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          # The installer embeds the required-artifact list, so a stale copy demands files the
+          # plugin no longer ships and refuses to install. Nothing else in CI reads it.
+          node packages/omo-senpi/plugin/scripts/build-install.mjs --check
 
       - name: Run Senpi compatibility tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')

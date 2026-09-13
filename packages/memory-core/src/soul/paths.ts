@@ -1,8 +1,9 @@
 // Soul-file identity shared by the write tools, the notice watermark, and the
 // omo-senpi notice wiring. A "soul edit" is any committed change touching
-// system/persona.md or system/identity.md (plan IC-5 / todo 7).
+// system/persona.md or system/identity.md (plan IC-5 / todo 7), or
+// system/boundaries.md: the user-owned block must never change silently.
 
-export const SOUL_PATHS = ["system/persona.md", "system/identity.md"] as const
+export const SOUL_PATHS = ["system/persona.md", "system/identity.md", "system/boundaries.md"] as const
 
 /**
  * Stable machine-consumed token embedded in the tool-result soul-edit

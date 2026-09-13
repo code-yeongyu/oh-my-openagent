@@ -256,10 +256,12 @@ export function wireDagLifecycle(
   runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose">,
   wireTaskLifecycle: () => void,
 ): void {
-  pi.on("session_shutdown", () => runtime.pauseForShutdown())
+  pi.on("session_shutdown", async () => {
+    await runtime.pauseForShutdown()
+    runtime.detach()
+  })
   wireTaskLifecycle()
   pi.on("session_start", (event) => runtime.attach(event))
-  pi.on("session_before_switch", () => runtime.detach())
   pi.on("session_shutdown", () => runtime.dispose())
 }
 

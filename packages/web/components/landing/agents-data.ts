@@ -20,17 +20,17 @@ import type { BentoSpan } from "@/components/ledger/bento-cell"
 
 /** `landing.agents.roster.*` message keys. */
 export type AgentKey =
-  | "sisyphus"
-  | "hephaestus"
-  | "prometheus"
-  | "metis"
-  | "momus"
-  | "atlas"
-  | "oracle"
-  | "librarian"
+  | "orchestrator"
+  | "planner"
+  | "planConsultant"
+  | "planReviewer"
+  | "kibitzer"
+  | "architect"
+  | "deep"
+  | "quick"
+  | "visualEngineering"
   | "explore"
-  | "sisyphusJunior"
-  | "multimodalLooker"
+  | "librarian"
   | "dynamic"
 
 interface AgentMeta {
@@ -49,23 +49,23 @@ export interface AgentCell extends AgentMeta {
 }
 
 const AGENT_META: Readonly<Record<string, AgentMeta>> = {
-  sisyphus: { key: "sisyphus", icon: ListChecks, colSpan: 2, rowSpan: 2, order: 0 },
-  hephaestus: { key: "hephaestus", icon: Hammer, colSpan: 2, rowSpan: 1, order: 1 },
-  prometheus: { key: "prometheus", icon: Compass, colSpan: 1, rowSpan: 1, order: 2 },
-  metis: { key: "metis", icon: Scale, colSpan: 1, rowSpan: 1, order: 3 },
-  momus: { key: "momus", icon: Eye, colSpan: 1, rowSpan: 1, order: 4 },
-  atlas: { key: "atlas", icon: Anvil, colSpan: 1, rowSpan: 1, order: 5 },
-  oracle: { key: "oracle", icon: Lightbulb, colSpan: 1, rowSpan: 1, order: 6 },
-  librarian: { key: "librarian", icon: BookOpen, colSpan: 1, rowSpan: 1, order: 7 },
-  explore: { key: "explore", icon: Search, colSpan: 1, rowSpan: 1, order: 8 },
-  "sisyphus-junior": { key: "sisyphusJunior", icon: GitBranch, colSpan: 1, rowSpan: 1, order: 9 },
-  "multimodal-looker": {
-    key: "multimodalLooker",
+  orchestrator: { key: "orchestrator", icon: ListChecks, colSpan: 2, rowSpan: 2, order: 0 },
+  planner: { key: "planner", icon: Compass, colSpan: 2, rowSpan: 1, order: 1 },
+  "plan-consultant": { key: "planConsultant", icon: Scale, colSpan: 1, rowSpan: 1, order: 2 },
+  "plan-reviewer": { key: "planReviewer", icon: Eye, colSpan: 1, rowSpan: 1, order: 3 },
+  kibitzer: { key: "kibitzer", icon: Lightbulb, colSpan: 1, rowSpan: 1, order: 4 },
+  architect: { key: "architect", icon: Anvil, colSpan: 1, rowSpan: 1, order: 5 },
+  deep: { key: "deep", icon: Hammer, colSpan: 1, rowSpan: 1, order: 6 },
+  quick: { key: "quick", icon: GitBranch, colSpan: 1, rowSpan: 1, order: 7 },
+  "visual-engineering": {
+    key: "visualEngineering",
     icon: ImageIcon,
     colSpan: 1,
     rowSpan: 1,
-    order: 10,
+    order: 8,
   },
+  explore: { key: "explore", icon: Search, colSpan: 1, rowSpan: 1, order: 9 },
+  librarian: { key: "librarian", icon: BookOpen, colSpan: 1, rowSpan: 1, order: 10 },
 }
 
 const DYNAMIC_CELL: AgentCell = {
@@ -83,7 +83,10 @@ const graphCells: readonly AgentCell[] = graphNodes.flatMap((node) => {
   return meta ? [{ ...meta, id: node.id, wave: node.wave }] : []
 })
 
-if (graphCells.length !== Object.keys(AGENT_META).length) {
+if (
+  graphCells.length !== Object.keys(AGENT_META).length ||
+  graphCells.length !== graphNodes.length
+) {
   throw new Error("agents-data: graph nodes and agent roster disagree")
 }
 

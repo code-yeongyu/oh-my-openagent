@@ -11,6 +11,7 @@ import { terminateRpcChild } from "../../runners/rpc/terminate"
 import { spawnFakeChild } from "../../runners/rpc/__fixtures__/spawn-fake"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createMemberSelfPoller } from "./self-poller"
+import { realColdRevive } from "../../lifecycle/__fixtures__/real-cold-revive"
 
 const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
 const MESSAGE_ID = "22222222-2222-4222-8222-222222222222"
@@ -26,6 +27,11 @@ afterEach(async () => {
 })
 
 describe("member injection residency", () => {
+  test("#given configured TTL and a real process member #when parked then messaged by task id #then detach_rpc resumes one acknowledged turn", async () => {
+    const result = await realColdRevive("process", false, { idleTimeoutMs: 37, team: true })
+    expect(result).toMatchObject({ cadenceMs: 37, parked: "rpc_detached", memberExtensionRestored: true, messageCount: 1, status: "completed", leaseReleased: true })
+  }, 20000)
+
   test("#given a member whose initial turn ended without a wait #when lead mail is injected #then its resident RPC session revives into a working turn", async () => {
     // given an ended but resident member session
     const root = mkdtempSync(join(tmpdir(), "senpi-member-residency-"))

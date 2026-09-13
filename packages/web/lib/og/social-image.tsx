@@ -81,7 +81,7 @@ export function SocialImage({ stats }: { readonly stats: FormattedStatsData }) {
               color: textLo,
             }}
           >
-            THE AGENT HARNESS · OPENCODE · CODEX · SENPI
+            YOUR TOOL FOR REAL WORK · BUT IT'S AN AGENT
           </div>
         </div>
       </div>

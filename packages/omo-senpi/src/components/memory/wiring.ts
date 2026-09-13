@@ -1,4 +1,4 @@
-import { MemoryBlockCache } from "@oh-my-opencode/memory-core"
+import { MemoryBlockCache, RecallCorpusCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
@@ -10,8 +10,7 @@ import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } 
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
-import type { KibitzerGateWiring } from "./kibitzer-wiring"
-import { createKibitzerComposition, type KibitzerComposition } from "./wiring-kibitzer"
+import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
 import { createMemoryRecallWiring } from "./recall-wiring"
 import { branchEntryCount } from "./wiring-context"
 import {
@@ -41,7 +40,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       onLiveCompletion: reflectionLive.onLiveReflectionCompleted,
     },
   )
-  const { resolveContext, journalWiringFor, factsWiringFor, kibitzerRunnerFor, runtimeFor } = runtimeWiring
+  const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
 
   const nudgeWiring = createMemoryNudgeWiring({
     resolveContext,
@@ -63,22 +62,21 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
   })
 
-  // Late-bound because the two wirings are mutually dependent by design: recall's drain needs the
-  // gate's epoch to reject a superseded payload, and the gate needs recall's collection to launch.
-  // The gate wiring is constructed immediately below, so every call through this ref lands after it.
-  const gateWiringRef: { current?: KibitzerGateWiring } = {}
+  // Late-bound because the two wirings are mutually dependent by design: recall's drain injects the
+  // nudges the Kibitzer composition holds, and the composition wakes its sidecars from recall's
+  // collection. The composition is built in registerStatic, before any hook can fire.
   const deliveryRef: { current?: KibitzerComposition["delivery"] } = {}
+  // One corpus cache for both: the sidecar's read-only memory tool reads the corpus the candidates came from.
+  const corpusCache = new RecallCorpusCache()
 
   const recallWiring = createMemoryRecallWiring({
     resolveContext,
     resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
     env: options.env,
-    currentCompactionEpoch: (sessionId) => gateWiringRef.current?.currentCompactionEpoch(sessionId) ?? 0,
+    corpusCache,
     drainQueued: (sessionId, context) => deliveryRef.current?.drainForPrompt(sessionId, context) ?? [],
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
-  // The settle half of the recall channel: collection feeds the gate child, and the gate's pending
-  // nudges are what recallWiring's before_agent_start handler injects on the NEXT turn.
   const kibitzerRef: { current?: KibitzerComposition } = {}
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
@@ -131,9 +129,20 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       reflectionLive.registerRpc(pi, resolveContext)
-      const kibitzer = createKibitzerComposition(options, pi, runtimeWiring, recallWiring, ctx, options.logger)
+      const kibitzer = createKibitzerComposition({
+        env: options.env,
+        cwd: options.cwd,
+        loadConfig: options.loadConfig,
+        resolveContext,
+        recall: recallWiring,
+        corpusCache,
+        ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
+        sendMessage: (message, sendOptions) => pi.sendMessage(message, sendOptions),
+        appendEntry: (customType, data) => pi.appendEntry?.(customType, data),
+        ...(options.kibitzerChildStarter === undefined ? {} : { childStarter: options.kibitzerChildStarter }),
+        ...(options.logger === undefined ? {} : { logger: options.logger }),
+      })
       kibitzerRef.current = kibitzer
-      gateWiringRef.current = kibitzer.gate
       deliveryRef.current = kibitzer.delivery
       registerMemoryStatic({
         pi,
@@ -143,7 +152,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         nudgeWiring,
         noticeWiring,
         recallWiring,
-        kibitzerGateWiring: kibitzer.gate,
         kibitzer,
         dreamTriggerWiring,
         completionApi: createReflectionCompletionApi,
@@ -204,7 +212,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       const journalFlushed = await shutdownDrain.flushJournal(input)
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
       await kibitzerRef.current?.onSessionShutdown(input.sessionId)
-      await kibitzerRef.current?.gate.onSessionShutdown(input.sessionId)
       const identity = resolveContext(input.sessionId)
       if (identity !== undefined) await factsWiringFor(identity).cancelActive?.()
       await shutdownDrain.run(input, { journalFlushed })
@@ -219,10 +226,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
 
     async whenIdle(): Promise<void> {
-      await kibitzerRef.current?.trigger.whenIdle()
+      await kibitzerRef.current?.whenIdle()
     },
-
-
   }
 }
 

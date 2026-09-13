@@ -32,6 +32,7 @@ version: 0.1.0
 | A durable fact, decision, or correction about the project or the work | A memory note: notes/ or reference/, or a system/ block when it must always be in context |
 | A repeatable procedure: steps you would follow again in a similar situation | A skill: skills/<name>/SKILL.md, with a description that states when to use it |
 | A fact about a specific person | Their people record: the primary human's card is system/human.md, everyone else gets people/<slug>/card.md plus people/<slug>/observations.md |
+| Something the person told you not to do | system/boundaries.md, in their exact words; never a rule you inferred |
 | Ephemeral state, speculation, or anything already captured above | Nowhere. Not saving is a valid outcome; decide it deliberately |
 
 One home per fact. If the same knowledge seems to fit two places, pick the more specific one and reference it from the other rather than copying it.
@@ -52,7 +53,7 @@ Cards hold what is stable about a person; observations hold what you noticed and
 
 ## Soul rules
 
-Files under system/ are your self-model, projected into every prompt. Edit them only for durable identity changes and keep them minimal. The persona is the single carrier of the announcement rule for those edits; this skill deliberately does not restate it.
+Files under system/ are your self-model, projected into every prompt. Edit them only for durable changes and keep them minimal. The persona is the single carrier of the announcement rule for those edits; this skill deliberately does not restate it.
 
 \`system/identity.md\` is an optional card of particulars. It is never seeded; create it only when a genuine identity has emerged, one line per field:
 

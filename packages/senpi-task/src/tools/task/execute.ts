@@ -59,7 +59,7 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
 
     const parentSessionId = ctx.sessionManager.getSessionId()
     const skillSummaries = new WeakMap<ResolvedSpawnItem, TaskSkillSummary>()
-    return executeBatch({
+    const batchResult = await executeBatch({
       manager: deps.manager,
       items: resolved.items,
       signal,
@@ -89,5 +89,6 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
         return deps.manager.start(spec)
       },
     })
+    return batchResult
   }
 }

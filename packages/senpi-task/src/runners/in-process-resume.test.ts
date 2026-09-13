@@ -152,16 +152,16 @@ describe("InProcessRunner resume", () => {
     const startNames = (startOptions?.customTools ?? []).map((tool) => tool.name)
     const resumeNames = (resumeOptions?.customTools ?? []).map((tool) => tool.name)
     expect(resumeNames).toEqual(startNames)
-    // the task/team family stays excluded; the member-scoped tool is re-resolved against the LIVE instance
+    // Current curated restrictions also constrain an older recorded member-scoped grant.
     expect(resumeNames).not.toContain("task_create")
-    expect((resumeOptions?.customTools ?? []).find((tool) => tool.name === "task_send")).toBe(taskSend)
+    expect(resumeNames).not.toContain("task_send")
     // the curated read-only bash override is reinstalled over the parent's builtin bash
     const resumeBash = (resumeOptions?.customTools ?? []).filter((tool) => tool.name === "bash")
     expect(resumeBash).toHaveLength(1)
     expect(resumeBash[0]?.description).toContain("read-only")
     expect(resumeBash[0]).not.toBe(parentBash)
     // the allowlist and the denylist are re-applied through the same fields as start
-    expect(resumeOptions?.tools).toEqual(["read", "bash", "task_send"])
+    expect(resumeOptions?.tools).toEqual(["read", "bash"])
     expect(resumeOptions?.excludeTools).toEqual(["grep"])
     // a denied tool stays absent from the effective surface AFTER resume
     const effective = resumeNames.filter((name) => !(resumeOptions?.excludeTools ?? []).includes(name))

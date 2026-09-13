@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { delimiter, join } from "node:path"
 
+import { createAgentToolkit } from "../../../../omo-codex/plugin/components/ulw-loop/src/sdk.js"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { __testInternals, createUlwLoopComponent } from "./index"
 import {
@@ -15,6 +16,7 @@ import {
   readRunnerRuntime,
   sessionEventCtx,
   statusArgsFor,
+  TEST_SESSION_ID,
   withEnv,
   withEnvAsync,
 } from "./ulw-loop.test-support"
@@ -135,29 +137,35 @@ describe("omo-senpi ulw-loop resolveOmoBin toolkit-first chain", () => {
 })
 
 describe("omo-senpi ulw-loop default registration through the toolkit chain", () => {
-  it("#given a PATH omo-agent-toolkit and no envs #when the component registers with defaults #then the toolkit binary receives the status argv", async () => {
-    const fake = createTempOmoBin(activeStatus("DEFAULT-REGISTRATION"), "omo-agent-toolkit")
-    const path = process.env.PATH ? `${fake.dir}${delimiter}${process.env.PATH}` : fake.dir
+  it("#given a real session plan and an unusable toolkit path #when input arrives #then status is read in-process and nothing is spawned", async () => {
+    const fixture = createTempOmoBin(activeStatus("DEFAULT-REGISTRATION"), "omo-agent-toolkit")
     try {
-      await withEnvAsync({ OMO_AGENT_TOOLKIT_BIN: undefined, OMO_BIN: undefined, PATH: path }, async () => {
-        const pi = new FakeExtensionAPI()
-        await createUlwLoopComponent().register(pi, {
-          logger: createLogger(),
-          config: { getFlag: () => false },
-        })
+      const seeded = await createAgentToolkit({
+        cwd: fixture.dir,
+        sessionId: TEST_SESSION_ID,
+        surface: "omo-senpi",
+      }).createGoals({ brief: "- alpha goal", force: true })
+      expect(seeded.ok).toBe(true)
 
-        const results = await pi.dispatch(
-          "input",
-          { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
-          sessionEventCtx(fake.dir),
-        )
-
-        expect(results).toHaveLength(1)
-        expect(results[0]).toMatchObject({ action: "transform" })
-        expect(readRunnerArgv(fake.dir)).toEqual(statusArgsFor())
+      const pi = new FakeExtensionAPI()
+      // A bin path that cannot be executed: if the component still spawned the toolkit for its
+      // status probe, the probe would fail and the hook would fall back to "continue".
+      await createUlwLoopComponent({ resolveOmoBin: () => join(fixture.dir, "does-not-exist-omo-agent-toolkit") }).register(pi, {
+        logger: createLogger(),
+        config: { getFlag: () => false },
       })
+
+      const results = await pi.dispatch(
+        "input",
+        { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" },
+        sessionEventCtx(fixture.dir),
+      )
+
+      expect(results).toHaveLength(1)
+      expect(results[0]).toMatchObject({ action: "transform" })
+      expect(existsSync(join(fixture.dir, "argv.json"))).toBe(false)
     } finally {
-      fake.cleanup()
+      fixture.cleanup()
     }
   }, { timeout: 20000 })
 
@@ -178,11 +186,10 @@ describe("omo-senpi ulw-loop default registration through the toolkit chain", ()
           sessionEventCtx(fake.dir),
         )
 
+        // No plan exists for this session, so the hook stays out of the way - and the stale binary
+        // on PATH is never executed, because the status probe is in-process now.
         expect(results).toEqual([{ action: "continue" }])
-        expect(logger.entries).toContainEqual({
-          level: "info",
-          message: "omo-senpi ulw-loop inactive; omo binary not found",
-        })
+        expect(logger.entries.map((entry) => entry.message)).not.toContain("omo-senpi ulw-loop inactive; omo binary not found")
         expect(existsSync(join(fake.dir, "argv.json"))).toBe(false)
       })
     } finally {

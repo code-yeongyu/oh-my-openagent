@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { ThemeColor } from "@code-yeongyu/senpi"
 
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
-import { renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerGateRecord, type KibitzerNudgedRecord } from "./kibitzer-notice"
+import { renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerGateRecord, type KibitzerNudgedRecord } from "./kibitzer/notice"
 import { renderRecallEntry, type MemoryRecallRecord } from "./recall-notice"
 
 const PLAIN_THEME = {

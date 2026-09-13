@@ -1,16 +1,31 @@
 
-## 2026-09-10 — A batched completion that never landed no longer counts as notified
+## 2026-09-13 — Preserve layout when sanitizing recorded reports
 
-Delivery is batched on the omo-senpi side, so a returning `ParentNotifier.enqueue` means QUEUED, not delivered, while `notified_epoch` is persisted at that moment. When the idle-injection coordinator retired on `session_shutdown` (`/reload`), the queued injection was dropped and `reconcileUnnotifiedNotifications` then skipped the record forever (`notified_epoch >= run_epoch`): the parent never learned its background task completed.
+`stripTerminalControls` is exported with an opt-in `preserveWhitespace` option
+for multiline recorded reports. Tabs, line endings and ordinary spacing survive
+while terminal escape/control sequences are removed. Existing single-line
+normalizers retain their default behavior.
 
-`CompletionNotifier.recordDeliveryFailure({taskIds, error})` is the out-of-band receipt for that case. It rolls `notified_epoch` back below the epoch, stamps `notification_failed_epoch`, appends `notification_failed`, and re-enters the retry ladder, so the post-reload `session_start` reconcile redelivers. Stale receipts are ignored: a record that already started a new run, a non-notifying terminal (cancel/interrupt), and a record deleted by TTL cleanup are all left untouched. A refused enqueue still throws and takes the existing synchronous failure path.
+## 2026-09-12 — Remove the retired curated agent-name alias
+
+`agents/legacy-agent-names.ts` and its exports (`LEGACY_AGENT_NAME_ALIASES`, `canonicalAgentName`, `legacyAgentNameNotice`, `CanonicalAgentName`) are deleted: the one-release window opened at 5.0.0-beta.51 and the package has since shipped through 5.0.0-beta.56. Every input boundary takes the submitted agent name verbatim — `resolveAgent`, `interactionPolicyForAgent`, `mapOmoConfigAgents` (including `allowed_subagents`), `dag/graph.ts` route compilation, `team/member-validator.ts`, the task tool's `validateTaskTarget` / `resolveSpawnItems`, and the spawn policy / invocation gate. The in-memory `legacySubagentType` → `legacyAlias` → `legacy_subagent_type` plumbing (validation, execute, execute-single, result-details, start-presentation) is removed with it, so a start text carries no deprecation line and `TaskToolDetails` never gains the extra field. `legacyOmoConfigAgentKeys` is gone; its only consumer was the omo-senpi startup notice. `resolve-agent.ts`'s `legacyFallbackChain` read-alias is deleted as dead code — `AGENT_FALLBACK_CHAINS` has been keyed by the canonical ids since the rename.
+
+## 2026-09-10 — Retire myth agent names from test fixtures and update package documentation
+
+The builtin curated agents `metis` and `momus` are renamed to `plan-consultant` and `plan-reviewer` in
+the codebase; the alias handles legacy task records. All non-alias test fixtures in `packages/senpi-task/src/`
+are updated to use the canonical names, and the team member name `atlas` in control-tool tests becomes `builder`.
+`packages/senpi-task/AGENTS.md` and `packages/senpi-task/AGENTS.md` are updated to reflect the new curated agent
+identities. Legacy ids (`metis` and `momus`) are only used in tests that explicitly exercise the alias table
+(todos 1, 3, 5) or in persisted task records demonstrating backward compatibility.
+
 ## 2026-09-10 — Keep the user question tools out of child sessions
 
 RPC children now receive `--no-ask-user` immediately after `--no-extensions` so the detached process cannot register `request_user_input` / `ask_user_question`. Headless auto-answer treats `method: "question"` as cancelled (structural request type until the pinned senpi unions include it). Catalog argv is unchanged.
 
 ## 2026-09-10 — Team tool failures are tool errors and the family renders as team rows
 
-`tools/control/tool-result.ts` gains `toolErrorResult` (and the `ToolExecutionResult` shape carrying senpi's inline `isError`). Every failure kind of the lead team family returns through it — `team_create` `invalid_arguments` / `spec_error` / `runtime_error`, `team_delete` `invalid_state`, `task_get` `not_found`, `task_update` `already_claimed` / `blocked_by` / `invalid_transition` / `cross_owner`, the team mailbox error kinds, and both shutdown error views — while success kinds are untouched. `task_send` propagates the flag when it wraps a failed team message. The result keeps its typed `details`, so the model still branches on `kind` while the TUI paints the row as an error and the RPC `tool_execution_end.isError` the desktop maps to `failed` is true.
+`tools/control/tool-result.ts` gains `toolErrorResult` (and the `ToolExecutionResult` shape carrying senpi's inline `isError`). Every failure kind of the lead team family returns through it — `team_create` `invalid_arguments` / `spec_error` / `runtime_error`, `team_delete` `invalid_state`, `task_get` `not_found`, `task_update` `already_claimed` / `blocked_by` / `invalid_transition` / `cross_owner`, the team mailbox error kinds, and both shutdown error views — while success kinds are untouched. `task_send` propagates the flag when it wraps a failed team message. The result keeps its typed `details`, so the model still branches on `kind`. The row background, the RPC `tool_execution_end.isError` the desktop maps to `failed`, and the `toolResult.isError` the model sees are derived by the senpi engine, which honors the inline flag from senpi#1549 onward; until the `@code-yeongyu/senpi` pin moves to a release containing it (#8082) those surfaces still show the old success state and only the compact rows below are live.
 
 New `tools/team/renderers.ts` gives the six lead tools their own `renderCall` / `renderResult` in the shared renderer-text grammar (`team create name:<n> members:<N>` / `spec:<name>`, `team delete run:<id> [force]`, `team task <op> ...`), lists every member with its own `statusThemeColor`, and renders every failure as one error-colored line carrying the kind, code, and a bounded reason excerpt — replacing senpi's bold-name + raw-JSON fallback. The factories are now generically typed so those renderers keep their argument and details types, `buildLeadTeamTools` publishes the family as a `LeadTeamTool` union, and `filterSharedParentTools` / `mergeChildCustomTools` take a generic tool element (they only read `name` and `exposure`).
 
@@ -30,13 +45,6 @@ an indexer, or another senpi process). When that hit the terminal transition the
   is released, and settles the waiters with a synthesized `error` record naming the persistence failure.
   `#settleWaiters(taskId, terminal?)` accepts that record instead of re-reading the store, which is guaranteed
   stale in this scenario. The DAG node folds as failed and `retry` can re-run it.
-
-
-
-## 2026-09-10 — Head every builtin Claude rung with the claude-sdk-oauth subscription lane
-
-Every `claude-*` rung in `src/category/fallback-chains.ts` and `src/agents/builtin/fallback-chains.ts` (metis, momus, and the explore/librarian haiku rungs) now lists `claude-sdk-oauth` before `anthropic`, `anthropic-api`, `github-copilot`, and `opencode`. senpi's Claude subscription lane serves the anthropic ids verbatim, and rung provider order is the ranking in `resolveModelForDelegateTask`, so a machine logged in to Claude Pro/Max that also holds an OpenCode Zen key was routed to the metered `opencode/claude-*` lane on every delegated Claude turn (#8051). The builtin category default stays pinned to `anthropic`; when `claude-sdk-oauth` is not authenticated (or `enabled: false`) it is absent from `getAvailable()` and resolution is unchanged. `model-core`'s requirement tables stay without the provider: no other edition has it, the same senpi-only delta the kimi-coding rungs already carry. `src/category/anthropic-lane.test.ts` pins the subscription-lane win and the unchanged no-lane resolution.
-
 ## 2026-09-08 — Persist child_session_id on spawned task records
 
 `#recordSpawnFacts` now writes the spawned child's own session id from the handle onto `st_*.json` as `child_session_id`, for both in-process and process children. Reattach rewrites keep or refresh the field from the live handle so resume paths cannot drop it. The parser already treated the field as optional; a legacy record without it still loads. External readers (omo-desktop) join a grandchild session's `parent_session_id` back to this field.
@@ -61,7 +69,6 @@ the old wording still pulling one of three single-dependent delegations back to 
 ## 2026-09-04 — Defer the lead tasklist tools to tool_search
 
 The four lead tasklist tools (`task_create`, `task_get`, `task_list`, `task_update`) register with `exposure: "search"` (plus `searchText`/`searchKeywords`/`searchGroup: "team-tasklist"`/`allowLazyActivation`) instead of the resident tool list. They only matter once a team exists, so they cost no prompt tokens until a tasklist operation is searched for and promote through `tool_search` on demand. Descriptions now lead with the selecting situation. `src/tools/team/tasklist-exposure.test.ts` pins the exposure on all four.
-
 
 ## 2026-08-28 — Align the task engine with Senpi 2026.8.28
 

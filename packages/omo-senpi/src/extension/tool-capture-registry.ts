@@ -16,7 +16,7 @@ function isCapturableTool(value: unknown): value is ToolDefinition {
 }
 
 /**
- * Install a capture wrapper around `pi.registerTool` (Momus fix: `pi.getAllTools()` returns ToolInfo
+ * Install a capture wrapper around `pi.registerTool` (plan-reviewer finding: `pi.getAllTools()` returns ToolInfo
  * WITHOUT an execute closure, so the only place to grab an executable ToolDefinition is registration
  * time). Every full definition any component registers - lsp registers earlier in the loop than task
  * - is recorded here with its closure and exposed to the shared-parent-tools provider.

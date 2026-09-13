@@ -1,0 +1,78 @@
+{
+  "codexVersion": "0.154.0",
+  "transport": "real app-server / local Responses mock",
+  "cases": [
+    {
+      "named": true,
+      "registered": true,
+      "fork": false,
+      "outcome": "configured Medium Worker admitted",
+      "hookStatus": [
+        "completed"
+      ]
+    },
+    {
+      "named": true,
+      "registered": true,
+      "fork": true,
+      "outcome": "upstream fork override rejected",
+      "hookStatus": [
+        "completed"
+      ]
+    },
+    {
+      "named": true,
+      "registered": false,
+      "fork": false,
+      "outcome": "LazyCodex role denial",
+      "hookStatus": [
+        "blocked"
+      ]
+    },
+    {
+      "named": true,
+      "registered": false,
+      "fork": true,
+      "outcome": "LazyCodex role denial",
+      "hookStatus": [
+        "blocked"
+      ]
+    },
+    {
+      "named": false,
+      "registered": true,
+      "fork": false,
+      "outcome": "LazyCodex role denial",
+      "hookStatus": [
+        "blocked"
+      ]
+    },
+    {
+      "named": false,
+      "registered": true,
+      "fork": true,
+      "outcome": "LazyCodex role denial",
+      "hookStatus": [
+        "blocked"
+      ]
+    },
+    {
+      "named": false,
+      "registered": false,
+      "fork": false,
+      "outcome": "LazyCodex role denial",
+      "hookStatus": [
+        "blocked"
+      ]
+    },
+    {
+      "named": false,
+      "registered": false,
+      "fork": true,
+      "outcome": "LazyCodex role denial",
+      "hookStatus": [
+        "blocked"
+      ]
+    }
+  ]
+}

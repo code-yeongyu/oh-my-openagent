@@ -204,7 +204,19 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   })
 
   const registry = createManagerResidencyRegistry(getManager)
-  const lifecycle = createTaskLifecycle({ store: storeChain.store, registry, config: settings })
+  const lifecycle = createTaskLifecycle({ store: storeChain.store, registry, config: settings,
+    revivePolicy: {
+      currentGeneration: () => {
+        const modelRegistry = runtime.modelRegistry()
+        return modelRegistry === undefined ? categoryConfigGenerations.current()?.generation
+          : categoryConfigGenerations.observe({ omoConfig: deps.omoConfig, registry: modelRegistry }).generation
+      },
+      warn: (warning) => {
+        baseStore.appendEvent(warning.task_id, { type: "config_generation_mismatch", payload: warning })
+        deps.pi.sendMessage({ customType: "senpi-task.config-generation-mismatch", content: "Resuming the recorded task configuration.", display: true, details: warning }, {})
+      },
+    },
+  })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }

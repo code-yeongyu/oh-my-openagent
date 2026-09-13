@@ -35,19 +35,20 @@ async function gitLog(dir: string, format: string): Promise<string> {
 
 describe("default memory seeds", () => {
   describe("#given the default block label constants", () => {
-    it("#then they are persona and human in order", () => {
-      expect(DEFAULT_MEMORY_BLOCK_LABELS).toEqual(["persona", "human"])
+    it("#then they are persona, human, and boundaries in order", () => {
+      expect(DEFAULT_MEMORY_BLOCK_LABELS).toEqual(["persona", "human", "boundaries"])
     })
   })
 
   describe("#given buildDefaultSeedFiles", () => {
-    it("#then it produces three files with expected paths and frontmatter", () => {
+    it("#then it produces four files with expected paths and frontmatter", () => {
       const files = buildDefaultSeedFiles()
 
-      expect(files).toHaveLength(3)
+      expect(files).toHaveLength(4)
       const paths = files.map((f) => f.relativePath)
       expect(paths).toContain("system/persona.md")
       expect(paths).toContain("system/human.md")
+      expect(paths).toContain("system/boundaries.md")
       expect(paths).toContain("skills/memory-discipline/SKILL.md")
     })
 
@@ -73,7 +74,7 @@ describe("default memory seeds", () => {
     })
   })
 
-  describe("#given a fresh repository #when initMemoryWithSeeds runs #then it commits two seeded files in one initial commit", async () => {
+  describe("#given a fresh repository #when initMemoryWithSeeds runs #then it commits every seeded file in one initial commit", async () => {
     // given
     const { dir, repo } = await createRepo()
 
@@ -86,8 +87,9 @@ describe("default memory seeds", () => {
     const tree = await repo.lsTree()
     expect(tree).toContain("system/persona.md")
     expect(tree).toContain("system/human.md")
+    expect(tree).toContain("system/boundaries.md")
     expect(tree).toContain("skills/memory-discipline/SKILL.md")
-    expect(tree).toHaveLength(3)
+    expect(tree).toHaveLength(4)
 
     const commitSubject = await gitLog(dir, "%s")
     expect(commitSubject).toBe("chore: initialize local memory")
@@ -143,5 +145,19 @@ describe("default memory seeds", () => {
     expect(block).toContain("<self>")
     expect(block).toContain("$MEMORY_DIR/system/persona.md</projection>")
     expect(block).toContain("<memory_metadata>")
+  })
+
+  describe("#given seeded content #when compiled via the memory compiler #then the boundaries block is projected as its own system node", async () => {
+    // given
+    const { repo } = await createRepo()
+
+    // when
+    await initMemoryWithSeeds(repo, { authorName: "Compiler Agent" })
+    const block = await compileMemoryBlock(repo, { agentId: "seed-agent" })
+
+    // then
+    expect(block).toContain("<boundaries>")
+    expect(block).toContain("$MEMORY_DIR/system/boundaries.md</projection>")
+    expect(block).toContain("</boundaries>")
   })
 })

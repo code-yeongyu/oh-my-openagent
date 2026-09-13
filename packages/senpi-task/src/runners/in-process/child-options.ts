@@ -1,6 +1,6 @@
 import type { CreateAgentSessionOptions, SessionManager, ToolDefinition } from "@code-yeongyu/senpi"
 
-import { CURATED_READONLY_AGENT_NAMES } from "../../agents/builtin"
+import { BUILTIN_AGENTS, CURATED_READONLY_AGENT_NAMES } from "../../agents/builtin"
 import type { ChildSpec } from "../in-process"
 import { createChildResourceLoader } from "./child-loader"
 import { createCuratedReadonlyBashTool } from "./curated-readonly-bash"
@@ -80,8 +80,11 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
   const mergedCustomTools = mergeChildCustomTools(input.sharedParentTools, spec.memberScopedTools, {
     uiOnlyToolNames,
   })
-  const customTools = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
-    ? [...mergedCustomTools.filter((tool) => tool.name !== "bash"), createCuratedReadonlyBashTool(spec.cwd)]
+  const curated = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
+  const floor = curated ? (BUILTIN_AGENTS[spec.agentType ?? ""]?.tools ?? []).filter((rule) => rule.allow).map((rule) => rule.pattern) : undefined
+  const toolAllowlist = floor === undefined ? spec.toolAllowlist : floor.filter((name) => spec.toolAllowlist === undefined || spec.toolAllowlist.includes(name))
+  const customTools = curated
+    ? [...mergedCustomTools.filter((tool) => tool.name !== "bash" && toolAllowlist?.includes(tool.name)), createCuratedReadonlyBashTool(spec.cwd)]
     : mergedCustomTools
   const settingsManager = createRuntimeFallbackSettings(spec.selectedModel, spec.fallbackModels, spec.retry)
   return {
@@ -98,7 +101,7 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
     ...(spec.model !== undefined && { model: spec.model }),
     ...(spec.thinkingLevel !== undefined && { thinkingLevel: spec.thinkingLevel }),
     settingsManager,
-    ...(spec.toolAllowlist !== undefined && { tools: [...spec.toolAllowlist] }),
+    ...(toolAllowlist !== undefined && { tools: [...toolAllowlist] }),
     ...(spec.toolDenylist !== undefined && { excludeTools: [...spec.toolDenylist] }),
   }
 }

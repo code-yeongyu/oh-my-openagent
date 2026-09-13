@@ -13,17 +13,21 @@ import { getPostCommitHookScript } from "../sync/mirror"
 /**
  * Pre-commit validator for staged memory markdown.
  *
- * Rules (letta parity):
- * - Scope is `.md` under `system/` or `reference/`, with an optional legacy
- *   `memory/` prefix. Root markdown is intentionally NOT validated.
+ * Rules (letta parity plus the strict-YAML contract shared with the skill loader):
+ * - Scope is `.md` under `system/`, `reference/` or `people/`, plus
+ *   `skills/<name>/SKILL.md`, with an optional legacy `memory/` prefix. Root
+ *   markdown is intentionally NOT validated.
  * - Frontmatter is required, must open and close with `---`.
  * - `description` is required and must be a non-empty single line.
+ * - Every value must be a quoted scalar or a plain scalar that strict YAML
+ *   reads verbatim: no `: `, no ` #`, no trailing `:`, no leading indicator.
  * - Known keys are `description`, `read_only`, the legacy `limit`, and the
  *   people-record keys `kind` and `aliases`; any other key fails the commit.
+ *   SKILL.md may carry any additional key (`name`, `version`, `deprecated`).
  * - `read_only` is protected: it cannot be added, changed or removed by the
  *   agent, and a file that is `read_only: true` in HEAD cannot be modified.
  * - Skills must be folders: `skills/<name>/SKILL.md`. Flat `skills/<name>.md`
- *   is rejected, and `SKILL.md` files are exempt from frontmatter validation.
+ *   is rejected.
  */
 export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 # Validate frontmatter in staged memory .md files.
@@ -41,9 +45,22 @@ fm_value() {
     grep "^$2:" | head -1 | cut -d: -f2- | sed 's/^ *//;s/ *$//'
 }
 
+check_plain_scalar() {
+  # $1 = file, $2 = key, $3 = value. A quoted value is the renderer's own
+  # output; a plain value must be one that strict YAML reads back verbatim.
+  case "$3" in
+    \\"*|\\'*|"") return 0 ;;
+    *": "*|*":"|*" #"*|"#"*|"["*|"]"*|"{"*|"}"*|"&"*|"*"*|"!"*|"|"*|">"*|"%"*|"@"*|"\\\`"*|","*|"?"*|"-"|"- "*)
+      printf "  %s: '%s' is not a safe YAML plain scalar (quote it, or remove ': ' and ' #'): %s\\n" "$1" "$2" "$3"
+      ;;
+  esac
+}
+
 check_keys() {
-  # Prints one error line per offending frontmatter key. Runs in a pipeline
-  # subshell, so it must never rely on assignments leaking to the caller.
+  # $1 = file, $2 = HEAD content, $3 = frontmatter, $4 = key policy
+  # ("contract" = memory key allowlist, "skill" = any key). Prints one error
+  # line per offending frontmatter key. Runs in a pipeline subshell, so it
+  # must never rely on assignments leaking to the caller.
   printf '%s\\n' "$3" | while IFS= read -r line; do
     [ -z "$line" ] && continue
     # Indented lines are YAML continuations of the previous key.
@@ -52,13 +69,19 @@ check_keys() {
     key=$(printf '%s\\n' "$line" | cut -d: -f1 | tr -d ' ')
     value=$(printf '%s\\n' "$line" | cut -d: -f2- | sed 's/^ *//;s/ *$//')
 
-    known=false
-    for k in $ALL_KNOWN_KEYS; do
-      [ "$key" = "$k" ] && known=true && break
-    done
-    if [ "$known" = false ]; then
-      printf "  %s: unknown frontmatter key '%s' (allowed: %s)\\n" "$1" "$key" "$ALL_KNOWN_KEYS"
-      continue
+    if [ "$4" != skill ]; then
+      known=false
+      for k in $ALL_KNOWN_KEYS; do
+        [ "$key" = "$k" ] && known=true && break
+      done
+      if [ "$known" = false ]; then
+        printf "  %s: unknown frontmatter key '%s' (allowed: %s)\\n" "$1" "$key" "$ALL_KNOWN_KEYS"
+        continue
+      fi
+    fi
+
+    if [ "$key" != description ] && [ "$key" != aliases ] && [ "$key" != read_only ]; then
+      check_plain_scalar "$1" "$key" "$value"
     fi
 
     if [ "$key" = read_only ]; then
@@ -77,13 +100,16 @@ check_keys() {
       case "$value" in
         "") printf "  %s: 'description' must not be empty\\n" "$1" ;;
         [\\>\\|]*) printf "  %s: 'description' must be a non-empty single line\\n" "$1" ;;
+        *) check_plain_scalar "$1" description "$value" ;;
       esac
     fi
   done
 }
 
 check_file() {
+  # $1 = file, $2 = key policy ("contract" or "skill")
   file="$1"
+  policy="\${2:-contract}"
   staged=$(git show ":$file")
 
   if [ "$(printf '%s\\n' "$staged" | head -1)" != "---" ]; then
@@ -104,7 +130,7 @@ check_file() {
   fi
 
   frontmatter=$(printf '%s\\n' "$staged" | tail -n +2 | head -n $((closing_line - 1)))
-  check_keys "$file" "$head_content" "$frontmatter"
+  check_keys "$file" "$head_content" "$frontmatter" "$policy"
 
   if ! printf '%s\\n' "$frontmatter" | grep -q '^description:'; then
     printf "  %s: missing required field 'description'\\n" "$file"
@@ -124,12 +150,19 @@ errors=$(
       printf '  %s: invalid skill path (skills must be folders). Use skills/<name>/SKILL.md\\n' "$skill_file"
     done
 
-  # Frontmatter is validated for system/ and reference/ markdown only.
-  # SKILL.md files live under skills/ and are never matched here.
+  # Memory content keys are an allowlist under system/, reference/ and people/.
   git diff --cached --name-only --diff-filter=ACM |
-    grep -E '^(memory/)?(system|reference)/.*\\.md$' |
+    grep -E '^(memory/)?(system|reference|people)/.*\\.md$' |
     while IFS= read -r file; do
-      check_file "$file"
+      check_file "$file" contract
+    done
+
+  # SKILL.md is read by the skill loader as strict YAML: same value rules,
+  # description required, any key allowed.
+  git diff --cached --name-only --diff-filter=ACM |
+    grep -E '^(memory/)?skills/.+/SKILL\\.md$' |
+    while IFS= read -r file; do
+      check_file "$file" skill
     done
 )
 

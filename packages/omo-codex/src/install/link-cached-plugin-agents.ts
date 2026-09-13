@@ -3,6 +3,7 @@ import { basename, join } from "node:path"
 import type { PreservedAgentReasoning } from "./managed-agent-reasoning-defaults"
 import { restorePreservedReasoning, restorePreservedServiceTier } from "./preserved-agent-settings"
 import { purgeRetiredManagedAgentFiles } from "./retired-managed-agent-purge"
+import { installDefaultAgentRole } from "./default-agent-role"
 
 export { capturePreservedAgentReasoning, capturePreservedAgentServiceTier } from "./preserved-agent-settings"
 
@@ -22,6 +23,7 @@ export async function linkCachedPluginAgents(input: {
   readonly platform?: LinkPlatform
   readonly preservedReasoning?: ReadonlyMap<string, PreservedAgentReasoning>
   readonly preservedServiceTier?: ReadonlyMap<string, string | null>
+  readonly defaultRoleEnabled?: boolean
 }): Promise<readonly LinkedAgent[]> {
   const bundledAgents = await discoverBundledAgents(input.pluginRoot)
   await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome })
@@ -49,6 +51,11 @@ export async function linkCachedPluginAgents(input: {
       value: input.preservedServiceTier?.get(agentName) ?? null,
     })
     linked.push({ name: agentFileName, path: linkPath, target: agentPath })
+  }
+  const worker = linked.find((entry) => entry.name === "lazycodex-worker-medium.toml")
+  if (worker !== undefined) {
+    const fallback = await installDefaultAgentRole({ codexHome: input.codexHome, worker, enabled: input.defaultRoleEnabled !== false })
+    if (fallback !== null) linked.push(fallback)
   }
   await writeManifest(
     input.pluginRoot,

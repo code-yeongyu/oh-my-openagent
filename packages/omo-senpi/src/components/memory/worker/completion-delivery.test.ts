@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -9,6 +9,7 @@ import {
   type ReflectionCompletionRecord,
 } from "./completion-contracts"
 import { deliverReflectionCompletion } from "./completion-delivery"
+import { recapFixture } from "./reflection-recap.test-support"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
@@ -50,6 +51,29 @@ async function deliverLive(record: ReflectionCompletionRecord) {
 }
 
 describe("deliverReflectionCompletion", () => {
+  test("#given a proven merge #when delivered #then only the transcript is enriched", async () => {
+    const root = await mkdtemp(join(tmpdir(), "recap-delivery-"))
+    roots.push(root)
+    const fixture = await recapFixture(root)
+    const entries: unknown[] = []
+    const live = {
+      sessionId: "recipient", identityContext: fixture.context,
+      api: { appendEntry: (_type: string, data?: unknown) => { entries.push(data) }, registerEntryRenderer() {} },
+    }
+    const delivered = await deliverReflectionCompletion(fixture.completionsDir, fixture.record, live)
+    expect(entries).toEqual([{ ...delivered, recap: expect.objectContaining({
+      schemaVersion: 1, runId: fixture.record.runId, deliverySessionId: "recipient",
+      conversationIds: ["conversation-a", "conversation-b"],
+      report: { status: "available", text: fixture.report, preview: "# RECAP_SENTINEL\n한국어 기록\n- Saved synthetic preference", sourceTruncated: false },
+    }) }])
+    expect(JSON.parse(await readFile(join(fixture.completionsDir, `${fixture.record.runId}.json`), "utf8"))).toEqual(delivered)
+    expect(delivered).not.toHaveProperty("recap")
+  })
+
+  test.each(["no_changes", "failed", "timed_out", "merge_conflict"] as const)("#given %s #when delivered #then no recap is appended", async (outcome) => {
+    const { entries } = await deliverLive(failedRecord({ outcome }))
+    expect(entries[0]?.data).not.toHaveProperty("recap")
+  })
   test("#given a failed record with reason spawn_failed and detail #when delivered live #then the notification includes both", async () => {
     // given
     const detail = "spawn ENOENT: senpi binary not found"

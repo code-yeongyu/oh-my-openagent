@@ -39,9 +39,7 @@ export async function ProofStripSection(): Promise<JSX.Element> {
               githubStars: t("proof.githubStars"),
               totalDownloads: t("proof.totalDownloads"),
               monthlyDownloads: t("proof.monthlyDownloads"),
-              agents: t("proof.agents"),
             }}
-            agentCount={t("proof.agentCount")}
           />
         </Reveal>
       </Frame>

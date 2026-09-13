@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { createTaskRecord, createTaskRecordStore, type TaskRecord, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
 
 import { createConfigGenerationStampingStore } from "./config-generation-store"
+import { TaskRecordCollisionError } from "../../../../senpi-task/src/store/record-write"
 
 const projects: string[] = []
 
@@ -87,6 +88,26 @@ describe("config generation stamping store", () => {
 
     // then
     expect(backing.load(record.task_id)?.config_generation).toBe(3)
+  })
+
+  test("#given an existing record of unknown generation #when replace persists continuation bookkeeping #then it stays unknown", () => {
+    const backing = backingStore()
+    const record = draft()
+    backing.save(record)
+    const store = createConfigGenerationStampingStore(backing, () => 9)
+    store.replace({ ...record, final_response: "CONTINUED" })
+    expect(backing.load(record.task_id)?.config_generation).toBeUndefined()
+    expect(backing.load(record.task_id)?.final_response).toBe("CONTINUED")
+  })
+
+  test("#given an existing legacy record #when create-only save collides #then provenance and content stay unchanged", () => {
+    const backing = backingStore()
+    const record = draft()
+    backing.save(record)
+    const store = createConfigGenerationStampingStore(backing, () => 9)
+    expect(() => store.save({ ...record, final_response: "COLLISION" })).toThrow(TaskRecordCollisionError)
+    expect(backing.load(record.task_id)?.config_generation).toBeUndefined()
+    expect(backing.load(record.task_id)?.final_response).toBeUndefined()
   })
 
   test("#given a stamping store #when replace and transition run #then the record passes through unchanged apart from the transition", () => {

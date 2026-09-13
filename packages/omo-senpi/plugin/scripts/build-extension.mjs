@@ -58,6 +58,8 @@ const memberEntryPath = join(repoRoot, "packages", "senpi-task", "src", "team", 
 const memberOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-member.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-member.js")
 const supervisorEntryPath = join(packageRoot, "src", "components", "memory", "worker", "memory-run-supervisor.ts")
 const supervisorOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "memory-run-supervisor.mjs") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "memory-run-supervisor.mjs")
+const toolkitRuntimeEntryPath = join(packageRoot, "src", "extension", "omo-agent-toolkit.ts")
+const toolkitRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-agent-toolkit.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-agent-toolkit.js")
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const builtinModuleNames = builtinModules
@@ -65,6 +67,7 @@ const builtinModuleNames = builtinModules
   .sort()
 const externalSpecifiers = [
   "#omo-task-runtime",
+  "#omo-agent-toolkit-runtime",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
@@ -101,7 +104,11 @@ export async function buildExtension(options = {}) {
   const advisorRuntimeOutput = options.advisorRuntimeOutputPath ?? (options.outputPath === undefined
     ? advisorRuntimeOutputPath
     : join(dirname(output), "omo-init-deep-advisor.js"))
+  const toolkitRuntimeOutput = options.toolkitRuntimeOutputPath ?? (options.outputPath === undefined
+    ? toolkitRuntimeOutputPath
+    : join(dirname(output), "omo-agent-toolkit.js"))
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
+  const toolkitRuntimeInputs = await buildEntry(toolkitRuntimeEntryPath, toolkitRuntimeOutput, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
@@ -111,7 +118,7 @@ export async function buildExtension(options = {}) {
   await Promise.all([
     stageRuntimePersonas(repoRoot, dirname(output)),
   ])
-  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs }
+  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, toolkitRuntimeInputs }
 }
 
 async function buildEntry(entry, output, buildDefines) {
@@ -249,7 +256,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
   if (process.argv.includes("--check")) {
     run("node", [join(scriptDir, "stage-lsp-daemon-runtime.mjs"), "--check"])
     run("node", [join(scriptDir, "stage-ast-grep-mcp-runtime.mjs"), "--check"])
-    run("node", [join(scriptDir, "stage-agent-toolkit.mjs"), "--check"])
     run("node", [join(scriptDir, "stage-x-search-skill.mjs"), "--check"])
     const result = await checkExtensionCurrent()
     if (!result.ok) {

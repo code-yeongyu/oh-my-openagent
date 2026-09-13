@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
@@ -9,6 +8,7 @@ export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
 export const ULW_LOOP_CUSTOM_TYPE = "omo-ulw-loop:skill-pointer"
 export const ULW_RESEARCH_CUSTOM_TYPE = "omo-ulw-research:skill-pointer"
+export const ULTIMATE_BROWSING_CUSTOM_TYPE = "omo-ultimate-browsing:skill-pointer"
 export const SKILL_POINTERS_DISABLED_FLAG = "omo-senpi-skill-pointers-disabled"
 
 const SKILL_COMMAND_PREFIX = "/skill:"
@@ -20,6 +20,32 @@ interface SkillPointerTarget {
   readonly expandedBlockPattern: RegExp
   readonly instruction: string
   readonly extra?: (sessionScope: string | null) => string
+  readonly companions?: readonly SkillCompanion[]
+}
+
+// A companion is a skill the parent workflow runs on. It has no keyword of its own: it rides on
+// every invocation of its parent, including the paths that dedup the parent's own pointer
+// (a raw `/skill:<parent>` command, an expanded `<skill name="<parent>">` block), and is skipped
+// only when the input already carries the companion itself.
+interface SkillCompanion {
+  readonly skillName: string
+  readonly customType: string
+  readonly expandedBlockPattern: RegExp
+  readonly role: string
+  readonly instruction: string
+}
+
+interface SkillPointerMessage {
+  readonly customType: string
+  readonly content: string
+}
+
+const ULTIMATE_BROWSING_COMPANION: SkillCompanion = {
+  skillName: "ultimate-browsing",
+  customType: ULTIMATE_BROWSING_CUSTOM_TYPE,
+  expandedBlockPattern: /<skill\s+name="ultimate-browsing"/i,
+  role: "runs its browsing lanes on the ultimate-browsing skill",
+  instruction: 'arm every browsing lane or member with load_skills: ["ultimate-browsing"]',
 }
 
 // After quoted regions are removed, patterns match independently and overlapping
@@ -54,7 +80,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
     pattern: /\bulw[\s-]*loop\b/i,
     expandedBlockPattern: /<skill\s+name="ulw-loop"/i,
     instruction: "run the goal-driven ultrawork loop with evidence-bound execution",
-    extra: ulwLoopCliShimSentence,
+    extra: ulwLoopToolSentence,
   },
   {
     skillName: "ulw-research",
@@ -62,6 +88,7 @@ const TARGETS: readonly SkillPointerTarget[] = [
     pattern: new RegExp(String.raw`\b(?:ulw|${MASS_ALIAS})[\s-]*research\b`, "i"),
     expandedBlockPattern: /<skill\s+name="ulw-research"/i,
     instruction: "orchestrate team-first maximum-saturation research",
+    companions: [ULTIMATE_BROWSING_COMPANION],
   },
 ]
 
@@ -112,14 +139,21 @@ function handleInput(
   // test runs against the text with quoted and relayed regions removed.
   const commandSkillName = skillCommandName(payload.text)
   const visible = stripQuotedRegions(payload.text)
-  const targets = TARGETS.filter(
-    (target) =>
-      target.pattern.test(visible) &&
-      target.skillName !== commandSkillName &&
-      !target.expandedBlockPattern.test(payload.text),
-  )
+  const alreadyLoaded = (skillName: string, expandedBlockPattern: RegExp): boolean =>
+    skillName === commandSkillName || expandedBlockPattern.test(payload.text)
+  const invoked = TARGETS.filter((target) => target.pattern.test(visible))
+  const pointers: SkillPointerMessage[] = invoked
+    .filter((target) => !alreadyLoaded(target.skillName, target.expandedBlockPattern))
+    .map((target) => ({ customType: target.customType, content: skillPointer(target, sessionScope) }))
+  for (const parent of invoked) {
+    for (const companion of parent.companions ?? []) {
+      if (alreadyLoaded(companion.skillName, companion.expandedBlockPattern)) continue
+      if (pointers.some((pointer) => pointer.customType === companion.customType)) continue
+      pointers.push({ customType: companion.customType, content: companionPointer(parent, companion) })
+    }
+  }
 
-  if (targets.length === 0) {
+  if (pointers.length === 0) {
     return { action: "continue" }
   }
 
@@ -127,14 +161,13 @@ function handleInput(
   // through senpi's one-at-a-time queue drain; appending keeps a leading `/skill:` command
   // expandable.
   if (payload.streamingBehavior !== undefined) {
-    const pointers = targets.map((target) => skillPointer(target, sessionScope))
-    return { action: "transform", text: [payload.text, ...pointers].join("\n") }
+    return { action: "transform", text: [payload.text, ...pointers.map((pointer) => pointer.content)].join("\n") }
   }
 
-  for (const target of targets) {
+  for (const pointer of pointers) {
     pi.sendMessage({
-      customType: target.customType,
-      content: skillPointer(target, sessionScope),
+      customType: pointer.customType,
+      content: pointer.content,
       display: false,
     })
   }
@@ -142,17 +175,12 @@ function handleInput(
   return { action: "continue" }
 }
 
-function ulwLoopCliShimPath(): string {
-  return fileURLToPath(new URL("../runtime/agent-toolkit/omo-agent-toolkit", import.meta.url))
-}
-
-// Eval kernels lack the session env; pass the proven scope explicitly instead of using global state.
-function ulwLoopCliShimSentence(sessionScope: string | null): string {
-  const abs = ulwLoopCliShimPath().replaceAll("\\", "/")
-  if (sessionScope === null) {
-    return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand>\`.`
-  }
-  return ` The resolved ulw-loop CLI shim is at ${abs} — invoke every ulw-loop command as \`${abs} ulw-loop <subcommand> --session-id ${sessionScope}\` (this session's state lives under .omo/ulw-loop/${sessionScope}/; the eval kernel does not inherit the session env, so always pass the flag).`
+// Native no longer ships a toolkit CLI: the loop is driven by the registered tool. The session id
+// still travels explicitly because an eval kernel does not inherit the session env.
+function ulwLoopToolSentence(sessionScope: string | null): string {
+  const base = ' Drive every ulw-loop operation with the registered tool, for example `tool.omo_agent_toolkit({ operation: "status" })`; do not spawn a CLI.'
+  if (sessionScope === null) return base
+  return `${base} This session's state lives under .omo/ulw-loop/${sessionScope}/.`
 }
 
 // A keyword proves a mention, not a request to run the workflow.
@@ -160,6 +188,11 @@ function skillPointer(target: SkillPointerTarget, sessionScope: string | null): 
   const skillsRoot = getBuiltinSkillsRoot()
   const extra = target.extra?.(sessionScope) ?? ""
   return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. If ${target.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.${extra}</omo-${target.skillName}-pointer>`
+}
+
+function companionPointer(parent: SkillPointerTarget, companion: SkillCompanion): string {
+  const skillsRoot = getBuiltinSkillsRoot()
+  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. If ${parent.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.</omo-${companion.skillName}-pointer>`
 }
 
 function skillCommandName(text: string): string | undefined {

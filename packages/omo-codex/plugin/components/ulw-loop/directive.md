@@ -340,17 +340,26 @@ make the child continue old parent context instead of the delegated task.
 If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: `fork_context: false` becomes `fork_turns: "none"`, `send_input` becomes `send_message`, finished agents end on their own (no `close_agent`; `followup_task` re-tasks, `interrupt_agent` stops), and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity.
 
 # TOML-backed subagent routing compatibility
-Installed role TOMLs (`~/.codex/agents/`) bind ONLY via `agent_type`.
-`multi_agent_v1.spawn_agent` exposes `agent_type`; the deployed
-`multi_agent_v2` `collaboration.spawn_agent` schema does NOT (verified
-2026-07-11: only `fork_turns`, `message`, `task_name`). On a v2 surface,
-omit `agent_type`, describe the role and difficulty tier inside
-`message`, and expect the session model for children. Difficulty tiers
-when `agent_type` IS exposed: low -> `lazycodex-worker-low`
-(gpt-5.6-luna/high), medium -> `lazycodex-worker-medium`
-(gpt-5.6-luna/max), high -> `lazycodex-worker-high` (gpt-5.6-sol/max);
-explorer/librarian carry their own TOMLs (gpt-5.6-luna/low). Difficulty
-(model power) is orthogonal to LIGHT/HEAVY rigor (process size).
+Inspect the ACTUAL spawn tool schema, not a version or namespace assumption.
+When `agent_type` is exposed (V1 or V2), EVERY spawn MUST pass an exact
+LazyCodex role: `explorer`, `librarian`, `plan`, `metis`, `momus`,
+`lazycodex-worker-low`, `lazycodex-worker-medium`, `lazycodex-worker-high`,
+`lazycodex-code-reviewer`, `lazycodex-qa-executor`, `lazycodex-gate-reviewer`,
+or `lazycodex-clone-fidelity-reviewer`. Map implementation difficulty to
+worker low/medium/high; their installed TOMLs supply model and instructions.
+Never select generic `worker`/`default` or describe a role instead of selecting it.
+Use `fork_turns: "none"` on V2 or `fork_context: false` on V1 unless full
+history is deliberately required; even a deliberate fork MUST name its role.
+
+Legacy-schema exception: ONLY when `agent_type` is absent, omit that unsupported
+field and carry the role, difficulty, and complete instructions in `message`;
+explicitly disable history. This cannot select a specialized TOML. The managed
+`default` supplies the medium worker for unnamed non-forks, unless opted out or
+blocked by a preserved user default. The spawn guard cannot see the schema and
+rejects unnamed requests: report incompatible routing, do not retry generically.
+An unnamed full-history fork skips role application inside Codex; no LazyCodex
+config can fix that upstream gap. Never claim this path has been repaired.
+Difficulty (model power) is orthogonal to LIGHT/HEAVY rigor (process size).
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, tell the child to send

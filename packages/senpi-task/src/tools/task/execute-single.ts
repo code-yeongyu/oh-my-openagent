@@ -9,7 +9,7 @@ import { waitForForegroundTask } from "./foreground-wait"
 import { partialDetails, recordDetails, startedDetails, type SingleSpawnParams } from "./result-details"
 import { appendMissingSkills } from "./skill-result"
 import { evaluateSpawnPolicy } from "./spawn-policy"
-import { backgroundConversionText, backgroundStartText } from "./start-presentation"
+import { backgroundConversionText, backgroundStartText, type StartLabels } from "./start-presentation"
 import type { TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
 import { validateTaskTarget } from "./validation"
 
@@ -66,6 +66,10 @@ export async function runSpawn(
   }
   const effectiveParams = policy?.kind === "force" ? { ...params, prompt: policy.prompt, load_skills: [] } : params
   const target = selection.kind === "category" ? { category: selection.category } : { subagentType: selection.subagentType }
+  const startLabels: StartLabels = {
+    taskSummary: params.task_summary,
+    description: params.description,
+  }
   // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
   // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
   await loadSenpiBarrel()
@@ -111,10 +115,7 @@ export async function runSpawn(
   }
   if (params.run_in_background === true) {
     return result(
-      appendMissingSkills(
-        backgroundStartText(started, { taskSummary: params.task_summary, description: params.description }),
-        spec.skills,
-      ),
+      appendMissingSkills(backgroundStartText(started, startLabels), spec.skills),
       startedDetails(started, params, spec.execution_mode, spec.skills),
     )
   }
@@ -189,11 +190,7 @@ export async function runSpawn(
     })
     if (waited.kind === "promoted") {
       return result(appendMissingSkills(
-        backgroundConversionText(
-          started,
-          { taskSummary: params.task_summary, description: params.description },
-          waited.budgetSeconds,
-        ),
+        backgroundConversionText(started, startLabels, waited.budgetSeconds),
         spec.skills,
       ), {
         ...startedDetails(started, params, spec.execution_mode, spec.skills),

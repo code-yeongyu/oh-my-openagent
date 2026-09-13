@@ -6,6 +6,8 @@ OmO Native is the anonymous product analytics pipeline for the omo-senpi adapter
 
 The payloads carry only booleans, buckets, counters, and allowlisted enum values. No free-form text ever leaves your machine. The exact schema is machine-generated below; if the generator and this document ever disagree, a drift test fails in CI.
 
+The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `delegation_started.name` and `delegation_completed.agent_type` carry the new ids, and this is a breaking value change for anyone querying the old ones. Events emitted before the rename carry metis/momus. <!-- retired-name-allowed -->
+
 <!-- BEGIN GENERATED SCHEMA -->
 ## Event schema
 
@@ -59,7 +61,7 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `delegation_started` | `background` | `boolean` | - |
 | `delegation_started` | `batch_size_bucket` | `string` | `1`, `2_4`, `5_plus` |
 | `delegation_started` | `kind` | `string` | `category`, `subagent` |
-| `delegation_started` | `name` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `architect`, `writing`, `explore`, `librarian`, `metis`, `momus`, `custom` |
+| `delegation_started` | `name` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `architect`, `writing`, `explore`, `librarian`, `plan-consultant`, `plan-reviewer`, `custom` |
 | `feature_used` | `$session_id` | `string` | - |
 | `feature_used` | `feature` | `string` | `goal_tool`, `team_create`, `memory_tool` |
 | `parallelism_summary` | `$session_id` | `string` | - |
@@ -93,7 +95,7 @@ The payloads carry only booleans, buckets, counters, and allowlisted enum values
 | `parallelism_summary` | `schema_kind` | `string` | `parallelism_v1`, `parallelism_v2` |
 | `parallelism_summary` | `upper_bound_saved_ms` | `number` | - |
 | `delegation_completed` | `$session_id` | `string` | - |
-| `delegation_completed` | `agent_type` | `string` | `explore`, `librarian`, `metis`, `momus`, `custom`, `none` |
+| `delegation_completed` | `agent_type` | `string` | `explore`, `librarian`, `plan-consultant`, `plan-reviewer`, `custom`, `none` |
 | `delegation_completed` | `background_mode` | `string` | `foreground`, `background`, `promoted`, `unknown` |
 | `delegation_completed` | `cache_read_tokens` | `number` | - |
 | `delegation_completed` | `cache_write_tokens` | `number` | - |

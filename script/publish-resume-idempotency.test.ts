@@ -46,7 +46,7 @@ export function assertResumeGuards(workflowText: string): string[] {
   const dispatchPublish = section(workflowText, "  dispatch-provenance-safe-publish:", "  publish-main:")
   const dispatchExistingTag = section(
     dispatchPublish,
-    '          if git rev-parse -q --verify "refs/tags/v${VERSION}"',
+    '          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}"',
     "          else\n            git tag",
   )
   const publishMain = section(workflowText, "  publish-main:", "  publish-platform:")
@@ -82,7 +82,7 @@ export function assertResumeGuards(workflowText: string): string[] {
 
   if (!hasAll(dispatchExistingTag, [
     'if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then',
-    'echo "::error::Existing tag v${VERSION} points to ${TAG_SHA}, not prepared release SHA ${RELEASE_SHA}."',
+    'echo "::error::Existing tag ${RELEASE_TAG} points to ${TAG_SHA}, not prepared release SHA ${RELEASE_SHA}."',
     "exit 1",
   ])) findings.push(resumeGuardFindings.dispatchTagShaMismatchRefusal)
 
@@ -116,7 +116,8 @@ export function assertResumeGuards(workflowText: string): string[] {
     "prepared_release_sha:",
     "inputs.prepared_release_sha == ''",
     "inputs.prepared_release_sha != ''",
-    'gh workflow run publish.yml --ref "v${VERSION}"',
+    'RELEASE_TAG="v${VERSION}"',
+    'gh workflow run publish.yml --ref "${RELEASE_TAG}"',
     '-f "prepared_release_sha=${RELEASE_SHA}"',
     'if [ "$PREPARED_RELEASE_SHA" != "$GITHUB_SHA" ]; then',
   ])) findings.push(resumeGuardFindings.preparedShaDispatchRouting)

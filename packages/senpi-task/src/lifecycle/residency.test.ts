@@ -20,7 +20,7 @@ function iso(offsetMs: number): string {
 }
 
 describe("admitResident (residency cap + LRU eviction)", () => {
-  test("#given a terminal resident idle beyond the retention window #when the idle sweep runs #then the idle sweep evicts it", async () => {
+  test("#given a terminal resident idle beyond the retention window #when the idle sweep runs #then the idle sweep suspends it", async () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000009", status: "completed", residency_state: "resident", updated_at: iso(0), host_pid: process.pid })
     const registry = new FakeRegistry()
@@ -42,7 +42,7 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     })
 
     await lifecycle.reclaimIdleResidents?.()
-    expect(store.load("st_00000009")?.residency_state).toBe("evicted")
+    expect(store.load("st_00000009")?.residency_state).toBe("persisted_only")
     expect(handle.disposed()).toBe(true)
     lifecycle.dispose?.()
   })

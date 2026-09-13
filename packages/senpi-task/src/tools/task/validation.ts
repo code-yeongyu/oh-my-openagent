@@ -1,3 +1,4 @@
+
 import type { ResolvedSpawnItem } from "./types"
 
 export type TaskTargetErrorCode = "both_targets" | "no_target" | "category_with_model"
@@ -76,7 +77,7 @@ const CATEGORY_WITH_MODEL_MESSAGE =
   "Provide EITHER category OR model, never both. A category-routed task always takes its model from the omo.json category config; a call-site model override would silently bypass that routing. Remove model and retry, or use subagent_type for an explicit-model spawn, or configure categories.<name>.models in omo.json."
 
 const NO_TARGET_MESSAGE =
-  'You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Example: task(category="quick", prompt="...") or task(subagent_type="momus", prompt="...").'
+  'You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Example: task(category="quick", prompt="...") or task(subagent_type="plan-reviewer", prompt="...").'
 
 const PROMPT_AND_TASKS_MESSAGE = "Provide EITHER prompt OR tasks, not both. Remove one and retry."
 

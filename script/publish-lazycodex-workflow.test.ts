@@ -112,9 +112,11 @@ describe("LazyCodex publish workflow", () => {
       publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
       publishLazycodexStep.includes("npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
-    const syncsLazycodexMarketplaceOnStableReleases = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
-      syncMarketplaceStep.includes("if: needs.release-metadata.outputs.dist_tag == ''") &&
-      lazycodexReleaseStateStep.includes("if: needs.release-metadata.outputs.dist_tag == ''")
+    const syncsLazycodexMarketplaceOnEveryPublishingChannel = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
+      syncMarketplaceStep.includes("if: inputs.publish_lazycodex == true") &&
+      lazycodexReleaseStateStep.includes("if: inputs.publish_lazycodex == true") &&
+      !syncMarketplaceStep.includes("dist_tag == ''") &&
+      !lazycodexReleaseStateStep.includes("dist_tag == ''")
     const tokenRequirementBeforePublish = workflow.indexOf("name: Require LazyCodex sync token") <
       workflow.indexOf("publish-main:")
     const requiresLazycodexSyncToken = workflow.includes("LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
@@ -138,7 +140,7 @@ describe("LazyCodex publish workflow", () => {
       lazycodexReleaseStateStep.includes("previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}")
     const createsLazycodexReleaseOnlyWhenChanged =
       lazycodexReleaseStep.includes(
-        "if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'",
+        "if: inputs.publish_lazycodex == true && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'",
       ) &&
       lazycodexReleaseStep.includes("GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
       lazycodexReleaseStep.includes('gh release create "v${VERSION}"') &&
@@ -162,8 +164,8 @@ describe("LazyCodex publish workflow", () => {
     expect(alwaysChecksLazycodexNpm, "release must always check lazycodex using the release version").toBe(true)
     expect(publishesLazycodexNpm, "lazycodex npm publish must be part of the normal release, tag stable releases as latest, and fail loudly").toBe(true)
     expect(
-      syncsLazycodexMarketplaceOnStableReleases,
-      "LazyCodex marketplace sync must run on every stable release (empty dist_tag)",
+      syncsLazycodexMarketplaceOnEveryPublishingChannel,
+      "LazyCodex marketplace sync must run on every channel that publishes lazycodex-ai, prereleases included",
     ).toBe(true)
     expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
     expect(capturesPreviousLazycodexBeforePublishing, "release metadata must capture the previous lazycodex-ai version before publishing the new one").toBe(true)
@@ -313,7 +315,8 @@ describe("LazyCodex publish workflow", () => {
     const smokesReleaseVersion = smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"')
     const smokesStableLatestOnly = smokeStep.includes('if [ -z "$DIST_TAG" ]; then') &&
       smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
-    const retriesRegistryPropagation = smokeStep.includes("for attempt in $(seq 1 12)") &&
+    const retriesRegistryPropagation = smokeStep.includes('for attempt in $(seq 1 "$SMOKE_READINESS_ATTEMPTS")') &&
+      smokeStep.includes('sleep "$SMOKE_READINESS_INTERVAL_SECONDS"') &&
       smokeStep.includes("registry propagation")
     const distinguishesVisibleInstallFailure =
       smokeStep.includes('npm view "$package_spec" version --silent') &&

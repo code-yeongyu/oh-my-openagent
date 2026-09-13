@@ -2,12 +2,10 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { messageability } from "../state"
+import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
 import {
   DEFAULT_SEND_DELIVERY,
-  type CancelOptions,
-  type CancelOutcome,
-  type InterruptOutcome,
   type SendDelivery,
   type SendInput,
   type SendOutcome,
@@ -15,19 +13,20 @@ import {
   type SteeringPort,
 } from "./types"
 import {
-  deliveryUncertain,
-  messageSha256,
+  uncertainDeliveryDenial,
   notContinuableReason,
   oneShotPolicyDenial,
   scopeDenied,
 } from "./engine-policy"
 import { reviveDetachedTerminalOnSend, reviveTerminal } from "./revive"
+import { createSteeringControls } from "./controls"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 
 export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   const pendingSends = new Map<string, number>()
+  const coldRevivals = new Set<string>()
 
   // Prelaunch steering is DURABLE: messages sent to a still-pending (queued) child append to the
   // record's pending_steering via store.mutate, so the queue survives a process restart (and a
@@ -69,17 +68,18 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
     if (port.isEvicting?.(record.task_id) === true) return evictionRefusal(record.task_id)
 
+    if (coldRevivals.has(record.task_id)) return { kind: "admission_refused", task_id: record.task_id, reason: "revival_in_progress" }
+    const cold = isColdRevivalCandidate(record)
     const mode = messageability(record.status, record.residency_state, record.execution_mode, record.killed)
-    if (mode === "not-continuable") {
+    if (!cold && mode === "not-continuable") {
       return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: TASK_OUTPUT_SUGGESTION }
     }
-    const uncertain = record.revive_delivery_uncertain
-    if (
-      record.status === "running" &&
-      uncertain?.run_epoch === record.notification.run_epoch &&
-      uncertain.message_sha256 === messageSha256(input.message)
-    ) {
-      return deliveryUncertain(record, record.notification.run_epoch)
+    const uncertain = uncertainDeliveryDenial(record, input.message)
+    if (uncertain !== undefined) return uncertain
+    if (cold) {
+      coldRevivals.add(record.task_id)
+      try { return await reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend) }
+      finally { coldRevivals.delete(record.task_id) }
     }
     const handle = port.liveHandle(record.task_id)
     if (handle === undefined) {
@@ -219,97 +219,5 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     clearPersistedQueue(taskId, new Set(queue.map((entry) => entry.id)))
   }
 
-  async function interruptTask(idOrName: string): Promise<InterruptOutcome> {
-    const record = resolve(idOrName)
-    if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
-    if (record.status !== "running") {
-      return { kind: "noop", task_id: record.task_id, status: record.status, reason: `Task ${record.task_id} is ${record.status}, not running.` }
-    }
-    // Transition BEFORE abort so steering is the single terminal writer: abort settles the launch
-    // outcome tracker, whose late complete/cancel transition is then rejected by terminal idempotence.
-    const result = port.store.transition(record.task_id, { type: "interrupt", timestamp: nowIso() })
-    if (!result.applied) {
-      return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be interrupted from running.` }
-    }
-    const handle = port.liveHandle(record.task_id)
-    if (handle !== undefined) await handle.abort()
-    const partial = handle?.lastAssistantText()
-    if (partial !== undefined && partial.length > 0) {
-      port.store.replace({ ...result.record, final_response: partial })
-    }
-    port.store.appendEvent(record.task_id, { type: "interrupted", payload: { previous_status: "running" } })
-    return { kind: "interrupted", task_id: record.task_id, previous_status: "running" }
-  }
-
-  async function cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const record = resolve(idOrName)
-    const destructionCause = options?.abort === "skip" ? "cancel_without_abort" : "cancel"
-    if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
-    if (record.status === "pending") {
-      const result = port.store.transition(record.task_id, {
-        type: "cancel",
-        timestamp: nowIso(),
-        ...(reason !== undefined ? { error_message: reason } : {}),
-      })
-      if (!result.applied) {
-        return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from pending.` }
-      }
-      port.dequeuePending(record.task_id)
-      clearPersistedQueue(record.task_id)
-      port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "pending", ...(reason !== undefined ? { reason } : {}) } })
-      await port.destruction.destroyResidentTask(record.task_id, destructionCause)
-      return { kind: "cancelled", task_id: record.task_id, previous_status: "pending" }
-    }
-    if (record.status !== "running") {
-      const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
-      return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
-    }
-    // Transition BEFORE abort so this cancel is the single terminal write; the tracker's later
-    // complete/cancel transition (settled by abort) is rejected by terminal idempotence.
-    const runStats = port.runStatsSnapshot(record.task_id)
-    const result = port.store.transition(record.task_id, {
-      type: "cancel",
-      timestamp: nowIso(),
-      ...(reason !== undefined ? { error_message: reason } : {}),
-      ...(runStats !== undefined ? { run_stats: runStats } : {}),
-    })
-    if (!result.applied) {
-      return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from running.` }
-    }
-    const handle = port.liveHandle(record.task_id)
-    // The record is already terminal (cancelled) above. abort() is best-effort: an rpc child that
-    // already exited rejects the abort send (protocol-client isExited), and a rejection here must NOT
-    // skip the destruction that moves the record OUT of resident - otherwise it freezes at
-    // {cancelled, resident}, un-evictable, leaking a residency slot forever.
-    if (handle !== undefined && options?.abort !== "skip") {
-      try {
-        await handle.abort()
-      } catch (error) {
-        log("senpi-task steering cancel abort rejected", {
-          taskId: record.task_id,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
-    }
-    port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
-    // An active Senpi in-process session can float AbortError from both abort() and dispose(). DAG
-    // cancellation therefore records terminal state now and lets that child reach its exact outcome
-    // boundary before lifecycle disposes it. RPC children still terminate immediately.
-    if (options?.abort === "skip" && handle !== undefined && handle.terminate === undefined) {
-      destroyAfterSettlement(handle, record.task_id)
-    } else {
-      // Destruction is delegated EXCLUSIVELY to lifecycle's port; steering never disposes directly.
-      await port.destruction.destroyResidentTask(record.task_id, destructionCause)
-    }
-    return { kind: "cancelled", task_id: record.task_id, previous_status: "running" }
-  }
-
-  function destroyAfterSettlement(handle: ManagedChildHandle, taskId: string): void {
-    const destroy = (): Promise<void> => port.destruction.destroyResidentTask(taskId, "cancel_without_abort")
-    void handle.waitForOutcome().then(destroy, destroy).catch((error: unknown) => {
-      log("senpi-task deferred cancel destruction rejected", { taskId, error: String(error) })
-    })
-  }
-
-  return { sendToTask, interruptTask, cancelTask, notifyStarted, hasPendingSends, dropPending }
+  return { sendToTask, ...createSteeringControls(port, resolve, clearPersistedQueue), notifyStarted, hasPendingSends, dropPending }
 }

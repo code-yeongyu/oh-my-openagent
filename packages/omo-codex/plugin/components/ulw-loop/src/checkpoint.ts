@@ -17,7 +17,7 @@ import {
 	sameBlockerOccurrences,
 	validateQualityGate,
 } from "./quality-gate.js";
-import { resolveToolkitSurface } from "./surface.js";
+import { resolveToolkitSurface, type UlwLoopToolkitSurface } from "./surface.js";
 import type {
 	UlwLoopAggregateCompletion,
 	UlwLoopItem,
@@ -35,11 +35,16 @@ export interface CheckpointUlwLoopArgs {
 	readonly codexGoalJson?: string;
 	readonly qualityGateJson?: string;
 }
+export interface CheckpointUlwLoopDependencies {
+	readonly surface?: UlwLoopToolkitSurface;
+}
 export interface CheckpointUlwLoopResult {
 	readonly plan: UlwLoopPlan;
 	readonly goal: UlwLoopItem;
 	readonly ledgerEntry: UlwLoopLedgerEntry;
 	readonly aggregateCompletion?: UlwLoopAggregateCompletion;
+	readonly nextActions: readonly string[];
+	readonly warnings: readonly string[];
 }
 
 const QUALITY_GATE_FS = { existsSync, statSync } as const;
@@ -149,6 +154,7 @@ export async function checkpointUlwLoop(
 	repoRoot: string,
 	args: CheckpointUlwLoopArgs,
 	scope?: UlwLoopScope,
+	dependencies?: CheckpointUlwLoopDependencies,
 ): Promise<CheckpointUlwLoopResult> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
 		const plan = await readUlwLoopPlan(repoRoot, scope);
@@ -158,6 +164,8 @@ export async function checkpointUlwLoop(
 		let aggregateCompletion: UlwLoopAggregateCompletion | undefined;
 		let qualityGate: UlwLoopQualityGate | undefined;
 		let codexGoal: unknown;
+		let nextActions: readonly string[] = [];
+		let warnings: readonly string[] = [];
 		if (args.status === "complete") {
 			const aggregate = codexGoalMode(plan) === "aggregate";
 			const final = isFinalRunCompletionCandidate(plan, goal);
@@ -170,7 +178,7 @@ export async function checkpointUlwLoop(
 			else requireAllCriteriaPass(goal);
 			let codexValidationError: UlwLoopError | undefined;
 			try {
-				codexGoal = await validateCheckpointCodexGoal({
+				const validation = await validateCheckpointCodexGoal({
 					repoRoot,
 					plan,
 					goal,
@@ -178,6 +186,9 @@ export async function checkpointUlwLoop(
 					evidence,
 					...(scope === undefined ? {} : { scope }),
 				});
+				codexGoal = validation.raw;
+				nextActions = validation.nextActions;
+				warnings = validation.warnings;
 			} catch (error) {
 				if (!(error instanceof UlwLoopError)) throw error;
 				codexValidationError = error;
@@ -191,7 +202,7 @@ export async function checkpointUlwLoop(
 					qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), {
 						repoRoot,
 						fs: QUALITY_GATE_FS,
-						reviewerSurface: resolveToolkitSurface(),
+						reviewerSurface: dependencies?.surface ?? resolveToolkitSurface(),
 						...(plan.evidenceLayoutVersion === 2
 							? { currentAttemptDir: ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope) }
 							: {}),
@@ -213,6 +224,7 @@ export async function checkpointUlwLoop(
 		} else applyBlockedOrFailed(goal, plan, args.status, evidence, now);
 		goal.updatedAt = now;
 		if (aggregateCompletion !== undefined) plan.aggregateCompletion = aggregateCompletion;
+		if (aggregateCompletion !== undefined) nextActions = [...nextActions, 'aggregate complete — now update_goal({status:"complete"})'];
 		plan.updatedAt = now;
 		await writePlan(repoRoot, plan, scope);
 		const ledgerEntry = buildLedger(now, args, goal, qualityGate, codexGoal, aggregateCompletion);
@@ -220,7 +232,7 @@ export async function checkpointUlwLoop(
 		const closedBatch = args.status === "complete" ? batchClosedBy(plan, goal.id) : undefined;
 		if (closedBatch !== undefined) await appendLedger(repoRoot, { at: now, kind: "batch_closed", goalId: goal.id, message: closedBatch.batchId }, scope);
 		return aggregateCompletion === undefined
-			? { plan, goal, ledgerEntry }
-			: { plan, goal, ledgerEntry, aggregateCompletion };
+			? { plan, goal, ledgerEntry, nextActions, warnings }
+			: { plan, goal, ledgerEntry, aggregateCompletion, nextActions, warnings };
 	});
 }

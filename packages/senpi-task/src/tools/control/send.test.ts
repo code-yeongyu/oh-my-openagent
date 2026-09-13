@@ -49,7 +49,7 @@ describe("runTaskSend", () => {
       manager,
       service: fakeTeamToolsService,
       teamRunId: "team-run-1",
-      from: "atlas",
+      from: "builder",
     })
 
     expect(typeof leadTool.renderCall).toBe("function")
@@ -145,11 +145,11 @@ describe("runTaskSend", () => {
 })
 
 describe("runTaskSend one-shot agent refusal", () => {
-  test("#given a running momus child #when task_send targets it #then the send is refused with the registry reminder and nothing is delivered", async () => {
+  test("#given a running plan-reviewer child #when task_send targets it #then the send is refused with the registry reminder and nothing is delivered", async () => {
     // given
     const inProcess = new FakeRunner()
     const { manager } = makeManager({ inProcess })
-    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "momus" }))
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "plan-reviewer" }))
     if (started.kind !== "started") throw new Error("expected started")
 
     // when
@@ -159,19 +159,19 @@ describe("runTaskSend one-shot agent refusal", () => {
     expect(result.details.kind).toBe("one_shot_agent")
     if (result.details.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
     expect(result.details.task_id).toBe(started.task_id)
-    expect(result.details.agent).toBe("momus")
+    expect(result.details.agent).toBe("plan-reviewer")
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
-    expect(text).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(text).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(text).toContain("<system-reminder>")
     expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual([])
     expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
   })
 
-  test("#given a completed resident momus child #when task_send targets it #then the send is refused with the registry reminder and no revive occurs", async () => {
+  test("#given a completed resident plan-reviewer child #when task_send targets it #then the send is refused with the registry reminder and no revive occurs", async () => {
     // given
     const inProcess = new FakeRunner()
     const { manager, store } = makeManager({ inProcess })
-    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "momus" }))
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", subagent_type: "plan-reviewer" }))
     if (started.kind !== "started") throw new Error("expected started")
     inProcess.handles.get(started.task_id)?.settle({ status: "completed", finalResponse: "review done" })
     await flush()
@@ -183,12 +183,12 @@ describe("runTaskSend one-shot agent refusal", () => {
     // then
     expect(result.details.kind).toBe("one_shot_agent")
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
-    expect(text).toBe(AGENT_INTERACTION_POLICIES.momus.sendDenialReminder)
+    expect(text).toBe(AGENT_INTERACTION_POLICIES["plan-reviewer"].sendDenialReminder)
     expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
     expect(store.load(started.task_id)?.status).toBe("completed")
   })
 
-  test("#given a completed resident non-momus child #when task_send targets it #then it still revives (regression guard)", async () => {
+  test("#given a completed resident non-plan-reviewer child #when task_send targets it #then it still revives (regression guard)", async () => {
     // given
     const inProcess = new FakeRunner()
     const { manager, store } = makeManager({ inProcess })

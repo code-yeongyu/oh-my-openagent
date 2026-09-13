@@ -59,7 +59,7 @@ describe("control tool renderers", () => {
     const line = firstLine(
       renderTaskSendCall(
         {
-          to: "atlas",
+          to: "builder",
           message: "한국어 안내가 아주 길게 이어집니다.\nEnglish guidance also continues long enough to require truncation safely.",
         },
         ANSI_THEME,
@@ -95,31 +95,31 @@ describe("control tool renderers", () => {
   test("#given structured shutdown task_send messages #when rendering calls #then summaries name request approve reject and reason without object stringification", () => {
     const request = firstLine(
       renderTaskSendCall(
-        { to: "atlas", team_run_id: "team-9", message: { type: "shutdown_request", reason: "done for today" } },
+        { to: "builder", team_run_id: "team-9", message: { type: "shutdown_request", reason: "done for today" } },
         TEST_THEME,
       ),
       120,
     )
     const approve = firstLine(
       renderTaskSendCall(
-        { to: "atlas", message: { type: "shutdown_response", request_id: "req-1", approve: true } },
+        { to: "builder", message: { type: "shutdown_response", request_id: "req-1", approve: true } },
         TEST_THEME,
       ),
       120,
     )
     const reject = firstLine(
       renderTaskSendCall(
-        { to: "atlas", message: { type: "shutdown_response", request_id: "req-2", approve: false, reason: "still testing" } },
+        { to: "builder", message: { type: "shutdown_response", request_id: "req-2", approve: false, reason: "still testing" } },
         TEST_THEME,
       ),
       120,
     )
 
-    expect(request).toContain("task_send shutdown:request to:atlas team:team-9")
+    expect(request).toContain("task_send shutdown:request to:builder team:team-9")
     expect(request).toContain("reason:")
-    expect(approve).toContain("task_send shutdown:approve to:atlas")
+    expect(approve).toContain("task_send shutdown:approve to:builder")
     expect(approve).toContain("request:req-1")
-    expect(reject).toContain("task_send shutdown:reject to:atlas")
+    expect(reject).toContain("task_send shutdown:reject to:builder")
     expect(reject).toContain("reason:")
     expect([request, approve, reject].join("\n")).not.toContain("deliver:")
     expect([request, approve, reject].join("\n")).not.toContain("[object Object]")
@@ -173,17 +173,17 @@ describe("control tool renderers", () => {
   })
 
   test("#given task_send without a message #when rendering the call #then it is meaningful without an empty message label", () => {
-    const line = firstLine(renderTaskSendCall({ to: "atlas" }, TEST_THEME), 80)
+    const line = firstLine(renderTaskSendCall({ to: "builder" }, TEST_THEME), 80)
 
-    expect(line).toContain("task_send to:atlas")
+    expect(line).toContain("task_send to:builder")
     expect(line).not.toContain("deliver:")
     expect(line).not.toContain("message:")
   })
 
   test("#given whitespace-only control text #when rendering calls #then empty message and reason labels are omitted", () => {
-    const send = firstLine(renderTaskSendCall({ to: "atlas", message: " \n\t " }, TEST_THEME), 80)
+    const send = firstLine(renderTaskSendCall({ to: "builder", message: " \n\t " }, TEST_THEME), 80)
     const shutdown = firstLine(
-      renderTaskSendCall({ to: "atlas", message: { type: "shutdown_request", reason: " \n\t " } }, TEST_THEME),
+      renderTaskSendCall({ to: "builder", message: { type: "shutdown_request", reason: " \n\t " } }, TEST_THEME),
       80,
     )
     const cancel = firstLine(renderTaskCancelCall({ task_id: "st_1", reason: " \n\t " }, TEST_THEME), 80)

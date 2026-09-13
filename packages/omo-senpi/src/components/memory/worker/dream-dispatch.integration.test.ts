@@ -159,7 +159,8 @@ describe("dream worker dispatch", () => {
     expect(item.result.outcome).toBe("merged")
     // git materializes merged files through the runner's autocrlf filter on Windows, so the card
     // can arrive with CRLF endings there; normalize before measuring line lengths.
-    const lines = (await readFile(join(item.identity.paths.repo, "people", "fixture", "card.md"), "utf8")).replace(/\r\n/g, "\n").trim().split("\n")
+    const card = (await readFile(join(item.identity.paths.repo, "people", "fixture", "card.md"), "utf8")).replace(/\r\n/g, "\n")
+    const lines = card.slice(card.indexOf("\n---\n") + "\n---\n".length).trim().split("\n")
     expect(lines).toHaveLength(limits.max_entries)
     expect(lines.every((line) => line.length === limits.max_entry_chars)).toBe(true)
   }, 30_000)

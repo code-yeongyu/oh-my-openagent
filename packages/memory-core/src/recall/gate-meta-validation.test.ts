@@ -43,9 +43,9 @@ describe("meta hint validation", () => {
       await pending.write("session-1", [
         { path: "notes/valid.md", hint: FACTUAL_HINTS[0]! },
         { path, hint },
-      ], { epoch: 0 })
+      ])
 
-      expect(await pending.take("session-1", { currentEpoch: 0 })).toEqual([])
+      expect(await pending.take("session-1")).toEqual([])
       expect(await readdir(dir)).toEqual([])
     })
   }
@@ -58,9 +58,9 @@ describe("meta hint validation", () => {
       const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "recall-meta-")))
       tempDirs.push(dir)
       const pending = new PendingNudges(dir)
-      await pending.write("session-1", [nudge], { epoch: 0 })
+      await pending.write("session-1", [nudge])
 
-      expect(await pending.take("session-1", { currentEpoch: 0 })).toEqual([nudge])
+      expect(await pending.take("session-1")).toEqual([nudge])
       expect(await readdir(dir)).toEqual([])
     })
   }

@@ -5,6 +5,7 @@ import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } fro
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import type { MemoryToolCommit, MemoryToolProvenance } from "./memory"
 import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
+import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { LockDomain } from "../locks"
 import {
@@ -165,11 +166,13 @@ async function applyOperations(root: string, operations: readonly PatchOperation
 
     let next = current
     for (const hunk of operation.hunks) next = applyMemoryPatchHunk(next, hunk, source.relative)
-    if (parseForTool(next).frontmatter.read_only === "true") {
+    const patched = parseForTool(next)
+    if (patched.frontmatter.read_only === "true") {
       throw new Error(`memory_apply_patch: ${target.relative} cannot be written with read_only=true`)
     }
+    assertDescriptionAcceptable(patched.frontmatter.description, target.relative)
 
-    pendingWrites.set(target.absolute, next)
+    pendingWrites.set(target.absolute, renderMemoryFile(patched.frontmatter, patched.body))
     pendingDeletes.delete(target.absolute)
     affectedPaths.add(target.relative)
     if (source.absolute !== target.absolute) {
@@ -198,12 +201,19 @@ function parseForTool(content: string): ReturnType<typeof parseMemoryFile> {
 }
 
 function normalizeAddedContent(label: string, rawContent: string): string {
+  let parsed: ReturnType<typeof parseMemoryFile>
   try {
-    const parsed = parseMemoryFile(rawContent)
-    return renderMemoryFile(parsed.frontmatter, parsed.body)
+    parsed = parseMemoryFile(rawContent)
   } catch {
     return renderMemoryFile({ description: `Memory block ${label}` }, rawContent)
   }
+  assertDescriptionAcceptable(parsed.frontmatter.description, label)
+  return renderMemoryFile(parsed.frontmatter, parsed.body)
+}
+
+function assertDescriptionAcceptable(description: string, path: string): void {
+  const violation = describeDescriptionViolation(description)
+  if (violation !== null) throw new Error(`memory_apply_patch: ${path}: ${violation}`)
 }
 
 function assertEditable(readOnly: string | undefined, path: string): void {

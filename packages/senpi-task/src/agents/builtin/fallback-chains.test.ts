@@ -7,7 +7,7 @@ import { AGENT_FALLBACK_CHAINS } from "./fallback-chains"
 
 // The ulw reviewer agents resolve their model through `categories` (resolve-agent-categories.ts),
 // so this table carries the 4 curated agents only.
-const ALL_CHAIN_NAMES = ["explore", "librarian", "metis", "momus"] as const
+const ALL_CHAIN_NAMES = ["explore", "librarian", "plan-consultant", "plan-reviewer"] as const
 
 describe("AGENT_FALLBACK_CHAINS", () => {
   test("#given the builtin chains #when listing keys #then only the 4 curated agent names are present", () => {
@@ -33,8 +33,8 @@ describe("AGENT_FALLBACK_CHAINS", () => {
     expect(lengths).toEqual({
       explore: 8,
       librarian: 8,
-      metis: 5,
-      momus: 6,
+      "plan-consultant": 5,
+      "plan-reviewer": 6,
     })
   })
 
@@ -60,14 +60,14 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["claude-sdk-oauth", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
         { providers: ["openai", "openai-codex"], model: "gpt-5.4-nano" }
       ],
-      metis: [
+      "plan-consultant": [
         { providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
         { providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" },
         { providers: ["openai", "openai-codex", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
         { providers: ["opencode-go"], model: "glm-5.2" },
         { providers: ["kimi-for-coding"], model: "kimi-k3" }
       ],
-      momus: [
+      "plan-reviewer": [
         { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "xhigh" },
         { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
         { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "high" },

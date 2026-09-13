@@ -87,6 +87,18 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
   readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
   readonly rpcEvents: FakeRpcEvent[] = []
+  // Session-scoped model spies (senpi ExtensionAPI.setSessionModel / setSessionThinkingLevel).
+  // No persisting model setter exists here on purpose: the senpi one writes the global default.
+  // Optional so hand-built fakes typed as `Omit<FakeExtensionAPI, ...>` literals keep compiling.
+  readonly sessionModels?: unknown[] = []
+  readonly sessionThinkingLevels?: string[] = []
+  readonly setSessionModel?: (model: unknown) => Promise<boolean> = async (model) => {
+    this.sessionModels?.push(model)
+    return true
+  }
+  readonly setSessionThinkingLevel?: (level: string) => void = (level) => {
+    this.sessionThinkingLevels?.push(level)
+  }
   events?: SenpiExtensionAPI["events"]
   rpc?: { emit(name: string, data: unknown): void }
 
@@ -134,6 +146,7 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   registerMcpServer(name: string, config: Record<string, unknown>): void {
     this.mcpServers.push({ name, config })
   }
+
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {
     const results: unknown[] = []

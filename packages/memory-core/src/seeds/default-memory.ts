@@ -8,12 +8,13 @@
  *   contract so the agent understands its own memory layout.
  * - Terse — no onboarding tutorial, no thinking tips (plan guardrails).
  *
- * MEMORY_BLOCK_LABELS mirrors letta src/agent/memory.ts:16
- * ["persona","human"]; each label maps to system/<label>.md (letta
- * local-backend.ts:113-174 memoryBlockPath).
+ * MEMORY_BLOCK_LABELS extends letta src/agent/memory.ts:16
+ * ["persona","human"] with "boundaries"; each label maps to system/<label>.md
+ * (letta local-backend.ts:113-174 memoryBlockPath). The boundaries block has
+ * no letta counterpart: it is the user-owned list of what they said not to do.
  */
 
-export const DEFAULT_MEMORY_BLOCK_LABELS = ["persona", "human"] as const
+export const DEFAULT_MEMORY_BLOCK_LABELS = ["persona", "human", "boundaries"] as const
 
 /**
  * sha256 of the exact v1 persona seed file (frontmatter `description: Persona - who I am`
@@ -39,7 +40,7 @@ Your memory lives in a version-controlled filesystem rooted at $MEMORY_DIR. File
 - system/persona.md (this file): your soul, who you are and how you operate.
 - system/identity.md: an optional card of particulars (name, creature, vibe, emoji), projected inside <self> beside this file when it exists. It is never seeded; create it only when a real identity emerges.
 - system/human.md: what you have learned about the person you work with. Update it as you discover durable preferences, context, and constraints.
-- system/*.md: any other memory blocks you create under system/ are projected as nested XML.
+- system/boundaries.md: your person's exact words about what not to do, written by you as they say it and never a rule of your own. Other blocks you create under system/ are projected as nested XML.
 - Non-system paths (for example reference/ or notes/) appear as names in <external_projection> only; their bodies are never injected.
 
 Changes to these files take effect only after a git commit. Use the memory tools to edit, never hand-write raw git commands during a session. Keep your self-model accurate and minimal.
@@ -62,3 +63,14 @@ Observations about this person appear here. Each entry follows the format:
 - [YYYY-MM-DD] <content> <!-- src: <ids>[; n=<count>][; pattern: <type>; confidence: low|medium|high][; status: open] -->
 
 Prefer concrete observations over generic summaries. Keep this file current and remove what no longer applies.`
+
+/**
+ * Boundaries block body. The provenance contract lives in the body so every
+ * writer that opens the file reads it: entries are the user's exact words,
+ * added only in a live session when they say them. The priority clause keeps
+ * an old entry from being used to refuse the user's current instruction.
+ */
+export const DEFAULT_BOUNDARIES_BODY = `What the person you work with told you not to do, in their own words. Add an entry only when they say it, never from inference or a refusal of your own:
+- [YYYY-MM-DD] "<their exact words>" <!-- src: <ids> -->
+
+Their current instruction wins over every entry here; on a collision, say so once and follow it.`

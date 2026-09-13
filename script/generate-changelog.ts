@@ -3,7 +3,13 @@
 import { $ } from "bun"
 import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
 
-const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu"]
+const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu", "sisyphus-dev-ai"]
+
+// Release automation opens and merges the release-state pull request, so its commits land in every
+// release range. Crediting it as a community contributor misreports who wrote the release.
+export function isCommunityContributor(login: string): boolean {
+  return !TEAM.includes(login) && !login.endsWith("[bot]")
+}
 
 const EXCLUDED_PREFIX_PATTERN = /^(ignore:|test:|chore:|ci:|release:)/i
 const CONTAINED_SURFACE_PATTERN = /\bsenpi\b|\bpi-goal\b|\bpi-webfetch\b/i
@@ -73,7 +79,7 @@ async function getContributors(previousTag: string): Promise<string[]> {
       const title = message.split("\n")[0] ?? ""
       if (isExcludedReleaseNoteSubject(title)) continue
 
-      if (login && !TEAM.includes(login)) {
+      if (login && isCommunityContributor(login)) {
         if (!contributors.has(login)) contributors.set(login, [])
         contributors.get(login)?.push(title)
       }

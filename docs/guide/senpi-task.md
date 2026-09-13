@@ -6,7 +6,7 @@ The component is on by default. Disable it with the `--no-omo-task` flag; it als
 
 ## Spawning a child
 
-Use the `task` tool. A single spawn needs `prompt` plus exactly one of `category` (routed through Sisyphus-Junior) or `subagent_type` (a named agent invoked directly); the two are mutually exclusive, and omitting both fails validation (`packages/senpi-task/src/tools/task/validation.ts`). Batch spawns use `tasks:[...]` instead of top-level `prompt`. Prompts are documented as English-only in the schema description, not machine-enforced.
+Use the `task` tool. A single spawn needs `prompt` plus exactly one of `category` (routed to the category worker) or `subagent_type` (a named agent invoked directly); the two are mutually exclusive, and omitting both fails validation (`packages/senpi-task/src/tools/task/validation.ts`). Batch spawns use `tasks:[...]` instead of top-level `prompt`. Prompts are documented as English-only in the schema description, not machine-enforced.
 
 - `run_in_background: false` (default) waits and returns the child's final response inline.
 - `run_in_background: true` returns a task id (prefixed `st_`) immediately so you can keep working and check back later.
@@ -21,7 +21,7 @@ For fanout, pass `tasks:[...]` instead of the top-level `prompt`/target fields. 
 {
   "tasks": [
     { "category": "quick", "prompt": "Check the API contract.", "name": "contract" },
-    { "subagent_type": "oracle", "prompt": "Review the migration risk.", "name": "risk" }
+    { "subagent_type": "plan-reviewer", "prompt": "Review the migration risk in the plan.", "name": "risk" }
   ],
   "run_in_background": true
 }
@@ -49,6 +49,14 @@ Every control/read tool targets a child by id or by name:
 - **`task_cancel`** cancels a child terminally and stops its work.
 
 Parent-initiated cancel returns its result synchronously in the tool response and never fires a completion notification.
+
+## Idle parking and message revival
+
+`task.resident_idle_timeout_ms` controls how long an eligible terminal child stays resident without activity. It defaults to **900000 ms (15 minutes)** and accepts positive safe-integer milliseconds only; `0`, fractions, strings, and disable sentinels are invalid. The idle sweep uses the same interval and does not keep the host process alive. Parking occurs on a sweep at or after `updated_at + resident_idle_timeout_ms`, never before it. A send refreshes `updated_at`; running children and children with pending steering are protected.
+
+Idle in-process children park as `persisted_only`; process children, including team members, park as `rpc_detached`. Their live handle is released, not irreversibly evicted. A direct `task_send` to an eligible parked child's task id restores its recorded transcript and launch contract, admits one new run epoch, and reports revival only after delivery acknowledgment. Admission refusal and uncertain delivery are explicit errors; uncertain messages are not automatically replayed. Killed, cancelled, lost, and one-shot children remain non-continuable. Capacity-driven eviction is unchanged.
+
+Parking is independent of `task.ttl_ms` (record and artifact retention, default 86400000 ms) and `task.resume_children` (session-shutdown behavior). Old output remains readable through `task_output` until record expiration. Team-name sends remain durable mailbox writes: a parked process has no active inbox poller, so use its task id for direct revival or resume the owning session before expecting mailbox delivery.
 
 ## Inspecting children
 
@@ -96,6 +104,7 @@ All defaults live in `omo.json` under `task` and `teams`. A minimal project conf
   "task": {
     "default_execution_mode": "in-process",
     "reattach_on_reconcile": true,
+    "resident_idle_timeout_ms": 900000,
     "wait": { "default_ms": 90000 }
   }
 }

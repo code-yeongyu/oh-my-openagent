@@ -70,7 +70,8 @@ export interface DagRuntime {
   attach(event?: unknown): Promise<void>
   sync(): void
   detach(): void
-  pauseForShutdown(): void
+  /** Retires live schedulers without cancelling them, then persists the pause. Await before teardown. */
+  pauseForShutdown(): Promise<void>
   dispose(): void
 }
 
@@ -550,8 +551,24 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       activeSessionId = undefined
       statusUi.dispose()
     },
-    pauseForShutdown() {
+    async pauseForShutdown() {
       cancelLeaseWatches()
+      // #8020: a committed shutdown RETIRES the schedulers instead of cancelling them (that is what
+      // `detach` does, and doing it here is what used to destroy a run on every session switch).
+      // The frontier loop must have exited before the pause is persisted, otherwise a late admission
+      // or settlement writes over the paused checkpoint. Retirement also drops the run from
+      // `schedulers`, so the #8029 in-process probe (`isRunHeldInProcess`) reports it unheld and a
+      // later recovery in this SAME process can reclaim it instead of skipping on a live lease.
+      const retiring = [...schedulers]
+      await Promise.all(retiring.map(([, owned]) => owned.scheduler.suspend()))
+      // Retiring the run makes `ensureScheduled`'s UNGUARDED `.finally(delete)` fire early, so it is
+      // drained here: otherwise it could land after a later control verb re-registered the same runId
+      // and evict that live controller. No assertion isolates this line - it closes a window this
+      // retirement itself opens, rather than fixing an observable behaviour of its own.
+      await Promise.allSettled(retiring.map(([, owned]) => owned.running))
+      for (const [runId, owned] of retiring) {
+        if (schedulers.get(runId) === owned) schedulers.delete(runId)
+      }
       const sessionId = activeSessionId ?? deps.engine.runtime.sessionId()
       if (sessionId !== undefined) recovery.pauseRunsForShutdown(sessionId)
     },

@@ -103,14 +103,6 @@ describe("cross-process lock protocol", () => {
 
     // #when
     const successor = await createLockRecord("memory-write")
-    if (process.platform === "win32") {
-      // getProcessStartIdentity has no Windows probe, so the live owner cannot be disproven;
-      // recovery must fail closed instead of stealing the lock.
-      const error = await captureError(acquireLock(lockPath, successor))
-      expect(error).toBeInstanceOf(LockContentionError)
-      expect(JSON.parse(await readFile(lockPath, "utf8"))).toEqual(reusedPidOwner)
-      return
-    }
     await acquireLock(lockPath, successor)
 
     // #then

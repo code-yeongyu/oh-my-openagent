@@ -29,7 +29,7 @@ export { REQUIRED_PLUGIN_ARTIFACTS }
 
 // Mirrors the files allowlist in packages/omo-senpi/plugin/package.json (locked by build-omo-native.test.ts).
 export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
-export const PAYLOAD_FILES = ["package.json", "README.md", "NOTICE", "LICENSE"] as const
+export const PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE"] as const
 export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 
 interface BuildOptions {
@@ -107,7 +107,6 @@ function runSenpiPluginBuild(outputDir: string): void {
         OMO_AST_GREP_MCP_ENTRY: astSource,
         OMO_AST_GREP_MCP_TARGET: join(buildRoot, "plugin", "runtime", "ast-grep-mcp", "cli.js"),
         OMO_AGENT_TOOLKIT_SOURCE_ENTRY: join(buildRoot, "codex", "ulw-loop", "cli.js"),
-        OMO_AGENT_TOOLKIT_TARGET: join(buildRoot, "plugin", "runtime", "agent-toolkit"),
         OMO_SENPI_PLUGIN_OUTPUT: join(buildRoot, "plugin"),
         OMO_SKIP_MATERIALIZE: "1",
       },
@@ -123,6 +122,7 @@ function runSenpiPluginBuild(outputDir: string): void {
       const sourcePath = join(sourcePluginDir, name)
       if (existsSync(sourcePath)) copyFileSync(sourcePath, join(stagedPluginDir, name))
     }
+    copyFileSync(join(repoRoot, "CHANGELOG.md"), join(stagedPluginDir, "CHANGELOG.md"))
     copyPluginPayload(outputDir, stagedPluginDir)
   } finally {
     rmSync(buildRoot, { recursive: true, force: true })

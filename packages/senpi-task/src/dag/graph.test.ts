@@ -58,7 +58,7 @@ describe("compileDag structure", () => {
     // given
     const withTargets = definition([
       node("a", [], { label: "Alpha", task_summary: "sum", description: "desc", load_skills: ["programming"] }),
-      { id: "b", prompt: "run b", subagent_type: "momus", model: "gpt-5.6", dependsOn: ["a"] },
+      { id: "b", prompt: "run b", subagent_type: "plan-reviewer", model: "gpt-5.6", dependsOn: ["a"] },
     ])
 
     // when
@@ -78,10 +78,29 @@ describe("compileDag structure", () => {
     expect(result.nodes[1]).toMatchObject({
       id: nodeId("b"),
       prompt: "run b",
-      route: { kind: "agent", agent: "momus", model: "gpt-5.6" },
+      route: { kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" },
       dependsOn: [nodeId("a")],
       state: "pending",
     })
+  })
+
+  it("#given a node with a retired curated subagent_type #when compiled #then the route stores the submitted id verbatim and keeps the DagRoute shape", () => {
+    // given
+    const withRetired = definition([
+      { id: "retired", prompt: "review", subagent_type: "momus", model: "gpt-5.6" },
+      { id: "canonical", prompt: "review", subagent_type: "plan-reviewer", model: "gpt-5.6" },
+      { id: "custom", prompt: "build", subagent_type: "custom-agent" },
+    ])
+
+    // when
+    const result = compileDag(withRetired, { at: AT })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.nodes[0]?.route).toEqual({ kind: "agent", agent: "momus", model: "gpt-5.6" })
+    expect(result.nodes[1]?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" })
+    expect(Object.keys(result.nodes[0]?.route ?? {}).sort()).toEqual(["agent", "kind", "model"])
+    expect(result.nodes[2]?.route).toEqual({ kind: "agent", agent: "custom-agent" })
   })
 
   it("#given a downstream node #when compiled #then the prompt is never templated with upstream ids", () => {

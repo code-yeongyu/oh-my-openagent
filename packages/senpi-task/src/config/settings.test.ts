@@ -4,6 +4,11 @@ import { describe, expect, test } from "bun:test"
 import { resolveOmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 describe("task settings", () => {
+  test("#given omitted or configured idle retention #when task settings resolve #then the canonical value reaches the engine", () => {
+    expect(resolveOmoTaskSettings({})).toHaveProperty("resident_idle_timeout_ms", 900000)
+    expect(resolveOmoTaskSettings({ resident_idle_timeout_ms: 37 })).toHaveProperty("resident_idle_timeout_ms", 37)
+    expect(() => resolveOmoTaskSettings({ resident_idle_timeout_ms: 0 })).toThrow()
+  })
   test("#given no residency override #when settings parse #then defaults residency cap to bounded two-per-cpu headroom", () => {
     // given
     const expected = Math.min(16, Math.max(8, availableParallelism() * 2))

@@ -2,6 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
+import { resolveReleaseVersion } from "./release-version.mjs"
 
 const workflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 // Windows checks YAML out with CRLF, and the byte-pinned markers below are written with LF, so
@@ -28,18 +29,6 @@ interface Workflow {
   jobs?: Record<string, Job>
 }
 
-const DIST_TAG_FIXTURE = `          if [[ "$VERSION" == *"-"* ]]; then
-            DIST_TAG=$(printf '%s' "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
-            if ! [[ "$DIST_TAG" =~ ^[a-z][a-z0-9-]*$ ]]; then
-              echo "::error::Invalid dist_tag: $DIST_TAG"
-              exit 1
-            fi
-            echo "dist_tag=\${DIST_TAG:-next}" >> "$GITHUB_OUTPUT"
-          else
-            DIST_TAG=""
-            echo "dist_tag=" >> "$GITHUB_OUTPUT"
-          fi`
-
 function job(name: string): Job {
   const value = workflow.jobs?.[name]
   if (!value) throw new Error(`missing job: ${name}`)
@@ -63,14 +52,6 @@ function mapOmoAiVersion(rootVersion: string): string {
     : `${rootVersion.slice(0, prereleaseIndex)}-0.${rootVersion.slice(prereleaseIndex + 1)}`
 }
 
-function extractDistTagBlock(text: string): string {
-  const start = text.indexOf('          if [[ "$VERSION" == *"-"* ]]; then')
-  const endMarker = '          fi\n\n          LAZYCODEX_COMPARE_TAG='
-  const end = text.indexOf(endMarker, start)
-  if (start < 0 || end < 0) throw new Error("missing DIST_TAG derivation block")
-  return text.slice(start, end + "          fi".length)
-}
-
 describe("omo-ai publish workflow shape", () => {
   test("preserves an explicit prerelease version and derives its beta dist tag", () => {
     // given
@@ -82,8 +63,8 @@ describe("omo-ai publish workflow shape", () => {
 
     // then
     expect(explicitVersionPrecedesBump).toBe(true)
-    expect(versionRun).toContain(String.raw`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$`)
-    expect(versionRun).toContain('DIST_TAG=$(printf \'%s\' "$VERSION" | cut -d\'-\' -f2 | cut -d\'.\' -f1)')
+    expect(versionRun).toContain('METADATA=$(node script/release-version.mjs "$VERSION")')
+    expect(resolveReleaseVersion("5.0.0-beta.62", false)).toEqual({ version: "5.0.0-beta.62", distTag: "beta" })
   })
 
   test("decides the Latest badge from the highest published semver, never from a pre-release flag", () => {
@@ -158,7 +139,7 @@ describe("omo-ai publish workflow shape", () => {
     expect(update.env?.OMO_AI_VERSION).toBe("${{ needs.release-metadata.outputs.omo_ai_version }}")
     expect(prepare.run).toContain(stampLine)
     expect(update.run).toContain(stampLine)
-    expect(prepare.run).toContain("git add package.json packages/omo-native/package.json ")
+    expect(prepare.run).toContain("git add CHANGELOG.md package.json packages/omo-native/package.json ")
   })
 
   test("builds and verifies the payload before stripping token auth", () => {
@@ -185,8 +166,8 @@ describe("omo-ai publish workflow shape", () => {
     expect(publishIndex).toBeGreaterThan(originalStripIndex)
     expect(publishIndex).toBeGreaterThan(lastWrapperPublishIndex)
     expect(dedicatedStripIndex).toBe(publishIndex - 1)
-    expect(dedicatedStrip.if).toBe("needs.release-metadata.outputs.already_published != 'true'")
-    expect(publish.if).toBe("needs.release-metadata.outputs.already_published != 'true'")
+    expect(dedicatedStrip.if).toBe("needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true")
+    expect(publish.if).toBe("needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true")
     expect(publish["working-directory"]).toBe("packages/omo-native")
     expect(publish.run).toContain("npm publish --ignore-scripts --access public --provenance --tag beta")
     expect(publish.run, "omo-ai publish must hardcode --tag beta rather than DIST_TAG").not.toContain("$DIST_TAG")
@@ -196,10 +177,11 @@ describe("omo-ai publish workflow shape", () => {
   test("always runs readiness, dist-tag guard, and live verification", () => {
     // These probes moved out of publish-main into post-publish-verify: they assert registry state that is
     // already public once publish-main succeeds, so gating the release job on them could only strand a
-    // published release. They stay unconditional inside their new job.
+    // published release. Inside their new job the only gate is the LazyCodex-only mode, which
+    // publishes no omo-ai at all.
     for (const name of ["Wait for omo-ai registry readiness", "Guard omo-ai dist-tags", "Verify omo-ai live install"]) {
       const step = namedStep("post-publish-verify", name)
-      expect(step).not.toHaveProperty("if")
+      expect(step.if).toBe("inputs.lazycodex_only != true")
       expect(step.env?.OMO_AI_VERSION).toBe("${{ needs.release-metadata.outputs.omo_ai_version }}")
       expect(step.env?.ALREADY_PUBLISHED).toBe("${{ needs.release-metadata.outputs.already_published }}")
     }
@@ -215,11 +197,15 @@ describe("omo-ai publish workflow shape", () => {
     expect(liveRun).toContain("ETARGET")
   })
 
-  test("keeps trusted publishing unconditional and DIST_TAG derivation byte-pinned", () => {
+  test("keeps trusted publishing unconditional and delegates validated channel metadata", () => {
     const preflightRun = namedStep("preflight-trust", "Verify trusted publisher for release packages").run ?? ""
 
     expect(preflightRun).toContain("ALL_PACKAGES=(oh-my-opencode oh-my-openagent omo-ai)")
     expect(preflightRun).toContain("docs/reference/omo-ai-publishing.md")
-    expect(extractDistTagBlock(workflowText)).toBe(DIST_TAG_FIXTURE)
+    expect(preflightRun).toContain('node script/preflight-trust.mjs "${ALL_PACKAGES[@]}"')
+    const versionRun = namedStep("release-metadata", "Calculate version").run ?? ""
+    expect(versionRun).toContain("DIST_TAG=$(printf '%s\\n' \"$METADATA\" | awk -F= '$1 == \"dist_tag\" { print $2 }')")
+    expect(resolveReleaseVersion("5.0.0", false).distTag).toBe("")
+    expect(resolveReleaseVersion("5.0.0-rc.1", false).distTag).toBe("rc")
   })
 })

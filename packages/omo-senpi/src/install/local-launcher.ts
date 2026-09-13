@@ -42,6 +42,9 @@ export function renderLocalLauncher(options: LocalLauncherOptions): string {
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    changelog: {
+      path: join(options.pluginPath, "CHANGELOG.md").replaceAll("\\", "/"),
+    },
     // Same channel the published launcher declares, so a local install is never told to update
     // the engine it is pinned against.
     update: {

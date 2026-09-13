@@ -126,6 +126,7 @@ export function createMemoryReflectionLiveWiring(
         : {
             sessionId,
             api,
+            identityContext: identity,
             ...(ui === undefined ? {} : { ui }),
             ...(options.logger === undefined ? {} : { logger: options.logger }),
           }

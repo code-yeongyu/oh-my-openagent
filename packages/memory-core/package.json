@@ -18,5 +18,8 @@
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test src/"
+  },
+  "devDependencies": {
+    "yaml": "2.9.0"
   }
 }

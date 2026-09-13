@@ -116,6 +116,9 @@ function writeStream(response, steps) {
   })
   const toolCalls = steps.filter((step) => step.type === "tool_call")
   const texts = steps.filter((step) => step.type === "text")
+  // `usage` rides the finish chunk exactly where an OpenAI-compatible provider reports it (the
+  // client asks for stream_options.include_usage); without it the client records zero tokens.
+  const usage = steps.find((step) => step.usage !== undefined)?.usage
   send(response, chunk({ role: "assistant" }))
   for (const [index, step] of texts.entries()) {
     if (index === 0 || toolCalls.length === 0) send(response, chunk({ content: step.text }))
@@ -130,18 +133,19 @@ function writeStream(response, steps) {
       }],
     }))
   }
-  send(response, chunk({}, toolCalls.length > 0 ? "tool_calls" : "stop"))
+  send(response, chunk({}, toolCalls.length > 0 ? "tool_calls" : "stop", usage))
   response.write("data: [DONE]\n\n")
   response.end()
 }
 
-function chunk(delta, finishReason = null) {
+function chunk(delta, finishReason = null, usage = undefined) {
   return {
     id: "mock-http-completion",
     object: "chat.completion.chunk",
     created: 0,
     model: "mock-http",
     choices: [{ index: 0, delta, finish_reason: finishReason }],
+    ...(usage === undefined ? {} : { usage }),
   }
 }
 
@@ -158,7 +162,7 @@ async function runSelfTest() {
       { type: "text", text: "a" },
       { type: "text", text: "b", releaseWhen: () => released },
       { type: "text", text: "c" },
-      { type: "text", text: "d", delayMs: 80 },
+      { type: "text", text: "d", delayMs: 80, usage: { prompt_tokens: 40000, completion_tokens: 3, total_tokens: 40003 } },
     ],
     requestLogPath: logPath,
     classifyRequest: (body) => body.lane ?? "parent",
@@ -181,6 +185,8 @@ async function runSelfTest() {
     const d = await post("parent")
     if (Date.now() - t0 < 50) throw new Error("self-test: delayMs")
     if (!d.text.includes("d")) throw new Error("self-test: delayed step")
+    if (!d.text.includes('"usage":{"prompt_tokens":40000')) throw new Error("self-test: a step's usage must ride the finish chunk")
+    if (a.text.includes('"usage"')) throw new Error("self-test: a step without usage must not invent one")
     const rows = readFileSync(logPath, "utf8").trim().split("\n").map((line) => JSON.parse(line))
     if (rows.length !== 4) throw new Error(`self-test: log length ${rows.length}`)
     if (rows[1].lane !== "judge" || rows[1].stepIndex !== 1) throw new Error("self-test: log classification")

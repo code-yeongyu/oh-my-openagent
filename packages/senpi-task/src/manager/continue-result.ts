@@ -13,6 +13,11 @@ export function toContinueResult(outcome: SendOutcome): ContinueResult {
       return { kind: "continued", task_id: outcome.task_id, status: "running", delivered: "revive" }
     case "delivery_uncertain":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: outcome.suggestion }
+    case "cwd_unavailable":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: "Restore access to the recorded working directory before retrying, or start a new task in an available directory." }
+    case "config_generation_mismatch":
+      return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: "Resolve the recorded configuration mismatch under the revival policy, or start a new task with the current configuration." }
+    case "admission_refused":
     case "capacity_deferred":
       return { kind: "not_continuable", task_id: outcome.task_id, reason: outcome.reason, suggestion: "Retry the send after capacity frees." }
     case "queued":

@@ -12,7 +12,12 @@ import { parse } from "jsonc-parser"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { createConfigStartupComponent, runSenpiStartupMigration, type SenpiStartupMigrationResult } from "./index"
+import {
+  createConfigStartupComponent,
+  notificationMessages,
+  runSenpiStartupMigration,
+  type SenpiStartupMigrationResult,
+} from "./index"
 
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
@@ -273,5 +278,67 @@ describe("createConfigStartupComponent", () => {
 
     // then
     expect(logs).toEqual(["warn:omo-senpi: configuration diagnostics: Invalid omo config"])
+  })
+
+  test("#given a retired agents.momus key in omo.json #when session_start captures a UI #then nothing is reported about it", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const logs: string[] = []
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { momus: { model: "omo-mock/mock-1" } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+    createConfigStartupComponent({
+      loadConfig: () => config,
+      resolveCwd: () => "/project",
+      runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
+    }).register(pi, context(logs))
+    const notifications: Array<{ message: string; type: string | undefined }> = []
+    const eventContext = { ui: { notify: (message: string, type?: string) => notifications.push({ message, type }) } }
+
+    // when
+    await pi.dispatch("session_start", {}, eventContext)
+
+    // then: the retired key is an ordinary custom agent now, so it produces no notice at all
+    expect(notifications).toEqual([])
+    expect(logs).toEqual([])
+  })
+})
+
+describe("notificationMessages", () => {
+  const quietMigration: SenpiStartupMigrationResult = { journalResumed: false, migratedFrom: [], results: [] }
+
+  test("#given retired agents.momus and agents.metis keys #when notices are built #then no notice is produced for them", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { momus: { model: "omo-mock/mock-1" }, metis: { disable: true } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then: the one-release alias window closed, so the keys are plain custom agents
+    expect(notices).toEqual([])
+  })
+
+  test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { "plan-reviewer": { model: "omo-mock/mock-1" }, scout: { description: "Project scout" } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([])
   })
 })

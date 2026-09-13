@@ -1,7 +1,7 @@
 // Delivery half of the kibitzer recall channel. before_agent_start drains the pending
-// file the gate wrote and injects one hidden omo-kibitzer:recall message. Fail-open:
-// an unreadable ledger or a failed visible trace never suppresses a nudge the judge
-// already paid for.
+// file the sidecar's delivery wrote and injects one hidden omo-kibitzer:recall message.
+// Fail-open: an unreadable ledger or a failed visible trace never suppresses a nudge the
+// sidecar already paid for.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 import { renderNudgeBlock, type RecallLedger, type RecallNudge } from "@oh-my-opencode/memory-core"
@@ -10,13 +10,13 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerNudgedRecord } from "./kibitzer-notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerNudgedRecord } from "./kibitzer/notice"
 import { renderRecallEntry } from "./recall-notice"
 import { RECALL_CUSTOM_TYPE, readSession } from "./recall-session-read"
 
-/** The pending handoff the gate writes and this turn drains; `take` is read-and-delete. */
+/** The pending handoff delivery writes and this turn drains; `take` is read-and-delete. */
 export interface PendingNudgesPort {
-  take(sessionId: string, options: { readonly currentEpoch: number }): Promise<RecallNudge[]>
+  take(sessionId: string): Promise<RecallNudge[]>
 }
 
 export interface RecallDrainOptions {
@@ -26,13 +26,6 @@ export interface RecallDrainOptions {
   readonly ledgerFor: (context: MemoryIdentityContext) => RecallLedger
   readonly pendingFor: (context: MemoryIdentityContext) => PendingNudgesPort
   readonly drainQueued?: (sessionId: string, context: MemoryIdentityContext) => RecallNudge[]
-  /**
-   * The session's live compaction epoch, owned by the kibitzer gate wiring. A pending payload is
-   * stamped with the epoch its judge ran under, so passing the live one here is what rejects a
-   * verdict about a transcript a compaction has since rewritten. Absent means "never compacted",
-   * matching the gate wiring's own default for an unknown session.
-   */
-  readonly currentCompactionEpoch?: (sessionId: string) => number
   readonly logger?: ComponentLogger
 }
 
@@ -43,17 +36,18 @@ export interface RecallDrain {
 // A memory worker child must never receive recall hints: it reasons ABOUT memory, and an injected
 // hint would both pollute its transcript and re-enter memory on the next extraction pass. The
 // reflection and facts sentinels are here for the sharper reason: those children must not judge
-// or consume the hints produced by the kibitzer gate.
+// or consume the hints produced by the Kibitzer sidecar.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
 
 /**
  * Provenance recorded next to a surfaced path. The ledger keys on the path alone - the hash exists
- * so a reader can tell a gate-delivered hint from a lexically matched one.
+ * so a reader can tell a Kibitzer-delivered hint from a lexically matched one. The value predates
+ * the resident sidecar and stays as it is: stored ledgers carry it.
  */
 export const GATE_SURFACE_HASH = "kibitzer-gate"
 
 export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
-  /** Drain the gate's pending nudges for this turn. Returns undefined when there is nothing to say. */
+  /** Drain the pending nudges for this turn. Returns undefined when there is nothing to say. */
   async function inject(payload: unknown, eventCtx: unknown): Promise<RecallInjection | undefined> {
     if (!isBeforeAgentStart(payload)) return undefined
     if (CHILD_SENTINELS.some((sentinel) => options.env[sentinel] === "1")) return undefined
@@ -65,9 +59,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
 
     let fromFile: RecallNudge[] = []
     try {
-      fromFile = await options.pendingFor(context).take(session.id, {
-        currentEpoch: options.currentCompactionEpoch?.(session.id) ?? 0,
-      })
+      fromFile = await options.pendingFor(context).take(session.id)
     } catch (error) {
       options.logger?.warn("omo-senpi memory recall pending take skipped", { sessionId: session.id, error: describe(error) })
     }
@@ -81,7 +73,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
     if (nudges.length === 0) return undefined
 
     // Composed BEFORE any bookkeeping: marking is advisory, so its failure must never consume or
-    // suppress a nudge the judge already paid for.
+    // suppress a nudge the sidecar already paid for.
     const injection: RecallInjection = {
       result: {
         message: {
@@ -101,7 +93,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
         nudges.map((nudge) => ({ path: nudge.path, hash: GATE_SURFACE_HASH })),
       )
     } catch (error) {
-      // Fail-open: an unrecorded path simply stays eligible for a later gate run.
+      // Fail-open: an unrecorded path simply stays eligible for a later wake.
       options.logger?.warn("omo-senpi memory recall ledger mark skipped", {
         sessionId: session.id,
         error: describe(error),

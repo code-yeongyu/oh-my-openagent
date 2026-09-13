@@ -1,6 +1,6 @@
 ---
 name: ultimate-browsing
-description: "Reaches web pages a plain fetch cannot: renders JS, drives clicks and forms, captures screenshots, holds a login, and gets past WAF blocks through platform-native readers and stealth Chrome. Use for any page work beyond retrieving static text."
+description: "Renders, drives, and screenshots web pages: JS-rendered sources, clicks and forms, persistent logins, WAF-blocked hosts (platform-native readers, stealth Chrome), and the browsing lane of a research run, with screenshots as provenance. Not for plain search or unblocked static fetch."
 ---
 
 # Ultimate Browsing

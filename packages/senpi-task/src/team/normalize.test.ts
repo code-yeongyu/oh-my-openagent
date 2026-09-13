@@ -43,7 +43,7 @@ describe("normalizeSenpiTeamSpec", () => {
 
   test("#given a spec that already carries its own name #when normalized #then the explicit name is preserved", () => {
     // given
-    const rawSpec = { name: "explicit-name", members: [{ kind: "subagent_type", subagent_type: "atlas" }] }
+    const rawSpec = { name: "explicit-name", members: [{ kind: "subagent_type", subagent_type: "builder" }] }
 
     // when
     const spec = normalizeSenpiTeamSpec(rawSpec, "record-key")

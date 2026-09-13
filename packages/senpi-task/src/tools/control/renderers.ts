@@ -141,6 +141,10 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
+      return { color: "warning", text: `task_send ${details.kind} ${details.task_id}: ${details.reason}` }
     case "steered":
       return {
         color: statusThemeColor(details.status),

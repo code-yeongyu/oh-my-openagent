@@ -1,0 +1,22 @@
+bun test v1.4.2 (744846f84)
+
+script/release-version.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './release-version.mjs' from '<worktree>/script/release-version.test.ts'
+-------------------------------
+
+
+script/preflight-trust.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './preflight-trust.mjs' from '<worktree>/script/preflight-trust.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 2 fail
+ 2 errors
+Ran 2 tests across 2 files. [1.53s]

@@ -13,13 +13,13 @@ Tracks bugs that are present in the current release but have been intentionally 
 
 - **Affects**: Complex `ulw` runs where planning is delegated through a subagent named `plan` while OpenCode's experimental plan mode is enabled.
 - **Symptom**: The delegated planner can use OpenCode's native plan workflow, write under `.opencode/plans/` (or OpenCode's data-directory `opencode/plans/` fallback), and show the native `plan_exit` approval prompt instead of returning an OMO plan under `.omo/plans/` to the parent. The nested approval can offer to switch that child to build mode, while leaving it unresolved keeps the synchronous parent task waiting.
-- **Workaround**: If a native `plan_exit` prompt appears inside a delegated `ulw` planner, do not switch that nested child to build mode. Interrupt back to the parent, then ask the parent to recover the plan output or rerun planning through Prometheus/OMO planning explicitly.
+- **Workaround**: If a native `plan_exit` prompt appears inside a delegated `ulw` planner, do not switch that nested child to build mode. Interrupt back to the parent, then ask the parent to recover the plan output or rerun planning through `/ulw-plan` explicitly.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5850.
 
-## #5839 - Ralph Loop prose-only Oracle approval detection (resolved)
+## #5839 - Ralph Loop prose-only gate-reviewer approval detection (resolved)
 
-- **Historical behavior**: The former Ralph Loop required Oracle to return the exact `<promise>VERIFIED</promise>` token and could reject a prose-only approval.
-- **Resolution**: Ralph Loop is no longer wired into current session hooks. The Goal subsystem replaced its user-facing continuation path and does not use the Ralph Loop Oracle verification detector.
+- **Historical behavior**: The former Ralph Loop required the gate reviewer to return the exact `<promise>VERIFIED</promise>` token and could reject a prose-only approval.
+- **Resolution**: Ralph Loop is no longer wired into current session hooks. The Goal subsystem replaced its user-facing continuation path and does not use the Ralph Loop verification detector.
 - **Status**: Resolved for current releases. Tracked historically at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
 
 ## #5746 - tmux subagent panes attach only after focus by default
@@ -38,8 +38,8 @@ Tracks bugs that are present in the current release but have been intentionally 
 
 ## #5806 - `ulw` mode does not persist across follow-up messages
 
-- **Affects**: Multi-turn Sisyphus sessions that rely on `ulw` or `ultrawork` keyword injection.
-- **Symptom**: The keyword detector is edge-triggered per message. A first prompt that includes `ulw` gets the ultrawork prompt, but a follow-up that omits the keyword can fall back to default Sisyphus behavior and lose the expected delegation pattern.
+- **Affects**: Multi-turn main-agent sessions that rely on `ulw` or `ultrawork` keyword injection.
+- **Symptom**: The keyword detector is edge-triggered per message. A first prompt that includes `ulw` gets the ultrawork prompt, but a follow-up that omits the keyword can fall back to the main agent's default behavior and lose the expected delegation pattern.
 - **Workaround**: Repeat `ulw` or `ultrawork` in every follow-up message that should stay in ultrawork mode. For long tasks, prefer starting a fresh prompt that includes the keyword instead of assuming the mode remains active.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5806.
 
@@ -133,13 +133,6 @@ BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first p
 
 - **Status**: Open. The runtime now avoids the misleading auto-updated toast when it detects an OpenCode-managed sandbox, but users may still need the manual cache refresh above until OpenCode exposes a reliable package-sandbox update path. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
 
-## #4710: `@plan` does not switch to Prometheus
-
-- **Affects**: Current OpenCode/Ultimate planning flow.
-- **Symptom**: `@plan` is OpenCode's native plan-agent mention, not an OMO Prometheus switch, so typing it from Sisyphus does not hand the request to Prometheus.
-- **Workaround**: Select Prometheus first with the Tab agent selector or `/agent`, ask for the plan there; after the plan is written under `.omo/plans/`, run `/ulw-execute` so Atlas executes it.
-- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4710.
-
 ## #5050: OpenCode can hang during startup before the plugin runs
 
 - **Affects**: OpenCode 1.16.2 startup with external plugins and cold package caches.
@@ -154,7 +147,7 @@ BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first p
 - **Workaround**: Record a `declined` install decision for the missing server with `lsp_install_decision`; future LSP calls collapse to a one-line warning. To share that decision across sessions, set `LSP_TOOLS_MCP_INSTALL_DECISIONS` to a stable decisions-file path.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5260.
 
-## #5120: Sisyphus can loop on simple tasks
+## #5120: The main agent can loop on simple tasks
 
 - **Affects**: OpenCode 1.17.0 with oh-my-openagent 4.8.1.
 - **Symptom**: A trivial prompt such as `output hello world` can repeat the plan-style status block instead of answering directly.
@@ -198,13 +191,13 @@ BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first p
 
 - **Affects**: OpenCode TUI sessions with custom OMO agent display names that include Chinese, Japanese, or Korean characters.
 - **Symptom**: The ASCII part of the agent name renders normally, but the CJK characters in the TUI header can appear garbled.
-- **Workaround**: Use ASCII-only custom display names such as `Sisyphus - Orchestrator` until the TUI rendering path handles multi-byte character widths reliably.
+- **Workaround**: Use ASCII-only custom display names such as `Orchestrator` until the TUI rendering path handles multi-byte character widths reliably.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4170.
 
 ## #3835 / #3456 — OpenCode Desktop shows only native agents
 
 - **Affects**: OpenCode Desktop sessions where `opencode agent list` or the TUI still shows OMO agents, but the Desktop agent selector only shows native agents such as Build and Plan.
-- **Symptom**: Desktop hides Sisyphus, Hephaestus, Prometheus, Atlas, or other OMO agents even though `oh-my-openagent doctor` passes.
+- **Symptom**: Desktop hides the OMO orchestrator, planner, and worker agents even though `oh-my-openagent doctor` passes.
 - **First check**: Inspect the OpenCode Desktop log for `Failed to load plugin oh-my-openagent@latest` and missing files under `~/.cache/opencode/packages/oh-my-openagent@latest/node_modules`.
 - **Cache workaround**: Close Desktop, remove the `oh-my-openagent@latest` package cache, then reinstall the plugin from the same working directory with `opencode plugin oh-my-openagent@latest`.
 - **Scope workaround**: If the plugin loads in one shell but not Desktop, compare the active user and project `opencode.json` files. OpenCode can read a closer project `.opencode/opencode.json` instead of the user config you inspected.

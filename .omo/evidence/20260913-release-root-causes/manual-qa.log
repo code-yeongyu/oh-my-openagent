@@ -1,0 +1,20 @@
+{"mode":"recover","code":0,"exchanges":2,"acquisitions":1,"output":"lazycodex-ai HTTP 503: {\"error\":\"registry unavailable\"} (attempt 1/6)\nOK lazycodex-ai\n"}
+{"mode":"misconfigured","code":1,"exchanges":1,"acquisitions":2,"output":"lazycodex-ai HTTP 403: {\"error\":\"publisher mismatch\"} (attempt 1/6)\nConfigure https://www.npmjs.com/package/lazycodex-ai/access - Provider: GitHub Actions; Organization: code-yeongyu; Repository: oh-my-openagent; Workflow filename: publish.yml. See docs/reference/omo-ai-publishing.md.\n::error::lazycodex-ai HTTP 403: {\"error\":\"publisher mismatch\"} (attempt 1/6)\n"}
+PASS: real workflow shell + Node CLI + local HTTP OIDC/exchange: retry recovery and fail-fast configuration; no live registry writes or credentials.
+version=5.0.0-beta.62.lazycodex.1
+dist_tag=beta
+=== Publishing oh-my-opencode (multi-package) ===
+
+10 |   if (lazycodexOnly) {
+11 |     if (!reserved || !/^(?:[0-9A-Za-z]+\.)*lazycodex\.[1-9]\d*$/.test(match[4] ?? "") || identifiers.filter((part) => part === "lazycodex").length !== 1) {
+12 |       throw new Error("LazyCodex-only version must end in lazycodex.N (N >= 1), e.g. 5.0.0-beta.62.lazycodex.1 or 5.0.0-lazycodex.1")
+13 |     }
+14 |   } else if (reserved) {
+15 |     throw new Error("The lazycodex prerelease identifier is reserved for LazyCodex-only releases")
+                   ^
+error: The lazycodex prerelease identifier is reserved for LazyCodex-only releases
+      at resolveReleaseVersion (<worktree>/script/release-version.mjs:15:15)
+      at main (<worktree>/script/publish.ts:406:24)
+      at <worktree>/script/publish.ts:440:1
+
+Bun v1.4.2 (macOS arm64)

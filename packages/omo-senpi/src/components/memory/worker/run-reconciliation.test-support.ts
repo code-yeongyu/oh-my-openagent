@@ -20,7 +20,7 @@ import { writeRunJsonAtomic } from "./run-artifacts"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-const PHASE_WATCHDOG_MS = 2_000
+const PHASE_WATCHDOG_MS = process.platform === "win32" ? 10_000 : 2_000
 
 export async function cleanupReconciliationFixtures(): Promise<void> {
   await Promise.all(roots.splice(0).map((root) =>

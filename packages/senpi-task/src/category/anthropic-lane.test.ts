@@ -72,9 +72,9 @@ describe("builtin Claude rungs under the senpi harness", () => {
     expect(resolved.spec.variant).toBe("xhigh")
   })
 
-  test("#given claude-sdk-oauth and opencode both serve Sonnet 4.6 #when metis resolves #then the subscription lane wins", () => {
+  test("#given claude-sdk-oauth and opencode both serve Sonnet 4.6 #when plan-consultant resolves #then the subscription lane wins", () => {
     // when
-    const resolved = expectResolvedAgent(resolveAgent("metis", BUILTIN_AGENTS, subscriptionAndMeteredRegistry()))
+    const resolved = expectResolvedAgent(resolveAgent("plan-consultant", BUILTIN_AGENTS, subscriptionAndMeteredRegistry()))
 
     // then
     expect(resolved.model).toBe("claude-sdk-oauth/claude-sonnet-4-6")
@@ -96,7 +96,7 @@ describe("builtin Claude rungs under the senpi harness", () => {
     const architect = expectResolvedCategory(resolveCategory("architect", {}, apiKeyRegistry))
     const meteredArchitect = expectResolvedCategory(resolveCategory("architect", {}, meteredOnlyRegistry))
     const meteredHigh = expectResolvedCategory(resolveCategory("unspecified-high", {}, meteredOnlyRegistry))
-    const metis = expectResolvedAgent(resolveAgent("metis", BUILTIN_AGENTS, apiKeyRegistry))
+    const planConsultant = expectResolvedAgent(resolveAgent("plan-consultant", BUILTIN_AGENTS, apiKeyRegistry))
 
     // then: the provider-pinned category default still wins outright, opencode is still the last
     // resort on a metered-only machine, and the requested-model record is untouched
@@ -117,8 +117,8 @@ describe("builtin Claude rungs under the senpi harness", () => {
       "opencode", "claude-opus-5", "xhigh",
     ])
     expect(meteredHigh.spec.requested_model?.display).toBe("openai/gpt-6-astra")
-    expect(metis.model).toBe("anthropic/claude-sonnet-4-6")
-    expect(metis.resolved_model?.display).toBe("anthropic/claude-sonnet-4-6")
-    expect(metis.fallback_models).toBeUndefined()
+    expect(planConsultant.model).toBe("anthropic/claude-sonnet-4-6")
+    expect(planConsultant.resolved_model?.display).toBe("anthropic/claude-sonnet-4-6")
+    expect(planConsultant.fallback_models).toBeUndefined()
   })
 })

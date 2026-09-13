@@ -44,9 +44,21 @@ export function deliveryUncertain(record: TaskRecord, runEpoch: number): SendOut
     kind: "delivery_uncertain",
     task_id: record.task_id,
     run_epoch: runEpoch,
-    reason: "child exited before acknowledging the message; inspect task_output before resending",
-    suggestion: "Do not resend automatically; inspect task_output first.",
+    reason: "Message delivery could not be confirmed durably; inspect task_output before continuing.",
+    suggestion: "Do not resend automatically; inspect task_output and explicitly resolve the recorded delivery first.",
   }
+}
+
+export function uncertainDeliveryDenial(record: TaskRecord, message: string): SendOutcome | undefined {
+  const uncertain = record.revive_delivery_uncertain
+  if (uncertain === undefined) return undefined
+  // Retained batches cannot be retried implicitly, even by a distinct message. An ordinary
+  // running turn without a retained batch still accepts distinct steering as before.
+  if (record.status !== "running" || (record.pending_steering?.length ?? 0) > 0 ||
+    (uncertain.run_epoch === record.notification.run_epoch && uncertain.message_sha256 === messageSha256(message))) {
+    return deliveryUncertain(record, uncertain.run_epoch)
+  }
+  return undefined
 }
 
 export function lazyRevivalFailure(record: TaskRecord, reason: string): SendOutcome {
@@ -59,14 +71,13 @@ export function lazyRevivalFailure(record: TaskRecord, reason: string): SendOutc
 }
 
 export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord {
-  // run_stats, terminal_at, and any unacknowledged-delivery marker describe the FINISHED run; none
-  // may cross into the new run (a stale marker would otherwise ride every later epoch).
+  // Finished-run output and timing reset; unresolved delivery is durable evidence, not run
+  // bookkeeping. Only explicit resolution or acknowledgment may remove its marker.
   const {
     final_response: _final,
     error_message: _error,
     run_stats: _stats,
     terminal_at: _terminalAt,
-    revive_delivery_uncertain: _uncertain,
     ...rest
   } = record
   return {

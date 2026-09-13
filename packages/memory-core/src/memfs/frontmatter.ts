@@ -1,87 +1,81 @@
 /**
- * Memory file frontmatter parse/render — letta-exact parity port.
+ * Memory file frontmatter parse/render.
  *
- * Format (letta tools/impl/memory.ts:472-553, memory-apply-patch.ts:644-714):
- * ---\n description: <single-line non-empty>\n [read_only: <value>]\n [limit: tolerated-ignored]\n ---\n <body>
+ * Reader grammar (letta parity, one `key: value` per line, split on the FIRST
+ * colon) plus quoted-scalar decoding; renderer output is always strict YAML so
+ * the same file reads identically here and in the skill loader (`yaml`).
  *
- * Tolerances (from source at a75f4d93e):
- * - Frontmatter delimited by ^---\r?\n ... \r?\n---\r?\n?
- * - Key parsing: split on FIRST colon, trim key and value
- * - description: required, non-empty (whitespace-only rejected)
+ * - description: required, non-empty, single line; quoted on output whenever a
+ *   plain scalar would not round-trip through strict YAML (`: `, ` #`, `true`,
+ *   leading indicators, ...).
  * - read_only: string value preserved verbatim (not coerced to boolean)
- * - limit: tolerated (parsed but not surfaced in the frontmatter object)
- * - Unknown keys: silently ignored (hook-layer enforces allowed set)
- * - CRLF normalized: regex tolerates \r\n on read; render emits LF only
- * - sanitizeFrontmatterValue collapses \r?\n to spaces then trims
- *
- * Dual-copy verdict: memory.ts:472-553 and memory-apply-patch.ts:644-714
- * are BEHAVIORALLY IDENTICAL. The only divergence is error-message prefix
- * ("memory:" vs "memory apply_patch:"). This module uses a neutral prefix
- * since tool-level distinction is the caller's responsibility (todo 9/10).
+ * - kind / aliases: people-record keys (aliases is a JSON array)
+ * - limit: tolerated-ignored legacy key
+ * - any other key (SKILL.md `name`, `version`, `deprecated`, ...) is preserved
+ *   as its raw scalar source in `extra` so edits never drop it
+ * - CRLF normalized on read; render emits LF only
  */
 
+import { FRONTMATTER_RE, decodeScalarSource, renderRawScalar, renderStringScalar } from "./frontmatter-scalar"
+import { describeHeaderGrammarViolation } from "./frontmatter-validation"
+
+export interface MemoryFrontmatter {
+  description: string
+  read_only?: string
+  kind?: string
+  aliases?: readonly string[]
+  extra?: Readonly<Record<string, string>>
+}
+
 export interface ParsedMemoryFile {
-  frontmatter: {
-    description: string;
-    read_only?: string;
-    kind?: string;
-    aliases?: readonly string[];
-  };
-  body: string;
+  frontmatter: MemoryFrontmatter
+  body: string
 }
 
 export class FrontmatterError extends Error {
-  override readonly name = "FrontmatterError";
+  override readonly name = "FrontmatterError"
 }
 
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+const CONTRACT_KEYS: ReadonlySet<string> = new Set(["description", "read_only", "kind", "aliases", "limit"])
+const EXTRA_KEY_RE = /^[A-Za-z0-9_-]+$/
 
-/**
- * Parse a memory markdown file, extracting frontmatter and body.
- *
- * Throws FrontmatterError if:
- * - frontmatter delimiters are missing/malformed
- * - description is absent or whitespace-only
- */
 export function parseMemoryFile(content: string): ParsedMemoryFile {
-  const match = content.match(FRONTMATTER_RE);
+  const match = content.match(FRONTMATTER_RE)
   if (!match) {
-    throw new FrontmatterError(
-      "frontmatter: target file is missing required frontmatter",
-    );
+    throw new FrontmatterError("frontmatter: target file is missing required frontmatter")
   }
 
-  const frontmatterText = match[1] ?? "";
-  const body = match[2] ?? "";
+  const frontmatterText = match[1] ?? ""
+  const body = match[2] ?? ""
 
-  let description: string | undefined;
-  let readOnly: string | undefined;
-  let kind: string | undefined;
-  let aliases: readonly string[] | undefined;
+  let description: string | undefined
+  let readOnly: string | undefined
+  let kind: string | undefined
+  let aliases: readonly string[] | undefined
+  const extra: Record<string, string> = {}
 
   for (const line of frontmatterText.split(/\r?\n/)) {
-    const idx = line.indexOf(":");
-    if (idx <= 0) continue;
+    const idx = line.indexOf(":")
+    if (idx <= 0) continue
 
-    const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
+    const key = line.slice(0, idx).trim()
+    const value = line.slice(idx + 1).trim()
 
     if (key === "description") {
-      description = value;
+      description = decodeScalarSource(value)
     } else if (key === "read_only") {
-      readOnly = value;
+      readOnly = value
     } else if (key === "kind") {
-      kind = value;
+      kind = decodeScalarSource(value)
     } else if (key === "aliases") {
-      aliases = parseAliases(value, line);
+      aliases = parseAliases(value, line)
+    } else if (key !== "limit" && EXTRA_KEY_RE.test(key)) {
+      extra[key] = value
     }
-    // 'limit' and unknown keys are tolerated-ignored per letta source.
   }
 
   if (!description || !description.trim()) {
-    throw new FrontmatterError(
-      "frontmatter: target file frontmatter is missing 'description'",
-    );
+    throw new FrontmatterError("frontmatter: target file frontmatter is missing 'description'")
   }
 
   return {
@@ -90,102 +84,102 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
       ...(readOnly !== undefined ? { read_only: readOnly } : {}),
       ...(kind !== undefined ? { kind } : {}),
       ...(aliases !== undefined ? { aliases } : {}),
+      ...(Object.keys(extra).length > 0 ? { extra } : {}),
     },
     body,
-  };
+  }
 }
 
 /**
- * Render a memory markdown file from frontmatter and body.
- *
- * - description is sanitized to a single line (newlines collapsed to spaces)
- * - read_only preserved verbatim when present
- * - empty body yields header with trailing newline; non-empty body appended as-is
- * - LF only output (CRLF normalized)
- *
- * Throws FrontmatterError if description is empty after trimming.
+ * Render a memory markdown file. Every value is emitted as a scalar that strict
+ * YAML reads back verbatim, and the header is re-validated and re-parsed
+ * before it is returned, so a file written here can never fail the skill loader.
  */
-export function renderMemoryFile(
-  frontmatter: { description: string; read_only?: string; kind?: string; aliases?: readonly string[] },
-  body: string,
-): string {
-  const description = frontmatter.description.trim();
+export function renderMemoryFile(frontmatter: MemoryFrontmatter, body: string): string {
+  const description = sanitizeFrontmatterValue(frontmatter.description)
   if (!description) {
-    throw new FrontmatterError(
-      "frontmatter: 'description' must not be empty",
-    );
+    throw new FrontmatterError("frontmatter: 'description' must not be empty")
   }
 
-  const lines = [
-    "---",
-    `description: ${sanitizeFrontmatterValue(description)}`,
-  ];
+  const lines = [`description: ${renderStringScalar(description)}`]
 
   if (frontmatter.read_only !== undefined) {
-    lines.push(`read_only: ${frontmatter.read_only}`);
+    lines.push(`read_only: ${frontmatter.read_only}`)
   }
 
   if (frontmatter.kind !== undefined) {
-    lines.push(`kind: ${sanitizeFrontmatterValue(frontmatter.kind)}`);
+    lines.push(`kind: ${renderStringScalar(sanitizeFrontmatterValue(frontmatter.kind))}`)
   }
 
   if (frontmatter.aliases !== undefined) {
-    lines.push(`aliases: ${JSON.stringify(frontmatter.aliases)}`);
+    lines.push(`aliases: ${JSON.stringify(frontmatter.aliases)}`)
   }
 
-  lines.push("---");
-
-  const header = lines.join("\n");
-  if (!body) {
-    return `${header}\n`;
+  for (const [key, raw] of Object.entries(frontmatter.extra ?? {})) {
+    if (!EXTRA_KEY_RE.test(key) || CONTRACT_KEYS.has(key)) {
+      throw new FrontmatterError(`frontmatter: '${key}' is not a valid extra frontmatter key`)
+    }
+    lines.push(`${key}: ${renderRawScalar(sanitizeFrontmatterValue(raw))}`)
   }
-  return `${header}\n${body}`;
+
+  const headerText = lines.join("\n")
+  const header = `---\n${headerText}\n---`
+  const rendered = body ? `${header}\n${body}` : `${header}\n`
+  assertStrictRoundTrip(headerText, rendered, { ...frontmatter, description })
+  return rendered
 }
 
-/**
- * Sanitize a frontmatter value to a single line by collapsing
- * any \r?\n sequence to a space, then trimming.
- */
+function assertStrictRoundTrip(headerText: string, rendered: string, frontmatter: MemoryFrontmatter): void {
+  const violation = describeHeaderGrammarViolation(headerText)
+  if (violation !== null) {
+    throw new FrontmatterError(`frontmatter: rendered header is not strict YAML: ${violation}`)
+  }
+  const reparsed = parseMemoryFile(rendered).frontmatter
+  const mismatches: string[] = []
+  if (reparsed.description !== frontmatter.description) mismatches.push("description")
+  if (reparsed.read_only !== frontmatter.read_only) mismatches.push("read_only")
+  if (frontmatter.kind !== undefined && reparsed.kind !== sanitizeFrontmatterValue(frontmatter.kind)) mismatches.push("kind")
+  if (JSON.stringify(reparsed.aliases) !== JSON.stringify(frontmatter.aliases)) mismatches.push("aliases")
+  for (const key of Object.keys(frontmatter.extra ?? {})) {
+    if (reparsed.extra?.[key] === undefined) mismatches.push(key)
+  }
+  if (mismatches.length > 0) {
+    throw new FrontmatterError(`frontmatter: rendered header does not round-trip (${mismatches.join(", ")})`)
+  }
+}
+
 function sanitizeFrontmatterValue(value: string): string {
-  return value.replace(/\r?\n/g, " ").trim();
+  return value.replace(/\r?\n/g, " ").trim()
 }
 
-/**
- * Parse the aliases frontmatter value per IC-13.
- *
- * A value starting with `[` is parsed as JSON and must yield an array
- * of non-empty strings. Anything else raises a FrontmatterError.
- */
 function parseAliases(value: string, rawLine: string): readonly string[] {
-  const trimmed = value.trim();
+  const trimmed = value.trim()
   if (!trimmed.startsWith("[")) {
     throw new FrontmatterError(
       `frontmatter: 'aliases' must be a JSON array of non-empty strings (line: ${rawLine})`,
-    );
+    )
   }
 
-  let parsed: unknown;
+  let parsed: unknown
   try {
-    parsed = JSON.parse(trimmed);
+    parsed = JSON.parse(trimmed)
   } catch {
-    throw new FrontmatterError(
-      `frontmatter: 'aliases' is not valid JSON (line: ${rawLine})`,
-    );
+    throw new FrontmatterError(`frontmatter: 'aliases' is not valid JSON (line: ${rawLine})`)
   }
 
   if (!Array.isArray(parsed)) {
     throw new FrontmatterError(
       `frontmatter: 'aliases' must be a JSON array, not ${typeof parsed} (line: ${rawLine})`,
-    );
+    )
   }
 
   for (const item of parsed) {
     if (typeof item !== "string" || item.trim() === "") {
       throw new FrontmatterError(
         `frontmatter: 'aliases' array must contain only non-empty strings (line: ${rawLine})`,
-      );
+      )
     }
   }
 
-  return parsed as string[];
+  return parsed as string[]
 }

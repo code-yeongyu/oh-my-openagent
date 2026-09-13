@@ -2,6 +2,8 @@
 
 ## [0.1.0] - unreleased
 
+- LazyCodex native spawns now require an explicit bundled role before plan, budget, or artifact checks. Unknown and unnamed roles fail loudly; Senpi admission is unchanged. Guidance follows the actual spawn schema, including V2 `agent_type` when exposed. Installer/bootstrap provide an opt-out-able, ownership-checked medium-worker `default` for unnamed non-forks. An unnamed full-history fork still skips role application inside Codex: configuration cannot repair that upstream gap, and enforcement depends on Codex invoking the trusted hook. Legacy schemas without `agent_type` retain message-carried instructions but are rejected by the schema-blind guard rather than silently falling through.
+
 - Bundled `directive.md` picks up the ultrawork test-proportionality change: the execution-loop PIN step asks for characterization pins only when refactoring behavior whose regressions the change could hide. Stays byte-identical to `prompts-core/ultrawork/codex.md` and the ultrawork component's `directive.md`.
 
 - **Hooks:** new `Stop` hook auto-resumes a turn that died with unfinished goals (defers to ulw-execute-continuation while its plan has remaining tasks, bails under context pressure, and caps at two resumes without ledger movement via a separate `.stuck` marker). New `PreToolUse` spawn guard adds a per-session fan-out cap (`OMO_SPAWN_FANOUT_LIMIT`, default 60) and denies final gate-reviewer spawns while the reviewer artifacts the gate audits are missing.

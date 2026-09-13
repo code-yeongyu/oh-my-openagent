@@ -1,5 +1,5 @@
 import type { SendManager, SendToolResult } from "./types"
-import { toolResult } from "./tool-result"
+import { toolErrorResult, toolResult } from "./tool-result"
 
 export function invalidArguments(reason: string): SendToolResult {
   return toolResult(reason, { kind: "invalid_arguments", reason })
@@ -39,6 +39,10 @@ function resolveListedTask(manager: SendManager, to: string): ReturnType<SendMan
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
   switch (outcome.kind) {
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
+      return toolErrorResult(outcome.reason, outcome)
     case "steered": {
       if (outcome.delivered !== "steer") {
         throw new Error(`task_send invariant violated: expected steer delivery, received ${outcome.delivered}`)

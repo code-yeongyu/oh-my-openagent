@@ -80,6 +80,7 @@ const EXPECTED_CONFIG = {
     max_depth: 1,
     residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
     resume_children: true,
+    resident_idle_timeout_ms: 900000,
     team: {
       max_members: 8,
       max_parallel_members: 4,

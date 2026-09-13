@@ -3,7 +3,7 @@ import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
 
-// The live parent-session state the completion push routes against (Metis #3 five-state machine).
+// The live parent-session state the completion push routes against (plan-consultant finding #3).
 export type ParentState =
   | { readonly kind: "idle" }
   | { readonly kind: "streaming" }

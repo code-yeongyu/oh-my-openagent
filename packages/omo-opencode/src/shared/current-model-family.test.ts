@@ -8,6 +8,8 @@ const LEGACY_GPT_MODEL_RE = /gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\
 
 const ALLOWED_LEGACY_REFERENCES = new Set([
   "packages/omo-opencode/src/generated/model-capabilities.generated.json",
+  // Immutable audit data records upstream module filenames, not active model selections.
+  "script/qa/fixtures/dependency-audit/baseline-76e54b0-806f8e0/graph-artifacts/meta.json",
 ])
 
 function isActiveSurface(path: string): boolean {

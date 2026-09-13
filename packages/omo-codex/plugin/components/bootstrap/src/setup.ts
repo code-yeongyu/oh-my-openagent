@@ -1,5 +1,6 @@
 import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { readDefaultRoleConfig } from "../../../../src/install/codex-default-role-config.ts";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
 // inlines the installer source modules into dist/cli.js so PLUGIN_ROOT ships
@@ -94,16 +95,21 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		await stageBundledAgents(options.pluginRoot, stageRoot);
 		const preservedReasoning = await capturePreservedAgentReasoning({ codexHome: options.codexHome });
 		const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome: options.codexHome });
+		const config = readDefaultRoleConfig({ env: options.env });
 		const linked = await linkCachedPluginAgents({
 			codexHome: options.codexHome,
 			pluginRoot: stageRoot,
 			preservedReasoning,
 			preservedServiceTier,
+			defaultRoleEnabled: config.enabled,
 		});
 		const agentConfigs = linked
 			.map((link) => ({ configFile: `./agents/${link.name}`, name: agentNameFromToml(link.name) }))
 			.sort((left, right) => left.name.localeCompare(right.name));
-		return { agentConfigs, degraded: [] };
+		return {
+			agentConfigs,
+			degraded: config.warnings.map((reason) => ({ component: "agents-config", hint: BOOTSTRAP_DOCTOR_HINT, reason })),
+		};
 	} catch (error) {
 		return {
 			agentConfigs: [],

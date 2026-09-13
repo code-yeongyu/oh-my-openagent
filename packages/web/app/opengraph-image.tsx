@@ -8,7 +8,8 @@ import {
   type FormattedStatsData,
 } from "@/lib/stats"
 
-export const alt = "Oh My OpenAgent - the agent harness. Live GitHub stars and project one-liner."
+export const alt =
+  "OmO - your tool for real work, but it's an agent. Live GitHub stars and project one-liner."
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 export const revalidate = 3600

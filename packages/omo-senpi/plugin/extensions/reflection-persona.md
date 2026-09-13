@@ -30,7 +30,7 @@ Your memory repo root is `$MEMORY_DIR`. The transcript payload to review is at `
 The primary agent's context (its prompts, skills, and external memory files) is stored in a memory filesystem rooted at `$MEMORY_DIR`. Changes to these files reach the primary agent's context after they're committed to the memory git repo.
 
 The filesystem contains:
-- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory.
+- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do, written only by the primary agent as they say it: leave it as you found it.
 - **Skills** (`skills/`): procedural memory for specialized workflows. Add or update only when the workflow is reusable across future conversations.
 - **External memory** (everything else): reference material retrieved on demand by name and description. Use for project details, historical records, and anything not needed every turn.
 

@@ -156,7 +156,9 @@ function spawnTarget(item: Record<string, unknown>, parent: Record<string, unkno
   const category = itemCategory ?? (itemSubagent === undefined ? identifier(parent.category) : undefined)
   const subagent = itemSubagent ?? (itemCategory === undefined ? identifier(parent.subagent_type) : undefined)
   if ((category === undefined) === (subagent === undefined)) return undefined
-  return category === undefined ? { kind: "subagent", name: subagent ?? "" } : { kind: "category", name: category }
+  return category === undefined
+    ? { kind: "subagent", name: subagent ?? "" }
+    : { kind: "category", name: category }
 }
 
 function featureForTool(toolName: string): "goal_tool" | "team_create" | "memory_tool" | undefined {

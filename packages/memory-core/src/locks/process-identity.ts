@@ -33,6 +33,16 @@ async function readLinuxStartIdentity(pid: number): Promise<string | null> {
   }
 }
 
+async function readWin32StartIdentity(pid: number): Promise<string | null> {
+  // PowerShell can resolve CreationDate for any visible process.
+  const value = await execFileText("powershell.exe", [
+    "-NoProfile",
+    "-Command",
+    `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString('o')`,
+  ])
+  return value === null ? null : `win32-creation-date:${value}`
+}
+
 export async function getProcessStartIdentity(pid: number): Promise<string | null> {
   if (process.platform === "linux") return await readLinuxStartIdentity(pid)
   if (process.platform === "darwin" || process.platform === "freebsd") {
@@ -42,6 +52,7 @@ export async function getProcessStartIdentity(pid: number): Promise<string | nul
     const value = await execFileText("/bin/ps", ["-o", "lstart=", "-p", String(pid)])
     return value === null ? null : `ps-lstart:${value.replace(/\s+/g, " ")}`
   }
+  if (process.platform === "win32") return await readWin32StartIdentity(pid)
   return null
 }
 

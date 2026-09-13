@@ -721,3 +721,330 @@
     }
   }
 }
+
+@layer base {
+  /* §3 v3 — Korean falls back from the Latin sans to a gothic web font (Pretendard); headings get more weight */
+  [lang|="ko"] {
+    font-family:
+      var(--font-geist-sans), "Pretendard Variable", Pretendard, "Apple SD Gothic Neo",
+      "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+  }
+  [lang|="ko"] :where(h1, h2) {
+    font-weight: 700;
+  }
+}
+
+@layer utilities {
+  /* §3 v3 — story prose: looser leading and a visible paragraph gap for CJK readers */
+  .prose-cjk {
+    text-wrap: pretty;
+  }
+  :where([lang|="ko"], [lang|="ja"], [lang|="zh"]) .prose-cjk {
+    line-height: 1.8;
+  }
+  .prose-cjk + .prose-cjk {
+    margin-top: 1.25em;
+  }
+
+  /* §10 v3 — story primitives. Each one has a reduced-motion final state below. */
+
+  /* Marquee: one row of chips scrolling on translateX; the track is duplicated by the component. */
+  .marquee {
+    display: flex;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  }
+  .marquee-track {
+    display: flex;
+    flex: none;
+    gap: var(--space-3);
+    padding-inline-end: var(--space-3);
+    animation: marquee var(--marquee-dur, 40s) linear infinite;
+  }
+  .marquee-reverse .marquee-track {
+    animation-direction: reverse;
+  }
+  .marquee:hover .marquee-track {
+    animation-play-state: paused;
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* Ticker: a vertical column of rows scrolling on translateY. */
+  .ticker {
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+  }
+  .ticker-track {
+    animation: ticker var(--ticker-dur, 30s) linear infinite;
+  }
+  .ticker:hover .ticker-track {
+    animation-play-state: paused;
+  }
+  @keyframes ticker {
+    to {
+      transform: translateY(-50%);
+    }
+  }
+
+  /* Lit text: words start faint and light up as .is-lit is added on scroll. */
+  .lit-word {
+    color: var(--text-faint);
+    transition: color var(--dur-reveal) var(--ease-out-quart);
+  }
+  .lit-word.is-lit {
+    color: var(--text-hi);
+  }
+
+  /* Kibitzer: independent clocks; the nudge travels into the verification slot. */
+  .kib-stage {
+    --kib-watch-cycle: 4.5s;
+    --kib-main-cycle: 14s;
+    --kib-cycle: 14s;
+    --kib-source: translateY(calc(-1 * (var(--space-40) + var(--space-24)))) scale(0.8);
+    display: grid;
+    gap: var(--space-8);
+    padding: var(--space-4);
+    border: 1px solid var(--line);
+    background: var(--ink-1);
+  }
+  .kib-side {
+    min-width: 0;
+  }
+  .kib-watch {
+    border-left: 1px solid var(--line-strong);
+    padding-left: var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .kib-watch-step,
+  .kib-main-step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--space-12);
+    padding: var(--space-2);
+    color: var(--text-mid);
+    border-bottom: 1px solid var(--line);
+    animation: kib-main-beat var(--kib-main-cycle) steps(1) infinite;
+    animation-delay: calc(var(--i) * var(--kib-main-cycle) / 4);
+  }
+  .kib-watch-step {
+    font-size: 0.875rem;
+    animation-name: kib-watch-beat;
+    animation-duration: var(--kib-watch-cycle);
+    animation-delay: calc(var(--i) * var(--kib-watch-cycle) / 3);
+  }
+  .kib-dot {
+    width: var(--space-2);
+    height: var(--space-2);
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .kib-memory {
+    border-color: var(--line-strong);
+    animation: kib-memory var(--kib-watch-cycle) steps(1) infinite;
+  }
+  .kib-main-track {
+    border-left: 1px solid var(--line-strong);
+    padding-left: var(--space-3);
+  }
+  .kib-insertion {
+    display: grid;
+    align-items: center;
+    min-height: var(--space-24);
+    padding-block: var(--space-2);
+  }
+  .kib-nudge {
+    position: relative;
+    z-index: 1;
+    padding: var(--space-3);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-control);
+    background: var(--ink-2);
+    color: var(--accent-hot);
+    transform-origin: left center;
+    animation: kib-deliver var(--kib-cycle) linear infinite;
+  }
+  .kib-nudge > span {
+    color: var(--accent);
+  }
+  .kib-decision {
+    display: grid;
+  }
+  .kib-decision > span {
+    grid-area: 1 / 1;
+  }
+  .kib-before {
+    animation: kib-before var(--kib-cycle) steps(1) infinite;
+  }
+  .kib-after {
+    color: var(--accent);
+    animation: kib-after var(--kib-cycle) steps(1) infinite;
+  }
+  .kib-return {
+    border-left: 1px solid var(--line-strong);
+    border-bottom: 1px solid var(--line-strong);
+    padding: var(--space-3);
+  }
+  .kib-stage[data-running="false"] * {
+    animation-play-state: paused;
+  }
+  @media (min-width: 768px) {
+    .kib-stage {
+      --kib-source: translateX(calc(-50% - var(--space-12))) scale(0.5);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: var(--space-12);
+      padding: var(--space-5);
+    }
+    .kib-watch {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @keyframes kib-main-beat {
+    0%,
+    100% {
+      color: var(--accent);
+      background-color: var(--accent-8);
+    }
+    25% {
+      color: var(--text-mid);
+      background-color: transparent;
+    }
+  }
+  @keyframes kib-watch-beat {
+    0%,
+    100% {
+      color: var(--accent);
+      background-color: var(--accent-8);
+    }
+    33.333% {
+      color: var(--text-mid);
+      background-color: transparent;
+    }
+  }
+  @keyframes kib-memory {
+    0%,
+    66.667%,
+    100% {
+      border-color: var(--line-strong);
+      background-color: transparent;
+    }
+    33.333% {
+      border-color: var(--accent);
+      background-color: var(--accent-8);
+    }
+  }
+  @keyframes kib-deliver {
+    0%,
+    30%,
+    100% {
+      opacity: 0;
+      transform: var(--kib-source);
+    }
+    32%,
+    38% {
+      opacity: 1;
+      transform: var(--kib-source);
+    }
+    50%,
+    94% {
+      opacity: 1;
+      transform: none;
+    }
+    98% {
+      opacity: 0;
+      transform: none;
+    }
+  }
+  @keyframes kib-before {
+    0%,
+    98%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes kib-after {
+    0%,
+    98%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kib-stage * {
+      animation: none;
+    }
+    .kib-nudge,
+    .kib-after {
+      opacity: 1;
+      transform: none;
+    }
+    .kib-before {
+      visibility: hidden;
+    }
+  }
+
+  /* Rotating word: a clipped line-height box; the track steps through --count words. */
+  .rotate-word {
+    display: inline-grid;
+    overflow: hidden;
+    vertical-align: top;
+    height: 1lh;
+  }
+  .rotate-word-track {
+    display: grid;
+    animation: rotate-word calc(var(--count) * 1.6s) steps(var(--count)) infinite;
+  }
+  .rotate-word-track > span {
+    height: 1lh;
+    white-space: nowrap;
+  }
+  @keyframes rotate-word {
+    to {
+      transform: translateY(-100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marquee,
+    .ticker {
+      mask-image: none;
+      overflow: visible;
+    }
+    .marquee-track,
+    .ticker-track {
+      animation: none;
+      flex-wrap: wrap;
+    }
+    .marquee-track[aria-hidden="true"],
+    .ticker-track > [aria-hidden="true"] {
+      display: none;
+    }
+    .lit-word {
+      color: var(--text-hi);
+      transition: none;
+    }
+    .rotate-word {
+      height: auto;
+      overflow: visible;
+    }
+    .rotate-word-track {
+      animation: none;
+    }
+    .rotate-word-track > span:not(:first-child) {
+      display: none;
+    }
+  }
+}

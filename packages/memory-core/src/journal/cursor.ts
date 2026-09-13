@@ -23,6 +23,8 @@ export type ReflectionTranscriptState = {
   readonly pending_compaction?: boolean
   /** Derived: serialized bytes of the entries after the reflected cursor. */
   readonly unreflected_bytes?: number
+  readonly consecutive_failures?: number
+  readonly next_eligible_at?: string
 }
 
 export type ReflectionSnapshot = {
@@ -186,6 +188,8 @@ export function finalizeCursor(
       reflected_through_byte_offset: reflectedThroughByteOffset(entries, snapshot.end_message_id),
       reflected_completed_steps: countCompletedSteps(snapshotEntries),
       last_reflection_succeeded_at: succeededAt,
+      consecutive_failures: 0,
+      next_eligible_at: undefined,
     },
     entries,
   )

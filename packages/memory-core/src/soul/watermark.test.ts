@@ -146,6 +146,25 @@ describe("consumeSoulNoticeDelta", () => {
     expect(notice).toEqual({ sha: dreamSha, subject: "chore(dream): consolidate" })
   })
 
+  it("#given a reflection commit that creates system/boundaries.md out of band #when consumed #then the notice names that commit", async () => {
+    // given
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const reflectionSha = await commit(
+      repo,
+      "system/boundaries.md",
+      "- never do X\n",
+      "feat(reflection): document core boundaries\n\nOmo-Writer: reflection",
+    )
+
+    // when
+    const notice = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    expect(notice).toEqual({ sha: reflectionSha, subject: "feat(reflection): document core boundaries" })
+  })
+
   it("#given a corrupt watermark file #when consumed #then it re-establishes silently at HEAD", async () => {
     // given
     const { repo, noticesDir, locksDir } = await fixture()

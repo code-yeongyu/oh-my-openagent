@@ -109,8 +109,9 @@ describe("test workflows", () => {
     const validatesDispatchSource = prepareJob.includes("PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}") &&
       prepareJob.includes('"$PREPARED_RELEASE_SHA" != "$GITHUB_SHA"')
     const dispatchesPinnedTagRun =
-      dispatchJob.includes('git tag "v${VERSION}" "$RELEASE_SHA"') &&
-      dispatchJob.includes('gh workflow run publish.yml --ref "v${VERSION}"') &&
+      dispatchJob.includes('RELEASE_TAG="v${VERSION}"') &&
+      dispatchJob.includes('git tag "${RELEASE_TAG}" "$RELEASE_SHA"') &&
+      dispatchJob.includes('gh workflow run publish.yml --ref "${RELEASE_TAG}"') &&
       dispatchJob.includes('prepared_release_sha=${RELEASE_SHA}')
     const provenanceOperationsRequirePinnedRun =
       publishMainJob.includes("inputs.prepared_release_sha != ''") &&
@@ -179,7 +180,9 @@ describe("test workflows", () => {
     const verifyChecksEveryHash = verifyStep.includes("shasum -a 256 -c SHA256SUMS")
     const verifyFailsBelowThirteenAssets = verifyStep.includes('"$ASSET_COUNT" -ne 13')
     const stepsAreChannelNeutral = ![downloadStep, uploadStep, verifyStep].some((step) => step.includes("dist_tag"))
-    const verifyRunsUnconditionally = !verifyStep.includes("if:") && !verifyStep.includes("skip_platform")
+    const verifyRunsUnconditionally = !verifyStep.includes("skip_platform") &&
+      (verifyStep.match(/\n\s+if: /g) ?? []).length <= 1 &&
+      (!verifyStep.includes("if:") || verifyStep.includes("if: inputs.lazycodex_only != true"))
 
     // #then
     expect(stepsFollowReleaseCreation, "release-binary steps must live inside the release job after Create GitHub release").toBe(true)

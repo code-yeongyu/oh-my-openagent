@@ -13,6 +13,7 @@ import {
 } from "./completion-contracts"
 import { childFailureCause } from "./failure-detail"
 import { reflectionRemediation } from "./remediation"
+import { sanitizeReflectionReport, type ReflectionRecap } from "./reflection-recap"
 import {
   detailExcerpt,
   joinFields,
@@ -69,9 +70,30 @@ function triggerPhrase(trigger: ReflectionTrigger): string {
   return trigger === "manual" ? "triggered manually" : `triggered by ${normalizeRendererText(trigger)}`
 }
 
-export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletionRecord> = (entry, options, theme) => {
+export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletionRecord & { readonly recap?: ReflectionRecap }> = (entry, options, theme) => {
   const record = entry.data
   if (!record) return undefined
+  if (record.outcome === "merged" && record.recap !== undefined) {
+    const recap = record.recap
+    const report = recap.report
+    const preview = report.status === "available" ? report.preview : `Report unavailable: ${report.reason}`
+    const body = report.status === "available"
+      ? `${report.text}${report.sourceTruncated ? "\nSource clipped to the bounded stdout prefix." : ""}`
+      : `Report unavailable: ${report.reason}`
+    return noticeComponent({
+      glyph: "●", title: "Memory updated", tone: "success",
+      why: `Reflection report: ${sanitizeReflectionReport(preview)}`,
+      extra: [{ text: joinFields([
+        recap.filesChanged === undefined ? undefined : `${recap.filesChanged} files changed`,
+        `commit ${normalizeRendererText(recap.mergedCommitSha).slice(0, 7)}`,
+      ]), tone: "dim" }],
+      detail: sanitizeReflectionReport([
+        "Reflection report", body, "Historical changed paths", ...recap.changedPaths,
+        `Source conversations: ${recap.conversationIds.join(", ")}`,
+        `Commit: ${recap.mergedCommitSha}`,
+      ].join("\n")),
+    }, options, theme)
+  }
   const reason = optionalRendererText(record.reason)
   const detail = optionalRendererText(childFailureCause(record.detail))
   const model = optionalRendererText(record.model)

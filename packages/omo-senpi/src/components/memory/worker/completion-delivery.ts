@@ -13,6 +13,7 @@ import {
 import { readCompletionRecord, writeCompletionRecord } from "./completion-records"
 import { detailExcerpt, optionalRendererText } from "./entry-renderers"
 import { childFailureCause, failureFingerprint } from "./failure-detail"
+import { readReflectionRecap } from "./reflection-recap"
 
 const DETAILED_DRAIN_LIMIT = 5
 const COMPLETION_MAX_AGE_MS = 7 * 24 * 60 * 60_000
@@ -66,7 +67,8 @@ export async function deliverReflectionCompletion(
   notify = true,
 ): Promise<ReflectionCompletionRecord> {
   const delivered = await markDelivered(completionsDir, record, live.sessionId)
-  live.api.appendEntry(REFLECTION_COMPLETION_ENTRY_TYPE, delivered)
+  const recap = live.identityContext === undefined ? undefined : await readReflectionRecap(live.identityContext, delivered)
+  live.api.appendEntry(REFLECTION_COMPLETION_ENTRY_TYPE, recap === undefined ? delivered : { ...delivered, recap })
   if (notify) safeNotify(live, completionMessage(delivered), completionLevel(delivered.outcome))
   return delivered
 }

@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { isExcludedReleaseNoteSubject, selectPreviousReleaseTag } from "./generate-changelog"
+import { isCommunityContributor, isExcludedReleaseNoteSubject, selectPreviousReleaseTag } from "./generate-changelog"
 
 describe("selectPreviousReleaseTag", () => {
   test("#given a beta target #when releases span channels #then the preceding beta is selected", () => {
@@ -46,5 +46,33 @@ describe("isExcludedReleaseNoteSubject", () => {
   ])("#given subject %p #when exclusion is checked #then excluded is %p", (subject, expected) => {
     // given / when / then
     expect(isExcludedReleaseNoteSubject(subject)).toBe(expected)
+  })
+})
+
+describe("isCommunityContributor", () => {
+  test("#given the release automation identity #when the footer is built #then it is not thanked as a community contributor", () => {
+    // given
+    const automation = "sisyphus-dev-ai"
+
+    // when
+    const credited = isCommunityContributor(automation)
+
+    // then
+    expect(credited).toBe(false)
+  })
+
+  test("#given maintainers and CI identities #when the footer is built #then none of them are credited", () => {
+    for (const login of ["code-yeongyu", "actions-user", "github-actions[bot]"]) {
+      expect(isCommunityContributor(login), `${login} must not be credited`).toBe(false)
+    }
+  })
+
+  test("#given any other bot account #when the footer is built #then it is not credited", () => {
+    expect(isCommunityContributor("dependabot[bot]")).toBe(false)
+    expect(isCommunityContributor("renovate[bot]")).toBe(false)
+  })
+
+  test("#given a genuine outside contributor #when the footer is built #then they are credited", () => {
+    expect(isCommunityContributor("minpeter")).toBe(true)
   })
 })

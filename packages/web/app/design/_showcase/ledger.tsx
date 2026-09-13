@@ -50,35 +50,60 @@ export function LedgerShowcase(): JSX.Element {
       </Showcase>
 
       <Showcase id="bento" eyebrow="components/ledger/bento-cell" title="BentoCell">
-        <Specimen label="2x2 / 2x1 / 1x1 (12 cells, gapless)" stack>
+        <Specimen label="2x2 / 2x1 / 1x1 (12 grid units, gapless)" stack>
           <BentoGrid>
             <BentoCell
               colSpan={2}
               rowSpan={2}
               icon={<ListChecks />}
               name="Orchestrator"
-              role="Lead orchestrator. Plans, delegates, and refuses to stop before the work is verified."
-              chip="claude-opus-4"
+              role="The main agent"
+              chip="Your session model"
               active
             />
             <BentoCell
               colSpan={2}
-              icon={<Hammer />}
-              name="Hephaestus"
-              role="Deep worker for long, autonomous implementation runs."
-              chip="gpt-5.6"
+              icon={<Compass />}
+              name="Planner"
+              role="/ulw-plan planning interview"
+              chip="Runs in the main session"
             />
-            <BentoCell icon={<Compass />} name="Planner" role="Interview and plan." chip="opus" />
-            <BentoCell icon={<Scale />} name="Metis" role="Pre-plan gap analysis." chip="opus" />
-            <BentoCell icon={<Eye />} name="Plan reviewer" role="Plan review gate." chip="opus" />
-            <BentoCell icon={<Anvil />} name="Atlas" role="Executes the plan." chip="sonnet" />
+            <BentoCell
+              icon={<Scale />}
+              name="Plan Consultant"
+              role="Gap analysis"
+              chip="Claude Sonnet 4.6"
+            />
+            <BentoCell
+              icon={<Eye />}
+              name="Plan Reviewer"
+              role="Plan review gate"
+              chip="GPT 6 Astra xHigh"
+            />
+            <BentoCell
+              icon={<Anvil />}
+              name="Architect"
+              role="Architecture consult lane"
+              chip="Claude Fable 5.1 Max"
+            />
+            <BentoCell
+              icon={<Hammer />}
+              name="Deep"
+              role="Deep autonomous problem-solving"
+              chip="GPT 6 Astra High"
+            />
             <BentoCell
               icon={<BookOpen />}
               name="Librarian"
-              role="Docs and references."
-              chip="flash"
+              role="Docs and code search"
+              chip="GPT 5.6 Luna Fast"
             />
-            <BentoCell icon={<Search />} name="Explore" role="Fast codebase search." chip="quick" />
+            <BentoCell
+              icon={<Search />}
+              name="Explore"
+              role="Codebase grep"
+              chip="GPT 5.6 Luna Fast"
+            />
           </BentoGrid>
         </Specimen>
       </Showcase>

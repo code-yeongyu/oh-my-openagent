@@ -27,8 +27,23 @@ function isSelfUpdate(args) {
 // environment prefix is read first, what goes on the wire, and which channel to check for
 // updates. The engine consumes this once and scrubs it, so nested engine processes are
 // unaffected.
+function pluginChangelogSource() {
+  try {
+    const pluginRoot = join(packageRoot, "plugin")
+    const changelogPath = join(pluginRoot, "CHANGELOG.md")
+    if (!existsSync(changelogPath)) return undefined
+    const version = readJson(join(pluginRoot, "package.json")).version
+    return typeof version === "string" && version ? { path: changelogPath, version } : { path: changelogPath }
+  } catch {
+    return undefined
+  }
+}
+
 function brandProfile() {
   const update = updateTarget()
+  // The changelog source is advisory: a missing plugin manifest or file must disable
+  // startup notes, never fail the launch.
+  const changelog = pluginChangelogSource()
   return {
     name: "OmO",
     command: "omo",
@@ -40,6 +55,7 @@ function brandProfile() {
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    ...(changelog ? { changelog } : {}),
     update: {
       packageName: "omo-ai",
       distTag: "beta",
@@ -61,7 +77,6 @@ function senpiEnvironment(senpiRoot) {
   const env = { ...process.env }
   delete env.OMO_BIN
   delete env.SENPI_BIN
-  env.OMO_AGENT_TOOLKIT_BIN = join(packageRoot, "bin", "omo-agent-toolkit.js")
   // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
   // tool inherits the same state instead of falling back to its own home.
   const agentDir = canonicalAgentDir(env)
@@ -134,8 +149,11 @@ export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
   reportLegacyFlatAdoption()
   const command = args[0]
+  // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
+  // omo_agent_toolkit tool. Report that plainly instead of failing on a missing file.
   if (command === "ulw-loop") {
-    await spawnNode(join(packageRoot, "plugin", "runtime", "agent-toolkit", "ulw-loop", "cli.js"), args.slice(1))
+    console.error("omo ulw-loop is unavailable in this build: use the omo_agent_toolkit tool inside a session (Codex keeps the standalone CLI).")
+    process.exitCode = 2
     return
   }
   if (command === "doctor") {

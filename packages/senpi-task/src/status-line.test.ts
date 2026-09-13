@@ -69,14 +69,14 @@ describe("formatStatusTarget", () => {
 
   test("#given only an agent type #when formatted #then the agent target shares the category grammar", () => {
     // given / when / then
-    expect(formatStatusTarget({ agentType: "momus" })).toBe("agent:momus")
+    expect(formatStatusTarget({ agentType: "plan-reviewer" })).toBe("agent:plan-reviewer")
   })
 
   test("#given an agent type and resolved model #when formatted #then model metadata qualifies the agent exactly like a category", () => {
     // given / when / then
     expect(
       formatStatusTarget({
-        agentType: "momus",
+        agentType: "plan-reviewer",
         resolvedModel: {
           provider: "openai",
           model_id: "gpt-5.6-sol-fast",
@@ -85,7 +85,7 @@ describe("formatStatusTarget", () => {
           source: "agent",
         },
       }),
-    ).toBe("agent:momus(openai/gpt-5.6-sol-fast:high)")
+    ).toBe("agent:plan-reviewer(openai/gpt-5.6-sol-fast:high)")
   })
 
   test("#given an agent type with only a raw model #when formatted #then the raw model qualifies the agent target", () => {

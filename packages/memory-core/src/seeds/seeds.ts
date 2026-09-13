@@ -1,8 +1,8 @@
 /**
  * Default memory seeding — letta parity port (plan todo 33).
  *
- * Seeds a fresh memory repo with system/persona.md + system/human.md
- * rendered with frontmatter, then delegates to GitMemoryRepo.init which
+ * Seeds a fresh memory repo with system/persona.md + system/human.md +
+ * system/boundaries.md rendered with frontmatter, then delegates to GitMemoryRepo.init which
  * writes, stages, and commits them as a single initial commit
  * ("chore: initialize local memory"). If the repo already has a HEAD
  * commit, GitMemoryRepo.init returns the existing HEAD unchanged — the
@@ -22,6 +22,7 @@
 import type { GitMemoryRepo, GitSeedFile } from "../git"
 import { renderMemoryFile } from "../memfs/frontmatter"
 import {
+  DEFAULT_BOUNDARIES_BODY,
   DEFAULT_HUMAN_BODY,
   DEFAULT_PERSONA_BODY,
 } from "./default-memory"
@@ -34,9 +35,11 @@ export { DEFAULT_MEMORY_BLOCK_LABELS } from "./default-memory"
 
 const PERSONA_PATH = "system/persona.md"
 const HUMAN_PATH = "system/human.md"
+const BOUNDARIES_PATH = "system/boundaries.md"
 
 const PERSONA_DESCRIPTION = "Persona - who I am"
 const HUMAN_DESCRIPTION = "Person - Human"
+const BOUNDARIES_DESCRIPTION = "Boundaries - what the person told me not to do, in their words"
 const HUMAN_ALIASES: readonly string[] = []
 
 export interface DefaultSeedFile extends GitSeedFile {}
@@ -46,9 +49,9 @@ export interface InitMemorySeedsOptions {
 }
 
 /**
- * Build the default seed files: system/persona.md + system/human.md with
- * frontmatter rendered from the content constants, plus the
- * memory-discipline skill (pre-rendered, SKILL.md frontmatter).
+ * Build the default seed files: system/persona.md + system/human.md +
+ * system/boundaries.md with frontmatter rendered from the content constants,
+ * plus the memory-discipline skill (pre-rendered, SKILL.md frontmatter).
  *
  * Pure — no filesystem access. Safe to call repeatedly.
  */
@@ -64,6 +67,10 @@ export function buildDefaultSeedFiles(): readonly DefaultSeedFile[] {
         { description: HUMAN_DESCRIPTION, kind: "person", aliases: HUMAN_ALIASES },
         DEFAULT_HUMAN_BODY,
       ),
+    },
+    {
+      relativePath: BOUNDARIES_PATH,
+      content: renderMemoryFile({ description: BOUNDARIES_DESCRIPTION }, DEFAULT_BOUNDARIES_BODY),
     },
     {
       relativePath: MEMORY_DISCIPLINE_SKILL_PATH,

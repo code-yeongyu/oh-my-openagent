@@ -125,6 +125,26 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
   })
 })
 
+describe("OmoTaskSettingsSchema resident idle timeout", () => {
+  test("#given absent retention #when resolved #then the approved default and expunge TTL stay independent", () => {
+    expect(OmoTaskSettingsSchema.parse({})).toMatchObject({ resident_idle_timeout_ms: 900000, ttl_ms: 86400000 })
+    expect(resolveOmoTaskSettings({ resident_idle_timeout_ms: 37 })).toMatchObject({ resident_idle_timeout_ms: 37, ttl_ms: 86400000 })
+    expect(OmoTaskSettingsLayerSchema.parse({})).not.toHaveProperty("resident_idle_timeout_ms")
+  })
+  test("#given positive safe integer milliseconds #when each boundary parses #then values are preserved", () => {
+    for (const value of [1, 37, 900000, Number.MAX_SAFE_INTEGER]) {
+      expect(OmoTaskSettingsSchema.parse({ resident_idle_timeout_ms: value })).toHaveProperty("resident_idle_timeout_ms", value)
+      expect(OmoTaskSettingsLayerSchema.parse({ resident_idle_timeout_ms: value })).toEqual({ resident_idle_timeout_ms: value })
+    }
+  })
+  test("#given invalid durations #when each schema boundary parses #then no disable sentinel or coercion is accepted", () => {
+    for (const value of [0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, "37", "unlimited", null]) {
+      expect(OmoTaskSettingsSchema.safeParse({ resident_idle_timeout_ms: value }).success).toBe(false)
+      expect(OmoTaskSettingsLayerSchema.safeParse({ resident_idle_timeout_ms: value }).success).toBe(false)
+    }
+  })
+})
+
 describe("OmoTaskSettingsSchema warnings", () => {
   test("#given no warning suppression override #when task settings parse #then unavailable categories warnings default on", () => {
     // given

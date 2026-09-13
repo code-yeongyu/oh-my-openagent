@@ -38,28 +38,30 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
       continue
     }
 
-    if (CURATED_READONLY_AGENT_NAMES.has(member.subagent_type)) {
+    const subagentType = member.subagent_type.trim()
+
+    if (CURATED_READONLY_AGENT_NAMES.has(subagentType)) {
       throw new SenpiTeamSpecError(
-        `curated read-only agent "${member.subagent_type}" cannot be a team member; delegate via the task tool instead`,
+        `curated read-only agent "${subagentType}" cannot be a team member; delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )
     }
 
-    if (ULW_REVIEWER_AGENT_NAMES.has(member.subagent_type)) {
+    if (ULW_REVIEWER_AGENT_NAMES.has(subagentType)) {
       throw new SenpiTeamSpecError(
-        `ulw reviewer agent "${member.subagent_type}" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead`,
+        `ulw reviewer agent "${subagentType}" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )
     }
 
-    if (!ports.isKnownAgent(member.subagent_type)) {
+    if (!ports.isKnownAgent(subagentType)) {
       const available = ports.agentNames !== undefined && ports.agentNames.length > 0
         ? ` Available agents: ${[...ports.agentNames].sort().join(", ")}.`
         : ""
       throw new SenpiTeamSpecError(
-        `Team '${spec.name}' member '${member.name}' references unknown subagent_type '${member.subagent_type}'.${available} ${ALLOWED_KINDS_HINT}.`,
+        `Team '${spec.name}' member '${member.name}' references unknown subagent_type '${subagentType}'.${available} ${ALLOWED_KINDS_HINT}.`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )

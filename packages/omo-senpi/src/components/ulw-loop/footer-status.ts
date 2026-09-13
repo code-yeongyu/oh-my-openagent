@@ -140,7 +140,7 @@ function goalActiveFromContext(runtime: UlwLoopFooterRuntime): boolean {
   return false
 }
 
-function goalPathsFromContext(value: unknown): readonly string[] {
+export function goalPathsFromContext(value: unknown): readonly string[] {
   if (!isRecord(value)) return []
   const manager = value["sessionManager"]
   if (!isRecord(manager)) return []

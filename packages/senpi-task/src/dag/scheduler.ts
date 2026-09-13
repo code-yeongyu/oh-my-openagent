@@ -94,6 +94,8 @@ export type DagNodeSpawnPolicy = (node: {
 export type DagScheduler = {
   readonly run: () => Promise<DagRunRecordV1>
   readonly cancel: (runId: DagRunId, reason?: string) => Promise<void>
+  /** Retires this controller without cancelling children; await before releasing its lease. */
+  readonly suspend: () => Promise<void>
   readonly snapshot: () => DagRunRecordV1
   readonly subscribe: (listener: DagJournalListener) => () => void
   readonly whenIdle: () => Promise<void>
@@ -163,6 +165,7 @@ type SchedulerContext = {
   readonly cancellationCompleted: Promise<void>
   readonly resolveCancellationCompleted: () => void
   cancellationStarted: boolean
+  suspended: boolean
   // #7412: set by the foreign-commit subscription so a wake that fired while no settle race was
   // armed is not lost - settleOne consumes it level-triggered.
   foreignSettlement: boolean
@@ -222,6 +225,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     cancellationCompleted: cancellationCompleted.promise,
     resolveCancellationCompleted: cancellationCompleted.resolve,
     cancellationStarted: false,
+    suspended: false,
     foreignSettlement: false,
     admissionInProgress: false,
     admissionIdleWaiters: new Set(),
@@ -252,9 +256,22 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     attachTaskSettlement(context, nodeId, taskId)
   }
 
+  let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => runFrontier(context),
+    run: () => running ??= runFrontier(context),
     cancel: (runId, reason) => cancelRun(context, runId, reason),
+    suspend: async () => {
+      context.suspended = true
+      context.resolveCancellationRequested()
+      unsubscribeCommits()
+      for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
+      await whenAdmissionIdle(context)
+      if (context.cancellationOperation !== undefined) await context.cancellationOperation
+      await journal.whenIdle()
+      for (const task of context.attachedTasks.values()) task.resolveFolded()
+      context.attachedTasks.clear()
+      context.attachedTaskIds.clear()
+    },
     snapshot: journal.snapshot,
     subscribe: journal.subscribe,
     whenIdle: journal.whenIdle,
@@ -467,6 +484,7 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
 }
 
 async function cancelledSnapshot(context: SchedulerContext): Promise<DagRunRecordV1> {
+  if (context.suspended && !context.cancellationStarted) return context.journal.snapshot()
   await context.cancellationCompleted
   return context.journal.snapshot()
 }
@@ -488,12 +506,13 @@ function resolveAdmissionIdle(context: SchedulerContext): void {
 // an unrelated slow sibling can no longer starve ready dependents behind a barrier the tool
 // contract never promised (dag_530ad299).
 async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
+  if (context.suspended) return context.journal.snapshot()
   if (context.journal.snapshot().status === "pending") {
     context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
   }
 
   for (;;) {
-    if (context.cancellationStarted) return cancelledSnapshot(context)
+    if (context.suspended || context.cancellationStarted) return cancelledSnapshot(context)
     // The skip cascade runs only at frontier quiescence (nothing attached), generalizing the
     // barrier-era rule that dependents were skipped between waves: a failed node stays revivable
     // (send -> revive) while any sibling is still mid-flight, and a revived outcome can complete
@@ -502,7 +521,7 @@ async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
     // Completions are reported before the next admission pass so a finishing wave reads as
     // settled before later-wave nodes it unblocked start interleaving their own events.
     emitCompletedWaves(context)
-    if (!await admitFrontier(context)) return cancelledSnapshot(context)
+    if (!await admitFrontier(context) || context.suspended) return cancelledSnapshot(context)
     const current = context.journal.snapshot()
     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
     if (context.attachedTasks.size === 0) {
@@ -528,7 +547,7 @@ async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
 // when no attached task can ever free one. Cancellation aborts the pass without admitting more.
 async function admitFrontier(context: SchedulerContext): Promise<boolean> {
   for (;;) {
-    if (context.cancellationStarted) return false
+    if (context.suspended || context.cancellationStarted) return false
     const denied = context.pendingAdmission.splice(0)
     const deniedIds = new Set(denied)
     const snapshot = context.journal.snapshot()
@@ -555,6 +574,9 @@ async function admitFrontier(context: SchedulerContext): Promise<boolean> {
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
     }
+    // The task owner record is durable even when admission finishes after suspension. Recovery
+    // resolves it by owner; this retired controller must not attach, fail, or promote the node.
+    if (context.suspended && !context.cancellationStarted) return false
     const nextDenied: DagNodeId[] = []
     for (let index = 0; index < results.length; index += 1) {
       const settled = results[index]
@@ -695,7 +717,7 @@ function attachStarted(
 function watchQueuedPromotion(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
   disposePromotionWatch(context, nodeId)
   const foldPromotion = (): void => {
-    if (context.cancellationStarted) return
+    if (context.suspended || context.cancellationStarted) return
     if (context.taskManager.get(taskId)?.status !== "running") return
     disposePromotionWatch(context, nodeId)
     // A task can terminalize straight from the queue (cancelled/errored before launch); by the
@@ -758,7 +780,7 @@ async function settleOne(context: SchedulerContext): Promise<boolean> {
     context.cancellationRequested.then(() => undefined),
   ])
   if (settled === null) return true
-  if (settled === undefined || context.cancellationStarted) return false
+  if (settled === undefined || context.suspended || context.cancellationStarted) return false
   const task = context.attachedTasks.get(settled.nodeId)
   context.attachedTasks.delete(settled.nodeId)
   context.attachedTaskIds.delete(settled.nodeId)

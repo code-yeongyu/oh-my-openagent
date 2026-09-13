@@ -45,6 +45,7 @@ const workflowExpectations = [
       "prepare-release-state",
       "dispatch-provenance-safe-publish",
       "publish-main",
+      "verify-release-notes",
       "release",
       "post-publish-verify",
     ],

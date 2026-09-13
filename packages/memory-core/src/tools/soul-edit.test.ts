@@ -91,6 +91,30 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.commit?.affectedPaths).toEqual(["system/identity.md"])
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
+  it("#given an insert into system/boundaries.md #when the tool runs #then the soul-edit directive appears", async () => {
+    // given
+    const setup = await fixture()
+    await seed(setup, "system/boundaries.md", "Entries follow:\n")
+
+    // when
+    const result = await runMemoryTool({
+      repo: setup.repo,
+      lock: setup.lock,
+      params: {
+        command: "insert",
+        reason: "record what the user said not to do",
+        file_path: "system/boundaries.md",
+        insert_line: 999,
+        insert_text: "- [2026-09-13] \"never force-push shared branches\" <!-- src: session-1 -->",
+        author: AUTHOR,
+      },
+    })
+
+    // then
+    expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
+    expect(result.commit?.affectedPaths).toEqual(["system/boundaries.md"])
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+
   it("#given a rename that moves system/persona.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given
     const setup = await fixture()

@@ -14,8 +14,9 @@ import {
   type TranscriptEntry,
 } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
-import type { ChildHandle, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import type { ChildHandle, ChildModelRegistry, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
+import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { FactsExtractorRunner, type FactsExtractorRunnerOptions } from "./facts-runner"
 import { createFactsRecordTool } from "./facts-record-tool"
 import type { FactsRunLedger } from "./facts-runner-types"
@@ -38,6 +39,31 @@ export async function fixture() {
   const queue = new FactsQueue({ identityPaths: identity.paths })
   await enqueue(queue, identity, "session-1", "m1", "The project uses Bun.")
   return { root, identity, queue }
+}
+
+/**
+ * The registry snapshot as production captures it: the parent session's concrete ModelRegistry.
+ * The runtime is created catalog-free (modelsPath: null) so the fixture owns exactly which models
+ * exist - the shipped catalog would otherwise satisfy the quick chain on its own. An in-process
+ * child shares this exact instance, so the facts child cannot drift onto another engine's model set.
+ */
+export function registrySnapshot(models: readonly { readonly id: string }[] = [{ id: "mock-1" }]): ChildModelRegistry {
+  const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
+  registry.registerProvider("omo-mock", {
+    api: "openai-completions",
+    baseUrl: "https://example.test",
+    apiKey: "test-key",
+    models: models.map((model) => ({
+      id: model.id,
+      name: `Mock ${model.id}`,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 1,
+      maxTokens: 1,
+    })),
+  })
+  return registry
 }
 
 export async function enqueue(

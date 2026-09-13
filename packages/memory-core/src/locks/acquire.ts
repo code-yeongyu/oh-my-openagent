@@ -87,7 +87,8 @@ async function unlinkCandidate(candidatePath: string): Promise<boolean> {
   return false
 }
 
-function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
+/** Resolves after `milliseconds`, or rejects with the signal's reason the moment it aborts. */
+export function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
     const timer = setTimeout(finish, milliseconds)
@@ -182,7 +183,12 @@ function rearmCandidateSweep(lockDirectory: string): void {
   sweptLockDirectories.delete(lockDirectory)
 }
 
-async function isProvenDead(owner: LockRecord): Promise<boolean> {
+/**
+ * The one stale-owner policy every lock domain shares: an owner is dead only on proof - a pid the
+ * kernel no longer knows, or a live pid whose start identity contradicts the recorded one (the pid
+ * was recycled). Another host, an unknown liveness or an incomparable identity all keep the owner.
+ */
+export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean> {
   if (owner.hostname !== hostname()) return false
   const liveness = getPidLiveness(owner.pid)
   if (liveness === "dead") return true
@@ -206,7 +212,7 @@ async function isProvenDead(owner: LockRecord): Promise<boolean> {
 // concurrent stale-candidate sweep could delete it while it is still being inspected.
 async function reclaimDeadRecoveryLock(recoveryPath: string): Promise<boolean> {
   const stale = await readOwner(recoveryPath)
-  if (stale === null || stale.record === null || !(await isProvenDead(stale.record))) return false
+  if (stale === null || stale.record === null || !(await isLockOwnerProvenDead(stale.record))) return false
 
   const tombstonePath = `${recoveryPath}.reaping-${randomUUID()}`
   try {
@@ -238,7 +244,7 @@ async function recoverDeadOwner(
   snapshot: OwnerSnapshot,
   contender: LockRecord,
 ): Promise<boolean> {
-  if (snapshot.record === null || !(await isProvenDead(snapshot.record))) return false
+  if (snapshot.record === null || !(await isLockOwnerProvenDead(snapshot.record))) return false
 
   const recoveryPath = `${lockPath}.recovery`
   const recoveryRecord: LockRecord = {
@@ -258,7 +264,7 @@ async function recoverDeadOwner(
     const current = await readOwner(lockPath)
     if (current === null) return true
     if (current.raw !== snapshot.raw || current.record === null) return false
-    if (!(await isProvenDead(current.record))) return false
+    if (!(await isLockOwnerProvenDead(current.record))) return false
     // Fence: only unlink the primary while this contender still owns the recovery lock. A
     // reaper that grabbed our live record and handed it back may have lost that hand-back to
     // a third contender's publish; in that case the critical section is no longer ours.

@@ -2,7 +2,7 @@
 
 import type { JSX, ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
-import { Bot, Download, Star } from "lucide-react"
+import { Download, Star } from "lucide-react"
 
 import { useLiveStats } from "@/components/landing/live-stats"
 import { cn } from "@/lib/utils"
@@ -22,9 +22,7 @@ export interface ProofStripProps {
     readonly githubStars: string
     readonly totalDownloads: string
     readonly monthlyDownloads: string
-    readonly agents: string
   }
-  readonly agentCount: string
   readonly className?: string
 }
 
@@ -124,15 +122,10 @@ function ProofCell({ value, label, icon, start }: ProofCellProps): JSX.Element {
 }
 
 /**
- * DESIGN.md §5 ProofStrip: 4 cells (2 × 2 below lg) ruled by `--line`; Numeral + Eyebrow +
+ * DESIGN.md §5 ProofStrip: 3 cells (stacked below sm, 3 across from sm) ruled by `--line`; Numeral + Eyebrow +
  * 14px icon per cell. Values are live from `/api/stats` and count up once on enter.
  */
-export function ProofStrip({
-  initialStats,
-  labels,
-  agentCount,
-  className,
-}: ProofStripProps): JSX.Element {
+export function ProofStrip({ initialStats, labels, className }: ProofStripProps): JSX.Element {
   const stats = useLiveStats(initialStats)
   const { ref, entered } = useEntered()
 
@@ -140,7 +133,7 @@ export function ProofStrip({
     <ul
       ref={ref}
       data-testid="proof-strip"
-      className={cn("bg-line border-line grid grid-cols-2 gap-px border lg:grid-cols-4", className)}
+      className={cn("bg-line border-line grid grid-cols-1 gap-px border sm:grid-cols-3", className)}
     >
       <ProofCell value={stats.stars} label={labels.githubStars} icon={<Star />} start={entered} />
       <ProofCell
@@ -155,7 +148,6 @@ export function ProofStrip({
         icon={<Download />}
         start={entered}
       />
-      <ProofCell value={agentCount} label={labels.agents} icon={<Bot />} start={entered} />
     </ul>
   )
 }

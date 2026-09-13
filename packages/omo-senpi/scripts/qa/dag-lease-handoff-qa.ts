@@ -94,7 +94,7 @@ try {
   // The predecessor host pauses the run for its shutdown; its pid is the recorded previous holder.
   const predecessorWarnings: unknown[] = []
   const predecessorRuntime = assembleRuntime(root, new CompletingRunner(), predecessorWarnings)
-  predecessorRuntime.pauseForShutdown()
+  await predecessorRuntime.pauseForShutdown()
   predecessorRuntime.dispose()
   store.withRunLock(RUN_ID, () => {
     const fresh = store.readCheckpoint<Record<string, unknown>>(RUN_ID)

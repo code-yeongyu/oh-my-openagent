@@ -21,7 +21,7 @@ test.describe("Manifesto Page", () => {
     await page.goto("/manifesto", { waitUntil: "domcontentloaded", timeout: 45000 })
 
     // when
-    const ctaLink = page.getByRole("link", { name: /Get Oh My OpenAgent/i })
+    const ctaLink = page.getByRole("link", { name: /Get OmO/i })
 
     // then
     await expect(ctaLink).toBeVisible()

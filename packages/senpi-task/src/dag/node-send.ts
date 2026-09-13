@@ -117,6 +117,9 @@ function foldSendOutcome(
         runId,
         nodeIds: [nodeId],
       })
+    case "admission_refused":
+    case "cwd_unavailable":
+    case "config_generation_mismatch":
     case "capacity_deferred":
       throw new DagNodeControlError({
         code: "node_not_continuable",

@@ -1,4 +1,6 @@
-# Oh My OpenAgent Web — Design System v2 ("Phosphor Ledger")
+# OmO Web — Design System v3 ("Phosphor Ledger", spoken plainly)
+
+> **v3 delta (2026-09-13).** The v2 visual system below (ink + phosphor, cyan = live, hairlines, 0px panels, no motion library) stays in force. v3 changes the **voice** and the **reader**: the site now speaks to someone who is interested in tech, not fluent in it. Copy is benefit-first ("Your tool for real work. But it's an agent."), jargon lives behind a scroll-revealed "still curious?" fold, chapter numerals and host/edition tabs are gone, one install command ships everywhere, and Korean gets a proper gothic web font fallback plus line-break and rhythm rules from the design review. New §10 story primitives are the only additions to the component set.
 
 > **Redesign contract. Written 2026-09-08 from runtime extraction of three reference sites, StyleGallery pattern contracts, the frontend skill's Layer A/B references, and three imagen concept drafts.** This document replaces the 2026-06-24 extraction contract. Every color, size, spacing value, motion value, and component the site renders must trace to a token or primitive named here. If a value is missing, add it here first, then use it.
 
@@ -66,8 +68,9 @@ An operations ledger read at night. The whole site is one framed sheet of ink ru
 ### Stack
 
 - Sans: `var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif` (Geist via `next/font`, self-hosted, `display: swap`).
+- Sans / ko (v3): `var(--font-geist-sans), "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", …` — Latin glyphs stay Geist, Hangul falls back to Pretendard (dynamic-subset web font linked from the root layout `<head>` with a preconnect; a CSS `@import` is dropped by the browser once Tailwind emits `@layer` first). Gothic only; never a serif or brush face for Korean.
 - Mono: `var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace`.
-- No serif. No Inter. Two families only. (omp.sh renders Geist too; herdr's Archivo 900 is _not_ adopted — Geist 500 with tight tracking gives the same authority without the shouting weight.)
+- No serif. No Inter. Two Latin families only.
 
 ### Scale
 
@@ -89,8 +92,9 @@ An operations ledger read at night. The whole site is one framed sheet of ink ru
 
 - Display and Title always carry negative tracking; body never does.
 - Body never below 14px; the 11px eyebrow is uppercase mono with 0.2em tracking, which is the readability floor for that role.
-- Eyebrows are content labels, not chapter numerals. "SECTION 01" / "ABOUT" style meta-labels are banned; "01 / 02 / 03" appears only on the wave rail where the number _is_ the meaning.
+- Eyebrows are content labels, not chapter numerals. "SECTION 01" / "ABOUT" style meta-labels are banned; v3 removes the numbered wave rail too — no numeral labels anywhere on the landing page.
 - CJK locales keep the existing base-layer rules: `letter-spacing: normal` on headings, `text-wrap: pretty`, `word-break: keep-all` (ko), `line-break: strict` (ja/zh). Display size for CJK drops one clamp step (`clamp(2.25rem, 1.25rem + 3.6vw, 4.5rem)`) so two lines still hold.
+- Korean (v3, from the design review): H1/H2 weight 700 so the message carries; story prose uses `.prose-cjk` (line-height 1.8, 1.25em paragraph gap) so lines and paragraphs read as separate; a particle or ending never starts a line — keep `mass ulw를` together and let the following word wrap instead. Section boundaries are made by size and weight, not by more hairlines.
 
 ## 4. Spacing & Layout
 
@@ -138,8 +142,8 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 ### Nav (`components/nav-header.tsx`)
 
 - Sticky (`sticky-header`), height 60px, `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
-- Left: OmO mark (24px SVG from `.github/assets/omo-icon-light.svg` re-exported to `public/brand/omo-mark.svg`) + wordmark `Oh My OpenAgent` (Geist 500 15px, -0.02em).
-- Center/right: links `Agents · Docs · Manifesto` in `--text-mid` mono 12px uppercase 0.12em; hover → `--text-hi` with a 1px underline growing `scaleX(0→1)` 320ms.
+- Left: OmO mark (24px SVG from `.github/assets/omo-icon-light.svg` re-exported to `public/brand/omo-mark.svg`) + wordmark `OmO` (Geist 500 15px, -0.02em). The brand is `OmO` on every surface (nav, footer, titles, OG, JSON-LD); the old long-form name is never rendered.
+- Center/right: links `Features · Docs · Manifesto` in `--text-mid` mono 12px uppercase 0.12em; hover → `--text-hi` with a 1px underline growing `scaleX(0→1)` 320ms.
 - Right: GitHub chip (mono `★ 68.8k` live count, `--ink-1` fill, `--line` border) and primary button `Install` (sm size).
 - Mobile: hamburger 44×44; sheet `--ink-3` with `--line` top rule; items 44px tall.
 - States: default, scrolled, open (mobile), link hover/focus-visible (2px `--accent-32` outline offset 2px), active route (underline visible at scaleX(1), `--text-hi`).
@@ -153,7 +157,7 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 ### CommandBar (`components/landing/install-command.tsx`)
 
 - The primary CTA of the site (omp.sh grammar). Row: prompt cell (40px wide, `--accent` `$`/`>` glyph on `--ink-2`), mono command in `--text-hi` on `--ink-1`, fixed-width COPY cell (mono uppercase 11px, `--text-lo` → `--text-hi` on hover, → `--accent` + "COPIED" for 2s after click). 1px `--line` border, 0px radius, height 48px; on < sm the command scrolls horizontally inside the cell (no wrap) and COPY stays reachable.
-- Optional tab row above (e.g. `OPENCODE · CODEX · SENPI`): mono 11px uppercase, inactive `--text-lo`, active `--text-hi` with a 1px `--accent` bottom border; 150ms color.
+- One command, no tab row (v3): every CommandBar on the site renders `bun install -g omo-ai@beta`. Host/edition switching was removed with the Editions section; the bar is the whole install story.
 - Glow: none by default; `focus-within` adds the inset ring `0 0 0 1px var(--accent-32)`.
 
 ### Eyebrow (`components/ledger/eyebrow.tsx`)
@@ -166,13 +170,13 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 ### LedgerRow (`components/ledger/ledger-row.tsx`)
 
-- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by Editions, Orchestration flow, Principles.
+- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by the `/design` showcase; the landing page (v3) no longer renders ledger rows.
 - States: default, hover, focus-within (index turns `--accent`), `data-active` (left 2px `--accent` rule) when linked from the graph.
 
 ### BentoCell (`components/ledger/bento-cell.tsx`)
 
-- Cells of the agents grid (`grid-flow-dense`, 1px gaps revealing `--line`, so the grid itself draws the rules). Cell fill `--ink-1`, hover `--ink-2` + icon `--accent`, spans: orchestrator 2×2, Hephaestus 2×1, others 1×1; mobile 1 column, tablet 2. Content: icon 20px (Lucide/Phosphor SVG), name (Subheading), role (Body/sm `--text-mid`), model chip (Meta mono on `--ink-2`, `--line` border, 2px radius).
-- Gapless verification: 4 columns × 3 rows desktop = 12 cells: orchestrator 4 + Hephaestus 2 + 6 singles = 12. Tablet 2 columns: orchestrator 2×2, Hephaestus 2×1, 6 singles → 4 + 2 + 6 = 12 = 2 × 6 rows. No holes.
+- Cells of the agents grid (`grid-flow-dense`, 1px gaps revealing `--line`, so the grid itself draws the rules). Cell fill `--ink-1`, hover `--ink-2` + icon `--accent`, spans: orchestrator 2×2, planner 2×1, others 1×1; mobile 1 column, tablet 2. Content: icon 20px (Lucide/Phosphor SVG), name (Subheading), role (Body/sm `--text-mid`), model chip (Meta mono on `--ink-2`, `--line` border, 2px radius).
+- Gapless verification: 4 columns × 4 rows desktop = 16 units: orchestrator 4 + planner 2 + 10 singles = 16. Tablet 2 columns: orchestrator 2×2, planner 2×1, 10 singles → 4 + 2 + 10 = 16 = 2 × 8 rows. No holes.
 
 ### Terminal (`components/landing/terminal.tsx`)
 
@@ -253,11 +257,11 @@ Grain is not used (omp.sh's canvas grain and factory's texture PNG would fight t
 
 ### Meaning
 
-The GitHub one-liner calls the user "the master of graph engineering". The focal object is that graph: a directed acyclic graph of agent nodes scheduled in waves by `mass ulw`. Wave 1 = orchestrator (lead) → wave 2 = planner, gap analysis, plan review (plan + gates) → wave 3 = Atlas, Hephaestus, Oracle, Librarian, Explore, worker, Multimodal-Looker (execution). A 12s loop lights the waves in order, pulses travel down the edges, and a final "verified" flash settles the graph.
+The GitHub one-liner calls the user "the master of graph engineering". The focal object is that graph: a directed acyclic graph of agent nodes scheduled in waves by `mass ulw`. Wave 1 = orchestrator (lead) → wave 2 = Ultrawork Planner, Plan Consultant, Plan Reviewer (plan + gates) → wave 3 = Kibitzer, Architect, Deep, Quick, Visual Engineering, Explore, Librarian (categories and curated agents, execution). A 12s loop lights the waves in order, pulses travel down the edges, and a final "verified" flash settles the graph.
 
 ### Content and geometry
 
-- Desktop 11 nodes / mobile 7 (drop gap analysis, plan review, Multimodal-Looker, worker). Positions precomputed in `components/landing/graph/graph-data.ts` (seeded, three planes along -Z).
+- Desktop 11 nodes / mobile 7 (drop Plan Consultant, Kibitzer, Quick, Visual Engineering). Positions precomputed in `components/landing/graph/graph-data.ts` (seeded, three planes along -Z).
 - Node = icosahedron (detail 1) `MeshStandardMaterial` (`--ink-3` base, emissive `--accent-dim`, emissiveIntensity 0.2 idle → 1.6 lit) + one additive-blended halo sprite (shared 64×64 radial CanvasTexture, `--accent-16` → transparent). No bloom / postprocessing.
 - Edges = one `LineSegments` geometry, `--accent-dim` at 0.35 opacity; lit edge 0.8.
 - Pulses = one `Points` object (≤ 48 desktop / 24 mobile) whose `t` along its edge advances per frame in a typed array; size 6px, `--accent-hot`.
@@ -277,6 +281,34 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 - Canvas: `dpr={[1, isMobile ? 1.25 : 1.75]}`, `gl={{ antialias: !isMobile, powerPreference: "high-performance", alpha: true }}`, `frameloop="always"` only while the hero is on screen and the tab visible, otherwise `"demand"`; after 20s without interaction, `"demand"` with one `invalidate()` per second to keep the wave loop alive.
 - Budget: the lazy renderer chunks (three core + @react-three/fiber + react-reconciler + the two drei modules) ≤ 224 KB gzip total, asserted by `scripts/check-graph-budget.mjs` (`bun run check:graph-budget`); three must not appear in the first-load JS of `/` (checked against the app build manifest). Measured 2026-09-08: 209.3 KB gzip across two chunks (163.4 + 45.9); three's core alone is ~150 KB gzip and is irreducible, so the budget is set at measured + 7% headroom rather than the 190 KB first estimate. drei is imported per module, never the barrel.
 - Lighthouse guard: chunk loads after LCP; TBT contribution ≤ 50ms on the mobile preset; the poster keeps CLS at 0.
+
+## 9b. Landing story (v3) and the §10 story primitives
+
+### Section order (`app/_components/landing-page.tsx`)
+
+`hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta`. Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
+
+- **secret**: the fold. Title = "we'd rather you never read this", body rendered by `LitText` (words light `--text-faint` → `--text-hi` as the paragraph scrolls from the viewport bottom to 35% height), then a `Reveal`ed accent line ("still curious?") that opens the feature story.
+- **ultrawork**: prompt line with the keyword as a `--accent-16` mark + three revealed steps. No product jargon in the copy.
+- **multi-model**: two `Marquee` rows of tuned profile chips (opposite directions, 36s / 44s, pause on hover). The chip list is data (`story-data.ts`) and never names families outside Claude / GPT / Kimi / Grok / GLM / DeepSeek.
+- **mass-ulw**: the existing desktop-app DAG (`dag/`) on a research → dataset → model → deck scenario (`scenario-data.ts`).
+- **kibitzer**: two concurrent loops, a narrow inexpensive memory-watching sidecar and a larger expensive frontier agent. Independent active markers run on `--kib-watch-cycle: 4.5s` (three beats) and `--kib-main-cycle: 14s` (four beats); the main turn counter advances on each animation iteration. A `--kib-cycle: 14s` story sends one nudge from memory across the gutter into a reserved slot between acting and verifying, replacing the skipped migration test with running it first at 50% of the story. The loops continue throughout. One IntersectionObserver pauses the stage offscreen. Below md, the sidecar becomes a compact top strip and the nudge travels vertically. Reduced motion shows the inserted nudge and corrected step, without animation.
+  - Stage geometry: desktop columns `minmax(0, 1fr) minmax(0, 2fr)`, gap `--space-12`, padding `--space-5`; mobile gap `--space-8`, padding `--space-4`. Ruled loop rows use `--space-12` minimum height, insertion slot `--space-24` minimum height. Nudge starts at `translateX(calc(-50% - var(--space-12))) scale(.5)` on desktop; mobile starts at `translateY(calc(-1 * (var(--space-40) + var(--space-24)))) scale(.8)`. Transform origin is left center; 0–30% hidden at source, 32–38% produced, 38–50% in flight, 50–94% inserted, 98–100% reset. Text stays full opacity except hidden/replaced story states; only the active row changes color. All other dimensions, type, colors and rules reuse §§2–6.
+- **skills**: a vertical `Ticker` of `name · blurb` rows (30s, pause on hover) next to the copy.
+- **crafted**: sticky copy column + a single-column rise-up list (`Reveal` with `--index` stagger); the docs link is the only CTA.
+- **platforms**: title with a `RotatingWord` (13 platforms, 1.6s per word, `steps()`), then every platform once as a `Chip`, revealed with stagger, and a footnote-style "coming soon" line under the list.
+
+### §10 primitives (`components/landing/story-primitives.tsx`, `lit-text.tsx`; CSS in `design-system.css` §10)
+
+| Primitive      | Motion                                                                                                                  | Reduced motion                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `Marquee`      | `translateX(-100%)` linear, duplicated track, pause on hover                                                            | static wrapped row, duplicate hidden                                  |
+| `Ticker`       | `translateY(-50%)` linear, duplicated list, pause on hover                                                              | static list, duplicate hidden                                         |
+| `LitText`      | scroll progress → `.is-lit` per word, 600ms color transition                                                            | all words lit                                                         |
+| `.kib-stage`   | Independent 4.5s watch / 14s main loops; 14s traveling nudge inserts before verification; iteration-driven turn counter | both loops visible, nudge inserted, corrected next step, no animation |
+| `RotatingWord` | `steps(n)` vertical track, 1.6s per word, 1.1em clip                                                                    | first word only                                                       |
+
+All five are CSS keyframes or one IntersectionObserver; no scroll listeners, no motion library (§6 rule unchanged).
 
 ## 10. Verification Matrix
 

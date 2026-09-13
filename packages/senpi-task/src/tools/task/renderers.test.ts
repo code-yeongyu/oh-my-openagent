@@ -36,7 +36,7 @@ describe("statusThemeColor", () => {
 describe("taskCallLines", () => {
   test("#given current spawn arguments #when rendered #then the plain row includes task, target, actual prompt, and mode", () => {
     // given
-    const args = { prompt: "ship it", subagent_type: "atlas", run_in_background: false }
+    const args = { prompt: "ship it", subagent_type: "builder", run_in_background: false }
 
     // when
     const lines = taskCallLines(args)
@@ -287,13 +287,13 @@ describe("taskResultLines", () => {
       task_id: "st_0000000d",
       status: "completed",
       mode: "spawn",
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "openai/manual",
       run_in_background: false,
     }).join(" ")
 
     // then
-    expect(row).toContain("agent:momus(openai/manual)")
+    expect(row).toContain("agent:plan-reviewer(openai/manual)")
     expect(row).toContain("foreground")
     expect(row).not.toContain("prompt:")
     expect(row).not.toContain("reason:")

@@ -1,5 +1,5 @@
 // Soul-edit visible notice channel (plan IC-4 / todo 7). A committed change
-// touching system/persona.md or system/identity.md emits a NON-MODEL-FACING
+// touching any SOUL_PATHS entry (persona, identity, boundaries) emits a NON-MODEL-FACING
 // entry through appendEntry + registerEntryRenderer; sendMessage is never used
 // because senpi converts it into user-role model context. On the direct tool
 // surface the commit metadata arrives through MemoryToolsOptions.onCommit; on

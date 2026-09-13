@@ -105,42 +105,60 @@ reachable reasoning depth.
 
 When the user asks about the `✦ Kibitzer` line that shows up mid-session
 ("recalled memory: ..."), or about the memory tip that promises stored memory can resurface on its own, explain the
-whole kibitzer recall gate, citing `packages/omo-senpi/src/components/memory/` and
+whole resident Kibitzer sidecar, citing `packages/omo-senpi/src/components/memory/kibitzer/` and
 `packages/memory-core/src/recall/`. This is NOT the periodic save reminder: `memory.nudge` in
-`nudge-wiring.ts` asks the agent to WRITE memory every N user turns, while kibitzer only READS
+`nudge-wiring.ts` asks the agent to WRITE memory every N user turns, while Kibitzer only READS
 memory and hands one hint back. Keep the two apart in the explanation.
 
 1. **Candidate collection** (`recall-wiring.ts`, `recall-session-read.ts`,
-   `recall-query-planner-tools.ts`): on every `tool_call` and on settle the component snapshots the
+   `recall-query-planner-tools.ts`): on every prompt and `tool_call` the component snapshots the
    live session synchronously (the host disposes the ctx once the handler returns), runs a lexical
    planner over the user-only text window plus the last 8 tool-argument payloads, and scores memory
    files against it. Memory-owned hidden channels are excluded from the window, so a previous hint
    can never seed the next query.
-2. **Delta gate and launch** (`kibitzer-trigger.ts`, `kibitzer-concurrency.ts`): the judge only
-   launches when the sorted candidate-path fingerprint differs from the session's last launch. A
-   launch that lands while a judge is already running is parked as the single trailing request. Per
-   session the count stops at 200, `tool_call` launches carry a 90 s deadline, and at most 2 judges
-   run process-wide; a capped launch is skipped, never queued.
-3. **The judge** (`kibitzer-runner.ts`, `kibitzer-judge-spec.ts`, persona at
-   `packages/memory-core/src/recall/assets/kibitzer-persona.md`): a quick-category in-process child
-   with exactly ONE tool, `nudge(path, hint)`, and no file access. Its instruction is that silence is
-   the default: it nudges only when a stored memory would change the agent's next action (it
-   contradicts the current approach, records a past failure of it, answers a question the agent is
-   about to re-derive, or names a constraint being ignored). Topical similarity alone is rejected.
-4. **Hint contract** (`kibitzer-nudge-tool.ts`, `packages/memory-core/src/recall/gate.ts`): the
-   path must be copied from the offered candidates, must not already be surfaced this session, and
-   must not be a `system/` path; the hint is one factual present-tense sentence, at most 200
+2. **One resident sidecar per session** (`kibitzer/index.ts`, `kibitzer/sidecar.ts`,
+   `kibitzer/events.ts`): each main session owns ONE quick-category in-process child, created lazily
+   and disposed at session shutdown. Every prompt, `tool_call` and `tool_result` reaches it as a
+   bounded event - secrets redacted before truncation, tool args capped at 400 characters, result
+   heads at 600, assistant text at 1500, prompts at 4000, `eval.summary` preferred over code, the
+   newest 20 events kept and older ones folded into a one-line digest. Events only buffer; a model
+   turn (a wake) happens only when the batch carries a memory path this sidecar has not judged and
+   the session has not surfaced. An idle child is revived with a follow-up; a running turn is steered.
+3. **Wake governance** (`kibitzer/wake-policy.ts`, `kibitzer/wake-slot.ts`): before a wake the
+   sidecar takes one slot of a machine-wide lease (memory-core's `recall-wake` lock domain,
+   `memory.recall.max_concurrent_wakes`, default 2, FIFO tickets, dead-owner recovery); when every
+   slot is busy it keeps buffering and retries at the next hook, never dropping an event. A wake is
+   limited to `memory.recall.tool_budget` tool calls (default 8) and 90 seconds; hitting either
+   ends the wake without counting as a failure, and nudges accepted before the cut are still
+   delivered. Accepted-nudge cooldown is 2 wakes per 10 minutes per session. When the child's own
+   context passes 60% of `memory.recall.sidecar_max_tokens` (default 48000) it is replaced by a
+   fresh child seeded with the delivered paths, the rejected paths, a one-line task summary and the
+   last cursor. A failed child is disposed and recreated after a jittered exponential backoff
+   (1 s doubling to 5 min) with every buffered event kept.
+4. **Exactly five read-only tools** (`kibitzer/tools/`, persona at
+   `packages/memory-core/src/recall/assets/kibitzer-persona.md`): `read` and `grep` inside the
+   workspace, `session_entries(since)` over the parent transcript minus memory-owned hidden entries,
+   `memory` with only `search` and `read` over the committed memory corpus, and `nudge(path,
+   hint)`. No `bash`, `edit`, `write`, and no tool that writes memory: the sidecar can look before
+   it speaks, but it cannot act. Its instruction is that silence is the default: it nudges only when
+   a stored memory would change the agent's next action (it contradicts the current approach,
+   records a past failure of it, answers a question the agent is about to re-derive, or names a
+   constraint being ignored). Topical similarity alone is rejected.
+5. **Hint contract** (`kibitzer/tools/nudge.ts`, `kibitzer/nudge-tool.ts`,
+   `packages/memory-core/src/recall/gate.ts`): the path must be one the sidecar was offered this
+   lifetime or found through its own `memory` search, must not already be surfaced this session,
+   and must not be a `system/` path; the hint is one factual present-tense sentence, at most 200
    characters (`NUDGE_HINT_MAX_CHARS`), single line, and secret-like text is rejected. The parent
    re-validates every accepted nudge against the same rules plus `memory.recall.max_items`
-   (default 2, range 1 to 5) before anything is persisted.
-5. **Delivery** (`kibitzer-delivery.ts`, `recall-drain.ts`): accepted nudges are marked surfaced in
-   the session ledger at ACCEPT time, so a parallel judge can't repeat them. The model-facing half
+   (default 2, range 1 to 5, counted per wake) before anything is persisted.
+6. **Delivery** (`kibitzer/delivery.ts`, `recall-drain.ts`): accepted nudges are marked surfaced in
+   the session ledger at ACCEPT time, so a later wake can't repeat them. The model-facing half
    is a hidden `omo-kibitzer:recall` message (`display: false`) carrying a `<recalled-memory
    source="[[path]]">` block that says the memory is a hint, not current state, and must be
    verified. It is steered in at the next `tool_result` when nothing else is pending, ridden in on
-   another source's idle flush, or drained into the next prompt; the pending file is stamped with
-   the compaction epoch and a compaction drops everything held.
-6. **The visible half** (`kibitzer-notice.ts`): because senpi draws nothing for the hidden message,
+   another source's idle flush, or drained into the next prompt. A compaction of the main session
+   drops everything delivery still holds, but never the sidecar itself - it keeps its context.
+7. **The visible half** (`kibitzer/notice.ts`): because senpi draws nothing for the hidden message,
    the component appends an `omo-kibitzer:nudged` entry and renders it as Kibitzer advice:
    a single fixed `Kibitzer` title (`✦ Kibitzer`, accent tone; opener-era records carry a retired
    `opener` field that is ignored) over `recalled memory: <hint>`,
@@ -149,10 +167,12 @@ memory and hands one hint back. Keep the two apart in the explanation.
    ever drawn. It's a transcript entry, not a toast: nothing pops over the input, and the renderer
    is fail-closed, so a malformed record draws nothing rather than a half-formed notice.
 
-What's worth bragging about: the user sees one calm line, and behind it a read-only judge with a
-single tool, a fingerprint-gated launch, a hard deadline, a 200-character hint budget, a ledger
-that guarantees a memory surfaces at most once per session, and a compaction-epoch check that
-refuses a verdict about a transcript that no longer exists. A judge that finds nothing says nothing,
-and that silence is the designed outcome, not a failure. Gate skips and failures render separately
-as `Kibitzer gate skipped` / `Kibitzer gate failed`; a deadline drop renders no notice at all and
-only leaves an `outcome.json` behind. Turn the whole thing off with `memory.recall.enabled: false`.
+What's worth bragging about: the user sees one calm line, and behind it a resident read-only
+judge that remembers what it already judged, five tools that can only look, a machine-wide cap on
+how many judges think at once, a per-wake tool budget and deadline, a 200-character hint budget, a
+ledger that guarantees a memory surfaces at most once per session, and a sidecar that reseeds
+itself before its own context runs out. A judge that finds nothing says nothing, and that silence
+is the designed outcome, not a failure; a failing model backs off quietly instead of spamming
+notices. Its audit trail is the child's own session JSONL under
+`recall/sidecars/<encoded-session>/` - no per-run directories. Turn the whole thing off with
+`memory.recall.enabled: false`, the only off switch.

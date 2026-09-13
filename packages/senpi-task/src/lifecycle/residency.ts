@@ -5,14 +5,8 @@ import { acquireSessionAdmissionLease, type AdmissionLeaseTiming } from "./admis
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
+import { suspendHandle } from "./shutdown"
 import type { AdmissionResult } from "./types"
-
-// Completed in-process sessions are large, so reclaim them after 15 minutes without activity.
-// This is deliberately shorter than the 24-hour record TTL: the record remains available for
-// task_output while the live AgentSession is released. The sweep runs at the same cadence and is
-// unref'd so it cannot keep an otherwise idle host alive.
-export const RESIDENT_IDLE_TIMEOUT_MS = 15 * 60 * 1000
-const RESIDENT_IDLE_SWEEP_INTERVAL_MS = RESIDENT_IDLE_TIMEOUT_MS
 
 // Both the "unlimited" literal and a 0 cap mean unbounded residency (omo.json accepts either).
 function isUnbounded(maxChildren: number | "unlimited"): maxChildren is "unlimited" | 0 {
@@ -57,7 +51,7 @@ function residentsFor(context: LifecycleContext, parentSessionId: string): reado
 
 /** Reclaim terminal residents that have not been touched during the idle retention window. */
 export async function reclaimIdleResidents(context: LifecycleContext): Promise<readonly string[]> {
-  const cutoff = context.now() - RESIDENT_IDLE_TIMEOUT_MS
+  const cutoff = context.now() - context.config.resident_idle_timeout_ms
   const candidates = context.store.list().records.filter(
     (record) =>
       record.residency_state === "resident" &&
@@ -66,30 +60,39 @@ export async function reclaimIdleResidents(context: LifecycleContext): Promise<r
       Date.parse(record.updated_at) <= cutoff &&
       !context.registry.hasPendingSends(record.task_id),
   )
-  const evicted: string[] = []
+  const reclaimed: string[] = []
   for (const candidate of candidates) {
-    // Re-read immediately before teardown: a concurrent revive changes status/residency and must
-    // win over an idle observation. The destruction port remains the only disposer.
-    const fresh = context.store.load(candidate.task_id)
-    if (
-      fresh === null ||
-      fresh.residency_state !== "resident" ||
-      (fresh.host_pid !== context.hostPid && context.registry.get(fresh.task_id) === undefined) ||
-      !TERMINAL_STATUSES.has(fresh.status) ||
-      Date.parse(fresh.updated_at) > cutoff ||
-      context.registry.hasPendingSends(fresh.task_id)
-    ) continue
+    // Reuse send/teardown arbitration across suspension's asynchronous abort and dispose.
+    if (context.registry.tryClaimEviction?.(candidate.task_id) === false) continue
     try {
-      await destroyResidentTask(context, fresh.task_id, "evict")
-      evicted.push(fresh.task_id)
+      const fresh = context.store.load(candidate.task_id)
+      if (
+        fresh === null ||
+        fresh.residency_state !== "resident" ||
+        (fresh.host_pid !== context.hostPid && context.registry.get(fresh.task_id) === undefined) ||
+        !TERMINAL_STATUSES.has(fresh.status) ||
+        Date.parse(fresh.updated_at) > cutoff ||
+        context.registry.hasPendingSends(fresh.task_id)
+      ) continue
+      if (fresh.killed === true || fresh.status === "cancelled" || fresh.status === "lost") {
+        await destroyResidentTask(context, fresh.task_id, "cancel")
+      } else {
+        const handle = context.registry.get(fresh.task_id)
+        // Reconciliation owns missing handles; a prior failed dispose is not a successful park.
+        if (handle === undefined) continue
+        await suspendHandle(context, handle, "idle")
+      }
+      reclaimed.push(fresh.task_id)
     } catch (error) {
-      log("senpi-task idle resident eviction failed", {
-        taskId: fresh.task_id,
+      log("senpi-task idle resident suspension failed", {
+        taskId: candidate.task_id,
         error: error instanceof Error ? error.message : String(error),
       })
+    } finally {
+      context.registry.releaseEviction?.(candidate.task_id)
     }
   }
-  return evicted
+  return reclaimed
 }
 
 export function startIdleResidentReclaimer(
@@ -106,7 +109,7 @@ export function startIdleResidentReclaimer(
         log("senpi-task idle resident sweep failed", { error: String(error) })
       })
       .finally(() => { running = false })
-  }, RESIDENT_IDLE_SWEEP_INTERVAL_MS)
+  }, context.config.resident_idle_timeout_ms)
   timer.unref?.()
   return () => context.idleReclaimerScheduler.clearInterval(timer)
 }

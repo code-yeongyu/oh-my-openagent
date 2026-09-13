@@ -6,7 +6,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger } from "../../extension/types"
-import { KIBITZER_TASK_RUNTIME_ASSET, loadKibitzerTaskRuntime } from "./kibitzer-task-runtime"
+import { KIBITZER_TASK_RUNTIME_ASSET, loadKibitzerTaskRuntime } from "./kibitzer/task-runtime"
 
 export interface PersonaPrimeTarget {
   readonly asset: string

@@ -1,0 +1,51 @@
+bun test v1.4.2 (744846f84)
+
+script/release-version.test.ts:
+(pass) LazyCodex-only numbers cannot consume the next omo number [0.51ms]
+(pass) stable-base LazyCodex releases never advance latest; omo channel mapping stays unchanged [0.23ms]
+14 |   expect(resolveReleaseVersion("5.0.0-rc.2.lazycodex.3", true).distTag).toBe("rc")
+15 | })
+16 | 
+17 | test("reserved identifier cannot escape the namespace through malformed versions", () => {
+18 |   for (const version of ["5.0.0", "5.0.0-beta.1", "5.0.0-beta.1.lazycodex", "5.0.0-beta.1.lazycodex.0", "5.0.0-beta.1.lazycodex.01", "5.0.0-beta.lazycodex.1.extra", "05.0.0-lazycodex.1", "5.0.0-beta.01.lazycodex.1", "5.0.0-latest.lazycodex.1"]) {
+19 |     expect(() => resolveReleaseVersion(version, true)).toThrow()
+                                                            ^
+error: expect(received).toThrow()
+
+Received function did not throw
+Received value: {
+  version: "5.0.0-latest.lazycodex.1",
+  distTag: "latest",
+}
+
+      at <anonymous> (<worktree>/script/release-version.test.ts:19:56)
+(fail) reserved identifier cannot escape the namespace through malformed versions [2.93ms]
+
+script/preflight-trust.test.ts:
+(pass) TLS failures, rate limits and server errors recover automatically with bounded backoff [4.06ms]
+(pass) ambiguous 404 propagation retries rather than claiming missing configuration [0.25ms]
+(pass) definitive HTTP 400 fails fast with package/status and configuration guidance [0.16ms]
+(pass) definitive HTTP 401 fails fast with package/status and configuration guidance [0.08ms]
+(pass) definitive HTTP 403 fails fast with package/status and configuration guidance [0.08ms]
+(pass) exhaustion surfaces actual npm status/body without misleading configuration guidance [0.16ms]
+58 |   expect(f.logs.join("\n")).not.toContain("/access")
+59 | })
+60 | 
+61 | test("an explicit missing publisher mapping fails fast even on HTTP 404", async () => {
+62 |   const f = fixture([new Response('{"error":"No trusted publisher configured"}', { status: 404 })])
+63 |   await expect(verifyPublisher("lazycodex-ai", "token", f.options)).rejects.toThrow("lazycodex-ai HTTP 404")
+                                                                                 ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "lazycodex-ai HTTP 404"
+Received message: "lazycodex-ai transport Error: Unexpected request (attempt 6/6)"
+
+      at <anonymous> (<worktree>/script/preflight-trust.test.ts:63:77)
+(fail) an explicit missing publisher mapping fails fast even on HTTP 404 [0.20ms]
+(pass) error diagnostics redact credential fields and JWTs [0.10ms]
+(pass) unknown HTTP failures fail closed and Retry-After is capped [0.13ms]
+
+ 10 pass
+ 2 fail
+ 48 expect() calls
+Ran 12 tests across 2 files. [1.61s]

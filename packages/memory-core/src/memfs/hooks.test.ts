@@ -159,7 +159,9 @@ describe("pre-commit hook", () => {
       "system/persona.md": VALID,
       "reference/notes.md": "---\ndescription: Notes\nlimit: 5000\n---\n\nnotes\n",
       "memory/system/legacy.md": "---\ndescription: Legacy layout\n---\n\nlegacy\n",
-      "skills/deploy/SKILL.md": "---\nname: deploy\nunknown_key: fine\n---\n\nsteps\n",
+      "skills/deploy/SKILL.md": "---\nname: deploy\ndescription: Use when deploying\nunknown_key: fine\n---\n\nsteps\n",
+      "skills/quoted/SKILL.md": "---\ndescription: \"Use when shipping: verify, merge\"\nversion: 0.2.0\n---\n\nsteps\n",
+      "people/sarah/card.md": "---\ndescription: Sarah - cofounder\nkind: person\naliases: [\"Sarah\"]\n---\n\nIDENTITY: cofounder\n",
       "README.md": "no frontmatter here\n",
     })
 
@@ -215,6 +217,41 @@ describe("pre-commit hook", () => {
       rule: "read_only added by the agent",
       files: { "system/persona.md": "---\ndescription: Persona\nread_only: true\n---\n\nbody\n" },
       reason: "'read_only' is a protected field and cannot be set by the agent",
+    },
+    {
+      rule: "an unquoted description containing ': ' in reference/",
+      files: { "reference/notes.md": "---\ndescription: Run the chain by default: verify, merge\n---\n\nbody\n" },
+      reason: "'description' is not a safe YAML plain scalar",
+    },
+    {
+      rule: "an unquoted description containing ' #' in system/",
+      files: { "system/persona.md": "---\ndescription: senpi #1439 tail\n---\n\nbody\n" },
+      reason: "'description' is not a safe YAML plain scalar",
+    },
+    {
+      rule: "an unquoted description containing ': ' in a SKILL.md",
+      files: { "skills/deploy/SKILL.md": "---\nname: deploy\ndescription: Use by default: verify\n---\n\nsteps\n" },
+      reason: "'description' is not a safe YAML plain scalar",
+    },
+    {
+      rule: "an unquoted extra value starting with '[' in a SKILL.md",
+      files: { "skills/deploy/SKILL.md": "---\ndescription: Deploy\nreplaced_by: [see other]\n---\n\nsteps\n" },
+      reason: "'replaced_by' is not a safe YAML plain scalar",
+    },
+    {
+      rule: "a SKILL.md without a description",
+      files: { "skills/deploy/SKILL.md": "---\nname: deploy\n---\n\nsteps\n" },
+      reason: "missing required field 'description'",
+    },
+    {
+      rule: "a SKILL.md without frontmatter",
+      files: { "skills/deploy/SKILL.md": "# Deploy\n\nsteps\n" },
+      reason: "missing frontmatter (must start with ---)",
+    },
+    {
+      rule: "a people card with an unknown key",
+      files: { "people/sarah/card.md": "---\ndescription: Sarah\nkind: person\npriority: high\n---\n\nIDENTITY: x\n" },
+      reason: "unknown frontmatter key 'priority'",
     },
     {
       rule: "flat skill file",

@@ -36,7 +36,7 @@ function writeOmoJson(cwd: string, config: unknown): void {
 }
 
 // The rendered "Available agents: a, b, c" fragment of the task tool description. The example line
-// quoting subagent_type="momus" must never leak into this extraction, so the marker anchors it.
+// quoting subagent_type="plan-reviewer" must never leak into this extraction, so the marker anchors it.
 function advertisedAgentNames(engine: TaskEngine): string {
   const description = buildTaskToolDescription({ omoConfig: engine.omoConfig, agents: engine.agents })
   const marker = "Available agents: "
@@ -67,11 +67,11 @@ describe("task engine builtin agent overlay", () => {
     expect(Object.keys(engine.agents).sort()).toEqual([
       "explore",
       "librarian",
-      "metis",
-      "momus",
       "omo-senpi-code-reviewer",
       "omo-senpi-gate-reviewer",
       "omo-senpi-qa-executor",
+      "plan-consultant",
+      "plan-reviewer",
     ])
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
     expect(engine.agents["omo-senpi-code-reviewer"]?.executionMode).toBe("in-process")
@@ -105,11 +105,11 @@ describe("task engine builtin agent overlay", () => {
     expect(Object.keys(engine.agents).sort()).toEqual([
       "explore",
       "librarian",
-      "metis",
-      "momus",
       "omo-senpi-code-reviewer",
       "omo-senpi-gate-reviewer",
       "omo-senpi-qa-executor",
+      "plan-consultant",
+      "plan-reviewer",
       "scout",
     ])
     expect(engine.agents["scout"]?.prompt).toBe("Scout the repo.")
@@ -163,22 +163,38 @@ describe("task engine builtin agent overlay", () => {
     expect(advertisedAgentNames(engine)).toBe(
       "explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor",
     )
-    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis, momus")
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("plan-consultant, plan-reviewer")
   })
 
-  test("#given agents.momus.disable in omo.json #when the description renders #then momus is hidden and the other three stay listed", () => {
+  test("#given agents.plan-reviewer.disable in omo.json #when the description renders #then plan-reviewer is hidden and the other agents stay listed", () => {
     // given
     const cwd = tempProject()
-    writeOmoJson(cwd, { agents: { momus: { disable: true } } })
+    writeOmoJson(cwd, { agents: { "plan-reviewer": { disable: true } } })
 
     // when
     const engine = composeIn(cwd)
 
     // then
-    expect(engine.agents["momus"]?.disable).toBe(true)
+    expect(engine.agents["plan-reviewer"]?.disable).toBe(true)
     expect(advertisedAgentNames(engine)).toBe(
       "explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor",
     )
-    expect(advertisedPlanGatedAgentNames(engine)).toBe("metis")
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("plan-consultant")
+  })
+
+  test("#given the retired agents.momus key in omo.json #when the engine resolves agents #then it defines a momus agent and leaves plan-reviewer builtin", () => {
+    // given
+    const cwd = tempProject()
+    writeOmoJson(cwd, { agents: { momus: { model: "omo-mock/mock-1", disable: true } } })
+
+    // when
+    const engine = composeIn(cwd)
+
+    // then
+    expect(engine.agents["momus"]?.model).toBe("omo-mock/mock-1")
+    expect(engine.agents["momus"]?.disable).toBe(true)
+    expect(engine.agents["plan-reviewer"]?.model).toBeUndefined()
+    expect(engine.agents["plan-reviewer"]?.disable).toBeUndefined()
+    expect(advertisedPlanGatedAgentNames(engine)).toBe("plan-consultant, plan-reviewer")
   })
 })

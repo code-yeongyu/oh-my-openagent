@@ -85,7 +85,7 @@ export async function suspendOnSessionShutdown(
 // ownership before abort settles the turn, so no cancelled/error terminal can land on the
 // suspended record), then live resources are torn down and the record is parked at its suspended
 // residency. The pre-dispose steps are best-effort so dispose ALWAYS runs.
-async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
+export async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
   context.registry.forget(handle.task_id)
   await bestEffort(handle.task_id, "abort", () => handle.abort())
   if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => handle.terminate())

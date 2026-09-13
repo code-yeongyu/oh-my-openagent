@@ -85,7 +85,11 @@ function compareSequences(a: readonly DagNodeId[], b: readonly DagNodeId[]): num
 function routeOf(input: DagNodeInput): DagRoute {
   return input.category !== undefined
     ? { kind: "category", category: input.category }
-    : { kind: "agent", agent: input.subagent_type, ...(input.model === undefined ? {} : { model: input.model }) }
+    : {
+        kind: "agent",
+        agent: input.subagent_type.trim(),
+        ...(input.model === undefined ? {} : { model: input.model }),
+      }
 }
 
 function failure(errors: readonly DagCompileError[], at: string): DagCompileResult {

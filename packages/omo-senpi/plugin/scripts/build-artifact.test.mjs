@@ -4,7 +4,31 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "bun:test"
 
-import { artifactsMatch, closeNodeMinifier, minifyBundle } from "./build-artifact.mjs"
+import { artifactsMatch, closeNodeMinifier, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
+
+test("#given Node and Bun builtin catalogs #when imports are normalized #then Bun namespaces stay unchanged and both outputs match", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-builtin-normalize-"))
+  const nodeOutput = join(root, "node.js")
+  const bunOutput = join(root, "bun.js")
+  const source = [
+    'import path from "path";',
+    'import "fs";',
+    'import "bun";',
+    'import { dlopen } from "bun:ffi";',
+    'const test = import("bun:test");',
+    'import "node:sqlite";',
+  ].join("\n")
+  try {
+    await Promise.all([writeFile(nodeOutput, source), writeFile(bunOutput, source)])
+    await normalizeBuiltinImports(nodeOutput, ["fs", "path", "node:sqlite"])
+    await normalizeBuiltinImports(bunOutput, ["fs", "path", "bun", "bun:ffi", "bun:test", "node:sqlite"])
+    const expected = source.replace('"path"', '"node:path"').replace('"fs"', '"node:fs"')
+    expect(await readFile(nodeOutput, "utf8")).toBe(expected)
+    expect(await readFile(bunOutput, "utf8")).toBe(expected)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test("#given an injected bundle body with a recomputed marker #when freshness is checked #then the artifact is rejected", () => {
   // given

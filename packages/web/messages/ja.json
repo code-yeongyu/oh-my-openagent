@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "title": "Oh My OpenAgent",
-    "description": "究極のエージェントハーネス。OmO と出会おう：あなたのようにコーディングする、必要なものがすべて揃ったエージェントハーネス。"
+    "title": "OmO",
+    "description": "Your tool for real work. But it's an agent. OmOはあなたのトークンを、現実に価値のある成果へ変えます。"
   },
   "nav": {
-    "brand": "Oh My OpenAgent",
-    "agents": "エージェント",
+    "brand": "OmO",
+    "features": "機能",
     "docs": "ドキュメント",
     "manifesto": "マニフェスト",
     "install": "インストール",
@@ -15,7 +15,7 @@
     "primary": "メインメニュー"
   },
   "footer": {
-    "brand": "Oh My OpenAgent",
+    "brand": "OmO",
     "copyright": "© {year} Sisyphus Labs · SUL-1.0 ソースアベイラブル",
     "product": "プロダクト",
     "community": "コミュニティ",
@@ -31,38 +31,15 @@
   },
   "landing": {
     "hero": {
-      "eyebrow": "エージェントハーネス",
-      "title": "mass ulw と打つ。",
-      "titleHighlight": "グラフを手にする。",
+      "title": "Your tool for real work.",
+      "titleHighlight": "But it's an agent.",
+      "subcopy": "あなたのトークンを、現実に価値のある成果へ。\n1万を超えるソースのリサーチ。すっと理解できる資料。\n会社の仕事、実験、バックエンド、フロントエンド、コーディング。\nあなたが望むどんな仕事でも。",
       "getStarted": "はじめる",
       "readManifesto": "マニフェストを読む",
-      "rail": {
-        "wave1": {
-          "index": "01",
-          "label": "オーケストレーターが率いる"
-        },
-        "wave2": {
-          "index": "02",
-          "label": "計画とゲート"
-        },
-        "wave3": {
-          "index": "03",
-          "label": "ワーカーが実行"
-        }
-      },
-      "modelsLabel": "すべてのモデルを同時に",
-      "modelsHint": "どんなに複雑な仕事でも、トークンを入れれば片づきます。グラフが各ノードを最適なモデルへ振り分けます。"
-    },
-    "installTabs": {
-      "opencode": "OpenCode",
-      "opencodeCommand": "bunx oh-my-openagent install",
-      "codex": "Codex",
-      "codexCommand": "npx lazycodex-ai install",
-      "senpi": "Senpi",
-      "senpiCommand": "npm i -g omo-ai@beta"
+      "installLabel": "コマンドひとつ、ツールひとつ",
+      "installCommand": "bun install -g omo-ai@beta"
     },
     "command": {
-      "tabsLabel": "インストール先",
       "copy": "コピー",
       "copied": "コピー済み",
       "copyAria": "インストールコマンドをコピー"
@@ -71,215 +48,87 @@
       "label": "ライブ指標",
       "githubStars": "GitHub スター",
       "totalDownloads": "累計ダウンロード",
-      "monthlyDownloads": "月間ダウンロード",
-      "agents": "エージェント",
-      "agentCount": "11"
+      "monthlyDownloads": "月間ダウンロード"
+    },
+    "secret": {
+      "lead": "この先の内容は、知らないままでいてほしいと思っています。",
+      "body": "私たちはこの時代の技術を、あなたの仕事を助けるためだけに使います。技術のための猛勉強ではなく、あなたの仕事に集中してください。使い続けるほど、あなたにいちばん合う道具になっていきます。",
+      "reveal": "それでも気になるあなたへ。"
+    },
+    "ultrawork": {
+      "title": "ultrawork",
+      "body": "この先を学ばなくても大丈夫。難しそうな仕事なら、プロンプトに ultrawork と添えてください。エージェントが自ら判断し、最善の成果まで進めます。",
+      "promptPrefix": "四半期レポートを本当に読めるものに直して",
+      "keyword": "ultrawork",
+      "step1": "1行を触る前にコードベース全体を読む",
+      "step2": "計画を立て、各ステップを証明してから進む",
+      "step3": "実際の画面で結果を検証してから止まる"
+    },
+    "multiModel": {
+      "title": "迷わないマルチモデル。",
+      "body": "お気に入りのフロンティアモデルと、安価なモデルを混ぜて使えます。ログインするだけ。モデルごとに調整されたシステムプロンプトが付いてくるので、選び間違えることがありません。",
+      "caption": "OmOに同梱された調整済みプロファイル"
     },
     "ulw": {
-      "eyebrow": "魔法の言葉",
-      "title": "どんな仕事も。すべてのモデルで。ひとつのグラフで。",
-      "description": "トークンを入れるだけ。mass ulw は仕事全体を依存グラフに変え、各ノードに合うモデル — Claude、GPT、Kimi、Grok、GLM — を並べてウェーブ単位で実行し、結果を検証してから止まります。"
+      "title": "何百ものエージェントを、あなたのために。キーワードひとつで。",
+      "body": "mass ulw と入力すると、仕事全体がエージェントのグラフになります。数千のソースを読むディープリサーチ、機械学習パイプラインの構築、誰もやりたくないマイグレーションまで。部分ごとに合うモデルが並列で動き、完了と言う前に検証します。"
     },
-    "editions": {
-      "eyebrow": "三つのエディション",
-      "title": "三つのエディション、一つの頭脳。",
-      "subtitle": "同じオーケストレーションエンジン。使っているホストを選ぶだけ。",
-      "ultimate": {
-        "name": "Ultimate",
-        "platform": "OpenCode",
-        "description": "11 エージェント、Team Mode、バックグラウンドタスク、3 層 MCP、55 のライフサイクルフックを備えたフルプラグイン。",
-        "install": "bunx oh-my-openagent install"
-      },
-      "light": {
-        "name": "Light",
-        "platform": "Codex CLI",
-        "description": "11 コンポーネント — bootstrap, comment-checker, git-bash, lazycodex-executor-verify, LSP, rules, teammode, telemetry, ultrawork, ulw-execute-continuation, ulw-loop — を Codex イベントに接続。",
-        "install": "npx lazycodex-ai install"
-      },
-      "senpi": {
-        "name": "Senpi",
-        "platform": "スタンドアロン ベータ",
-        "description": "OMO 拡張を内蔵したネイティブ omo コマンド。OpenCode や Codex ホスト不要のスタンドアロン。ベータチャンネルのみ。",
-        "install": "npm i -g omo-ai@beta"
-      },
-      "tagAgents": "11 エージェント",
-      "tagHooks": "55 ライフサイクルフック",
-      "tagComponents": "Light: 11 コンポーネント",
-      "tagBeta": "Senpi: ベータチャンネル"
+    "kibitzer": {
+      "title": "Kibitzer。あなたのエージェントは、あなたと仕事を忘れません。",
+      "body": "小さく安価なモデルが高価なメインエージェントの隣に座り、あなたがしてきたことを記憶から確かめ、メインが同じ失敗を繰り返す前にそっと促します。高価なモデルは切れ味を保ち、あなたは同じ説明を繰り返さなくなります。",
+      "sidecar": "Kibitzer · 小さなモデル",
+      "main": "メインエージェント · フロンティアモデル",
+      "memory": "メモリ",
+      "nudge": "ナッジ",
+      "scene": "小さく安価なKibitzerが高価なメインエージェントとは独立して監視とメモリ確認を繰り返し、リリース前にマイグレーションテストを実行するようメインループにナッジを挿入します。",
+      "cheapLoop": "小さく安価なモデル · 独立ループ",
+      "expensiveLoop": "高価なフロンティアモデル · メインループ",
+      "watch": "監視",
+      "read": "メモリ確認",
+      "judge": "判断",
+      "memoryNote": "前回のマイグレーション：テストを省略し、本番で障害が発生。",
+      "watchAgain": "監視を続ける",
+      "turn": "ターン {turn}",
+      "plan": "計画 · スキーマ変更",
+      "act": "実行 · マイグレーションを作成",
+      "skip": "検証 · マイグレーションテストを省略",
+      "testFirst": "検証 · まずマイグレーションテストを実行",
+      "ship": "検証済みの変更をリリース",
+      "nextTurn": "計画に戻る · 次のターン",
+      "reason": "前回は本番で障害が出ました。まずマイグレーションテストを実行してください。"
     },
-    "agents": {
-      "eyebrow": "ロスター",
-      "title": "11 のエージェント、一つのグラフ。",
-      "subtitle": "ウェーブでスケジュールされる 11 エージェントの有向グラフ。オーケストレーターが率い、プランナー・ギャップ分析・プランレビューがゲートを担い、ワーカーが実行します。グラフのノードをクリックすると該当セルが点灯します。",
-      "sisyphus": {
-        "name": "オーケストレーター",
-        "role": "リードエージェント",
-        "model": "Claude Opus 5 Max",
-        "description": "言葉ではなく意図を読み、一行も触る前にコードベースを把握し、専門エージェントに委譲して結果を独立に検証します。中断した実行は boulder.json から止まった箇所で再開します。"
-      },
-      "hephaestus": {
-        "name": "Hephaestus",
-        "role": "ディープワーカー — 探索、計画、決定、実行、検証",
-        "model": "GPT 5.6 Sol Medium"
-      },
-      "prometheus": {
-        "name": "プランナー",
-        "role": "戦略プランナー",
-        "model": "Claude Fable 5.1 XHigh"
-      },
-      "metis": {
-        "name": "Metis",
-        "role": "計画コンサルタント",
-        "model": "Claude Opus 5 High"
-      },
-      "momus": {
-        "name": "プランレビュアー",
-        "role": "レビューゲート",
-        "model": "GPT 6 Astra xHigh"
-      },
-      "atlas": {
-        "name": "Atlas",
-        "role": "並列タスク実行者",
-        "model": "Claude Sonnet 5"
-      },
-      "oracle": {
-        "name": "Oracle",
-        "role": "アーキテクチャコンサルタント",
-        "model": "GPT 5.6 Sol xHigh"
-      },
-      "librarian": {
-        "name": "Librarian",
-        "role": "ドキュメント・コード検索",
-        "model": "GPT 5.6 Luna Fast"
-      },
-      "explore": {
-        "name": "Explore",
-        "role": "コードベース grep",
-        "model": "GPT 5.6 Luna Fast"
-      },
-      "sisyphusJunior": {
-        "name": "ワーカー",
-        "role": "単一タスク実行者",
-        "model": "Per-category"
-      },
-      "multimodalLooker": {
-        "name": "Multimodal-Looker",
-        "role": "メディア解析",
-        "model": "GPT 5.6 Sol Low"
-      },
-      "dynamic": {
-        "name": "Dynamic Agent",
-        "role": "タスクに合わせて組み立て",
-        "model": "Per-category"
-      }
+    "skills": {
+      "title": "高品質なスキルを、必要なものだけ最小限に。",
+      "body": "あなたのモデルは賢いけれど、現実の問題を解くには知らないことがまだ多い。OmOはその欠けた知識をスキルとして届け、いまの仕事に必要なものだけを読み込みます。"
     },
-    "orchestration": {
-      "eyebrow": "オーケストレーション",
-      "title": "考えてから、動く。",
-      "subtitle": "計画と実行は別の仕事です。プランナーはコードを書かず、実行者は二人のレビュアーを通った計画に従います。",
-      "prometheus": {
-        "name": "プランナー",
-        "role": "戦略プランナー",
-        "model": "Claude Fable 5.1 XHigh",
-        "description": "インタビューし、コードベースを探索し、計画を書く。コードは書かない。",
-        "features": ["インタビューモード", "マルチエージェントによるコードベース探索"]
-      },
-      "metis": {
-        "name": "Metis",
-        "role": "ギャップ分析",
-        "model": "Claude Opus 5 High",
-        "description": "バグになる前に計画の曖昧さを読み取る。",
-        "features": ["欠けた要件", "暗黙の前提"]
-      },
-      "momus": {
-        "name": "プランレビュアー",
-        "role": "計画レビュー",
-        "model": "GPT 6 Astra xHigh",
-        "description": "計画が持ちこたえる時だけ承認。そうでなければ差し戻す。",
-        "features": ["敵対的レビュー", "OKAY か理由の一覧"]
-      },
-      "atlas": {
-        "name": "Atlas",
-        "role": "マスター実行者",
-        "model": "Claude Sonnet 5",
-        "description": "承認済みの計画を読み、カテゴリとスキルで委譲し、学びを記録し、すべての結果を自ら検証する。",
-        "features": ["意図ベースのルーティング", "独立検証"]
-      }
+    "crafted": {
+      "title": "そしてそれ以外も、あなたが触れるすべてが crafted されています。",
+      "body": "ほとんどは目に見えません。それが狙いです。",
+      "docs": "詳しくはドキュメントで",
+      "item1Name": "コードモードのツール呼び出し",
+      "item1Desc": "独立したツール呼び出しを、遅い往復ではなく小さなプログラムひとつでまとめて実行します。",
+      "item2Name": "ツール呼び出しの吸収",
+      "item2Desc": "数十の読み取り・検索・参照が1ステップに畳まれます。ターンが減り、待ち時間が減り、トークンが減ります。",
+      "item3Name": "ツール呼び出しの補正",
+      "item3Desc": "壊れた引数は実行前に修復されます。タイプミスひとつでターンを無駄にしません。",
+      "item4Name": "チームモード",
+      "item4Desc": "分割に値する大きさの仕事なら、リードエージェントが専門家チームを並列で運営します。",
+      "item5Name": "ポーリングではなくモニター",
+      "item5Desc": "ビルド、デプロイ、ファイルを待つことは購読です。エージェントは働き続け、到着したら目を覚まします。",
+      "item6Name": "生き残るゴール",
+      "item6Desc": "長い作業は証拠と共にチェックポイントされ、セッションが再開しても止まった場所から続きます。",
+      "item7Name": "すべてホットリロード",
+      "item7Desc": "設定、スキル、プロンプトがライブで再読み込みされます。試すために再起動は不要です。"
     },
-    "teamMode": {
-      "eyebrow": "Team Mode · オプトイン",
-      "title": "複数のエージェントを並べて。",
-      "description": "リードエージェントがカテゴリ特化のメンバーを並列で動かします。専用ツールで対話し、全メンバーの作業を tmux で見守れます。",
-      "features": {
-        "lead": {
-          "title": "リードオーケストレーション",
-          "description": "コーディネーター一人、スペシャリスト多数。team_send_message と team_task_create でメッセージング。"
-        },
-        "parallel": {
-          "title": "真の並列",
-          "description": "最大 8 メンバーが同時に作業。キューなし。"
-        },
-        "tmux": {
-          "title": "tmux 可視化",
-          "description": "フォーカスとグリッドのウィンドウ: 全体を見失わずに一人を拡大。"
-        },
-        "tools": {
-          "title": "team_* ツール群",
-          "description": "team_mode.enabled の背後にある 12 の専用ツール (team_create, team_status, team_send_message, ...)。"
-        }
-      },
-      "optIn": "team_mode.enabled = true → restart opencode",
-      "mockup": {
-        "title": "tmux — team · grid",
-        "status": "3 件実行中",
-        "paneLead": "lead",
-        "statusLead": "team_status: 3 メンバー作業中",
-        "lineLead": "> team_task_create dashboard-ui",
-        "paneImpl": "member · visual-engineering",
-        "statusImpl": "app/dashboard/page.tsx を編集中",
-        "lineImpl": "> team_send_message lead \"layout done\"",
-        "paneReview": "member · ultrabrain",
-        "statusReview": "plan.md をレビュー中",
-        "lineReview": "> 14 ファイルを読み込み中",
-        "paneTest": "member · quick",
-        "statusTest": "e2e 実行中",
-        "lineTest": "> 42 passed",
-        "caption": "デフォルトはオフ。作業が人単位にきれいに分かれる時にオンにします。"
-      }
-    },
-    "principles": {
-      "eyebrow": "設計判断",
-      "title": "作りが違う。",
-      "subtitle": "ハーネスの振る舞いを決める六つの判断。",
-      "specialization": {
-        "title": "専門化",
-        "description": "各エージェントは一つのことをうまくやる。一人が全部を知る代わりに、タスクごとにスキルを注入する。"
-      },
-      "trustVerify": {
-        "title": "信頼しつつ検証",
-        "description": "オーケストレーターがすべてを独立に検証する。サブエージェントの主張は結果ではない。"
-      },
-      "wisdom": {
-        "title": "知恵の蓄積",
-        "description": "各タスクの学びが、実行内の後続タスクすべてに引き継がれる。"
-      },
-      "modelOptimization": {
-        "title": "モデル最適化",
-        "description": "計画と難しい判断には高価なモデル、定型作業には安価なモデル。"
-      },
-      "categories": {
-        "title": "カテゴリシステム",
-        "description": "意図ベースのルーティング。必要なものを言えば — ultrabrain、visual-engineering、quick — 合うモデルが処理する。"
-      },
-      "continuity": {
-        "title": "セッション継続",
-        "description": "中断した作業は止まった箇所から正確に再開する。セッション間で失うものはない。"
-      },
-      "boulderEvidence": "$ cat boulder.json\n{ \"plan\": \"dashboard\", \"wave\": 3, \"status\": \"resuming\" }"
+    "platforms": {
+      "titlePrefix": "そして、あなたの",
+      "body": "いつもいる場所でエージェントと話してください。ボットではなくあなたとして、使っているすべてのプラットフォームでメッセージを送ります。",
+      "footnote": "近日対応予定。メッセージングプラットフォームを順次つないでいます。",
+      "titleSuffix": "から"
     },
     "reviews": {
       "eyebrow": "ユーザーの声",
-      "title": "開発者の言葉。",
+      "title": "ユーザーの声。",
       "review1": {
         "text": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
         "author": "Arthur Guiot"
@@ -289,37 +138,25 @@
         "author": "B, Quant Researcher"
       },
       "review3": {
-        "text": "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day.",
-        "author": "Jacob Ferrari"
-      },
-      "review4": {
-        "text": "use oh-my-openagent, you will never go back",
-        "author": "d0t3ch"
-      },
-      "review5": {
         "text": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
         "author": "Henning Kilset"
-      },
-      "review6": {
-        "text": "Oh My OpenCode Is Actually Insane",
-        "author": "Darren Builds AI (YouTube)"
       }
     },
     "cta": {
       "eyebrow": "インストール",
-      "title": "ボイラープレートはもう書かない。",
-      "subtitle": "Oh My OpenAgent をインストールし、プロジェクトを開いて mass ulw と打つだけ。どんなに複雑な仕事でも — すべてのモデルを同時に、グラフとして。",
-      "installCommand": "bunx oh-my-openagent install",
+      "title": "コマンドひとつ。そして仕事へ戻る。",
+      "subtitle": "OmOをインストールし、プロジェクトを開いて、やることを伝える。セットアップはそれだけです。",
       "installNow": "今すぐインストール",
-      "readTheDocs": "ドキュメントを読む"
+      "readTheDocs": "ドキュメントを読む",
+      "installCommand": "bun install -g omo-ai@beta"
     },
     "dag": {
       "region": "ワークフローグラフを開いた OmO デスクトップ",
-      "windowTitle": "OmO — ship the dashboard",
+      "windowTitle": "OmO — 市場調査 12k ソース",
       "threads": "スレッド",
-      "thread1": "ship the dashboard",
-      "thread2": "fix flaky e2e",
-      "thread3": "migrate auth",
+      "thread1": "市場調査 12k ソース",
+      "thread2": "ランキングモデルの学習",
+      "thread3": "投資家向け資料を仕上げる",
       "workflow": "ワークフロー",
       "status": {
         "pending": "待機",
@@ -337,7 +174,7 @@
     }
   },
   "docs": {
-    "mobileHeader": "Oh My OpenAgentドキュメント",
+    "mobileHeader": "OmO ドキュメント",
     "searchPlaceholder": "ドキュメントを検索..."
   },
   "manifesto": {
@@ -358,7 +195,7 @@
     },
     "notCollaboration": "それは「人間-AIコラボレーション」ではありません。それはAIが仕事を果たせていないということです。",
     "premise": "{linkText}は、人間がスペルチェッカーではなくアーキテクトであるべきという前提に基づいて構築されています。",
-    "premiseLinkText": "Oh My OpenAgent",
+    "premiseLinkText": "OmO",
     "indistinguishable": {
       "title": "区別できないコード",
       "subtitle": "エージェントが書いたコードは、シニアエンジニアが書いたコードと区別がつかないべきです。",
@@ -400,14 +237,14 @@
         },
         "footer": "ゼロ介入。完全な自律性。ただ結果。"
       },
-      "prometheus": {
+      "plannerExecutor": {
         "badge": "アプローチ2",
         "title": "プランナー + 実行者",
         "subtitle": "戦略的なコントロールが欲しい時。",
-        "prometheusTitle": "プランナー",
-        "prometheusDescription": "インタビューを実施し、コンテキストを調査し、詳細なYAMLプランを生成します。",
-        "atlasTitle": "Atlas",
-        "atlasDescription": "プランを実行し、サブエージェントに委譲し、ウェーブを管理し、進捗を追跡します。",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "インタビューを実施し、コンテキストを調査し、詳細な作業計画を書きます。",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "承認済みの計画を同じセッションで実行し、カテゴリで委譲し、ウェーブを管理し、進捗を追跡します。",
         "footer": "あなたがアーキテクト。エージェントが実行。完全な透明性。"
       }
     },
@@ -428,15 +265,15 @@
     "coreLoop": {
       "title": "コアループ",
       "features": {
-        "prometheus": {
+        "planner": {
           "feature": "プランニングインタビュー",
           "purpose": "知的なインタビューを通じて意図を抽出"
         },
-        "metis": {
-          "feature": "Metis",
+        "planConsultant": {
+          "feature": "プランコンサルタント",
           "purpose": "バグになる前に曖昧さを捕捉"
         },
-        "momus": {
+        "planReviewer": {
           "feature": "プランレビューゲート",
           "purpose": "実行前にプランが完全であることを検証"
         },
@@ -475,7 +312,7 @@
     },
     "finalCta": {
       "title": "just ulw ulw",
-      "button": "Oh My OpenAgentを入手"
+      "button": "OmOを入手"
     }
   }
 }

@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from ".
 import { dirname, join, relative } from "node:path"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
 import { parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
+import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
 import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
@@ -105,7 +106,7 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
 
 async function create(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "create")
-  const description = required(params.description, "description", "create")
+  const description = acceptableDescription(params.description, "create")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   if (existsSync(path)) throw toolError(`create: block already exists at ${source}`)
   await mkdir(dirname(path), { recursive: true })
@@ -170,11 +171,18 @@ async function move(root: string, params: MemoryToolParams): Promise<AppliedComm
 
 async function updateDescription(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "update_description")
-  const description = required(params.description, "description", "update_description")
+  const description = acceptableDescription(params.description, "update_description")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   const file = await loadEditable(path, source)
   await writeFile(path, renderMemoryFile({ ...file.frontmatter, description }, file.body), "utf8")
   return affected(root, path)
+}
+
+function acceptableDescription(value: string | undefined, command: MemoryCommand): string {
+  const description = required(value, "description", command).replace(/\r?\n/g, " ").trim()
+  const violation = describeDescriptionViolation(description)
+  if (violation !== null) throw toolError(`${command}: ${violation}`)
+  return description
 }
 
 async function loadEditable(path: string, source: string): Promise<ParsedMemoryFile> {

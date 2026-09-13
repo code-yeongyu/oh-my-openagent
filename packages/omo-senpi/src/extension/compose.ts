@@ -3,7 +3,6 @@ import { loadPiTui } from "@oh-my-opencode/senpi-task"
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
-import { createToolkitPathProvisioning } from "./toolkit-path-provisioning"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
 
 export interface ComposeOmoSenpiExtensionOptions {
@@ -60,13 +59,9 @@ export function composeOmoSenpiExtension(
   options: ComposeOmoSenpiExtensionOptions = {},
 ): (pi: unknown) => Promise<void> {
   const logger = options.logger ?? defaultLogger
-  const provisionToolkitPath = createToolkitPathProvisioning({ logger })
   const provisionDagSdkRoot = createDagSdkRootProvisioning({ logger })
 
   return async (pi: unknown): Promise<void> => {
-    // Provision the in-session toolkit PATH/env at activation, before any component registers,
-    // so component spawns resolve omo-agent-toolkit without global bins. Never throws.
-    provisionToolkitPath()
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
 

@@ -111,86 +111,10 @@ function applyUlwExecuteOverlay(content) {
   return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
 }
 
-const ulwPlanReviewOverride = `## Senpi Review Policy (authoritative)
-
-In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval.
-
-Only a plan file produced by this skill and recorded with \`review_required\` authorizes a \`momus\` or \`metis\` review. A bare \`ulw\` run without that file uses notepad self-review instead, however large the work feels.
-
-If a section below conflicts with this section, this section wins.
-
-`
-
-const ulwPlanMomusOnlyRewrites = [
-  [
-    'The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native \`momus\` reviewer subagent, and (2) an independent Oracle review via \`task(subagent_type="oracle", ...)\` on the strongest available reasoning model, in a fully isolated sub-session with normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing.',
-    'In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file.',
-  ],
-  ["### High-accuracy review (dual review)", "### High-accuracy review (momus-only in omo-senpi)"],
-  [
-    'One round = exactly ONE \`momus\` + ONE independent review, dispatched together',
-    'One round = exactly ONE \`momus\` review, dispatched',
-  ],
-  ['"independent_reviewer": "oracle",', '"independent_reviewer": null,'],
-  ['"lanes": ["momus", "independent"],', '"lanes": ["momus"],'],
-  [
-    '(all read-only, plus \`oracle\` for the high-accuracy review)',
-    '(all read-only; \`momus\` also runs the high-accuracy review)',
-  ],
-  [
-    'the dual high-accuracy review (native \`momus\` + the independent Oracle review) is now REQUIRED',
-    'the high-accuracy review (momus-only in omo-senpi) is now REQUIRED',
-  ],
-]
-
-function rewriteUlwPlanReviewToMomusOnly(content) {
-  let rewritten = content
-  for (const [source, replacement] of ulwPlanMomusOnlyRewrites) {
-    rewritten = rewritten.replaceAll(source, replacement)
-  }
-  return rewritten
-}
-
-const ulwPlanConsultationLanes = `## Senpi Design Consultation Lanes (authoritative)
-
-When the task tool's available categories include \`architect\` and/or \`ultrabrain\`, ACTIVELY consult them as background advisory lanes while grounding and drafting the plan:
-
-| Lane | Category | Ask it for |
-| --- | --- | --- |
-| Big-picture design | \`architect\` | module boundaries, decomposition options, trade-offs, blast radius |
-| Detail design | \`ultrabrain\` | algorithms, edge cases, exact interfaces and contracts |
-
-Spawn them with \`task(category: "architect" \\| "ultrabrain", run_in_background: true)\` in the same wave as your research lanes, and integrate their answers before the approval brief. Every such prompt MUST start with TASK / DELIVERABLE / SCOPE / VERIFY / STOP WHEN and MUST declare itself advisory-only: read-only analysis, NO file edits, recommendations returned as text. Treat what comes back as claims to verify, not as decisions already made.
-
-This section is an EXPLICIT EXCEPTION to the later rule "Never dispatch with \`category=\`": it authorizes exactly these two advisory lanes. Every other category dispatch stays forbidden. When neither category is listed as available, skip these lanes silently.
-
-`
-
-function applyUlwPlanOverlay(content) {
-  const rewritten = rewriteUlwPlanReviewToMomusOnly(content)
-  if (rewritten.includes("# ulw-plan - full workflow")) {
-    return insertAfterFrontmatter(rewritten, ulwPlanReviewOverride)
-  }
-  if (/^#\s+ulw-plan\s*$/m.test(rewritten)) {
-    return insertAfterFrontmatter(rewritten, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
-  }
-  return rewritten
-}
-
-function insertAfterFrontmatter(content, section) {
-  const frontmatterEnd = content.indexOf("\n---\n", content.startsWith("---\n") ? 4 : 0)
-  if (!content.startsWith("---\n") || frontmatterEnd === -1) return `${section}${content}`
-  const insertAt = frontmatterEnd + "\n---\n".length
-  return `${content.slice(0, insertAt)}\n${section}${content.slice(insertAt)}`
-}
-
 function applySharedTierAdaptation(skillName, content) {
   let adapted = applySenpiSkillRosterOverlay(skillName, content)
   if (skillName === "ulw-execute") {
     adapted = applyUlwExecuteOverlay(adapted)
-  }
-  if (skillName === "ulw-plan") {
-    adapted = applyUlwPlanOverlay(adapted)
   }
   adapted = stripNamedSections(adapted)
   adapted = stripForbiddenGuidanceLines(adapted)

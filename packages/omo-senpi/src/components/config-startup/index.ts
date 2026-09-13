@@ -13,7 +13,6 @@ import {
   type ConfigMigrationDiscoveryFileSystem,
   type ConfigMigrationPathOperations,
 } from "@oh-my-opencode/omo-opencode/config-migration"
-
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
 
@@ -128,11 +127,16 @@ export function createConfigStartupComponent(options: ConfigStartupComponentOpti
   }
 }
 
-function notificationMessages(
+export type StartupNotice = {
+  readonly message: string
+  readonly type: "info" | "warning"
+}
+
+export function notificationMessages(
   migration: SenpiStartupMigrationResult,
   config: SenpiOmoConfigResult,
-): readonly { readonly message: string; readonly type: "info" | "warning" }[] {
-  const messages: { message: string; type: "info" | "warning" }[] = []
+): readonly StartupNotice[] {
+  const messages: StartupNotice[] = []
   if (migration.error !== undefined) messages.push({ message: `omo-senpi: configuration migration: ${migration.error}`, type: "warning" })
   else if (migration.migratedFrom.length > 0) messages.push({
     message: `omo-senpi: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,

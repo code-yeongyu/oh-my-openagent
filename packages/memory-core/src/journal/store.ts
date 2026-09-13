@@ -72,8 +72,12 @@ function parseState(raw: string | null): ReflectionTranscriptState {
     const state = parsed as Record<string, unknown>
     const reflectedThroughByteOffset = optionalNonNegativeInteger(state.reflected_through_byte_offset)
     const unreflectedBytes = optionalNonNegativeInteger(state.unreflected_bytes)
+    const consecutiveFailures = optionalNonNegativeInteger(state.consecutive_failures)
+    const nextEligibleAt = optionalString(state.next_eligible_at)
     return {
       ...(unreflectedBytes === undefined ? {} : { unreflected_bytes: unreflectedBytes }),
+      ...(consecutiveFailures === undefined ? {} : { consecutive_failures: consecutiveFailures }),
+      ...(nextEligibleAt === undefined ? {} : { next_eligible_at: nextEligibleAt }),
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
       ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
@@ -222,6 +226,16 @@ export class TranscriptJournal {
           : reflectedThroughByteOffset(entries, state.reflected_through_message_id)),
     }, entries)
     return this.readStateUnlocked()
+  }
+
+  async recordReflectionFailure(): Promise<void> {
+    await this.locked(async () => {
+      const entries = await this.readEntriesUnlocked()
+      const state = await this.readStateUnlocked()
+      const failures = (state.consecutive_failures ?? 0) + 1
+      const delay = Math.min(300_000, 5_000 * 2 ** (failures - 1))
+      await this.writeStateUnlocked({ ...state, consecutive_failures: failures, next_eligible_at: new Date(this.now().getTime() + delay).toISOString() }, entries)
+    })
   }
 
   async finalizeReflection(snapshot: ReflectionSnapshot, success: boolean): Promise<void> {

@@ -20,7 +20,7 @@ The plugin ships 19 skills by default:
 - `review-work` — multi-angle implementation and PR review
 - `ultimate-browsing` — escalation browsing for blocked or hard-to-reach pages
 - `ultrawork` — ultrawork mode directive
-- `ulw-execute` — execute a Prometheus work plan with Boulder state
+- `ulw-execute` — execute a ulw-plan work plan with Boulder state
 - `ulw-loop` — goal-like ultrawork loop
 - `ulw-plan` — adversarial planning workflow
 - `ulw-research` — ultra-wide research orchestration

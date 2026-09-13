@@ -12,6 +12,7 @@ const MASS_ULW_MARKER = "<omo-mass-ulw-pointer>"
 const ULW_PLAN_MARKER = "<omo-ulw-plan-pointer>"
 const ULW_LOOP_MARKER = "<omo-ulw-loop-pointer>"
 const ULW_RESEARCH_MARKER = "<omo-ulw-research-pointer>"
+const ULTIMATE_BROWSING_MARKER = "<omo-ultimate-browsing-pointer>"
 
 const SCENARIOS = [
   {
@@ -21,14 +22,14 @@ const SCENARIOS = [
       { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md", "workflow tool"] },
       { customType: "omo-ulw-loop:skill-pointer", markers: [ULW_LOOP_MARKER, "ulw-loop/SKILL.md", "read tool"] },
     ],
-    forbidMarkers: [ULW_PLAN_MARKER, ULW_RESEARCH_MARKER],
+    forbidMarkers: [ULW_PLAN_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   {
     name: "ulw-plan",
     prompt: "go ulw plan the migration",
     expectHidden: [{ customType: "omo-ulw-plan:skill-pointer", markers: [ULW_PLAN_MARKER, "ulw-plan/SKILL.md", "read tool"] }],
-    forbidMarkers: [MASS_ULW_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   {
@@ -37,15 +38,32 @@ const SCENARIOS = [
     expectHidden: [
       { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md"] },
       { customType: "omo-ulw-research:skill-pointer", markers: [ULW_RESEARCH_MARKER, "ulw-research/SKILL.md"] },
+      {
+        customType: "omo-ultimate-browsing:skill-pointer",
+        markers: [ULTIMATE_BROWSING_MARKER, "ultimate-browsing/SKILL.md", 'load_skills: ["ultimate-browsing"]'],
+      },
     ],
     forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER],
+    expectTranscriptMarkers: ["<ultrawork-mode>"],
+  },
+  {
+    name: "ulw-research-companion",
+    prompt: "ulw research the gateway options",
+    expectHidden: [
+      { customType: "omo-ulw-research:skill-pointer", markers: [ULW_RESEARCH_MARKER, "ulw-research/SKILL.md", "read tool"] },
+      {
+        customType: "omo-ultimate-browsing:skill-pointer",
+        markers: [ULTIMATE_BROWSING_MARKER, "ultimate-browsing/SKILL.md", "read tool", 'load_skills: ["ultimate-browsing"]'],
+      },
+    ],
+    forbidMarkers: [MASS_ULW_MARKER, ULW_PLAN_MARKER, ULW_LOOP_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
   {
     name: "plain-mass-ulw",
     prompt: "mass ulw please orchestrate the docs refresh",
     expectHidden: [{ customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md"] }],
-    forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER],
+    forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER, ULW_RESEARCH_MARKER, ULTIMATE_BROWSING_MARKER],
     expectTranscriptMarkers: ["<ultrawork-mode>"],
   },
 ]

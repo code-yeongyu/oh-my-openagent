@@ -12,7 +12,7 @@ const CONTINUATION_LIMIT = 8
 
 const ULW_EXECUTE_STEERING_REMINDER = [
   "<omo-senpi-ulw-execute>",
-  "An active Prometheus ulw-execute plan is present in this working directory.",
+  "An active ulw-execute work plan is present in this working directory.",
   "Before continuing, read `.omo/boulder.json` and the active plan file to determine what remains; use the ledger and plan as the source of truth.",
   "Continue the current work with evidence-bound execution; do not start unrelated work until every top-level checkbox is `- [x]`.",
   "</omo-senpi-ulw-execute>",
@@ -188,7 +188,7 @@ function renderDirective(state: DirectiveState): string {
 
   return [
     "<omo-senpi-ulw-execute-continuation>",
-    "You are mid-flight on a Prometheus work plan; this turn is an automatic continuation. Do NOT ask whether to continue — the contract is auto-continue until every top-level checkbox is `- [x]`.",
+    "You are mid-flight on a ulw-execute work plan; this turn is an automatic continuation. Do NOT ask whether to continue — the contract is auto-continue until every top-level checkbox is `- [x]`.",
     "",
     "# State",
     "",

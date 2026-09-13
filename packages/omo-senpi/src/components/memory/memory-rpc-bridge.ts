@@ -2,6 +2,8 @@ import type { GitTreeSizedEntry } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { MEMORY_REFLECTIONS_RPC_METHOD, readMemoryReflections } from "./memory-rpc-reflections"
+export { MEMORY_REFLECTIONS_RPC_METHOD } from "./memory-rpc-reflections"
 import {
   buildMemorySnapshot,
   createMemoryRpcGitRepo,
@@ -116,6 +118,7 @@ export function createMemoryRpcBridge(
   let sessionId: string | undefined
   let lastSnapshot: string | undefined
   let disposed = false
+  let bindingGeneration = 0
 
   function repoFor(context: MemoryIdentityContext): MemoryRpcGitRepo {
     const cached = repos.get(context.identityPaths.repo)
@@ -139,11 +142,25 @@ export function createMemoryRpcBridge(
   }
 
   registerStatusHandler(pi, buildSnapshot)
+  pi.rpc?.handle?.(MEMORY_REFLECTIONS_RPC_METHOD, async (request) => {
+    const boundSession = sessionId
+    const generation = bindingGeneration
+    const context = boundSession === undefined ? undefined : deps.resolveContext(boundSession)
+    if (disposed || boundSession === undefined || context === undefined) {
+      return { kind: "unavailable", reason: "No bound memory session." }
+    }
+    const page = await readMemoryReflections(context, boundSession, request)
+    if (disposed || generation !== bindingGeneration || context !== deps.resolveContext(boundSession)) {
+      return { kind: "unavailable", reason: "Memory session binding changed." }
+    }
+    return page
+  })
 
   return {
     attach(nextSessionId) {
       if (disposed) return
       sessionId = nextSessionId
+      bindingGeneration++
       lastSnapshot = undefined
     },
 
@@ -158,11 +175,13 @@ export function createMemoryRpcBridge(
     },
 
     detach() {
+      bindingGeneration++
       sessionId = undefined
       lastSnapshot = undefined
     },
 
     dispose() {
+      bindingGeneration++
       disposed = true
       sessionId = undefined
       lastSnapshot = undefined

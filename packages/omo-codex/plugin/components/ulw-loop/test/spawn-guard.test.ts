@@ -6,7 +6,13 @@ import { Readable, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PreToolUsePayload } from "../src/codex-hook.ts";
-import { applySpawnGuards, DEFAULT_FANOUT_LIMIT, runSpawnAdmissionRecorderCli } from "../src/spawn-guard.ts";
+// Budget/artifact behavior is independent of role admission; the native entry
+// point and its composition are covered in spawn-role-matrix.test.ts.
+import {
+	applySpawnBudgetGuards as applySpawnGuards,
+	DEFAULT_FANOUT_LIMIT,
+	runSpawnAdmissionRecorderCli,
+} from "../src/spawn-guard.ts";
 
 let workDir: string;
 let originalLimit: string | undefined;

@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path"
+import { readDefaultRoleConfig } from "./codex-default-role-config"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
@@ -125,6 +126,8 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     installed,
     pluginSources,
   })
+  const omoConfig = readDefaultRoleConfig({ cwd: projectDirectory, env })
+  for (const warning of omoConfig.warnings) log(`Warning: ${warning}`)
   for (const plugin of installed) {
     const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path
     const agentLinks = await linkCachedPluginAgents({
@@ -133,6 +136,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       platform,
       preservedReasoning,
       preservedServiceTier,
+      defaultRoleEnabled: omoConfig.enabled,
     })
     for (const link of agentLinks) {
       log(`Linked agent ${link.name} -> ${link.target}`)

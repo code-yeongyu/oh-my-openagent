@@ -4,6 +4,7 @@ import type { ToolExecutionResult } from "./tool-result"
 
 import type { TaskManager } from "../../manager"
 import type { TaskStatus } from "../../state"
+import type { ColdRevivalFailureCode } from "../../lifecycle/port"
 import type { SenpiShutdownErrorCode } from "../../team"
 import type { TeamSendDetails } from "../team/messaging"
 
@@ -22,6 +23,7 @@ export type SendManager = Pick<TaskManager, "sendToTask" | "list">
 export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 
 export type SendResultDetails =
+  | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: "steer" }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
   | {

@@ -68,3 +68,7 @@ Codex exposes ONE subagent surface per session — check your tool list. GPT-5.6
 V1 fallback (gpt-5.5, gpt-5.6-luna): `multi_agent_v1.spawn_agent({...,"fork_context":false})`, `multi_agent_v1.send_input` (re-task), `multi_agent_v1.wait_agent({"targets":[...],"timeout_ms":...})`, `multi_agent_v1.close_agent`.
 
 When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`.
+
+## Driver goal lifecycle
+
+The Codex thread goal is a DRIVER the loop instructs, never a gate. `checkpoint` takes an OPTIONAL `--codex-goal-json` snapshot, records it verbatim in the ledger, and never rejects on its status or objective; the advice arrives in `nextActions`. A driver completed early yields advice to `create_goal` again with the plan's objective verbatim; `paused`, `usage_limited`, and `budget_limited` yield resume advice; a differing objective is a warning, not a refusal. Malformed snapshot input is the only failure, reported as `ULW_LOOP_CODEX_GOAL_JSON_INVALID`.

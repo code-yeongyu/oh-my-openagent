@@ -56,6 +56,20 @@ describe("OMO Senpi plugin manifest", () => {
     expect(Reflect.has(pi, "hooks")).toBe(false)
   })
 
+  it("#given the plugin is the harness itself #when the engine resolves it from the command line #then the manifest declares a system package", () => {
+    const manifest = readJsonObject(pluginManifestPath)
+    const pi = manifest.pi
+
+    if (typeof pi !== "object" || pi === null || Array.isArray(pi)) {
+      throw new Error("plugin package.json pi manifest is not an object")
+    }
+
+    // senpi honors a boolean `system` flag only for command-line packages (the launcher passes
+    // `--extension <plugin>`), which files the plugin's extension and bundled skills under the
+    // `system` scope and keeps them out of the compact startup banner.
+    expect(Reflect.get(pi, "system")).toBe(true)
+  })
+
   it("#given the Senpi package is one generated runtime unit #when loaded #then npm dependency and workspace surfaces stay absent", () => {
     const manifest = readJsonObject(pluginManifestPath)
     const dependencies = manifest.dependencies
@@ -85,6 +99,7 @@ describe("OMO Senpi plugin manifest", () => {
       "skills-conditional",
       "runtime",
       "scripts/install.mjs",
+      "CHANGELOG.md",
       "README.md",
       "NOTICE",
       "LICENSE",

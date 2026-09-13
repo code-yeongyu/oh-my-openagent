@@ -34,7 +34,7 @@ const passingInput = {
 		{ type: "tool_execution", payload: { tool: "write", is_error: true } },
 	],
 	parentOutput:
-		'Target "nonexistent" not found. Available agents: explore, librarian, metis, momus. Available categories: mockcat.',
+		'Target "nonexistent" not found. Available agents: explore, librarian, omo-senpi-code-reviewer, omo-senpi-gate-reviewer, omo-senpi-qa-executor, plan-consultant, plan-reviewer. Available categories: mockcat.',
 };
 
 const passingChecks = {

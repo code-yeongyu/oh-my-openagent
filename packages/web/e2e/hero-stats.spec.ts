@@ -1,31 +1,18 @@
 import { test, expect } from "@playwright/test"
 
+import en from "../messages/en.json" with { type: "json" }
+
 test.describe("Hero Stats", () => {
-  test("renders the GitHub description as the hero tagline", async ({ page, request }) => {
+  test("renders the shipped sub-copy as the hero tagline", async ({ page }) => {
     // given
-    const stats: unknown = await (await request.get("/api/stats")).json()
-    const description =
-      typeof stats === "object" && stats !== null && "description" in stats
-        ? stats.description
-        : undefined
-    expect(typeof description).toBe("string")
+    await page.goto("/")
 
     // when
-    await page.goto("/")
-
-    // then
     const tagline = page.getByTestId("hero-tagline")
-    await expect(tagline).toBeVisible()
-    await expect(tagline).toHaveText(/\S/)
-    await expect(tagline).toHaveText(String(description))
-  })
-
-  test("renders the agent count in the proof strip", async ({ page }) => {
-    // given / when
-    await page.goto("/")
 
     // then
-    await expect(page.getByTestId("proof-strip").getByText(/^11 agents$/)).toBeVisible()
+    await expect(tagline).toBeVisible()
+    await expect(tagline).toHaveText(en.landing.hero.subcopy.replace(/\s+/g, " "))
   })
 
   test("serves a generated Open Graph image", async ({ request }) => {
@@ -55,6 +42,7 @@ test.describe("Hero Stats", () => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
+          source: "live",
           stars: "0",
           totalDownloads: "1M+",
           monthlyDownloads: "580k+",
@@ -71,6 +59,31 @@ test.describe("Hero Stats", () => {
     // then
     await expect(page.getByText("0 GitHub Stars")).toBeHidden()
     await expect(page.locator("text=/[\\d.]+k GitHub Stars/")).toBeVisible()
+  })
+
+  test("ignores a fallback payload from live stats", async ({ page }) => {
+    // given
+    await page.route("**/api/stats", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "fallback",
+          stars: "1",
+          totalDownloads: "1",
+          monthlyDownloads: "1",
+          weeklyDownloads: "1",
+        }),
+      })
+    })
+
+    // when
+    const statsResponse = page.waitForResponse((response) => response.url().includes("/api/stats"))
+    await page.goto("/")
+    await statsResponse
+
+    // then
+    await expect(page.getByText("1 Total Downloads")).toBeHidden()
+    await expect(page.locator("text=/[\\d.]+[kM]\\+? Total Downloads/")).toBeVisible()
   })
 
   test("displays total download count", async ({ page }) => {

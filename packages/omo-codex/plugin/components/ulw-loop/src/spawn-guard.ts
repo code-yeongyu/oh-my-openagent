@@ -6,6 +6,7 @@ import type { PreToolUsePayload } from "./codex-hook.js";
 import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
 import { ulwLoopAttemptEvidenceDir, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
+import { spawnRoleDenial } from "./spawn-role-guard.js";
 import { isStateLockTimeout, type StateLockOptions, withStateLockSync } from "./state-lock.js";
 import {
 	GATE_REVIEWER_AGENT_NAMES,
@@ -18,7 +19,12 @@ import type { UlwLoopPlan } from "./types.js";
 // spawn_agent = v1; collaborationspawn_agent = the delimiter-free flattened v2
 // hook token from codex-rs hook_names.rs; collaboration.spawn_agent = the
 // dotted token observed live in the task-1 probe (hook-tool-tokens.txt).
-const SPAWN_TOOL_TOKENS = new Set(["spawn_agent", "collaborationspawn_agent", "collaboration.spawn_agent"]);
+const SPAWN_TOOL_TOKENS = new Set([
+	"spawn_agent",
+	"multi_agent_v1.spawn_agent",
+	"collaborationspawn_agent",
+	"collaboration.spawn_agent",
+]);
 export const DEFAULT_FANOUT_LIMIT = 24;
 const DEFAULT_REVIEW_SPAWN_LIMIT = 3;
 const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|omo-senpi-gate-reviewer|final gate review/i;
@@ -34,6 +40,15 @@ export interface SpawnGuardOptions {
 }
 
 export function applySpawnGuards(payload: PreToolUsePayload, options: SpawnGuardOptions = {}): string {
+	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
+	if (resolveToolkitSurface() === "lazycodex") {
+		const reason = spawnRoleDenial(payload.tool_input);
+		if (reason !== null) return deny(reason);
+	}
+	return applySpawnBudgetGuards(payload, options);
+}
+
+export function applySpawnBudgetGuards(payload: PreToolUsePayload, options: SpawnGuardOptions = {}): string {
 	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
 	const breaker = readAdmissionBreaker(payload.session_id);
 	if (breaker !== null)
@@ -110,11 +125,14 @@ export async function runSpawnGuardCli(stdin: NodeJS.ReadableStream, stdout: Nod
 		const chunks: Buffer[] = [];
 		for await (const chunk of stdin) chunks.push(Buffer.from(chunk));
 		const payload = parsePreToolUsePayload(Buffer.concat(chunks).toString("utf8"));
-		if (payload === null) return;
+		if (payload === null) {
+			stdout.write(deny("LazyCodex spawn guard received an invalid hook payload; role routing was not verified."));
+			return;
+		}
 		const output = applySpawnGuards(payload);
 		if (output.length > 0) stdout.write(output);
 	} catch (error) {
-		if (error instanceof Error) return;
+		stdout.write(deny(`LazyCodex spawn guard failed: ${error instanceof Error ? error.message : String(error)}`));
 	}
 }
 

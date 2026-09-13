@@ -150,13 +150,13 @@ export function makeManager(options: {
   config?: OmoTaskSettings
   planner?: ChildPlanner
   inProcess?: FakeRunner
-  process?: FakeRunner
+  process?: ManagedRunner
   admit?: AdmitResident
 } = {}) {
   const project = options.project ?? tempProject()
   const store = options.store ?? createTaskRecordStore({ project_dir: project })
   const inProcess = options.inProcess ?? new FakeRunner()
-  const processRunner = options.process ?? new FakeRunner()
+  const processRunner: ManagedRunner = options.process ?? new FakeRunner()
   const manager = createTaskManager({
     store,
     runners: { "in-process": inProcess, process: processRunner },

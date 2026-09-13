@@ -57,6 +57,9 @@ jobs:
       - name: Type check
         run: bun run type-check
 
+      - name: Unit tests
+        run: bun run test
+
       - name: OpenNext (Cloudflare) build
         run: bunx opennextjs-cloudflare build
         env:

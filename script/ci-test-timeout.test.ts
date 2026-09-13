@@ -29,7 +29,13 @@ describe("per-file test timeout budget", () => {
           "",
         ].join("\n"))
       }
-      const run = (...extra: string[]) => spawnSync(process.execPath, ["test", ...extra, dir], { cwd: repoRoot, encoding: "utf8" })
+      // The parent runs in GitHub Actions, but the probe's captured output must not use Bun's
+      // GitHub log-group reporter. Bun 1.4.x sends the grouped test output to stderr after the
+      // initial header on CI, and Windows can return the sync capture at that split point.
+      const probeEnv = { ...process.env }
+      delete probeEnv.CI
+      delete probeEnv.GITHUB_ACTIONS
+      const run = (...extra: string[]) => spawnSync(process.execPath, ["test", ...extra, dir], { cwd: repoRoot, encoding: "utf8", env: probeEnv })
       const explicit = run("--timeout", "20000")
       expect(`${explicit.stdout}${explicit.stderr}`).toMatch(/\b2 pass\b/)
       expect(`${explicit.stdout}${explicit.stderr}`).not.toMatch(/timed out after 5000ms/)

@@ -1,0 +1,138 @@
+bun test v1.4.2 (744846f84)
+
+script/publish-lazycodex-version-stamp-workflow.test.ts:
+(pass) LazyCodex release version stamping workflow > stamps hook status messages with the release version before publishing lazycodex-ai [0.60ms]
+(pass) LazyCodex release version stamping workflow > stamps hook status messages with the release version before syncing the LazyCodex repository [2.59ms]
+
+script/publish-readiness-budget.test.ts:
+(pass) publish.yml post-publish-verify registry readiness > #given the registry needs ~5 minutes to expose the version #when readiness polls #then it keeps waiting instead of failing a successful publish [158.79ms]
+(pass) publish.yml post-publish-verify registry readiness > #given the registry never exposes the version #when the budget is exhausted #then it fails and names the publish-vs-propagation distinction [389.26ms]
+
+script/omo-ai-publish-shape.test.ts:
+(pass) omo-ai publish workflow shape > preserves an explicit prerelease version and derives its beta dist tag [0.26ms]
+(pass) omo-ai publish workflow shape > decides the Latest badge from the highest published semver, never from a pre-release flag [0.12ms]
+(pass) omo-ai publish workflow shape > maps every root release to a unique ordered prerelease [0.12ms]
+(pass) omo-ai publish workflow shape > checks out before asserting root bin ownership [0.07ms]
+(pass) omo-ai publish workflow shape > stamps omo-native in both release paths and stages its manifest [0.07ms]
+(pass) omo-ai publish workflow shape > builds and verifies the payload before stripping token auth [0.07ms]
+(pass) omo-ai publish workflow shape > publishes omo-ai through beta-only OIDC after every wrapper publish [0.07ms]
+(pass) omo-ai publish workflow shape > always runs readiness, dist-tag guard, and live verification [0.10ms]
+(pass) omo-ai publish workflow shape > keeps trusted publishing unconditional and delegates validated channel metadata [0.09ms]
+
+script/publish-workflow.test.ts:
+(pass) test workflows > use pure bun test for workflows [0.35ms]
+(pass) test workflows > builds publish-main from the prepared release SHA [0.11ms]
+(pass) test workflows > dispatches a source-pinned publish run before provenance-bearing release operations [0.17ms]
+(pass) test workflows > passes the omo-ai version to the platform publish workflow [0.11ms]
+(pass) test workflows > attaches and verifies release-binary assets on every GitHub release [0.17ms]
+(pass) test workflows > exercise root checks across linux macos and windows [0.08ms]
+(pass) test workflows > runs codex compatibility checks on every supported os without serializing build [0.12ms]
+(pass) test workflows > runs Codex compatibility tests with Node available for the self-built MCP runtimes [0.08ms]
+(pass) test workflows > builds bundled MCP runtimes before Codex compatibility tests [0.16ms]
+(pass) test workflows > runs Git Bash installer regressions in Codex compatibility checks [0.07ms]
+(pass) test workflows > tracks the nested Codex plugin lockfile used by npm ci [16.55ms]
+(pass) test workflows > pins every workflow Bun setup to the tested runtime [8.87ms]
+
+script/release-version.test.ts:
+(pass) the actual metadata step validates before npm reads and forwards channel outputs [200.29ms]
+(pass) LazyCodex-only numbers cannot consume the next omo number [0.21ms]
+(pass) stable-base LazyCodex releases never advance latest; omo channel mapping stays unchanged [0.08ms]
+(pass) reserved identifier cannot escape the namespace through malformed versions [0.13ms]
+
+script/published-install-smoke.test.ts:
+(pass) published install smoke > #given an installed plugin without the composed ultrawork skill #when artifacts are checked #then the missing path is reported [0.60ms]
+(pass) published install smoke > #given a fully installed plugin #when artifacts are checked #then nothing is reported [0.60ms]
+(pass) published install smoke > #given both payload sources #when smoke args are parsed #then the package spec and tarball path are separated [0.09ms]
+(pass) published install smoke > #given specs carrying shell metacharacters #when they are checked #then none is accepted for packing [0.10ms]
+(pass) published install smoke > #given plain dist-tag and exact-version specs #when they are checked #then both are accepted [0.08ms]
+
+script/publish-resume-idempotency.test.ts:
+(pass) publish resume idempotency > keeps every resumability guard in the real publish workflow [0.26ms]
+(pass) publish resume idempotency > reports the exact guard removed by an in-memory mutation [0.19ms]
+(pass) publish resume idempotency > reports the stale-stamp refusal when the head-equality guard is neutralised [0.18ms]
+
+script/ci-job-summary-workflow.test.ts:
+(pass) GitHub workflow job summaries > #given a new step-based workflow job #when workflow coverage is checked #then the job is discovered automatically [0.18ms]
+(pass) GitHub workflow job summaries > #given repository workflows #when inspected #then every step-based job writes a concise Markdown summary [1.45ms]
+(pass) GitHub workflow job summaries > #given a privileged publish summary #when it renders dispatch inputs #then raw inputs are passed through env [0.13ms]
+(pass) GitHub workflow job summaries > #given summary inputs #when the shared writer runs #then it emits the Markdown contract GitHub renders [19.67ms]
+
+script/preflight-trust.test.ts:
+(pass) the real HTTP adapter retries the same POST with its authorization and body intact [6.59ms]
+(pass) TLS failures, rate limits and server errors recover automatically with bounded backoff [0.27ms]
+(pass) ambiguous 404 propagation retries rather than claiming missing configuration [0.13ms]
+(pass) definitive HTTP 400 fails fast with package/status and configuration guidance [0.12ms]
+(pass) definitive HTTP 401 fails fast with package/status and configuration guidance [0.08ms]
+(pass) definitive HTTP 403 fails fast with package/status and configuration guidance [0.07ms]
+(pass) exhaustion surfaces actual npm status/body without misleading configuration guidance [0.12ms]
+(pass) an explicit missing publisher mapping fails fast even on HTTP 404 [0.09ms]
+(pass) error diagnostics redact credential fields and JWTs [0.09ms]
+(pass) unknown HTTP failures fail closed and Retry-After is capped [0.11ms]
+
+script/publish-lazycodex-smoke-budget.test.ts:
+(pass) publish.yml post-publish-verify LazyCodex smoke readiness > #given the registry needs ~5 minutes to expose the version #when the smoke polls #then it reaches the package instead of giving up [263.76ms]
+(pass) publish.yml post-publish-verify LazyCodex smoke readiness > #given the registry never exposes the version #when the budget is exhausted #then it fails and names propagation, not the package [710.37ms]
+
+script/publish-post-verify-workflow.test.ts:
+(pass) publish post-publish verification > #given registry propagation must not hold the release hostage > #when publish-main is inspected #then it no longer carries the post-publish verification steps [1.34ms]
+(pass) publish post-publish verification > #given registry propagation must not hold the release hostage > #when the workflow is parsed #then post-publish-verify owns every one of those steps [0.08ms]
+(pass) publish post-publish verification > #given registry propagation must not hold the release hostage > #when post-publish-verify is wired #then it runs after the release job [0.07ms]
+(pass) publish post-publish verification > #given registry propagation must not hold the release hostage > #when the release job is wired #then it never waits on post-publish-verify [0.06ms]
+(pass) publish post-publish verification > #given registry propagation must not hold the release hostage > #when post-publish-verify completes #then it writes a job summary like every other publish job [0.06ms]
+(pass) publish post-publish verification > #given pre-publish gating must stay intact > #when publish-main is inspected #then it still refuses to publish without platform packages [0.07ms]
+
+script/publish-gate-reuse-workflow.test.ts:
+(pass) publish gate reuse > waits for a successful CI push workflow run on the exact prepared SHA [0.20ms]
+(pass) publish gate reuse > removes release-local test jobs and gates publication on CI reuse [0.27ms]
+(pass) publish gate reuse > uses a workflow-capable token and retries release PR writes [0.14ms]
+(pass) publish gate reuse > scopes the release PAT away from repo-controlled generation [0.15ms]
+(pass) publish gate reuse > keeps every publication surface pinned to a prepared release SHA [0.15ms]
+
+script/publish-lazycodex-channel-workflow.test.ts:
+(pass) LazyCodex publish channels > every channel that publishes lazycodex-ai also syncs the marketplace and cuts the LazyCodex release [0.11ms]
+(pass) LazyCodex publish channels > lazycodex_only is a dispatch input that reaches the provenance-safe child under its own tag namespace [0.08ms]
+(pass) LazyCodex publish channels > lazycodex_only publishes the base head without stamping and refuses a version either release path already used [0.08ms]
+(pass) LazyCodex publish channels > lazycodex_only skips every omo publish, release, and verification surface [0.09ms]
+(pass) LazyCodex publish channels > publish-time plugin builds stamp the manifests an unstamped tree would otherwise leave behind [0.08ms]
+
+script/publish-release-platform-workflow.test.ts:
+(pass) release and platform publish workflows > publishes platform packages before installable wrappers [0.15ms]
+(pass) release and platform publish workflows > fails when a required platform artifact is missing [0.11ms]
+(pass) release and platform publish workflows > publishes openagent platform packages even when legacy opencode publish is unavailable [0.09ms]
+(pass) release and platform publish workflows > keeps the platform publish workflow step syntax valid around version updates [0.09ms]
+(pass) release and platform publish workflows > publishes platform launchers without Bun compile [0.09ms]
+(pass) release and platform publish workflows > regenerates and commits release lockfiles only in the prepared source state [0.13ms]
+(pass) release and platform publish workflows > validates an existing release tag before redispatching its prepared source [0.11ms]
+(pass) release and platform publish workflows > enumerates windows-arm64 consistently across every platform-list surface [0.33ms]
+(pass) release and platform publish workflows > matches the canonical platform set in optionalDependencies and on-disk platform packages [0.21ms]
+(pass) release binary asset lane in the platform publish workflow > plumbs omo_ai_version into the release-binary build [0.12ms]
+(pass) release binary asset lane in the platform publish workflow > gates release-binary steps on a release-asset probe, not the npm publish skip [0.11ms]
+(pass) release binary asset lane in the platform publish workflow > smokes every release binary leg on its matching runner class [0.11ms]
+(pass) release binary asset lane in the platform publish workflow > smokes arm64 linux binaries on a native arm64 runner with no fallback [0.09ms]
+(pass) release binary asset lane in the platform publish workflow > leaves npm publishing, runner routing, and matrix fail-fast untouched [0.10ms]
+
+script/publish-lazycodex-workflow.test.ts:
+(pass) LazyCodex publish workflow > publishes a LazyCodex GitHub release only when the marketplace payload changed [0.24ms]
+(pass) LazyCodex publish workflow > skips the LazyCodex GitHub release when the previous payload is unchanged [0.12ms]
+(pass) LazyCodex publish workflow > can skip LazyCodex npm alias publishing when npm holds the package name [0.11ms]
+(pass) LazyCodex publish workflow > publishes lazycodex as a Node installer without Bun-backed runtime dependencies [0.35ms]
+(pass) LazyCodex publish workflow > smoke tests the published LazyCodex alias after npm publish [0.15ms]
+(pass) LazyCodex publish workflow > builds the Codex plugin components in publish-main before any package that ships the plugin tree [0.11ms]
+
+script/publish-release-bundle-rebuild.test.ts:
+(pass) test workflows > retries release-state PR reads and writes on transient GitHub API errors [0.10ms]
+(pass) test workflows > rebuilds version-stamped Senpi bundles into the release commit [0.09ms]
+
+script/publish-stale-stamp-reuse.test.ts:
+(pass) publish.yml prepare-release-state reuse decision > #given a stale 'release: vX' commit behind the base head #when prepare runs for vX #then it refuses instead of handing the stale SHA to the publish child [460.45ms]
+(pass) publish.yml prepare-release-state reuse decision > #given the 'release: vX' commit IS the base head #when prepare runs for vX #then it reuses that SHA without pushing [420.20ms]
+
+script/publish-lazycodex-sync-workflow.test.ts:
+(pass) LazyCodex marketplace sync workflow > builds bundled MCP dists before the release marketplace sync builds the Codex plugin [0.20ms]
+(pass) LazyCodex marketplace sync workflow > uses the vendored LSP tools package directly during release marketplace sync [0.14ms]
+(pass) LazyCodex marketplace sync workflow > stages generated LazyCodex repository workflow changes [0.11ms]
+
+ 96 pass
+ 0 fail
+ 611 expect() calls
+Ran 96 tests across 18 files. [4.98s]

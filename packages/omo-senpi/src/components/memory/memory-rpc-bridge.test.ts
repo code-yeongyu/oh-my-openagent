@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile, readFile, readdir } from "node:fs/promises"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -17,6 +17,8 @@ import {
   type MemoryRpcSnapshot,
 } from "./memory-rpc-bridge"
 import { createMemoryRpcGitRepo } from "./memory-rpc-snapshot-state"
+import { recapFixture } from "./worker/reflection-recap.test-support"
+import { readMemoryReflections } from "./memory-rpc-reflections"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -107,6 +109,58 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test("#given a never-written identity #when backfill reads #then no runtime directories are created", async () => {
+    const root = await mkdtemp(join(tmpdir(), "recap-read-only-"))
+    roots.push(root)
+    const context = createMemoryIdentityContext({ identity: "agent-test", identityPaths: buildIdentityPaths(root, "agent-test"),
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 } })
+    expect((await readMemoryReflections(context, "session-1", {})).entries).toEqual([])
+    expect(await readdir(root)).toEqual([])
+  })
+  test("#given equal timestamps and consumed records #when paging #then keys advance and completion bytes stay unchanged", async () => {
+    const root = await mkdtemp(join(tmpdir(), "recap-paging-"))
+    roots.push(root)
+    const first = await recapFixture(root, { runId: "run-a", delivery: { status: "consumed", sessionId: "recipient" } })
+    await recapFixture(root, { runId: "run-b", delivery: { status: "consumed", sessionId: "recipient" } })
+    const path = join(first.completionsDir, "run-a.json")
+    const before = await readFile(path, "utf8")
+    const page = await readMemoryReflections(first.context, "recipient", { limit: 1 })
+    const next = await readMemoryReflections(first.context, "recipient", { limit: 1, cursor: page.nextCursor })
+    expect(page.entries.map((entry) => entry.runId)).toEqual(["run-b"])
+    expect(next.entries.map((entry) => entry.runId)).toEqual(["run-a"])
+    expect(next.nextCursor).toBeUndefined()
+    expect(await readFile(path, "utf8")).toBe(before)
+    expect((await readMemoryReflections(first.context, "conversation-b", {})).entries).toHaveLength(2)
+    expect((await readMemoryReflections(first.context, "unrelated", {})).entries).toHaveLength(0)
+  })
+
+  test.each([{ limit: 0 }, { limit: 101 }, { limit: 1.5 }, { cursor: "../secret" }, { cursor: "e30" }, { directory: "/tmp" }])(
+    "#given malformed request %j #when paging #then it is rejected", async (request) => {
+      const context = await contextFixture()
+      await expect(readMemoryReflections(context, "session-1", request)).rejects.toThrow()
+    },
+  )
+
+  test.each(["attach", "detach", "dispose"] as const)("#given an in-flight page #when %s changes binding #then the stale result is discarded", async (operation) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
+    bridge.attach("session-1")
+    const result = host.handlers.get("omo.memory.reflections")?.({})
+    if (operation === "attach") bridge.attach("session-1")
+    else bridge[operation]()
+    expect(await result).toMatchObject({ kind: "unavailable" })
+  })
+  test("#given a bound session #when reflections are requested #then a read-only page is returned", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
+    bridge.attach("session-1")
+    expect(await host.handlers.get("omo.memory.reflections")?.({ limit: 1 })).toEqual({
+      schemaVersion: 1, identity: context.identity, sessionId: "session-1", entries: [],
+    })
+    expect(host.emits).toEqual([])
+  })
   describe("#given a bound memory session and an rpc-capable host", () => {
     test("#when the bridge syncs #then it emits one snapshot describing repo, reflection, and journal state", async () => {
       const context = await contextFixture()

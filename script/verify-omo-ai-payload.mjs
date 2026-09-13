@@ -13,18 +13,14 @@ const pkgDir = resolve(repoRoot, "packages", "omo-native")
 
 const REQUIRED_ARTIFACTS = [
   "bin/omo.js",
-  "bin/omo-agent-toolkit.js",
   "plugin/package.json",
+  "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
   // Credential-gated skill: not under plugin/skills (never eager-loaded) but the bundled x-search
   // component resolves ../skills-conditional/x-search/SKILL.md, so the payload must ship it.
   "plugin/skills-conditional/x-search/SKILL.md",
   "plugin/runtime/lsp-daemon/dist/cli.js",
   "plugin/runtime/ast-grep-mcp/cli.js",
-  "plugin/runtime/agent-toolkit/cli.js",
-  "plugin/runtime/agent-toolkit/ulw-loop/cli.js",
-  "plugin/runtime/agent-toolkit/omo-agent-toolkit",
-  "plugin/runtime/agent-toolkit/omo-agent-toolkit.cmd",
   "plugin/runtime/dag/sdk.js",
 ]
 

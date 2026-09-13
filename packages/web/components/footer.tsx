@@ -58,7 +58,7 @@ const GROUPS: readonly FooterGroup[] = [
 ]
 
 const LINK_CLASS =
-  "text-text-lo hover:text-text-hi focus-visible:outline-accent-32 inline-flex min-h-6 items-center text-sm transition-colors duration-[var(--dur-micro)] ease-standard focus-visible:outline-2 focus-visible:outline-offset-2"
+  "text-text-lo hover:text-text-hi focus-visible:outline-accent-32 inline-flex min-h-11 items-center text-sm transition-colors duration-[var(--dur-micro)] ease-standard focus-visible:outline-2 focus-visible:outline-offset-2"
 
 /** DESIGN.md §5 Footer: top hairline, py-12, 2 → 4 columns, mono meta copyright. */
 export async function Footer({ locale }: { readonly locale?: string } = {}): Promise<JSX.Element> {
@@ -91,7 +91,7 @@ export async function Footer({ locale }: { readonly locale?: string } = {}): Pro
             <h2 id={`footer-${group.key}`} className="eyebrow">
               {t(group.key)}
             </h2>
-            <ul className="flex flex-col gap-2">
+            <ul className="-my-2 flex flex-col">
               {group.links.map((link) => (
                 <li key={link.key}>
                   {link.external ? (

@@ -424,7 +424,7 @@ a midpoint decision, never to wait.
 Delegate through the `task` tool: `prompt` plus exactly ONE of
 `category` (routed through the omo category router) or `subagent_type`
 (a direct agent — the curated read-only agents `explore`, `librarian`,
-`metis`, `momus` work with zero configuration);
+`plan-consultant`, `plan-reviewer` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
 child with skills, `name` to track it. Read a child back with
 `task_output`, steer it with `task_send`, end it with `task_cancel`;
@@ -476,12 +476,12 @@ No plan file means no reviewer: a bare `ulw` run — however heavy —
 records a self-review in the notepad instead. Same for LIGHT tier.
 Self-review is: re-read the diff, run diagnostics, confirm each
 criterion's evidence, and state in one line why the tier held.
-`momus` and `metis` are plan-gated reviewers, not general helpers —
+`plan-reviewer` and `plan-consultant` are plan-gated reviewers, not general helpers —
 never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "momus"` for read-only
+   assignment in `prompt` — `subagent_type: "plan-reviewer"` for read-only
    review, or a reviewer-shaped `category` when the review must run
    code. Pass: goal, success-criteria, scenario evidence, full diff,
    notepad path.

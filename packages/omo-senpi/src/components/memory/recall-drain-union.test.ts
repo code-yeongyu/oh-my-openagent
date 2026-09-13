@@ -4,7 +4,7 @@ import { PendingNudges, RecallLedger, renderNudgeBlock } from "@oh-my-opencode/m
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
-import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
 import { createRecallDrain } from "./recall-drain"
 import {
   ROLLOUTS_PATH,
@@ -27,7 +27,7 @@ async function setup(tempDirs: string[], options: {
 } = {}) {
   const { context } = await fixture(tempDirs)
   const pending = new PendingNudges(context.identityPaths.recallPending)
-  if (options.pending !== undefined) await pending.write(SESSION_ID, options.pending, { epoch: 0 })
+  if (options.pending !== undefined) await pending.write(SESSION_ID, options.pending)
   const pi = new MemoryFakeExtensionAPI()
   const logs = options.logs ?? []
   const queued = options.queued
@@ -36,7 +36,7 @@ async function setup(tempDirs: string[], options: {
     resolveSettings: () => memorySettings(),
     env: {},
     ledgerFor: () => new RecallLedger(context.identityPaths.recallLedger),
-    pendingFor: () => ({ take: options.take ?? (() => pending.take(SESSION_ID, { currentEpoch: 0 })) }),
+    pendingFor: () => ({ take: options.take ?? (() => pending.take(SESSION_ID)) }),
     ...(options.drainQueued === undefined
       ? queued === undefined ? {} : { drainQueued: () => [...queued] }
       : { drainQueued: options.drainQueued }),
@@ -70,7 +70,7 @@ describe("recall prompt-drain union", () => {
     expect(result?.message?.content).toBe(renderNudgeBlock(NUDGE))
     expect(typeof result?.message?.content === "string" ? result.message.content.match(/<recalled-memory /g) : []).toHaveLength(1)
     expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
-    expect(await pending.take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
+    expect(await pending.take(SESSION_ID)).toEqual([])
   })
 
   test("#given a queued path is already ledgered #when the prompt starts #then the queued nudge still injects", async () => {

@@ -139,6 +139,7 @@ describe("buildTaskExecute spawn", () => {
             global_concurrency: 8,
             max_depth: 1,
             residency_max_children: 8,
+            resident_idle_timeout_ms: 900000,
             ttl_ms: 86400000,
             resume_children: true,
             wait: { min_ms: 5000, default_ms: 60000, max_ms: 600000 },
@@ -179,7 +180,7 @@ describe("buildTaskExecute spawn", () => {
       }),
     )
 
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     expect(waitForId).toBe("st_00000004")
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""

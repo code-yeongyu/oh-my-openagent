@@ -74,6 +74,7 @@ export class ReflectionReservationStore {
 
     const evaluated = evaluateTransitions(
       {
+        now: this.now().toISOString(),
         journal: { conversationId, state: await journal.getState(), snapshot: null },
         reservation: await this.readState(),
         config: this.options.config,
@@ -141,6 +142,9 @@ export class ReflectionReservationStore {
         snapshots,
         this.options.config,
       )
+      if (outcome !== "merged" && outcome !== "no_changes" && current.active?.request.trigger !== "manual" && current.active?.request.trigger !== "dream") {
+        for (const id of current.active?.request.conversationIds ?? []) await journals.get(id)?.recordReflectionFailure()
+      }
       for (const captured of transition.finalize) {
         const journal = journals.get(captured.conversationId)
         if (journal) await journal.finalizeReflection(captured.snapshot, true)

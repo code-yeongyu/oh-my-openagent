@@ -54,6 +54,31 @@ const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent|update_plan)\b
 // guidance, so mask it before scanning for leaked harness tokens.
 const cliInterfaceFlagPattern = /--codex-goal-json/g
 const taskTargetPattern = /\b(subagent_type|category)["']?\s*[=:]\s*["']([a-z0-9-]+)["']/g
+// Retired persona names (plan: omo-senpi-role-names) must not ship to Senpi users through the
+// synced output. plugin/skills/ is gitignored, so this file is the ONLY gate for it: the root
+// retired-name gate and the repo-wide CI scans cannot see generated skill bundles.
+const retiredPersonaNamePattern = /\b(?:sisyphus-junior|hephaestus|prometheus|atlas|metis|momus)\b/i
+const retiredSubagentTypePattern = /subagent_type=["']?(?:oracle|sisyphus)/
+// `github.com/prometheus/client_golang` is the third-party Go metrics module, not the planner
+// persona — the same carve-out class as keeping the generic lowercase "oracle" noun legal in
+// debugging/visual-qa methodology prose.
+const thirdPartyModulePathPattern = /github\.com\/prometheus\/client_golang/
+// A line ending in the plan-wide marker is a sanctioned legacy mention (e.g. the ulw-plan
+// review.momus reading rule); todo 23's root gate asserts these markers stay scarce repo-wide.
+const retiredNameAllowedMarker = /<!-- retired-name-allowed -->\s*$/
+// PENDING RETIREMENT — reported to the plan lead for a follow-up todo: persona names that still
+// live in shared-skill files outside this gate's owning change (todo 11 edits only
+// ulw-execute/SKILL.md and three refactor/SKILL.md lines; the files below belong to no todo in
+// the plan). Each entry exempts ONLY lines matching the pattern in that exact file; any other
+// occurrence anywhere still fails. Shrink this list to zero as the follow-up lands.
+const pendingPersonaNameRetirements: readonly {
+  readonly pathSuffix: string
+  readonly linePattern: RegExp
+}[] = [
+  { pathSuffix: "coding-agent-sessions/references/opencode.md", linePattern: /`Sisyphus-Junior`/ },
+  { pathSuffix: "frontend/references/designpowers/lane-a-direction.md", linePattern: /\bPrometheus\b/ },
+  { pathSuffix: "frontend/references/designpowers/routing.md", linePattern: /\bPrometheus\b/ },
+]
 
 function listDirectoryNames(path: string): string[] {
   if (!existsSync(path)) {
@@ -250,6 +275,30 @@ describe("OMO Senpi scoped skill sync", () => {
     }
 
     expect(invalidTargets).toEqual([])
+  })
+
+  test("#given the synced skill output #when scanned #then no retired persona name or OpenCode-only agent id ships", () => {
+    const leaks: string[] = []
+
+    for (const file of listFiles(skillsRoot)) {
+      // `relative` yields `\`-separated paths on Windows; the exemption suffixes are written with
+      // `/`, so compare on a normalized form or the exemptions silently stop matching there.
+      const relativePath = relative(repoRoot, file).replaceAll("\\", "/")
+      const lines = readFileSync(file, "utf8").split("\n")
+      for (const [index, line] of lines.entries()) {
+        if (retiredNameAllowedMarker.test(line)) continue
+        if (thirdPartyModulePathPattern.test(line)) continue
+        const pendingRetirement = pendingPersonaNameRetirements.some(
+          ({ pathSuffix, linePattern }) => relativePath.endsWith(pathSuffix) && linePattern.test(line),
+        )
+        if (pendingRetirement) continue
+        if (retiredPersonaNamePattern.test(line) || retiredSubagentTypePattern.test(line)) {
+          leaks.push(`${relativePath}:${index + 1}: ${line.trim()}`)
+        }
+      }
+    }
+
+    expect(leaks).toEqual([])
   })
 
   test("#given frontend skill #when inspected #then materialized design references exist", () => {
