@@ -4,7 +4,7 @@ import { delimiter, isAbsolute, join } from "node:path"
 
 import { COMMENT_CHECKER_ENV_KEY, COMMENT_CHECKER_PACKAGE_NAME } from "./constants"
 import type { SenpiCommentCheckerBinaryResolverOptions } from "./types"
-import { isCommentCheckerPackage } from "./utils"
+import { isCommentCheckerPackage, isRecord } from "./utils"
 
 export function resolveSenpiCommentCheckerBinary(options: SenpiCommentCheckerBinaryResolverOptions = {}): string | null {
   const checkExists = options.existsSync ?? existsSync
@@ -65,7 +65,7 @@ function resolvePackageApiBinary(input: PackageApiBinaryResolverInput): string |
     const binaryPath = packageExports.getBinaryPath()
     return input.existsSync(binaryPath) ? binaryPath : null
   } catch (error) {
-    if (error instanceof Error) {
+    if (error instanceof Error || (isRecord(error) && error["code"] === "MODULE_NOT_FOUND")) {
       return null
     }
     throw error
