@@ -19,6 +19,9 @@ import { createOrGetSession } from "./session-creator"
 import { processMessages } from "./message-processor"
 import { waitForCompletion } from "./completion-poller"
 import { getFirstFallbackModel } from "../../agents/builtin-agents/model-resolution"
+import { isPrometheusAgent } from "../../hooks/prometheus-md-only/agent-matcher"
+import { injectPlanningContextIfMissing } from "../../hooks/prometheus-md-only/planning-context-injection"
+import { getAgentFromSession } from "../../hooks/prometheus-md-only/agent-resolution"
 
 function createSyncExecutorDeps(modelFallbackControllerAccessor?: ModelFallbackControllerAccessor) {
   return {
@@ -114,6 +117,7 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
+  planningWarningInjectionDisabled = false,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`,
@@ -175,6 +179,23 @@ export function createCallOmoAgent(
       // Check if agent is disabled
       if (disabledAgents.some((disabled) => stripInvisibleAgentCharacters(disabled).toLowerCase() === normalizedAgent)) {
         return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your .omo/omo.jsonc to use it.`
+      }
+
+      // #6291: the tool.execute.before hook injection can be dropped because
+      // OpenCode executes tools with its own original args reference, so the
+      // planning context is (re-)applied here on the dispatched prompt itself.
+      if (!planningWarningInjectionDisabled) {
+        const parentAgent = toolCtx.agent || await getAgentFromSession(toolCtx.sessionID, ctx.directory, ctx.client)
+        if (isPrometheusAgent(parentAgent)) {
+          const guardedPrompt = injectPlanningContextIfMissing(args.prompt)
+          if (guardedPrompt !== args.prompt) {
+            args = { ...args, prompt: guardedPrompt }
+            log("[call_omo_agent] Injected prometheus planning context into delegated prompt", {
+              sessionID: toolCtx.sessionID,
+              agent: parentAgent,
+            })
+          }
+        }
       }
 
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({

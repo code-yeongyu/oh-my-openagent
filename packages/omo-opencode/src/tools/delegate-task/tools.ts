@@ -15,6 +15,8 @@ import {
 } from "./executor"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
+import { isPrometheusAgent } from "../../hooks/prometheus-md-only/agent-matcher"
+import { injectPlanningContextIfMissing } from "../../hooks/prometheus-md-only/planning-context-injection"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeNativeSkillInfos, type NativeSkillEntry } from "../skill/native-skills"
 import type { SkillInfo } from "../skill/types"
@@ -86,7 +88,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     args: delegateTaskArgsSchema,
     async execute(args, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
-      const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
+      let delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
@@ -119,6 +121,20 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       const parentContext = await resolveParentContext(ctx, options.client)
+
+      // #6291: the tool.execute.before hook injection can be dropped because
+      // OpenCode executes tools with its own original args reference, so the
+      // planning context is (re-)applied here on the dispatched prompt itself.
+      if (!options.planningWarningInjectionDisabled && isPrometheusAgent(parentContext.agent)) {
+        const guardedPrompt = injectPlanningContextIfMissing(delegateTaskArgs.prompt)
+        if (guardedPrompt !== delegateTaskArgs.prompt) {
+          delegateTaskArgs = { ...delegateTaskArgs, prompt: guardedPrompt }
+          log("[task] Injected prometheus planning context into delegated prompt", {
+            sessionID: ctx.sessionID,
+            agent: parentContext.agent,
+          })
+        }
+      }
 
       if (delegateTaskArgs.task_id) {
         if (runInBackground) {
