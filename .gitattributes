@@ -11,3 +11,6 @@
 *.toml text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+
+# Evidence terminal captures contain raw CR/CRLF + ANSI sequences; never normalize
+.omo/evidence/** -text
