@@ -65,6 +65,9 @@ describe("resolveVariant", () => {
     } satisfies VariantTable
 
     expect(resolveVariant({ modelID: "devin/swe-2-high", variants: orderedVariants })).toBe("swe-2")
+    expect(resolveVariant({ modelID: "opencodex/ocx-devin-swe-2", variants: orderedVariants })).toBe("swe-2")
+    expect(resolveVariant({ modelID: "ocx-devin-swe-2-medium", variants: orderedVariants })).toBe("swe-2")
+    expect(resolveVariant({ modelID: "ocx-devin-swe-20", variants: orderedVariants })).toBe("default")
     expect(resolveVariant({ modelID: "devin/swe-1-7", variants: orderedVariants })).toBe("default")
   })
 
