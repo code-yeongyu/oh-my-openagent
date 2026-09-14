@@ -28,7 +28,7 @@
     "test": "bun test src/**/*.test.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-tui": "0.84.2",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.9.13-2",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -44,7 +44,7 @@
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-    "typebox": "1.3.18"
+    "typebox": "1.3.30"
   },
   "peerDependencies": {
     "@code-yeongyu/senpi": "2026.9.13-2"

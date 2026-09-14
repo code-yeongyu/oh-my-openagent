@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { parse as parseYaml } from "yaml"
+import { parseYaml } from "./yaml.test-support"
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { parseMemoryFile } from "./frontmatter"
 import { MAX_DESCRIPTION_LENGTH, describeFrontmatterGrammarViolation, describeFrontmatterViolation } from "./frontmatter-validation"
@@ -131,7 +131,7 @@ describe("normalizeMemoryFrontmatter", () => {
     expect(result.rewritten).toEqual(["reference/swallowed.md"])
     const after = await readFile(join(repo.dir, "reference/swallowed.md"), "utf8")
     expect(describeFrontmatterGrammarViolation(after)).toBeNull()
-    expect(parseYaml(after.slice(4, after.indexOf("\n---", 4))).description).toBe(parseMemoryFile(long).frontmatter.description)
+    expect(parseYaml(after.slice(4, after.indexOf("\n---", 4)))).toEqual({ description: parseMemoryFile(long).frontmatter.description })
     expect(describeFrontmatterViolation(after)).toContain(`${MAX_DESCRIPTION_LENGTH}`)
   })
 

@@ -3,7 +3,7 @@
  *
  * Reader grammar (letta parity, one `key: value` per line, split on the FIRST
  * colon) plus quoted-scalar decoding; renderer output is always strict YAML so
- * the same file reads identically here and in the skill loader (`yaml`).
+ * the same file reads identically here and in a strict YAML skill loader.
  *
  * - description: required, non-empty, single line; quoted on output whenever a
  *   plain scalar would not round-trip through strict YAML (`: `, ` #`, `true`,
