@@ -15,7 +15,13 @@ import { RpcCommandError } from "./errors"
 import { classifyChildExit } from "./exit-mapping"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
-import { agentEndOutcome, exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
+import {
+  agentEndOutcome,
+  assistantMessageHasToolCall,
+  exitTurnOutcome,
+  extractAssistantText,
+  promptFailureOutcome,
+} from "./turn-outcome"
 
 export type CreateRpcChildHandleOptions = {
   readonly client: RpcProtocolClient
@@ -93,7 +99,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     outcome = built
     clearInterval(heartbeat)
     flush(idleWaiters)
-    if (turnOutcome === undefined) settleTurn(exitTurnOutcome(built, finalText))
+    if (turnOutcome === undefined) settleTurn(exitTurnOutcome(built, terminalAssistantMessage?.text))
     for (const waiter of exitWaiters.splice(0)) {
       waiter(built)
     }
@@ -172,7 +178,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
         ? Promise.resolve(turnOutcome)
         : outcome === undefined
           ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
-          : Promise.resolve(exitTurnOutcome(outcome, finalText)),
+          : Promise.resolve(exitTurnOutcome(outcome, terminalAssistantMessage?.text)),
     lastAssistantText: () => finalText,
     terminalAssistantMessage: () => terminalAssistantMessage,
     wasAbortedByUser: () => abortedByUser,
@@ -212,7 +218,7 @@ function readSessionId(response: RpcResponse): string | undefined {
 function extractTerminalAssistantMessage(message: unknown): RpcTerminalAssistantMessage | undefined {
   if (typeof message !== "object" || message === null) return undefined
   const record = message as Record<string, unknown>
-  if (record.role !== "assistant") return undefined
+  if (record.role !== "assistant" || assistantMessageHasToolCall(record)) return undefined
   const text = extractAssistantText(record)
   const stopReason = typeof record.stopReason === "string" ? record.stopReason : undefined
   const errorMessage = typeof record.errorMessage === "string" ? record.errorMessage : undefined

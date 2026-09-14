@@ -9,6 +9,7 @@ export type ChildSessionListener = (event: ChildSessionEvent) => void
 // live AgentSession; fakes implement only these members.
 export type ChildSession = {
   readonly sessionId: string
+  readonly messages?: readonly unknown[]
   prompt(text: string): Promise<void>
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
@@ -93,6 +94,7 @@ export type CreateRestoredChildHandleInput = {
 // from prompt() resolution alone (the silent-empty-completion bug).
 type TurnObservation = {
   text: string | undefined
+  terminalToolCall: boolean
   stopReason: string | undefined
   errorMessage: string | undefined
   provider: string | undefined
@@ -105,7 +107,12 @@ function observeTurnEvent(observation: TurnObservation, event: ChildSessionEvent
   const message = event.message
   if (!isRecord(message) || message.role !== "assistant") return
   const text = assistantText(message)
-  if (text !== undefined) observation.text = text
+  observation.terminalToolCall = assistantHasToolCall(message)
+  if (observation.terminalToolCall) {
+    observation.text = undefined
+  } else if (text !== undefined) {
+    observation.text = text
+  }
   observation.stopReason = typeof message.stopReason === "string" ? message.stopReason : undefined
   observation.errorMessage = typeof message.errorMessage === "string" ? message.errorMessage : undefined
   observation.provider = typeof message.provider === "string" ? message.provider : undefined
@@ -123,6 +130,11 @@ function assistantText(message: Record<string, unknown>): string | undefined {
 
 function isTextPart(part: unknown): part is { readonly type: "text"; readonly text: string } {
   return isRecord(part) && part.type === "text" && typeof part.text === "string"
+}
+
+function assistantHasToolCall(message: Record<string, unknown>): boolean {
+  return Array.isArray(message.content)
+    && message.content.some((part: unknown) => isRecord(part) && part.type === "toolCall")
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -143,6 +155,17 @@ function turnOutcome(session: ChildSession, observation: TurnObservation, comple
       failure: {
         kind: "child-turn-failed",
         message: observation.errorMessage ?? `child turn ended with stopReason "${observation.stopReason}"`,
+      },
+    }
+  }
+  if (observation.terminalToolCall) {
+    if (completion === "turn") return { status: "completed", finalResponse: "", ...provenance }
+    return {
+      status: "error",
+      ...provenance,
+      failure: {
+        kind: "child-turn-failed",
+        message: "child turn ended after a tool call without a terminal assistant response",
       },
     }
   }
@@ -196,6 +219,16 @@ async function runTurn(
 // transcript's last assistant text is the honest drain for a child whose completion never reached
 // its record (crash between turn end and transition). No text means nothing durable was produced.
 function settledSessionOutcome(session: ChildSession, completion: ChildCompletionPolicy): RunnerOutcome {
+  const restoredAssistant = lastAssistantMessage(session.messages)
+  if (completion !== "turn" && restoredAssistant !== undefined && assistantHasToolCall(restoredAssistant)) {
+    return {
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "restored session ended after a tool call without a terminal assistant response",
+      },
+    }
+  }
   const final = session.getLastAssistantText()
   if (final !== undefined && final.length > 0) return { status: "completed", finalResponse: final }
   if (completion === "turn") return { status: "completed", finalResponse: "" }
@@ -203,6 +236,15 @@ function settledSessionOutcome(session: ChildSession, completion: ChildCompletio
     status: "error",
     failure: { kind: "child-turn-failed", message: "restored session has no assistant output" },
   }
+}
+
+function lastAssistantMessage(messages: readonly unknown[] | undefined): Record<string, unknown> | undefined {
+  if (messages === undefined) return undefined
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (isRecord(message) && message.role === "assistant") return message
+  }
+  return undefined
 }
 
 type TrackedChildHandle = {
@@ -221,7 +263,13 @@ function createTrackedChildHandle(
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
   const observation: TurnObservation = {
-    text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined, provider: undefined, model: undefined,
+    text: undefined,
+    terminalToolCall: false,
+    stopReason: undefined,
+    errorMessage: undefined,
+    baseline: undefined,
+    provider: undefined,
+    model: undefined,
   }
   const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
 
@@ -231,6 +279,7 @@ function createTrackedChildHandle(
     aborted = false
     turnActive = true
     observation.text = undefined
+    observation.terminalToolCall = false
     observation.stopReason = undefined
     observation.errorMessage = undefined
     observation.provider = undefined
