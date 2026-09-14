@@ -74,6 +74,18 @@ export function composeOmoSenpiExtension(
       return
     }
 
+    // Two omo extensions in one senpi process (e.g. a local dev plugin in senpi
+    // settings packages plus the omo launcher's bundled extension) fight over
+    // tool registration and session ctx. The FIRST instance wins; later ones
+    // stand down entirely so the winner owns tool dispatch alone.
+    // See: config-watch's per-component guard only covers config, not tools.
+    if (markOmoSenpiActive()) {
+      logger.warn("omo-senpi duplicate extension instance detected; standing down", {
+        hint: "two omo extensions are loaded in this senpi process (e.g. a local dev plugin in senpi settings packages plus the omo launcher's bundled extension); remove one",
+      })
+      return
+    }
+
     pi.registerFlag("omo-senpi-disabled", {
       type: "boolean",
       default: false,
@@ -159,4 +171,19 @@ export function composeOmoSenpiExtension(
 
 function componentDisabledFlag(name: string): string {
   return `omo-senpi-${name}-disabled`
+}
+
+// Process-wide single-winner guard: the first omo-senpi extension instance to
+// activate in this senpi process owns tool dispatch. module state is shared per
+// process, so a second bundled copy (dev plugin + launcher bundle) sees the
+// flag and stands down before registering anything.
+declare global {
+  // eslint-disable-next-line no-var
+  var __omoSenpiActiveInstance: boolean | undefined
+}
+
+function markOmoSenpiActive(): boolean {
+  if (globalThis.__omoSenpiActiveInstance === true) return true
+  globalThis.__omoSenpiActiveInstance = true
+  return false
 }

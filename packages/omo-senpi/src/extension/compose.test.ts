@@ -28,6 +28,9 @@ class ReloadingFakeExtensionAPI extends FakeExtensionAPI {
 
 afterEach(() => {
   jest.useRealTimers()
+  // The duplicate-instance guard is process-wide: reset between tests so each
+  // case starts as the first (winning) instance.
+  delete (globalThis as Record<string, unknown>).__omoSenpiActiveInstance
 })
 
 function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
@@ -373,5 +376,49 @@ describe("composeOmoSenpiExtension", () => {
 
     // then
     expect(alphaCalls).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
+  })
+
+  it("#given a second omo extension instance in the same process #when composed #then it stands down without registering anything", async () => {
+    // given the first instance already won
+    const first = new FakeExtensionAPI()
+    const firstLogger = createRecordingLogger()
+    await composeOmoSenpiExtension(
+      [
+        {
+          name: "alpha",
+          register(api) {
+            api.registerTool({ name: "alpha_tool" })
+          },
+        },
+      ],
+      { logger: firstLogger },
+    )(first)
+    expect(first.tools.map((tool) => tool.name)).toEqual(["alpha_tool"])
+
+    // when a second instance (dev plugin + launcher bundle) activates
+    const second = new FakeExtensionAPI()
+    const secondLogger = createRecordingLogger()
+    await composeOmoSenpiExtension(
+      [
+        {
+          name: "alpha",
+          register(api) {
+            api.registerTool({ name: "alpha_tool" })
+          },
+        },
+      ],
+      { logger: secondLogger },
+    )(second)
+
+    // then it registers nothing and warns once
+    expect(second.tools).toEqual([])
+    expect(second.flags).toEqual([])
+    expect(secondLogger.entries).toContainEqual({
+      level: "warn",
+      message: "omo-senpi duplicate extension instance detected; standing down",
+      details: {
+        hint: "two omo extensions are loaded in this senpi process (e.g. a local dev plugin in senpi settings packages plus the omo launcher's bundled extension); remove one",
+      },
+    })
   })
 })
