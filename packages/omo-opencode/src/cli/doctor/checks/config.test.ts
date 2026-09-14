@@ -265,5 +265,73 @@ describe("config check", () => {
         }
       }
     })
+
+    // regression: issue #8104 — installer-written mixed agents.*.models was
+    // reported as "Unknown config key" even though assets/omo.schema.json
+    // declares the key. Renaming to fallback_models then hit the deprecation
+    // checker, so no on-disk shape passed both checks.
+    it("does not flag installer-shaped agents.*.models as an invalid configuration", async () => {
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalHome = process.env.HOME
+      const originalCwd = process.cwd()
+      const testRootDir = join(
+        tmpdir(),
+        `omo-doctor-installer-agent-models-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
+      const projectDir = join(testRootDir, "project")
+      const installerModels = [
+        "opencode-go/qwen3.7-plus",
+        { model: "opencode-go/minimax-m3" },
+        { model: "opencode-go/minimax-m2.7" },
+      ]
+
+      try {
+        //#given a unified user config with the installer's mixed models[] chain
+        mkdirSync(projectDir, { recursive: true })
+        mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+        process.env.HOME = testRootDir
+        delete process.env.OPENCODE_CONFIG_DIR
+        writeFileSync(
+          join(testRootDir, ".omo", "omo.jsonc"),
+          JSON.stringify({
+            "[opencode]": {
+              agents: {
+                librarian: { models: installerModels },
+                explore: { models: installerModels },
+                atlas: { models: installerModels },
+                "sisyphus-junior": { models: installerModels },
+              },
+            },
+          }, null, 2) + "\n",
+          "utf-8",
+        )
+        process.chdir(projectDir)
+
+        //#when running the consolidated config check
+        const result = await config.checkConfig()
+        const unknownModels = result.issues.filter((issue) =>
+          issue.title === "Invalid configuration"
+          && issue.description.includes("Unknown config key: agents.")
+          && issue.description.includes(".models"),
+        )
+
+        //#then installer-shaped agents.*.models remains valid
+        expect(unknownModels).toEqual([])
+        expect(result.status).not.toBe("fail")
+      } finally {
+        process.chdir(originalCwd)
+        rmSync(testRootDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+        if (originalHome === undefined) {
+          delete process.env.HOME
+        } else {
+          process.env.HOME = originalHome
+        }
+      }
+    })
   })
 })
