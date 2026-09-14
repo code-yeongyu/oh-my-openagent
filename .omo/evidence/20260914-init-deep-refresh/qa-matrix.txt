@@ -1,0 +1,5 @@
+QA MATRIX
+1 happy | root hierarchy summary | expected 50-150 lines, required development-environment contract, and local guide links exist | observed lines=109, focused tests 20 pass/0 fail, missing links=[] | PASS | AGENTS.md and bash_22 output
+2 boundary | snapshot parse and exact key set | expected valid JSON with committed mode/current dev SHA/10841 files | observed {'commitSha': 'c8f1de1bb9b44c64866e698a490af5a3a505beb2', 'fileCount': 10841, 'loc': 1068220, 'timestamp': 1789355448568, 'mode': 'committed'} | PASS | .omo/init-deep.json
+3 regression | diff scope | expected no runtime source edits | observed [' M .omo/init-deep.json', ' M AGENTS.md'] | PASS | git status --short
+4 review | one gate reviewer plus one bounded retry | expected independent verdict or explicit inconclusive provider outcome | observed both attempts returned connection errors with no verdict | INCONCLUSIVE | task st_01a09e45 and st_01a09e46 transcripts
