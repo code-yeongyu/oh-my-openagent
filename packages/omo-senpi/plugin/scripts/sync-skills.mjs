@@ -158,6 +158,19 @@ async function assertSourceExists(source) {
   }
 }
 
+// Read-only inventory shared by generation and shipped-payload validation.
+export async function getSkillOutputManifest() {
+  const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
+  const sharedSkillNames = sharedSkillEntries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+  return {
+    root: skillsRoot,
+    names: [...new Set([...componentSkillNames, ...nativeSkillNames, ...sharedSkillNames])],
+  }
+}
+
 export async function syncSkills() {
   await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   await mkdir(skillsRoot, { recursive: true })
@@ -176,13 +189,8 @@ export async function syncSkills() {
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
-  const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
-  const sharedSkillNames = sharedSkillEntries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-
-  for (const skillName of sharedSkillNames) {
+  const { names } = await getSkillOutputManifest()
+  for (const skillName of names) {
     if (componentSkillNames.has(skillName) || nativeSkillNames.has(skillName)) continue
     const source = join(sharedSkillsRoot, skillName)
     const destination = join(skillsRoot, skillName)

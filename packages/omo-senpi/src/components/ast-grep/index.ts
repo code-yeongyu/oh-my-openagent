@@ -50,6 +50,10 @@ export function createAstGrepComponent(options: AstGrepComponentOptions = {}): O
         env: { [PROJECT_CWD_ENV]: env[PROJECT_CWD_ENV] ?? resolveCwd(), [BUN_BE_BUN_ENV]: "1" },
         enabled: true,
         lifecycle: "lazy",
+        // The three tools cost ~2K prompt tokens per request and ~1.6% of sessions call them. Search
+        // exposure keeps them out of the resident tool list; the ast-grep skill names them so a
+        // by-name call activates them on first use.
+        exposure: "search",
       })
     },
   }

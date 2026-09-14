@@ -38,6 +38,9 @@ function createFixture(claudeCodeVersion: string): Fixture {
     version: "2026.9.2",
     type: "module",
   }))
+  const rpcPath = join(root, "dist", "modes", "rpc", "rpc-mode.js")
+  mkdirSync(dirname(rpcPath), { recursive: true })
+  writeFileSync(rpcPath, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
   const anthropicMessages = join(root, BUNDLED_ANTHROPIC_MESSAGES)
   mkdirSync(dirname(anthropicMessages), { recursive: true })
   writeFileSync(anthropicMessages, anthropicMessagesSource(claudeCodeVersion))

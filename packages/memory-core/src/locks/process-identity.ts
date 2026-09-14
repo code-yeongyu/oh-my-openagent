@@ -43,7 +43,31 @@ async function readWin32StartIdentity(pid: number): Promise<string | null> {
   return value === null ? null : `win32-creation-date:${value}`
 }
 
-export async function getProcessStartIdentity(pid: number): Promise<string | null> {
+type ReadProcessStartIdentity = (pid: number) => Promise<string | null>
+
+export function createProcessStartIdentityReader(
+  read: ReadProcessStartIdentity,
+  ownPid: number,
+): ReadProcessStartIdentity {
+  // Our own pid cannot be reused while this module is alive. Other owners must always
+  // be re-probed: caching them would hide process exit or PID reuse from stale-lock recovery.
+  let ownIdentity: Promise<string | null> | undefined
+  return (pid) => {
+    if (pid !== ownPid) return read(pid)
+    ownIdentity ??= read(pid).then((identity) => {
+      if (identity === null) ownIdentity = undefined
+      return identity
+    }, (error: unknown) => {
+      ownIdentity = undefined
+      throw error
+    })
+    return ownIdentity
+  }
+}
+
+export const getProcessStartIdentity = createProcessStartIdentityReader(readProcessStartIdentity, process.pid)
+
+async function readProcessStartIdentity(pid: number): Promise<string | null> {
   if (process.platform === "linux") return await readLinuxStartIdentity(pid)
   if (process.platform === "darwin" || process.platform === "freebsd") {
     if (getPidLiveness(pid) === "dead") return null

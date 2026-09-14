@@ -1,7 +1,8 @@
 // biome-ignore-all format: compact steering module must stay below the 240 pure-LOC budget
 import { isUlwLoopDone } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
-import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { commit } from "./plan-commit.js";
+import { findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock } from "./plan-io.js";
 import { makeGoal, reviseCriterion, reviseWording, splitOrBlock } from "./steering-mutations.js";
 import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import type {
@@ -209,9 +210,9 @@ export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringPr
 		}
 		const at = proposal.now?.toISOString() ?? iso();
 		const batchEntry = accepted ? batchUpdateLedgerEntry(plan, next, at) : null;
-		if (accepted) await writePlan(repoRoot, next, scope);
-		await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, at), scope);
-		if (batchEntry !== null) await appendLedger(repoRoot, batchEntry, scope);
+		const entries = [ledgerEntry(proposal, finalAudit, at)];
+		if (batchEntry !== null) entries.push(batchEntry);
+		await commit(repoRoot, scope, { plan: next, entries });
 		return { plan: next, accepted, audit: finalAudit, rejectedReasons: audit.invariant.rejectedReasons, deduped: false };
 	});
 }

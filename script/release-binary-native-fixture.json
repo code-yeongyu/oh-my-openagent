@@ -1,0 +1,43 @@
+{
+  "$comment": "Native addon availability for compiled release payloads. An available entry MUST ship native/prebuilds/<prebuildHost>/<fileStem>.<prebuildHost>.node; staging fails if missing. The senpi-pty 2026.8.24 npm tarball ships only darwin-arm64. senpi_grep stays unavailable until the engine pin adopts its published prebuilds. Baseline CPU variants share their base OS/arch host; musl targets never use glibc prebuilds.",
+  "generatedAt": "2026-09-14",
+  "prebuilds": {
+    "senpi_pty": {
+      "packageName": "@code-yeongyu/senpi-pty",
+      "pinSource": "ptyPin",
+      "pin": "2026.8.24",
+      "targets": {
+        "darwin-arm64": { "available": true, "prebuildHost": "darwin-arm64" },
+        "darwin-x64": { "available": false, "prebuildHost": null },
+        "darwin-x64-baseline": { "available": false, "prebuildHost": null },
+        "linux-x64": { "available": false, "prebuildHost": null },
+        "linux-x64-baseline": { "available": false, "prebuildHost": null },
+        "linux-arm64": { "available": false, "prebuildHost": null },
+        "linux-x64-musl": { "available": false, "prebuildHost": null },
+        "linux-x64-musl-baseline": { "available": false, "prebuildHost": null },
+        "linux-arm64-musl": { "available": false, "prebuildHost": null },
+        "windows-x64": { "available": false, "prebuildHost": null },
+        "windows-x64-baseline": { "available": false, "prebuildHost": null },
+        "windows-arm64": { "available": false, "prebuildHost": null }
+      }
+    },
+    "senpi_grep": {
+      "packageName": "@code-yeongyu/senpi",
+      "pinSource": "enginePin",
+      "targets": {
+        "darwin-arm64": { "available": false, "prebuildHost": "darwin-arm64" },
+        "darwin-x64": { "available": false, "prebuildHost": "darwin-x64" },
+        "darwin-x64-baseline": { "available": false, "prebuildHost": "darwin-x64" },
+        "linux-x64": { "available": false, "prebuildHost": "linux-x64" },
+        "linux-x64-baseline": { "available": false, "prebuildHost": "linux-x64" },
+        "linux-arm64": { "available": false, "prebuildHost": "linux-arm64" },
+        "linux-x64-musl": { "available": false, "prebuildHost": null },
+        "linux-x64-musl-baseline": { "available": false, "prebuildHost": null },
+        "linux-arm64-musl": { "available": false, "prebuildHost": null },
+        "windows-x64": { "available": false, "prebuildHost": "win32-x64" },
+        "windows-x64-baseline": { "available": false, "prebuildHost": "win32-x64" },
+        "windows-arm64": { "available": false, "prebuildHost": "win32-arm64" }
+      }
+    }
+  }
+}

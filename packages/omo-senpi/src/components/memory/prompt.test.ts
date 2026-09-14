@@ -160,6 +160,8 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).not.toContain("previous messages")
     expect(result?.message).toMatchObject({ customType: "omo-memory:notice", display: false })
     expect(result?.message?.content).toContain("- 3 previous messages")
+    expect(result?.message?.content).toContain("arrives automatically as <recalled-memory> blocks")
+    expect(result?.message?.content).toContain("no recall tool to call")
   }, 30_000)
 
   test("#given the same identity and HEAD across sessions and turns #when volatile notices change #then the system block stays byte-identical and notices travel as a late message", async () => {

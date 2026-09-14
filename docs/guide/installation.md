@@ -157,7 +157,9 @@ If you already used Bun global install or update and Bun reports blocked lifecyc
 bun pm -g untrusted
 ```
 
-Do not run a blanket trust command. Trust only packages you recognize from this install path, such as `oh-my-openagent`, legacy `oh-my-opencode`, or `@code-yeongyu/comment-checker`, then rerun the supported `bunx oh-my-openagent install` or `npx lazycodex-ai doctor` check.
+Do not run a blanket trust command. Trust only packages you recognize from this install path, such as `oh-my-openagent` or legacy `oh-my-opencode`, then rerun the supported `bunx oh-my-openagent install` or `npx lazycodex-ai doctor` check.
+
+The OpenCode comment-checker hook downloads its pinned binary directly from [GitHub releases](https://github.com/code-yeongyu/go-claude-code-comment-checker/releases) on first use and caches it locally. No comment-checker npm package or lifecycle-script trust is required. If the download fails, comment checking is disabled for that process; allow GitHub access and restart OpenCode to retry.
 
 ### Senpi edition (beta): `omo` via npm `omo-ai`
 
@@ -527,7 +529,7 @@ After OpenCode sees the provider, reference models with the OpenCode provider pr
 ```json
 {
   "agents": {
-    "plan-consultant": { "model": "amazon-bedrock/us.anthropic.claude-sonnet-4-6" },
+    "plan-consultant": { "model": "amazon-bedrock/us.anthropic.claude-fable-5-1", "reasoning": "max" },
     "plan-reviewer": { "model": "amazon-bedrock/us.anthropic.claude-opus-5" }
   },
   "categories": {
@@ -544,7 +546,7 @@ GitHub Copilot is supported as a **fallback provider** when native providers are
 
 | Agent / category      | Model                                    |
 | --------------------- | ---------------------------------------- |
-| **plan-consultant**   | `github-copilot/claude-sonnet-4-6`       |
+| **plan-consultant**   | `github-copilot/claude-opus-5` (max)     |
 | **plan-reviewer**     | `github-copilot/gpt-6-astra` (high)      |
 | **explore**           | `github-copilot/claude-haiku-4-5`        |
 | **librarian**         | `github-copilot/claude-haiku-4-5`        |
@@ -572,7 +574,7 @@ When OpenCode Zen is the best available provider, common examples:
 
 | Agent / category      | Model                                                |
 | --------------------- | ---------------------------------------------------- |
-| **plan-consultant**   | `opencode/claude-sonnet-4-6`                         |
+| **plan-consultant**   | `opencode/claude-fable-5-1` (max)                    |
 | **plan-reviewer**     | `opencode/gpt-6-astra` (high)                        |
 | **deep** (category)   | `opencode/gpt-6-astra` (high)                        |
 | main agent (session)  | `opencode/claude-opus-5` or `opencode-go/kimi-k3`    |
@@ -639,7 +641,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent               | Role                                       | Default Chain                                                          |
 | ------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
-| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → anthropic\|github-copilot\|opencode/claude-opus-5 (max) → openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium) → opencode-go/glm-5.2 → kimi-for-coding/kimi-k3 |
+| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) |
 | **plan-reviewer**   | High-accuracy plan review gate             | openai\|openai-codex/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|openai-codex\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5 (max) → … (full chain in source) |
 | **explore**         | Fast codebase grep                         | openai\|openai-codex/gpt-5.6-luna-fast (low) → deepseek/deepseek-v4-flash (max) → opencode-go\|bailian-coding-plan/qwen3.5-plus → … → anthropic\|github-copilot/claude-haiku-4-5 → openai\|openai-codex/gpt-5.4-nano (full chain in source) |
 | **librarian**       | Docs/code search                           | (same chain as `explore`)                                              |
@@ -662,7 +664,7 @@ If the user wants to override which model a curated agent or category uses, edit
 ```jsonc
 {
   "agents": {
-    "plan-consultant": { "model": "anthropic/claude-sonnet-4-6" },
+    "plan-consultant": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
     "plan-reviewer": { "model": "openai/gpt-6-astra" }, // the plan gate; keep it on a strong reasoning model
   },
   "categories": {

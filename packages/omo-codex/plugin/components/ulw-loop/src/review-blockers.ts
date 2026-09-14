@@ -8,8 +8,9 @@ import {
 } from "./codex-goal-snapshot.js";
 import { compatibleCodexObjectives, expectedCodexObjective, isFinalRunCompletionCandidate } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
+import { commit } from "./plan-commit.js";
 import { seedDefaultSuccessCriteria } from "./plan-crud.js";
-import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { readUlwLoopPlan, withUlwLoopMutationLock } from "./plan-io.js";
 import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
 
@@ -88,8 +89,7 @@ export async function recordFinalReviewBlockers(
 		const summaryEntry: UlwLoopLedgerEntry = { at: now, kind: "goal_review_blocked", goalId: goal.id, status: goal.status, evidence: args.evidence, codexGoal, message: `Review blockers recorded; appended ${newGoal.id}.` };
 		Reflect.set(summaryEntry, "kind", "blocker_recorded");
 		const ledgerEntries = [blockedEntry, addedEntry, summaryEntry];
-		await writePlan(repoRoot, plan, scope);
-		for (const entry of ledgerEntries) await appendLedger(repoRoot, entry, scope);
+		await commit(repoRoot, scope, { plan, entries: ledgerEntries });
 		return {
 			plan,
 			blockedGoal: goal,

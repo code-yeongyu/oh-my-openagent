@@ -217,6 +217,10 @@ export function createAgentToolkitTool(deps: AgentToolkitToolDeps): {
   readonly label: string
   readonly description: string
   readonly parameters: typeof AgentToolkitToolParams
+  readonly exposure: "search"
+  readonly searchGroup: string
+  readonly searchKeywords: readonly string[]
+  readonly allowLazyActivation: true
   readonly execute: (
     toolCallId: string,
     params: AgentToolkitToolInput,
@@ -227,6 +231,19 @@ export function createAgentToolkitTool(deps: AgentToolkitToolDeps): {
     label: "Agent toolkit",
     description: DESCRIPTION,
     parameters: AgentToolkitToolParams,
+    // ulw-loop work starts from the skill, which names tool.omo_agent_toolkit explicitly; the schema
+    // costs ~850 prompt tokens per request, so it rides the catalog and activates on that first call.
+    exposure: "search",
+    searchGroup: "ulw-loop",
+    searchKeywords: [
+      "ulw loop",
+      "goal loop",
+      "durable run state",
+      "checkpoint a goal",
+      "ulw-loop status",
+      "agent toolkit",
+    ],
+    allowLazyActivation: true,
     // The host calls every tool as execute(toolCallId, params, signal, onUpdate, ctx); only the
     // first two matter here, and the envelope is returned as text content plus typed details.
     execute: async (_toolCallId: string, params: AgentToolkitToolInput): Promise<AgentToolkitToolExecutionResult> =>

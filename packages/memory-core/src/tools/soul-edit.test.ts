@@ -138,6 +138,30 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.commit?.affectedPaths).toEqual(["system/persona.md", "reference/old-persona.md"])
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
+  it("#given an insert into system/self-aware.md #when the tool runs #then no soul-edit directive appears (self-aware is not a soul path)", async () => {
+    // given
+    const setup = await fixture()
+    await seed(setup, "system/self-aware.md", "Entries follow:\n")
+
+    // when
+    const result = await runMemoryTool({
+      repo: setup.repo,
+      lock: setup.lock,
+      params: {
+        command: "insert",
+        reason: "promote an observation",
+        file_path: "system/self-aware.md",
+        insert_line: 999,
+        insert_text: "- [2026-09-14] cond: a remote machine is named | reaction: \"why here\" (msg-1) | obs: searched local fs first, 2 of 9 | next: run the host check first <!-- status: observed; expires: 2026-12-14 -->",
+        author: AUTHOR,
+      },
+    })
+
+    // then
+    expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
+    expect(result.commit?.affectedPaths).toEqual(["system/self-aware.md"])
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+
   it("#given a commit that touches only non-soul files #when the tool runs #then no soul-edit directive appears but commit metadata is present", async () => {
     // given
     const setup = await fixture()

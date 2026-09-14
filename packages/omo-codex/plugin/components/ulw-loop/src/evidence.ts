@@ -1,6 +1,7 @@
 import { essentialCriteriaOf, hasAllCriteriaPass, hasEssentialCriteriaPass } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
-import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { commit } from "./plan-commit.js";
+import { readUlwLoopPlan, withUlwLoopMutationLock } from "./plan-io.js";
 import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
 
@@ -75,7 +76,6 @@ export async function recordEvidence(
 		if (args.notes !== undefined) criterion.notes = args.notes;
 		goal.updatedAt = capturedAt;
 		plan.updatedAt = capturedAt;
-		await writePlan(repoRoot, plan, scope);
 		const ledgerEntry: UlwLoopLedgerEntry = {
 			at: capturedAt,
 			kind,
@@ -87,7 +87,7 @@ export async function recordEvidence(
 			before: { status: prevStatus },
 			after: { goalId: goal.id, criterionId: criterion.id, status: args.status, evidence, capturedAt, prevStatus },
 		};
-		await appendLedger(repoRoot, ledgerEntry, scope);
+		await commit(repoRoot, scope, { plan, entries: [ledgerEntry] });
 		return { plan, goal, criterion, ledgerEntry };
 	});
 }
@@ -115,19 +115,19 @@ export async function markCriteriaPendingResetForGoal(
 		}
 		goal.updatedAt = now;
 		plan.updatedAt = now;
-		await writePlan(repoRoot, plan, scope);
-		await appendLedger(
-			repoRoot,
-			{
-				at: now,
-				kind: "criteria_revised",
-				goalId,
-				message: `Reset ${goal.successCriteria.length} criteria to pending.`,
-				before,
-				after: { resetCount: goal.successCriteria.length },
-			},
-			scope,
-		);
+		await commit(repoRoot, scope, {
+			plan,
+			entries: [
+				{
+					at: now,
+					kind: "criteria_revised",
+					goalId,
+					message: `Reset ${goal.successCriteria.length} criteria to pending.`,
+					before,
+					after: { resetCount: goal.successCriteria.length },
+				},
+			],
+		});
 		return { plan, resetCount: goal.successCriteria.length };
 	});
 }

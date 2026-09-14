@@ -13,7 +13,7 @@
     "librarian": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
 
     // Pre-planning consultant: minimal overhead for coding plans
-    "plan-consultant": { "model": "anthropic/claude-sonnet-4-6" },
+    "plan-consultant": { "model": "anthropic/claude-sonnet-5" },
 
     // Plan reviewer: code quality, edge cases, and test coverage
     "plan-reviewer": {

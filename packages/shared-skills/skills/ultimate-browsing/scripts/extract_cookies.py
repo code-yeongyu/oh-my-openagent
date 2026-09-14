@@ -4,7 +4,7 @@
 The OS-keyring lookup is an injected boundary: cookie_paths resolves profile
 paths and cookie_crypto derives keys + decrypts values, both pure and testable
 with synthetic fixtures on any OS. This module wires them to a real browser DB
-and the agent-browser CDP session.
+and a local Chrome CDP session controlled by playwright-core scripts.
 
 Usage:
     python extract_cookies.py --browser chrome --domain youtube.com --output /tmp/cookies.json
@@ -255,7 +255,7 @@ def inject_cookies(cookies: list[CookieRecord], cdp_port: int) -> None:
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or "CDP cookie injection failed").strip())
     ok = int((proc.stdout or "0").strip() or "0")
-    print(f"Injected {ok}/{len(filtered)} cookies into agent-browser (CDP {cdp_port})")
+    print(f"Injected {ok}/{len(filtered)} cookies into local Chrome (playwright-core CDP {cdp_port})")
 
 
 def main() -> None:
@@ -263,7 +263,7 @@ def main() -> None:
     parser.add_argument("--browser", required=True, choices=sorted(BROWSERS.keys()))
     parser.add_argument("--domain", required=True, action="append", dest="domains")
     parser.add_argument("--output", help="Write cookies JSON to file")
-    parser.add_argument("--inject", action="store_true", help="Inject into agent-browser")
+    parser.add_argument("--inject", action="store_true", help="Inject into the local Chrome CDP endpoint used by a playwright-core script")
     parser.add_argument("--cdp", type=int, default=9242, help="CDP port (default 9242)")
     args = parser.parse_args()
 

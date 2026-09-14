@@ -1,18 +1,20 @@
 import { test, expect } from "@playwright/test"
 
 test.describe("Manifesto Page", () => {
-  test("renders hero and core philosophy", async ({ page }) => {
+  test("renders the title, byline and closing", async ({ page }) => {
     test.setTimeout(60000)
     // given
     await page.goto("/manifesto", { waitUntil: "domcontentloaded", timeout: 45000 })
 
     // when
     const heading = page.getByRole("heading", { name: "Ultrawork Manifesto" })
-    const bottleneckText = page.getByText("HUMAN IN THE LOOP = BOTTLENECK").first()
+    const byline = page.getByTestId("manifesto-byline")
+    const closing = page.getByRole("heading", { name: "just ulw ulw" })
 
     // then
     await expect(heading).toBeVisible()
-    await expect(bottleneckText).toBeVisible()
+    await expect(byline).toContainText("Q Kim")
+    await expect(closing).toBeVisible()
   })
 
   test("renders CTA with GitHub link", async ({ page }) => {
@@ -28,17 +30,37 @@ test.describe("Manifesto Page", () => {
     await expect(ctaLink).toHaveAttribute("href", "https://github.com/code-yeongyu/oh-my-openagent")
   })
 
-  test("has no horizontal overflow at 375px", async ({ page }) => {
+  test("links the footnote to the archived January 2026 version", async ({ page }) => {
+    test.setTimeout(60000)
     // given
-    await page.setViewportSize({ width: 375, height: 812 })
     await page.goto("/manifesto", { waitUntil: "domcontentloaded", timeout: 45000 })
+    const note = page.getByTestId("manifesto-legacy-note")
+    await expect(note).toContainText("January 19, 2026")
 
     // when
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - window.innerWidth,
-    )
+    await Promise.all([
+      page.waitForURL("**/manifesto/2026-01", { timeout: 15000 }),
+      note.getByRole("link").click(),
+    ])
 
     // then
-    expect(overflow).toBeLessThanOrEqual(1)
+    await expect(page.getByText(/Old version/)).toBeVisible()
+    await expect(page.getByText("HUMAN IN THE LOOP = BOTTLENECK").first()).toBeVisible()
   })
+
+  for (const route of ["/manifesto", "/manifesto/2026-01"]) {
+    test(`${route} has no horizontal overflow at 375px`, async ({ page }) => {
+      // given
+      await page.setViewportSize({ width: 375, height: 812 })
+      await page.goto(route, { waitUntil: "domcontentloaded", timeout: 45000 })
+
+      // when
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      )
+
+      // then
+      expect(overflow).toBeLessThanOrEqual(1)
+    })
+  }
 })

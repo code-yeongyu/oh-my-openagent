@@ -1,0 +1,29 @@
+arch=x86_64 node=v24.19.0
+bun=1.4.2
++ zod@4.4.3
+
+490 packages installed [12.69s]
+  omo-task.js  1.0 MB  (entry point)
+
+Bundled 213 modules in 221ms
+
+  omo-member.js  170.24 KB  (entry point)
+
+Bundled 147 modules in 159ms
+
+  memory-run-supervisor.mjs  41.51 KB  (entry point)
+
+Bundled 159 modules in 176ms
+
+  omo-init-deep-advisor.js  85.22 KB  (entry point)
+
+Built omo-senpi extensions: /work/packages/omo-senpi/plugin/extensions/omo.js, /work/packages/omo-senpi/plugin/extensions/omo-task.js, /work/packages/omo-senpi/plugin/extensions/omo-member.js, /work/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /work/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+Bundled 159 modules in 163ms
+
+  omo-init-deep-advisor.js  85.22 KB  (entry point)
+
+omo-senpi extension build is current: /work/packages/omo-senpi/plugin/extensions/omo.js
+  install.mjs  20.66 KB  (entry point)
+
+omo-senpi installer is current: /work/packages/omo-senpi/plugin/scripts/install.mjs
+BUNDLE_DONE

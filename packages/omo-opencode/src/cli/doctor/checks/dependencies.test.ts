@@ -1,11 +1,12 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import * as deps from "./dependencies"
+import * as downloader from "../../../hooks/comment-checker/downloader"
 
 afterEach(() => mock.restore())
 
@@ -41,13 +42,7 @@ describe("dependencies check", () => {
       //#given cached binary exists
       const mockCachedPath = "/mock/path/to/comment-checker"
 
-      mock.module("../../../hooks/comment-checker/downloader", () => ({
-        getCachedBinaryPath: () => mockCachedPath,
-        getCacheDir: () => "/mock/cache/dir",
-        getBinaryName: () => "comment-checker",
-        downloadCommentChecker: async () => mockCachedPath,
-        ensureCommentCheckerBinary: async () => mockCachedPath,
-      }))
+      spyOn(downloader, "getCachedBinaryPath").mockReturnValue(mockCachedPath)
 
       //#when checking
       const info = await deps.checkCommentChecker()

@@ -49,6 +49,7 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/summary.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/surrogate.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_fetch_chain.py",
+  "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_playwright_stealth.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_playwright_templates.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_surrogate.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/tests/test_surrogate_validators.py",

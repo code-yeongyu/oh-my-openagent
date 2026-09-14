@@ -1,3 +1,10 @@
+## 2026-09-14 - Metis heads with Claude Fable 5.1 at max (#8259)
+
+The `metis` pre-planning consultant chain in `model-core` is now `claude-fable-5-1 (max)` -> `claude-opus-5 (max)` ->
+`kimi-k3 (max)` (was `claude-opus-5 (high)` -> `kimi-k3 (low)`). The senpi-native `plan-consultant` chain mirrors it
+again, `explore` / `librarian` on that edition are back on `qwen3.7-plus`, and a parity test now fails whenever the two
+tables disagree. Docs and example configs that documented the retired `claude-sonnet-4-6` head are updated.
+
 ## 2026-09-09 - Suspend native DAG runs on committed session switches (#8020)
 
 OMO no longer cancels DAG nodes from the vetoable `session_before_switch` hook. Committed shutdown first retires scheduler admission and settlement, awaits in-flight admission and journal delivery, then persists the pause before task-child suspension. Returning in the same process can reclaim an explicitly released own lease; active self claims and live foreign holders remain protected. Completed output is reused, running children reconcile through their durable task owners, and pending dependents are admitted once. Deliberate workflow cancellation remains destructive. `/session` information and `/resume` selector cancellation are unchanged. External terminal-hosted controllers are outside this native DAG lifecycle fix.

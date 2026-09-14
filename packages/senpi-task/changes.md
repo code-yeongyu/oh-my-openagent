@@ -1,4 +1,15 @@
 
+## 2026-09-14 — Re-mirror the curated agent chains from model-core and guard the mirror
+
+`agents/builtin/fallback-chains.ts` had drifted from the `model-core` table it claims to mirror: `plan-consultant`
+still headed with `claude-sonnet-4-6` (no reasoning variant) although the source moved off that head on 2026-07-26,
+and `explore` / `librarian` carried `qwen3.5-plus` where the source has `qwen3.7-plus` (#8259). The consultant chain is
+now `claude-fable-5-1 (max)` -> `claude-opus-5 (max)` -> `kimi-k3 (max)`, with `claude-sdk-oauth` still heading the
+Claude rungs (#8051), and the utility rungs match the source again. `AGENT_FALLBACK_CHAINS` is exported from the
+`./agents-builtin` subpath so `omo-senpi` can hold a parity test that compares every curated chain with its model-core
+source rung for rung (modulo the `claude-sdk-oauth` head); the pin test here keeps catching transcription drift, the
+parity test catches source drift.
+
 ## 2026-09-13 — Preserve layout when sanitizing recorded reports
 
 `stripTerminalControls` is exported with an opt-in `preserveWhitespace` option

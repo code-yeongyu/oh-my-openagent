@@ -125,6 +125,12 @@
   }
 }
 
+@property --lit-p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 @layer base {
   *,
   ::after,
@@ -196,6 +202,11 @@
     --dur-type: 40ms;
     --dur-pulse: 2200ms;
     --dur-wave: 12s;
+    --lit-blur: 4px;
+    --lit-read-hold: 18vh;
+    --lit-follow-fade: 22vh;
+    --lit-follow-gap: 1.25em;
+    --lit-follow-rise: var(--space-6);
 
     /* Legacy shadcn variables remapped onto the ledger tokens */
     --background: var(--ink-0);
@@ -790,13 +801,104 @@
     }
   }
 
-  /* Lit text: words start faint and light up as .is-lit is added on scroll. */
-  .lit-word {
-    color: var(--text-faint);
-    transition: color var(--dur-reveal) var(--ease-out-quart);
+  /* Lit text: one paragraph progress (--lit-p 0→1) sweeps light through every word.
+     Each word owns 3 progress units and overlaps its neighbours, so the fill glides across
+     glyphs and between words instead of flipping. */
+  .lit-progress {
+    --lit-p: 0;
+    --lit-f: 0;
+    timeline-scope: --lit-body;
   }
-  .lit-word.is-lit {
-    color: var(--text-hi);
+  .lit-text {
+    white-space: pre-line;
+    view-timeline: --lit-body block;
+  }
+  @supports (animation-timeline: view()) {
+    .lit-progress.lit-scroll {
+      animation: lit-progress linear both;
+      animation-timeline: --lit-body;
+      animation-range-start: cover 20vh;
+      animation-range-end: cover calc(100% - 50vh);
+    }
+    .lit-scroll .lit-follow {
+      animation: lit-follow linear both;
+      animation-timeline: --lit-body;
+      animation-range-start: cover
+        calc(100% - 50vh + max(var(--lit-read-hold), var(--lit-follow-gap)));
+      animation-range-end: cover
+        calc(
+          100% - 50vh + max(var(--lit-read-hold), var(--lit-follow-gap)) + var(--lit-follow-fade)
+        );
+    }
+  }
+  .lit-follow {
+    margin-top: var(--lit-follow-gap);
+    opacity: var(--lit-f);
+    transform: translateY(calc((1 - var(--lit-f)) * var(--lit-follow-rise)));
+  }
+  @keyframes lit-follow {
+    from {
+      opacity: 0;
+      transform: translateY(var(--lit-follow-rise));
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes lit-progress {
+    from {
+      --lit-p: 0;
+    }
+    to {
+      --lit-p: 1;
+    }
+  }
+  .lit-word {
+    --lit-local: clamp(0, calc((var(--lit-p) * (var(--lit-count) + 2) - var(--i)) / 3), 1);
+    background-image: linear-gradient(
+      90deg,
+      var(--text-hi) 0%,
+      var(--text-hi) 45%,
+      var(--text-faint) 55%,
+      var(--text-faint) 100%
+    );
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    background-position-x: calc((1 - var(--lit-local)) * 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: blur(calc((1 - var(--lit-local)) * var(--lit-blur)));
+  }
+
+  /* Reading blocks (manifesto): the same sweep, tuned for long-form prose. Unread words stay
+     legible (--text-lo instead of --text-faint), the blur is halved, and every word is lit until
+     hydration picks a mode, so the page reads before JavaScript does. */
+  .lit-read {
+    --lit-blur: 2px;
+  }
+  .lit-read[data-lit-mode="pending"] {
+    --lit-p: 1;
+  }
+  .lit-read .lit-word {
+    background-image: linear-gradient(
+      90deg,
+      var(--text-hi) 0%,
+      var(--text-hi) 45%,
+      var(--text-lo) 55%,
+      var(--text-lo) 100%
+    );
+  }
+  .lit-link {
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  .lit-link:hover,
+  .lit-link:focus-visible {
+    text-decoration-thickness: 2px;
   }
 
   /* Kibitzer: independent clocks; the nudge travels into the verification slot. */
@@ -1032,9 +1134,21 @@
     .ticker-track > [aria-hidden="true"] {
       display: none;
     }
+    .lit-progress,
+    .lit-progress.lit-scroll {
+      --lit-p: 1;
+      animation: none;
+    }
+    .lit-follow,
+    .lit-scroll .lit-follow {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
     .lit-word {
+      background-image: none;
       color: var(--text-hi);
-      transition: none;
+      filter: none;
     }
     .rotate-word {
       height: auto;

@@ -1,6 +1,6 @@
 import { mkdir, readdir, stat } from "node:fs/promises"
 import { join, relative } from "node:path"
-import targetFixture from "../../release-binary-pty-fixture.json"
+import targetFixture from "../../release-binary-native-fixture.json"
 import { hashFile, run, type Runtime } from "./runtime"
 
 export async function captureBytes(runtime: Runtime) {
@@ -23,7 +23,7 @@ export async function captureTargetBytes(runtime: Runtime) {
   const assets = join(runtime.root, "release-assets")
   await mkdir(assets)
   const rows = []
-  for (const target of Object.keys(targetFixture.targets).sort()) {
+  for (const target of Object.keys(targetFixture.prebuilds.senpi_pty.targets).sort()) {
     const binaryName = `omo-${target}${target.startsWith("windows-") ? ".exe" : ""}`
     // Release asset acquisition is the sole public-network exception; no credentials enter the audited process.
     const result = await run(["gh", "release", "download", "v5.0.0-beta.62", "--repo", "code-yeongyu/oh-my-openagent", "--pattern", binaryName, "--dir", assets],

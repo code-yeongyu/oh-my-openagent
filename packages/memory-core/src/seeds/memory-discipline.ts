@@ -33,6 +33,7 @@ version: 0.1.0
 | A repeatable procedure: steps you would follow again in a similar situation | A skill: skills/<name>/SKILL.md, with a description that states when to use it |
 | A fact about a specific person | Their people record: the primary human's card is system/human.md, everyone else gets people/<slug>/card.md plus people/<slug>/observations.md |
 | Something the person told you not to do | system/boundaries.md, in their exact words; never a rule you inferred |
+| What your person, a reviewer, or a test showed about your own behavior | reference/self/observations.md, quoting them with the source; reflection promotes it to system/self-aware.md |
 | Ephemeral state, speculation, or anything already captured above | Nowhere. Not saving is a valid outcome; decide it deliberately |
 
 One home per fact. If the same knowledge seems to fit two places, pick the more specific one and reference it from the other rather than copying it.

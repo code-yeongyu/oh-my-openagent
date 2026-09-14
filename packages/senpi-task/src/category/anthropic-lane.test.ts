@@ -72,13 +72,13 @@ describe("builtin Claude rungs under the senpi harness", () => {
     expect(resolved.spec.variant).toBe("xhigh")
   })
 
-  test("#given claude-sdk-oauth and opencode both serve Sonnet 4.6 #when plan-consultant resolves #then the subscription lane wins", () => {
+  test("#given claude-sdk-oauth and opencode both serve Fable 5.1 #when plan-consultant resolves #then the subscription lane wins", () => {
     // when
     const resolved = expectResolvedAgent(resolveAgent("plan-consultant", BUILTIN_AGENTS, subscriptionAndMeteredRegistry()))
 
     // then
-    expect(resolved.model).toBe("claude-sdk-oauth/claude-sonnet-4-6")
-    expect(resolved.resolved_model).toMatchObject({ provider: "claude-sdk-oauth", model_id: "claude-sonnet-4-6" })
+    expect(resolved.model).toBe("claude-sdk-oauth/claude-fable-5-1")
+    expect(resolved.resolved_model).toMatchObject({ provider: "claude-sdk-oauth", model_id: "claude-fable-5-1" })
   })
 
   test("#given claude-sdk-oauth is absent #when Claude rungs resolve #then selection is identical to the pre-lane table", () => {
@@ -117,8 +117,8 @@ describe("builtin Claude rungs under the senpi harness", () => {
       "opencode", "claude-opus-5", "xhigh",
     ])
     expect(meteredHigh.spec.requested_model?.display).toBe("openai/gpt-6-astra")
-    expect(planConsultant.model).toBe("anthropic/claude-sonnet-4-6")
-    expect(planConsultant.resolved_model?.display).toBe("anthropic/claude-sonnet-4-6")
+    expect(planConsultant.model).toBe("anthropic/claude-fable-5-1")
+    expect(planConsultant.resolved_model?.display).toBe("anthropic/claude-fable-5-1")
     expect(planConsultant.fallback_models).toBeUndefined()
   })
 })

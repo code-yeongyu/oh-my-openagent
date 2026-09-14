@@ -75,4 +75,4 @@ State-first tmux integration. Shared tmux primitives are extracted to `packages/
 
 The built-in skill catalog now lives entirely in `packages/skills-loader-core/src/features/builtin-skills/` — see [its AGENTS.md](../../../skills-loader-core/src/features/builtin-skills/AGENTS.md) for the skill table and browser-variant selection rules. Import through `@oh-my-opencode/skills-loader-core/builtin-skills`.
 
-Browser variant selected by `browser_automation_engine` config: `playwright` (default) | `playwright-cli` | `agent-browser`.
+`browser_automation_engine` selects the browser provider; the provider enum lives in `config/schema/browser-automation.ts`. Browser QA guidance comes from the `visual-qa` skill's Bun.WebView / local-Chrome playwright-core script tiers.

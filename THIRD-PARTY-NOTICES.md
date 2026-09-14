@@ -4,6 +4,14 @@ This file enumerates third-party components redistributed by the root `oh-my-ope
 
 Generator/checker note: update this file with the audited component list, then run `node scripts/check-third-party-notices.mjs`. Task 11 owns tarball ship verification.
 
+## Downloaded binaries
+
+### comment-checker v0.8.0
+- License: MIT, as declared by the upstream project.
+- Copyright: Yeongyu Kim and contributors.
+- Upstream URL: https://github.com/code-yeongyu/go-claude-code-comment-checker/releases
+- Distribution: the OpenCode hook downloads the host-platform release binary into its local cache on first use. The root package no longer installs the npm package or its all-platform `vendor/` payload. Separate Codex component notices remain in `packages/omo-codex/THIRD-PARTY-NOTICES.md`.
+
 ## Components
 
 ### @clack/prompts@1.5.0
@@ -11,12 +19,6 @@ Generator/checker note: update this file with the audited component list, then r
 - Copyright: Copyright (c) Nate Moore.
 - Upstream URL: https://github.com/bombshell-dev/clack
 - Where-bundled: root production dependency.
-
-### @code-yeongyu/comment-checker@0.8.0
-- License: MIT, from package metadata. The inspected package did not include a separate LICENSE file.
-- Copyright: Yeongyu Kim and contributors.
-- Upstream URL: https://github.com/code-yeongyu/go-claude-code-comment-checker
-- Where-bundled: root production dependency and vendored checker binary payload under `vendor/<platform>/`.
 
 ### @modelcontextprotocol/sdk@1.29.0
 - License: MIT, from `node_modules/@modelcontextprotocol/sdk/LICENSE`.
