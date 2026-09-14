@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { prepareCompileSafeEngine } from "../bin/lib/compile-safe-engine.js"
+import { NESTED_PI_DIR_MOVES } from "../bin/lib/legacy-pi-dir-guard.js"
 
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
@@ -143,6 +144,10 @@ describe("compile-safe engine preparation", () => {
         write(
           join(root, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js"),
           'const claudeCodeVersion = "2.1.251";\n',
+        )
+        write(
+          join(root, "dist", "legacy-senpi-dir-migration.js"),
+          `export function migrateLegacySenpiDirs() {}\n${NESTED_PI_DIR_MOVES}`,
         )
         const result = spawnSync("node", [PATCH_SCRIPT], {
           encoding: "utf8",

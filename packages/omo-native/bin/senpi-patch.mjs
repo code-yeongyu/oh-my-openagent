@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import { prepareCompileSafeEngine } from "./lib/compile-safe-engine.js"
+import { patchLegacyPiDirMigration } from "./lib/legacy-pi-dir-guard.js"
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(join(packageRoot, "package.json"))
@@ -44,4 +45,5 @@ if (belowFloor) {
   )
 }
 
+patchLegacyPiDirMigration(senpiRoot)
 prepareCompileSafeEngine(senpiRoot)
