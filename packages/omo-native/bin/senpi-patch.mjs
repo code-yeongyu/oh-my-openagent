@@ -44,4 +44,22 @@ if (belowFloor) {
   )
 }
 
+// --thinking / model-derived thinking is a session override. The published Senpi
+// startup path re-applies the already-selected level through the persistent setter,
+// which writes modelThinkingLevels even when defaultThinkingLevel stays unchanged
+// (https://github.com/code-yeongyu/oh-my-openagent/issues/8116).
+const cliThinkingMainRelative = "dist/main.js"
+const cliThinkingPersistentApply =
+  "created.session.setThinkingLevel(created.session.thinkingLevel)"
+const cliThinkingSessionApply =
+  "created.session.setSessionThinkingLevel(created.session.thinkingLevel)"
+const cliThinkingMainPath = join(senpiRoot, cliThinkingMainRelative)
+if (!existsSync(cliThinkingMainPath)) throw new Error(`omo-ai: installed Senpi target is missing: ${cliThinkingMainRelative}`)
+const cliThinkingSource = readFileSync(cliThinkingMainPath, "utf8")
+if (cliThinkingSource.includes(cliThinkingPersistentApply)) {
+  writeFileSync(cliThinkingMainPath, cliThinkingSource.replaceAll(cliThinkingPersistentApply, cliThinkingSessionApply))
+} else if (!cliThinkingSource.includes(cliThinkingSessionApply)) {
+  throw new Error(`omo-ai: unsupported Senpi ${cliThinkingMainRelative}`)
+}
+
 prepareCompileSafeEngine(senpiRoot)

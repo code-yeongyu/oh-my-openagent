@@ -8,11 +8,16 @@ import { fileURLToPath } from "node:url"
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
 const BUNDLED_ANTHROPIC_MESSAGES = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
+const BUNDLED_MAIN = "dist/main.js"
 const FLOOR = "2.1.251"
+const CLI_THINKING_PERSISTENT =
+  "created.session.setThinkingLevel(created.session.thinkingLevel)"
+const CLI_THINKING_SESSION =
+  "created.session.setSessionThinkingLevel(created.session.thinkingLevel)"
 
 const roots: string[] = []
 
-type Fixture = { root: string; anthropicMessages: string }
+type Fixture = { root: string; anthropicMessages: string; main: string }
 
 function anthropicMessagesSource(claudeCodeVersion: string): string {
   return [
@@ -30,7 +35,17 @@ function anthropicMessagesSource(claudeCodeVersion: string): string {
   ].join("\n")
 }
 
-function createFixture(claudeCodeVersion: string): Fixture {
+function cliThinkingMainSource(apply: string): string {
+  return [
+    "const cliThinkingOverride = runtimeParsed.thinking !== undefined || cliThinkingFromModel;",
+    "if (created.session.model && cliThinkingOverride) {",
+    `    ${apply};`,
+    "}",
+    "",
+  ].join("\n")
+}
+
+function createFixture(claudeCodeVersion: string, apply = CLI_THINKING_SESSION): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-patch-"))
   roots.push(root)
   writeFileSync(join(root, "package.json"), JSON.stringify({
@@ -41,7 +56,10 @@ function createFixture(claudeCodeVersion: string): Fixture {
   const anthropicMessages = join(root, BUNDLED_ANTHROPIC_MESSAGES)
   mkdirSync(dirname(anthropicMessages), { recursive: true })
   writeFileSync(anthropicMessages, anthropicMessagesSource(claudeCodeVersion))
-  return { root, anthropicMessages }
+  const main = join(root, BUNDLED_MAIN)
+  mkdirSync(dirname(main), { recursive: true })
+  writeFileSync(main, cliThinkingMainSource(apply))
+  return { root, anthropicMessages, main }
 }
 
 function runPatch(root: string) {
@@ -113,6 +131,58 @@ describe("senpi-patch claudeCodeVersion floor", () => {
         const result = runPatch(fixture.root)
         expect(result.status).not.toBe(0)
         expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${BUNDLED_ANTHROPIC_MESSAGES}`)
+      })
+    })
+  })
+})
+
+describe("senpi-patch CLI thinking session-only apply", () => {
+  describe("#given startup re-applies the CLI thinking level through the persistent setter", () => {
+    describe("#when the patch script runs as postinstall does", () => {
+      test("#then the apply is rewritten to the session-only setter", () => {
+        const fixture = createFixture(FLOOR, CLI_THINKING_PERSISTENT)
+        const result = runPatch(fixture.root)
+        expect(result.status).toBe(0)
+        expect(readFileSync(fixture.main, "utf8")).toBe(cliThinkingMainSource(CLI_THINKING_SESSION))
+        expect(readFileSync(fixture.anthropicMessages, "utf8")).toBe(anthropicMessagesSource(FLOOR))
+      })
+    })
+  })
+
+  describe("#given startup already uses the session-only setter", () => {
+    describe("#when the patch script runs", () => {
+      test("#then dist/main.js stays byte-identical", () => {
+        const fixture = createFixture(FLOOR, CLI_THINKING_SESSION)
+        const before = readFileSync(fixture.main, "utf8")
+        const result = runPatch(fixture.root)
+        expect(result.status).toBe(0)
+        expect(readFileSync(fixture.main, "utf8")).toBe(before)
+      })
+    })
+  })
+
+  describe("#given the thinking apply was already rewritten", () => {
+    describe("#when the patch script runs again", () => {
+      test("#then the rewritten file is left unchanged and the exit stays clean", () => {
+        const fixture = createFixture(FLOOR, CLI_THINKING_PERSISTENT)
+        runPatch(fixture.root)
+        const afterFirst = readFileSync(fixture.main, "utf8")
+        expect(afterFirst).toBe(cliThinkingMainSource(CLI_THINKING_SESSION))
+        const second = runPatch(fixture.root)
+        expect(second.status).toBe(0)
+        expect(readFileSync(fixture.main, "utf8")).toBe(afterFirst)
+      })
+    })
+  })
+
+  describe("#given dist/main.js has neither thinking apply form", () => {
+    describe("#when the patch script runs", () => {
+      test("#then it fails with the unsupported-Senpi error naming dist/main.js", () => {
+        const fixture = createFixture(FLOOR)
+        writeFileSync(fixture.main, "export {}\n")
+        const result = runPatch(fixture.root)
+        expect(result.status).not.toBe(0)
+        expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${BUNDLED_MAIN}`)
       })
     })
   })
