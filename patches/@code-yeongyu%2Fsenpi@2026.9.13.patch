@@ -1,0 +1,27 @@
+diff --git a/dist/modes/rpc/worker-session-registry.js b/dist/modes/rpc/worker-session-registry.js
+index b78cfad4a833aee1611dda3b0e22ff42ecde3074..962d2e011b88dbc8f6f7d4992a5dd7ccd4532db2 100644
+--- a/dist/modes/rpc/worker-session-registry.js
++++ b/dist/modes/rpc/worker-session-registry.js
+@@ -132,20 +132,8 @@ export class WorkerSessionRegistry {
+         if (entry.closeStarted)
+             return entry.closeCompletion;
+         entry.closeStarted = true;
+-        // Reply on a bounded deadline, but keep entry, attachments and reservations until exit.
+-        let timer;
+-        await Promise.race([
+-            entry.worker.close(this.closeGraceMs),
+-            new Promise((resolve) => {
+-                timer = setTimeout(() => {
+-                    if (entry.state !== "closed")
+-                        entry.state = "quarantined";
+-                    resolve();
+-                }, this.closeGraceMs);
+-            }),
+-        ]);
+-        if (timer)
+-            clearTimeout(timer);
++        // The worker deadline requests termination; only exit releases registry ownership.
++        await entry.worker.close(this.closeGraceMs);
+     }
+     list() {
+         return [...this.entries].map(([sessionId, entry]) => {
