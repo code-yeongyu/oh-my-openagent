@@ -81,6 +81,7 @@ import {
 } from "./loop-detector"
 import { ParentWakeNotifier, type ParentWakePromptContext } from "./parent-wake-notifier"
 import type { PendingParentWake } from "./parent-wake-dedupe"
+import { startPollSessionProbes, type PollSessionProbeBatch } from "./poll-session-probes"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
@@ -179,6 +180,25 @@ interface Todo {
   priority: string
   id: string
 }
+
+interface PollCandidateTaskIdentity {
+  task: BackgroundTask
+  sessionID: string
+  currentAttemptID: string | undefined
+  startedAt: Date | undefined
+  completionSource: string
+}
+
+interface PollTerminalCandidate extends PollCandidateTaskIdentity {
+  kind: "terminal"
+}
+
+interface PollProbeCandidate extends PollCandidateTaskIdentity {
+  kind: "probe"
+  sessionGoneThresholdReached: boolean
+}
+
+type PollCompletionCandidate = PollTerminalCandidate | PollProbeCandidate
 
 function formatAttemptModelSummary(attempt: Pick<BackgroundTaskAttempt, "providerId" | "modelId"> | undefined): string | undefined {
   if (!attempt?.providerId || !attempt.modelId) {
@@ -3047,97 +3067,212 @@ The task was re-queued on a fallback model after a retryable failure.
 
       await this.checkAndInterruptStaleTasks(allStatuses)
 
-      for (const task of this.tasks.values()) {
-        if (task.status !== "running") continue
+      const candidates = await this.collectPollCompletionCandidates(allStatuses)
+      if (this.shutdownTriggered) return
 
-        const sessionID = task.sessionId
-        if (!sessionID) continue
-
-        try {
-          const sessionStatus = allStatuses?.[sessionID]
-          // Handle retry before checking running state
-          if (sessionStatus?.type === "retry") {
-            const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
-              ? (sessionStatus as { message?: string }).message
-              : undefined
-            const errorInfo = { name: "SessionRetry", message: retryMessage }
-            if (await this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
-              continue
-            }
-          }
-
-          // Only skip completion when session status is actively running.
-          // Unknown or terminal statuses (like "interrupted") fall through to completion.
-          if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
-            log("[background-agent] Session still running, relying on event-based progress:", {
-              taskId: task.id,
-              sessionID,
-              sessionStatus: sessionStatus.type,
-              toolCalls: task.progress?.toolCalls ?? 0,
-            })
-            continue
-          }
-
-          if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
-            await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
-            continue
-          }
-
-          if (sessionStatus && sessionStatus.type !== "idle") {
-            log("[background-agent] Unknown session status, treating as potentially idle:", {
-              taskId: task.id,
-              sessionID,
-              sessionStatus: sessionStatus.type,
-            })
-          }
-
-          if (allStatuses === undefined) {
-            continue
-          }
-
-          // Session is idle or no longer in status response (completed/disappeared)
-          const sessionGoneFromStatus = allStatuses !== undefined && !sessionStatus
-          const sessionGoneThresholdReached = sessionGoneFromStatus
-            && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
-          const completionSource = sessionStatus?.type === "idle"
-            ? "polling (idle status)"
-            : "polling (session gone from status)"
-          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
-          if (!hasValidOutput) {
-            if (sessionGoneThresholdReached) {
-              const sessionExists = await this.verifySessionExists(sessionID)
-              if (!sessionExists) {
-                log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
-                await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
-                continue
-              }
-
-              task.consecutiveMissedPolls = 0
-            }
-            log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
-            continue
-          }
-
-          // Re-check status after async operation
-          if (task.status !== "running") continue
-
-          const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-          if (hasIncompleteTodos) {
-            log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
-            continue
-          }
-
-          await this.tryCompleteTask(task, completionSource)
-        } catch (error) {
-          log("[background-agent] Poll error for task:", { taskId: task.id, error })
-        }
-      }
+      const probes = startPollSessionProbes(
+        candidates.filter((candidate): candidate is PollProbeCandidate => candidate.kind === "probe").map((candidate) => ({
+          sessionID: candidate.sessionID,
+          requiresExistenceCheck: candidate.sessionGoneThresholdReached,
+        })),
+        {
+          resolvers: {
+            validateSessionHasOutput: (sessionID) => this.validateSessionHasOutput(sessionID),
+            verifySessionExists: (sessionID) => this.verifySessionExists(sessionID),
+            checkSessionTodos: (sessionID) => this.checkSessionTodos(sessionID),
+          },
+          onProbeError: (sessionID, probe, error) => {
+            log("[background-agent] Poll probe failed:", { sessionID, probe, error })
+          },
+        },
+      )
+      await this.resolvePollCompletionCandidates(candidates, probes)
 
       if (!this.hasRunningTasks()) {
         this.stopPolling()
       }
     } finally {
       this.pollingInFlight = false
+    }
+  }
+
+  /**
+   * Classify every running task against the batched session status map.
+   *
+   * Retry transitions are applied here because they mutate task state. Terminal
+   * and probe-backed actions are returned in task order, so teardown remains
+   * ordered while session reads begin without waiting for earlier teardown.
+   */
+  private async collectPollCompletionCandidates(
+    allStatuses: SessionStatusMap | undefined,
+  ): Promise<Array<PollCompletionCandidate>> {
+    const candidates: Array<PollCompletionCandidate> = []
+
+    for (const task of this.tasks.values()) {
+      if (task.status !== "running") continue
+
+      const sessionID = task.sessionId
+      if (!sessionID) continue
+
+      try {
+        const sessionStatus = allStatuses?.[sessionID]
+        // Handle retry before checking running state
+        if (sessionStatus?.type === "retry") {
+          const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
+            ? (sessionStatus as { message?: string }).message
+            : undefined
+          const errorInfo = { name: "SessionRetry", message: retryMessage }
+          if (await this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
+            continue
+          }
+        }
+
+        // Only skip completion when session status is actively running.
+        // Unknown or terminal statuses (like "interrupted") fall through to completion.
+        if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
+          log("[background-agent] Session still running, relying on event-based progress:", {
+            taskId: task.id,
+            sessionID,
+            sessionStatus: sessionStatus.type,
+            toolCalls: task.progress?.toolCalls ?? 0,
+          })
+          continue
+        }
+
+        if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
+          candidates.push({
+            kind: "terminal",
+            task,
+            sessionID,
+            currentAttemptID: task.currentAttemptID,
+            startedAt: task.startedAt,
+            completionSource: `polling (terminal session status: ${sessionStatus.type})`,
+          })
+          continue
+        }
+
+        if (sessionStatus && sessionStatus.type !== "idle") {
+          log("[background-agent] Unknown session status, treating as potentially idle:", {
+            taskId: task.id,
+            sessionID,
+            sessionStatus: sessionStatus.type,
+          })
+        }
+
+        if (allStatuses === undefined) {
+          continue
+        }
+
+        // Session is idle or no longer in status response (completed/disappeared)
+        const sessionGoneFromStatus = allStatuses !== undefined && !sessionStatus
+        const sessionGoneThresholdReached = sessionGoneFromStatus
+          && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
+        const completionSource = sessionStatus?.type === "idle"
+          ? "polling (idle status)"
+          : "polling (session gone from status)"
+
+        candidates.push({
+          kind: "probe",
+          task,
+          sessionID,
+          currentAttemptID: task.currentAttemptID,
+          startedAt: task.startedAt,
+          completionSource,
+          sessionGoneThresholdReached,
+        })
+      } catch (error) {
+        log("[background-agent] Poll error for task:", { taskId: task.id, error })
+      }
+    }
+
+    return candidates
+  }
+
+  /**
+   * Apply completion actions in original task order. Each probe is awaited only
+   * when its ordered candidate is reached, so a slow suffix cannot block a ready
+   * prefix from releasing its concurrency slot.
+   */
+  private isCurrentPollCompletionCandidate(candidate: PollCompletionCandidate): boolean {
+    const { task } = candidate
+    const isCurrent = !this.shutdownTriggered
+      && this.tasks.get(task.id) === task
+      && task.status === "running"
+      && task.sessionId === candidate.sessionID
+      && task.currentAttemptID === candidate.currentAttemptID
+      && task.startedAt === candidate.startedAt
+    if (!isCurrent) {
+      log("[background-agent] Skipping stale poll completion candidate:", {
+        taskId: task.id,
+        sessionID: candidate.sessionID,
+        shutdownTriggered: this.shutdownTriggered,
+      })
+    }
+    return isCurrent
+  }
+
+  private async resolvePollCompletionCandidates(
+    candidates: Array<PollCompletionCandidate>,
+    probes: PollSessionProbeBatch,
+  ): Promise<void> {
+    for (const candidate of candidates) {
+      if (this.shutdownTriggered) return
+      const { task, sessionID } = candidate
+
+      try {
+        if (candidate.kind === "terminal") {
+          if (!this.isCurrentPollCompletionCandidate(candidate)) continue
+          await this.tryCompleteTask(task, candidate.completionSource)
+          continue
+        }
+
+        const result = probes.resultsBySession.get(sessionID)
+        if (!result) {
+          log("[background-agent] Output probe unresolved this poll, waiting:", task.id)
+          continue
+        }
+
+        const probeResult = await result
+        if (!this.isCurrentPollCompletionCandidate(candidate)) continue
+
+        const hasValidOutput = probeResult.hasOutput
+        if (hasValidOutput === undefined) {
+          log("[background-agent] Output probe unresolved this poll, waiting:", task.id)
+          continue
+        }
+
+        if (!hasValidOutput) {
+          if (candidate.sessionGoneThresholdReached) {
+            const sessionExists = probeResult.sessionExists
+            if (sessionExists === false) {
+              log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
+              await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
+              continue
+            }
+
+            if (sessionExists === true) {
+              task.consecutiveMissedPolls = 0
+            }
+          }
+          log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
+          continue
+        }
+
+        const hasIncompleteTodos = probeResult.hasIncompleteTodos
+        if (hasIncompleteTodos === undefined) {
+          log("[background-agent] Todo probe unresolved this poll, waiting:", task.id)
+          continue
+        }
+
+        if (hasIncompleteTodos || this.observedIncompleteTodosBySession.get(sessionID) === true) {
+          log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+          continue
+        }
+
+        await this.tryCompleteTask(task, candidate.completionSource)
+      } catch (error) {
+        log("[background-agent] Poll error for task:", { taskId: task.id, error })
+      }
     }
   }
 
