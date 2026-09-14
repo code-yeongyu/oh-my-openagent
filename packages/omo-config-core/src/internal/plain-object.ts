@@ -12,3 +12,11 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
     Object.prototype.toString.call(value) === "[object Object]"
   )
 }
+
+export function hasTamperedPrototype(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some((entry) => hasTamperedPrototype(entry))
+  if (typeof value !== "object" || value === null) return false
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) return true
+  return Object.values(value).some((entry) => hasTamperedPrototype(entry))
+}

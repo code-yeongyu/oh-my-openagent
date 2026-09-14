@@ -1,6 +1,7 @@
 import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
 import type * as z from "zod"
 
+import { hasTamperedPrototype } from "../internal/plain-object"
 import { OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
 import { isUnsafeObjectKey, mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
@@ -88,14 +89,6 @@ function unrecognizedKeyIssues(issues: readonly z.core.$ZodIssue[]): readonly Un
  */
 function hasUnsafeUnrecognizedKey(issues: readonly UnrecognizedKeyIssue[]): boolean {
   return issues.some((issue) => issue.keys.some((key) => isUnsafeObjectKey(key)))
-}
-
-function hasTamperedPrototype(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some((entry) => hasTamperedPrototype(entry))
-  if (!isRecord(value)) return false
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) return true
-  return Object.values(value).some((entry) => hasTamperedPrototype(entry))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
