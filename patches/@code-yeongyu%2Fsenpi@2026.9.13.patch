@@ -25,3 +25,194 @@ index b78cfad4a833aee1611dda3b0e22ff42ecde3074..962d2e011b88dbc8f6f7d4992a5dd7cc
      }
      list() {
          return [...this.entries].map(([sessionId, entry]) => {
+diff --git a/dist/core/extensions/builtin/config-reload/index.js b/dist/core/extensions/builtin/config-reload/index.js
+index 57762e19c..cabc95cd7 100644
+--- a/dist/core/extensions/builtin/config-reload/index.js
++++ b/dist/core/extensions/builtin/config-reload/index.js
+@@ -73,6 +73,7 @@ export function configReloadExtension(pi, options = {}) {
+     const eventUnsubscribes = [];
+     const pending = new Map();
+     let engine;
++    const watcherClosures = [];
+     let activeTargets = [];
+     let currentContext;
+     let started = false;
+@@ -86,9 +87,8 @@ export function configReloadExtension(pi, options = {}) {
+     // The engine goes inert the moment close() is called; its unsubscribe loop can
+     // take seconds per watcher, and session_shutdown is awaited by the reload flow.
+     const closeWatchers = () => {
+-        engine?.close().catch((error) => {
+-            logger.error("watcher_error", { path: "watcher teardown", message: errorMessage(error) });
+-        });
++        if (engine)
++            watcherClosures.push(Promise.allSettled([engine.close()]));
+         engine = undefined;
+         activeTargets = [];
+     };
+@@ -161,8 +161,9 @@ export function configReloadExtension(pi, options = {}) {
+         }
+     };
+     const processChange = async (change) => {
+-        if (reloadInFlight || !currentContext)
++        if (reloadInFlight || !currentContext || !started)
+             return;
++        const changeContext = currentContext;
+         // Suppression state (self-write consumption, routine-diff base) is per path,
+         // so it must be resolved before grouping: a path watched by several
+         // registrations would otherwise be classified once per group and reach the
+@@ -178,6 +179,8 @@ export function configReloadExtension(pi, options = {}) {
+         const rearmDirectoryWatch = change.created.some((path) => activeTargets.some((target) => target.rearmOnCreation === resolve(path)));
+         for (const [registrationId, paths] of groups) {
+             const errors = await validateChangedPaths(registrationId, paths, registrations, agentDir, currentContext.cwd);
++            if (!started || currentContext !== changeContext)
++                return;
+             if (errors.length > 0) {
+                 rejectChange(currentContext, registrationId, paths, errors, logger, pi);
+                 continue;
+@@ -205,11 +208,14 @@ export function configReloadExtension(pi, options = {}) {
+         });
+     };
+     const rebuildWatchers = (ctx) => {
++        if (!started || currentContext !== ctx) return;
+         closeWatchers();
+         clearCompactionRecheck();
+         const settingsManager = SettingsManager.create(ctx.cwd, agentDir, { projectTrusted: ctx.isProjectTrusted() });
+         const settings = resolveConfigReloadSettings(settingsManager);
+-        if (!settings.enabled || ctx.mode === "print" || ctx.mode === "json") {
++        // Nonpersistent RPC probes need a configuration snapshot, not live OS watches.
++        if (!settings.enabled || ctx.mode === "print" || ctx.mode === "json" ||
++            (ctx.mode === "rpc" && ctx.sessionManager.getSessionFile() === undefined)) {
+             pi.events.emit(CONFIG_WATCH_READY, { enabled: false });
+             return;
+         }
+@@ -347,10 +353,12 @@ export function configReloadExtension(pi, options = {}) {
+         await processReloadHandoff(event, ctx);
+     });
+     pi.on("agent_end", async (_event, ctx) => {
++        if (!started) return;
+         currentContext = ctx;
+         await flushPending();
+     });
+     pi.on("agent_settled", async (_event, ctx) => {
++        if (!started) return;
+         currentContext = ctx;
+         await flushPending();
+     });
+@@ -359,7 +367,7 @@ export function configReloadExtension(pi, options = {}) {
+             rebuildWatchers(currentContext);
+         return { trusted: "undecided" };
+     });
+-    pi.on("session_shutdown", (event) => {
++    pi.on("session_shutdown", async (event) => {
+         const closingContext = currentContext;
+         started = false;
+         currentContext = undefined;
+@@ -371,6 +379,10 @@ export function configReloadExtension(pi, options = {}) {
+         pending.clear();
+         if (event.reason !== "reload" && closingContext)
+             reloadHandoffs.delete(handoffKey(closingContext));
++        const results = (await Promise.all(watcherClosures)).flat();
++        const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
++        if (errors.length > 0)
++            throw new AggregateError(errors, "Config watcher shutdown failed");
+     });
+     function canRequestReload(ctx) {
+         return (ctx.isIdle() &&
+diff --git a/dist/core/extensions/builtin/config-reload/watch-engine.js b/dist/core/extensions/builtin/config-reload/watch-engine.js
+index 5da9d2133..be0750e6c 100644
+--- a/dist/core/extensions/builtin/config-reload/watch-engine.js
++++ b/dist/core/extensions/builtin/config-reload/watch-engine.js
+@@ -23,6 +23,7 @@ export class ConfigReloadWatchEngine {
+     #pending = new Map();
+     #timer;
+     #closed = false;
++    #closeCompletion;
+     constructor(options) {
+         this.#subscribe = options.subscribe;
+         this.#onRealChange = options.onRealChange;
+@@ -105,7 +106,7 @@ export class ConfigReloadWatchEngine {
+      */
+     close() {
+         if (this.#closed) {
+-            return Promise.resolve();
++            return this.#closeCompletion;
+         }
+         this.#closed = true;
+         if (this.#timer) {
+@@ -113,19 +114,14 @@ export class ConfigReloadWatchEngine {
+             this.#timer = undefined;
+         }
+         const unsubscribes = this.#unsubscribes.splice(0);
+-        return new Promise((settle) => {
+-            this.#clock.setTimeout(() => {
+-                for (const unsubscribe of unsubscribes) {
+-                    try {
+-                        unsubscribe();
+-                    }
+-                    catch (error) {
+-                        this.#reportError(error, "watch subscription");
+-                    }
+-                }
+-                settle();
+-            }, 0);
+-        });
++        // Cancel queued registrations synchronously; await every native disposer.
++        this.#closeCompletion = Promise.allSettled(unsubscribes.map(async (unsubscribe) => unsubscribe()))
++            .then((results) => {
++                const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
++                if (errors.length > 0)
++                    throw new AggregateError(errors, "Config watcher teardown failed");
++            });
++        return this.#closeCompletion;
+     }
+     getBaselineSnapshot() {
+         const snapshot = new Map();
+diff --git a/dist/core/extensions/builtin/config-reload/watch-event-source.js b/dist/core/extensions/builtin/config-reload/watch-event-source.js
+index f7548d679..404561155 100644
+--- a/dist/core/extensions/builtin/config-reload/watch-event-source.js
++++ b/dist/core/extensions/builtin/config-reload/watch-event-source.js
+@@ -16 +16,2 @@ parentPort.on("message", (message) => {
+-	if (message.kind !== "watch") return;
++	if (message.kind !== "watch") return;
++	if (Atomics.load(message.active, 0) === 0) return;
+@@ -103,7 +104,7 @@ export function createFsWatchEventSource(onError = () => { }, options = {}) {
+                 return;
+             const replacement = ensureRecursiveWorker();
+             for (const [id, subscription] of recursiveSubscriptions) {
+-                replacement.postMessage({ kind: "watch", id, path: subscription.path, recursive: subscription.recursive });
++                replacement.postMessage({ kind: "watch", id, path: subscription.path, recursive: subscription.recursive, active: subscription.active });
+             }
+         });
+         recursiveWorker = worker;
+@@ -113,11 +114,15 @@ export function createFsWatchEventSource(onError = () => { }, options = {}) {
+         if (WORKER_OFFLOADED_WATCH_PLATFORMS.has(options.platform ?? process.platform)) {
+             const id = nextSubscriptionId++;
+             const recursive = watchOptions?.recursive ?? false;
+-            ensureRecursiveWorker().postMessage({ kind: "watch", id, path, recursive });
+-            recursiveSubscriptions.set(id, { path, listener, recursive });
++            const active = new Int32Array(new SharedArrayBuffer(4));
++            Atomics.store(active, 0, 1);
++            ensureRecursiveWorker().postMessage({ kind: "watch", id, path, recursive, active });
++            recursiveSubscriptions.set(id, { path, listener, recursive, active });
++            let closing;
+             return () => {
+                 if (!recursiveSubscriptions.delete(id))
+-                    return;
++                    return closing;
++                Atomics.store(active, 0, 0);
+                 // Resolve at unsubscribe time: the worker may have been replaced after a crash.
+                 const worker = recursiveWorker;
+                 if (!worker)
+@@ -127,7 +132,11 @@ export function createFsWatchEventSource(onError = () => { }, options = {}) {
+                     return;
+                 }
+                 recursiveWorker = undefined;
+-                void worker.terminate().catch((error) => onError(error, path));
++                closing = worker.terminate().catch((error) => {
++                    onError(error, path);
++                    throw error;
++                });
++                return closing;
+             };
+         }
+         const watcher = watchWithErrorHandler(path, listener, () => onError(new Error(`fs.watch failed for ${path}`), path), { recursive: watchOptions?.recursive ?? false });
