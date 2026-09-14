@@ -26,17 +26,17 @@ export async function normalizeBuiltinImports(output, builtinModuleNames) {
   if (normalized !== bundled) await writeFile(output, normalized)
 }
 
-export async function minifyBundle(output) {
+export async function minifyBundle(output, compressionPasses = 1) {
   if (process.versions.bun !== undefined) {
-    await minifyBundleWithNode(output)
+    await minifyBundleWithNode(output, compressionPasses)
     return
   }
-  await minifyBundleInProcess(output)
+  await minifyBundleInProcess(output, compressionPasses)
 }
 
-async function minifyBundleInProcess(output) {
+async function minifyBundleInProcess(output, compressionPasses = 1) {
   const result = await minify(await readFile(output, "utf8"), {
-    compress: { passes: 2 },
+    compress: { passes: compressionPasses },
     mangle: true,
     module: true,
   })
@@ -46,13 +46,13 @@ async function minifyBundleInProcess(output) {
   await writeFile(output, result.code)
 }
 
-function minifyBundleWithNode(output) {
+function minifyBundleWithNode(output, compressionPasses) {
   const minifier = getNodeMinifier()
   clearTimeout(minifier.idleTimer)
   const id = ++minifierRequestId
   return new Promise((resolvePromise, reject) => {
     minifier.pending.set(id, { resolve: resolvePromise, reject })
-    minifier.child.stdin.write(`${JSON.stringify({ id, output })}\n`, (error) => {
+    minifier.child.stdin.write(`${JSON.stringify({ id, output, compressionPasses })}\n`, (error) => {
       if (error === null || error === undefined) return
       minifier.pending.delete(id)
       reject(error)
@@ -178,7 +178,7 @@ if (resolve(process.argv[1] ?? "") === resolve(BUILD_ARTIFACT_PATH)) {
     for await (const line of lines) {
       const request = JSON.parse(line)
       try {
-        await minifyBundleInProcess(request.output)
+        await minifyBundleInProcess(request.output, request.compressionPasses)
         process.stdout.write(`${JSON.stringify({ id: request.id })}\n`)
       } catch (error) {
         process.stdout.write(`${JSON.stringify({ id: request.id, error: error instanceof Error ? error.message : String(error) })}\n`)
