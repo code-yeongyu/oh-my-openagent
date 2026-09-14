@@ -73,4 +73,21 @@ describe("sweepStaleOmoAgentSessions runtime runner integration", () => {
 		])
 		expect(killTmuxSessionIfExistsMock).toHaveBeenCalledTimes(2)
 	})
+
+	it("#given list-sessions exits non-zero #when stale sweep called #then exposes the error for retry", async () => {
+		// given
+		runTmuxCommandMock.mockResolvedValue({
+			success: false,
+			output: "",
+			stdout: "",
+			stderr: "tmux server is unavailable",
+			exitCode: 1,
+		})
+		const sweepStaleOmoAgentSessions = await loadSweepStaleOmoAgentSessions()
+
+		// when / then
+		await expect(sweepStaleOmoAgentSessions()).rejects.toThrow(
+			"tmux list-sessions failed with exit code 1: tmux server is unavailable",
+		)
+	})
 })
