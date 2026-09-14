@@ -5,11 +5,12 @@ import {
   deriveConfig,
   deriveJobBoard,
   deriveLoop,
+  deriveLsp,
   deriveRoster,
 } from "./derivers"
-import { MAX_AGENTS, MAX_JOBS, MIRROR_SCHEMA_VERSION } from "./constants"
+import { MAX_AGENTS, MAX_JOBS, MAX_LSP_CLIENTS, MIRROR_SCHEMA_VERSION } from "./constants"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
-import type { AgentRow, JobRow, LoopLive, RosterRow } from "./state-types"
+import type { AgentRow, JobRow, LoopLive, LspClientRow, RosterRow } from "./state-types"
 
 const liveLoop: LoopLive = {
   kind: "live",
@@ -26,6 +27,7 @@ function snapshot(input: {
   readonly activeAgents?: readonly AgentRow[]
   readonly jobBoard?: readonly JobRow[]
   readonly loop?: LoopLive | null
+  readonly lspClients?: readonly LspClientRow[]
 }): TuiRuntimeSnapshot {
   return {
     version: MIRROR_SCHEMA_VERSION,
@@ -34,6 +36,7 @@ function snapshot(input: {
     activeAgents: [...(input.activeAgents ?? [])],
     jobBoard: [...(input.jobBoard ?? [])],
     loop: input.loop ?? null,
+    lspClients: [...(input.lspClients ?? [])],
   }
 }
 
@@ -199,6 +202,26 @@ describe("tui sidebar section derivers", () => {
     // then
     expect(nullState).toEqual({ kind: "none" })
     expect(emptyState).toEqual({ kind: "none" })
+  })
+
+  it("#given no clients #when deriving LSP #then it returns none", () => {
+    expect(deriveLsp(null)).toEqual({ kind: "none" })
+    expect(deriveLsp(snapshot({}))).toEqual({ kind: "none" })
+  })
+
+  it("#given oversized unsorted clients #when deriving LSP #then it sorts by state and server and caps", () => {
+    const clients: LspClientRow[] = Array.from({ length: MAX_LSP_CLIENTS + 2 }, (_, index) => ({
+      serverId: `server-${String(index).padStart(2, "0")}`,
+      root: `/root/${index}`,
+      state: index % 3 === 0 ? "dead" : index % 3 === 1 ? "alive" : "initializing",
+      refCount: index,
+    }))
+    const state = deriveLsp(snapshot({ lspClients: clients }))
+    expect(state.kind).toBe("list")
+    if (state.kind === "list") {
+      expect(state.clients).toHaveLength(MAX_LSP_CLIENTS)
+      expect(state.clients[0]?.state).toBe("initializing")
+    }
   })
 
   it("#given a live loop with pass fail pending and blocked counts #when deriving loop #then it passes the live state through", () => {

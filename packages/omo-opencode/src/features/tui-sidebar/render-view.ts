@@ -7,6 +7,8 @@ import type {
   ConfigBanner,
   JobBoardState,
   LoopState,
+  LspClientRow,
+  LspState,
   RosterState,
   SidebarView,
 } from "./state-types"
@@ -31,12 +33,13 @@ export function buildViewNodes(view: SidebarView, theme: ThemeLike): ViewNode[] 
           ...loopNodes(view.loop, theme),
           ...agentNodes(view.agents, theme),
           ...jobNodes(view.jobs, theme),
+          ...lspNodes(view.lsp, theme),
         ]),
       ]
     case "broken":
       return brokenNodes(view.messages, theme)
     case "idle":
-      return idleNodes(view.roster, theme)
+      return idleNodes(view.roster, view.lsp, theme)
     default:
       return assertNever(view)
   }
@@ -54,11 +57,12 @@ function linesForView(view: SidebarView): string[] {
         ...loopLines(view.loop),
         ...agentLines(view.agents),
         ...jobLines(view.jobs),
+        ...lspLines(view.lsp),
       ]
     case "broken":
       return ["config invalid - run doctor", ...view.messages]
     case "idle":
-      return rosterLines(view.roster)
+      return [...rosterLines(view.roster), ...lspLines(view.lsp)]
     default:
       return assertNever(view)
   }
@@ -184,6 +188,32 @@ function jobLines(jobs: JobBoardState): string[] {
   }
 }
 
+function lspNodes(lsp: LspState, theme: ThemeLike): ViewNode[] {
+  switch (lsp.kind) {
+    case "none":
+      return []
+    case "list":
+      return [section("LSP", theme, lsp.clients.map((client) => text({ fg: theme.text }, lspLine(client))))]
+    default:
+      return assertNever(lsp)
+  }
+}
+
+function lspLines(lsp: LspState): string[] {
+  switch (lsp.kind) {
+    case "none":
+      return []
+    case "list":
+      return ["LSP", ...lsp.clients.map(lspLine)]
+    default:
+      return assertNever(lsp)
+  }
+}
+
+function lspLine(client: LspClientRow): string {
+  return `${truncate(client.serverId)} ${client.state} ${truncate(client.root)} refs=${client.refCount}`
+}
+
 function brokenNodes(messages: readonly string[], theme: ThemeLike): ViewNode[] {
   return [
     section("Config", theme, [
@@ -193,8 +223,11 @@ function brokenNodes(messages: readonly string[], theme: ThemeLike): ViewNode[] 
   ]
 }
 
-function idleNodes(roster: RosterState, theme: ThemeLike): ViewNode[] {
-  return [section("Models", theme, rosterLines(roster).map((line) => text({ fg: theme.text }, line)))]
+function idleNodes(roster: RosterState, lsp: LspState, theme: ThemeLike): ViewNode[] {
+  return [
+    section("Models", theme, rosterLines(roster).map((line) => text({ fg: theme.text }, line))),
+    ...lspNodes(lsp, theme),
+  ]
 }
 
 function rosterLines(roster: RosterState): string[] {
