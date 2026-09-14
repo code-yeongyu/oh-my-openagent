@@ -106,15 +106,15 @@ test.describe("Landing Page", () => {
     const marquee = page.getByTestId("model-marquee").locator(".marquee-track").first()
     await marquee.scrollIntoViewIfNeeded()
     const animation = await marquee.evaluate((node) => getComputedStyle(node).animationName)
-    const litWords = page.locator('[data-section="secret"] .lit-word')
-    await litWords.first().scrollIntoViewIfNeeded()
-    const faintWords = await litWords.evaluateAll(
-      (nodes) => nodes.filter((node) => !node.classList.contains("is-lit")).length,
+    const litText = page.locator('[data-section="secret"] .lit-progress')
+    await litText.scrollIntoViewIfNeeded()
+    const litProgress = await litText.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("--lit-p").trim(),
     )
 
     // then
     expect(animation).toBe("none")
-    expect(faintWords).toBe(0)
+    expect(litProgress).toBe("1")
   })
 
   test("runs independent Kibitzer loops and inserts a static nudge under reduced motion", async ({

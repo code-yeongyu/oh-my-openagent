@@ -1,6 +1,6 @@
 # oh-my-openagent - Multi-Harness Agent OS
 
-**Generated:** 2026-09-14 | **Base:** cfdaa1d16 | **Release line:** v5 beta
+**Generated:** 2026-09-14 | **Base:** c8f1de1bb | **Release line:** v5 beta
 
 ## OVERVIEW
 

@@ -196,6 +196,7 @@
     --dur-type: 40ms;
     --dur-pulse: 2200ms;
     --dur-wave: 12s;
+    --lit-blur: 4px;
 
     /* Legacy shadcn variables remapped onto the ledger tokens */
     --background: var(--ink-0);
@@ -790,13 +791,54 @@
     }
   }
 
-  /* Lit text: words start faint and light up as .is-lit is added on scroll. */
-  .lit-word {
-    color: var(--text-faint);
-    transition: color var(--dur-reveal) var(--ease-out-quart);
+  /* Lit text: one paragraph progress (--lit-p 0→1) sweeps light through every word.
+     Each word owns 3 progress units and overlaps its neighbours, so the fill glides across
+     glyphs and between words instead of flipping. */
+  @property --lit-p {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
   }
-  .lit-word.is-lit {
-    color: var(--text-hi);
+  .lit-progress {
+    --lit-p: 0;
+  }
+  @supports (animation-timeline: view()) {
+    .lit-progress.lit-scroll {
+      animation: lit-progress linear both;
+      animation-timeline: view();
+      animation-range: cover 20vh entry 100%;
+    }
+  }
+  /* The follow-up line waits for the last words (progress 0.82 → 1) before it rises in. */
+  .lit-follow {
+    --lit-f: clamp(0, calc((var(--lit-p) - 0.82) / 0.18), 1);
+    opacity: var(--lit-f);
+    transform: translateY(calc((1 - var(--lit-f)) * 24px));
+  }
+  @keyframes lit-progress {
+    from {
+      --lit-p: 0;
+    }
+    to {
+      --lit-p: 1;
+    }
+  }
+  .lit-word {
+    --lit-local: clamp(0, calc((var(--lit-p) * (var(--lit-count) + 2) - var(--i)) / 3), 1);
+    background-image: linear-gradient(
+      90deg,
+      var(--text-hi) 0%,
+      var(--text-hi) 45%,
+      var(--text-faint) 55%,
+      var(--text-faint) 100%
+    );
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    background-position-x: calc((1 - var(--lit-local)) * 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: blur(calc((1 - var(--lit-local)) * var(--lit-blur)));
   }
 
   /* Kibitzer: independent clocks; the nudge travels into the verification slot. */
@@ -1032,9 +1074,19 @@
     .ticker-track > [aria-hidden="true"] {
       display: none;
     }
+    .lit-progress,
+    .lit-progress.lit-scroll {
+      --lit-p: 1;
+      animation: none;
+    }
+    .lit-follow {
+      opacity: 1;
+      transform: none;
+    }
     .lit-word {
+      background-image: none;
       color: var(--text-hi);
-      transition: none;
+      filter: none;
     }
     .rotate-word {
       height: auto;

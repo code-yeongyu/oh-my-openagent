@@ -17,7 +17,7 @@
 - Root `AGENTS.md` contains 101 lines, within the required 50-150 range.
 - After restoring the compact development-environment contract, root `AGENTS.md` contains 109 lines, still within the required range.
 - Top-level scoring found no uncovered directory above the creation threshold; existing child guides were retained rather than duplicated.
-- Snapshot: commit `cfdaa1d16d25d6152410dea514fd978acfd62bab`, 10,884 tracked files, 1,073,426 filtered source lines, committed mode.
+- After merging the latest `dev`, snapshot metadata was refreshed to commit `c8f1de1bb9b44c64866e698a490af5a3a505beb2`, 10,841 tracked files, 1,068,220 filtered source lines, committed mode.
 - Focused verification passed: `bun test script/agents-md-dev-env.test.ts packages/omo-opencode/src/shared/markdown-link-audit.test.ts` reported 20 pass, 0 fail.
 - The canonical setup installed dependencies and initialized submodules, then its optional build failed under local Bun 1.3.14 / Node 22 while the repository expects Bun 1.4.2 / Node 24. The failure was in pre-existing TypeScript declaration errors outside the documentation diff.
 - The mandatory gate reviewer and one smaller retry both failed at the provider boundary with connection errors and produced no verdict. The review lane is recorded as `INCONCLUSIVE`; no success claim from either reviewer was accepted.

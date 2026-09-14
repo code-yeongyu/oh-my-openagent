@@ -288,7 +288,7 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 
 `hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta`. Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
 
-- **secret**: the fold. Title = "we'd rather you never read this", body rendered by `LitText` (words light `--text-faint` → `--text-hi` as the paragraph scrolls from the viewport bottom to 35% height), then a `Reveal`ed accent line ("still curious?") that opens the feature story.
+- **secret**: the fold. Title = "we'd rather you never read this", body rendered by `LitText` (a single progress value sweeps `--text-faint` → `--text-hi` through the glyphs of each word and across neighbours as the paragraph scrolls from the viewport bottom to 35% height; no per-word flips), then the accent line ("still curious?") rises in from the same progress once the last words are lit (`.lit-follow`, progress 0.82 → 1).
 - **ultrawork**: prompt line with the keyword as a `--accent-16` mark + three revealed steps. No product jargon in the copy.
 - **multi-model**: two `Marquee` rows of tuned profile chips (opposite directions, 36s / 44s, pause on hover). The chip list is data (`story-data.ts`) and never names families outside Claude / GPT / Kimi / Grok / GLM / DeepSeek.
 - **mass-ulw**: the existing desktop-app DAG (`dag/`) on a research → dataset → model → deck scenario (`scenario-data.ts`).
@@ -300,13 +300,13 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 
 ### §10 primitives (`components/landing/story-primitives.tsx`, `lit-text.tsx`; CSS in `design-system.css` §10)
 
-| Primitive      | Motion                                                                                                                  | Reduced motion                                                        |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `Marquee`      | `translateX(-100%)` linear, duplicated track, pause on hover                                                            | static wrapped row, duplicate hidden                                  |
-| `Ticker`       | `translateY(-50%)` linear, duplicated list, pause on hover                                                              | static list, duplicate hidden                                         |
-| `LitText`      | scroll progress → `.is-lit` per word, 600ms color transition                                                            | all words lit                                                         |
-| `.kib-stage`   | Independent 4.5s watch / 14s main loops; 14s traveling nudge inserts before verification; iteration-driven turn counter | both loops visible, nudge inserted, corrected next step, no animation |
-| `RotatingWord` | `steps(n)` vertical track, 1.6s per word, 1.1em clip                                                                    | first word only                                                       |
+| Primitive                  | Motion                                                                                                                                                                                                                                                     | Reduced motion                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `Marquee`                  | `translateX(-100%)` linear, duplicated track, pause on hover                                                                                                                                                                                               | static wrapped row, duplicate hidden                                  |
+| `Ticker`                   | `translateY(-50%)` linear, duplicated list, pause on hover                                                                                                                                                                                                 | static list, duplicate hidden                                         |
+| `LitProgress` / `LitWords` | `--lit-p` 0→1 via `animation-timeline: view()`, range `cover 20vh → entry 100%` (IO fallback, 200 steps); per-word gradient sweep + `--lit-blur` 4px→0 with a 3-unit overlap (react-bits `ScrollReveal` mechanism, no tilt); `.lit-follow` rises at 0.82→1 | `--lit-p: 1`, plain `--text-hi`, no gradient, no blur                 |
+| `.kib-stage`               | Independent 4.5s watch / 14s main loops; 14s traveling nudge inserts before verification; iteration-driven turn counter                                                                                                                                    | both loops visible, nudge inserted, corrected next step, no animation |
+| `RotatingWord`             | `steps(n)` vertical track, 1.6s per word, 1.1em clip                                                                                                                                                                                                       | first word only                                                       |
 
 All five are CSS keyframes or one IntersectionObserver; no scroll listeners, no motion library (§6 rule unchanged).
 

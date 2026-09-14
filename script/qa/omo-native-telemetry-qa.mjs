@@ -23,7 +23,6 @@ import {
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..", "..")
 const pluginRoot = join(repoRoot, "packages", "omo-senpi", "plugin")
-const goalExtension = join(repoRoot, "packages", "pi-goal", "src", "index.ts")
 const defaultEvidenceDir = join(repoRoot, ".omo", "evidence", "20260810-omo-native-telemetry")
 const expectedNativeEvents = new Set([
   "daily_active",
@@ -252,7 +251,7 @@ async function driveCli({ senpiBin, port, label, configEnabled = true, extraEnv 
   const sandbox = createSandbox(label, configEnabled)
   const commandArgs = [
     "--mode", "rpc", "--offline", "--approve", "--no-context-files", "--session-dir", sandbox.sessionDir,
-    "-e", sandbox.providerPath, "-e", goalExtension, "--provider", "openai", "--model", "gpt-5.6-sol",
+    "-e", sandbox.providerPath, "--provider", "openai", "--model", "gpt-5.6-sol",
   ]
   const child = spawn(senpiBin, commandArgs, {
     cwd: sandbox.cwd,
@@ -487,7 +486,7 @@ ${input.help.trimEnd()}
 
 ## Drive mechanism
 
-The enabled and opt-out scenarios used the real Senpi CLI in persistent \`--mode rpc\` so exactly three prompts ran in one real session and prompt ordinals remained meaningful. The executable's \`-p\` capability was prechecked first as required. Tool selection used a temporary local provider generated from the repository precedent at \`packages/omo-senpi/scripts/qa/mock-provider/index.ts\`; it deterministically issued \`create_goal\`, \`task\`, and builtin \`read\` calls. The real built plugin at \`packages/omo-senpi/plugin\` was loaded through each isolated Senpi \`settings.json\`, and \`packages/pi-goal/src/index.ts\` was loaded explicitly for the goal tool.
+The enabled and opt-out scenarios used the real Senpi CLI in persistent \`--mode rpc\` so exactly three prompts ran in one real session and prompt ordinals remained meaningful. The executable's \`-p\` capability was prechecked first as required. Tool selection used a temporary local provider generated from the repository precedent at \`packages/omo-senpi/scripts/qa/mock-provider/index.ts\`; it deterministically issued \`create_goal\`, \`task\`, and builtin \`read\` calls. The real built plugin at \`packages/omo-senpi/plugin\` was loaded through each isolated Senpi \`settings.json\` and provided the goal tool.
 
 Isolation for every run used a fresh mktemp root containing its own \`SENPI_CODING_AGENT_DIR\`, session directory, XDG config directory, project, provider fixture, and omo.json. The developer's real \`~/.senpi\` was never configured or read by the driver.
 
@@ -539,7 +538,6 @@ async function main() {
   if (senpiBin === null) throw new Error("BlockedClaim: installed senpi CLI was not found on PATH or in node_modules/.bin")
   const help = runHelp(senpiBin)
   if (!existsSync(join(pluginRoot, "extensions", "omo.js"))) throw new Error("built omo-senpi plugin is missing")
-  if (!existsSync(goalExtension)) throw new Error("pi-goal extension source is missing")
   mkdirSync(args.evidenceDir, { recursive: true })
 
   const capture = await startCaptureServer()
