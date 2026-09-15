@@ -491,7 +491,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "Ship it" }],
+      parts: [{ type: "text", text: "/goal Ship it" }],
     }
 
     // when
@@ -513,7 +513,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     }
 
     // when
@@ -535,7 +535,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     }
 
     // when
@@ -557,7 +557,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     }
 
     // when
@@ -616,19 +616,19 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "Ship it" }],
+      parts: [{ type: "text", text: "/goal Ship it" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     })
 
     // then
@@ -640,10 +640,6 @@ describe("createChatMessageHandler - goal command handling and stop continuation
       "test-session",
     ])
     expect(goalMock.setGoalCalls).toEqual([
-      {
-        sessionID: "test-session",
-        objective: "<session-context>context</session-context>\nYou are starting an Atlas work session.",
-      },
       { sessionID: "test-session", objective: "Ship it" },
     ])
     expect(goalMock.pauseGoalCalls).toEqual(["test-session"])
@@ -655,6 +651,33 @@ describe("createChatMessageHandler - goal command handling and stop continuation
 })
 
 describe("createChatMessageHandler - /goal raw slash fallback", () => {
+  test("does not execute a command embedded in a later ordinary text part", async () => {
+    const goalMock = createGoalHookMock()
+    const args = createMockHandlerArgs()
+    args.hooks.goal = goalMock.hook
+    const output = { message: {}, parts: [
+      { type: "text", text: "Please explain this command; do not execute it:" },
+      { type: "text", text: "/goal clear" },
+    ] }
+    await createChatMessageHandler(args)(createMockInput("sisyphus"), output)
+    expect(goalMock.clearGoalCalls).toEqual([])
+    expect(goalMock.setGoalCalls).toEqual([])
+    expect(output.parts[1].text).toBe("/goal clear")
+  })
+
+  test("automatic goal uses original user text before hook injection", async () => {
+    const goalMock = createGoalHookMock()
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.goal = goalMock.hook
+    args.pluginConfig.default_mode = { goal: true }
+    args.hooks.keywordDetector = { "chat.message": async (_input, output) => {
+      output.parts.push({ type: "text", text: "injected instructions".repeat(200) })
+    } }
+    const output = { message: {}, parts: [{ type: "text", text: "original task" }] }
+    await createChatMessageHandler(args)(createMockInput("sisyphus"), output)
+    expect(goalMock.setGoalCalls).toEqual([{ sessionID: "test-session", objective: "original task" }])
+    expect(output.parts[1].text).toBe("injected instructions".repeat(200))
+  })
   test("does not route an auto-slash-expanded skill payload into goal handling", async () => {
     // given
     const setGoal = mock((_: string, objective: string) => {
@@ -698,7 +721,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "Ship the dashboard" }],
+      parts: [{ type: "text", text: "/goal Ship the dashboard" }],
     }
 
     // when
@@ -719,7 +742,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     }
 
     // when
@@ -739,7 +762,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     }
 
     // when
@@ -759,7 +782,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     }
 
     // when
