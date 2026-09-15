@@ -54,8 +54,21 @@ function stripResolutionControlKeys(config: OmoConfig): OmoConfig {
   return resolved
 }
 
-function validationDiagnostic(path: string, issues: readonly { readonly path: readonly PropertyKey[] }[]): OmoConfigDiagnostic {
-  const issuePaths = issues.map((issue) => issue.path.map((segment) => String(segment)).join("."))
+function validationDiagnostic(
+  path: string,
+  issues: readonly { readonly path: readonly PropertyKey[]; readonly code?: string; readonly keys?: readonly PropertyKey[] }[],
+): OmoConfigDiagnostic {
+  const issuePaths = issues.map((issue) => {
+    const location = issue.path.map((segment) => String(segment)).join(".")
+    // `unrecognized_keys` reports the offending key names in `keys` and leaves
+    // `path` pointing at the enclosing object, which is empty at the root. Without
+    // this the message names no key at all, or appears to blame the wrong one.
+    if (issue.code === "unrecognized_keys" && issue.keys !== undefined && issue.keys.length > 0) {
+      const keys = issue.keys.map((key) => String(key)).join(", ")
+      return location.length > 0 ? `${location}: unrecognized key(s): ${keys}` : `unrecognized key(s): ${keys}`
+    }
+    return location
+  })
   return {
     kind: "validation",
     message: `Invalid omo config at ${path}: ${issuePaths.join(", ")}`,

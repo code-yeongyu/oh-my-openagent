@@ -145,4 +145,27 @@ describe("loadOmoConfig unknown-key tolerance", () => {
       rmSync(fixture.root, { force: true, recursive: true })
     }
   })
+
+  test("#given an unrecognized key beside a real schema violation #when loading the senpi view #then the diagnostic names both", () => {
+    // given: a genuine violation forces the validation path, where zod also
+    // reports the unknown key with an empty `path`
+    const fixture = makeFixture()
+    writeUserConfig(fixture.homeDir, '{"codegraph":{"enabled":true},"agents":{"x":{"models":"not-an-array"}}}')
+
+    try {
+      // when
+      const result = loadSenpi(fixture)
+
+      // then
+      const validation = result.diagnostics.find((diagnostic) => diagnostic.kind === "validation")
+      expect(validation).toBeDefined()
+      // without naming `keys`, the message rendered as "agents.x.models, " —
+      // a trailing separator with nothing after it, which reads as if an
+      // unrelated block were at fault
+      expect(validation?.message).toContain("agents.x.models")
+      expect(validation?.message).toContain("codegraph")
+    } finally {
+      rmSync(fixture.root, { force: true, recursive: true })
+    }
+  })
 })
