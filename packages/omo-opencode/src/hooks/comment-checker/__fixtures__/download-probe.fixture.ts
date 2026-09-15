@@ -2,12 +2,10 @@ import { mock } from "bun:test"
 import * as nodeModule from "node:module"
 import { z } from "zod"
 
-const { platform, arch } = z.object({
+const target = z.object({
   platform: z.string(),
   arch: z.string(),
 }).parse(JSON.parse(process.argv[2] ?? "{}"))
-Object.defineProperty(process, "platform", { value: platform })
-Object.defineProperty(process, "arch", { value: arch })
 
 let resolutionAttempts = 0
 mock.module("module", () => ({
@@ -26,7 +24,12 @@ const fetchMock = mock(async (input: string | URL | Request) => {
 const originalFetch = globalThis.fetch
 Object.assign(globalThis, { fetch: fetchMock })
 try {
+  // Load the downloader against the real host platform first. Overwriting
+  // process.platform/arch before import makes Windows resolve linux-arm64
+  // optional natives and blows the 10s probe budget (CI exit 143 / SIGTERM).
   const { downloadCommentChecker } = await import("../downloader")
+  Object.defineProperty(process, "platform", { value: target.platform })
+  Object.defineProperty(process, "arch", { value: target.arch })
   const result = await downloadCommentChecker()
   console.log(JSON.stringify({ urls, resolutionAttempts, result }))
 } finally {
