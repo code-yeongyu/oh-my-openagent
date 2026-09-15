@@ -180,7 +180,63 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given retained noReply wake and fresh activity exceed active ceiling #then it dispatches once safe", async () => {
+  test("#given retained noReply wake ages while parent stays busy after tools return #then it does not fork a competing reply", async () => {
+    // given: all-complete reminder already deposited as noReply while the parent
+    // was blocked on background_output. The tool then returns and the original
+    // turn keeps generating (session busy, history looks "safe"). The 60s active
+    // defer ceiling must not start a second assistant loop.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let messages: SessionMessageStub[] = BLOCKED_MESSAGES
+    const sessionStatuses: Record<string, { type: string }> = { "parent-1": { type: "idle" } }
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses,
+      messagesProvider: () => messages,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: admit-only deposit while background_output is still running
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+
+      // when: tool returned, original turn still generating, wake aged past 60s
+      now = 220_000
+      messages = SAFE_MESSAGES
+      sessionStatuses["parent-1"] = { type: "busy" }
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: no competing reply-producing wake
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+
+      // when: the live turn ends
+      now = 221_000
+      sessionStatuses["parent-1"] = { type: "idle" }
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: exactly one reply-producing resume after idle
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).not.toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given retained noReply wake and fresh activity exceed active ceiling #then it waits for idle before reply", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -195,7 +251,7 @@ describe("parent wake active defer ceiling", () => {
     notifier.recordParentSessionActivity("parent-1")
 
     try {
-      // when
+      // when: admit-only because activity is fresh
       await notifier.flushPendingParentWake("parent-1")
       now = 220_000
       sessionStatuses["parent-1"] = { type: "busy" }
@@ -204,9 +260,20 @@ describe("parent wake active defer ceiling", () => {
       notifier.recordParentSessionActivity("parent-1")
       await notifier.flushPendingParentWake("parent-1")
 
-      // then
-      expect(promptAsyncCalls).toHaveLength(2)
+      // then: ceiling must not fork a competing reply while the parent is still busy
+      expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+
+      // when: parent becomes idle after the activity window expires
+      now = 401_000
+      sessionStatuses["parent-1"] = { type: "idle" }
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: exactly one reply-producing resume
+      expect(promptAsyncCalls).toHaveLength(2)
       expect(promptAsyncCalls[1]?.body.noReply).not.toBe(true)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
