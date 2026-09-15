@@ -15,7 +15,6 @@ import { buildSubagentPrompt } from "../../runners/in-process/subagent-prompt"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { createTaskLifecycle } from "../create"
-import { EventEmitter, once } from "node:events"
 import { coldReviveTeam } from "./cold-revive-team"
 import { runTaskOutput } from "../../tools/output/output"
 import { livenessDetails } from "../../../../omo-senpi/src/components/task/member-liveness"
@@ -47,16 +46,11 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
   registry.registerProvider("omp-fixture", provider)
   const model = registry.find("omp-fixture", "fixture")
   assert(model)
-  const events = new EventEmitter()
   const transitions: string[] = []
   const backing = createTaskRecordStore({ project_dir: root })
   const store = { ...backing, transition: (id: string, event: Parameters<typeof backing.transition>[1]) => {
     transitions.push(event.type)
     return backing.transition(id, event)
-  }, appendEvent: (id: string, event: Parameters<typeof backing.appendEvent>[1]) => {
-    const path = backing.appendEvent(id, event)
-    events.emit(event.type)
-    return path
   } }
   const config = OmoTaskSettingsSchema.parse({ default_concurrency: 1, global_concurrency: 1, ...(options.idleTimeoutMs === undefined ? {} : { resident_idle_timeout_ms: options.idleTimeoutMs }) })
   const record = createTaskRecord({ parent_session_id: "fixture-parent", root_session_id: "fixture-parent", depth: 1, execution_mode: mode, model: "omp-fixture/fixture", notify_on_terminal: false })
@@ -84,14 +78,13 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
   let now = 1000
   let cadenceMs = 0
   let unrefs = 0
-  let tick: () => void = () => assert.fail("scheduler not registered")
   const manager = createTaskManager({ store, config, cwd: root, now: () => now, runners: { "in-process": runner, process: runner }, rpcRespawnRunner: rpc,
     ...(trustedRespawnLaunch === undefined ? {} : { trustedRespawnLaunch }),
     planner: () => { throw new Error("cold revival must not replan") },
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
   const lifecycle = createTaskLifecycle({ store, config, registry: createManagerResidencyRegistry(() => manager), now: () => now,
-    idleReclaimerScheduler: { setInterval: (callback, ms) => { tick = callback; cadenceMs = ms; return { unref: () => { unrefs += 1 } } }, clearInterval: () => undefined },
+    idleReclaimerScheduler: { setInterval: (_callback, ms) => { cadenceMs = ms; return { unref: () => { unrefs += 1 } } }, clearInterval: () => undefined },
   })
   try {
     const managedSpec = { taskId: record.task_id, cwd: root, stateDir: join(store.stateDir, "children", record.task_id), prompt: spec.prompt, instructions: spec.instructions, depth: 1, parentSessionId: "fixture-parent", rootSessionId: "fixture-parent", agentType: "fixture-worker", toolAllowlist: ["read", "fixture_read"], toolDenylist: ["write", "edit"], memberScopedToolNames: ["fixture_read"] }
@@ -108,11 +101,9 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     assert.equal(unrefs, 1)
     now += config.resident_idle_timeout_ms - 1
     assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [])
-    const suspended = once(events, "suspended", { signal: AbortSignal.timeout(15000) })
     now += 1
     const parkedAt = now
-    tick()
-    await suspended
+    assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [record.task_id])
     assert.equal(manager.getResidentHandle(record.task_id), undefined)
     const parkedRecord = store.load(record.task_id)
     assert(parkedRecord)

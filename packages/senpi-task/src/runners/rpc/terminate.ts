@@ -85,14 +85,18 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
     stdio: "ignore",
     windowsHide: true,
   })
-  await new Promise<void>((resolve, reject) => {
-    taskkill.once("error", reject)
+  // taskkill close AND the child's `exit` are both observed with the same bound POSIX uses after
+  // SIGKILL. bun-on-Windows sometimes never emits `exit` after a successful /T /F kill; awaiting
+  // that event unbounded parked idle reclaim until the 20s test budget (member injection residency).
+  const taskkillDone = new Promise<void>((resolve) => {
+    taskkill.once("error", () => resolve())
     taskkill.once("close", () => resolve())
   })
+  await waitForExitOrDelay(taskkillDone, PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
   if (!hasExited(child)) {
     child.kill("SIGKILL")
   }
-  await exited
+  await waitForExitOrDelay(exited, PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
 }
 
 function childExit(child: ChildProcess): Promise<void> {
