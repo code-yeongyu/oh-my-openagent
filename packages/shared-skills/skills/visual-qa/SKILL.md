@@ -218,7 +218,7 @@ BLOCKING: items that must be fixed; empty if PASS
 
 When both passes return, merge them into a single report. Per dimension, mark good or bad with evidence. For each bad item, state what is wrong, where (file/line, hotspot grid, or capture line), and the concrete fix. Call out what is genuinely good so it is not regressed later.
 
-### Completion gate - loop until an independent pass on fresh evidence
+### Completion gate - bounded independent review on fresh evidence
 
 This is a hard stop rule, not a guideline. The UI is NOT done until ALL of these hold at once on the SAME current build:
 
@@ -226,7 +226,26 @@ This is a hard stop rule, not a guideline. The UI is NOT done until ALL of these
 - That reviewer judged a FRESH capture of every enumerated page from Step 2 - no stale artifacts, no skipped pages.
 - Every CJK and layout finding is resolved in the rendered output, not merely noted.
 
-If any page fails, you are not done - but treat the two blocker kinds differently. `[product]` findings: fix the source, re-capture the pages the fix touched, and dispatch a FRESH reviewer (never a followup to the previous one - stale reviewer context re-litigates settled findings). `[evidence]` findings: the product is not implicated - repair the capture pipeline, re-shoot only the defective artifacts, verify them against the live build, and re-dispatch without touching product code. Loop until the independent reviewer passes on the current build, and make the final approving round judge a complete fresh capture set. Do not stop because the automated script reports zero issues - the script aims the reviewer, it does not replace it. Do not stop because an earlier pass approved an older build. The only non-loop exit is to list the exact remaining gaps and get explicit user acceptance; never self-certify a silent PASS.
+Track the review budget explicitly from the first dispatch: `review_round` (starts at 1), `max_review_rounds`, `blocking_findings`, and `non_blocking_findings`. A low-risk surface gets ONE review round. A normal product surface gets the initial review plus at most TWO focused re-review rounds.
+
+If any page fails, you are not done - but treat the two blocker kinds differently. `[product]` findings: fix the source, re-capture the pages the fix touched, and dispatch a FRESH reviewer (never a followup to the previous one - stale reviewer context re-litigates settled findings); a blocker fixed inside the budget earns that focused fresh round. `[evidence]` findings: the product is not implicated - repair the capture pipeline, re-shoot only the defective artifacts, verify them against the live build, and re-dispatch without touching product code. Non-blocking polish findings are recorded as notes and NEVER start another reviewer round; a reviewer that reports only polish does not extend the budget. Make each approving round judge a complete fresh capture set. Do not stop because the automated script reports zero issues - the script aims the reviewer, it does not replace it. Do not stop because an earlier pass approved an older build.
+
+When the budget is exhausted without a PASS: STOP. Do not dispatch another reviewer. Report the verdict as `needs-human-review`, keep every unresolved blocker visible in the Must fix list, and continue only after explicit user acceptance or a new user request. Never self-certify a silent PASS.
+
+<!-- visual-qa-review-budget-contract -->
+```json
+{
+  "review_round": "1_based_count_of_fresh_reviewer_dispatches",
+  "max_review_rounds": { "low_risk_surface": 1, "normal_product_surface": 3 },
+  "round_counting": "initial_dual_oracle_review_is_round_1_each_focused_re_review_increments",
+  "blocking_findings": "unresolved_blockers_after_the_current_round",
+  "non_blocking_findings": "polish_notes_recorded_never_redispatched",
+  "non_blocking_finding_disposition": "note_no_new_reviewer",
+  "blocker_fix_re_review": "focused_fresh_reviewer_within_budget",
+  "on_budget_exhausted": "needs-human-review",
+  "budget_override": "explicit_user_request_only"
+}
+```
 
 ```markdown
 # Visual QA - Verdict: GOOD | NEEDS WORK
