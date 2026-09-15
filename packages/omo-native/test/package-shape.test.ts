@@ -45,11 +45,16 @@ describe("omo-ai published package shape", () => {
     })
 
     describe("#when the dependencies are audited", () => {
-      test("#then it declares exactly the engine and codemode parser runtime dependencies", () => {
+      test("#then it declares exactly the engine, codemode parser, and comment-checker runtime dependencies", () => {
         expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
           "@babel/parser",
+          "@code-yeongyu/comment-checker",
           "@code-yeongyu/senpi",
         ])
+      })
+
+      test("#then the comment-checker runtime dependency is exactly pinned", () => {
+        expect(manifest.dependencies?.["@code-yeongyu/comment-checker"]).toBe("0.8.0")
       })
 
       test("#then the codemode parser dependency is exactly pinned", () => {
