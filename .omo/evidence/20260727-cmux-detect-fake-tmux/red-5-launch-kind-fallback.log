@@ -1,0 +1,27 @@
+RED round 5 - CMUX_AGENT_LAUNCH_KIND left unreconciled (the shape this PR had at review 5073159049)
+
+Detector reverted to the socket-path-only expression:
+	if (!environment.CMUX_SOCKET_PATH) return false
+	const tmuxEnvironment = environment.TMUX
+	if (!tmuxEnvironment) return true
+	return hasCmuxSocketPath(tmuxEnvironment)
+
+$ bun test packages/tmux-core/src/cmux-detect.test.ts
+
+-   "socket=false kind=omo tmux=cmux -> true",
++   "socket=false kind=omo tmux=cmux -> false",
+(fail) precedence between CMUX_SOCKET_PATH and CMUX_AGENT_LAUNCH_KIND >
+       #given every combination of both cmux signals and a TMUX shape
+Expected: true
+Received: false
+(fail) precedence between CMUX_SOCKET_PATH and CMUX_AGENT_LAUNCH_KIND >
+       #given a cmux-shaped TMUX without CMUX_SOCKET_PATH #when only the launch kind differs
+
+ 13 pass
+ 2 fail
+
+Exactly one matrix row moves (socket=false, kind=omo, tmux=cmux-shaped) plus the
+load-bearing fallback assertion that isolates it. That single row is the entire
+behavioural delta of the reconciliation: it proves CMUX_AGENT_LAUNCH_KIND is
+non-vacuous rather than documented-but-inert, and it is reachable whenever a
+shell profile scrubs CMUX_* while the cmux tmux shim still injects TMUX.

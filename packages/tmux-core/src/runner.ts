@@ -1,4 +1,5 @@
 import { spawn } from "@oh-my-opencode/utils/runtime"
+import { resolveCmuxCliExecutable } from "./cmux-cli"
 import { isCmuxCompatEnvironment } from "./cmux-detect"
 
 type RunTmuxOptions = {
@@ -36,7 +37,9 @@ function resolveTmuxExecutable(tmuxPath: string): string[] {
 	}
 
 	const executableName = tmuxPath.split(/[\\/]/).pop()
-	const cmuxExecutable = executableName && /^cmux(?:\.(?:bat|cmd|exe|ps1))?$/i.test(executableName) ? tmuxPath : "cmux"
+	const cmuxExecutable = executableName && /^cmux(?:\.(?:bat|cmd|exe|ps1))?$/i.test(executableName)
+		? tmuxPath
+		: resolveCmuxCliExecutable()
 	return [cmuxExecutable, "__tmux-compat"]
 }
 

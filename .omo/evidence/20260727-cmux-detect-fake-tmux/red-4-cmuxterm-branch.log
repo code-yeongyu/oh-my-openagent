@@ -1,0 +1,36 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/tmux-core/src/cmux-detect.test.ts:
+33 | 
+34 |     // when
+35 |     const result = isCmuxCompatEnvironment()
+36 | 
+37 |     // then
+38 |     expect(result).toBe(false)
+                        ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/Yoonki/.local/src/omo-pr6390/packages/tmux-core/src/cmux-detect.test.ts:38:20)
+(fail) isCmuxCompatEnvironment > #given TMUX contains cmuxterm without CMUX_SOCKET_PATH #when isCmuxCompatEnvironment called #then returns false (cmux never writes cmuxterm into a socket path) [1.38ms]
+45 | 
+46 |     // when
+47 |     const result = isCmuxCompatEnvironment()
+48 | 
+49 |     // then
+50 |     expect(result).toBe(false)
+                        ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/Yoonki/.local/src/omo-pr6390/packages/tmux-core/src/cmux-detect.test.ts:50:20)
+(fail) isCmuxCompatEnvironment > #given a real tmux socket whose session name contains cmuxterm #when isCmuxCompatEnvironment called #then returns false
+
+ 8 pass
+ 2 fail
+ 14 expect() calls
+Ran 10 tests across 1 file. [88.00ms]
