@@ -3,6 +3,26 @@ import { join } from "node:path"
 
 const eventSourceChanges = [
   ['\tif (message.kind !== "watch") return;', '\tif (message.kind !== "watch") return;\n\tif (Atomics.load(message.active, 0) === 0) return;'],
+  [`		watcher.on("error", (error) => {
+			parentPort.postMessage({
+				kind: "error",
+				id: message.id,
+				message: error instanceof Error ? error.message : String(error),
+			});
+		});
+		watchers.set(message.id, watcher);`,
+   `		watcher.on("error", (error) => {
+			parentPort.postMessage({
+				kind: "error",
+				id: message.id,
+				message: error instanceof Error ? error.message : String(error),
+			});
+		});
+		if (Atomics.load(message.active, 0) === 0) {
+			watcher.close();
+			return;
+		}
+		watchers.set(message.id, watcher);`],
   ['replacement.postMessage({ kind: "watch", id, path: subscription.path, recursive: subscription.recursive });', 'replacement.postMessage({ kind: "watch", id, path: subscription.path, recursive: subscription.recursive, active: subscription.active });'],
   [`            ensureRecursiveWorker().postMessage({ kind: "watch", id, path, recursive });
             recursiveSubscriptions.set(id, { path, listener, recursive });`,
@@ -25,6 +45,19 @@ const eventSourceChanges = [
 ]
 
 const engineChanges = [
+  [`    /**
+     * Marks the engine inert synchronously, then drains the unsubscribe loop off
+     * the caller's stack. A single \`fs.watch\` unsubscribe can block for seconds on
+     * a loaded machine, and a reload awaits this call; every dispatch path already
+     * checks \`#closed\`, so the still-attached subscriptions are silent while the
+     * returned promise settles. Await it only to observe teardown completion.
+     */`,
+   `    /**
+     * Marks the engine inert synchronously and invokes every unsubscriber on this
+     * turn so in-flight worker registrations observe cancellation. Native disposer
+     * promises are awaited on the returned completion; the non-worker platform
+     * branch remains a synchronous close. Await it only to observe teardown completion.
+     */`],
   ['    #closed = false;', '    #closed = false;\n    #closeCompletion;'],
   [`        if (this.#closed) {
             return Promise.resolve();

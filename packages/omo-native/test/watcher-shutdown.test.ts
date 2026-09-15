@@ -38,6 +38,62 @@ describe("config watcher shutdown", () => {
     } finally { worker.exit.resolve(0) }
   })
 
+  test("disposes a watch admitted after a stale active load", async () => {
+    // Given the actual worker handler and a load seam that shuts down after reading 1.
+    await using fixture = await watcherFixture()
+    const worker = new GatedWorker()
+    const port = new EventEmitter()
+    const live: Array<EventEmitter & { close: () => void }> = []
+    let preempted = false
+    let nativeEntries = 0
+    const source = fixture.events.RECURSIVE_WATCH_WORKER_SOURCE.replace(
+      "\tif (Atomics.load(message.active, 0) === 0) return;",
+      "\tif (loadActive(message.active) === 0) return;",
+    )
+    if (source === fixture.events.RECURSIVE_WATCH_WORKER_SOURCE) throw new Error("load seam was not installed")
+    new Function("require", "loadActive", source)((specifier: string) => {
+      switch (specifier) {
+        case "node:fs": return {
+          watch: () => {
+            nativeEntries++
+            const watcher = Object.assign(new EventEmitter(), {
+              close() {
+                const index = live.indexOf(watcher)
+                if (index >= 0) live.splice(index, 1)
+              },
+            })
+            live.push(watcher)
+            return watcher
+          },
+        }
+        case "node:worker_threads": return { parentPort: port }
+        default: throw new Error(`Unexpected worker import: ${specifier}`)
+      }
+    }, (active: Int32Array) => {
+      const value = Atomics.load(active, 0)
+      if (!preempted && value === 1) {
+        preempted = true
+        void unsubscribe()
+        worker.exit.resolve(0)
+      }
+      return value
+    })
+    const subscribe = fixture.events.createFsWatchEventSource(undefined, { platform: "darwin", createRecursiveWorker: () => worker })
+    const unsubscribe = subscribe(fixture.root, () => undefined)
+    try {
+      // When only the queued watch runs after that stale load; do not dispatch the
+      // later unwatch, which would hide a retained native registration.
+      const watches = worker.commands.filter((command) => typeof command === "object" && command !== null && "kind" in command && command.kind === "watch")
+      expect(watches).toHaveLength(1)
+      port.emit("message", watches[0])
+      await immediateTurn()
+      // Then fs.watch was entered, but the post-watch re-check did not retain it.
+      expect(preempted).toBe(true)
+      expect(nativeEntries).toBe(1)
+      expect(live).toEqual([])
+    } finally { worker.exit.resolve(0) }
+  })
+
   test("awaits worker termination when the last subscription is removed", async () => {
     // Given a worker whose termination completion is explicitly gated.
     await using fixture = await watcherFixture()

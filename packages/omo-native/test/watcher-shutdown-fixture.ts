@@ -8,6 +8,16 @@ const engineRoot = join(import.meta.dir, "../../../node_modules/@code-yeongyu/se
 const configPath = "dist/core/extensions/builtin/config-reload"
 const moduleNames = ["watch-event-source.js", "watch-engine.js", "index.js"] as const
 
+const postWatchReCheck = `\t\tif (Atomics.load(message.active, 0) === 0) {\n\t\t\twatcher.close();\n\t\t\treturn;\n\t\t}\n\t\twatchers.set(message.id, watcher);`
+
+/** Drop the post-watch re-check so the helper, not node_modules, owns H2. */
+function seedUnpatchedWatcher(source: string): string {
+  if (!source.includes(postWatchReCheck)) return source
+  const next = source.replace(postWatchReCheck, "\t\twatchers.set(message.id, watcher);")
+  if (next.includes(postWatchReCheck)) throw new Error("failed to seed unpatched watcher")
+  return next
+}
+
 /** Isolate installed-engine modules without mocking their lifecycle implementation. */
 export async function watcherFixture() {
   const root = await mkdtemp(join(tmpdir(), "omo-watch-shutdown-"))
@@ -16,13 +26,13 @@ export async function watcherFixture() {
   try {
     for (const name of moduleNames) {
       const original = join(engineRoot, configPath, name)
-      const source = (await readFile(original, "utf8"))
+      const source = seedUnpatchedWatcher((await readFile(original, "utf8"))
         .replace(/from "([^"]+)"/g, (_match, specifier: string) => {
           const local = moduleNames.find((entry) => specifier === `./${entry}`)
           const resolved = local ? pathToFileURL(join(target, local)).href : import.meta.resolve(specifier, original)
           return `from ${JSON.stringify(resolved)}`
         })
-        .replace("const RECURSIVE_WATCH_WORKER_SOURCE", "export const RECURSIVE_WATCH_WORKER_SOURCE")
+        .replace("const RECURSIVE_WATCH_WORKER_SOURCE", "export const RECURSIVE_WATCH_WORKER_SOURCE"))
       await writeFile(join(target, name), source)
     }
     patchWatcherShutdown(root)
