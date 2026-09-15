@@ -5,8 +5,8 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { z } from "zod"
 import { patchRpcCloseOrdering } from "../bin/lib/rpc-close-ordering.js"
+import { boundHeldSession, registryWithHeldWorker, rpcRoot, turnBoundary, type TerminalPublication } from "./rpc-close-ordering-fixture"
 
-const rpcRoot = join(import.meta.dir, "../../../node_modules/@code-yeongyu/senpi/dist/modes/rpc")
 const wireRecord = z.object({ type: z.string(), command: z.string().optional() })
 
 // Only the scheduling boundary is injected. Registry, router and JSONL writer
@@ -25,8 +25,6 @@ async function registryWithScheduler() {
   const { withScheduler } = await import(pathToFileURL(join(root, "registry.mjs")).href)
   return { withScheduler, [Symbol.asyncDispose]: () => rm(root, { recursive: true, force: true }) }
 }
-
-const turnBoundary = () => new Promise<void>((resolve) => setImmediate(resolve))
 
 describe("RPC close publication", () => {
   test("lists no session at either terminal record when the grace deadline precedes worker exit", async () => {
@@ -115,4 +113,60 @@ describe("RPC close publication", () => {
       await router.dispose()
     }
   })
+
+  test("lists no session at worker-error terminal records until the real exit callback removes it", async () => {
+    // Given a session opened through the real registry, whose worker exit is held.
+    await using loaded = await registryWithHeldWorker()
+    const { opened, worker, publications, writer } = await boundHeldSession(loaded)
+    try {
+      // When the worker reports failure while its exit callback is still held.
+      worker.emit("error", new Error("review-worker-failed"))
+      await turnBoundary()
+      await writer.flush()
+      const beforeExit = publications.length
+      worker.release()
+      await turnBoundary()
+      await writer.flush()
+
+      // Then terminal close records observe completed registry removal, with the failure response.
+      expect(beforeExit).toBe(0)
+      expectTerminalClose(publications, opened.sessionId, "review-worker-failed")
+    } finally {
+      worker.release()
+    }
+  })
+
+  test("lists no session at unexpected-exit terminal records until the real exit callback removes it", async () => {
+    // Given a bound session whose transport exit is the first failure signal.
+    await using loaded = await registryWithHeldWorker()
+    const { opened, worker, publications, writer } = await boundHeldSession(loaded)
+    try {
+      // When the worker process exits without a prior error event.
+      worker.release()
+      await turnBoundary()
+      await writer.flush()
+
+      // Then session_worker_exited is published only after registry removal.
+      expectTerminalClose(publications, opened.sessionId, "session_worker_exited")
+    } finally {
+      worker.release()
+    }
+  })
 })
+
+function expectTerminalClose(publications: readonly TerminalPublication[], sessionId: string, error: string) {
+  const terminals = publications.filter(
+    (publication) => publication.record.type === "session_closed" || publication.record.command === "close_session",
+  )
+  expect(terminals.map((publication) => publication.record)).toEqual([
+    { type: "session_closed", sessionId },
+    {
+      type: "response",
+      command: "close_session",
+      success: false,
+      error,
+      sessionId,
+    },
+  ])
+  expect(publications.every((publication) => publication.sessionsAtPublication.length === 0)).toBe(true)
+}
