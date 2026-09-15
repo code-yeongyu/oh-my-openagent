@@ -8,6 +8,20 @@ import {
 } from "./dependency-audit/contracts"
 
 describe("dependency audit parsers", () => {
+  test("retains every selected probe when --case is repeated", () => {
+    // given
+    const args = ["--phase", "post", "--binary", "/tmp/audit/binary", "--out", "/tmp/audit/post", "--case", "bytes", "--case", "graph", "--case", "rpc", "--case", "extension"]
+    // when
+    const options = parseCaptureArgs(args)
+    // then
+    expect(options.case).toEqual(["bytes", "graph", "rpc", "extension"])
+  })
+  test("rejects an invalid earlier probe when a valid --case follows it", () => {
+    // given
+    const args = ["--phase", "post", "--binary", "/tmp/audit/binary", "--out", "/tmp/audit/post", "--case", "../summary", "--case", "rpc"]
+    // when / then
+    expect(() => parseCaptureArgs(args)).toThrow()
+  })
   test.each(["Bundled 4476 modules in 300ms", "[100ms] bundle 3995 modules"])("reads module counts when Bun emits %s", (output) => {
     // given
     const expected = output.includes("4476") ? 4476 : 3995

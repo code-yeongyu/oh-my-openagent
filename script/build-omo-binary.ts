@@ -37,8 +37,10 @@ const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts"
 export const EMBEDDED_PAYLOAD_ROOT = "omo-runtime"
 /** Relative path of the embedded runtime manifest inside the payload root. */
 export const RUNTIME_MANIFEST_REL_PATH = "runtime-manifest.json"
-/** Hard per-binary size budget (150MB). */
+/** Hard per-binary size budget (150 MiB). */
 export const MAX_BINARY_BYTES = 150 * 1024 * 1024
+/** P0 release budget for the measured darwin-arm64 target (100 MiB). */
+export const P0_MAX_BINARY_BYTES = 104_857_600
 
 export interface NativePrebuild {
   readonly fileStem: "senpi_pty" | "senpi_grep"
@@ -245,7 +247,7 @@ export function assertBinarySizeBudget(
   binaryPath: string,
   options: { readonly maxBytes?: number } = {},
 ): void {
-  const maxBytes = options.maxBytes ?? MAX_BINARY_BYTES
+  const maxBytes = options.maxBytes ?? (target === "darwin-arm64" ? P0_MAX_BINARY_BYTES : MAX_BINARY_BYTES)
   const size = statSync(binaryPath).size
   if (size > maxBytes) {
     throw new Error(
@@ -600,7 +602,7 @@ export async function buildReleaseBinary(
       )
     }
 
-    // Flags mirror senpi's own scripts.build:binary (node_modules/@code-yeongyu/senpi/package.json).
+    // Split the shared engine graph while preserving runtime function/class names.
     // A binary that fails post-compile verification must not survive on disk.
     let compileOutput: string
     try {
@@ -609,8 +611,10 @@ export async function buildReleaseBinary(
         [
           "build",
           "--compile",
+          "--splitting",
           `--target=${target.bunTarget}`,
-          "--minify-whitespace",
+          "--minify",
+          "--keep-names",
           "--compile-autoload-package-json",
           "--no-compile-autoload-dotenv",
           "--no-compile-autoload-bunfig",

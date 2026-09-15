@@ -4,63 +4,15 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-type WorkflowExpectation = {
-  readonly path: string
-  readonly jobs: readonly string[]
-}
+import { load } from "js-yaml"
+import { z } from "zod"
+import { readWorkflowSteps, workflowStepSchema } from "./receipt-gate.fixture"
 
 const workflowDirectory = ".github/workflows"
 const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
-
-const workflowExpectations = [
-  {
-    path: ".github/workflows/ci.yml",
-    jobs: [
-      "ci-mode",
-      "block-master-pr",
-      "test",
-      "typecheck",
-      "codex-compatibility",
-      "senpi-compatibility",
-      "lazycodex-published-smoke",
-      "build",
-      "omo-ai-payload-check",
-      "auto-commit-schema",
-      "draft-release",
-    ],
-  },
-  { path: ".github/workflows/cla.yml", jobs: ["cla"] },
-  { path: ".github/workflows/compiled-worker.yml", jobs: ["relocated-worker"] },
-  { path: ".github/workflows/bot-merge.yml", jobs: ["merge"] },
-  { path: ".github/workflows/lint-workflows.yml", jobs: ["actionlint"] },
-  { path: ".github/workflows/npm-dist-tag-rollback.yml", jobs: ["retag"] },
-  { path: ".github/workflows/package-labels.yml", jobs: ["ensure-labels", "label-pull-request", "label-issue"] },
-  { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish", "smoke-linux-arm64"] },
-  {
-    path: ".github/workflows/publish.yml",
-    jobs: [
-      "gate-reuse",
-      "preflight-trust",
-      "release-metadata",
-      "prepare-release-state",
-      "dispatch-provenance-safe-publish",
-      "publish-main",
-      "verify-release-notes",
-      "release",
-      "post-publish-verify",
-    ],
-  },
-  {
-    path: ".github/workflows/review-claims.yml",
-    jobs: ["gate", "claim", "release-claim", "stale-sweep"],
-  },
-  { path: ".github/workflows/refresh-model-capabilities.yml", jobs: ["refresh"] },
-  { path: ".github/workflows/sisyphus-agent.yml", jobs: ["agent"] },
-  { path: ".github/workflows/stats.yml", jobs: ["stats"] },
-  { path: ".github/workflows/web-ci.yml", jobs: ["format-lint-typecheck-build"] },
-  { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
-  { path: ".github/workflows/windows-flake-soak.yml", jobs: ["soak"] },
-] as const satisfies readonly WorkflowExpectation[]
+const summaryWorkflowSchema = z.object({
+  jobs: z.record(z.string(), z.object({ steps: z.array(workflowStepSchema).optional() })),
+})
 
 function discoverWorkflowPaths(): readonly string[] {
   return readdirSync(workflowDirectory)
@@ -69,59 +21,9 @@ function discoverWorkflowPaths(): readonly string[] {
     .sort()
 }
 
-function discoverStepBasedJobs(workflow: string): readonly string[] {
-  const jobsStart = workflow.match(/^jobs:\s*$/m)
-  if (jobsStart?.index === undefined) return []
-
-  const jobs: string[] = []
-  const lines = workflow.slice(jobsStart.index + jobsStart[0].length).split("\n")
-  let currentJob: string | undefined
-  let currentJobHasSteps = false
-
-  function flushCurrentJob(): void {
-    if (currentJob !== undefined && currentJobHasSteps) jobs.push(currentJob)
-  }
-
-  for (const line of lines) {
-    const jobMatch = line.match(/^  ([A-Za-z0-9_-]+):\s*$/)
-    if (jobMatch !== null) {
-      flushCurrentJob()
-
-      const nextJob = jobMatch[1]
-      if (nextJob === undefined) throw new Error(`Unable to read job name from line: ${line}`)
-      currentJob = nextJob
-      currentJobHasSteps = false
-      continue
-    }
-
-    if (currentJob !== undefined && /^    steps:\s*$/.test(line)) currentJobHasSteps = true
-  }
-
-  flushCurrentJob()
-  return jobs
-}
-
-function sliceJob(workflow: string, jobName: string): string {
-  const marker = `  ${jobName}:`
-  const start = workflow.indexOf(marker)
-  if (start < 0) throw new Error(`missing job ${jobName}`)
-
-  const afterMarker = start + marker.length
-  const nextJob = workflow.slice(afterMarker).match(/\n  [A-Za-z0-9_-]+:\n/)
-  if (nextJob?.index === undefined) return workflow.slice(start)
-
-  return workflow.slice(start, afterMarker + nextJob.index)
-}
-
-function sliceWorkflowSectionToEnd(workflow: string, startMarker: string): string {
-  const start = workflow.indexOf(startMarker)
-  if (start < 0) throw new Error(`missing workflow section starting at ${startMarker}`)
-
-  return workflow.slice(start)
-}
-
-function hasSummaryWriter(jobSection: string): boolean {
-  return jobSection.includes("name: Write job summary") && jobSection.includes("GITHUB_STEP_SUMMARY")
+function discoverStepBasedJobs(workflow: string) {
+  const parsed = summaryWorkflowSchema.parse(load(workflow))
+  return Object.entries(parsed.jobs).flatMap(([name, job]) => job.steps === undefined ? [] : [{ name, steps: job.steps }])
 }
 
 describe("GitHub workflow job summaries", () => {
@@ -144,34 +46,32 @@ describe("GitHub workflow job summaries", () => {
       "",
     ].join("\n")
 
-    expect(discoverStepBasedJobs(workflow)).toEqual(["existing", "newly-added"])
+    expect(discoverStepBasedJobs(workflow).map((job) => job.name)).toEqual(["existing", "newly-added"])
   })
 
   test("#given repository workflows #when inspected #then every step-based job writes a concise Markdown summary", () => {
-    const expectedWorkflowPaths = workflowExpectations.map((expectation) => expectation.path).sort()
-    expect(discoverWorkflowPaths()).toEqual(expectedWorkflowPaths)
-
-    for (const expectation of workflowExpectations) {
-      const workflow = readFileSync(expectation.path, "utf8")
-      expect(discoverStepBasedJobs(workflow), `${expectation.path} step-based job list must stay covered`).toEqual(
-        expectation.jobs,
-      )
-
-      for (const job of expectation.jobs) {
-        const jobSection = sliceJob(workflow, job)
-
-        expect(hasSummaryWriter(jobSection), `${expectation.path} ${job} must write a job summary`).toBe(true)
+    // given: discover real jobs, so an unrelated new workflow needs no mirrored inventory.
+    const paths = discoverWorkflowPaths()
+    expect(paths.length).toBeGreaterThan(0)
+    for (const path of paths) {
+      // when
+      const jobs = discoverStepBasedJobs(readFileSync(path, "utf8"))
+      // then
+      for (const job of jobs) {
+        const summary = job.steps.find((step) => step.run?.includes("GITHUB_STEP_SUMMARY"))
+        expect(summary, `${path} ${job.name} must write a job summary`).toBeDefined()
+        expect(summary?.if, `${path} ${job.name} must summarize failures too`).toBe("always()")
       }
     }
   })
 
   test("#given a privileged publish summary #when it renders dispatch inputs #then raw inputs are passed through env", () => {
-    const workflow = readFileSync(".github/workflows/publish-platform.yml", "utf8")
-    const summaryStep = sliceWorkflowSectionToEnd(workflow, "      - name: Write job summary")
-
-    expect(summaryStep).toContain("JOB_SUMMARY_DIST_TAG: ${{ inputs.dist_tag || 'latest' }}")
-    expect(summaryStep).toContain("\\`$JOB_SUMMARY_DIST_TAG\\`")
-    expect(summaryStep).not.toContain("`${{ inputs.dist_tag || 'latest' }}`")
+    // given / when
+    const summary = readWorkflowSteps("publish-platform.yml", "publish").find((step) => step.run?.includes("GITHUB_STEP_SUMMARY"))
+    // then: raw dispatch input must not become executable shell source.
+    expect(summary?.env?.JOB_SUMMARY_DIST_TAG).toBe("${{ inputs.dist_tag || 'latest' }}")
+    expect(summary?.run).toContain("$JOB_SUMMARY_DIST_TAG")
+    expect(summary?.run).not.toContain("${{ inputs.dist_tag")
   })
 
   test("#given summary inputs #when the shared writer runs #then it emits the Markdown contract GitHub renders", () => {

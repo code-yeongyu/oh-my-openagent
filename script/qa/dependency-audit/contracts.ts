@@ -6,7 +6,7 @@ export const CASES = ["bytes", "graph", "startup", "rpc", "extension", "webfetch
 export type CaseName = typeof CASES[number]
 export const captureSchema = z.object({
   phase: z.enum(["baseline", "post"]), binary: z.string().min(1), out: z.string().min(1),
-  case: z.enum(CASES).optional(),
+  case: z.array(z.enum(CASES)).readonly().optional(),
 })
 export type CaptureOptions = z.infer<typeof captureSchema>
 export class AuditError extends Error {
@@ -15,7 +15,7 @@ export class AuditError extends Error {
 }
 export function parseCaptureArgs(args: readonly string[]): CaptureOptions {
   return captureSchema.parse(parseArgs({ args: [...args], options: {
-    phase: { type: "string" }, binary: { type: "string" }, out: { type: "string" }, case: { type: "string" },
+    phase: { type: "string" }, binary: { type: "string" }, out: { type: "string" }, case: { type: "string", multiple: true },
   }, strict: true, allowPositionals: false }).values)
 }
 export function parseModuleCount(output: string): number {

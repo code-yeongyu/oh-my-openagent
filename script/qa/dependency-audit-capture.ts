@@ -18,8 +18,9 @@ const captures: Readonly<Record<CaseName, (runtime: Runtime) => Promise<object>>
 }
 export async function capture(args: readonly string[]): Promise<void> {
   const options = parseCaptureArgs(args)
+  const selected = options.case ?? CASES
   const results = []
-  for (const name of options.case === undefined ? CASES : [options.case]) {
+  for (const name of selected) {
     const runtime = await createRuntime(options)
     const timestamp = new Date().toISOString()
     let observables: object
@@ -43,7 +44,7 @@ export async function capture(args: readonly string[]): Promise<void> {
   await Bun.write(join(options.out, "summary.json"), `${JSON.stringify({
     command: ["bun", "script/qa/dependency-audit-capture.ts", ...args], machine: results[0]?.machine,
     versions: results[0]?.versions, exitCode: 0, timestamp: new Date().toISOString(), schemaVersion: 1, phase: options.phase,
-    complete: results.length === (options.case === undefined ? CASES.length : 1),
+    complete: results.length === selected.length,
     pass: results.every((result) => result.pass === true), cases: results,
     cleanup: results.map((result) => ({ case: result.case, receipt: result.cleanup })),
   }, null, 2)}\n`)
