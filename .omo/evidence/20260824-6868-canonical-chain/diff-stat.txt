@@ -1,0 +1,14 @@
+ .../hooks/runtime-fallback/fallback-models.test.ts | 76 +++++++++++++++++++
+ .../src/hooks/runtime-fallback/fallback-models.ts  | 24 +++---
+ .../plugin-handlers/plan-model-inheritance.test.ts | 32 ++++++++
+ .../src/plugin-handlers/plan-model-inheritance.ts  |  1 +
+ .../prometheus-agent-config-builder.test.ts        | 52 +++++++++++++
+ .../prometheus-agent-config-builder.ts             | 15 ++--
+ .../src/plugin/available-categories.ts             |  4 +-
+ .../tools/delegate-task/category-resolver.test.ts  | 86 +++++++++++++++++++++-
+ .../src/tools/delegate-task/category-resolver.ts   | 22 ++++--
+ .../delegate-task/subagent-model-resolution.ts     | 26 ++++---
+ .../tools/delegate-task/tool-description.test.ts   | 17 +++++
+ .../src/tools/delegate-task/tool-description.ts    |  3 +-
+ packages/shared-skills/upstreams/designpowers      |  0
+ 13 files changed, 322 insertions(+), 36 deletions(-)
