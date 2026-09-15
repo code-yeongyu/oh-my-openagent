@@ -1,0 +1,4 @@
+data: {"id":"evt_072b50613001nTZHo6N674EJ10","type":"server.connected","properties":{}}
+
+data: {"id":"evt_072b50693002tWdGWOfhD9N3Dy","type":"session.created","properties":{"sessionID":"ses_f8d4af96cffeXfJvPG42VA1obX","info":{"id":"ses_f8d4af96cffeXfJvPG42VA1obX","slug":"calm-pixel","version":"1.18.29","projectID":"global","directory":"/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.9nWzziCTsl/proj","path":"private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.9nWzziCTsl/proj","title":"New session - 2026-09-05T17:54:21.459Z","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788630861459,"updated":1788630861459}}}}
+

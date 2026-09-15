@@ -1,0 +1,22 @@
+{
+  "tupleMarker": "tuple-7458",
+  "decisions": [
+    {
+      "ok": true,
+      "directory": "<SANDBOX>/pinned",
+      "findPluginEntry": {
+        "entry": "oh-my-openagent@4.19.4",
+        "isPinned": true,
+        "pinnedVersion": "4.19.4",
+        "configPath": "<SANDBOX>/pinned/.opencode/opencode.json"
+      },
+      "isLocalDev": false
+    },
+    {
+      "ok": true,
+      "directory": "<SANDBOX>/local",
+      "findPluginEntry": null,
+      "isLocalDev": true
+    }
+  ]
+}

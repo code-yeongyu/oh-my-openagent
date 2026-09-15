@@ -16,7 +16,7 @@ type PluginEntryResult = {
 } | null
 
 function normalizePathForAssertion(filePath: string): string {
-  return filePath.replaceAll("\\", "/").replaceAll("/private/var/", "/var/")
+  return fs.realpathSync(filePath).replaceAll("\\", "/")
 }
 
 function runFindPluginEntry(
@@ -172,6 +172,25 @@ describe("findPluginEntry", () => {
 
     // #then no matching entry is returned
     expect(result).toBeNull()
+  })
+
+  test("finds the plugin entry when a tuple-style entry precedes it", async () => {
+    // #given a tuple-style plugin entry is configured before our plugin
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        plugin: [["opencode-auto-resume@1.1.10", { chunkTimeoutMs: 300000 }], `${PACKAGE_NAME}@4.19.4`],
+      }),
+    )
+
+    // #when plugin entry is detected
+    const result = runFindPluginEntry(temporaryDirectory)
+
+    // #then the tuple entry is skipped and our pinned entry is still found
+    expect(result).not.toBeNull()
+    expect(result?.entry).toBe(`${PACKAGE_NAME}@4.19.4`)
+    expect(result?.isPinned).toBe(true)
+    expect(result?.pinnedVersion).toBe("4.19.4")
   })
 
   test("reads user config from profile dir even when OPENCODE_CONFIG_DIR changes after import", async () => {

@@ -1,0 +1,12 @@
+$ bun install --frozen-lockfile
+Implicit prepare runs bun run build. Selected actual failure lines:
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+exit: 1

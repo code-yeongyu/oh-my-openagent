@@ -1,0 +1,56 @@
+{
+  "result": {
+    "opencode": "1.18.30",
+    "bun": "1.4.0",
+    "node": "v24.18.0",
+    "health": true,
+    "loadedTupleOptions": "tuple-7458",
+    "sse": [
+      "server.connected",
+      "session.created"
+    ],
+    "pinned": {
+      "entry": "oh-my-openagent@4.19.4",
+      "isPinned": true,
+      "pinnedVersion": "4.19.4",
+      "isLocalDev": false
+    },
+    "localTuple": {
+      "findPluginEntry": null,
+      "isLocalDev": true
+    },
+    "isolatedSessions": 1,
+    "isolatedHomeAndAllXdg": true,
+    "projectOutsideCheckout": true,
+    "childEnvironmentAllowlisted": true,
+    "before": 8098
+  },
+  "decision": {
+    "tupleMarker": "tuple-7458",
+    "decisions": [
+      {
+        "ok": true,
+        "directory": "<sandbox>/pinned",
+        "findPluginEntry": {
+          "entry": "oh-my-openagent@4.19.4",
+          "isPinned": true,
+          "pinnedVersion": "4.19.4",
+          "configPath": "<sandbox>/pinned/.opencode/opencode.json"
+        },
+        "isLocalDev": false
+      },
+      {
+        "ok": true,
+        "directory": "<sandbox>/local",
+        "findPluginEntry": null,
+        "isLocalDev": true
+      }
+    ]
+  },
+  "isolation": {
+    "before": 8098,
+    "after": 8098,
+    "unchanged": true
+  },
+  "sse": "data: {\"id\":\"evt_09b7a58e4001GkS5kWPEjWxt4p\",\"type\":\"server.connected\",\"properties\":{}}\n\ndata: {\"id\":\"evt_09b7a58fa0019GH6hB2m2nhbmr\",\"type\":\"session.created\",\"properties\":{\"sessionID\":\"ses_f6485a706ffeaKE6wOwgsd3wLE\",\"info\":{\"id\":\"ses_f6485a706ffeaKE6wOwgsd3wLE\",\"slug\":\"nimble-sailor\",\"version\":\"1.18.30\",\"projectID\":\"global\",\"directory\":\"/private<sandbox>/project\",\"path\":\"\",\"title\":\"New session - 2026-09-13T15:54:41.785Z\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}},\"time\":{\"created\":1789314881785,\"updated\":1789314881785}}}}\n\n"
+}

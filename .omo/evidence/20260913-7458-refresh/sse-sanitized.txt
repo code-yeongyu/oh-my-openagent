@@ -1,0 +1,3 @@
+data: {"id":"evt_09b657949001ZknzpX7RIgWobd","type":"server.connected","properties":{}}
+
+data: {"id":"evt_09b657954001bFfOMtRCjEU28P","type":"session.created","properties":{"sessionID":"ses_f649a86acffe51iCJEAgwK5Pas","info":{"id":"ses_f649a86acffe51iCJEAgwK5Pas","slug":"swift-sailor","version":"1.18.30","projectID":"global","directory":"<SANDBOX>/project","path":"","title":"New session - 2026-09-13T15:31:53.811Z","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1789313513811,"updated":1789313513811}}}}
