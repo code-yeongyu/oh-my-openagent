@@ -66,8 +66,19 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
   let disposed = false
   const reportedReadFaults = new Set<string>()
 
+  const reportedEmitFaults = new Set<string>()
   const emit = (name: string, data: unknown): void => {
-    pi.rpc?.emit(name, data)
+    try {
+      pi.rpc?.emit(name, data)
+    } catch (error) {
+      // Timer-driven heartbeat/snapshot/activity have no caller; a throwing subscriber must not
+      // become uncaughtException. One warning per channel+message; the run continues.
+      const message = error instanceof Error ? error.message : String(error)
+      const key = `${name}:${message}`
+      if (reportedEmitFaults.has(key)) return
+      reportedEmitFaults.add(key)
+      deps.logger?.warn("omo-dag rpc emit failed; subscriber ignored", { channel: name, error: message })
+    }
   }
 
   // Store reads run from timers (heartbeat, snapshot flush) where a throw has no caller left to reach:

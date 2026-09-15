@@ -792,4 +792,72 @@ describe("dag rpc bridge", () => {
       expect(warnings).toHaveLength(1)
     })
   })
+
+  // rpc.emit is invoked from journal fan-out AND from timers. A throwing subscriber must not
+  // escape either path: the Windows bun runner pretty-prints an uncaught Error as
+  // `error: subscriber exploded` and treats that as a suite failure.
+  describe("#given rpc.emit throws", () => {
+    function throwingPi(channel: string) {
+      const emitted: EmittedEvent[] = []
+      const warnings: unknown[] = []
+      const pi = {
+        on() {},
+        rpc: {
+          emit: (name: string, data: unknown) => {
+            if (name === channel) throw new Error("subscriber exploded")
+            emitted.push({ name, data })
+          },
+        },
+        registerTool() {},
+        registerCommand() {},
+        registerFlag() {},
+        getFlag: () => undefined,
+        sendMessage() {},
+        sendUserMessage() {},
+      } as unknown as SenpiExtensionAPI
+      return {
+        pi,
+        emitted,
+        logger: { warn: (_message: string, details?: unknown) => void warnings.push(details) },
+        warnings,
+      }
+    }
+
+    it("#when a journal event is forwarded #then the throw is logged once and later seqs still attempt delivery", () => {
+      const source = fakeRun("dag_1", "running")
+      const { pi, logger, warnings } = throwingPi("omo.dag.event")
+      const timers = fakeTimers()
+      const bridge = createDagRpcBridge(pi, {
+        liveRuns: () => [source.run],
+        timers: timers.seam,
+        now: timers.now,
+        logger,
+      })
+      bridge.attach()
+
+      expect(() => source.publish(runEvent("dag_1", 1, "dag.run.created"))).not.toThrow()
+      expect(() => source.publish(runEvent("dag_1", 2, "dag.wave.started"))).not.toThrow()
+      expect(warnings).toEqual([{ channel: "omo.dag.event", error: "subscriber exploded" }])
+    })
+
+    it("#when the heartbeat tick emits #then the throw is logged and the next beat is still scheduled", () => {
+      const source = fakeRun("dag_1", "running")
+      const { pi, emitted, logger, warnings } = throwingPi("omo.dag.heartbeat")
+      const timers = fakeTimers()
+      const bridge = createDagRpcBridge(pi, {
+        liveRuns: () => [source.run],
+        timers: timers.seam,
+        now: timers.now,
+        logger,
+      })
+      bridge.attach()
+      source.publish(runEvent("dag_1", 4, "dag.wave.started"))
+
+      expect(() => timers.advance(DAG_DEFAULT_HEARTBEAT_MS)).not.toThrow()
+      expect(() => timers.advance(DAG_DEFAULT_HEARTBEAT_MS)).not.toThrow()
+      expect(warnings).toEqual([{ channel: "omo.dag.heartbeat", error: "subscriber exploded" }])
+      expect(emittedNames(emitted, "omo.dag.event")).toHaveLength(1)
+      expect(timers.pending()).toBeGreaterThan(0)
+    })
+  })
 })

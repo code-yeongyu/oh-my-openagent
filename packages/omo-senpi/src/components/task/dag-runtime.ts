@@ -650,7 +650,8 @@ function deliverDurableEvent(listener: (event: DagRunEvent) => void, event: DagR
   try {
     listener(event)
   } catch (error) {
-    console.error("DAG runtime subscriber failed", error)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`DAG runtime subscriber failed: ${message}`)
   }
 }
 
