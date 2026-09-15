@@ -1,0 +1,2 @@
+BEFORE-style path throws: InvalidObjectiveError - Objective exceeds maximum length of 2000 characters
+AFTER clamp length: 2000 | passes validation: true
