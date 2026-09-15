@@ -42,7 +42,9 @@ async function readWin32StartIdentity(pid: number): Promise<string | null> {
   const value = await execFileText("powershell.exe", [
     "-NoProfile",
     "-Command",
-    `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString('o')`,
+    // DIAGNOSTIC FAULT INJECTION (#8294, scratch branch only): emulate a runner where PowerShell
+    // startup exceeds the 2 s execFile budget, so every probe is killed and reports null.
+    `Start-Sleep -Seconds 3; (Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString('o')`,
   ])
   return value === null ? null : `win32-creation-date:${value}`
 }
