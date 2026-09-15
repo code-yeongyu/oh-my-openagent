@@ -1,0 +1,100 @@
+{
+  "relatedTests": {
+    "pass": 243,
+    "fail": 0,
+    "assertions": 759,
+    "files": 3
+  },
+  "adapterCompiler": {
+    "exitCode": 0,
+    "log": "compiler-correct-entry.log"
+  },
+  "probeCompiler": {
+    "exitCode": 0,
+    "log": "probe-compiler-scoped-ambient.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scope": "terminal-probe.ts plus existing adapter markdown-modules.d.ts"
+  },
+  "fullBuild": {
+    "exitCode": 0,
+    "sentinel": "build: all steps completed",
+    "commandScopedFileTransport": true
+  },
+  "lspDiagnostics": "All seven paths rejected: LSP file path must be inside request cwd",
+  "liveQaAttempts": [
+    {
+      "attempt": 1,
+      "result": "setup failure",
+      "error": "EEXIST: config/opencode created by isolated opencode --version"
+    },
+    {
+      "attempt": 2,
+      "result": "passed SSE + synchronous caller assertions"
+    },
+    {
+      "attempt": 3,
+      "result": "passed stronger sandbox DB + byte equality + grace + real DB assertions"
+    },
+    {
+      "attempt": 4,
+      "result": "passed after explicit matching SSE error wait and bounded cleanup",
+      "toolDurationMs": 10110,
+      "realSessionCountBefore": 8107,
+      "realSessionCountAfter": 8107
+    }
+  ],
+  "rawLogs": [
+    {
+      "path": "build.log",
+      "sha256": "4b0251187d78441995fbad518e5a76cf8211e1d7dc3de659cfd2537e903ead97"
+    },
+    {
+      "path": "compiler-correct-entry.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "compiler.log",
+      "sha256": "68b6c272ca9311e7da2bbfb220c6309cd40737334588dc8f86c226700b107f58"
+    },
+    {
+      "path": "install.log",
+      "sha256": "9cb1d8b787d277cc309ec725c3ceae3310bc2a485a27cbbe9576479a0aeb0f76"
+    },
+    {
+      "path": "merge.log",
+      "sha256": "b209373f54d99b09fbe2d9baa6a41c297ac30cbf1a509fe2952a751e5bf96b66"
+    },
+    {
+      "path": "probe-compiler-with-adapter-includes.log",
+      "sha256": "3301dbd060a64ff2452e632b1347aa85c6249528958639eb4d5445e5cbb89f4d"
+    },
+    {
+      "path": "probe-compiler.log",
+      "sha256": "35b049490d2888921677c59bb5b0be953894286588b0d895730fcc74db7c63e0"
+    },
+    {
+      "path": "qa-attempt1.log",
+      "sha256": "107582b161dfffbe4d974b0f0063038ddae22635b8278b8355199db8a0e985a4"
+    },
+    {
+      "path": "qa-attempt2/server.log",
+      "sha256": "ca384972cf88c2dd5c3e1b102843584eedf0d819bf3369bd1415a86d91dc166d"
+    },
+    {
+      "path": "qa-attempt2.log",
+      "sha256": "c1aecc7890231c4a9069f60c75b2500f7b6e283b738a74ed0171107b1686a0e8"
+    },
+    {
+      "path": "qa-attempt3/server.log",
+      "sha256": "ca384972cf88c2dd5c3e1b102843584eedf0d819bf3369bd1415a86d91dc166d"
+    },
+    {
+      "path": "qa-attempt3.log",
+      "sha256": "beb1aca552a670d4d3dc33b74148be706d1da6a6bf0c39ef7f7b3d0245e02cae"
+    },
+    {
+      "path": "tests.log",
+      "sha256": "cc391cea5388d8a132df54d8f8e0fa9b19b43c67b3dbd457c006131acb68d719"
+    }
+  ]
+}

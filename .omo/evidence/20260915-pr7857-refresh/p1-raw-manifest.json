@@ -1,0 +1,46 @@
+[
+  {
+    "path": "build.log",
+    "sha256": "0ef00321a5e016a4fd295c9568e456a21c3ab186a84e3ea21eded9ffd8a57279"
+  },
+  {
+    "path": "compiler.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "green.log",
+    "sha256": "4fce62230cbeeae430905528412d5844632675b333f60a349d77b19a903afb3f"
+  },
+  {
+    "path": "probe-compiler.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "qa-attached/live.jsonl",
+    "sha256": "3a1461d076f050255b52ce2badb96e7499aa1deb30a2ea44f8d1e15e050b42b6"
+  },
+  {
+    "path": "qa-attached/server.log",
+    "sha256": "ca384972cf88c2dd5c3e1b102843584eedf0d819bf3369bd1415a86d91dc166d"
+  },
+  {
+    "path": "qa-attached.log",
+    "sha256": "15eda29d569967e548a03d462271b40ab74a9d9d6bbae5f8cf7b7f30099fe1fa"
+  },
+  {
+    "path": "qa-fresh/live.jsonl",
+    "sha256": "2af3d720565891772836a8a6b5db4a3f14219b0ae4156333c1c68338883e44b9"
+  },
+  {
+    "path": "qa-fresh/server.log",
+    "sha256": "ca384972cf88c2dd5c3e1b102843584eedf0d819bf3369bd1415a86d91dc166d"
+  },
+  {
+    "path": "qa-fresh.log",
+    "sha256": "b221bc396c5bbe8505d8cf0de9ed1d2865b88a3fcd764b5bbad06f5ec06219a9"
+  },
+  {
+    "path": "red.log",
+    "sha256": "02bf32da85cad5c03509998b8d3d2783ecdc48dee79c5eae2ebfbfe495b71a94"
+  }
+]

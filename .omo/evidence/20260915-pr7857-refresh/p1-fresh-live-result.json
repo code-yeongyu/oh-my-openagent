@@ -1,0 +1,80 @@
+{
+  "case": "fresh",
+  "isolation": {
+    "environmentCleared": true,
+    "inheritedCredentials": false,
+    "inheritedConfig": false,
+    "inheritedSkills": false,
+    "cwdEmptySandbox": true,
+    "envKeys": [
+      "CI",
+      "DO_NOT_TRACK",
+      "HOME",
+      "OMO_DISABLE_PROCESS_CLEANUP",
+      "OPENCODE_DISABLE_AUTOUPDATE",
+      "OPENCODE_DISABLE_CLAUDE_CODE",
+      "OPENCODE_DISABLE_DEFAULT_PLUGINS",
+      "OPENCODE_DISABLE_EXTERNAL_SKILLS",
+      "OPENCODE_DISABLE_MODELS_FETCH",
+      "PATH",
+      "TMPDIR",
+      "XDG_CACHE_HOME",
+      "XDG_CONFIG_HOME",
+      "XDG_DATA_HOME",
+      "XDG_STATE_HOME"
+    ],
+    "realSessionCountBefore": 8103,
+    "realSessionCountAfter": 8103
+  },
+  "events": [
+    {
+      "id": "evt_0a5910d26002SeE8yWxO4EqAK2",
+      "type": "session.error",
+      "properties": {
+        "sessionID": "ses_f5a6ef33fffeQBlr4Jf69sTfS4",
+        "error": {
+          "name": "UnknownError",
+          "data": {
+            "message": "Model not found: openai/pr7857-missing."
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_0a5910d28001IXYdsYZy41h5vb",
+      "type": "session.error",
+      "properties": {
+        "sessionID": "ses_f5a6ef33fffeQBlr4Jf69sTfS4",
+        "error": {
+          "name": "UnknownError",
+          "data": {
+            "message": "ProviderModelNotFoundError: Model not found: openai/pr7857-missing.\n    at <anonymous> (/$bunfs/root/chunk-3yjk1w4m.js:439:94278)\n    at SessionPrompt.getModel (/$bunfs/root/chunk-jsvjjq7j.js:1142:11505)\n    at SessionPrompt.getModel (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:908)\n    at SessionPrompt.run (/$bunfs/root/chunk-jsvjjq7j.js:1142:15339)\n    at SessionPrompt.run (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:10503)\n    at SessionRunState.ensureRunning (/$bunfs/root/chunk-jsvjjq7j.js:1142:15308)\n    at SessionRunState.ensureRunning (definition) (/$bunfs/root/chunk-jsvjjq7j.js:2:8188)\n    at SessionPrompt.loop (/$bunfs/root/chunk-jsvjjq7j.js:1142:10225)\n    at SessionPrompt.loop (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:15244)\n    at SessionPrompt.prompt (/$bunfs/root/chunk-mjh4q85p.js:4:13569)\n    at SessionPrompt.prompt (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:9844)"
+          }
+        }
+      }
+    }
+  ],
+  "provider": [
+    {
+      "branch": "tool-call"
+    },
+    {
+      "branch": "caller-received",
+      "output": "ProviderModelNotFoundError: Model not found: openai/pr7857-missing.\n    at <anonymous> (/$bunfs/root/chunk-3yjk1w4m.js:439:94278)\n    at SessionPrompt.getModel (/$bunfs/root/chunk-jsvjjq7j.js:1142:11505)\n    at SessionPrompt.getModel (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:908)\n    at SessionPrompt.run (/$bunfs/root/chunk-jsvjjq7j.js:1142:15339)\n    at SessionPrompt.run (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:10503)\n    at SessionRunState.ensureRunning (/$bunfs/root/chunk-jsvjjq7j.js:1142:15308)\n    at SessionRunState.ensureRunning (definition) (/$bunfs/root/chunk-jsvjjq7j.js:2:8188)\n    at SessionPrompt.loop (/$bunfs/root/chunk-jsvjjq7j.js:1142:10225)\n    at SessionPrompt.loop (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:15244)\n    at SessionPrompt.prompt (/$bunfs/root/chunk-mjh4q85p.js:4:13569)\n    at SessionPrompt.prompt (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:9844)"
+    }
+  ],
+  "passed": true,
+  "opencodeVersion": "1.18.30",
+  "database": {
+    "childMessageRoles": [
+      "user",
+      "user"
+    ],
+    "childAssistantCount": 0,
+    "continuationAssistantCount": 0,
+    "completedBackgroundBeforeContinuation": false,
+    "toolStatus": "completed",
+    "toolDurationMs": 10141,
+    "callerOutputEqualsSseError": true
+  }
+}

@@ -67,6 +67,7 @@ export async function pollSyncSession(
     maxAssistantTurns?: number
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
+    getTerminalChildError?: (sessionID: string) => string | null | undefined
     childWakeGraceMs?: number
   },
   timeoutMs?: number
@@ -165,6 +166,12 @@ export async function pollSyncSession(
 
     await wait(syncTiming.POLL_INTERVAL_MS)
     pollCount++
+
+    const terminalChildError = input.getTerminalChildError?.(input.sessionID)
+    if (terminalChildError) {
+      log("[task] Poll detected terminal child error", { sessionID: input.sessionID, terminalChildError })
+      return terminalChildError
+    }
 
     let sessionStatus: ({ type: string; updatedAt?: string | number; revision?: string | number; messageCount?: number } & Record<string, unknown>) | undefined
     try {

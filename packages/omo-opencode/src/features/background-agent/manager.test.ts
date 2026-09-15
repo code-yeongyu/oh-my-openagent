@@ -6070,6 +6070,173 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     manager.shutdown()
   })
 
+  test.each(["completed", "error"] as const)("records terminal errors for sync-attached %s tasks without changing background state", (status) => {
+    //#given
+    const manager = createBackgroundManager()
+    const nowSpy = spyOn(Date, "now").mockReturnValue(1_000_000)
+    const message = "Model not found: openai/pr7857-missing"
+    const task = createMockTask({ id: `attached-${status}`, parentSessionId: "parent", sessionId: `ses_${status}`, status })
+    getTaskMap(manager).set(task.id, task)
+    const detach = manager.attachSyncContinuation(task.sessionId!)
+    try {
+      //#when
+      manager.handleEvent({ type: "session.error", properties: { sessionID: task.sessionId, error: { name: "APIError", message: "503 overloaded" } } })
+      nowSpy.mockReturnValue(1_010_000)
+      expect(manager.getTerminalChildError(task.sessionId!)).toBeNull()
+      manager.handleEvent({ type: "session.error", properties: { sessionID: task.sessionId, error: { name: "ProviderModelNotFoundError", message } } })
+      nowSpy.mockReturnValue(1_019_999)
+      expect(manager.getTerminalChildError(task.sessionId!)).toBeNull()
+      nowSpy.mockReturnValue(1_020_000)
+      //#then
+      expect(manager.getTerminalChildError(task.sessionId!)).toBe(message)
+      expect(task.status).toBe(status)
+      expect(task.error).toBeUndefined()
+      manager.handleEvent({ type: "message.updated", properties: { info: { sessionID: task.sessionId, role: "assistant", id: "recovered" } } })
+      expect(manager.getTerminalChildError(task.sessionId!)).toBeNull()
+      detach()
+      manager.handleEvent({ type: "session.error", properties: { sessionID: task.sessionId, error: { name: "ProviderModelNotFoundError", message } } })
+      nowSpy.mockReturnValue(1_030_000)
+      expect(manager.getTerminalChildError(task.sessionId!)).toBeNull()
+    } finally {
+      detach()
+      nowSpy.mockRestore()
+      manager.shutdown()
+    }
+  })
+
+  test("does not record terminal errors for sync-attached historical attempts", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const nowSpy = spyOn(Date, "now").mockReturnValue(1_000_000)
+    const task = createMockTask({
+      id: "stale-attached", parentSessionId: "parent", sessionId: "current", currentAttemptID: "attempt-current",
+      attempts: [{ attemptId: "attempt-old", attemptNumber: 1, sessionId: "old", status: "error", providerId: "openai", modelId: "missing", startedAt: new Date(0) }],
+    })
+    getTaskMap(manager).set(task.id, task)
+    const detach = manager.attachSyncContinuation("old")
+    try {
+      //#when
+      manager.handleEvent({ type: "session.error", properties: { sessionID: "old", error: { name: "ProviderModelNotFoundError", message: "Model not found" } } })
+      nowSpy.mockReturnValue(1_010_000)
+      //#then
+      expect(manager.getTerminalChildError("old")).toBeNull()
+      expect(manager.getTerminalChildError("current")).toBeNull()
+      expect(task.status).toBe("running")
+      expect(task.error).toBeUndefined()
+    } finally {
+      detach()
+      nowSpy.mockRestore()
+      manager.shutdown()
+    }
+  })
+
+  test("delays untracked terminal errors for fallback grace and clears recovered sessions", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const recordedAt = Date.now()
+    const nowSpy = spyOn(Date, "now").mockReturnValue(recordedAt)
+    const message = "Model not found: opencode/gpt-5-nano"
+
+    try {
+      //#when
+      for (const sessionID of ["ses_grace_terminal", "ses_grace_recovered"]) {
+        manager.handleEvent({
+          type: "session.error",
+          properties: { sessionID, error: { name: "ProviderModelNotFoundError", message } },
+        })
+      }
+
+      //#then
+      expect(manager.getTerminalChildError("ses_grace_terminal")).toBeNull()
+      expect(manager.getTerminalChildError("ses_grace_recovered")).toBeNull()
+      nowSpy.mockReturnValue(recordedAt + 9_999)
+      expect(manager.getTerminalChildError("ses_grace_terminal")).toBeNull()
+      manager.handleEvent({
+        type: "message.updated",
+        properties: {
+          info: { id: "msg_grace_recovered", sessionID: "ses_grace_recovered", role: "assistant" },
+        },
+      })
+      nowSpy.mockReturnValue(recordedAt + 10_000)
+      expect(manager.getTerminalChildError("ses_grace_terminal")).toBe(message)
+      expect(manager.getTerminalChildError("ses_grace_recovered")).toBeNull()
+      nowSpy.mockReturnValue(recordedAt + 20_000)
+      expect(manager.getTerminalChildError("ses_grace_recovered")).toBeNull()
+      manager.handleEvent({ type: "session.deleted", properties: { sessionID: "ses_grace_terminal" } })
+      expect(manager.getTerminalChildError("ses_grace_terminal")).toBeNull()
+    } finally {
+      nowSpy.mockRestore()
+      manager.shutdown()
+    }
+  })
+
+  test("records only terminal errors for untracked sessions", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const recordedAt = 1_000_000
+    const nowSpy = spyOn(Date, "now").mockReturnValue(recordedAt)
+
+    try {
+      //#when
+      manager.handleEvent({
+        type: "session.error",
+        properties: {
+          sessionID: "ses_untracked",
+          error: { name: "ProviderModelNotFoundError", message: "Model not found: opencode/gpt-5-nano" },
+        },
+      })
+      manager.handleEvent({
+        type: "session.error",
+        properties: {
+          sessionID: "ses_transient",
+          error: { name: "APIError", message: "503 overloaded", statusCode: 503 },
+        },
+      })
+      nowSpy.mockReturnValue(recordedAt + 10_000)
+
+      //#then
+      expect(manager.getTerminalChildError?.("ses_untracked")).toBe("Model not found: opencode/gpt-5-nano")
+      expect(manager.getTerminalChildError?.("ses_transient")).toBeNull()
+      expect(manager.getTerminalChildError?.("ses_unknown")).toBeNull()
+    } finally {
+      nowSpy.mockRestore()
+      manager.shutdown()
+    }
+  })
+
+  test("clears a recorded terminal error once the session produces output again", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const recordedAt = 2_000_000
+    const nowSpy = spyOn(Date, "now").mockReturnValue(recordedAt)
+
+    try {
+      manager.handleEvent({
+        type: "session.error",
+        properties: {
+          sessionID: "ses_recovered",
+          error: { name: "ProviderModelNotFoundError", message: "Model not found: opencode/gpt-5-nano" },
+        },
+      })
+      nowSpy.mockReturnValue(recordedAt + 10_000)
+      expect(manager.getTerminalChildError?.("ses_recovered")).toBe("Model not found: opencode/gpt-5-nano")
+
+      //#when
+      manager.handleEvent({
+        type: "message.updated",
+        properties: {
+          info: { id: "msg_recovered", sessionID: "ses_recovered", role: "assistant" },
+        },
+      })
+
+      //#then
+      expect(manager.getTerminalChildError?.("ses_recovered")).toBeNull()
+    } finally {
+      nowSpy.mockRestore()
+      manager.shutdown()
+    }
+  })
+
   test("does not terminate task on session.error when session is still alive", async () => {
     //#given
     const manager = createBackgroundManagerWithOptions({

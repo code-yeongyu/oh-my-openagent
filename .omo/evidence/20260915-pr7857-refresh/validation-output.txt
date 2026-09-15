@@ -1,0 +1,609 @@
+tests.log
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/tools/delegate-task/sync-session-poller.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+(pass) pollSyncSession > native finish-based completion > returns terminal child error immediately when only the anchor user turn exists [27.49ms]
+(pass) pollSyncSession > native finish-based completion > returns terminal session error when assistant message contains info.error [11.71ms]
+(pass) pollSyncSession > native finish-based completion > surfaces terminal errors even when status remains busy [11.40ms]
+(pass) pollSyncSession > native finish-based completion > ignores stale prior-turn assistant errors after a new user turn starts [65.84ms]
+(pass) pollSyncSession > native finish-based completion > detects completion when assistant message has terminal finish reason [11.79ms]
+(pass) pollSyncSession > native finish-based completion > keeps polling when assistant finish is tool-calls (non-terminal) [230.34ms]
+(pass) pollSyncSession > native finish-based completion > keeps polling when finish is 'unknown' (non-terminal) [118.26ms]
+(pass) pollSyncSession > native finish-based completion > keeps polling when finish is 'stop' but assistant still has tool-call parts [115.08ms]
+(pass) pollSyncSession > native finish-based completion > does not complete when assistant id < user id (user sent after assistant) [122.27ms]
+(pass) pollSyncSession > abort handling > #given session completed AND abort fires #then returns completion result not abort [1.28ms]
+(pass) pollSyncSession > abort handling > returns abort message when signal is aborted [0.25ms]
+(pass) pollSyncSession > abort handling > retries final message fetch on abort before returning aborted [22.67ms]
+(pass) pollSyncSession > timeout handling > returns error string on timeout [64.80ms]
+(pass) pollSyncSession > non-idle session status > inspects messages while active but only completes once the session is idle [33.66ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when messages array is empty [0.30ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when no assistant message exists [0.14ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when only assistant message exists (no user) [0.11ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when assistant message has missing finish field [0.12ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when assistant message has missing info.id field [0.10ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when finish is stop but assistant has tool-call parts [0.09ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when finish is end_turn but assistant has tool-call parts [0.08ms]
+(pass) pollSyncSession > isSessionComplete edge cases > returns false when user message has missing info.id field [0.09ms]
+(pass) pollSyncSession > direct child background task gating > waits for a fresh terminal turn after child background tasks clear [229.76ms]
+(pass) pollSyncSession > direct child background task gating > keeps waiting while a parent wake is pending even after children clear [222.40ms]
+(pass) pollSyncSession > direct child background task gating > times out when direct child background tasks never finish [65.34ms]
+
+packages/omo-opencode/src/tools/delegate-task/sync-continuation.test.ts:
+(pass) executeSyncContinuation - toast cleanup error paths > passes bound manager callbacks when polling a continuation [11.60ms]
+(pass) executeSyncContinuation - toast cleanup error paths > removes toast when fetchSyncResult throws [0.52ms]
+(pass) executeSyncContinuation - toast cleanup error paths > removes toast when pollSyncSession throws [0.27ms]
+(pass) executeSyncContinuation - toast cleanup error paths > recovers from MessageAbortedError poll error when result already exists [0.26ms]
+(pass) executeSyncContinuation - toast cleanup error paths > recovers from canonical aborted-operation message [0.20ms]
+(pass) executeSyncContinuation - toast cleanup error paths > returns MessageAbortedError poll error when recovery fetch has no result [0.18ms]
+(pass) executeSyncContinuation - toast cleanup error paths > does not recover abort poll error when anchor cannot be established [14.10ms]
+(pass) executeSyncContinuation - toast cleanup error paths > removes toast on successful completion [0.47ms]
+(pass) executeSyncContinuation - toast cleanup error paths > marks and aborts resumed sync session after successful handback [0.91ms]
+(pass) executeSyncContinuation - toast cleanup error paths > does not mark or abort resumed sync session when handback fails [0.49ms]
+(pass) executeSyncContinuation - toast cleanup error paths > removes toast when abort happens [0.34ms]
+(pass) executeSyncContinuation - toast cleanup error paths > no crash when toastManager is null [0.23ms]
+(pass) executeSyncContinuation - toast cleanup error paths > includes subagent in task_metadata when agent info is present in session messages [0.39ms]
+(pass) executeSyncContinuation - toast cleanup error paths > omits subagent from task_metadata when no agent info in session messages [0.21ms]
+(pass) executeSyncContinuation - toast cleanup error paths > preserves restricted tool permissions for resumed explore sessions [0.39ms]
+(pass) executeSyncContinuation - toast cleanup error paths > preserves restricted tool permissions for resumed librarian sessions [0.21ms]
+(pass) executeSyncContinuation - toast cleanup error paths > keeps task delegation enabled during prometheus sync continuation [0.27ms]
+(pass) executeSyncContinuation - toast cleanup error paths > attaches the session to the background manager for the poll window and detaches after handback [0.28ms]
+(pass) executeSyncContinuation - toast cleanup error paths > detaches from the background manager when pollSyncSession throws [0.25ms]
+(pass) executeSyncContinuation - toast cleanup error paths > detaches from the background manager when the continuation prompt fails [0.59ms]
+
+packages/omo-opencode/src/features/background-agent/manager.test.ts:
+(pass) BackgroundManager tmux callback ordering > starts promptAsync before a blocking tmux callback resolves [14.96ms]
+(pass) BackgroundManager session.error fallback hydration > hydrates fallbackChain from session fallback state before retrying sync child-session errors [0.40ms]
+(pass) BackgroundManager delegated child-session bootstrap > registers launch bootstrap before first prompt and clears it after completion [1.95ms]
+(pass) BackgroundManager prompt rejection fallback routing > routes launch-time prompt rejections into tryFallbackRetry before marking interrupt [0.86ms]
+(pass) BackgroundManager prompt rejection fallback routing > keeps launch running when promptAsync returns ambiguous EOF after dispatch [0.37ms]
+(pass) BackgroundManager prompt rejection fallback routing > routes resume-time prompt rejections into tryFallbackRetry before marking interrupt [0.81ms]
+(pass) BackgroundManager prompt rejection fallback routing > keeps resumed task running when promptAsync returns ambiguous EOF after dispatch [0.25ms]
+(pass) BackgroundManager retry observability > queues a parent-visible retry notification when fallback retry is scheduled [2.71ms]
+(pass) BackgroundManager retry observability > falls back to task parent agent when retrying wake cannot load parent messages [0.80ms]
+(pass) BackgroundManager retry observability > does not invent a parent agent when retrying wake has no context source [0.56ms]
+(pass) BackgroundManager retry observability > queues a second parent-visible notification once the retry session ID is created [0.59ms]
+(pass) BackgroundManager retry observability > builds retry-ready links from the parent session directory when it differs from the manager directory [0.34ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return empty array when no tasks exist [0.11ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return direct children only when no nested tasks [0.09ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return all nested descendants (2 levels deep) [0.08ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return all nested descendants (3 levels deep) [0.08ms]
+(pass) BackgroundManager.getAllDescendantTasks > should handle multiple branches (tree structure) [0.09ms]
+(pass) BackgroundManager.getAllDescendantTasks > should not include tasks from unrelated sessions [0.07ms]
+(pass) BackgroundManager.getAllDescendantTasks > getTasksByParentSession should only return direct children (not recursive) [0.07ms]
+(pass) BackgroundManager.getTasksSnapshot > getTasksSnapshot empty returns an empty defensive snapshot [0.13ms]
+(pass) BackgroundManager.getTasksSnapshot > returns frozen snapshots without exposing the internal task map [0.13ms]
+(pass) BackgroundManager.notifyParentSession - release ordering > should unblock queued task even when prompt hangs [0.22ms]
+(pass) BackgroundManager.notifyParentSession - release ordering > should keep queue blocked if release is after prompt (demonstrates the bug) [51.45ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should not prune fresh tasks [0.20ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should prune tasks older than 30 minutes [0.11ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should prune stale notifications [0.10ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should clean up notifications when task is pruned [0.10ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should keep fresh tasks while pruning stale ones [0.09ms]
+(pass) BackgroundManager.resume > should throw error when task not found [0.42ms]
+(pass) BackgroundManager.resume > should resume existing task and reset state to running [0.11ms]
+(pass) BackgroundManager.resume > should preserve task identity while updating parent context [0.10ms]
+(pass) BackgroundManager.resume > should track resume calls with prompt [0.08ms]
+(pass) BackgroundManager.resume > should preserve existing tool call count in progress [0.08ms]
+(pass) BackgroundManager.resume > should reject resume when task is already running [0.10ms]
+(pass) LaunchInput.skillContent > skillContent should be optional in LaunchInput type [0.07ms]
+(pass) LaunchInput.skillContent > skillContent can be provided in LaunchInput [0.06ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should skip compaction agent and use nearest non-compaction message [254.46ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should use currentMessage model/agent when available [0.18ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should fallback to parentAgent when currentMessage.agent is undefined [0.09ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should not pass model when currentMessage.model is incomplete [0.08ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should handle null currentMessage gracefully [0.07ms]
+(pass) BackgroundManager.notifyParentSession - aborted parent > should fall back and still notify when parent session messages are aborted [255.64ms]
+(pass) BackgroundManager.notifyParentSession - aborted parent > should swallow aborted error from prompt [252.88ms]
+(pass) BackgroundManager.notifyParentSession - aborted parent > should queue notification when promptAsync aborts while parent is idle [252.53ms]
+(pass) BackgroundManager.notifyParentSession - notifications toggle > should skip parent prompt injection when notifications are disabled [0.27ms]
+(pass) BackgroundManager.notifyParentSession - variant propagation > should prefer parent session variant over child task variant in parent notification promptAsync body [252.26ms]
+(pass) BackgroundManager.notifyParentSession - variant propagation > should not include variant in promptAsync body when task has no variant [254.33ms]
+(pass) BackgroundManager.injectPendingNotificationsIntoChatMessage > should defer queued notifications without mutating user text [0.32ms]
+(pass) BackgroundManager.tryCompleteTask > should release concurrency and clear key on completion [0.60ms]
+(pass) BackgroundManager.tryCompleteTask > should prevent double completion and double release [0.52ms]
+(pass) BackgroundManager.tryCompleteTask > should abort session on completion [0.39ms]
+(pass) BackgroundManager.tryCompleteTask > should fire onSubagentSessionDeleted callback on completion [0.34ms]
+(pass) BackgroundManager.tryCompleteTask > #given the final child is mid-teardown #when its session abort is still pending #then hasPendingParentWake keeps reporting an owed wake [0.57ms]
+(pass) BackgroundManager.tryCompleteTask > should immediately clear completed subagent runtime-fallback eligibility [0.31ms]
+(pass) BackgroundManager.tryCompleteTask > should clean pendingByParent even when promptAsync notification fails [0.51ms]
+(pass) BackgroundManager.tryCompleteTask > should remove toast tracking before notifying completed task [0.50ms]
+(pass) BackgroundManager.tryCompleteTask > should release task concurrencyKey when startTask throws after assigning it [0.48ms]
+(pass) BackgroundManager.tryCompleteTask > should mark task as error when startTask throws after session creation [0.57ms]
+(pass) BackgroundManager.tryCompleteTask > should release queue slot when queued task is already interrupt [0.31ms]
+(pass) BackgroundManager.tryCompleteTask > should avoid overlapping promptAsync calls when tasks complete concurrently [253.37ms]
+(pass) BackgroundManager.trackTask > should not double acquire on duplicate registration [0.39ms]
+(pass) BackgroundManager.resume concurrency key > should re-acquire using external task concurrency key [0.56ms]
+(pass) BackgroundManager.resume concurrency key > should re-acquire persisted model group using provider concurrency key [0.48ms]
+(pass) BackgroundManager.resume running-task guard > rejects a running task without changing parent context or dispatching a prompt [0.29ms]
+(pass) BackgroundManager.resume promptAsync gate state > restores completed task state when resume prompt is skipped because the session is active [0.40ms]
+(pass) BackgroundManager.resume promptAsync gate state > restores completed task state when resume prompt is skipped by an existing reservation [0.64ms]
+(pass) BackgroundManager.resume model persistence > should pass model when task has a configured model [0.29ms]
+(pass) BackgroundManager.resume model persistence > should preserve promoted per-model settings when resuming a task [0.20ms]
+(pass) BackgroundManager.resume model persistence > should NOT pass model when task has no model (backward compatibility) [0.13ms]
+(pass) BackgroundManager process cleanup > should remove listeners after last shutdown [0.18ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should return task with pending status immediately [0.52ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should sanitize wrapped agent names before task creation and queueing [0.58ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should sanitize slash and quote wrapped agent names before task creation and queueing [0.38ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should reject wrapper-only agent names after sanitization [0.14ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should initialize attempt state for a newly launched task [0.34ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should return immediately even with concurrency limit [0.60ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should keep agent when launch has model and keep agent without model [0.67ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should queue multiple tasks without blocking [0.85ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > does not override parent session permission when creating child session [11.42ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should transition first task to running immediately [11.54ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should set startedAt when transitioning to running [10.99ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should track rootSessionID and spawnDepth from the parent chain [1.04ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should block launches that exceed maxDepth [0.18ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows multiple descendants without a root spawn cap [0.62ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows spawn assertions after reserveSubagentSpawn without a root spawn cap [0.59ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should fail closed when session lineage lookup fails [0.30ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows replacement launch when a queued task is cancelled before session starts [1.07ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows retry after session creation fails before session starts [11.71ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should only roll back the failed task reservation once when siblings still exist [0.44ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should keep the next queued task when the first task is cancelled during session creation [1.04ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should keep sibling launch running when concurrent launches share a parent and the first is cancelled during session creation [0.91ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should keep task cancelled and abort the session when cancellation wins during session creation [0.70ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should start prompt before tmux callback cancellation [1.28ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows relaunch after task completes [0.96ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows relaunch after running task is cancelled [1.00ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows relaunch after task errors [102.07ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows repeated relaunch after pending tasks are cancelled [1.72ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > pending task can be cancelled > should cancel pending task successfully [0.91ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > pending task can be cancelled > should not cancel running task [11.53ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > pending task can be cancelled > should remove cancelled task from queue [1.48ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > cancelTask > should cancel running task and release concurrency [0.55ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > cancelTask > should remove task from toast manager when notification is skipped [0.27ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should process different concurrency keys in parallel [11.68ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should respect per-key concurrency limits [0.63ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should process model-based keys in parallel [11.62ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should respect provider concurrency across different models on the same provider [0.96ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should resolve limits from raw model keys while queueing by provider key [0.43ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should remove cancelled pending model task from provider queue [0.58ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should use queuedAt for pending task TTL [0.35ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should use startedAt for running task TTL [10.59ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should have different timestamps for queuedAt and startedAt [153.18ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > manual verification scenario > should handle 10 tasks with limit 5 returning immediately [2.08ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should NOT interrupt task running less than 30 seconds (min runtime guard) [0.55ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should NOT interrupt task with recent lastUpdate [0.13ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt task with stale lastUpdate (> 3min) [0.26ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should respect custom staleTimeoutMs config [0.13ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should release concurrency before abort [0.14ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should handle multiple stale tasks in same poll cycle [0.15ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should use default timeout when config not provided [0.11ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt running session when lastUpdate exceeds stale timeout [0.36ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt task when session is idle and lastUpdate exceeds stale timeout [0.14ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt running session even with very old lastUpdate [0.12ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt running session with no progress after message staleness timeout [0.11ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt task with no lastUpdate after messageStalenessTimeout [0.24ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should NOT interrupt task with no lastUpdate within session-gone timeout [0.10ms]
+(pass) BackgroundManager.shutdown session abort > should call session.abort for all running tasks during shutdown [0.12ms]
+(pass) BackgroundManager.shutdown session abort > should not call session.abort for completed or cancelled tasks [0.11ms]
+(pass) BackgroundManager.shutdown session abort > should call onShutdown callback during shutdown [0.10ms]
+(pass) BackgroundManager.shutdown session abort > should not throw when onShutdown callback throws [0.84ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should cancel descendant tasks and keep them until delayed cleanup [1.03ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should remove cancelled tasks from toast manager while preserving delayed cleanup [0.72ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should clean pending notifications for deleted sessions [0.09ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should clear session agent state for deleted sessions to prevent map leak [0.13ms]
+(pass) BackgroundManager.handleEvent - session.error > sets task to error, releases concurrency, and keeps it until delayed cleanup [0.64ms]
+(pass) BackgroundManager.handleEvent - session.error > should remove errored task from toast manager while preserving delayed cleanup [0.44ms]
+(pass) BackgroundManager.handleEvent - session.error > ignores session.error for non-running tasks [0.11ms]
+(pass) BackgroundManager.handleEvent - session.error > ignores session.error for unknown session [0.33ms]
+(pass) BackgroundManager.handleEvent - session.error > delays untracked terminal errors for fallback grace and clears recovered sessions [0.36ms]
+(pass) BackgroundManager.handleEvent - session.error > records only terminal errors for untracked sessions [0.28ms]
+(pass) BackgroundManager.handleEvent - session.error > clears a recorded terminal error once the session produces output again [0.13ms]
+(pass) BackgroundManager.handleEvent - session.error > does not terminate task on session.error when session is still alive [0.24ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task and notifies parent on terminal session.error (e.g. no provider available) even when session is still alive [0.63ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task and notifies parent on terminal model lookup failure while session is still alive [0.44ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task and notifies parent on terminal credential failure while session is still alive [0.26ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task when agent-not-found arrives as async session.error after promptAsync accept [0.65ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when the wake prompt fails through session.error [304.19ms]
+(pass) BackgroundManager.handleEvent - session.error > pins the registered parent agent alias before dispatching a deferred parent wake [155.11ms]
+(pass) BackgroundManager.handleEvent - session.error > keeps dispatched parent wake tracked when message.updated only records the injected user wake [152.02ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when a late error follows the injected user wake part [302.90ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when split text deltas stream the injected user wake [306.16ms]
+(pass) BackgroundManager.handleEvent - session.error > does not requeue dispatched parent wake after real assistant text delta output [154.02ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when session.error arrives with only the injected user wake visible [303.35ms]
+(pass) BackgroundManager.handleEvent - session.error > does not requeue dispatched parent wake when session history already contains assistant output after the wake [303.84ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task on session.error when session is gone [0.70ms]
+(pass) BackgroundManager.handleEvent - session.error > completes task on session.idle after transient session.error [11.68ms]
+(pass) BackgroundManager.handleEvent - session.error > completes task when session.idle carries session id in info [10.69ms]
+(pass) BackgroundManager.handleEvent - session.error > completes task on session.status idle after todo-continuation finishes [0.98ms]
+(pass) BackgroundManager.handleEvent - session.error > retry path releases current concurrency slot and prefers current provider in fallback entry [0.73ms]
+(pass) BackgroundManager.handleEvent - session.error > retry path triggers on session.status retry events [0.35ms]
+(pass) BackgroundManager.handleEvent - session.error > retry path triggers on message.updated assistant error events [0.32ms]
+(pass) BackgroundManager queue processing - error tasks are skipped > does not start tasks with status=error [0.23ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey > removes stale pending task from queue [0.50ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey > removes stale task from toast manager [0.36ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey > keeps stale task until notification cleanup after notifying parent [251.23ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should have completionTimers Map initialized [0.12ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should start per-task cleanup timers independently of sibling completion [0.60ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should clear all completion timers on shutdown [0.13ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should preserve cleanup timer when terminal task session is deleted [0.16ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should not leak timers across multiple shutdown calls [0.07ms]
+(pass) BackgroundManager.handleEvent - early session.idle deferral > should defer and retry when session.idle fires before MIN_IDLE_TIME_MS [111.11ms]
+(pass) BackgroundManager.handleEvent - early session.idle deferral > should not defer when session.idle fires after MIN_IDLE_TIME_MS [11.45ms]
+(pass) BackgroundManager.handleEvent - early session.idle deferral > should not process deferred idle if task already completed by other means [201.89ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should update lastUpdate on text-type message.part.updated event [0.28ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should update lastUpdate when legacy message.part.updated only has part session id [0.12ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should update lastUpdate on thinking-type message.part.updated event [0.09ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should initialize progress on first non-tool event [0.11ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should NOT mark thinking model as stale when text events refresh lastUpdate [0.19ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should refresh lastUpdate on message.part.delta events (OpenCode >=1.2.0) [0.13ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should complete idle task without fetching messages after output event was observed [11.03ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should keep resumed task in memory after previous completion timer deadline [0.46ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should start cleanup timer even when promptAsync aborts [0.30ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should keep completed task retrievable after scheduled removal [0.14ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should resolve a completed task registered by an earlier plugin manager instance [0.11ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should redact active task prompts resolved from an earlier plugin manager instance [0.12ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should resolve archived completed task from an earlier plugin manager instance [0.08ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should archive terminal registry tasks during earlier manager shutdown [0.10ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should forget active registry tasks during earlier manager shutdown [0.10ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should cap completed task archive size at 100 entries [0.27ms]
+(pass) BackgroundManager - tool permission spread order > startTask respects explore agent restrictions [0.39ms]
+(pass) BackgroundManager - tool permission spread order > startTask keeps agent when explicit model is configured [0.23ms]
+(pass) BackgroundManager - tool permission spread order > startTask updates tracked session agent when launch falls back to general [11.33ms]
+(pass) BackgroundManager - tool permission spread order > resume respects explore agent restrictions [0.33ms]
+(pass) BackgroundManager - tool permission spread order > resume keeps agent when explicit model is configured [0.19ms]
+(pass) BackgroundManager.launch - attempt state initialization > newly launched task has attempt state with attemptNumber 1 and currentAttemptID pointing at it [0.67ms]
+(pass) BackgroundManager attempt lifecycle bindings > startTask binds the created session to the queued attempt ID and mirrors task projection [0.27ms]
+(pass) BackgroundManager attempt lifecycle bindings > startTask clears child session agent state when task is cancelled before launch binding [0.16ms]
+(pass) BackgroundManager attempt lifecycle bindings > historical attempt session IDs resolve to the task while stale session.error events leave the current attempt unchanged [0.16ms]
+(pass) BackgroundManager attempt lifecycle bindings > late launch prompt errors from a historical attempt do not interrupt the current retry attempt [0.34ms]
+
+ 243 pass
+ 0 fail
+ 759 expect() calls
+Ran 243 tests across 3 files. [11.08s]
+
+
+compiler-correct-entry.log
+
+
+probe-compiler-scoped-ambient.log
+
+
+build.log
+$ bun run script/build.ts
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Cloning into '<worktree>/packages/shared-skills/upstreams/designpowers'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Cloning into '<worktree>/packages/shared-skills/upstreams/open-design'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Cloning into '<worktree>/packages/shared-skills/upstreams/taste-skill'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Cloning into '<worktree>/packages/shared-skills/upstreams/ui-ux-pro-max'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Submodule path 'packages/shared-skills/upstreams/designpowers': checked out 'cb00757da9d554591fa78d27aa1854d60a05c4f7'
+Submodule path 'packages/shared-skills/upstreams/open-design': checked out '6afe7eae156bfa29251a51fd0636649c257f7444'
+Submodule path 'packages/shared-skills/upstreams/taste-skill': checked out 'b17742737e796305d829b3ad39eda3add0d79060'
+Submodule path 'packages/shared-skills/upstreams/ui-ux-pro-max': checked out 'f32d6a61cdf0bfd57404c45854583fd19ff95088'
+[materialize] wrote 148 frontend reference files from submodules
+build:git-bash-mcp
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 45ms
+
+  cli.js  22.68 KB  (entry point)
+
+build:ast-grep-mcp
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 103 modules in 52ms
+
+  cli.js  85.17 KB  (entry point)
+
+build:tui
+Bundled 555 modules in 96ms
+
+  tui.js  2.16 MB  (entry point)
+
+build:cli
+Bundled 929 modules in 136ms
+
+  index.js  3.37 MB  (entry point)
+
+build:codex-install
+$ bun run script/build-codex-install.ts
+build:cli-node
+$ bun run script/build-cli-node.ts
+built dist/cli-node (1 output)
+build:index
+Bundled 1998 modules in 191ms
+
+  index.js  5.87 MB  (entry point)
+
+build:node-require-shim
+$ bun run script/patch-node-require-shim.ts
+Patched Node/Electron require shim in dist/index.js
+build:omo-schema
+$ bun run script/build-omo-schema.ts
+Generating omo JSON Schema...
+✓ omo JSON Schema generated: assets/omo.schema.json
+build:schema
+$ bun run script/build-schema.ts
+Generating JSON Schemas...
+✓ JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+build:shared-skills-assets
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+build:declarations
+build:lsp-daemon
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 52 packages, and audited 55 packages in 1s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 9ms
+
+  cli.js     250.43 KB  (entry point)
+  index.js   231.32 KB  (entry point)
+  client.js  229.0 KB   (entry point)
+
+build:lsp-tools-mcp
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 52 packages, and audited 55 packages in 1s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 12ms
+
+  cli.js               195.27 KB  (entry point)
+  mcp.js               194.80 KB  (entry point)
+  tools.js             182.91 KB  (entry point)
+  request-context.js   7.47 KB    (entry point)
+  lsp/manager.js       109.46 KB  (entry point)
+
+build:codex-plugin
+$ npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build
+
+added 71 packages, and audited 89 packages in 1s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 5.0.0-beta.62 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.62 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 13ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.62 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 8ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.62 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 17ms
+
+  cli.js  156.17 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 8ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 5ms
+
+  cli.js  4.22 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 12ms
+
+  cli.js  156.38 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.62 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 94 modules in 16ms
+
+  cli.js  0.27 MB  (entry point)
+
+Bundled 92 modules in 15ms
+
+  posthog.js  0.27 MB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 94 modules in 12ms
+
+  cli.js  0.27 MB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.62 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 7ms
+
+  cli.js  14.52 KB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 5ms
+
+  cli.js  14.78 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.62 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 5ms
+
+  cli.js  35.97 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 4ms
+
+  cli.js  36.14 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.62 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.62 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 10ms
+
+  cli.js  6.1 KB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 9ms
+
+  cli.js  8.79 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.62 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 53 modules in 7ms
+
+  cli.js  199.46 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.62 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.62 build
+> node scripts/build-runtime.mjs
+
+Bundled 10 modules in 16ms
+
+  cli.js  228.00 KB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 53 modules in 6ms
+
+  cli.js  200.58 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.62 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+
+  dist/cli.js  375.6kb
+
+⚡ Done in 23ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 179 modules in 11ms
+
+  cli.js  0.38 MB  (entry point)
+
+build:senpi-plugin
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] skipped (OMO_SKIP_MATERIALIZE=1)
+Staged Senpi LSP runtime: <worktree>/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: <worktree>/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+Staged x-search conditional skill: <worktree>/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 42 modules in 8ms
+
+  sdk.js  99.21 KB  (entry point)
+
+Bundled 960 modules in 62ms
+
+  omo.js  2.0 MB  (entry point)
+
+Bundled 700 modules in 38ms
+
+  omo-task.js  1.0 MB  (entry point)
+
+Bundled 213 modules in 12ms
+
+  omo-member.js  177.82 KB  (entry point)
+
+Bundled 151 modules in 11ms
+
+  memory-run-supervisor.mjs  42.50 KB  (entry point)
+
+Bundled 159 modules in 12ms
+
+  omo-init-deep-advisor.js  85.68 KB  (entry point)
+
+Built omo-senpi extensions: <worktree>/packages/omo-senpi/plugin/extensions/omo.js, <worktree>/packages/omo-senpi/plugin/extensions/omo-task.js, <worktree>/packages/omo-senpi/plugin/extensions/omo-member.js, <worktree>/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, <worktree>/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to <worktree>/packages/omo-senpi/plugin/skills
+generated directive is current: <worktree>/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 7 modules in 4ms
+
+  install.mjs  20.66 KB  (entry point)
+
+Built omo-senpi installer: <worktree>/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed
