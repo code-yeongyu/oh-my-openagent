@@ -18,6 +18,7 @@ on:
           - dag-race
           - memfs-restore
           - memory-two-process
+          - memory-two-process-diagnostic
           - senpi-overflow
           - full-shard-2
       iterations:
@@ -131,6 +132,16 @@ jobs:
               }
             )
             "memory-two-process" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/memory-core/src/concurrency/two-process.test.ts")
+              }
+            )
+            "memory-two-process-diagnostic" = @(
+              [ordered]@{
+                Phase = "diagnostic"
+                Arguments = [string[]]@("test", "packages/memory-core/src/concurrency/win32-probe-diagnostic.test.ts")
+              }
               [ordered]@{
                 Phase = "test"
                 Arguments = [string[]]@("test", "packages/memory-core/src/concurrency/two-process.test.ts")
