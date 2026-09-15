@@ -7,6 +7,29 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 describe("build-omo-schema-document", () => {
+  test("#given defaulted profiles #when generating the schema #then omission is allowed", () => {
+    const schema = createOmoJsonSchema()
+    const properties = isRecord(schema.properties) ? schema.properties : {}
+
+    expect(properties.profiles).toBeDefined()
+    expect(schema.required ?? []).not.toContain("profiles")
+  })
+
+  test.each(["root", "profile"])("#given an embedded %s schema #when generated #then git_master is optional", (location) => {
+    const schema = createOmoJsonSchema()
+    const properties = isRecord(schema.properties) ? schema.properties : {}
+    const profiles = isRecord(properties.profiles) ? properties.profiles : {}
+    const profile = isRecord(profiles.additionalProperties) ? profiles.additionalProperties : {}
+    const profileProperties = isRecord(profile.properties) ? profile.properties : {}
+    const openCode = (location === "root" ? properties : profileProperties)["[opencode]"]
+
+    expect(isRecord(openCode)).toBe(true)
+    if (!isRecord(openCode)) throw new Error("Expected embedded OpenCode schema")
+    const openCodeProperties = isRecord(openCode.properties) ? openCode.properties : {}
+    expect(openCodeProperties.git_master).toBeDefined()
+    expect(openCode.required ?? []).not.toContain("git_master")
+  })
+
   test("#given the omo config schema #when generated #then it is a draft-7 document with the config sections", () => {
     // given
     const expectedDraft = "http://json-schema.org/draft-07/schema#"
@@ -177,6 +200,21 @@ describe("build-omo-schema-document", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("#given embedded OpenCode schemas #when serialized #then only the composed document declares an identifier", () => {
+    // given
+    const schema = createOmoJsonSchema()
+    const identifiers: unknown[] = []
+
+    // when
+    JSON.parse(JSON.stringify(schema), (key: string, value: unknown) => {
+      if (key === "$id") identifiers.push(value)
+      return value
+    })
+
+    // then
+    expect(identifiers).toEqual([OMO_SCHEMA_ID])
   })
 
   test("#given the schema generator #when it runs twice #then it produces no diff", () => {

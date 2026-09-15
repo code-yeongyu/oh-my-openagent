@@ -1,0 +1,44 @@
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+.omo/evidence/20260909-6445-input-schema/valid-unified-migrated.json valid
+.omo/evidence/20260909-6445-input-schema/valid-unified-profile.json valid
+unknown format "uri" ignored in schema at path "#/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/model_capabilities/properties/source_url"
+.omo/evidence/20260909-6445-input-schema/valid-flat.json valid
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+.omo/evidence/20260909-6445-input-schema/invalid-git-master.json invalid
+[
+  {
+    instancePath: '/[opencode]/git_master',
+    schemaPath: '#/properties/%5Bopencode%5D/properties/git_master/type',
+    keyword: 'type',
+    params: { type: 'object' },
+    message: 'must be object'
+  }
+]
+.omo/evidence/20260909-6445-input-schema/invalid-profiles.json invalid
+[
+  {
+    instancePath: '/profiles',
+    schemaPath: '#/properties/profiles/type',
+    keyword: 'type',
+    params: { type: 'object' },
+    message: 'must be object'
+  }
+]
+.omo/evidence/20260909-6445-input-schema/invalid-unknown.json invalid
+[
+  {
+    instancePath: '',
+    schemaPath: '#/additionalProperties',
+    keyword: 'additionalProperties',
+    params: { additionalProperty: 'unexpected' },
+    message: 'must NOT have additional properties'
+  }
+]
+SCHEMA_DATA_QA_PASS

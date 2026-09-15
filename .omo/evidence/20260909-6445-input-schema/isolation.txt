@@ -1,0 +1,5 @@
+HOST_DB_BEFORE=8083
+OWNED_CONTAINER=omo-schema-6445-network-26703
+{"status":"PASS","healthy":true,"call_omo_agent":true,"serverExited":true}
+HOST_DB_AFTER=8083
+HOST_DB_UNCHANGED_CONTAINER_REMOVED

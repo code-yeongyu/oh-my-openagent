@@ -1,0 +1,22 @@
+bun test v1.4.0 (34cbb9a40)
+
+script/build-schema.test.ts:
+✓ build-schema-document > #given defaulted git_master #when generating the flat schema #then omission is allowed [10.33ms]
+✓ build-schema-document > generates schema with skills property [1.68ms]
+
+script/build-omo-schema.test.ts:
+✓ build-omo-schema-document > #given defaulted profiles #when generating the schema #then omission is allowed [3.61ms]
+✓ build-omo-schema-document > #given an embedded root schema #when generated #then git_master is optional [1.88ms]
+✓ build-omo-schema-document > #given an embedded profile schema #when generated #then git_master is optional [1.62ms]
+✓ build-omo-schema-document > #given the omo config schema #when generated #then it is a draft-7 document with the config sections [1.42ms]
+✓ build-omo-schema-document > #given the strict root object #when generated #then $schema is an allowed property and extras are rejected [1.44ms]
+✓ build-omo-schema-document > #given the todo-4 and todo-15 golden migrated document #when validated by the generated schema #then base and profile OpenCode blocks validate [76.35ms]
+✓ build-omo-schema-document > #given an out-of-range OpenCode team maximum #when validated by the generated schema #then root and profile blocks are rejected [47.01ms]
+✓ build-omo-schema-document > #given an unknown top-level key #when validated by the generated schema #then it is rejected [30.96ms]
+✓ build-omo-schema-document > #given embedded OpenCode schemas #when serialized #then only the composed document declares an identifier [8.34ms]
+✓ build-omo-schema-document > #given the schema generator #when it runs twice #then it produces no diff [5.60ms]
+
+ 12 pass
+ 0 fail
+ 29 expect() calls
+Ran 12 tests across 2 files. [2.91s]
