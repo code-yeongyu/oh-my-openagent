@@ -68,6 +68,7 @@ type ProcessHandle = import("bun:ffi").Pointer | bigint
 
 type Kernel32ProcessTimes = {
   readonly OpenProcess: (access: number, inheritHandle: number, pid: number) => ProcessHandle | null
+  readonly GetCurrentProcess: () => ProcessHandle | null
   readonly GetProcessTimes: (
     handle: ProcessHandle,
     creation: BigUint64Array,
@@ -86,6 +87,7 @@ async function openKernel32(): Promise<Kernel32ProcessTimes | null> {
     const { dlopen, FFIType } = await import("bun:ffi")
     const library = dlopen("kernel32.dll", {
       OpenProcess: { args: [FFIType.u32, FFIType.i32, FFIType.u32], returns: FFIType.ptr },
+      GetCurrentProcess: { args: [], returns: FFIType.ptr },
       GetProcessTimes: { args: [FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr], returns: FFIType.i32 },
       CloseHandle: { args: [FFIType.ptr], returns: FFIType.i32 },
     })
@@ -105,7 +107,8 @@ export async function readWin32ProcessCreationFiletime(pid: number): Promise<big
   kernel32Lookup ??= openKernel32()
   const kernel32 = await kernel32Lookup
   if (kernel32 === null) return null
-  const handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
+  const self = pid === process.pid
+  const handle = self ? kernel32.GetCurrentProcess() : kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
   if (handle === null || handle === 0 || handle === 0n) return null
   try {
     const creation = new BigUint64Array(1)
@@ -113,6 +116,6 @@ export async function readWin32ProcessCreationFiletime(pid: number): Promise<big
     const filetime = creation[0] ?? 0n
     return ok === 0 || filetime === 0n ? null : filetime
   } finally {
-    kernel32.CloseHandle(handle)
+    if (!self) kernel32.CloseHandle(handle)
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { execFile } from "node:child_process"
 
-import { getProcessStartIdentity, startIdentitiesConflict } from "./process-identity"
+import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "./process-identity"
 import { readDarwinProcessStartSeconds, readWin32ProcessCreationFiletime } from "./process-start-time"
 
 const onDarwin = process.platform === "darwin"
@@ -181,6 +181,16 @@ describe("win32 process creation time", () => {
       expect(await getProcessStartIdentity(UNREACHABLE_PID)).toBeNull()
     },
   )
+})
+
+describe("pid liveness", () => {
+  test("#given the current pid #when liveness is probed #then it is alive", () => {
+    expect(getPidLiveness(process.pid)).toBe("alive")
+  })
+
+  test("#given the current pid #when start identity is read #then it is present", async () => {
+    expect(await getProcessStartIdentity(process.pid)).not.toBeNull()
+  })
 })
 
 describe("start identity comparison", () => {

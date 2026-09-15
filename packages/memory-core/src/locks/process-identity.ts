@@ -111,6 +111,10 @@ export function startIdentitiesComparable(recorded: string, actual: string): boo
 export type ProcessLiveness = "alive" | "dead" | "unknown"
 
 export function getPidLiveness(pid: number): ProcessLiveness {
+  // The running process cannot be dead. bun-on-Windows `kill(pid, 0)` has returned ESRCH for the
+  // current pid (1.88ms `expect(recorded).not.toBeNull()` in supervisor start identity), and a
+  // false-dead own pid short-circuits the start-identity reader to null.
+  if (pid === process.pid) return "alive"
   try {
     process.kill(pid, 0)
     return "alive"
