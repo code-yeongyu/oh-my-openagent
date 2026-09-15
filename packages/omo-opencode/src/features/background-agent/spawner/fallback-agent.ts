@@ -36,6 +36,7 @@ export function buildFallbackBody(
       task: false,
       call_omo_agent: true,
       question: false,
+      lsp_install_decision: true,
       ...getAgentToolRestrictions(fallbackAgent, options),
     },
   }
