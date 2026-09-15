@@ -1,0 +1,8 @@
+SANDBOX=/tmp/pr6669-cli-nMEF0h
+--- opencode run (no credentials, expect provider error not hang) ---
+{"type":"error","timestamp":1788279668247,"sessionID":"ses_fa239c371ffe8qrZg47nuNc9LM","error":{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_ba9f4958"}}}
+RUN_EXIT=1
+--- isolated session count ---
+1
+--- plugin log ---
+[2026-09-01T16:21:07.247Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/pr6669-cli-nMEF0h"}
