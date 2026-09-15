@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { parse as parseYaml } from "yaml"
+import { YAMLException } from "js-yaml"
+import { parseYaml } from "./yaml.test-support"
 import { FrontmatterError, parseMemoryFile, renderMemoryFile } from "./frontmatter"
 import {
   MAX_DESCRIPTION_LENGTH,
@@ -31,7 +32,7 @@ describe("renderMemoryFile strict YAML output", () => {
   ]
 
   for (const description of hazards) {
-    it(`#given description ${JSON.stringify(description)} #when rendered #then yaml.parse returns the identical string`, () => {
+    it(`#given description ${JSON.stringify(description)} #when rendered #then the YAML parser returns the identical string`, () => {
       // #when
       const rendered = renderMemoryFile({ description }, "body")
 
@@ -172,7 +173,7 @@ describe("describeFrontmatterViolation", () => {
     const violation = describeFrontmatterViolation("---\ndescription: by default: verify\n---\nbody")
 
     expect(violation).toContain("'description' is not a safe YAML plain scalar")
-    expect(() => parseYaml("description: by default: verify")).toThrow(/Nested mappings/)
+    expect(() => parseYaml("description: by default: verify")).toThrow(YAMLException)
   })
 
   it("#given a plain value that YAML would silently truncate at ' #' #then it is reported as unsafe", () => {
@@ -184,7 +185,7 @@ describe("describeFrontmatterViolation", () => {
 
   it("#given a description that YAML reads as a boolean #then it is rejected as an unsafe plain scalar", () => {
     expect(describeFrontmatterViolation("---\ndescription: true\n---\nbody")).toContain("plain scalar")
-    expect(parseYaml("description: true").description).toBe(true)
+    expect(parseYaml("description: true")).toEqual({ description: true })
   })
 
   it("#given a block scalar or an indented continuation #then the single-line contract names it", () => {
@@ -192,7 +193,7 @@ describe("describeFrontmatterViolation", () => {
     expect(describeFrontmatterViolation("---\ndescription: ok\n  stray: 1\n---\nbody")).toContain("indented")
   })
 
-  it("#given a duplicate key #then it is rejected like the yaml package rejects it", () => {
+  it("#given a duplicate key #then it is rejected like the strict YAML parser rejects it", () => {
     expect(describeFrontmatterViolation("---\ndescription: a\ndescription: b\n---\nbody")).toContain("duplicate")
     expect(() => parseYaml("description: a\ndescription: b")).toThrow()
   })
@@ -210,7 +211,7 @@ describe("describeFrontmatterViolation", () => {
   })
 })
 
-describe("strict-YAML oracle: every header the gate accepts reads identically through the yaml package", () => {
+describe("strict-YAML oracle: every header the gate accepts reads identically through the skill loader's YAML parser", () => {
   const accepted = [
     "description: A note about the project",
     "description: 2026-09-10 outage on the build host",
@@ -225,7 +226,7 @@ describe("strict-YAML oracle: every header the gate accepts reads identically th
     `description: ${"x".repeat(MAX_DESCRIPTION_LENGTH)}`,
   ]
   for (const header of accepted) {
-    it(`#given ${JSON.stringify(header.slice(0, 60))} #then yaml.parse agrees with the memory reader`, () => {
+    it(`#given ${JSON.stringify(header.slice(0, 60))} #then the YAML parser agrees with the memory reader`, () => {
       const content = `---\n${header}\n---\nbody\n`
       expect(describeFrontmatterViolation(content)).toBeNull()
       const strict = parseYaml(header) as Record<string, unknown>
@@ -248,7 +249,7 @@ describe("strict-YAML oracle: every header the gate accepts reads identically th
     "description: - dash",
   ]
   for (const header of rejected) {
-    it(`#given ${JSON.stringify(header)} #then the gate rejects what yaml would misread or refuse`, () => {
+    it(`#given ${JSON.stringify(header)} #then the gate rejects what YAML would misread or refuse`, () => {
       expect(describeFrontmatterViolation(`---\n${header}\n---\nbody\n`)).not.toBeNull()
       const raw = header.slice("description: ".length)
       let strict: unknown

@@ -59,6 +59,24 @@ function readStringArray(record: JsonObject, key: string): readonly string[] {
 }
 
 describe("omo-senpi package shape", () => {
+  test.each([
+    ["package.json", "overrides"],
+    ["packages/omo-senpi/package.json", "dependencies"],
+    ["packages/senpi-task/package.json", "peerDependencies"],
+    ["packages/senpi-task/package.json", "devDependencies"],
+  ])("#given %s %s #when resolving pi-tui #then it uses the installed engine's fork", async (path, section) => {
+    // given
+    const nativeManifest = await readJsonObject("packages/omo-native/package.json")
+    const enginePin = readString(readStringRecord(nativeManifest, "dependencies"), "@code-yeongyu/senpi")
+    const manifest = await readJsonObject(path)
+
+    // when
+    const dependency = readStringRecord(manifest, section)["@earendil-works/pi-tui"]
+
+    // then
+    expect(dependency).toBe(`npm:@code-yeongyu/senpi-tui@${enginePin}`)
+  })
+
   test("#given the senpi adapter manifest #when audited #then it declares the package contract", async () => {
     // given
     const [rootManifest, manifest] = await Promise.all([

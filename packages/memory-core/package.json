@@ -23,6 +23,6 @@
     "test": "bun test src/"
   },
   "devDependencies": {
-    "yaml": "2.9.0"
+    "js-yaml": "^5.4.2"
   }
 }

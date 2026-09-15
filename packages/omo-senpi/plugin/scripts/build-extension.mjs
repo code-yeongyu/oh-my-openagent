@@ -133,7 +133,8 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
       ...externals.flatMap((specifier) => ["--external", specifier]),
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
-    await minifyBundle(output)
+    // Only the main entry needs an extra compression pass to meet its byte budget.
+    await minifyBundle(output, entry === entryPath ? 2 : 1)
     return await attachBuildMarker({
       output,
       entry,

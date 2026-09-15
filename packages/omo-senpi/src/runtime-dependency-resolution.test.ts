@@ -118,13 +118,13 @@ function collectPackageNames(value: unknown): Set<string> {
 }
 
 function findPackageRoot(specifier: string): string {
-  const packageName = packageNameOf(specifier)
   let current = dirname(requireFromPackage.resolve(specifier))
   for (;;) {
     const manifestPath = join(current, "package.json")
     if (existsSync(manifestPath)) {
       const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { name?: unknown }
-      if (manifest.name === packageName) return current
+      // Node already resolved the alias; its nearest named manifest owns that entry.
+      if (typeof manifest.name === "string") return current
     }
 
     const parent = dirname(current)

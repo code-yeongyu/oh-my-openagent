@@ -56,11 +56,11 @@
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "typebox": "1.3.18"
+    "typebox": "1.3.30"
   },
   "peerDependencies": {
     "@code-yeongyu/senpi": "2026.9.13-2",
-    "@earendil-works/pi-tui": "0.84.2",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.9.13-2",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -76,8 +76,8 @@
   },
   "devDependencies": {
     "@code-yeongyu/senpi": "2026.9.13-2",
-    "@earendil-works/pi-tui": "0.84.2",
-    "typebox": "1.3.18"
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.9.13-2",
+    "typebox": "1.3.30"
   },
   "sideEffects": false
 }

@@ -2,10 +2,10 @@
  * The single-line scalar subset of YAML that memory frontmatter uses, written
  * without a YAML runtime dependency (the extension bundle has no byte budget
  * for one). The rules are deliberately conservative: a plain scalar is
- * accepted only when the `yaml` package's core schema is known to read it
+ * accepted only when the YAML 1.2 core schema is known to read it
  * back verbatim, and anything else is emitted as a JSON double-quoted scalar,
  * which is a valid YAML double-quoted scalar. `frontmatter-strict-yaml.test.ts`
- * pins this subset against the real `yaml` package.
+ * pins this subset against `js-yaml` with CORE_SCHEMA.
  */
 
 export const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/

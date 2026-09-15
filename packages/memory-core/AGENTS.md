@@ -44,7 +44,7 @@ The public API is the barrel at `src/index.ts`.
   non-empty `description`; `read_only: "true"` blocks mutation. Keep UTF-8,
   normalized repository-relative paths, and LF output.
 - **Frontmatter is strict YAML, one grammar everywhere.** `renderMemoryFile`
-  is the only writer: it quotes any scalar that the `yaml` package would not
+  is the only writer: it quotes any scalar that the skill loader's YAML parser would not
   read back verbatim and re-parses its own header. The reader decodes quoted
   scalars, keeps non-contract keys (`extra`) so SKILL.md `name`/`version`
   survive edits, and only falls back to the legacy first-colon grammar for

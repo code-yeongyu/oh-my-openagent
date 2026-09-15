@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "bun:test"
+import { minify } from "terser"
 
 import { artifactsMatch, closeNodeMinifier, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
 
@@ -55,6 +56,32 @@ test("#given the Node minifier starts closing #when another bundle is queued #th
     await minifyBundle(second)
 
     expect(await readFile(second, "utf8")).toBe(await readFile(first, "utf8"))
+  } finally {
+    closeNodeMinifier()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("#given per-bundle compression budgets #when the Node worker minifies #then it defaults to one pass and honors an extra pass", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-minifier-passes-"))
+  const source = "export function f() { var a; (a = function() { return 42; })(); return a(); }"
+  const defaultOutput = join(root, "default.js")
+  const oneOutput = join(root, "one.js")
+  const twoOutput = join(root, "two.js")
+  try {
+    const [one, two] = await Promise.all([1, 2].map((passes) => minify(source, {
+      compress: { passes }, mangle: true, module: true,
+    })))
+    expect(one.code).not.toBe(two.code)
+    await Promise.all([defaultOutput, oneOutput, twoOutput].map((path) => writeFile(path, source)))
+
+    await minifyBundle(defaultOutput)
+    await minifyBundle(oneOutput, 1)
+    await minifyBundle(twoOutput, 2)
+
+    expect(await readFile(defaultOutput, "utf8")).toBe(one.code)
+    expect(await readFile(oneOutput, "utf8")).toBe(one.code)
+    expect(await readFile(twoOutput, "utf8")).toBe(two.code)
   } finally {
     closeNodeMinifier()
     await rm(root, { recursive: true, force: true })
