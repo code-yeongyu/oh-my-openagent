@@ -6,13 +6,9 @@ A JavaScript `eval` cell that defines tools with `tool(fn)` can now hand named t
 
 Session shutdown no longer waits on the Kibitzer sidecar or on facts cancellation past the 1500ms drain deadline: `shutdown-drain.ts` gained `raceDetached`, which always starts the cleanup (it is what hands back the machine-wide wake lease and the sidecar directory owner lock) but races it against the same deadline the drain steps share, logs the existing budget warning with the step name, and lets the work finish detached instead of stalling quit/reload/new/resume. Every Kibitzer wake is now bounded from the admission that opened it: `seed()` and `followUp()` arm the 90s deadline before the child I/O rather than after it, so a `startChild` that never returns ends the wake as `deadline` with its lease handed back and the late handle aborted and disposed without beginning a turn, and every re-arm is clamped to `startedAt + KIBITZER_WAKE_MAX_TOTAL_MS` (300s), so a steer storm can no longer keep one wake - and one machine slot - alive without bound.
 
-||||||| 879a8b791
-
 ## 2026-09-16 - The Kibitzer sidecar grep stops at a budget, an abort, or a .gitignore rule (#8342)
 
 The resident Kibitzer's read-only `grep` no longer reads a whole workspace. Its scan is bounded by a file count (5000), the bytes it actually reads (64MB) and wall-clock time (10s), and it also stops when the turn's AbortSignal fires - which it now receives, because every sidecar tool closure takes senpi's third `execute` argument and `budgeted()` forwards it. Whichever limit trips first keeps the matches found so far and names itself in a new `stopped` field beside `truncated: true`; a scan that trips nothing returns exactly the same JSON as before. In a git work tree the candidate list comes from `git ls-files --cached --others --exclude-standard`, so ignored build output, caches and vendored dependencies are skipped; a non-git root or any git failure falls back to the previous walk, and an explicitly named file is still scanned as given.
-
-||||||| 879a8b791
 
 ## 2026-09-16 - Make Kibitzer candidate collection incremental (#8340)
 
