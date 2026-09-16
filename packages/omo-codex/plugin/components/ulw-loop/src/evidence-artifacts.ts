@@ -8,7 +8,7 @@ function fail(message: string, code: string, details: Record<string, unknown>): 
 
 function stored(repoRoot: string, absolute: string): string {
 	const rel = relative(repoRoot, absolute);
-	const inside = rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+	const inside = rel !== "" && !rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel);
 	return inside ? rel.split(sep).join("/") : absolute;
 }
 

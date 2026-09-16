@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { normalizeDriverObjective as normalizeObjective } from "./driver-objective-ack.js";
 
 export type CodexGoalSnapshotStatus =
 	| "active"
@@ -60,10 +61,6 @@ function normalizeStatus(value: unknown): CodexGoalSnapshotStatus {
 	if (status === "budget_limited") return "budget_limited";
 	if (status === "active" || status === "in_progress" || status === "pending" || status === "running") return "active";
 	return "unknown";
-}
-
-function normalizeObjective(value: string): string {
-	return value.replace(/\s+/g, " ").trim();
 }
 
 export function parseCodexGoalSnapshot(value: unknown): CodexGoalSnapshot {

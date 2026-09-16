@@ -77,8 +77,10 @@ export async function recordEvidence(
 		criterion.capturedEvidence = evidence;
 		criterion.capturedAt = capturedAt;
 		if (args.notes !== undefined) criterion.notes = args.notes;
-		if (artifacts !== undefined) criterion.artifacts = artifacts;
-		else delete criterion.artifacts;
+		if (artifacts !== undefined) {
+			if (artifacts.length > 0) criterion.artifacts = artifacts;
+			else delete criterion.artifacts;
+		}
 		goal.updatedAt = capturedAt;
 		plan.updatedAt = capturedAt;
 		const ledgerEntry: UlwLoopLedgerEntry = {
