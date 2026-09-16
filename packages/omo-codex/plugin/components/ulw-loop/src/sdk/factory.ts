@@ -90,7 +90,8 @@ function unreachable(value: never): never {
 function stringsFrom(result: object, key: "nextActions" | "warnings"): readonly string[] {
 	if (!(key in result)) return [];
 	const value = Object.entries(result).find(([name]) => name === key)?.[1];
-	return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").slice(0, 8) : [];
+	const items = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+	return key === "nextActions" ? items.slice(0, 8) : items;
 }
 
 function checkpointWithValidatedSnapshot(
@@ -186,7 +187,7 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 					plan,
 					summary: summarizeUlwLoopPlan(plan),
 					nextActions: statusNextActions(plan, context.surface),
-					evidenceRoot: ulwLoopEvidenceRoot(scope),
+					evidenceRoot: plan.evidenceLayoutVersion === 2 ? ulwLoopEvidenceRoot(scope) : ".omo/evidence",
 					// Attempt directories are an evidence-layout v2 concept; a v1 plan must not advertise one.
 					...(active === undefined || plan.evidenceLayoutVersion !== 2
 						? {}

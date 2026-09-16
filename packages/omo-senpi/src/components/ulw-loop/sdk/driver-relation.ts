@@ -15,7 +15,14 @@ export type SessionDriverRelation =
 
 function expectedObjectives(plan: UlwLoopPlan): ReadonlySet<string> {
   const active = plan.goals.find(goal => goal.id === plan.activeGoalId)
-  const candidates = codexGoalMode(plan) === "aggregate" ? compatibleCodexObjectives(plan) : active === undefined ? [] : [active.objective]
+  const candidates =
+    codexGoalMode(plan) === "aggregate"
+      ? compatibleCodexObjectives(plan)
+      : active !== undefined
+        ? [active.objective]
+        : plan.codexObjective !== undefined
+          ? [plan.codexObjective, ...(plan.codexObjectiveAliases ?? [])]
+          : []
   return new Set(candidates.map(normalizeDriverObjective).filter(Boolean))
 }
 
