@@ -23,7 +23,14 @@ export function applyFrontierToolSchemaPermission(
   const explicitPermissionMap = explicitPermission as MutablePermission | undefined
   const frontierDeny = getFrontierToolSchemaPermission(model)
   if (Object.keys(frontierDeny).length > 0) {
-    Object.assign(nextPermission, frontierDeny)
+    for (const toolName of FRONTIER_TOOL_SCHEMA_NAMES) {
+      if (explicitPermissionMap?.[toolName] !== undefined) continue
+      if (explicitTools?.[toolName] === true) {
+        delete nextPermission[toolName]
+        continue
+      }
+      nextPermission[toolName] = "deny"
+    }
     return nextPermission as AgentConfig["permission"]
   }
 
