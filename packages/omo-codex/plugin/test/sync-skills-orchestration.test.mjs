@@ -265,27 +265,26 @@ test("#given start-work skill #when synced for Codex #then the difficulty-tier d
 	assert.match(content, /Global Review and Debugging Gate/);
 	assert.match(content, /full commit SHA/);
 	assert.match(content, /re-read the ledger record/);
-	assert.match(content, /exact lane\/SHA pair/);
+	assert.match(content, /exact reviewer\/SHA pair/);
+	assert.match(content, /one comprehensive reviewer must return PASS/);
+	assert.doesNotMatch(content, /All five review lanes/);
 	assert.doesNotMatch(content, /works the same on both surfaces/);
 });
 
-test("#given review-work skill #when some lanes do not finish #then aggregate result remains bounded", async () => {
+test("#given review-work skill #when synced for Codex #then one-reviewer result remains bounded", async () => {
 	const content = await readSkill("review-work");
 
-	assert.match(content, /pending\/PASS\/FAIL\/INCONCLUSIVE/);
-	assert.match(content, /Preserve completed lane results immediately/);
-	assert.match(content, /ALL 5 lanes have a terminal state/);
-	assert.match(content, /REVIEW INCONCLUSIVE - not approved/);
-	assert.match(content, /Overall Verdict: PASSED \/ FAILED \/ INCONCLUSIVE/);
-	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
-	assert.match(content, /Do not spin in repeated/);
+	assert.match(content, /Use one comprehensive reviewer by default/);
+	assert.match(content, /Add at most one specialist/);
+	assert.match(content, /same reviewer with the focused delta/);
+	assert.match(content, /bounded correction loop/);
 	assert.match(content, /bare REJECT\/FAIL token without findings is not a verdict/);
 	assert.match(content, /cites the violated goal criterion/);
-	assert.match(content, /append a durable task-evidence record/);
+	assert.match(content, /append a durable task-evidence\s+record/);
 	assert.match(content, /full commit SHA/);
 	assert.match(content, /re-read that record/);
-	assert.match(content, /exact lane\/SHA pair/);
-	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
+	assert.match(content, /exact reviewer\/SHA pair/);
+	assert.doesNotMatch(content, /ALL 5 lanes/);
 });
 
 test("#given PR and review skills #when synced for Codex #then worktree lifecycle is mandatory", async () => {
@@ -303,8 +302,8 @@ test("#given PR and review skills #when synced for Codex #then worktree lifecycl
 	assert.doesNotMatch(sharedStartWork, /If worktree mode was used/);
 	assert.doesNotMatch(sharedStartWork, /merge or hand off exactly as requested/);
 
-	assert.match(reviewWork, /dedicated review worktree attached to that branch/);
-	assert.match(reviewWork, /Never\s+checkout, test, or edit the review branch in the main worktree/);
+	assert.match(reviewWork, /dedicated review worktree/);
+	assert.match(reviewWork, /Do not check out, edit, or test the review branch in the default checkout/);
 });
 
 test("#given generated Codex compatibility guidance #when multi-agent lifecycle tools are mentioned #then optional tools are guarded by the active tools list", () => {
