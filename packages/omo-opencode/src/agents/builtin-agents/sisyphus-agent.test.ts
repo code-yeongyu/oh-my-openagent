@@ -76,7 +76,7 @@ describe("maybeCreateSisyphusConfig", () => {
   });
 
   describe("#given Opus 4.7 model with user override allowing grep and glob", () => {
-    test("#when config is created #then grep and glob are still denied", () => {
+    test("#when config is created #then explicit read-only search permissions are respected", () => {
       // given
       const agentOverrides: AgentOverrides = {
         sisyphus: {
@@ -104,13 +104,13 @@ describe("maybeCreateSisyphusConfig", () => {
       });
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
+      expect(config?.permission).toHaveProperty("grep", "allow");
+      expect(config?.permission).toHaveProperty("glob", "allow");
     });
   });
 
   describe("#given dotted Opus 4.7 model with user override allowing grep and glob", () => {
-    test("#when config is created #then grep and glob are still denied", () => {
+    test("#when config is created #then explicit read-only search permissions are respected", () => {
       // given
       const agentOverrides: AgentOverrides = {
         sisyphus: {
@@ -138,17 +138,17 @@ describe("maybeCreateSisyphusConfig", () => {
       });
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
+      expect(config?.permission).toHaveProperty("grep", "allow");
+      expect(config?.permission).toHaveProperty("glob", "allow");
     });
   });
 
-  describe("#given GPT 5.5 model with user override allowing grep and glob", () => {
-    test("#when config is created #then grep and glob are still denied", () => {
+  describe("#given GPT 5.6 model with user override allowing grep and glob", () => {
+    test("#when config is created #then explicit read-only search permissions are respected", () => {
       // given
       const agentOverrides: AgentOverrides = {
         sisyphus: {
-          model: "openai/gpt-5.5",
+          model: "openai/gpt-5.6-sol",
           permission: {
             grep: "allow",
             glob: "allow",
@@ -161,8 +161,8 @@ describe("maybeCreateSisyphusConfig", () => {
       const config = maybeCreateSisyphusConfig({
         disabledAgents: [],
         agentOverrides,
-        availableModels: new Set(["openai/gpt-5.5"]),
-        systemDefaultModel: "openai/gpt-5.5",
+        availableModels: new Set(["openai/gpt-5.6-sol"]),
+        systemDefaultModel: "openai/gpt-5.6-sol",
         isFirstRunNoCache: false,
         availableAgents: [],
         availableSkills: [],
@@ -172,8 +172,8 @@ describe("maybeCreateSisyphusConfig", () => {
       });
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
+      expect(config?.permission).toHaveProperty("grep", "allow");
+      expect(config?.permission).toHaveProperty("glob", "allow");
     });
   });
 
