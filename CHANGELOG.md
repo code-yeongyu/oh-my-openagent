@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0-beta.66] - 2026-09-16
+
 ### Engine: senpi 2026.9.16-2
 
 **JavaScript eval cells can now hand `tool(fn)` functions to in-process children.** The kernel-tools capability was previously unreachable on the worker tool-call path, so children were refused with `tools_unavailable`. senpi 2026.9.16-2 ([#1754](https://github.com/code-yeongyu/senpi/issues/1754), [#1755](https://github.com/code-yeongyu/senpi/pull/1755)) dispatches those calls, so item 6 (JS kernel tools) actually works in OmO Native.
