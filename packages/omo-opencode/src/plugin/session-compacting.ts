@@ -3,6 +3,13 @@ import type { Hooks } from "@opencode-ai/plugin"
 import { isCompactionAgent } from "../shared/compaction-marker"
 import { log } from "../shared/logger"
 
+import {
+  reissueCompactionContinue,
+  resolveCompactionContinueReroute,
+  shouldRerouteCompactionContinue,
+  type CompactionAutocontinuePromptClient,
+} from "./compaction-autocontinue-reroute"
+
 type SessionCompactingHook = NonNullable<Hooks["experimental.session.compacting"]>
 type SessionCompactingInput = Parameters<SessionCompactingHook>[0]
 type SessionCompactingOutput = Parameters<SessionCompactingHook>[1]
@@ -27,6 +34,8 @@ export type CompactionAutocontinueHook = (
 
 type CompactionAutocontinueHandlerOptions = {
   readonly duplicateGuardMs?: number
+  readonly client?: CompactionAutocontinuePromptClient
+  readonly directory?: string
 }
 
 type TimerHandleWithOptionalUnref = ReturnType<typeof setTimeout> & {
@@ -177,5 +186,23 @@ export function createCompactionAutocontinueHandler(
         await restore(input.sessionID)
       }
     })
+
+    if (options.client) {
+      const decision = await resolveCompactionContinueReroute(options.client, input.sessionID)
+      if (shouldRerouteCompactionContinue(decision)) {
+        output.enabled = false
+        const reissued = await reissueCompactionContinue({
+          client: options.client,
+          directory: options.directory,
+          sessionID: input.sessionID,
+          agent: typeof input.agent === "string" && input.agent.length > 0 ? input.agent : decision.workingAgent,
+          workingModel: decision.workingModel,
+        })
+        log("[session-compacting] rerouted compaction autocontinue to the working model", {
+          sessionID: input.sessionID,
+          reissued,
+        })
+      }
+    }
   }
 }
