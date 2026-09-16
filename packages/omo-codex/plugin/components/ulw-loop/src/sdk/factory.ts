@@ -173,10 +173,13 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 			invoke("status", async () => {
 				const plan = await readUlwLoopPlan(context.cwd, scope);
 				const active = plan.goals.find((goal) => goal.id === plan.activeGoalId);
+				const sessionId = scope.sessionId;
 				return {
 					plan,
 					summary: summarizeUlwLoopPlan(plan),
 					nextActions: statusNextActions(plan, context.surface),
+					// Stable plan-level evidence root that does not move with the active goal.
+					...(plan.evidenceLayoutVersion === 2 ? { evidenceRoot: `.omo/evidence/ulw/${sessionId}` } : {}),
 					// Attempt directories are an evidence-layout v2 concept; a v1 plan must not advertise one.
 					...(active === undefined || plan.evidenceLayoutVersion !== 2
 						? {}

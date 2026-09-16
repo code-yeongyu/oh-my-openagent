@@ -101,7 +101,32 @@ export function deriveGoalCandidates(brief: string): Array<{ title: string; obje
 	}));
 }
 
-export function makeGoal(title: string, objective: string, index: number, now: string): UlwLoopItem {
+export interface AddGoalCriterionInput {
+	readonly scenario: string;
+	readonly expectedEvidence: string;
+	readonly userModel?: UlwLoopSuccessCriterion["userModel"];
+	readonly essential?: boolean;
+}
+
+function buildCriteriaFromInput(inputs: readonly AddGoalCriterionInput[]): UlwLoopSuccessCriterion[] {
+	return inputs.map((input, i) => ({
+		id: `C${String(i + 1).padStart(3, "0")}`,
+		scenario: input.scenario,
+		userModel: input.userModel ?? "happy",
+		expectedEvidence: input.expectedEvidence,
+		essential: input.essential ?? true,
+		capturedEvidence: null,
+		status: "pending" as const,
+	}));
+}
+
+export function makeGoal(
+	title: string,
+	objective: string,
+	index: number,
+	now: string,
+	successCriteria?: readonly AddGoalCriterionInput[],
+): UlwLoopItem {
 	const cleanTitle = assertNonEmpty(title, "title");
 	const cleanObjective = assertNonEmpty(objective, "objective");
 	return {
@@ -109,15 +134,24 @@ export function makeGoal(title: string, objective: string, index: number, now: s
 		title: cleanTitle,
 		objective: cleanObjective,
 		status: "pending",
-		successCriteria: seedDefaultSuccessCriteria(index, cleanObjective),
+		successCriteria:
+			successCriteria !== undefined && successCriteria.length > 0
+				? buildCriteriaFromInput(successCriteria)
+				: seedDefaultSuccessCriteria(index, cleanObjective),
 		attempt: 0,
 		createdAt: now,
 		updatedAt: now,
 	};
 }
 
-export function appendGoalToPlan(plan: UlwLoopPlan, title: string, objective: string, now: string): UlwLoopItem {
-	const goal = makeGoal(title, objective, plan.goals.length, now);
+export function appendGoalToPlan(
+	plan: UlwLoopPlan,
+	title: string,
+	objective: string,
+	now: string,
+	successCriteria?: readonly AddGoalCriterionInput[],
+): UlwLoopItem {
+	const goal = makeGoal(title, objective, plan.goals.length, now, successCriteria);
 	plan.goals.push(goal);
 	plan.updatedAt = now;
 	return goal;

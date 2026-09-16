@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -33,6 +33,108 @@ describe("agent toolkit SDK contract", () => {
 		expect(() => createAgentToolkit({ cwd: ".", sessionId: "", surface: "lazycodex" })).toThrow(
 			"ULW_LOOP_SESSION_ID_REQUIRED",
 		);
+	});
+
+	it("help() returns self-describing operations with method names, args, and descriptions", async () => {
+		const toolkit = createAgentToolkit({ cwd: ".", sessionId: "help-self-describe", surface: "lazycodex" });
+		const result = await toolkit.help();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const manifest = result.result;
+		for (const op of manifest.operations) {
+			expect(op.method).toBeDefined();
+			expect(typeof op.method).toBe("string");
+			expect(op.description).toBeDefined();
+			expect(typeof op.description).toBe("string");
+			expect(op.args).toBeDefined();
+			expect(typeof op.args).toBe("object");
+		}
+		// Verify camelCase methods are present
+		const methods = manifest.operations.map((op) => op.method);
+		expect(methods).toContain("recordEvidence");
+		expect(methods).toContain("addGoal");
+		expect(methods).toContain("createGoals");
+	});
+
+	it("addGoal accepts custom success criteria", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "ulw-sdk-addgoal-criteria-"));
+		try {
+			const toolkit = createAgentToolkit({ cwd, sessionId: "addgoal-criteria", surface: "lazycodex" });
+			await toolkit.createGoals({ brief: "Base plan" });
+			const result = await toolkit.addGoal({
+				title: "Custom criteria goal",
+				objective: "Test custom criteria",
+				successCriteria: [
+					{ scenario: "API returns 200", expectedEvidence: "curl output showing 200 OK" },
+					{ scenario: "Error case returns 4xx", expectedEvidence: "curl output showing 400", userModel: "edge", essential: false },
+				],
+			});
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			const goal = result.result.goal;
+			expect(goal.successCriteria).toHaveLength(2);
+			expect(goal.successCriteria[0]?.scenario).toBe("API returns 200");
+			expect(goal.successCriteria[0]?.userModel).toBe("happy"); // default
+			expect(goal.successCriteria[0]?.essential).toBe(true); // default
+			expect(goal.successCriteria[1]?.userModel).toBe("edge");
+			expect(goal.successCriteria[1]?.essential).toBe(false);
+			// No placeholder text
+			expect(goal.successCriteria[0]?.expectedEvidence).not.toContain("Replace via");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
+
+	it("status() includes evidenceRoot for v2 plans", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "ulw-sdk-evidence-root-"));
+		try {
+			const toolkit = createAgentToolkit({ cwd, sessionId: "evidence-root-test", surface: "lazycodex" });
+			await toolkit.createGoals({ brief: "Evidence root test" });
+			const status = await toolkit.status();
+			expect(status.ok).toBe(true);
+			if (!status.ok) return;
+			expect(status.result).toHaveProperty("evidenceRoot");
+			expect(status.result.evidenceRoot).toContain(".omo/evidence/ulw/");
+			expect(status.result.evidenceRoot).toContain("evidence-root-test");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	});
+
+	it("recordEvidence validates artifact paths exist", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "ulw-sdk-artifacts-"));
+		try {
+			const toolkit = createAgentToolkit({ cwd, sessionId: "artifacts-test", surface: "lazycodex" });
+			await toolkit.createGoals({ brief: "Artifacts test" });
+			await toolkit.completeGoals();
+			const criterionId = seedDefaultSuccessCriteria(0, "Artifacts test")[0]?.id;
+			if (!criterionId) throw new Error("no criterion");
+
+			// Missing artifact should fail
+			const goalId = "G001-artifacts-test";
+			const missing = await toolkit.recordEvidence({
+				goalId,
+				criterionId,
+				status: "pass",
+				evidence: "proof",
+				artifacts: ["nonexistent.log"],
+			});
+			expect(missing.ok).toBe(false);
+			if (!missing.ok) expect(missing.error.code).toBe("ULW_LOOP_ARTIFACT_NOT_FOUND");
+
+			// Existing artifact should pass
+			await writeFile(join(cwd, "output.log"), "test log", "utf8");
+			const valid = await toolkit.recordEvidence({
+				goalId,
+				criterionId,
+				status: "pass",
+				evidence: "proof with artifact",
+				artifacts: ["output.log"],
+			});
+			expect(valid.ok).toBe(true);
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
 	});
 
 	it("uses explicit surface roles for SDK checkpoint templates", async () => {

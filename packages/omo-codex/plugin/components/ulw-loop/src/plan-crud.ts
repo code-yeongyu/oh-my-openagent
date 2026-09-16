@@ -128,13 +128,13 @@ function completedPlanExistsError(scope: UlwLoopScope | undefined, surface: UlwL
 
 export async function addUlwLoopGoal(
 	repoRoot: string,
-	args: { title: string; objective: string },
+	args: { title: string; objective: string; successCriteria?: readonly import("./plan-goal-factory.js").AddGoalCriterionInput[] },
 	scope?: UlwLoopScope,
 ): Promise<{ plan: UlwLoopPlan; goal: UlwLoopItem }> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
 		const plan = await readUlwLoopPlan(repoRoot, scope);
 		const now = iso();
-		const goal = appendGoalToPlan(plan, args.title, args.objective, now);
+		const goal = appendGoalToPlan(plan, args.title, args.objective, now, args.successCriteria);
 		await commit(repoRoot, scope, {
 			plan,
 			entries: [{ at: now, kind: "goal_added", goalId: goal.id, status: goal.status, message: goal.title }],

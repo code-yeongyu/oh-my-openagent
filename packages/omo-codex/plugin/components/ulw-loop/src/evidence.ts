@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { essentialCriteriaOf, hasAllCriteriaPass, hasEssentialCriteriaPass } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
 import { commit } from "./plan-commit.js";
@@ -12,7 +14,25 @@ type RecordEvidenceArgs = {
 	readonly status: EvidenceStatus;
 	readonly evidence: string;
 	readonly notes?: string;
+	readonly artifacts?: readonly string[];
 };
+
+function validateArtifacts(artifacts: readonly string[] | undefined, repoRoot: string): readonly string[] {
+	if (artifacts === undefined || artifacts.length === 0) return [];
+	const missing: string[] = [];
+	for (const artifact of artifacts) {
+		const absolute = resolve(repoRoot, artifact);
+		if (!existsSync(absolute)) missing.push(artifact);
+	}
+	if (missing.length > 0) {
+		throw new UlwLoopError(
+			`Artifact paths not found relative to session cwd: ${missing.join(", ")}`,
+			"ULW_LOOP_ARTIFACT_NOT_FOUND",
+			{ details: { missing } },
+		);
+	}
+	return artifacts;
+}
 
 function ulwLoopFail(message: string, code: string, details: Record<string, unknown>): never {
 	throw new UlwLoopError(message, code, { details });
@@ -67,6 +87,7 @@ export async function recordEvidence(
 		const goal = findGoal(plan, args.goalId);
 		const criterion = findCriterion(goal, args.criterionId);
 		const evidence = nonEmptyEvidence(args.evidence);
+		const validatedArtifacts = validateArtifacts(args.artifacts, repoRoot);
 		const kind = ledgerKind(args.status);
 		const prevStatus = criterion.status;
 		const capturedAt = iso();
@@ -74,6 +95,7 @@ export async function recordEvidence(
 		criterion.capturedEvidence = evidence;
 		criterion.capturedAt = capturedAt;
 		if (args.notes !== undefined) criterion.notes = args.notes;
+		if (validatedArtifacts.length > 0) (criterion as Record<string, unknown>).artifacts = validatedArtifacts;
 		goal.updatedAt = capturedAt;
 		plan.updatedAt = capturedAt;
 		const ledgerEntry: UlwLoopLedgerEntry = {
@@ -84,6 +106,7 @@ export async function recordEvidence(
 			criterionStatus: args.status,
 			evidence,
 			capturedEvidence: evidence,
+			...(validatedArtifacts.length > 0 ? { artifacts: validatedArtifacts } : {}),
 			before: { status: prevStatus },
 			after: { goalId: goal.id, criterionId: criterion.id, status: args.status, evidence, capturedAt, prevStatus },
 		};
