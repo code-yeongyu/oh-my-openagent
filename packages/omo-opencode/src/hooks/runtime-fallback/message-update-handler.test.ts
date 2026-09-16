@@ -4,7 +4,14 @@ import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { createStaleSessionCleanup } from "./auto-retry-cleanup"
+import { createFallbackState } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import {
+  clearAllProviderFailures,
+  isProviderFailed,
+} from "../../shared/provider-failure-state"
+import { clearSessionModel, setSessionModel } from "../../shared/session-model-state"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -155,6 +162,36 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
 describe("createMessageUpdateHandler runtime fallback dispatch", () => {
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    clearAllProviderFailures()
+    clearSessionModel("session-provider-mismatch")
+    clearSessionModel("session-fallback-provider-attribution")
+  })
+
+  it("#given fallback state advanced to a different provider #when that provider fails #then the active provider is marked failed, not the original", async () => {
+    const sessionID = "session-fallback-provider-attribution"
+    const deps = createRuntimeFallbackDeps([])
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
+    setSessionModel(sessionID, { providerID: "provider-a", modelID: "model-x" })
+    const state = createFallbackState("provider-a/model-x")
+    state.currentModel = "provider-b/model-y"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "provider-b/model-y",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "provider-b")).toBe(true)
+    expect(isProviderFailed(sessionID, "provider-a")).toBe(false)
   })
 
   it("#given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast", async () => {
@@ -185,6 +222,58 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
       "toast",
     ])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  it("#given stored provider differs from message and no fallbacks #when session is reaped #then only stored failure is cleared", async () => {
+    const sessionID = "session-provider-mismatch"
+    const deps = createRuntimeFallbackDeps([])
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
+    setSessionModel(sessionID, { providerID: "google", modelID: "gemini-3.1-pro" })
+
+    await handler({
+      sessionID,
+      providerID: "untrusted-message-provider",
+      info: {
+        role: "assistant",
+        providerID: "untrusted-info-provider",
+        model: "google/gemini-3.1-pro",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "google")).toBe(true)
+    expect(isProviderFailed(sessionID, "untrusted-message-provider")).toBe(false)
+    expect(isProviderFailed(sessionID, "untrusted-info-provider")).toBe(false)
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+
+    deps.sessionLastAccess.set(sessionID, 0)
+    createStaleSessionCleanup(deps, () => {})()
+
+    expect(isProviderFailed(sessionID, "google")).toBe(false)
+  })
+
+  it("#given no stored provider #when message update supplies a provider #then no provider is marked unreachable", async () => {
+    const sessionID = "session-without-stored-provider"
+    const deps = createRuntimeFallbackDeps([])
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, []))
+
+    await handler({
+      sessionID,
+      providerID: "untrusted-message-provider",
+      info: {
+        role: "assistant",
+        model: "google/gemini-3.1-pro",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "The usage limit has been reached for this model.",
+        },
+      },
+    })
+
+    expect(isProviderFailed(sessionID, "untrusted-message-provider")).toBe(false)
   })
 })
 
