@@ -54,6 +54,7 @@ type ModelFallbackHookArgs = {
   toast?: FallbackToast
   onApplied?: FallbackCallback
   controllerAccessor?: ModelFallbackControllerAccessor
+  resolveUserConfiguredPrimary?: (agentName: string) => FallbackEntry | undefined
 }
 
 export function setSessionFallbackChain(
@@ -151,6 +152,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     pendingModelFallbacks,
     lastToastKey,
     sessionFallbackChains,
+    resolveUserConfiguredPrimary: args?.resolveUserConfiguredPrimary,
   })
 
   args?.controllerAccessor?.register(controller)
