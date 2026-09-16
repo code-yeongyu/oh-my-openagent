@@ -1,0 +1,89 @@
+{
+  "platform": "darwin-arm64",
+  "node": "24.12.0",
+  "bun": "1.4.2",
+  "target_baseline": "fbcc57e374c180c41ffc8562c0ab7e7414935811",
+  "baseline_method": "Same worktree/dependencies/driver, with target HEAD locks.ts and both original Senpi bundles; patched files restored byte-for-byte afterward.",
+  "patch_source_sha256": "00b977fe0961a46aadc75096b2f8c54ad4c37fb7a0a58712ed712e1b566bfe24",
+  "team_e2e": {
+    "patch": {
+      "result": "FAIL",
+      "checks": {
+        "createTwoMembersActive": true,
+        "createListsActiveMembers": true,
+        "leadToMemberEnqueued": true,
+        "memberEnvelopeEchoed": true,
+        "memberToLeadInjected": false,
+        "leadInboxDrained": true,
+        "noBlockingTeamWaitCalls": true,
+        "crashHoldReached": true,
+        "crashKilledMemberAtHold": true,
+        "crashReservationUncommittedAtKill": true,
+        "crashReservationRestoredUnread": true,
+        "crashReservationNoResidue": true,
+        "crashReservedMessageDeliveredExactlyOnce": true,
+        "crashRestartExitClean": true,
+        "crashLivenessInjectedToLead": false,
+        "crashLivenessAcknowledged": false,
+        "resume_member_suspended_on_quit": true,
+        "resume_member_revived": false,
+        "resume_member_mailbox_identity": false,
+        "resume_lead_poller_running": false,
+        "resume_shutdown_approved_setup": true,
+        "resume_shutdown_approved_not_revived": true
+      },
+      "failed": [
+        "memberToLeadInjected",
+        "crashLivenessInjectedToLead",
+        "crashLivenessAcknowledged",
+        "resume_member_revived",
+        "resume_member_mailbox_identity",
+        "resume_lead_poller_running"
+      ],
+      "credentialIsolationClean": true,
+      "wholeDirUnchanged": true,
+      "leakedPids": 0
+    },
+    "target_baseline": {
+      "result": "FAIL",
+      "checks": {
+        "createTwoMembersActive": true,
+        "createListsActiveMembers": true,
+        "leadToMemberEnqueued": true,
+        "memberEnvelopeEchoed": true,
+        "memberToLeadInjected": false,
+        "leadInboxDrained": true,
+        "noBlockingTeamWaitCalls": true,
+        "crashHoldReached": true,
+        "crashKilledMemberAtHold": true,
+        "crashReservationUncommittedAtKill": false,
+        "crashReservationRestoredUnread": false,
+        "crashReservationNoResidue": true,
+        "crashReservedMessageDeliveredExactlyOnce": true,
+        "crashRestartExitClean": true,
+        "crashLivenessInjectedToLead": false,
+        "crashLivenessAcknowledged": false,
+        "resume_member_suspended_on_quit": true,
+        "resume_member_revived": false,
+        "resume_member_mailbox_identity": false,
+        "resume_lead_poller_running": false,
+        "resume_shutdown_approved_setup": true,
+        "resume_shutdown_approved_not_revived": true
+      },
+      "failed": [
+        "memberToLeadInjected",
+        "crashReservationUncommittedAtKill",
+        "crashReservationRestoredUnread",
+        "crashLivenessInjectedToLead",
+        "crashLivenessAcknowledged",
+        "resume_member_revived",
+        "resume_member_mailbox_identity",
+        "resume_lead_poller_running"
+      ],
+      "credentialIsolationClean": true,
+      "wholeDirUnchanged": true,
+      "leakedPids": 0
+    }
+  },
+  "scope": "Atomic owner publication; original Windows CI root cause not proven; no claim of week-long Windows reliability."
+}

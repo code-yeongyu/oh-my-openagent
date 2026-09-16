@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test"
 import type { Mode, OpenMode, PathLike } from "node:fs"
-import { mkdtemp, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { link, mkdtemp, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 async function createTempDirectory(prefix: string): Promise<string> {
   return await mkdtemp(join(tmpdir(), prefix))
@@ -334,5 +335,44 @@ test("#given a lock held by a live foreign pid #when detectStaleLock runs #then 
     child.kill()
     await child.exited
     await rm(rootDirectory, { recursive: true, force: true })
+  }
+})
+
+
+test("#given a writer killed before owner publication #when another process acquires #then no partial shared lock blocks it", async () => {
+  const { withLock } = await import("./locks")
+  const root = await createTempDirectory("locks-publish-interrupted-")
+  const lockPath = join(root, "lock")
+  const modulePath = fileURLToPath(new URL("./locks.ts", import.meta.url))
+  const child = Bun.spawn([process.execPath, "-e", `
+    import { publishLockOwner } from ${JSON.stringify(modulePath)};
+    await publishLockOwner(${JSON.stringify(lockPath)}, "complete-owner", {
+      link: async () => process.exit(73),
+    });
+  `], { stdout: "ignore", stderr: "pipe" })
+  try {
+    expect(await child.exited).toBe(73)
+    await expect(readFile(lockPath, "utf8")).rejects.toThrow()
+    // Abrupt exit bypasses finally, but the abandoned private payload is not the shared lock.
+    expect((await readdir(root)).some(entry => entry.startsWith("lock.owner."))).toBe(true)
+    expect(await withLock(lockPath, async () => "acquired")).toBe("acquired")
+  } finally {
+    child.kill()
+    await child.exited
+    await rm(root, { recursive: true, force: true })
+  }
+}, 2_000)
+
+test("#given an existing owner #when another complete payload is published #then it cannot replace the live lock", async () => {
+  const { publishLockOwner } = await import("./locks")
+  const root = await createTempDirectory("locks-publish-exclusive-")
+  const lockPath = join(root, "lock")
+  try {
+    await publishLockOwner(lockPath, "first-owner", { link })
+    await expect(publishLockOwner(lockPath, "second-owner")).rejects.toThrow()
+    expect(await readFile(lockPath, "utf8")).toBe("first-owner")
+    expect(await readdir(root)).toEqual(["lock"])
+  } finally {
+    await rm(root, { recursive: true, force: true })
   }
 })

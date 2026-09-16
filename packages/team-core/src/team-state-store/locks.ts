@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { access, open, readFile, rename, rm, unlink } from "node:fs/promises"
+import { access, link, open, readFile, rename, rm, unlink } from "node:fs/promises"
 import { dirname } from "node:path"
 
 import { tolerantFsync } from "../tolerant-fsync"
@@ -117,33 +117,52 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+/** Publish a complete owner exclusively; a killed writer must never leave an ownerless lock. */
+export async function publishLockOwner(
+  lockPath: string,
+  content: string,
+  deps: { readonly link?: typeof link } = {},
+): Promise<void> {
+  const candidatePath = `${lockPath}.owner.${randomUUID()}`
+  try {
+    const fileHandle = await open(candidatePath, "wx")
+    try {
+      await fileHandle.writeFile(content)
+      await tolerantFsync(fileHandle, `acquireLock:${lockPath}`)
+    } finally {
+      await fileHandle.close()
+    }
+    // A hard link creates the name only if absent, unlike rename which can replace a live owner.
+    // Before this point, interruption can leave only a private candidate, never a shared lock.
+    await (deps.link ?? link)(candidatePath, lockPath)
+  } finally {
+    await reapStaleLock(candidatePath)
+  }
+}
+
 async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: number): Promise<void> {
   const startedAt = Date.now()
-  for (;;) {
-    if (Date.now() - startedAt > LOCK_WAIT_TIMEOUT_MS) {
-      throw new Error(`Timed out acquiring lock: ${lockPath}`)
-    }
-
-    try {
-      const fileHandle = await open(lockPath, "wx")
-      try {
-        await fileHandle.writeFile(buildOwnerContent(ownerTag))
-        await tolerantFsync(fileHandle, `acquireLock:${lockPath}`)
-      } finally {
-        await fileHandle.close()
+  // Prepare once: contended waiters retry only the exclusive link, without rewriting/fsyncing.
+  await publishLockOwner(lockPath, buildOwnerContent(ownerTag), {
+    link: async (candidatePath, targetPath) => {
+      for (;;) {
+        if (Date.now() - startedAt > LOCK_WAIT_TIMEOUT_MS) {
+          throw new Error(`Timed out acquiring lock: ${lockPath}`)
+        }
+        try {
+          await link(candidatePath, targetPath)
+          return
+        } catch (error) {
+          await assertRetryableLockOpenError(lockPath, error)
+          if (await detectStaleLock(lockPath, staleAfterMs)) {
+            await reapStaleLock(lockPath)
+            continue
+          }
+          await delay(LOCK_RETRY_MS)
+        }
       }
-      return
-    } catch (error) {
-      await assertRetryableLockOpenError(lockPath, error)
-
-      if (await detectStaleLock(lockPath, staleAfterMs)) {
-        await reapStaleLock(lockPath)
-        continue
-      }
-
-      await delay(LOCK_RETRY_MS)
-    }
-  }
+    },
+  })
 }
 
 export async function withLock<T>(
