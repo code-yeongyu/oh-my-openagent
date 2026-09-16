@@ -15,7 +15,8 @@ export function applyFrontierToolSchemaPermission(
   permission: AgentConfig["permission"] | undefined,
   model: string,
   explicitPermission?: AgentConfig["permission"],
-  explicitTools?: Record<string, boolean>
+  explicitTools?: Record<string, boolean>,
+  respectExplicitSearchOverrides = false
 ): AgentConfig["permission"] | undefined {
   if (!permission) return permission
 
@@ -24,10 +25,12 @@ export function applyFrontierToolSchemaPermission(
   const frontierDeny = getFrontierToolSchemaPermission(model)
   if (Object.keys(frontierDeny).length > 0) {
     for (const toolName of FRONTIER_TOOL_SCHEMA_NAMES) {
-      if (explicitPermissionMap?.[toolName] !== undefined) continue
-      if (explicitTools?.[toolName] === true) {
-        delete nextPermission[toolName]
-        continue
+      if (respectExplicitSearchOverrides) {
+        if (explicitPermissionMap?.[toolName] !== undefined) continue
+        if (explicitTools?.[toolName] === true) {
+          delete nextPermission[toolName]
+          continue
+        }
       }
       nextPermission[toolName] = "deny"
     }

@@ -100,7 +100,8 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusConfig.permission,
     resolvedModel,
     sisyphusOverride?.permission,
-    (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
+    (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools,
+    true
   )
 
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
