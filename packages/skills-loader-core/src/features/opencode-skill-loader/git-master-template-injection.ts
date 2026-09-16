@@ -1,6 +1,7 @@
 import type { GitMasterConfig } from "../../types"
 import { assertValidGitEnvPrefix } from "../../config/git-env-prefix"
 import { detectShellType, buildEnvPrefix, type ShellType } from "../../shared/shell-env"
+import { resolveGitAttribution, type GitAttributionCheckOptions } from "@oh-my-opencode/utils"
 
 const BASH_CODE_BLOCK_PATTERN = /```bash\r?\n([\s\S]*?)```/g
 const LEADING_GIT_COMMAND_PATTERN = /^([ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]+\s+)*)git(?=[ \t]|$)/gm
@@ -44,10 +45,16 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
 	return buildEnvPrefix(envRecord, resolvedShellType)
 }
 
-export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
-	const commitFooter = config?.commit_footer ?? true
-	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
+export function injectGitMasterConfig(
+	template: string,
+	config?: GitMasterConfig,
+	options?: GitAttributionCheckOptions,
+): string {
+	const attribution = resolveGitAttribution(config, options)
+	const commitFooter = attribution.commitFooter
+	const includeCoAuthoredBy = attribution.includeCoAuthoredBy
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
+
 
 	const shellType = detectShellType()
 	const shellPrefix = gitEnvPrefix ? buildShellAwareGitPrefix(gitEnvPrefix, shellType) : ""

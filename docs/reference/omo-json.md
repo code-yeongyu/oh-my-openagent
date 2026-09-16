@@ -144,7 +144,7 @@ The optional `memory` block configures the Senpi memory subsystem (`schema/memor
 
 ### `git_master` (Senpi harness)
 
-The optional `git_master` block controls commit attribution in Senpi (`schema/git-master.ts`). When the agent works with the `git-master` skill — reading it in the main session or loading it into a task child via `load_skills` — omo appends a commit-attribution directive to the skill content based on these settings.
+The optional `git_master` block controls commit attribution in Senpi (`schema/git-master.ts`). When the agent works with the `git-master` skill, whether reading it in the main session or loading it into a task child via `load_skills`, omo appends a commit-attribution directive to the skill content based on these settings.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
@@ -161,7 +161,13 @@ Both attributions ship enabled by default. To opt out of the co-author trailer:
 }
 ```
 
+Attribution can also be disabled through:
+- Git config: `git config --global omo.attribution false` (or `sisyphus.attribution false`)
+- Environment variables: `NO_AI_ATTRIBUTION=1`, `OMO_NO_COMMIT_ATTRIBUTION=1`, or `OMO_GIT_ATTRIBUTION=0`
+- GPG commit signing: Repositories configured with `commit.gpgsign = true` automatically suppress third-party trailers and promotional footers unless explicitly enabled in configuration.
+
 The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Senpi harness.
+
 
 ### `models` (shared catalog)
 

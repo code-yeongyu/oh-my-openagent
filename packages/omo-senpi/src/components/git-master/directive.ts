@@ -1,4 +1,5 @@
 import type { OmoGitMasterSettings } from "@oh-my-opencode/omo-config-core"
+import { resolveGitAttribution, type GitAttributionCheckOptions } from "@oh-my-opencode/utils"
 
 export const SISYPHUS_CO_AUTHOR_TRAILER =
   "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
@@ -6,10 +7,15 @@ export const SISYPHUS_CO_AUTHOR_TRAILER =
 export const DEFAULT_COMMIT_FOOTER =
   "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)"
 
-export function buildGitMasterAttributionDirective(settings: OmoGitMasterSettings): string | undefined {
-  const footerText = resolveFooterText(settings.commit_footer)
-  const includeCoAuthor = settings.include_co_authored_by
+export function buildGitMasterAttributionDirective(
+  settings: OmoGitMasterSettings,
+  options?: GitAttributionCheckOptions,
+): string | undefined {
+  const resolved = resolveGitAttribution(settings, options)
+  const footerText = resolveFooterText(resolved.commitFooter)
+  const includeCoAuthor = resolved.includeCoAuthoredBy
   if (footerText === undefined && !includeCoAuthor) return undefined
+
 
   const attributions: string[] = []
   if (footerText !== undefined) attributions.push(`**Footer in the commit body:** ${footerText}`)

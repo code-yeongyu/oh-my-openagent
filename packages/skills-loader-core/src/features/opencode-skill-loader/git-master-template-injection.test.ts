@@ -237,3 +237,60 @@ describe("#given idempotency of prefixGitCommandsInBashCodeBlocks", () => {
 		})
 	})
 })
+
+describe("#given git attribution policy suppression", () => {
+	it("#then suppresses commit footer and co-author when NO_AI_ATTRIBUTION is set", () => {
+		const result = withUnixShell(() =>
+			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, {
+				env: { NO_AI_ATTRIBUTION: "1" },
+				gitConfigReader: () => undefined,
+			}),
+		)
+
+		expect(result).not.toContain("### 5.5 Commit Footer & Co-Author")
+		expect(result).not.toContain("Ultraworked with [Sisyphus]")
+		expect(result).not.toContain("Co-authored-by: ")
+	})
+
+	it("#then suppresses attribution when git config omo.attribution is false", () => {
+		const result = withUnixShell(() =>
+			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, {
+				env: {},
+				gitConfigReader: (key) => (key === "omo.attribution" ? "false" : undefined),
+			}),
+		)
+
+		expect(result).not.toContain("### 5.5 Commit Footer & Co-Author")
+		expect(result).not.toContain("Ultraworked with [Sisyphus]")
+		expect(result).not.toContain("Co-authored-by: ")
+	})
+
+	it("#then suppresses attribution when git config sisyphus.attribution is false", () => {
+		const result = withUnixShell(() =>
+			injectGitMasterConfig(SAMPLE_TEMPLATE, undefined, {
+				env: {},
+				gitConfigReader: (key) => (key === "sisyphus.attribution" ? "false" : undefined),
+			}),
+		)
+
+		expect(result).not.toContain("### 5.5 Commit Footer & Co-Author")
+		expect(result).not.toContain("Ultraworked with [Sisyphus]")
+		expect(result).not.toContain("Co-authored-by: ")
+	})
+
+	it("#then preserves custom string footer even when attribution is suppressed", () => {
+		const result = withUnixShell(() =>
+			injectGitMasterConfig(
+				SAMPLE_TEMPLATE,
+				{ commit_footer: "Custom Project Footer" },
+				{
+					env: { NO_AI_ATTRIBUTION: "1" },
+					gitConfigReader: () => undefined,
+				},
+			),
+		)
+
+		expect(result).toContain("Custom Project Footer")
+		expect(result).not.toContain("Co-authored-by: ")
+	})
+})
