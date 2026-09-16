@@ -95,7 +95,9 @@ export async function recordFinalReviewBlockers(
 			blockedGoal: goal,
 			newGoal,
 			ledgerEntries,
-			nextActions: reconciliation.warnings,
+			nextActions: reconciliation.warnings.filter(
+				(warning) => !warning.startsWith("driver_objective_differs:"),
+			),
 			warnings: reconciliation.warnings.filter((warning) => warning.startsWith("driver_objective_differs")),
 		};
 	});

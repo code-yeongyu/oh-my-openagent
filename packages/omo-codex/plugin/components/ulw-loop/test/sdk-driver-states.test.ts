@@ -108,14 +108,18 @@ describe("SDK driver-goal states", () => {
 	});
 
 	describe("#given a driver whose objective differs from the plan", () => {
-		it("#when the goal is checkpointed #then the difference is reported, never a rejection", async () => {
+		it("#when the goal is checkpointed #then the difference is reported in warnings, never a rejection", async () => {
 			const seeded = await seed("driver-differs");
 
 			const closed = await closeWith(seeded, { goal: { objective: "a different objective", status: "active" } });
 
 			expect(closed.ok).toBe(true);
 			if (closed.ok) {
-				expect([...(closed.warnings ?? []), ...closed.nextActions].join(" ")).toContain("driver_objective_differs");
+				// The difference appears in warnings (informational) but not in nextActions (actionable)
+				expect((closed.warnings ?? []).join(" ")).toContain("driver_objective_differs");
+				expect(closed.nextActions.join(" ")).not.toContain("driver_objective_differs");
+				// Must not suggest create_goal when a driver goal already exists
+				expect(closed.nextActions.join(" ")).not.toContain("create_goal");
 			}
 		});
 	});

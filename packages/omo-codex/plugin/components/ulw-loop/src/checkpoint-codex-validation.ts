@@ -26,11 +26,14 @@ export async function validateCheckpointCodexGoal(input: {
 			: {}),
 	});
 	if (!reconciliation.ok) throw new CodexGoalSnapshotError(formatCodexGoalReconciliation(reconciliation));
-	return {
-		raw: snapshot?.raw,
-		nextActions: reconciliation.warnings,
-		warnings: reconciliation.warnings.filter((warning) => warning.startsWith("driver_objective_differs")),
-	};
+	// Only actionable advice goes into nextActions; informational differences go into warnings only.
+	// When the driver goal exists but its objective differs, the SDK should not tell the agent to
+	// create_goal (the goal already exists) or repeat the diff on every call — that belongs in warnings.
+	const nextActions = reconciliation.warnings.filter(
+		(warning) => !warning.startsWith("driver_objective_differs:"),
+	);
+	const warnings = reconciliation.warnings.filter((warning) => warning.startsWith("driver_objective_differs"));
+	return { raw: snapshot?.raw, nextActions, warnings };
 }
 
 export function combineCheckpointValidationErrors(codexError: UlwLoopError, gateError: UlwLoopError): UlwLoopError {

@@ -104,7 +104,17 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 		try {
 			const result = await fn();
 			const nextActions = typeof result === "object" && result !== null ? nextActionsFrom(result) : [];
-			return await notify(operation, { ok: true, operation, result, nextActions });
+			const resultWarnings =
+				typeof result === "object" && result !== null && "warnings" in result && Array.isArray(result.warnings)
+					? (result.warnings as string[])
+					: [];
+			return await notify(operation, {
+				ok: true,
+				operation,
+				result,
+				nextActions,
+				...(resultWarnings.length > 0 ? { warnings: resultWarnings } : {}),
+			});
 		} catch (error) {
 			const response = caught(operation, error instanceof Error ? error : new Error("ULW_LOOP_ERROR"));
 			return notify(operation, response);
