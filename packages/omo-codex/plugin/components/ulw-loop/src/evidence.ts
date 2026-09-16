@@ -95,7 +95,7 @@ export async function recordEvidence(
 		criterion.capturedEvidence = evidence;
 		criterion.capturedAt = capturedAt;
 		if (args.notes !== undefined) criterion.notes = args.notes;
-		if (validatedArtifacts.length > 0) (criterion as Record<string, unknown>).artifacts = validatedArtifacts;
+		if (validatedArtifacts.length > 0) criterion.artifacts = validatedArtifacts;
 		goal.updatedAt = capturedAt;
 		plan.updatedAt = capturedAt;
 		const ledgerEntry: UlwLoopLedgerEntry = {

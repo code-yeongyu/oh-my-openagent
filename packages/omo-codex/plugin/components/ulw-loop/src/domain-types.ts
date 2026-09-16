@@ -19,6 +19,7 @@ export interface UlwLoopSuccessCriterion {
 	status: UlwLoopCriterionStatus;
 	capturedAt?: string;
 	notes?: string;
+	artifacts?: readonly string[];
 }
 
 export interface UlwLoopItem {
