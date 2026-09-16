@@ -39,12 +39,26 @@ function validateCodexGoalJson(raw: string | undefined): void {
 	}
 }
 
-function validateContext(context: ToolkitContext): void {
-	if (!context.cwd.trim()) throw new UlwLoopError("cwd is required.", "ULW_LOOP_CWD_REQUIRED");
+interface NormalizedContext {
+	readonly context: ToolkitContext;
+	readonly warnings: readonly string[];
+}
+
+function normalizeContext(context: ToolkitContext): NormalizedContext {
+	const warnings: string[] = [];
+	let cwd = context.cwd;
+	if (!cwd.trim()) {
+		cwd = process.cwd();
+		warnings.push(
+			`PI_SESSION_CWD was not set; falling back to process.cwd() (${cwd}). ` +
+				`To fix: set process.env.PI_SESSION_CWD in the eval kernel, or restart the session.`,
+		);
+	}
 	if (!context.sessionId.trim())
 		throw new UlwLoopError("ULW_LOOP_SESSION_ID_REQUIRED: sessionId is required.", "ULW_LOOP_SESSION_ID_REQUIRED");
 	if (context.surface !== "omo-senpi" && context.surface !== "lazycodex")
 		throw new UlwLoopError("surface must be omo-senpi or lazycodex.", "ULW_LOOP_SURFACE_INVALID");
+	return { context: cwd === context.cwd ? { ...context } : { ...context, cwd }, warnings };
 }
 
 function errorDetails(error: UlwLoopError): ToolkitError {
@@ -87,8 +101,8 @@ function checkpointWithValidatedSnapshot(
 	return checkpointUlwLoop(context.cwd, args, scope, { surface: context.surface });
 }
 
-export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDependencies = {}): AgentToolkit {
-	validateContext(context);
+export function createAgentToolkit(rawContext: ToolkitContext, deps: AgentToolkitDependencies = {}): AgentToolkit {
+	const { context, warnings: contextWarnings } = normalizeContext(rawContext);
 	const scope: UlwLoopScope = { sessionId: context.sessionId };
 	const notify = async <Operation extends UlwLoopOperation>(
 		operation: Operation,
@@ -104,7 +118,13 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 		try {
 			const result = await fn();
 			const nextActions = typeof result === "object" && result !== null ? nextActionsFrom(result) : [];
-			return await notify(operation, { ok: true, operation, result, nextActions });
+			return await notify(operation, {
+				ok: true,
+				operation,
+				result,
+				nextActions,
+				...(contextWarnings.length > 0 ? { warnings: contextWarnings } : {}),
+			});
 		} catch (error) {
 			const response = caught(operation, error instanceof Error ? error : new Error("ULW_LOOP_ERROR"));
 			return notify(operation, response);

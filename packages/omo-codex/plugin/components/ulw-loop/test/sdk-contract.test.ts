@@ -35,6 +35,18 @@ describe("agent toolkit SDK contract", () => {
 		);
 	});
 
+	it("falls back to process.cwd() when cwd is empty and includes a warning", async () => {
+		const toolkit = createAgentToolkit({ cwd: "", sessionId: "cwd-fallback-test", surface: "lazycodex" });
+		const result = await toolkit.help();
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.warnings).toBeDefined();
+		expect(result.warnings?.length).toBeGreaterThan(0);
+		expect(result.warnings?.[0]).toContain("PI_SESSION_CWD");
+		expect(result.warnings?.[0]).toContain("process.cwd()");
+		expect(result.warnings?.[0]).toContain("restart the session");
+	});
+
 	it("uses explicit surface roles for SDK checkpoint templates", async () => {
 		for (const surface of ["omo-senpi", "lazycodex"] as const) {
 			const cwd = await mkdtemp(join(tmpdir(), `ulw-sdk-template-${surface}-`));
