@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs"
 import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { ResolvedModelRecord } from "../state"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { KernelToolGrant } from "../kernel-tools/resolve"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { isWorkpoolYieldTool } from "../workpool/worker-tool-identity"
 import {
@@ -78,6 +80,12 @@ export type ChildSpec = {
   // executable ToolDefinitions merged AFTER the shared-tool family filter - the ONLY sanctioned
   // bypass of the task/team-family exclusion (team layer injects the pre-scoped member tool here).
   readonly memberScopedTools?: readonly ToolDefinition[]
+  /**
+   * TRANSIENT parent kernel-tool grant for THIS process only: live capability plus the fenced
+   * descriptors resolved at spawn. It is never persisted - SpawnSpecV1, the JSONL session_init and
+   * the task record carry no closure, descriptor or requested name (see buildSpawnSpecV1).
+   */
+  readonly kernelTools?: KernelToolGrant
   readonly depth: number
   readonly parentSessionId: string
   readonly rootSessionId: string
@@ -112,6 +120,12 @@ export type InProcessRunnerOptions = {
   readonly uiOnlyToolNames?: Iterable<string>
   readonly depthPolicy?: DepthPolicy
   readonly createSession?: CreateChildSession
+  /**
+   * The parent engine's runtime kernel-tool map. The runner binds a granted child here at spawn so
+   * a SAME-host revive can reach the same live parent closures; a new host process has no map entry
+   * and the revived child fails closed instead.
+   */
+  readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
 const defaultCreateChildSession: CreateChildSession = async (options) =>
@@ -122,12 +136,19 @@ export class InProcessRunner {
   readonly #uiOnlyToolNames: readonly string[]
   readonly #depthPolicy: DepthPolicy
   readonly #createSession: CreateChildSession
+  readonly #kernelToolBindings: KernelToolBindingRegistry | undefined
 
   constructor(options: InProcessRunnerOptions = {}) {
     this.#sharedParentTools = options.sharedParentTools ?? []
     this.#uiOnlyToolNames = [...(options.uiOnlyToolNames ?? [])]
     this.#depthPolicy = options.depthPolicy ?? { maxDepth: DEFAULT_MAX_CHILD_DEPTH }
     this.#createSession = options.createSession ?? defaultCreateChildSession
+    this.#kernelToolBindings = options.kernelToolBindings
+  }
+
+  /** Drop a child's runtime kernel-tool binding (deliberate destruction, expunge, shutdown). */
+  releaseKernelTools(taskId: string): void {
+    this.#kernelToolBindings?.release(taskId)
   }
 
   async start(spec: ChildSpec): Promise<ChildHandle> {
@@ -143,6 +164,9 @@ export class InProcessRunner {
       // SessionManager and the child option helpers below read barrel values synchronously, so the
       // barrel is loaded here (memoized: a cache hit in any process that already runs the engine).
       const { SessionManager } = await loadSenpiBarrel()
+      // Runtime-only: the grant is bound under this child's id for same-host revival. Nothing about
+      // it reaches the record, the v1 spawn_spec or the child's JSONL transcript.
+      if (spec.kernelTools !== undefined) this.#kernelToolBindings?.bind(spec.taskId, spec.kernelTools)
       const options = buildChildSessionOptions({
         spec,
         sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec)),
@@ -200,11 +224,17 @@ export class InProcessRunner {
     let session: ChildSession
     try {
       const { SessionManager } = await loadSenpiBarrel()
+      // Parent kernel tools are NOT rebuilt from the spec: only a runtime binding that survived
+      // same-host parking can restore a callable tool, and a missing binding restores typed error
+      // stubs from this child's own recorded transcript names.
+      const { kernelTools: _discardedGrant, ...plain } = spec
       const options = buildChildSessionOptions({
-        spec: { ...spec, memberScopedTools },
+        spec: { ...plain, memberScopedTools },
         sessionManager: SessionManager.open(sessionPath, requireChildSessionDir(spec), spec.cwd),
         sharedParentTools: this.#sharedParentTools,
         uiOnlyToolNames: this.#uiOnlyToolNames,
+        revivedSessionPath: sessionPath,
+        ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
       session = await this.#createSession(options)
     } catch (error) {

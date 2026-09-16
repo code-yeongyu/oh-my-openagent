@@ -1,6 +1,7 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition, SkillInvocationState } from "../../agents"
+import type { KernelToolErrorCode } from "../../kernel-tools/contract"
 import type { TaskManager } from "../../manager"
 import type { ResolvedModelRecord, TaskRunStats } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
@@ -12,6 +13,9 @@ export type TaskToolContext = {
   readonly cwd: string
   readonly sessionManager: { getSessionId(): string }
   readonly getPromptCacheSafeWaitSeconds?: () => number | undefined
+  // Transient parent JS kernel-tool capability, present only while a live JavaScript eval owns this
+  // tool call. Read structurally (readKernelToolsCapability) so the engine pin may predate it.
+  readonly kernelTools?: unknown
 }
 
 // Parent-session ancestry the tool folds into the child spawn: the child's depth is the parent's
@@ -87,6 +91,13 @@ export type TaskHandleDetails = {
   readonly run_epoch: number
 }
 
+// Machine-readable outcome of a `tools` request: granted descriptor names, or the typed refusal.
+export type TaskKernelToolsDetail = {
+  readonly requested: readonly string[]
+  readonly granted?: readonly string[]
+  readonly error?: { readonly code: KernelToolErrorCode; readonly message: string }
+}
+
 export type TaskToolItemDetail = {
   readonly task_id: string
   readonly run_epoch?: number
@@ -122,6 +133,7 @@ export type TaskToolDetails = {
   readonly reason?: string
   readonly run_stats?: TaskRunStats
   readonly skills?: TaskSkillSummary
+  readonly kernel_tools?: TaskKernelToolsDetail
 }
 
 export type { TaskToolParamsStatic }

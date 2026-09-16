@@ -93,6 +93,9 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
   const name = identifier(raw.name)
   const model = identifier(raw.model)
   const loadSkills = stringList(raw.load_skills)
+  // Parent kernel-tool names must survive normalization: dropping them here would silently spawn a
+  // child WITHOUT the tools the caller asked for instead of granting or refusing them.
+  const tools = stringList(raw.tools)
   const runInBackground = booleanFlag(raw.run_in_background)
 
   return {
@@ -105,6 +108,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
     ...(name === undefined ? {} : { name }),
     ...(model === undefined ? {} : { model }),
     ...(loadSkills === undefined ? {} : { load_skills: loadSkills }),
+    ...(tools === undefined ? {} : { tools }),
     ...(tasks === undefined ? {} : { tasks }),
   }
 }

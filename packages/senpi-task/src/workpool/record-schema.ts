@@ -28,6 +28,8 @@ export const WorkpoolRecordSchema = z.strictObject({
     }),
   }),
   status: z.enum(["open", "closing", "cancelled"]),
+  // Plain-data worker tool names only; no closure, descriptor or generation is ever persisted.
+  kernel_tool_names: z.array(nonempty).optional(),
   aggregate: z.strictObject({ generation: z.number().int().positive(), delivered: z.boolean(), accepted: z.boolean().optional() }).optional(),
   items: z.array(z.strictObject({
     key: nonempty, input: z.json(), item_id: z.templateLiteral(["wi_", z.string()]).refine(id => /^wi_[0-9a-f]{32}$/.test(id)),

@@ -6,6 +6,7 @@ import {
   createFsSkillLoader,
   createTaskLifecycle,
   parseExtensionEntries,
+  createKernelToolBindings,
   createTaskManager,
   createTeamMemberRespawnLaunchResolver,
   createTaskRecordStore,
@@ -191,6 +192,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   }
 
   const categoryConfigGenerations = createCategoryConfigGenerations()
+  // ONE runtime-only kernel-tool capability map per engine, shared by the in-process runner (grant
+  // and same-host revival), the lifecycle (release on destruction/expunge/shutdown) and the
+  // manager's pool admission (fresh resolution per new worker).
+  const kernelToolBindings = createKernelToolBindings()
   const storeChain = createTaskStoreChain({
     baseStore,
     runtime,
@@ -204,7 +209,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   })
 
   const registry = createManagerResidencyRegistry(getManager)
-  const lifecycle = createTaskLifecycle({ store: storeChain.store, registry, config: settings,
+  const lifecycle = createTaskLifecycle({ store: storeChain.store, registry, config: settings, kernelToolBindings,
     revivePolicy: {
       currentGeneration: () => {
         const modelRegistry = runtime.modelRegistry()
@@ -219,7 +224,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   })
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
-  const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
+  const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings, kernelToolBindings }
   const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
   const basePlanner = createGenerationObservingPlanner({
     planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier()),
@@ -237,6 +242,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const manager = createTaskManager({
     store: storeChain.store,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
+    kernelToolBindings,
     planner,
     config: settings,
     cwd: deps.cwd,

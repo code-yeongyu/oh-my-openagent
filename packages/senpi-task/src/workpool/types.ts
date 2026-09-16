@@ -20,6 +20,7 @@ export const WORKPOOL_ERROR_CODES = [
   "duplicate_key_conflict", "tools_unavailable", "admission_refused", "spawn_failed", "policy_denied",
   "worker_not_continuable", "worker_unassigned", "stale_assignment", "yield_unavailable", "store_corrupt", "cancelled",
   "yield_conflict", "item_missing_yield", "delivery_uncertain", "cwd_unavailable", "config_generation_mismatch",
+  "reserved_tool_name", "tool_name_collision", "kernel_tool_missing", "kernel_tool_stale",
 ] as const
 export type WorkpoolErrorCode = typeof WORKPOOL_ERROR_CODES[number]
 export class WorkpoolError extends Error {
@@ -58,6 +59,9 @@ export type WorkpoolRecord = {
   readonly agent: WorkpoolAgent
   readonly worker_spec: WorkpoolSpec
   readonly status: "open" | "closing" | "cancelled"
+  // Parent kernel-tool names requested at create. Plain data: the live capability and its fenced
+  // descriptors are never persisted and are re-resolved at every NEW worker spawn.
+  readonly kernel_tool_names?: readonly string[]
   readonly items: readonly WorkpoolItem[]
   readonly workers: readonly WorkpoolWorker[]
   readonly aggregate?: { readonly generation: number; readonly delivered: boolean; readonly accepted?: boolean }

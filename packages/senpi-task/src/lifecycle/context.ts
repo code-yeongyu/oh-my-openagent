@@ -1,6 +1,7 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import { log } from "@oh-my-opencode/utils"
 
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { TaskRecordStore } from "../store"
 import { injectedLifecycleReattachPorts } from "./port"
 import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
@@ -24,6 +25,9 @@ export type LifecycleContext = {
   readonly reattachPorts: LifecycleReattachPorts | undefined
   readonly reconcileAdmission: BatchAdmissionOptions
   readonly idleReclaimerScheduler: IdleReclaimerScheduler
+  // Runtime-only parent kernel-tool map (item 6). Deliberate destruction and record expunge release
+  // a child's binding here; idle parking deliberately does NOT.
+  readonly kernelToolBindings: KernelToolBindingRegistry | undefined
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
@@ -61,6 +65,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     reattachPorts: injectedLifecycleReattachPorts(deps),
     reconcileAdmission: deps.reconcileAdmission ?? {},
     idleReclaimerScheduler: deps.idleReclaimerScheduler ?? defaultIdleReclaimerScheduler,
+    kernelToolBindings: deps.kernelToolBindings,
   }
 }
 

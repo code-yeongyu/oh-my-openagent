@@ -99,6 +99,7 @@ export function buildManagedSpec(input: {
     ...(spec.memberScopedTools !== undefined
       ? { memberScopedToolNames: spec.memberScopedTools.map((tool) => tool.name) }
       : {}),
+    ...(spec.kernelTools !== undefined ? { kernelTools: spec.kernelTools } : {}),
     ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
     ...(memberEnv !== undefined ? { memberEnv } : {}),
   }

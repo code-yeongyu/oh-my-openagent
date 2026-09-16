@@ -12,6 +12,7 @@ import {
   mapOmoConfigAgents,
   parseExtensionEntries,
   type AgentDefinition,
+  type KernelToolBindingRegistry,
   type ManagedRunner,
 } from "@oh-my-opencode/senpi-task"
 
@@ -31,6 +32,8 @@ export interface RunnerBuildContext {
   readonly runtime: TaskRuntimeContext
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly settings: OmoTaskSettings
+  // The engine's runtime-only parent kernel-tool map (item 6); absent in bare test wirings.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
 export interface TaskRunnerFactories {
@@ -66,6 +69,7 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
     },
     uiOnlyToolNames: TASK_CHILD_UI_ONLY_TOOL_NAMES,
     depthPolicy: { maxDepth: Math.max(build.settings.max_depth + 1, 1) },
+    ...(build.kernelToolBindings === undefined ? {} : { kernelToolBindings: build.kernelToolBindings }),
   })
   const context = createParentRegistrySessionContext(() => build.runtime.modelRegistry())
   return createInProcessManagedRunner(inProcess, context)

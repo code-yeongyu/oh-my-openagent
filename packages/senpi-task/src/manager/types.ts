@@ -3,6 +3,8 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { KernelToolGrant } from "../kernel-tools/resolve"
 import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type {
   CancelOptions,
@@ -47,6 +49,9 @@ export type ManagedStartSpec = {
   // the executable definitions against the live parent registries.
   readonly memberScopedToolNames?: readonly string[]
   readonly memberScopedTools?: readonly ToolDefinition[]
+  // TRANSIENT parent kernel-tool grant (item 6). Process-lifetime only: never persisted onto the
+  // record or the v1 spawn_spec, which carry plain launch data exclusively.
+  readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
 }
@@ -79,6 +84,8 @@ export type ManagerStartSpec = {
   readonly allowed_subagents?: readonly string[]
   readonly run_in_background?: boolean
   readonly memberScopedTools?: readonly ToolDefinition[]
+  // TRANSIENT parent kernel-tool grant resolved by the caller against its LIVE capability.
+  readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
 }
@@ -209,6 +216,9 @@ export type TaskManagerOptions = {
   // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
   // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
   readonly hostPid?: number
+  // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so
+  // a same-host parked child revives onto the same live parent closures; absent = no kernel tools.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
 export type TaskManager = {

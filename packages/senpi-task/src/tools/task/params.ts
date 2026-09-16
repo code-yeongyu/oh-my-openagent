@@ -33,6 +33,11 @@ export const TaskToolParams = Type.Object({
       description: "Skill names whose SKILL.md content is prepended to the child prompt. Defaults to [].",
     }),
   ),
+  tools: Type.Optional(
+    Type.Array(Type.String({ minLength: 1 }), {
+      description: "Names of JavaScript tools the calling eval cell defined with tool(fn). They are granted to this child only; define each one before requesting it. Available only for in-process children of a live JavaScript eval, never for curated read-only agents, process/team children or other kernel languages.",
+    }),
+  ),
   tasks: Type.Optional(
     Type.Array(
       Type.Object({

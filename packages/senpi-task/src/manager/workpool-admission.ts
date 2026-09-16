@@ -9,6 +9,8 @@ import { acknowledgeWorkerTurn, appendAssignedMessages, beginWorkerTurn, WORKPOO
 import type { ReviveReservation, SendOutcome } from "../steering/types"
 import { WorkpoolError, type WorkpoolAgent, type WorkpoolCaller, type WorkpoolSpec } from "../workpool/types"
 import type { WorkpoolAdmission, WorkpoolRequest } from "../workpool/ports"
+import { resolveWorkerKernelTools } from "../workpool/worker-kernel-tools"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import { TaskConcurrency } from "./concurrency"
 import { decideDepthPolicy } from "./depth-policy"
 import { resolveExecutionMode } from "./execution-mode"
@@ -29,6 +31,8 @@ export type PoolManagerPorts = {
   trackRevive(taskId: string, epoch: number): void
   nextSequence(parentSessionId: string): number
   workerTools(taskId: string): readonly ToolDefinition[]
+  // The parent engine's runtime kernel-tool map. Absent = no pool may hold parent tools.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
 export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmission {
@@ -97,11 +101,14 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
             if (!current()) return
             input.authorize()
             if (!acquired.lease.isOwner()) throw new WorkpoolError("admission_refused", "Residency admission lease was displaced.")
+            // Grants are resolved AFRESH for every new worker: an existing worker never rebinds.
+            const kernelTools = await resolveWorkerKernelTools(pool, ports.kernelToolBindings)
             if (!input.bind(taskId, epoch)) return
             context = prepareWorkpoolLaunch({ options, workerSpec: pool.worker_spec, taskId, hostPid: ports.hostPid,
               taskSeq: ports.nextSequence(pool.parent_session_id),
               spec: { ...pool.worker_spec.start,
                 memberScopedTools: ports.workerTools(taskId),
+                ...(kernelTools === undefined ? {} : { kernelTools }),
                 ...(pool.worker_spec.start.execution_mode === "process" ? workpoolProcessLaunch(options.store.stateDir, taskId) : {}),
               },
             })

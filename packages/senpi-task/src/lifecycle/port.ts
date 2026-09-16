@@ -3,6 +3,7 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { BatchAdmissionOptions } from "./residency"
 import type { RevivePolicyPort } from "./revive-policy"
 
@@ -177,6 +178,9 @@ export type LifecycleDeps = {
   readonly reconcileAdmission?: BatchAdmissionOptions
   // Injectable timer seam keeps lifecycle tests deterministic and prevents test-created timers.
   readonly idleReclaimerScheduler?: IdleReclaimerScheduler
+  // The engine's runtime-only parent kernel-tool map. Destruction and expunge release a child's
+  // binding through it; idle parking keeps the binding so a same-host revive still reaches it.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {

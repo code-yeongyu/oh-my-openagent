@@ -67,7 +67,10 @@ test("#given reserved tools or a gated agent #when creating a pool #then typed d
   // given
   const f = host()
   // when / then
-  for (const tools of [[], ["lookup"]]) expect((await f.execute({ op: "create", ...poolInput, tools }, f.ctx)).details.error).toMatchObject({ code: "tools_unavailable" })
+  // No live parent JS kernel on this host context: a requested worker tool fails closed, and a
+  // reserved host name is refused before any capability is consulted.
+  expect((await f.execute({ op: "create", ...poolInput, tools: ["lookup"] }, f.ctx)).details.error).toMatchObject({ code: "tools_unavailable" })
+  expect((await f.execute({ op: "create", ...poolInput, tools: ["task_send"] }, f.ctx)).details.error).toMatchObject({ code: "reserved_tool_name" })
   expect((await f.execute({ op: "create", ...poolInput, agent: { subagent_type: "plan-reviewer", prompt: "st_11111111 succeeded" } }, f.ctx)).details.error).toMatchObject({ code: "policy_denied" })
   expect((await f.execute({ op: "yield", results: [] }, f.ctx)).details.error).toMatchObject({ code: "worker_unassigned" })
   expect(f.store.list().records).toEqual([])

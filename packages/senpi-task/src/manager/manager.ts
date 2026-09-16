@@ -141,6 +141,10 @@ function publicStartFailureMessage(error: unknown): string {
         return "In-process child session creation failed."
       case "child-prompt-failed":
         return "Child prompt failed to start."
+      case "tools_unavailable":
+        // Sanitized but typed: the caller must be able to tell a refused parent kernel-tool grant
+        // from a generic runner failure without reading private spec details.
+        return "Parent kernel tools are unavailable for this child."
       default:
         return GENERIC_START_FAILURE_MESSAGE
     }
@@ -245,7 +249,8 @@ class TaskManagerImpl implements TaskManager {
         this.#outcome.trackOutcome(taskId, live.handle, live.model, epoch)
       },
       workerTools: taskId => [createWorkpoolWorkerTool({ workpools: this.workpools, taskId, runEpoch: () => this.get(taskId)?.notification.run_epoch ?? -1 })],
-    }))
+      ...(options.kernelToolBindings === undefined ? {} : { kernelToolBindings: options.kernelToolBindings }),
+    }), options.kernelToolBindings)
     registerLifecycleReattachPorts(options.store, {
       reserve: (record) => this.#reserveForReattach(record),
       respawn: (record, resumeSessionPath) => this.respawn(record, resumeSessionPath),
