@@ -474,7 +474,7 @@ describe("resolveCompatibleModelSettings", () => {
         field: "reasoningEffort",
         from: "xhigh",
         to: "max",
-        reason: "unsupported-by-model-family",
+        reason: "unsupported-by-model-metadata",
       },
     ])
   })
@@ -910,6 +910,91 @@ describe("resolveCompatibleModelSettings", () => {
       variant: undefined,
       reasoningEffort: undefined,
       changes: [],
+    })
+  })
+
+  // #8400 — model metadata must take precedence over heuristic family aliases
+  describe("metadata precedence over family aliases (#8400)", () => {
+    test("glm low reasoningEffort is preserved when metadata declares low support", () => {
+      // glm family has alias { low: "high" }, but if the model's own metadata
+      // declares "low" as a supported tier, it must be honoured as-is.
+      const result = resolveCompatibleModelSettings({
+        providerID: "zhipuai-coding-plan",
+        modelID: "glm-5.3",
+        desired: { reasoningEffort: "low" },
+        capabilities: {
+          reasoningEfforts: ["low", "high", "max"],
+        },
+      })
+
+      expect(result.reasoningEffort).toBe("low")
+      expect(result.changes).toEqual([])
+    })
+
+    test("glm medium reasoningEffort is preserved when metadata declares medium support", () => {
+      const result = resolveCompatibleModelSettings({
+        providerID: "zhipuai-coding-plan",
+        modelID: "glm-5.3",
+        desired: { reasoningEffort: "medium" },
+        capabilities: {
+          reasoningEfforts: ["low", "medium", "high", "max"],
+        },
+      })
+
+      expect(result.reasoningEffort).toBe("medium")
+      expect(result.changes).toEqual([])
+    })
+
+    test("glm low falls back to alias when metadata does NOT include low", () => {
+      // When the model's metadata only has ["high", "max"], the alias
+      // low→high should still apply as a helpful mapping.
+      const result = resolveCompatibleModelSettings({
+        providerID: "zhipuai-coding-plan",
+        modelID: "glm-5.3",
+        desired: { reasoningEffort: "low" },
+        capabilities: {
+          reasoningEfforts: ["high", "max"],
+        },
+      })
+
+      expect(result.reasoningEffort).toBe("high")
+      expect(result.changes).toEqual([{
+        field: "reasoningEffort",
+        from: "low",
+        to: "high",
+        reason: "unsupported-by-model-metadata",
+      }])
+    })
+
+    test("grok xhigh reasoningEffort is preserved when metadata declares xhigh support", () => {
+      // grok family heuristic only has ["low", "medium", "high"], but if the
+      // provider/registry declares xhigh, it must be respected.
+      const result = resolveCompatibleModelSettings({
+        providerID: "opencode-go",
+        modelID: "grok-4.6",
+        desired: { reasoningEffort: "xhigh" },
+        capabilities: {
+          reasoningEfforts: ["low", "medium", "high", "xhigh"],
+        },
+      })
+
+      expect(result.reasoningEffort).toBe("xhigh")
+      expect(result.changes).toEqual([])
+    })
+
+    test("metadata-declared variant is preserved even when family alias exists", () => {
+      // Same principle for variant field.
+      const result = resolveCompatibleModelSettings({
+        providerID: "zhipuai-coding-plan",
+        modelID: "glm-5.3",
+        desired: { variant: "low" },
+        capabilities: {
+          variants: ["low", "high", "max"],
+        },
+      })
+
+      expect(result.variant).toBe("low")
+      expect(result.changes).toEqual([])
     })
   })
 })

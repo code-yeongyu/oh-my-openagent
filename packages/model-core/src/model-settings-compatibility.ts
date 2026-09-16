@@ -77,17 +77,31 @@ function resolveField(
   metadataOverride?: string[],
   familyAliases?: Record<string, string>,
 ): FieldResolution {
-  const aliased = familyAliases?.[normalized]
-  if (aliased && (metadataOverride?.includes(aliased) || familyCaps?.includes(aliased))) {
-    return { value: aliased, reason: "unsupported-by-model-family" }
-  }
-
+  // Model metadata (provider registry / bundled snapshot) is the single source of
+  // truth for model feature detection.  When the requested value is already
+  // declared by metadata we honour it directly — heuristic family aliases must
+  // NOT override an explicitly supported tier.
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
+
+    // The requested tier is absent from metadata — try a family alias before
+    // falling back to ladder clamping so we can map unsupported names
+    // (e.g. "medium" → "high") when the alias target *is* in metadata.
+    const aliased = familyAliases?.[normalized]
+    if (aliased && metadataOverride.includes(aliased)) {
+      return { value: aliased, reason: "unsupported-by-model-metadata" }
+    }
+
     return {
       value: downgradeWithinLadder(normalized, metadataOverride),
       reason: "unsupported-by-model-metadata",
     }
+  }
+
+  // No metadata — fall back to heuristic family knowledge.
+  const aliased = familyAliases?.[normalized]
+  if (aliased && familyCaps?.includes(aliased)) {
+    return { value: aliased, reason: "unsupported-by-model-family" }
   }
 
   if (familyCaps) {
