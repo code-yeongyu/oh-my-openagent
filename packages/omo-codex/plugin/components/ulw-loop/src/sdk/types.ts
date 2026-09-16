@@ -69,6 +69,7 @@ type StatusResult = {
 	readonly plan: UlwLoopPlan;
 	readonly summary: ReturnType<typeof summarizeUlwLoopPlan>;
 	readonly nextActions: readonly string[];
+	readonly evidenceRoot?: string;
 	readonly currentAttemptDir?: string;
 };
 
