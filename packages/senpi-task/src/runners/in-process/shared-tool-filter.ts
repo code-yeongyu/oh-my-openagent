@@ -15,7 +15,21 @@ export type SharedToolFilterOptions = {
 }
 
 export function isTaskOrTeamFamilyTool(name: string): boolean {
-  return name === "workflow" || name === "task" || name.startsWith("task_") || name.startsWith("team_")
+  return name === "workpool" || name.startsWith("workpool_") || name === "workflow" || name === "task" || name.startsWith("task_") || name.startsWith("team_")
+}
+
+/**
+ * The names a child ends up with before its OWN allow/deny applies: the shared parent tools minus
+ * the task/team family and the UI-only names. The kernel-tool grant needs this set at the TOOL
+ * layer - before any child session exists - to refuse a colliding name and to decide the
+ * nested-host-scope rule (kernel-tools/nested-host-scope.ts).
+ */
+export function childVisibleToolNames(
+  names: readonly string[],
+  uiOnlyToolNames: Iterable<string> = [],
+): string[] {
+  const uiOnly = new Set(uiOnlyToolNames)
+  return names.filter((name) => !isTaskOrTeamFamilyTool(name) && !uiOnly.has(name))
 }
 
 // Only `name` and `exposure` are read, and every tool is passed through unchanged, so the element

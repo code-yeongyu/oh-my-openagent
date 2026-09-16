@@ -155,6 +155,10 @@ describe("composeOmoSenpiExtension", () => {
     const pi: Omit<FakeExtensionAPI, "registerMcpServer"> & { registerMcpServer?: undefined } = {
       handlers: [],
       tools: [],
+      removedToolHints: new Map(),
+      registerRemovedToolHint(name, hint) {
+        this.removedToolHints.set(name, hint)
+      },
       commands: [],
       flags: [],
       messages: [],

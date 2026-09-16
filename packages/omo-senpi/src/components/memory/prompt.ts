@@ -17,7 +17,8 @@ export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
 
 export interface MemoryPromptSession {
   readonly id: string
-  readonly priorMessageCount: number
+  /** Messages the branch's latest compaction pushed out of the live context; 0 while nothing compacted. */
+  readonly compactedMessageCount: number
 }
 
 export interface MemoryPromptInjectionOptions {
@@ -66,11 +67,14 @@ export function createMemoryPromptHandler(
       repo,
       options.resolveCompileWarnTokens?.(context.identity),
     )
+    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice)
+    const nextPrompt = replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock))
+    if (notice === undefined) return { systemPrompt: nextPrompt }
     return {
-      systemPrompt: replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock)),
+      systemPrompt: nextPrompt,
       message: {
         customType: MEMORY_NOTICE_CUSTOM_TYPE,
-        content: renderMemoryNotice(session.priorMessageCount, nudgeTurns, soulNotice),
+        content: notice,
         display: false,
       },
     }
@@ -95,22 +99,28 @@ async function addMemoryPressureMetadata(
   return `${block.slice(0, metadataEnd)}${line}\n${block.slice(metadataEnd)}`
 }
 
+/**
+ * Session-volatile lines only. Every line is a fact about THIS session's state; standing facts (what
+ * memory is, that recall arrives on its own) live in the compiled block. No line means no notice.
+ */
 function renderMemoryNotice(
-  previousMessageCount: number,
+  compactedMessageCount: number,
   nudgeTurns: number | undefined,
   soulNotice: { readonly sha: string } | undefined,
-): string {
-  return [
-    "<memory_notice>",
-    `- ${previousMessageCount} previous messages between you and the user are stored in recall memory`,
+): string | undefined {
+  const lines = [
+    ...(compactedMessageCount === 0
+      ? []
+      : [`- ${compactedMessageCount} earlier messages were compacted out of the live context; what still matters from them arrives on its own as <recalled-memory> blocks`]),
     ...(nudgeTurns === undefined
       ? []
       : [`- ${nudgeTurns} ${MEMORY_NUDGE_METADATA_TOKEN}. Save durable facts now, or decide nothing qualifies.`]),
     ...(soulNotice === undefined
       ? []
       : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
-    "</memory_notice>",
-  ].join("\n")
+  ]
+  if (lines.length === 0) return undefined
+  return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")
 }
 
 function defaultCreateRepo(context: MemoryIdentityContext): GitMemoryRepo {
@@ -133,7 +143,29 @@ function readPromptSession(eventCtx: unknown): MemoryPromptSession | undefined {
   const id = Reflect.apply(getSessionId, manager, [])
   const branch = Reflect.apply(getBranch, manager, [])
   if (typeof id !== "string" || id.length === 0 || !Array.isArray(branch)) return undefined
-  return { id, priorMessageCount: branch.length }
+  return { id, compactedMessageCount: countCompactedMessages(branch) }
+}
+
+/**
+ * The branch carries summarized-out entries alongside the live ones, so its length says nothing about
+ * what left the context. Senpi's live context starts at the latest compaction's `firstKeptEntryId`;
+ * the messages before that entry are the ones the model can no longer see. A branch whose kept id is
+ * gone (an older compaction's entries pruned from this path) falls back to the compaction entry.
+ */
+function countCompactedMessages(branch: readonly unknown[]): number {
+  let compactionIndex = -1
+  let firstKeptEntryId: string | undefined
+  for (const [index, entry] of branch.entries()) {
+    if (!isRecord(entry) || entry.type !== "compaction") continue
+    compactionIndex = index
+    firstKeptEntryId = typeof entry.firstKeptEntryId === "string" ? entry.firstKeptEntryId : undefined
+  }
+  if (compactionIndex < 0) return 0
+  const keptIndex = firstKeptEntryId === undefined
+    ? -1
+    : branch.findIndex((entry) => isRecord(entry) && entry.id === firstKeptEntryId)
+  const boundary = keptIndex < 0 ? compactionIndex : keptIndex
+  return branch.slice(0, boundary).filter((entry) => isRecord(entry) && entry.type === "message").length
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

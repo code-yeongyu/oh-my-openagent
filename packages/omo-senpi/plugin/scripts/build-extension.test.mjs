@@ -42,6 +42,7 @@ function outputPathsIn(root) {
     memberOutputPath: join(root, "omo-member.js"),
     supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
     advisorRuntimeOutputPath: join(root, "omo-init-deep-advisor.js"),
+    toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
   }
 }
 
@@ -69,6 +70,20 @@ async function mutableOutputs() {
 }
 
 describe("checkExtensionCurrent", () => {
+  test("#given the eval SDK build #when inputs and exports are inspected #then the standalone entry has no dependencies", async () => {
+    const outputs = await sharedOutputs()
+    expect(outputs.toolkitSdkInputs.some(input => input.endsWith("src/extension/agent-toolkit-sdk.ts"))).toBe(true)
+    expect(outputs.toolkitSdkInputs.filter(input => input.includes("node_modules/"))).toEqual([])
+    const sdk = await import(outputs.toolkitSdkOutputPath)
+    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "agentToolkit", "createAgentToolkit", "toolkitContextFromEnv"].sort())
+  })
+
+  test("#given a missing SDK artifact #when freshness is checked #then it reports that output", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.toolkitSdkOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.toolkitSdkOutputPath })
+  })
+
   test("#given the host platform #when resolving the Bun executable #then Windows bypasses the command shell", () => {
     expect(resolveBunExecutable("win32")).toBe("bun.exe")
     expect(resolveBunExecutable("darwin")).toBe("bun")
@@ -236,10 +251,11 @@ describe("checkExtensionCurrent", () => {
 
     expect(main).toContain('import("#omo-task-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
-    expect(main).toContain('import("#omo-agent-toolkit-runtime")')
+    expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
+    expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
     expect(manifest.imports).toEqual({
       "#omo-task-runtime": "./extensions/omo-task.js",
-      "#omo-agent-toolkit-runtime": "./extensions/omo-agent-toolkit.js",
+      "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })
   })
 })

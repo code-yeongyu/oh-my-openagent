@@ -21,6 +21,10 @@
       "types": "./src/xdg-data-dir.ts",
       "import": "./src/xdg-data-dir.ts"
     },
+    "./logger": {
+      "types": "./src/logger.ts",
+      "import": "./src/logger.ts"
+    },
     "./record-type-guard": {
       "types": "./src/record-type-guard.ts",
       "import": "./src/record-type-guard.ts"

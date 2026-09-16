@@ -16,7 +16,6 @@ import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
 import { fakeChild, withinMs, type FakeChild } from "./kibitzer/sidecar.test-support"
 import type { AnyKibitzerSidecarTool } from "./kibitzer/tools/result"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
-import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-session-read"
 import { createMemoryWiring, type MemoryWiring } from "./wiring"
 
@@ -139,9 +138,10 @@ describe("kibitzer registration wiring", () => {
     expect(f.pi.handlers.filter((registration) => registration.event === "before_agent_start")).toHaveLength(3)
     expect(results).toHaveLength(3)
     const [projection, recall, kibitzer] = results as Array<{ systemPrompt?: string; message?: { customType?: string; content?: string } } | undefined>
-    // Projection first: it is the only writer of systemPrompt, and its message is the memory notice.
+    // Projection first: it is the only writer of systemPrompt. Its memory notice is session-volatile,
+    // and this branch never compacted, so it has nothing to say and injects no message.
     expect(projection?.systemPrompt).toContain("persona")
-    expect(projection?.message?.customType).toBe(MEMORY_NOTICE_CUSTOM_TYPE)
+    expect(projection?.message).toBeUndefined()
     expect(recall?.message?.customType).toBe(RECALL_CUSTOM_TYPE)
     expect(recall?.message?.content).toContain(HINT)
     expect(recall?.systemPrompt).toBeUndefined()

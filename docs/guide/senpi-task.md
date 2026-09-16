@@ -12,6 +12,7 @@ Use the `task` tool. A single spawn needs `prompt` plus exactly one of `category
 - `run_in_background: true` returns a task id (prefixed `st_`) immediately so you can keep working and check back later.
 - `name` gives the child a stable, human-friendly handle within the session so you can steer it by name instead of id.
 - `model` is valid only with `subagent_type`; category-routed tasks reject it and resolve their model from category config. `load_skills` prepends named SKILL.md content to the child prompt.
+- `subagent_type` must name a loaded agent. A name that is unknown or disabled fails with `unknown_target` listing the available agents; it is never resolved as a category of the same name, so `task(subagent_type="architect")` fails instead of quietly returning the `architect` category's model. Pass `category: "architect"` when a category is what you want.
 
 To continue an existing child with full context instead of spawning a new one, use `task_send` with `to` set to the child id or name.
 

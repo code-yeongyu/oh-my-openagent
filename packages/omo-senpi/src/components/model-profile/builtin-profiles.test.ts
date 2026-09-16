@@ -60,6 +60,13 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(offenders).toEqual([])
   })
 
+  it("lists no rung on the openai API lane so openai-codex is the only OpenAI lane", () => {
+    const apiLaneRungs = rungs()
+      .filter((rung) => rung.providers.includes("openai"))
+      .map((rung) => `${rung.profile}: ${rung.providers.join("|")}/${rung.model}`)
+    expect(apiLaneRungs).toEqual([])
+  })
+
   it("copies the deep category chain verbatim into deep-work", () => {
     expect(BUILTIN_MODEL_PROFILES["deep-work"]?.models).toEqual(CATEGORY_FALLBACK_CHAINS["deep"])
   })

@@ -238,6 +238,7 @@ export function buildPlanSkeleton(slug, intent) {
 **What it will NOT do:** <fill last - 1-3 plain lines mirroring Must NOT have>
 
 **Effort:** <Quick | Short | Medium | Large | XL>
+<!-- Effort is exactly ONE band, never hours/days. Quick = single edit, minutes of agent work; Short = one focused change, a few files; Medium = multi-file feature in one session; Large = several waves, one long session; XL = multi-session or architectural work. A written duration is rewritten to a band. -->
 **Risk:** <Low | Medium | High> - <one-line driver>
 ${decisionsLine}
 

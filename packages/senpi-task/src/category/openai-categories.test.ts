@@ -98,10 +98,10 @@ describe("category prompt append resolvers", () => {
 })
 
 describe("GPT-6 Astra builtin defaults and gates", () => {
-  it("#given the builtin definitions #then ultrabrain runs Astra at max, deep and unspecified-high at high", () => {
-    expect(definition("ultrabrain").config).toEqual({ model: "openai/gpt-6-astra", variant: "max" })
-    expect(definition("deep").config).toEqual({ model: "openai/gpt-6-astra", variant: "high" })
-    expect(definition("unspecified-high").config).toEqual({ model: "openai/gpt-6-astra", variant: "high" })
+  it("#given the builtin definitions #then ultrabrain runs Astra at max, deep and unspecified-high at high, all on the openai-codex lane", () => {
+    expect(definition("ultrabrain").config).toEqual({ model: "openai-codex/gpt-6-astra", variant: "max" })
+    expect(definition("deep").config).toEqual({ model: "openai-codex/gpt-6-astra", variant: "high" })
+    expect(definition("unspecified-high").config).toEqual({ model: "openai-codex/gpt-6-astra", variant: "high" })
   })
 
   it("#given the GPT flagship gate #then ultrabrain and deep open on either Astra or Sol and unspecified-high is ungated", () => {
@@ -123,7 +123,7 @@ describe("resolveCategory on a GPT-6 Astra registry", () => {
   ] as const
 
   for (const { category, variant, append } of cases) {
-    it(`#given only openai/gpt-6-astra #when ${category} resolves #then the child gets Astra at ${variant} with the Astra append`, () => {
+    it(`#given only the openai API lane serving gpt-6-astra #when ${category} resolves #then cross-provider fallthrough still gives Astra at ${variant} with the Astra append`, () => {
       const result = resolveCategory(category, {}, astraRegistry)
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")

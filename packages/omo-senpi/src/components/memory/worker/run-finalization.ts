@@ -1,10 +1,9 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { cleanupReflectionWorktree } from "@oh-my-opencode/memory-core"
-
 import {
   readRunJson,
+  readRunTextTail,
   runOutcomeMatchesLedger,
   updateRunLedger,
   writeRunJsonAtomic,
@@ -14,7 +13,7 @@ import {
   withRunFinalizationClaim,
   type ClaimedRunResult,
 } from "./run-finalization-claim"
-import { resolveFinalizationDecision } from "./run-finalization-git"
+import { cleanupAndRecord, resolveFinalizationDecision } from "./run-finalization-git"
 import { settleReservationRun } from "./run-finalization-settlement"
 import { withRunTerminalGate } from "./run-terminal-gate"
 import { checkRunAbandonmentPrecedence } from "./run-terminal-precedence"
@@ -25,7 +24,6 @@ import type {
 } from "./run-finalization-types"
 import {
   parseReservationRunLedger,
-  worktreeFromLedger,
   type ReservationRunLedger,
 } from "./reservation-run-ledger"
 
@@ -65,17 +63,31 @@ export async function failReservationRun(
         return finalizeClaimedOutcome(context, runDir, ledger.runId)
       }
       const current = await readLedger(runDir, ledger.runId)
+      const described = await describeUnpublishedFailure(runDir, detail)
       const decision: DurableFinalizationDecision = {
         outcome,
         reason: outcome === "timed_out" ? "deadline_exceeded" : "supervisor_failed",
-        ...(detail === undefined ? {} : { detail }),
+        ...(described === undefined ? {} : { detail: described }),
       }
       await checkpointFailure(runDir, decision)
-      await cleanupOrThrow(context, current)
+      await cleanupAndRecord(context, current, runDir)
       return settleReservationRun(context, runDir, current, decision)
     }),
   )
   return claimedValue(claimed)
+}
+
+const CHILD_STDERR_TAIL_BYTES = 64 * 1024
+
+/**
+ * A run that dies without an outcome still usually left its cause in child-stderr.log; that
+ * tail leads the detail so the health fingerprint keys on the cause, and the caller's
+ * description of the dead processes follows it.
+ */
+async function describeUnpublishedFailure(runDir: string, detail: string | undefined): Promise<string | undefined> {
+  const stderrTail = (await readRunTextTail(join(runDir, "child-stderr.log"), CHILD_STDERR_TAIL_BYTES)).trim()
+  const parts = [stderrTail, detail?.trim() ?? ""].filter((part) => part.length > 0)
+  return parts.length === 0 ? undefined : parts.join("\n")
 }
 
 export async function overrideFailedReservationRun(
@@ -96,7 +108,7 @@ export async function overrideFailedReservationRun(
         detail,
       }
       await checkpointFailure(runDir, decision)
-      await cleanupOrThrow(context, current)
+      await cleanupAndRecord(context, current, runDir)
       return settleReservationRun(context, runDir, current, decision)
     }),
   )
@@ -182,16 +194,6 @@ async function checkpointFailure(
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
   })
-}
-
-async function cleanupOrThrow(
-  context: RunFinalizationContext,
-  ledger: ReservationRunLedger,
-): Promise<void> {
-  const cleanup = await cleanupReflectionWorktree(worktreeFromLedger(context.identity, ledger))
-  if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) {
-    throw new Error(`Reflection cleanup incomplete for ${ledger.runId}`)
-  }
 }
 
 function claimedValue(

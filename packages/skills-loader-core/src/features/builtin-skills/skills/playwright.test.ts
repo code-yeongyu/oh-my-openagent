@@ -1,27 +1,20 @@
 /// <reference path="../../../../../../bun-test.d.ts" />
 
 import { describe, expect, test } from "bun:test"
-import { parseFrontmatter } from "@oh-my-opencode/utils"
-import { agentBrowserSkill as directAgentBrowserSkill } from "./agent-browser-skill"
 import { createBuiltinSkills } from "../skills"
 import * as playwrightFacade from "./playwright"
 import { createPlaywrightSkill, playwrightSkill as directPlaywrightSkill } from "./playwright-mcp-skill"
 
-declare const Bun: {
-  file(path: string): { text(): Promise<string> }
-}
-
 describe("playwright browser skill facade", () => {
   test("#given split browser skill modules #when importing through the facade #then it preserves exported skill identity", () => {
     // given
-    const expectedExports = ["agentBrowserSkill", "createPlaywrightSkill", "playwrightSkill"]
+    const expectedExports = ["createPlaywrightSkill", "playwrightSkill"]
 
     // when
     const exportNames = Object.keys(playwrightFacade).sort()
 
     // then
     expect(exportNames).toEqual(expectedExports)
-    expect(playwrightFacade.agentBrowserSkill).toBe(directAgentBrowserSkill)
     expect(playwrightFacade.playwrightSkill).toBe(directPlaywrightSkill)
     expect(playwrightFacade.createPlaywrightSkill).toBe(createPlaywrightSkill)
   })
@@ -105,11 +98,11 @@ describe("playwright browser skill facade", () => {
   })
 
   test("#given custom MCP args with alternate providers #when creating builtin skills #then the option is ignored", () => {
-    for (const browserProvider of ["playwright-cli", "agent-browser", "dev-browser"] as const) {
+    for (const browserProvider of ["playwright-cli", "dev-browser"] as const) {
       // when
       const skills = createBuiltinSkills({ browserProvider, playwrightMcpArgs: ["--headless"] })
       const browserSkill = skills.find((skill) =>
-        ["playwright", "agent-browser", "dev-browser"].includes(skill.name),
+        ["playwright", "dev-browser"].includes(skill.name),
       )
 
       // then
@@ -117,23 +110,4 @@ describe("playwright browser skill facade", () => {
     }
   })
 
-  test("#given agent-browser source markdown #when exposed through the split skill #then frontmatter is stripped and tool markers stay stable", async () => {
-    // given
-    const agentBrowserSkillFile = await Bun.file("packages/skills-loader-core/src/features/builtin-skills/agent-browser/SKILL.md").text()
-    const { data, body, hadFrontmatter } = parseFrontmatter<{ readonly name: string; readonly description: string }>(agentBrowserSkillFile)
-
-    // when
-    const skill = playwrightFacade.agentBrowserSkill
-
-    // then
-    expect(data.name).toBe("agent-browser")
-    expect(data.description).toContain("browser interactions")
-    expect(hadFrontmatter).toBe(true)
-    expect(skill.name).toBe("agent-browser")
-    expect(skill.allowedTools).toEqual(["Bash(agent-browser:*)"])
-    expect(body.length).toBeGreaterThan(0)
-    expect(skill.template.length).toBeGreaterThan(0)
-    expect(skill.template.startsWith("---\n")).toBe(false)
-    expect(skill.template).toContain("AGENT_BROWSER_SESSION")
-  })
 })

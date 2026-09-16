@@ -31,6 +31,8 @@ export class TaskConcurrency {
   readonly #leases = new Map<string, Lease>()
   #enqueueSequence = 0
   #legacyEpoch = -1
+  #granting: Waiter | undefined
+  #dispatching = false
 
   constructor(config: TaskConcurrencyConfig = {}) {
     this.#config = config
@@ -62,7 +64,7 @@ export class TaskConcurrency {
     const laneKey = this.getKey(model)
     const leaseKey = leaseKeyOf(taskId, runEpoch)
     if (this.#leases.has(leaseKey)) return false
-    if (this.#queues.has(laneKey)) return false
+    if (this.#queues.has(laneKey) && (this.#granting?.taskId !== taskId || this.#granting.runEpoch !== runEpoch)) return false
     if (!this.#laneHasRoom(model, laneKey) || !this.#globalHasRoom()) return false
     this.#recordLease(model, { laneKey, taskId, runEpoch })
     return true
@@ -141,7 +143,16 @@ export class TaskConcurrency {
     return { lanes: this.#counts.size, queues: this.#queues.size, leases: this.#leases.size }
   }
 
+  // Workpool pushes schedule this only after returning their durable item IDs.
+  drain(): void { this.#dispatch() }
+
   #dispatch(): void {
+    if (this.#dispatching) return
+    this.#dispatching = true
+    try { this.#drainEligible() } finally { this.#dispatching = false }
+  }
+
+  #drainEligible(): void {
     for (;;) {
       if (!this.#globalHasRoom()) return
       let selected: Waiter | undefined
@@ -157,9 +168,15 @@ export class TaskConcurrency {
       if (selected === undefined) return
       const queue = this.#queues.get(selected.laneKey)
       if (queue === undefined) continue
+      this.#granting = selected
+      let acquired: boolean
+      try { acquired = this.tryAcquire(selected.model, selected.taskId, selected.runEpoch) }
+      finally { this.#granting = undefined }
+      // An advisory capacity observation is not a lease. Leave this waiter in place exactly
+      // once when the atomic acquisition loses; a release will drain it, never a retry loop.
+      if (!acquired) return
       queue.shift()
       if (queue.length === 0) this.#queues.delete(selected.laneKey)
-      this.#recordLease(selected.model, selected)
       selected.grant()
     }
   }

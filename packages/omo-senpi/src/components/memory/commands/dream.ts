@@ -131,6 +131,7 @@ function requiredValue(value: string | true | undefined, flag: string): string {
 function dreamRejection(rejection: string): string {
   if (rejection === "no_unreflected_content") return "dream found no unreflected content to process"
   if (rejection === "no_session") return "dreaming is not available without a bound memory session"
+  if (rejection === "parked") return "automatic memory reflection is paused after repeated failures; run /reflect to retry now"
   return `dream request was not started: ${rejection}`
 }
 

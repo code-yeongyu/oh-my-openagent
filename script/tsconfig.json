@@ -11,5 +11,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["./*.ts"]
+  "include": ["./*.ts", "qa/**/*.ts"],
+  "exclude": ["qa/fixtures/**", "qa/omo-native-telemetry-qa.test.ts"]
 }

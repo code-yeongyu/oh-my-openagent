@@ -1,3 +1,4 @@
+export * from "./disabled-skills"
 export * from "./loader"
 export * from "./merge"
 export * from "./paths"

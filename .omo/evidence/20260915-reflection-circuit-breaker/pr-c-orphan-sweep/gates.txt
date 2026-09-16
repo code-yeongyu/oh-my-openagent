@@ -1,0 +1,32 @@
+# gates captured after rebase onto origin/dev (7870f80de)
+
+$ bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+exit: 0
+
+$ bun test packages/memory-core
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.13ms]
+
+ 858 pass
+ 0 fail
+ 5748 expect() calls
+Ran 858 tests across 94 files. [90.00s]
+exit: 0
+
+$ bun test --timeout 20000 packages/omo-senpi/src/components/memory
+(pass) memory tool (read-only) > #given an unknown operation #when called #then a structured rejection names the allowed operations [152.91ms]
+
+ 1497 pass
+ 0 fail
+ 6473 expect() calls
+Ran 1497 tests across 192 files. [147.63s]
+exit: 0
+
+$ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+
+omo-senpi extension build is current: /Users/yeongyu/local-workspaces/omo-wt/fix-reflection-orphan-sweep/packages/omo-senpi/plugin/extensions/omo.js
+exit: 0
+
+$ node packages/omo-senpi/plugin/scripts/build-install.mjs --check
+
+omo-senpi installer is current: /Users/yeongyu/local-workspaces/omo-wt/fix-reflection-orphan-sweep/packages/omo-senpi/plugin/scripts/install.mjs
+exit: 0

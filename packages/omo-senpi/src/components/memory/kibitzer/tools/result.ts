@@ -8,12 +8,16 @@ import type { WakeToolBudget } from "./budget"
 // early-termination hint); neither is declared on the base result type, so they are intersected here.
 export type KibitzerToolResult = AgentToolResult<undefined> & { readonly isError?: boolean; readonly terminate?: boolean }
 
-/** A sidecar tool: a member-scoped ToolDefinition whose execute is a plain two-argument closure. */
+/**
+ * A sidecar tool: a member-scoped ToolDefinition whose execute is a plain closure. The third
+ * parameter is the turn's AbortSignal, which senpi passes to every `AgentTool.execute`; a tool that
+ * does not scan (everything but `grep` today) simply declares the two arguments it uses.
+ */
 export type KibitzerSidecarTool<TParams extends TSchema> = Omit<
   ToolDefinition<TParams, undefined>,
   "execute" | "renderCall" | "renderResult"
 > & {
-  readonly execute: (toolCallId: string, params: Static<TParams>) => Promise<KibitzerToolResult>
+  readonly execute: (toolCallId: string, params: Static<TParams>, signal?: AbortSignal) => Promise<KibitzerToolResult>
 }
 
 /**
@@ -25,7 +29,7 @@ export type AnyKibitzerSidecarTool = Omit<
   ToolDefinition<TSchema, undefined>,
   "execute" | "renderCall" | "renderResult"
 > & {
-  readonly execute: (toolCallId: string, params: never) => Promise<KibitzerToolResult>
+  readonly execute: (toolCallId: string, params: never, signal?: AbortSignal) => Promise<KibitzerToolResult>
 }
 
 export type KibitzerRejectionCode =
@@ -76,13 +80,13 @@ export function boundedText(text: string, cap: number): string {
  */
 export function budgeted<TParams>(
   budget: () => WakeToolBudget,
-  run: (params: TParams) => Promise<KibitzerToolResult>,
-): (toolCallId: string, params: TParams) => Promise<KibitzerToolResult> {
-  return async (_toolCallId, params) => {
+  run: (params: TParams, signal?: AbortSignal) => Promise<KibitzerToolResult>,
+): (toolCallId: string, params: TParams, signal?: AbortSignal) => Promise<KibitzerToolResult> {
+  return async (_toolCallId, params, signal) => {
     const current = budget()
     if (!current.charge()) {
       return rejection("tool_budget_exceeded", `The tool-call budget for this wake (${current.limit}) is exhausted; end the turn.`)
     }
-    return run(params)
+    return run(params, signal)
   }
 }

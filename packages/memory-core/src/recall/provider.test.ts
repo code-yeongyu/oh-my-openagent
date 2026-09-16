@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
@@ -184,6 +184,99 @@ describe("RecallCorpusCache", () => {
 
     // then
     expect(second).not.toBe(first)
+    expect(second.revision).not.toBe(first.revision)
+    expect(second.documents.map((document) => document.path)).toContain("notes/deploy.md")
+  }, GIT_INTEGRATION_TEST_TIMEOUT)
+
+  it("#given an unchanged git directory #when the corpus loads again #then HEAD is not resolved a second time", async () => {
+    // given
+    const { repo } = await createRepo()
+    let headCalls = 0
+    const cache = new RecallCorpusCache({
+      head: async (target) => {
+        headCalls += 1
+        return target.head()
+      },
+    })
+    const first = await cache.load(repo)
+    expect(headCalls).toBe(1)
+
+    // when
+    const second = await cache.load(repo)
+
+    // then
+    expect(headCalls).toBe(1)
+    expect(second).toBe(first)
+  }, GIT_INTEGRATION_TEST_TIMEOUT)
+
+  it("#given a touched branch ref file #when the corpus reloads #then HEAD is resolved again", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    let headCalls = 0
+    const cache = new RecallCorpusCache({
+      head: async (target) => {
+        headCalls += 1
+        return target.head()
+      },
+    })
+    await cache.load(repo)
+    const headFile = (await readFile(join(dir, ".git", "HEAD"), "utf8")).trim()
+    const ref = headFile.startsWith("ref: ") ? headFile.slice("ref: ".length) : undefined
+    expect(ref).toBeDefined()
+
+    // when: git rewriting the ref is observable as a new mtime, without changing the commit
+    const refPath = join(dir, ".git", ...(ref ?? "").split("/"))
+    const touched = new Date(Date.now() + 5_000)
+    await utimes(refPath, touched, touched)
+    await cache.load(repo)
+
+    // then
+    expect(headCalls).toBe(2)
+  }, GIT_INTEGRATION_TEST_TIMEOUT)
+
+  it("#given a directory without a .git directory #when the corpus loads twice #then every load resolves HEAD", async () => {
+    // given: no probe is possible, so the gate falls open to the git call exactly as before
+    const dir = await createBareDir()
+    const repo = new GitMemoryRepo({ dir, agentId: "recall-agent" })
+    let headCalls = 0
+    const cache = new RecallCorpusCache({
+      head: async (target) => {
+        headCalls += 1
+        return target.head()
+      },
+    })
+
+    // when
+    await cache.load(repo)
+    const second = await cache.load(repo)
+
+    // then
+    expect(headCalls).toBe(2)
+    expect(second.revision).toBeNull()
+  }, GIT_INTEGRATION_TEST_TIMEOUT)
+
+  it("#given a new commit #when the corpus reloads #then the probe re-resolves HEAD and the corpus grows", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    let headCalls = 0
+    const cache = new RecallCorpusCache({
+      head: async (target) => {
+        headCalls += 1
+        return target.head()
+      },
+    })
+    const first = await cache.load(repo)
+    await writeFile(join(dir, "notes/deploy.md"), "---\ndescription: Deployment runbook\n---\nRoll forward.\n")
+    await repo.commitWrite(["notes/deploy.md"], "add deploy runbook", {
+      agentId: "recall-agent",
+      authorName: "Recall Agent",
+    })
+
+    // when
+    const second = await cache.load(repo)
+
+    // then
+    expect(headCalls).toBe(2)
     expect(second.revision).not.toBe(first.revision)
     expect(second.documents.map((document) => document.path)).toContain("notes/deploy.md")
   }, GIT_INTEGRATION_TEST_TIMEOUT)

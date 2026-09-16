@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
 
+import { readLedgerAt } from "./ledger.js";
 import { normalizeUlwLoopSessionId, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
+import { readUlwLoopPlanSync } from "./plan-io.js";
 import { isStateLockTimeout, withStateLockSync } from "./state-lock.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
@@ -37,7 +39,7 @@ export function runStopResumeHook(input: unknown): string {
 	if (boulderContinuationWillFire(payload.cwd, payload.session_id)) return "";
 	const scope = { sessionId: payload.session_id } as const;
 	const stateDir = ulwLoopDir(payload.cwd, scope);
-	const plan = readPlan(join(stateDir, "goals.json"));
+	const plan = readPlan(payload.cwd, payload.session_id);
 	if (plan === null || plan.aggregateCompletion?.status === "complete") return "";
 	const goal = resumableGoal(plan);
 	if (goal === undefined) return "";
@@ -81,11 +83,10 @@ function consumeResumeBudgetLocked(lockPath: string, stateDir: string, goalId: s
 	}
 }
 
-// Two-strike cap keyed on ledger movement: an unchanged ledger.jsonl line
-// count across resumes means the loop is not progressing. The stuck marker is
-// a separate file — a ledger append would change the count and self-reset.
+// Hook budget counters are exempt from plan/audit commits. Count reconciled
+// entries, not cache lines: a writer dying after link still made progress.
 function consumeResumeBudget(stateDir: string, goalId: string): boolean {
-	const ledgerLineCount = countLedgerLines(join(stateDir, "ledger.jsonl"));
+	const ledgerLineCount = readLedgerAt(stateDir).length;
 	const counterPath = resolve(stateDir, `auto-resume-${goalId}.json`);
 	const stuckPath = resolve(stateDir, `auto-resume-${goalId}.stuck`);
 	// goals.json is untrusted input: a crafted goal id (e.g. `../../x`) must
@@ -119,20 +120,11 @@ function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: 
 	].join("\n");
 }
 
-function readPlan(goalsPath: string): UlwLoopPlan | null {
+function readPlan(repoRoot: string, sessionId: string): UlwLoopPlan | null {
 	try {
-		return JSON.parse(readFileSync(goalsPath, "utf8")) as UlwLoopPlan;
+		return readUlwLoopPlanSync(repoRoot, { sessionId });
 	} catch (error) {
 		if (error instanceof Error) return null;
-		throw error;
-	}
-}
-
-function countLedgerLines(ledgerPath: string): number {
-	try {
-		return readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).length;
-	} catch (error) {
-		if (error instanceof Error) return 0;
 		throw error;
 	}
 }

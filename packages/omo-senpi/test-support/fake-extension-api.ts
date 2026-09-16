@@ -80,6 +80,7 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   cwd?: string
   readonly handlers: Array<{ event: string; handler: FakeEventHandler }> = []
   readonly tools: Record<string, unknown>[] = []
+  readonly removedToolHints = new Map<string, string>()
   readonly commands: FakeCommandRegistration[] = []
   readonly flags: FakeFlagRegistration[] = []
   readonly messages: FakeSendMessageCall[] = []
@@ -110,6 +111,10 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   registerTool(tool: Record<string, unknown>): void {
     this.tools.push(tool)
+  }
+
+  registerRemovedToolHint(name: string, hint: string): void {
+    this.removedToolHints.set(name, hint)
   }
 
   registerMessageRenderer(customType: string, renderer: unknown): void {

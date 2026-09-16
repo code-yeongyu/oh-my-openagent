@@ -9,6 +9,7 @@ import {
   type SendDelivery,
   type SendInput,
   type SendOutcome,
+  type ReviveReservation,
   type SteeringEngine,
   type SteeringPort,
 } from "./types"
@@ -51,7 +52,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return new Date(port.now()).toISOString()
   }
 
-  async function sendToTask(input: SendInput): Promise<SendOutcome> {
+  async function sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome> {
     const record = resolve(input.idOrName)
     if (record === undefined) {
       return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
@@ -78,13 +79,13 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (uncertain !== undefined) return uncertain
     if (cold) {
       coldRevivals.add(record.task_id)
-      try { return await reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend) }
+      try { return await reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend, reservation) }
       finally { coldRevivals.delete(record.task_id) }
     }
     const handle = port.liveHandle(record.task_id)
     if (handle === undefined) {
       if (record.residency_state === "rpc_detached" && record.execution_mode === "process") {
-        return reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend)
+        return reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend, reservation)
       }
       return {
         kind: "not_continuable",
@@ -103,7 +104,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
 
     if (mode === "steer") return steerRunning(record, handle, input.message, deliverAs)
-    return reviveTerminal(port, record, handle, input.message, nowIso, beginSend, endSend)
+    return reviveTerminal(port, record, handle, input.message, nowIso, beginSend, endSend, reservation)
   }
 
   async function steerRunning(record: TaskRecord, handle: ManagedChildHandle, message: string, deliverAs: SendDelivery): Promise<SendOutcome> {
@@ -197,7 +198,8 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     // was persisted, in persisted order. Malformed entries never reach here - the store parser
     // already dropped them with a diagnostic.
     const fresh = tryLoad(taskId)
-    const queue = fresh?.pending_steering
+    // Pool assignments are captured by their admitted turn, never replayed as individual sends.
+    const queue = fresh?.pending_steering?.filter(entry => entry.workpool === undefined)
     if (fresh === undefined || queue === undefined || queue.length === 0) return
     const handle = port.liveHandle(taskId)
     if (handle === undefined) return

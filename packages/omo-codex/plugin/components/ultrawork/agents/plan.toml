@@ -32,7 +32,7 @@ Write ONE plan to `.omo/plans/<slug>.md` (create the directory if absent). No "P
 ## TL;DR
 > Summary:      <1-2 sentences>
 > Deliverables: <bullet list>
-> Effort:       <Quick | Short | Medium | Large | XL>
+> Effort:       <Quick | Short | Medium | Large | XL>  (one band, never hours/days: Quick = single edit, minutes of agent work; Short = one focused change, a few files; Medium = multi-file feature in one session; Large = several waves, one long session; XL = multi-session or architectural work)
 > Risk:         <Low | Medium | High> - <one-line driver>
 
 ## Scope
@@ -94,10 +94,10 @@ Critical path: Task 1 -> Task 2 -> Task 6
   - [ ] <verifiable condition with the exact command or assertion>
 
   QA scenarios (MANDATORY - task incomplete without these):
-  > Name the exact tool AND its exact invocation - not "verify it works". Browser use: in Codex, use `browser:control-in-app-browser` first when available and no authenticated/persistent user browser profile is required; otherwise use Chrome to drive the page, or agent-browser (https://github.com/vercel-labs/agent-browser) when Chrome is unavailable. Computer use: OS-level GUI automation for a non-browser desktop app.
+  > Name the exact tool AND its exact invocation - not "verify it works". Browser use: in Codex, prefer `browser:control-in-app-browser`; otherwise, or for Chrome semantics, stealth, trace, or auth, write and run a `playwright-core` script from js eval against local Chrome (`channel: "chrome"`; persistent context on a CLONED profile, never the live one). Computer use: OS-level GUI automation for a non-browser desktop app.
   ```
   Scenario: <happy path>
-    Tool:     <bash | curl | tmux | browser:control-in-app-browser | playwright(real Chrome) | agent-browser | computer-use>
+    Tool:     <bash | curl | tmux | browser:control-in-app-browser | playwright-core(js eval, local Chrome) | computer-use>
     Steps:    <exact command / API call / page action with concrete inputs - URL, payload, keystrokes, selectors>
     Expected: <concrete, binary pass/fail observable>
     Evidence: <attemptDir>/task-<N>-<slug>.<ext>   (attemptDir = currentAttemptDir from `omo-agent-toolkit ulw-loop status --json`, .omo/evidence/ulw/<session>/<goalId>/a<attempt>)

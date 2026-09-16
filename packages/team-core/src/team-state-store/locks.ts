@@ -30,6 +30,9 @@ const LOCK_WAIT_TIMEOUT_MS = 15_000
 const LOCK_RELEASE_RETRY_ATTEMPTS = 3
 const LOCK_RELEASE_RETRY_MS = 25
 
+/** Distinguishes this process from a predecessor that reused the same pid. */
+export const lockOwnerInstanceId = randomUUID()
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -37,19 +40,29 @@ function delay(ms: number): Promise<void> {
 }
 
 function buildOwnerContent(ownerTag: string): string {
-  return `${ownerTag}\n${process.pid}\n${Date.now()}\n`
+  return `${ownerTag}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`
 }
 
-function parseOwnerContent(content: string): { ownerPid: number; acquiredAtEpochMs: number } | null {
+type LockOwnerContent = {
+  readonly ownerPid: number
+  readonly acquiredAtEpochMs: number
+  readonly instanceId: string | null
+}
+
+function parseOwnerContent(content: string): LockOwnerContent | null {
   const lines = content.split(/\r?\n/).filter((line) => line.length > 0)
-  if (lines.length !== 3) return null
+  if (lines.length !== 3 && lines.length !== 4) return null
 
   const ownerPid = Number.parseInt(lines[1] ?? "", 10)
   const acquiredAtEpochMs = Number.parseInt(lines[2] ?? "", 10)
   if (!Number.isInteger(ownerPid) || ownerPid <= 0) return null
   if (!Number.isInteger(acquiredAtEpochMs) || acquiredAtEpochMs <= 0) return null
 
-  return { ownerPid, acquiredAtEpochMs }
+  return {
+    ownerPid,
+    acquiredAtEpochMs,
+    instanceId: lines.length === 4 ? (lines[3] ?? null) : null,
+  }
 }
 
 function errorCode(error: unknown): string | null {
@@ -156,7 +169,21 @@ export async function detectStaleLock(lockPath: string, staleAfterMs: number): P
     const parsed = parseOwnerContent(content)
     if (parsed === null) return false
 
+    // A live pid whose instance id is not ours is this process number recycled
+    // after the previous owner died. Same-process waiters share lockOwnerInstanceId
+    // and must still serialize.
+    if (
+      parsed.instanceId !== null
+      && parsed.instanceId !== lockOwnerInstanceId
+      && parsed.ownerPid === process.pid
+    ) {
+      return true
+    }
+
     if (isPidAlive(parsed.ownerPid)) return false
+
+    // 4-line dead owners are stale immediately. Legacy 3-line keeps the age rule.
+    if (parsed.instanceId !== null) return true
 
     return Date.now() - parsed.acquiredAtEpochMs > staleAfterMs
   } catch (error) {

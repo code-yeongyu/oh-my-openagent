@@ -45,12 +45,15 @@ export function taskIdentityLabel(input: TaskIdentityInput): string {
   return label === undefined ? excerptRendererText(input.taskId, IDENTITY_MAX_WIDTH) : excerptRendererText(label, IDENTITY_MAX_WIDTH)
 }
 
-// WHO it runs as: one routing identity, shared by category- and agent-routed tasks. Category wins
-// when both are present (a record never carries both, but a defensive caller might).
+// WHO it runs as: one routing identity, shared by category- and agent-routed tasks. A record
+// carrying BOTH shows both, asked-for name first (`agent:<asked>→category:<used>`): the caller wrote
+// that subagent_type, so preferring the category would erase the only evidence of what was asked
+// for and make a deliberate call indistinguishable from a routing accident (#8348).
 export function formatTargetIdentity(input: Pick<StatusTargetInput, "category" | "agentType">): string | undefined {
   const category = optionalRendererText(input.category)
-  if (category !== undefined) return `category:${category}`
   const agentType = optionalRendererText(input.agentType)
+  if (category !== undefined && agentType !== undefined) return `agent:${agentType}→category:${category}`
+  if (category !== undefined) return `category:${category}`
   if (agentType !== undefined) return `agent:${agentType}`
   return undefined
 }

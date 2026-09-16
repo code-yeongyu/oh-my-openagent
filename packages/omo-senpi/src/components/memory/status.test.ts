@@ -85,11 +85,21 @@ function segmentContext(input: {
   readonly sessionId?: string
   readonly backlogSteps?: number
   readonly failures?: number
+  readonly parked?: boolean
 }) {
   const identity = input.identity ?? "fake-agent"
   const root = mkdtempSync(join(tmpdir(), "omo-memory-segments-"))
   roots.push(root)
   const paths = buildIdentityPaths(root, identity)
+  if (input.parked === true) {
+    mkdirSync(paths.reflection, { recursive: true })
+    writeFileSync(join(paths.reflection, "park.json"), JSON.stringify({
+      version: 1,
+      streak: 3,
+      parkedAt: new Date(SEGMENT_NOW - 60_000).toISOString(),
+      lastFailure: { runId: "run-2", at: new Date(SEGMENT_NOW - 60_000).toISOString(), fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed" },
+    }))
+  }
   if (input.sessionId !== undefined && input.backlogSteps !== undefined) {
     const stateDir = join(paths.transcripts, input.sessionId)
     mkdirSync(stateDir, { recursive: true })
@@ -204,6 +214,25 @@ describe("refreshMemoryStatus segments", () => {
 
     expect(recorder.statusCalls).toEqual([
       { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3" },
+    ])
+  }, 30_000)
+
+  test("#given automatic reflection is parked #when refresh runs #then the footer says paused after the streak badge", async () => {
+    const context = segmentContext({ failures: 3, parked: true })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      gitRepo: segmentRepo(),
+      now: () => SEGMENT_NOW,
+      checkAdvisory: false,
+    })
+
+    expect(recorder.statusCalls).toEqual([
+      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3 paused" },
     ])
   }, 30_000)
 

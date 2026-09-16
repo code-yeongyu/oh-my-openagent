@@ -25,7 +25,7 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 | **Librarian** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
 | **Explore** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
 | **Multimodal-Looker** | gpt-5.6-sol low | 0.1 | subagent | kimi-k3 → glm-4.6v → gpt-5-nano | PDF/image analysis |
-| **Metis** | claude-opus-5 high | **0.3** | subagent | kimi-k3 low | Pre-planning consultant |
+| **Metis** | claude-fable-5-1 max | **0.3** | subagent | claude-opus-5 max → kimi-k3 max | Pre-planning consultant |
 | **Momus** | gpt-5.6-terra high | 0.1 | subagent | gpt-5.6-sol xhigh (high on Copilot) → claude-opus-5 max → gemini-3.1-pro high → glm-5.2 | Plan reviewer |
 | **Atlas** | claude-sonnet-5 | 0.1 | primary | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 | Todo-list orchestrator |
 | **Prometheus** | claude-fable-5 xhigh | (override-only) | primary | kimi-k3 max | Strategic planner (interview); built via `buildPrometheusAgentConfig` (not in `agentSources`) |

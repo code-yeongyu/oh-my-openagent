@@ -397,6 +397,118 @@ describe("session shutdown drain budget", () => {
     expect(message).toBe("memory bind-time reconcile failed")
   })
 
+  test("#given a pre-drain await that never resolves #when it is raced detached #then the handler returns at the deadline with the budget warning and the steps after it still run", async () => {
+    // given
+    const order: string[] = []
+    const { logger, warningCalls } = recordingLogger()
+    const input = { reason: "quit", sessionId: SESSION, deadlineAt: 50, now: () => 0 } as const
+    const drain = createShutdownDrain({ logger, steps: recordingSteps(order) })
+    drain.registerEvaluator(() => { order.push("d1") })
+    let entered = false
+
+    // when
+    const raced = await drain.raceDetached(input, "kibitzer-shutdown", () => {
+      entered = true
+      return new Promise<void>(() => {})
+    })
+    await drain.run(input, { journalFlushed: true })
+
+    // then: the work was started (it owns the wake lease and the directory lock), the handler let
+    // go of it at the deadline, and everything the drain still owes the session ran afterwards.
+    expect(entered).toBe(true)
+    expect(raced).toBe(false)
+    expect(warningCalls).toEqual([{
+      message: "memory shutdown drain hit its budget",
+      details: {
+        step: "kibitzer-shutdown",
+        reason: "quit",
+        sessionId: SESSION,
+        remainingMs: 50,
+        completedSteps: [],
+      },
+    }])
+    expect(order).toEqual(["b", "c-prime", "d1"])
+  })
+
+  test("#given a detached pre-drain await abandoned at the deadline #when it finally settles #then its continuation still runs to completion", async () => {
+    // given
+    const order: string[] = []
+    const { logger } = recordingLogger()
+    const drain = createShutdownDrain({ logger, steps: recordingSteps(order) })
+    const release = Promise.withResolvers<void>()
+    const released = Promise.withResolvers<string>()
+
+    // when
+    const raced = await drain.raceDetached({ reason: "quit", sessionId: SESSION, deadlineAt: 50, now: () => 0 }, "kibitzer-shutdown", async () => {
+      await release.promise
+      released.resolve("lease released")
+    })
+
+    // then: the continuation that hands the wake lease back is not cancelled by the deadline.
+    expect(raced).toBe(false)
+    release.resolve()
+    expect(await released.promise).toBe("lease released")
+  })
+
+  test("#given a detached pre-drain await that rejects after the deadline #when it settles #then the failure is warned with its step instead of surfacing unhandled", async () => {
+    // given
+    const order: string[] = []
+    const failures: LogCall[] = []
+    const warned = Promise.withResolvers<LogCall>()
+    const logger: ComponentLogger = {
+      info: () => {},
+      warn: (message, details) => {
+        if (message !== "memory shutdown drain detached step failed") return
+        failures.push({ message, details })
+        warned.resolve({ message, details })
+      },
+      error: () => {},
+    }
+    const drain = createShutdownDrain({ logger, steps: recordingSteps(order) })
+    const release = Promise.withResolvers<void>()
+
+    // when
+    await drain.raceDetached({ reason: "reload", sessionId: SESSION, deadlineAt: 50, now: () => 0 }, "facts-cancel", async () => {
+      await release.promise
+      throw new Error("cancel exploded")
+    })
+    release.resolve()
+
+    // then
+    expect(await warned.promise).toEqual({
+      message: "memory shutdown drain detached step failed",
+      details: { step: "facts-cancel", reason: "reload", sessionId: SESSION, error: "Error: cancel exploded" },
+    })
+    expect(failures).toHaveLength(1)
+  })
+
+  test("#given a detached pre-drain await that completes inside the budget #when a later one expires #then the completed step is reported as done", async () => {
+    // given
+    const order: string[] = []
+    const { logger, warningCalls } = recordingLogger()
+    const input = { reason: "quit", sessionId: SESSION, deadlineAt: 50, now: () => 0 } as const
+    const drain = createShutdownDrain({ logger, steps: recordingSteps(order) })
+
+    // when
+    const first = await drain.raceDetached(input, "kibitzer-shutdown", async () => { order.push("kibitzer") })
+    const second = await drain.raceDetached(input, "facts-cancel", () => new Promise<void>(() => {}))
+
+    // then
+    expect(first).toBe(true)
+    expect(second).toBe(false)
+    expect(order).toEqual(["kibitzer"])
+    expect(warningCalls).toEqual([{
+      message: "memory shutdown drain hit its budget",
+      details: {
+        step: "facts-cancel",
+        reason: "quit",
+        sessionId: SESSION,
+        remainingMs: 50,
+        completedSteps: ["kibitzer-shutdown"],
+      },
+    }])
+  })
+
   test("#given a step that rejects #when the drain runs #then the drain still completes the remaining steps", async () => {
     // given
     const order: string[] = []

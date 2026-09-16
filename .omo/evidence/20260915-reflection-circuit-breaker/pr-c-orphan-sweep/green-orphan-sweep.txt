@@ -1,0 +1,12 @@
+bun test v1.4.2 (744846f84)
+
+packages/memory-core/src/reflection/orphan-sweep.test.ts:
+(pass) reflection orphan sweep > #given leftovers under the worktrees dir #when they are listed #then registered worktrees strays and reflection branches are reported [272.95ms]
+(pass) reflection orphan sweep > #given live and fresh leftovers #when orphans are selected #then only unowned aged items and legacy branches are chosen [0.12ms]
+(pass) reflection orphan sweep > #given stale registered stray and legacy leftovers #when the sweep runs #then they are removed and live or fresh ones survive [371.77ms]
+(pass) reflection orphan sweep > #given an aged directory beside the worktrees dir #when the sweep runs #then only entries inside the worktrees dir are removed [376.95ms]
+
+ 4 pass
+ 0 fail
+ 18 expect() calls
+Ran 4 tests across 1 file. [2.16s]

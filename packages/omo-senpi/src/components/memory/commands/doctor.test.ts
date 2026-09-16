@@ -228,6 +228,28 @@ describe("/doctor", () => {
   const WARN_NOW_MS = Date.parse("2026-08-12T05:00:00.000Z")
   const OK_NOW_MS = Date.parse("2126-08-12T05:00:00.000Z")
 
+  test("#given automatic reflection is parked #when doctor runs #then reflection health reports the pause and the manual retry", async () => {
+    // given
+    const { identity, pi, ctx } = await harness({ deps: { now: () => WARN_NOW_MS } })
+    await seedReflectionFailureStreak(identity.identityPaths.reflection, WARN_NOW_MS - 60 * 60_000)
+    await mkdir(identity.identityPaths.reflection, { recursive: true })
+    await writeFile(join(identity.identityPaths.reflection, "park.json"), JSON.stringify({
+      version: 1,
+      streak: 3,
+      parkedAt: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(),
+      lastFailure: { runId: "run-3", at: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(), fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed", detail: "Model not found" },
+    }))
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    expect(text).toContain("[warn] reflection-health")
+    expect(text).toContain("automatic reflection paused since")
+    expect(text).toContain("next probe")
+    expect(text).toContain("/reflect")
+  })
+
   test("#given a failure streak one hour before the injected now #when doctor runs #then reflection health warns with the live streak", async () => {
     // given
     const { identity, pi, ctx } = await harness({ deps: { now: () => WARN_NOW_MS } })

@@ -15,6 +15,7 @@ import { createMemoryFooterStatusLive } from "./status-live-wiring"
 import {
   consumePendingReflectionCompletions,
   emitReflectionHealthAlert,
+  emitReflectionParkAlert,
   type ReflectionCompletionApi,
   type ReflectionLiveSession,
 } from "./worker"
@@ -219,6 +220,7 @@ async function drainCompletions(
     observedRunIds,
     currentLauncher,
   })
+  await emitReflectionParkAlert(identity.identityPaths.reflection, identity.identity, liveSession, healthAlertOnce)
 }
 
 function describe(error: unknown): string {

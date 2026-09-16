@@ -7,9 +7,9 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, parseLockRecord, parseMemoryFile } from "@oh-my-opencode/memory-core"
+import { V1_PERSONA_SEED_SHA256, parseLockRecord, parseMemoryFile, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
-import { readReflectionHealth, reflectionRemediation } from "../worker"
+import { readReflectionHealth, reflectionParkNextProbeAt, reflectionRemediation } from "../worker"
 import { runGit } from "./repo"
 import { estimateSystemTokens } from "./tokens"
 import { defaultIsProcessAlive, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
@@ -226,10 +226,21 @@ export async function checkReflectionHealth(
   }
   const failure = health.lastFailure
   const hint = reflectionRemediation(failure?.reason, failure?.detail)
+  const paused = await describeReflectionPark(reflectionDir)
   return {
     name: "reflection-health",
-    level: health.streak >= 3 ? "warn" : "ok",
-    detail: `streak ${health.streak}; fingerprint ${health.fingerprint || "none"}; pending ${health.pendingCount}; last success ${lastSuccess}; ${hint}`,
+    level: health.streak >= 3 || paused !== "" ? "warn" : "ok",
+    detail: `streak ${health.streak}; fingerprint ${health.fingerprint || "none"}; pending ${health.pendingCount}; last success ${lastSuccess}; ${hint}${paused}`,
+  }
+}
+
+async function describeReflectionPark(reflectionDir: string): Promise<string> {
+  try {
+    const park = await readReflectionParkFile(reflectionDir)
+    if (park.parkedAt === undefined) return ""
+    return `; automatic reflection paused since ${park.parkedAt} (next probe ${reflectionParkNextProbeAt(park) ?? "unknown"}; run /reflect to retry now)`
+  } catch (error) {
+    return `; park state unreadable: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 

@@ -1118,7 +1118,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
     }
   })
 
-  test("metis and atlas resolve to Sol in an OpenAI-only environment without a system default", async () => {
+  test("atlas resolves to Sol and metis keeps its chain head in an OpenAI-only environment without a system default", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set(["openai/gpt-5.6-sol"]))
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
@@ -1130,8 +1130,8 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       // #then
       expect(agents.atlas).toMatchObject({ model: "openai/gpt-5.6-sol", variant: "medium" })
       expect(agents.metis).toBeDefined()
-      expect(agents.metis.model).toBe("anthropic/claude-opus-5")
-      expect(agents.metis.variant).toBe("high")
+      expect(agents.metis.model).toBe("anthropic/claude-fable-5-1")
+      expect(agents.metis.variant).toBe("max")
     } finally {
       fetchSpy.mockRestore()
       cacheSpy.mockRestore()
@@ -1350,42 +1350,29 @@ describe("buildAgent with category and skills", () => {
     expect(agent.prompt).toBe("Base prompt")
   })
 
-  test("agent with agent-browser skill resolves when browserProvider is set", () => {
+  test("agent resolves the selected dev-browser skill", () => {
     // #given
-    const source = {
-      "test-agent": () =>
-        ({
-          description: "Test agent",
-          skills: ["agent-browser"],
-          prompt: "Base prompt",
-        }) as AgentConfig,
-    }
+    const input = { description: "Test agent", skills: ["dev-browser"], prompt: "Base prompt" }
+    const { resolved } = resolveMultipleSkills(input.skills, { browserProvider: "dev-browser" })
+    const expectedContent = [...resolved.values()].join("\n\n")
 
-    // #when - browserProvider is "agent-browser"
-    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL), { browserProvider: "agent-browser" })
+    // #when
+    const agent = resolveAgentSkills(input, { browserProvider: "dev-browser" })
 
-    // #then - agent-browser skill content should be in prompt
-    expect(agent.prompt).toContain("agent-browser")
-    expect(agent.prompt).toContain("Base prompt")
+    // #then - compose the real skill artifact, not pinned instruction prose
+    expect(agent.prompt).toContain(expectedContent)
+    expect(agent.prompt).toContain(input.prompt)
   })
 
-  test("agent with agent-browser skill NOT resolved when browserProvider not set", () => {
+  test("agent leaves the base prompt unchanged for a removed builtin", () => {
     // #given
-    const source = {
-      "test-agent": () =>
-        ({
-          description: "Test agent",
-          skills: ["agent-browser"],
-          prompt: "Base prompt",
-        }) as AgentConfig,
-    }
+    const input = { description: "Test agent", skills: [["agent", "browser"].join("-")], prompt: "Base prompt" }
 
-    // #when - no browserProvider (defaults to playwright)
-    const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
+    // #when
+    const agent = resolveAgentSkills(input)
 
-    // #then - agent-browser skill not found, only base prompt remains
-    expect(agent.prompt).toBe("Base prompt")
-    expect(agent.prompt).not.toContain("agent-browser open")
+    // #then
+    expect(agent.prompt).toBe(input.prompt)
   })
 })
 

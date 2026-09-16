@@ -337,7 +337,7 @@ describe("omo-senpi ultrawork component", () => {
     // given
     const prompts = [
       "ulw-plan 스킬 좀 검토해줘",
-      "ulw-loop 상태를 tool.omo_agent_toolkit으로 확인",
+      "ulw-loop 상태를 agentToolkit.status()로 확인",
     ] as const
 
     for (const prompt of prompts) {

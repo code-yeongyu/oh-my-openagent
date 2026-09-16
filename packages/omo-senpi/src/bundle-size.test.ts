@@ -55,7 +55,15 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // it is a devDependency oracle only). bundle-purity stays green and no third-party dependency was
 // inlined. Measured 1,144,862 bytes after minification on top of dev's 1,136,265 (linux/amd64, bun
 // 1.4.2); 1,180,000 keeps ~3% headroom rather than the failing value.
-const BUDGET_BYTES = 1_180_000
+// Raised 1,180,000 -> 1,220,000 for the Kibitzer bounds wave (#8335 incremental candidate collection,
+// #8336 sidecar grep budgets, #8337 shutdown and wake caps): the per-entry mention index, the
+// normalized-haystack memo, the stat-gated HEAD and ledger probes, the grep budget/abort/gitignore
+// paths and the drain race plus wake clamps are all first-party code, and the dependency manifests are
+// byte-identical to pre-wave dev (`git diff 879a8b791...HEAD -- package.json bun.lock
+// packages/*/package.json` is empty). The wave grew the minified bundle 1,175,406 -> 1,181,607
+// (linux/amd64, node 24 + bun 1.4.2), and the previous ceiling had only 4,594 bytes of slack left
+// before it. 1,220,000 keeps ~3.2% headroom rather than the failing value.
+const BUDGET_BYTES = 1_220_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

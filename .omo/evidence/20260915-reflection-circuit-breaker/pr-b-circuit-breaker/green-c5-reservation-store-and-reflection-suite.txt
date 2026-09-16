@@ -1,0 +1,126 @@
+bun test v1.4.2 (744846f84)
+
+packages/memory-core/src/concurrency/two-process.test.ts:
+(pass) one memory identity across real Bun processes > #given two synchronized tool writers #when each makes ten writes #then twenty linear commits land with observed lock contention [1968.98ms]
+(pass) one memory identity across real Bun processes > #given two synchronized reflection reservers #when they race one identity #then one is active, one is pending, and completion promotes pending [102.08ms]
+(pass) one memory identity across real Bun processes > #given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits [1998.18ms]
+
+packages/memory-core/src/reflection/park.test.ts:
+(pass) reflection park policy > #given fewer non-retryable failures than the threshold #when applied #then the streak counts and nothing is parked [0.14ms]
+(pass) reflection park policy > #given the non-retryable threshold is reached #when applied #then the identity parks at that failure's time [0.07ms]
+(pass) reflection park policy > #given retryable failures below their higher threshold #when applied #then nothing is parked [0.10ms]
+(pass) reflection park policy > #given the retryable threshold is reached #when applied #then the identity parks [0.08ms]
+(pass) reflection park policy > #given a parked identity #when another failure lands #then it stays parked at the original time and the streak grows [0.06ms]
+(pass) reflection park policy > #given a detail longer than the cap #when applied #then the stored detail is bounded [0.06ms]
+(pass) reflection park policy > #given any park state #when cleared #then it is empty again [0.05ms]
+(pass) reflection park gate > #given no park #when any request arrives #then the gate is open [0.06ms]
+(pass) reflection park gate > #given a parked identity #when an automatic request arrives inside the probe interval #then it is parked with the next probe time [0.07ms]
+(pass) reflection park gate > #given a parked identity #when a manual request arrives #then the gate is open [0.07ms]
+(pass) reflection park gate > #given a parked identity past the probe interval #when an automatic request arrives #then exactly one probe is admitted and the next one waits [0.06ms]
+(pass) reflection park gate > #given request kinds #when classified #then only manual reflections and manual dreams are not automatic [0.05ms]
+(pass) reflection park state parsing > #given a well-formed persisted state #when parsed #then it round-trips [0.10ms]
+(pass) reflection park state parsing > #given not an object #when parsed #then it is rejected [0.07ms]
+(pass) reflection park state parsing > #given wrong version #when parsed #then it is rejected [0.06ms]
+(pass) reflection park state parsing > #given negative streak #when parsed #then it is rejected [0.05ms]
+(pass) reflection park state parsing > #given parked without a timestamp string #when parsed #then it is rejected [0.04ms]
+
+packages/memory-core/src/reflection/reservation-park.test.ts:
+(pass) reflection reservation park > #given automatic runs failing deterministically #when the streak reaches the threshold #then the identity parks and automatic evaluation is refused [15.11ms]
+(pass) reflection reservation park > #given a parked identity #when a manual reflection is requested #then it is reserved and its success clears the park [15.48ms]
+(pass) reflection reservation park > #given a parked identity #when the probe interval elapses #then exactly one automatic probe is admitted and a second request waits [15.65ms]
+(pass) reflection reservation park > #given transient failures #when they stay below their threshold #then the journal backoff still applies and nothing is parked [17.87ms]
+(pass) reflection reservation park > #given transient failures #when they reach their threshold #then the identity parks [29.89ms]
+(pass) reflection reservation park > #given the failure that parks #when completion returns #then it reports the park edge exactly once [14.77ms]
+(pass) reflection reservation park > #given a manual run fails while parked #when completion returns #then the park is unchanged [13.95ms]
+(pass) reflection reservation park > #given an automatic pending request queued behind the failure that parks #when completion promotes #then the pending automatic run is dropped instead of launched [12.30ms]
+
+packages/memory-core/src/reflection/reservation.test.ts:
+(pass) persisted reflection reservation > #given active.lock rename fails #when reserving #then the temporary is removed and the error propagates [3.16ms]
+(pass) persisted reflection reservation > #given pending.json rename fails #when reserving #then the temporary is removed and the error propagates [4.02ms]
+(pass) persisted reflection reservation > #given crashed reservation writers #when startup reads state under the scheduler lock #then only their temporary siblings are swept [2.58ms]
+(pass) persisted reflection reservation > #given many large pending captures #when reservations merge on disk #then pending.json stays bounded and no journal cursor advances [47.24ms]
+(pass) persisted reflection reservation > #given an aborted signal #when reservation starts #then active and pending state remain empty [2.48ms]
+(pass) persisted reflection reservation > #given journal state at threshold #when the persisted machine evaluates a successful settle #then it captures and reserves the cursor snapshot [3.92ms]
+(pass) persisted reflection reservation > #given an async run-id factory #when a reservation is made #then the awaited id names the reserved run [4.27ms]
+(pass) persisted reflection reservation > #given a factory deriving ids from shared state #when reservations race #then minting is serialized so no id is issued twice [30.04ms]
+(pass) persisted reflection reservation > #given a new active reservation #when it is published #then launch-owner identity and reservation time are durable in the same record [3.18ms]
+(pass) persisted reflection reservation > #given simultaneous trigger requests #when reserved #then one becomes active and all others collapse into one atomic pending record [31.68ms]
+(pass) persisted reflection reservation > #given dream outcomes #when runs complete #then dream state advances only for merged and no_changes [9.69ms]
+(pass) persisted reflection reservation > #given a failed active run #when completed #then its cursor is unchanged and valid pending work is promoted [6.95ms]
+(pass) persisted reflection reservation > #given successful compaction-triggered work #when completed #then its snapshot advances and the compaction flag clears exactly once [6.22ms]
+(pass) persisted reflection reservation > #given a pending threshold request made stale by successful cursor advancement #when dequeued #then it is dropped [6.20ms]
+(pass) persisted reflection reservation > #given automatic pending work below its threshold #when dequeued #then it is dropped but a manual pending request remains launchable [9.99ms]
+
+packages/memory-core/src/reflection/machine-failure-backoff.test.ts:
+(pass) reflection automatic failure backoff > backs off automatic evaluation until the exact deadline, while manual bypasses [0.10ms]
+(pass) reflection automatic failure backoff > legacy state remains eligible [0.06ms]
+
+packages/memory-core/src/reflection/machine.test.ts:
+(pass) reflection trigger machine > #given a successful settle at the configured step threshold #when evaluated #then it requests a step-count reservation [0.10ms]
+(pass) reflection trigger machine > #given zero or undefined thresholds #when a successful run settles #then step count never launches [0.06ms]
+(pass) reflection trigger machine > #given a backlog at or above the snapshot byte budget #when a successful run settles below the step threshold #then a step-count reservation is requested [0.06ms]
+(pass) reflection trigger machine > #given a step-count run is already reserved #when the backlog overflows the budget #then no duplicate reservation is requested [0.07ms]
+(pass) reflection trigger machine > #given an aborted or failed run #when it settles #then no automatic trigger launches [0.05ms]
+(pass) reflection trigger machine > #given compaction was accepted #when several successful boundaries settle #then its reservation is emitted exactly once [0.07ms]
+(pass) reflection trigger machine > #given an active threshold run #when compaction and manual requests arrive #then one pending slot unions conversations and preserves manual priority [0.10ms]
+(pass) reflection trigger machine > #given reflection and dream requests #when they compete for one pending slot #then the specified priority order and newest tie winner are preserved [0.10ms]
+(pass) reflection trigger machine > #given two dream requests during an active reflection #when they merge #then one pending dream unions snapshots and the newest equal-priority request wins [0.08ms]
+(pass) reflection trigger machine > #given more pending conversations than the merge allows #when they union #then the newest survive and the oldest are evicted [0.69ms]
+(pass) reflection trigger machine > #given pending snapshots past the aggregate byte budget #when they union #then the oldest are evicted until the merge fits [18.61ms]
+(pass) reflection trigger machine > #given a single snapshot larger than the aggregate budget #when it first becomes pending #then it is evicted without changing active work [1.47ms]
+(pass) reflection trigger machine > #given UTF-8 snapshots and JSON escaping #when the pending byte cap evicts #then the serialized payload fits and keeps the newest suffix [10.73ms]
+(pass) reflection trigger machine > #given an initial pending request with only conversation ids #when it exceeds the count cap #then ids are bounded too [0.17ms]
+(pass) reflection trigger machine > #given a recaptured oldest pending conversation #when the count cap overflows #then first-seen order determines eviction [0.55ms]
+(pass) reflection trigger machine > #given legacy oversized pending state #when the dead active run completes #then promotion applies the same bounds [0.14ms]
+(pass) reflection trigger machine > #given interleaved reflection and dream requests #when every bounded event sequence is applied #then at most one active and one pending run exist [0.64ms]
+(pass) reflection trigger machine > #given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor [0.11ms]
+(pass) reflection trigger machine > #given a failed active run and a queued request #when completed #then the cursor stays unmoved and pending is promoted [0.07ms]
+(pass) reflection trigger machine > #given pending automatic work became stale #when dequeued #then it is dropped, while manual work survives [0.08ms]
+
+packages/memory-core/src/reflection/completion-validation.test.ts:
+(pass) dream token budget completion validation > #given a pressure dream whose merged system estimate remains at target #when validated #then budget_not_met is recorded [0.85ms]
+(pass) dream token budget completion validation > #given a pressure dream below target #when validated #then the estimate is clean [0.07ms]
+(pass) dream token budget completion validation > #given a non-pressure dream above target #when validated #then the estimate is reported without failing [0.07ms]
+(pass) reflection completion validation > #given an uncommitted worktree edit #when finalized #then it reports dirty_uncommitted and cleans up [271.56ms]
+(pass) reflection completion validation > #given the linked-worktree .git administration file is altered #when finalized #then validation fails and cleans up [254.48ms]
+
+packages/memory-core/src/reflection/completion-validation-frontmatter.test.ts:
+(pass) reflection completion frontmatter gate > #given a reflection that writes a SKILL.md with an unquoted ': ' description #when validated #then it fails naming the path [323.83ms]
+(pass) reflection completion frontmatter gate > #given a reflection that writes a reference note without a description #when validated #then it fails [317.58ms]
+(pass) reflection completion frontmatter gate > #given a legacy file whose body is edited but whose frontmatter is untouched #when validated #then it stays valid [345.90ms]
+(pass) reflection completion frontmatter gate > #given a legacy file whose invalid frontmatter is re-touched #when validated #then it fails [376.87ms]
+(pass) reflection completion frontmatter gate > #given a reflection that writes strict frontmatter and deletes a file #when validated #then it is valid [449.62ms]
+
+packages/memory-core/src/reflection/worktree.test.ts:
+(pass) reflection worktree finalization > #given recorded identity before Git creation #when cleanup runs #then missing resources are idempotently confirmed absent [214.21ms]
+(pass) reflection worktree finalization > #given a precreate callback #when a worktree is created #then identity is published before Git resources exist [253.31ms]
+(pass) reflection worktree finalization > #given a clean committed reflection #when auto-finalized #then it no-ff merges and cleans up [487.04ms]
+(pass) reflection worktree finalization > #given a document-maintenance allowlist #when the child changes another path #then nothing is merged [532.54ms]
+(pass) reflection worktree finalization > #given a reflection with no commits #when finalized #then it reports no_changes and cleans up [321.25ms]
+(pass) reflection worktree finalization > #given conflicting child and parent commits #when auto-finalized #then merge aborts cleanly and cleanup always runs [573.02ms]
+(pass) reflection worktree finalization > #given a dirty parent #when auto-finalized #then it refuses before merge and cleans up [457.18ms]
+(pass) reflection worktree finalization > #given a non-conflicting parent advance after launch #when auto-finalized #then recorded-base drift merges successfully [666.59ms]
+(pass) reflection worktree finalization > #given an externally merged reflection branch #when explicit finalization verifies reachability #then it reports merged and cleans up [510.67ms]
+
+packages/memory-core/src/reflection/worktree-integration.test.ts:
+(pass) reflection worktree integration > #given a validated tip #when auto integration lands #then it creates a no-ff receipt without cleaning resources [538.25ms]
+(pass) reflection worktree integration > #given legacy auto receipts #when probed without a validated tip #then only the exact trailer is accepted [423.61ms]
+(pass) reflection worktree integration > #given a landed auto merge #when probed #then exact receipt and validated-tip ancestry prove integration [546.62ms]
+(pass) reflection worktree integration > #given a matching receipt that excludes the validated tip #when probed #then it is rejected [453.91ms]
+(pass) reflection worktree integration > #given a non-exact receipt on an integrated tip #when auto mode probes #then only ancestry is accepted [438.40ms]
+(pass) reflection worktree integration > #given external integration without a receipt #when either mode probes #then ancestry proves integration [517.55ms]
+(pass) reflection worktree integration > #given an owned interrupted merge #when auto integration retries #then it aborts that merge and lands one clean merge [557.09ms]
+(pass) reflection worktree integration > #given foreign merge residue #when auto integration runs #then parent index and merge state remain untouched [659.50ms]
+(pass) reflection worktree integration > #given present then absent resources #when cleanup repeats #then both receipts confirm absence [436.46ms]
+
+packages/memory-core/src/reflection/assets/assets.test.ts:
+(pass) dream persona asset > #given the source asset and the packaged plugin copy #when loaded and read #then all copies are identical [0.82ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the machine budget-contract anchor is embedded [0.11ms]
+(pass) dream persona asset > #given the dream persona #when parsed as sections #then the memory-usage ledger input is documented [0.08ms]
+(pass) reflection persona asset > #given the source asset #when loaded through assets.ts #then it equals the real source [0.26ms]
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.15ms]
+
+ 98 pass
+ 0 fail
+ 926 expect() calls
+Ran 98 tests across 11 files. [16.06s]

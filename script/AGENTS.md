@@ -40,7 +40,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 
 ## SUBDIRS
 
-- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`, `omo-native-telemetry-qa.mjs` (end-to-end telemetry privacy QA: sandbox, capture server, redaction; `--evidence-dir <dir> --senpi-bin <path>`).
+- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`, `omo-native-telemetry-qa.mjs` (end-to-end telemetry privacy QA; `--evidence-dir <dir> --senpi-bin <path>`). Its adjacent `omo-native-telemetry-{provider,drive,capture,assertions,evidence}.mjs` modules own the scripted provider, isolated RPC lifecycle, capture server, privacy checks, and evidence output. Prompt progression waits for `agent_settled`; failure termination reserves a one-second grace inside the 120-second total drive budget, then escalates to SIGKILL without losing the original error. Evidence includes each session JSONL, redacted payloads, opt-out checks, and cleanup receipts.
 - `fixtures/` -- shared script test fixtures (vendored LSP build owner).
 - `agent/` -- dev-env contract: `setup.sh`, `cleanup.sh`, `cleanup-hook.sh`, `docker-dev.sh`, `qa-sandbox.sh`, `qa-docker.sh` (see root AGENTS.md DEVELOPMENT ENVIRONMENT).
 

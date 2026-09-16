@@ -441,7 +441,8 @@ describe("omo launcher", () => {
         const result = run(fixture, ["ulw-loop", "status", "--json"])
 
         expect(result.status).toBe(2)
-        expect(result.stderr).toContain("omo_agent_toolkit")
+        expect(result.stderr).toContain("OMO_AGENT_TOOLKIT_SDK_ROOT")
+        expect(result.stderr).not.toContain("omo_agent_toolkit tool")
       })
     })
 

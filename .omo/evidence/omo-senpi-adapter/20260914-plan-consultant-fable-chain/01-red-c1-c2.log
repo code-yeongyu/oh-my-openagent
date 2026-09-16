@@ -1,0 +1,125 @@
+--- C1 exit=1
+          "claude-sdk-oauth",
+          "anthropic",
+          "github-copilot",
+          "opencode",
+        ],
+-       "variant": "max",
+      },
+      {
+        "model": "claude-opus-5",
+        "providers": [
+          "claude-sdk-oauth",
+@@ -135,18 +134,30 @@
+          "opencode",
+        ],
+        "variant": "max",
+      },
+      {
+-       "model": "kimi-k3",
++       "model": "gpt-5.6-sol",
++       "providers": [
++         "openai",
++         "openai-codex",
++         "github-copilot",
++         "opencode",
++       ],
++       "variant": "medium",
++     },
++     {
++       "model": "glm-5.2",
+        "providers": [
+          "opencode-go",
++       ],
++     },
++     {
++       "model": "kimi-k3",
++       "providers": [
+          "kimi-for-coding",
+-         "moonshotai",
+-         "opencode",
+        ],
+-       "variant": "max",
+      },
+    ],
+    "plan-reviewer": [
+      {
+        "model": "gpt-6-astra",
+
+- Expected  - 8
++ Received  + 19
+
+      at <anonymous> (/private<remote-worktree-root>/omo/packages/senpi-task/src/agents/builtin/fallback-chains.test.ts:42:35)
+(fail) AGENT_FALLBACK_CHAINS > #given the mirrored fallback table #when compared with the independent transcription #then every provider model variant and order is pinned [0.17ms]
+(pass) AGENT_FALLBACK_CHAINS > #given the builtin chains #when scanning providers #then no rung lists vercel or quotio-openai [0.08ms]
+(pass) AGENT_FALLBACK_CHAINS > #given the builtin chains #when a rung lists openai #then openai-codex rides alongside [0.06ms]
+
+ 15 pass
+ 3 fail
+ 204 expect() calls
+Ran 18 tests across 2 files. [6.60s]
+
+RESULT C1 exit=1
+--- C2 exit=1
+
+  [
+    {
++     "model": "claude-sonnet-4-6",
++     "providers": [
++       "anthropic",
++       "github-copilot",
++       "opencode",
++     ],
++   },
++   {
+      "model": "claude-opus-5",
+      "providers": [
+        "anthropic",
+        "github-copilot",
+        "opencode",
+      ],
+-     "variant": "high",
++     "variant": "max",
+    },
+    {
+-     "model": "kimi-k3",
++     "model": "gpt-5.6-sol",
++     "providers": [
++       "openai",
++       "openai-codex",
++       "github-copilot",
++       "opencode",
++     ],
++     "variant": "medium",
++   },
++   {
++     "model": "glm-5.2",
+      "providers": [
+        "opencode-go",
++     ],
++   },
++   {
++     "model": "kimi-k3",
++     "providers": [
+        "kimi-for-coding",
+-       "moonshotai",
+-       "opencode",
+      ],
+-     "variant": "low",
+    },
+  ]
+
+- Expected  - 5
++ Received  + 25
+
+      at <anonymous> (/private<remote-worktree-root>/omo/packages/omo-senpi/src/components/task/builtin-agent-chain-parity.test.ts:37:55)
+(fail) builtin curated agent chain parity > #given the senpi plan-consultant chain #when compared with model-core metis #then every rung matches modulo the claude-sdk-oauth head [0.20ms]
+(pass) builtin curated agent chain parity > #given the senpi plan-reviewer chain #when compared with model-core momus #then every rung matches modulo the claude-sdk-oauth head [0.13ms]
+
+ 1 pass
+ 3 fail
+ 17 expect() calls
+Ran 4 tests across 1 file. [1.89s]
+
+RESULT C2 exit=1
+TEST_DONE failed=2

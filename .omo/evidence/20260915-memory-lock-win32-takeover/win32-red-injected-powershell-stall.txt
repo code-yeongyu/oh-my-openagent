@@ -1,0 +1,38 @@
+# windows-latest RED reproduction: PowerShell start-identity probe stalled 3 s (> 2 s execFile budget)
+# run: https://github.com/code-yeongyu/oh-my-openagent/actions/runs/34948614700 (branch diag/8294-win32-probe-red @ 95fde4f720 = dev 23c778c5bb + diagnostic test + Start-Sleep injection in readWin32StartIdentity)
+# command: bun test --timeout 30000 packages/memory-core/src/concurrency/win32-probe-diagnostic.test.ts ; then two-process.test.ts
+
+DIAG {"kind":"liveness-after-exit","round":0,"pid":860,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":1,"pid":8984,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":2,"pid":1556,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":3,"pid":1424,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":4,"pid":6756,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":5,"pid":3384,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":6,"pid":5368,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":7,"pid":2008,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"foreign-probe","round":0,"pid":6128,"ms":2014,"identity":null}
+DIAG {"kind":"foreign-probe","round":1,"pid":6128,"ms":2015,"identity":null}
+DIAG {"kind":"foreign-probe","round":2,"pid":6128,"ms":2015,"identity":null}
+DIAG {"kind":"foreign-probe","round":3,"pid":6128,"ms":2014,"identity":null}
+DIAG {"kind":"foreign-probe","round":4,"pid":6128,"ms":2014,"identity":null}
+DIAG {"kind":"foreign-probe","round":5,"pid":6128,"ms":2015,"identity":null}
+DIAG {"kind":"own-lock-record","round":0,"ms":2019,"process_start":"unavailable"}
+DIAG {"kind":"own-lock-record","round":1,"ms":2017,"process_start":"unavailable"}
+DIAG {"kind":"own-lock-record","round":2,"ms":2015,"process_start":"unavailable"}
+DIAG {"kind":"own-lock-record","round":3,"ms":2015,"process_start":"unavailable"}
+DIAG {"kind":"own-lock-record","round":4,"ms":2014,"process_start":"unavailable"}
+DIAG {"kind":"own-lock-record","round":5,"ms":2015,"process_start":"unavailable"}
+DIAG {"kind":"rm-while-held","outcome":"removed","ms":1}
+DIAG {"kind":"rm-after-kill","attempts":1,"ms":0}
+
+(pass) win32 probe diagnostic (#8294) > (a) liveness of a SIGKILLed child right after the parent's exit event [125.79ms]
+(pass) win32 probe diagnostic (#8294) > (b) PowerShell start-identity probe latency for a live foreign pid [12104.79ms]
+(pass) win32 probe diagnostic (#8294) > (c) repeated own-pid createLockRecord cost [12097.92ms]
+(pass) win32 probe diagnostic (#8294) > (d) fs.rm maxRetries/retryDelay against a Windows EBUSY [25.68ms]
+Ran 4 tests across 1 file. [27.38s]
+(pass) one memory identity across real Bun processes > #given two synchronized tool writers #when each makes ten writes #then twenty linear commits land with observed lock contention [27671.65ms]
+(pass) one memory identity across real Bun processes > #given two synchronized reflection reservers #when they race one identity #then one is active, one is pending, and completion promotes pending [10398.86ms]
+killed 1 dangling process
+(fail) one memory identity across real Bun processes > #given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits [30024.32ms]
+  ^ this test timed out after 30000ms.
+Ran 3 tests across 1 file. [69.51s]

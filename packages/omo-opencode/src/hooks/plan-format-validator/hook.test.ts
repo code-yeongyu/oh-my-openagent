@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -41,6 +41,7 @@ function createFixture(content: string, options: FixtureOptions = {}) {
 
   return {
     output,
+    resolvedPath,
     async run(): Promise<void> {
       await hook["tool.execute.after"](input, output)
     },
@@ -143,6 +144,90 @@ Describe the first implementation section here.
       await fixture.run()
 
       // then
+      expect(fixture.output.output).toBe(originalOutput)
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("normalizes an Effort line that carries an hour count to a band", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## TL;DR (For humans)
+
+**What you'll get:** A settings page.
+
+**Effort:** 200 hours
+**Risk:** Low - isolated change
+
+## Todos
+- [ ] 1. Implement the change
+
+## Final Verification Wave
+- [ ] F1. Run the focused tests
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      const written = readFileSync(fixture.resolvedPath, "utf-8")
+      expect(written).not.toContain("200 hours")
+      expect(written).toContain("**Effort:** XL")
+      expect(fixture.output.output).toContain("<plan-format-warning>")
+      expect(fixture.output.output).toContain("Effort")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("normalizes an Effort line that carries a day count to the matching band", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## TL;DR (For humans)
+
+**Effort:** 3 days
+
+## Todos
+- [ ] 1. Implement the change
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      const written = readFileSync(fixture.resolvedPath, "utf-8")
+      expect(written).not.toContain("3 days")
+      expect(written).toContain("**Effort:** Large")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("leaves a band-valued Effort line untouched", async () => {
+    // given
+    const content = `# Plan
+
+## TL;DR (For humans)
+
+**Effort:** Medium
+
+## Todos
+- [ ] 1. Implement the change
+`
+    const fixture = createFixture(content)
+    const originalOutput = fixture.output.output
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(readFileSync(fixture.resolvedPath, "utf-8")).toBe(content)
       expect(fixture.output.output).toBe(originalOutput)
     } finally {
       fixture.cleanup()

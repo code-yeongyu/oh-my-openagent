@@ -21,12 +21,17 @@ interface Seeded {
 
 // One fixture shape for every driver state: a real plan whose first goal is ready to close, so the
 // only thing under test is what the driver snapshot does to the checkpoint.
-async function seed(sessionId: string): Promise<Seeded> {
+async function seed(sessionId: string, brief = "- alpha goal\n- beta goal"): Promise<Seeded> {
 	const cwd = await mkdtemp(join(tmpdir(), "ulw-driver-"));
 	workDirs.push(cwd);
 	const toolkit = createAgentToolkit({ cwd, sessionId, surface: "omo-senpi" });
-	const created = await toolkit.createGoals({ brief: "- alpha goal\n- beta goal" });
+	const created = await toolkit.createGoals({ brief });
 	if (!created.ok) throw new Error("fixture could not create goals");
+	return passNextGoal(cwd, sessionId);
+}
+
+async function passNextGoal(cwd: string, sessionId: string): Promise<Seeded> {
+	const toolkit = createAgentToolkit({ cwd, sessionId, surface: "omo-senpi" });
 	const started = await toolkit.completeGoals({});
 	if (!started.ok || started.operation !== "complete-goals" || "done" in started.result)
 		throw new Error("fixture could not start a goal");
@@ -44,6 +49,10 @@ async function seed(sessionId: string): Promise<Seeded> {
 	}
 	const plan = await readUlwLoopPlan(cwd, { sessionId });
 	return { cwd, sessionId, goalId, objective: plan.codexObjective ?? "" };
+}
+
+function warningsOf(result: object): readonly string[] {
+	return "warnings" in result && Array.isArray(result.warnings) ? result.warnings : [];
 }
 
 async function closeWith(seeded: Seeded, snapshot?: Record<string, unknown>) {
@@ -108,15 +117,35 @@ describe("SDK driver-goal states", () => {
 	});
 
 	describe("#given a driver whose objective differs from the plan", () => {
-		it("#when the goal is checkpointed #then the difference is reported, never a rejection", async () => {
+		it("#when the goal is checkpointed #then the difference is a warning, never a rejection and never a next action", async () => {
 			const seeded = await seed("driver-differs");
 
 			const closed = await closeWith(seeded, { goal: { objective: "a different objective", status: "active" } });
 
 			expect(closed.ok).toBe(true);
 			if (closed.ok) {
-				expect([...(closed.warnings ?? []), ...closed.nextActions].join(" ")).toContain("driver_objective_differs");
+				expect(warningsOf(closed.result).join(" ")).toContain("driver_objective_differs");
+				expect(closed.nextActions.join(" ")).not.toContain("driver_objective_differs");
+				expect(closed.nextActions.join(" ")).not.toContain("create_goal");
 			}
+		});
+
+		it("#when a later goal is checkpointed under the same driver #then the difference is acknowledged in the plan and not repeated", async () => {
+			const first = await seed("driver-differs-once", "- alpha goal\n- beta goal\n- gamma goal");
+			const driver = { goal: { objective: "  a different\n objective  ", status: "active" } };
+
+			const firstClose = await closeWith(first, driver);
+			const second = await passNextGoal(first.cwd, first.sessionId);
+			const secondClose = await closeWith(second, driver);
+
+			expect(firstClose.ok && secondClose.ok).toBe(true);
+			if (firstClose.ok && secondClose.ok) {
+				expect(warningsOf(firstClose.result).join(" ")).toContain("driver_objective_differs");
+				expect(warningsOf(secondClose.result)).toEqual([]);
+				expect(secondClose.nextActions).toEqual([]);
+			}
+			const plan = await readUlwLoopPlan(first.cwd, { sessionId: first.sessionId });
+			expect(plan.acknowledgedDriverObjectives).toEqual(["a different objective"]);
 		});
 	});
 

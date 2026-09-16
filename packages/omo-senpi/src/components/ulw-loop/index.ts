@@ -3,28 +3,26 @@ import { existsSync } from "node:fs"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { findContinuableBoulderWork } from "../ulw-execute-continuation/boulder-eligibility"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { createUlwLoopFooterStatus, goalPathsFromContext, type UlwLoopFooterStatusOptions } from "./footer-status"
-import { resolveOmoBin, runOmoCommand } from "./omo-command"
-import { readUlwLoopStatusInProcess, sessionIdFromStatusArgs } from "./status-source"
-import { extractSessionId, resolveUlwLoopSessionScope, ulwLoopScopedGoalsPath, ulwLoopStatusArgs } from "./session-scope"
+import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
+import { readUlwLoopStatusInProcess } from "./status-source"
+import { extractSessionId, resolveUlwLoopSessionScope, ulwLoopScopedGoalsPath } from "./session-scope"
 
 const CONTINUATION_LIMIT = 8
 const STEERING_REMINDER = [
   "<omo-senpi-ulw-loop>",
   "An active ulw-loop run is present in this working directory.",
-  'Before continuing, read it with the registered tool: `tool.omo_agent_toolkit({ operation: "status" })`. The session id is supplied by the host, so pass no path and spawn no CLI.',
+  'Before continuing, read it from a JS eval cell through the SDK: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). The session id is bound from the host env, so pass no session id or plan path, call no tool named omo_agent_toolkit, and spawn no CLI.',
   "Use the returned plan plus its structured nextActions, and the existing .omo/ulw-loop ledger, as the source of truth.",
   "Continue the current ulw-loop story with evidence-bound execution; do not start unrelated work until the active run is complete or checkpointed.",
   "</omo-senpi-ulw-loop>",
 ].join("\n")
 const CONTINUATION_PROMPT = [
   "Continue the active ulw-loop run.",
-  'Call `tool.omo_agent_toolkit({ operation: "status" })` in this session, inspect the active incomplete goals and the structured nextActions, and keep working until the run is complete or safely checkpointed.',
+  'In a JS eval cell run: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Inspect the active incomplete goals and the structured nextActions, and keep working until the run is complete or safely checkpointed.',
 ].join("\n")
 
 export interface UlwLoopComponentOptions {
-  resolveOmoBin?: () => string | null
-  runCommand?: (bin: string, args: readonly string[], options: { cwd: string }) => Promise<{ code: number; stdout: string }>
+  readStatus?: (cwd: string, sessionId: string) => Promise<{ code: number; stdout: string }>
   planExists?: (cwd: string, sessionId: string) => boolean
   footerStatus?: UlwLoopFooterStatusOptions
 }
@@ -43,26 +41,14 @@ interface ActiveStatus {
   sessionScoped?: boolean
 }
 
-type RunCommand = NonNullable<UlwLoopComponentOptions["runCommand"]>
+type ReadStatus = NonNullable<UlwLoopComponentOptions["readStatus"]>
 type PlanLookup = NonNullable<UlwLoopComponentOptions["planExists"]>
 
 export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): OmoSenpiComponent {
   return {
     name: "ulw-loop",
     async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
-      // The control plane is in-process now, so a missing toolkit CLI no longer disables this
-      // component: the typed tool and the status probe both run through the SDK. The resolved bin
-      // is kept only for the injected runCommand seam tests still drive.
-      const omoBin = (options.resolveOmoBin ?? resolveOmoBin)() ?? ""
-      // Native never spawns the toolkit for its own control plane any more: the default reader is the
-      // in-process SDK, and options.runCommand stays as the injected seam for tests.
-      const runCommand: RunCommand =
-        options.runCommand ??
-        (async (_bin, args, commandOptions) => {
-          const sessionId = sessionIdFromStatusArgs(args)
-          if (sessionId === undefined) return { code: 1, stdout: JSON.stringify({ ok: false, error: { code: "ULW_LOOP_SESSION_ID_REQUIRED" } }) }
-          return readUlwLoopStatusInProcess(commandOptions.cwd, sessionId)
-        })
+      const readStatus = options.readStatus ?? readUlwLoopStatusInProcess
       const planExists = options.planExists ?? ulwLoopPlanExists
       const footerStatus = createUlwLoopFooterStatus(options.footerStatus)
       const state = {
@@ -73,26 +59,14 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         pendingRun: undefined as { payload: unknown; status: ActiveStatus } | undefined,
       }
 
-      // The tool is registered once, but every call must bind to the session the host is serving
-      // right now, so the latest event context is what resolves cwd, session id, and goal store.
-      let lastEventCtx: unknown
-      const { createAgentToolkitTool } = await import("#omo-agent-toolkit-runtime")
-      pi.registerTool({
-        ...createAgentToolkitTool({
-          resolveCwd: () => cwdFromContext(lastEventCtx),
-          resolveSessionId: () => resolveUlwLoopSessionScope(lastEventCtx) ?? undefined,
-          resolveGoalPaths: () => goalPathsFromContext(lastEventCtx),
-        }),
-      })
+      pi.registerRemovedToolHint?.("omo_agent_toolkit", 'omo_agent_toolkit was removed. Inside an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Never spawn the toolkit CLI.')
 
       pi.on("session_start", async (_payload, eventCtx) => {
-        lastEventCtx = eventCtx
-        const status = await readActiveStatus(omoBin, runCommand, planExists, eventCtx, ctx)
+        const status = await readActiveStatus(readStatus, planExists, eventCtx, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
       })
 
       pi.on("input", async (payload, eventCtx) => {
-        lastEventCtx = eventCtx
         if (!isInputEvent(payload)) return { action: "continue" }
         if (!isUserSourcedInput(payload)) return { action: "continue" }
 
@@ -100,7 +74,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         state.previousStatusRaw = undefined
         state.pendingRun = undefined
         if (payload.streamingBehavior === undefined) return { action: "continue" }
-        const status = await readActiveStatus(omoBin, runCommand, planExists, eventCtx, ctx)
+        const status = await readActiveStatus(readStatus, planExists, eventCtx, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null || !status.active) return { action: "continue" }
         return {
@@ -113,7 +87,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       // agent_end only records this run: it refreshes the footer for EVERY ended run (a blocked
       // outcome must never leave the `⚡ ultraworking` spinner on screen for a finished run) and
       // hands the outcome to agent_settled. No terminal-outcome gate runs here, because this handler
-      // is awaited by the host across a two-process toolkit spawn during which a late Esc mutates
+      // is awaited by the host across the status read during which a late Esc mutates
       // this very payload into a user abort, and because a turn the host is holding for required
       // auto-compaction still reports `willRetry: false` here.
       pi.on("agent_end", async (payload, eventCtx) => {
@@ -133,7 +107,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
           return
         }
 
-        const status = await readActiveStatus(omoBin, runCommand, planExists, eventCtx, ctx)
+        const status = await readActiveStatus(readStatus, planExists, eventCtx, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
         if (status === null) {
           return
@@ -183,7 +157,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
       pi.on("tool_result", async (payload, eventCtx) => {
         if (!shouldRefreshFooterAfterToolResult(payload)) return
-        const status = await readActiveStatus(omoBin, runCommand, planExists, eventCtx, ctx)
+        const status = await readActiveStatus(readStatus, planExists, eventCtx, ctx)
         footerStatus.sync(eventCtx, status?.active ?? false)
       })
 
@@ -233,8 +207,7 @@ function ulwLoopPlanExists(cwd: string, sessionId: string): boolean {
 }
 
 async function readActiveStatus(
-  omoBin: string,
-  runCommand: RunCommand,
+  readStatus: ReadStatus,
   planExists: PlanLookup,
   eventCtx: unknown,
   ctx: ComponentContext,
@@ -246,18 +219,14 @@ async function readActiveStatus(
   const sessionId = resolveUlwLoopSessionScope(eventCtx)
   if (sessionId === null) return { raw: "", active: false, sessionScoped: false }
 
-  // Spawning the toolkit costs two node startups (`bin/omo-agent-toolkit.js` re-spawns `cli.js`), and the
-  // input hook is awaited inside `emitInput` before the submitted message is committed. Without this
-  // session's goals.json the toolkit can only answer ULW_LOOP_PLAN_MISSING, so answer inactive without
-  // paying for it.
   if (!planExists(cwd, sessionId)) return { raw: "", active: false }
 
   let result: { code: number; stdout: string }
   try {
-    result = await runCommand(omoBin, ulwLoopStatusArgs(sessionId), { cwd })
+    result = await readStatus(cwd, sessionId)
   } catch (error) {
     ctx.logger.warn("omo-senpi ulw-loop status ignored", {
-      reason: "run-command-failed",
+      reason: "read-status-failed",
       error: error instanceof Error ? error.message : String(error),
     })
     return null
@@ -339,9 +308,4 @@ function cwdFromContext(value: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-export const __testInternals = {
-  resolveOmoBin,
-  runOmoCommand,
 }

@@ -89,6 +89,7 @@ export async function fireDream(input: {
     throw error
   }
   if (stopped()) return { fired: false, rejection: "aborted" }
+  if (result.status === "parked") return { fired: false, rejection: "parked" }
   if (result.status === "active") {
     if (stopped()) return { fired: false, rejection: "aborted" }
     try {

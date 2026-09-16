@@ -14,7 +14,7 @@
  * no letta counterpart: it is the user-owned list of what they said not to do.
  */
 
-export const DEFAULT_MEMORY_BLOCK_LABELS = ["persona", "human", "boundaries"] as const
+export const DEFAULT_MEMORY_BLOCK_LABELS = ["persona", "human", "boundaries", "self-aware"] as const
 
 /**
  * sha256 of the exact v1 persona seed file (frontmatter `description: Persona - who I am`
@@ -40,7 +40,7 @@ Your memory lives in a version-controlled filesystem rooted at $MEMORY_DIR. File
 - system/persona.md (this file): your soul, who you are and how you operate.
 - system/identity.md: an optional card of particulars (name, creature, vibe, emoji), projected inside <self> beside this file when it exists. It is never seeded; create it only when a real identity emerges.
 - system/human.md: what you have learned about the person you work with. Update it as you discover durable preferences, context, and constraints.
-- system/boundaries.md: your person's exact words about what not to do, written by you as they say it and never a rule of your own. Other blocks you create under system/ are projected as nested XML.
+- system/boundaries.md holds your person's exact words about what not to do; system/self-aware.md holds what they, reviewers, and tests showed about your behavior, maintained by reflection from reference/self/observations.md. Neither is a rule of your own. Other blocks you create under system/ are projected as nested XML.
 - Non-system paths (for example reference/ or notes/) appear as names in <external_projection> only; their bodies are never injected.
 
 Changes to these files take effect only after a git commit. Use the memory tools to edit, never hand-write raw git commands during a session. Keep your self-model accurate and minimal.
@@ -74,3 +74,31 @@ export const DEFAULT_BOUNDARIES_BODY = `What the person you work with told you n
 - [YYYY-MM-DD] "<their exact words>" <!-- src: <ids> -->
 
 Their current instruction wins over every entry here; on a collision, say so once and follow it.`
+
+/**
+ * Self-aware block body: how the agent looks from the outside, as shown by the
+ * person, reviewers, tests, and tools. Projected every turn, so it carries only
+ * the purpose, the ownership split (reflection writes here, the primary agent
+ * writes the journal), the read rule, and the shared entry grammar. Identity
+ * stays in persona.md; the person's prohibitions stay in boundaries.md.
+ */
+export const DEFAULT_SELF_AWARE_BODY = `How you look from the outside: what your person, reviewers, tests, and tools showed about your behavior, each quoted with its source. Reflection maintains this summary from reference/self/observations.md; you add there, never here.
+
+Read each entry as a reading of you to test, not a rule. When one collides with your person's current ask, follow the ask.
+
+- [YYYY-MM-DD] cond: <when> | reaction: "<their words>" (<src>) | obs: <what you did, counted> | next: <what you will check> <!-- status: hypothesis|observed|disconfirmed; expires: YYYY-MM-DD -->`
+
+/**
+ * Self-observations journal body: the append-only source the primary agent
+ * writes when an external reaction happens. Not projected, so it carries the
+ * write-time rules (when to add a line, quote the reaction, outcome before
+ * `observed`) and one worked example.
+ */
+export const DEFAULT_SELF_OBSERVATIONS_BODY = `One line per external reaction to your behavior, appended when it happens:
+
+- [YYYY-MM-DD] cond: <when> | reaction: "<their words>" (<src>) | obs: <what you did, counted> | next: <what you will check> <!-- status: hypothesis|observed|disconfirmed; expires: YYYY-MM-DD -->
+
+Add a line when your person corrects or characterizes you, a reviewer or gate rejects your work, or a test contradicts what you claimed. Quote them; count what you did; name the next check. A line becomes observed when a later outcome agrees with it; until then, praise and unbacked pushback stay hypothesis.
+
+Example:
+- [2026-09-14] cond: a remote machine is named in the ask | reaction: "why are you searching here" (msg 01a0…) | obs: searched local fs before the host check, 2 of 9 | next: run the host check first <!-- status: observed; expires: 2026-12-14 -->`

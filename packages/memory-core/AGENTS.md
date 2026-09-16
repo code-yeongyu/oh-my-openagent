@@ -20,7 +20,7 @@ The public API is the barrel at `src/index.ts`.
 | `src/facts/` | Durable fact pipeline: queue + cursor watermarks, failure backoff/store, payload capping, person routing, recovery, mutation planning. |
 | `src/people/` | People-card grammar: parse/serialize, slug rules, reserved slugs, observations. |
 | `src/soul/` | Soul-file paths and identity-scoped soul-notice watermark consumption. |
-| `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, and merge outcomes. |
+| `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, merge outcomes, the orphan sweep that reclaims worktrees/branches no live run owns, and the park policy that stops automatic reflection after repeated failures (one half-open probe per interval). |
 | `src/compile/` | Compile committed memory revisions into marked system-prompt blocks and cache them by template hash. |
 | `src/search/` | Query parsing, transcript providers, and ranked memory/session search. |
 | `src/sync/` | Remote mirror synchronization and secret redaction. |

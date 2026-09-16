@@ -2,7 +2,7 @@ import type { ExecutionMode, StartResult } from "../../manager"
 import type { ToolProgressDetails } from "../../progress"
 import type { TaskRecord } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
-import type { TaskSkillSummary, TaskToolDetails, TaskToolMode } from "./types"
+import type { TaskHandleDetails, TaskSkillSummary, TaskToolDetails, TaskToolMode } from "./types"
 
 export type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
@@ -27,9 +27,10 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
   }
 }
 
-export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails {
+export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails & TaskHandleDetails {
   return {
     ...recordSummary(record),
+    run_epoch: record.notification.run_epoch,
     mode,
     subagent_type: record.agent_type,
     resolved_model: record.resolved_model,
@@ -46,6 +47,7 @@ export function startedDetails(
 ): TaskToolDetails {
   return {
     task_id: started.task_id,
+    ...(started.run_epoch === undefined ? {} : { run_epoch: started.run_epoch }),
     status: started.status,
     mode: "spawn",
     task_summary: params.task_summary,

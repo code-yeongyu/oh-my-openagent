@@ -1,7 +1,6 @@
 import { existsSync, appendFileSync } from "fs"
 import { join } from "path"
 import { homedir, tmpdir } from "os"
-import { createRequire } from "module"
 import {
   cleanupArchive,
   downloadArchive,
@@ -25,6 +24,8 @@ function debugLog(...args: unknown[]) {
 }
 
 const REPO = "code-yeongyu/go-claude-code-comment-checker"
+// Release pin: https://github.com/code-yeongyu/go-claude-code-comment-checker/releases
+const COMMENT_CHECKER_VERSION = "0.8.0"
 
 interface PlatformInfo {
   os: string
@@ -72,21 +73,6 @@ export function getCachedBinaryPath(): string | null {
 }
 
 /**
- * Get the version from the installed @code-yeongyu/comment-checker package.
- */
-function getPackageVersion(): string {
-  try {
-    const require = createRequire(import.meta.url)
-    const pkg = require("@code-yeongyu/comment-checker/package.json")
-    return pkg.version
-  } catch (error) {
-    error instanceof Error
-    // Fallback to hardcoded version if package not found
-    return "0.4.1"
-  }
-}
-
-/**
  * Download the comment-checker binary from GitHub Releases.
  * Returns the path to the downloaded binary, or null on failure.
  */
@@ -109,7 +95,7 @@ export async function downloadCommentChecker(): Promise<string | null> {
     return binaryPath
   }
   
-  const version = getPackageVersion()
+  const version = COMMENT_CHECKER_VERSION
   const { os, arch, ext } = platformInfo
   const assetName = `comment-checker_v${version}_${os}_${arch}.${ext}`
   const downloadUrl = `https://github.com/${REPO}/releases/download/v${version}/${assetName}`

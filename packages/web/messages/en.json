@@ -52,7 +52,7 @@
     },
     "secret": {
       "lead": "We'd rather you never had to read what's below.",
-      "body": "We use this era's technology for one purpose only: helping you get your work done. You don't need to study the tech. Focus on your work, and the more you use it, the more it becomes the tool that fits you.",
+      "body": "Focus on your work.\nOmO takes care of the tech.\nThe more you use it, the better it fits you.",
       "reveal": "Still curious? This is for you."
     },
     "ultrawork": {
@@ -179,21 +179,73 @@
   },
   "manifesto": {
     "badge": "Manifesto",
+    "meta": {
+      "author": "Q Kim",
+      "date": "Sep 14, 2026",
+      "series": "This series gets updated as the world changes."
+    },
+    "hero": {
+      "title": "Ultrawork Manifesto",
+      "subtitle": "We build today's tools, and tomorrow's,\nso you can keep your head in your work."
+    },
+    "chapters": {
+      "yourWork": {
+        "title": "Your work",
+        "p1": "You boot up your laptop. You open Slack.\nEvery day we sit at a keyboard and a mouse and do the same work as everyone else.\nExcept it isn't the same.\nEvery day, we mix in a little of our own wisdom and experience.",
+        "p2": "Nobody else has your wisdom and experience.\nThat's what makes your work worth something.",
+        "p3": "Your work matters.\nNot because you dug up piles of material, set up an experiment, and wrote the code.\nBecause your wisdom and experience went into it.\nThe rest was just your hands moving."
+      },
+      "ourTool": {
+        "title": "The tool we build",
+        "p1": "Agents today can act on your behalf.",
+        "p2": "They read dozens of times more than you ever could,\nthrow all of human knowledge at the question of how to build it,\nand they work 24 hours a day.",
+        "p3": "So it ought to be simple.\nYou put in quality tokens and compute,\nand great work comes out.",
+        "p4": "That's what today's tool has to be.",
+        "p5": "Which harness, which model's quirks, which skills...\nnone of that should be your problem.",
+        "p6": "When your wisdom meets quality tokens, it should compile straight into good work.",
+        "p7": "That's the tool we're building.\nIt takes your quality tokens and turns them into great work."
+      },
+      "ourThinking": {
+        "title": "What we think",
+        "p1": "Agents today can act on your behalf,\nbut they don't have your wisdom or your experience.",
+        "p2": "Give them everything you know, and then some.\nWhat you picked up by living as a human\nstill won't come out of the few characters an agent uses to make sense of the world.",
+        "p3Link": "We already live in a world where AI cracks a Millennium Prize problem,",
+        "p3Rest": "\nand even that proof grew from one seed, a single line of human wisdom.",
+        "p4": "We value your wisdom and experience.\nAnd everyone else's, just as much.",
+        "p5": "Our tool takes someone's wisdom and experience, and how they got there,\nand hands it to you, still alive.",
+        "p6": "Our own thinking reaches you as living wisdom.\nUnder the name of an agent. Under the name of a tool.",
+        "p7": "Your thinking can reach someone else the same way.\nThen everyone gets to spend their time on the problems that actually matter to them,\nand solve those.\nWe think we can build that world."
+      },
+      "tomorrow": {
+        "title": "Tomorrow's tool",
+        "p1": "When everyone shares what they know,\nwhen people think up the countless problems that matter to them and toss them out,\nand computers just come back with the answers,",
+        "p2": "we'll show up again, with tomorrow's tool,\nso you can focus one more time."
+      }
+    },
+    "closing": {
+      "lead": "So don't overthink it,",
+      "title": "just ulw ulw",
+      "button": "Get OmO"
+    },
+    "legacyNote": "Back on <date>January 19, 2026</date> we said an agent that makes you read its code is a badly built tool. <link>Read the old version</link>"
+  },
+  "manifestoLegacy": {
+    "badge": "Manifesto",
     "hero": {
       "title": "Ultrawork Manifesto",
       "subtitle": "The Philosophy of High-Output Engineering"
     },
     "bottleneck": "> HUMAN IN THE LOOP = BOTTLENECK",
-    "autonomousCar": "Imagine an autonomous car that requires you to grab the steering wheel every 30 seconds. Would you call that \"autonomous\"? No. You'd call it driver assist — barely better than cruise control.",
+    "autonomousCar": "Imagine an autonomous car that makes you grab the wheel every 30 seconds. Would you call that \"autonomous\"? No. You'd call it driver assist. Barely better than cruise control.",
     "whyDifferent": "Why is coding any different?",
-    "micromanagement": "We've accepted a paradigm where \"AI coding\" means a chatbot that writes 20 lines, then waits for you to fix it. That's not automation — that's micromanagement.",
+    "micromanagement": "We've accepted a version of \"AI coding\" where a chatbot writes 20 lines, then waits for you to fix them. Nobody would call that automation. It's micromanagement.",
     "painPoints": {
-      "fixing": "Fixing AI's half-finished code",
+      "fixing": "Fixing the AI's half-finished code",
       "syntax": "Manually correcting syntax errors",
       "copyPasting": "Copy-pasting context back and forth",
       "reviewing": "Reviewing every single line for hallucinations"
     },
-    "notCollaboration": "That's not \"human-AI collaboration\" — that's the AI failing to do its job.",
+    "notCollaboration": "That's not \"human-AI collaboration.\" That's the AI failing to do its job.",
     "premise": "{linkText} is built on the premise that the human should be the architect, not the spell-checker.",
     "premiseLinkText": "OmO",
     "indistinguishable": {
@@ -201,10 +253,10 @@
       "subtitle": "Agent-written code should be indistinguishable from code written by a senior engineer.",
       "items": {
         "patterns": "Follows existing codebase patterns and architecture",
-        "errorHandling": "Implements proper error handling and edge cases",
+        "errorHandling": "Handles errors and edge cases without being asked",
         "tests": "Writes tests that actually test behavior, not just coverage",
-        "noSlop": "No 'AI slop' — clean, concise, maintainable code",
-        "comments": "Comments only when they add value — never stating the obvious"
+        "noSlop": "No AI slop, meaning no over-engineering and no abstractions nobody asked for",
+        "comments": "Comments only when they add value, never to restate the obvious"
       },
       "quote": "\"If you can tell whether a commit was made by a human or an agent, the agent has failed.\""
     },
@@ -213,13 +265,13 @@
       "description": "We don't care about token usage. We care about output. If spending $5 on tokens saves an hour of engineering time, that's a 20x ROI.",
       "parallelAgents": "Parallel agents exploring multiple solutions",
       "completeWork": "Complete work without human intervention",
-      "selfVerification": "Thorough self-verification loops",
+      "selfVerification": "Verifies its own work before calling it done",
       "however": "However...",
       "optimizeDescription": "We optimize for efficiency where it counts. Not by crippling the model, but by:",
       "cheaperModels": "Using cheaper models for routine tasks",
-      "avoidingRedundant": "Avoiding redundant exploration",
-      "intelligentCaching": "Intelligent caching of context",
-      "stoppingExactly": "Stopping exactly when sufficient"
+      "avoidingRedundant": "Not exploring the same ground twice",
+      "intelligentCaching": "Caching what it learned across sessions",
+      "stoppingExactly": "Stopping once there's enough context"
     },
     "cognitiveLoad": {
       "title": "Minimize Human Cognitive Load",
@@ -229,37 +281,37 @@
         "title": "Ultrawork",
         "subtitle": "Just say \"ulw\" and walk away.",
         "steps": {
-          "analyze": "Analyzes codebase context",
-          "breakdown": "Breaks down task into atomic steps",
-          "execute": "Executes implementation",
+          "analyze": "Reads the codebase for context",
+          "breakdown": "Breaks the task into atomic steps",
+          "execute": "Implements it",
           "verify": "Verifies against requirements",
-          "commit": "Commits changes"
+          "commit": "Commits the changes"
         },
-        "footer": "Zero intervention. Full autonomy. Just results."
+        "footer": "Zero intervention. Just results."
       },
       "plannerExecutor": {
         "badge": "Approach 2",
         "title": "Planner + Executor",
         "subtitle": "When you want strategic control.",
         "plannerTitle": "Ultrawork Planner",
-        "plannerDescription": "Runs the interview, researches context, and writes a detailed work plan.",
+        "plannerDescription": "Interviews you and researches the codebase, then writes a detailed work plan.",
         "executorTitle": "/ulw-execute",
-        "executorDescription": "Executes the approved plan in the same session, delegates by category, manages waves, and tracks progress.",
-        "footer": "You architect. Agents execute. Full transparency."
+        "executorDescription": "Executes the approved plan in the same session, delegating by category and tracking progress wave by wave.",
+        "footer": "You architect. Agents execute. Nothing happens out of sight."
       }
     },
     "principles": {
       "predictable": {
         "title": "Predictable",
-        "description": "Same inputs = consistent output. No random deviations or creative liberties unless requested."
+        "description": "Same inputs, same output. No surprises and no creative liberties you didn't ask for."
       },
       "continuous": {
         "title": "Continuous",
-        "description": "Survives interruptions. Tracks progress in real-time. Preserves context across sessions."
+        "description": "Work survives a crashed session or a week away, because the agent keeps the state and you don't have to."
       },
       "delegatable": {
         "title": "Delegatable",
-        "description": "Clear acceptance criteria. Self-correcting mechanisms. Escalation only when absolutely needed."
+        "description": "Hand it a task with clear acceptance criteria, the way you'd hand one to a capable teammate. It corrects itself when something goes wrong and escalates only when it has to."
       }
     },
     "coreLoop": {
@@ -267,7 +319,7 @@
       "features": {
         "planner": {
           "feature": "Planning interview",
-          "purpose": "Extract intent through intelligent interview"
+          "purpose": "Draw out what you actually want before anything gets built"
         },
         "planConsultant": {
           "feature": "Plan consultant",
@@ -275,11 +327,11 @@
         },
         "planReviewer": {
           "feature": "Plan review gate",
-          "purpose": "Verify plans are complete before execution"
+          "purpose": "Verify the plan is complete before execution"
         },
         "orchestrator": {
           "feature": "Orchestrator",
-          "purpose": "Coordinate work without human micromanagement"
+          "purpose": "Coordinate the work so you don't have to micromanage it"
         },
         "todoContinuation": {
           "feature": "Todo Continuation",
@@ -287,11 +339,11 @@
         },
         "categorySystem": {
           "feature": "Category System",
-          "purpose": "Route to optimal model without human decision"
+          "purpose": "Route each task to the right model so you never have to pick one"
         },
         "backgroundAgents": {
           "feature": "Background Agents",
-          "purpose": "Parallel research without blocking user"
+          "purpose": "Research in parallel without blocking you"
         },
         "wisdomAccumulation": {
           "feature": "Wisdom Accumulation",
@@ -302,8 +354,8 @@
     "future": {
       "title": "The Future We're Building",
       "items": {
-        "focus": "Human developers focus on WHAT to build, not HOW to get AI to build it",
-        "quality": "Code quality independent of who wrote it",
+        "focus": "Developers think about what to build, not how to get an AI to build it",
+        "quality": "Code quality that doesn't depend on who wrote it",
         "complexity": "Complex projects as easy as simple ones",
         "promptEngineering": "\"Prompt engineering\" becomes obsolete"
       },
@@ -313,6 +365,11 @@
     "finalCta": {
       "title": "just ulw ulw",
       "button": "Get OmO"
+    },
+    "archive": {
+      "eyebrow": "Old version · Jan 19, 2026",
+      "note": "Written when not reading the code was still called crazy, and everyone sat in front of the agent.",
+      "back": "Read the current version"
     }
   }
 }

@@ -238,6 +238,7 @@ export function buildPlanSkeleton(slug, intent) {
 **What it will NOT do:** <fill last - 1-3 plain lines mirroring Must NOT have>
 
 **Effort:** <Quick | Short | Medium | Large | XL>
+<!-- Effort is exactly ONE band, never hours/days. Quick = single edit, minutes of agent work; Short = one focused change, a few files; Medium = multi-file feature in one session; Large = several waves, one long session; XL = multi-session or architectural work. A written duration is rewritten to a band. -->
 **Risk:** <Low | Medium | High> - <one-line driver>
 ${decisionsLine}
 
@@ -254,7 +255,7 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
 ## Verification strategy
 > Zero human intervention - all verification is agent-executed.
 - Test decision: <TDD | tests-after | none> + framework
-- Evidence: <attemptDir>/task-<N>-${slug}.<ext> (attemptDir = currentAttemptDir from the ulw-loop status operation - the omo_agent_toolkit tool on Senpi, the omo-agent-toolkit CLI on Codex, .omo/evidence/ulw/<session>/<goalId>/a<attempt>; outside ulw-loop use .omo/evidence/)
+- Evidence: <attemptDir>/task-<N>-${slug}.<ext> (attemptDir = currentAttemptDir from the ulw-loop status operation - on Senpi the eval SDK import, const { agentToolkit } = await import(\`\${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js\`) then agentToolkit.status(), on Codex the omo-agent-toolkit CLI, .omo/evidence/ulw/<session>/<goalId>/a<attempt>; outside ulw-loop use .omo/evidence/)
 
 ## Execution strategy
 ### Parallel execution waves

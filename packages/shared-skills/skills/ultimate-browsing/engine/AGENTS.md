@@ -65,7 +65,8 @@ is a regression, not an upgrade:
 - **De-personalization** — no personal absolute paths, no personal auth token literals,
   no personal browser choice; enforced by `depersonalization-gate.test.ts`.
 - **Skill-level layering** — the engine is Tier 1 under a router that also owns Tier 1.5
-  (agent-reach) and Tier 2 (CloakBrowser + agent-browser). Upstream has no such tiering.
+  (agent-reach) and Tier 2 (Bun.WebView / local-Chrome playwright-core scripts from js eval).
+  Upstream has no such tiering.
 
 ### WANT — upstream improvements worth porting forward
 

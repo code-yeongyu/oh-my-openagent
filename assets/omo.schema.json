@@ -807,7 +807,7 @@
       "type": "object",
       "properties": {
         "commit_footer": {
-          "default": true,
+          "default": false,
           "anyOf": [
             {
               "type": "boolean"
@@ -818,7 +818,7 @@
           ]
         },
         "include_co_authored_by": {
-          "default": true,
+          "default": false,
           "type": "boolean"
         }
       },
@@ -2137,6 +2137,12 @@
         "enabled"
       ],
       "additionalProperties": false
+    },
+    "disabled_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "[opencode]": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -11811,14 +11817,14 @@
         },
         "git_master": {
           "default": {
-            "commit_footer": true,
-            "include_co_authored_by": true,
+            "commit_footer": false,
+            "include_co_authored_by": false,
             "git_env_prefix": "GIT_MASTER=1"
           },
           "type": "object",
           "properties": {
             "commit_footer": {
-              "default": true,
+              "default": false,
               "anyOf": [
                 {
                   "type": "boolean"
@@ -11829,7 +11835,7 @@
               ]
             },
             "include_co_authored_by": {
-              "default": true,
+              "default": false,
               "type": "boolean"
             },
             "git_env_prefix": {
@@ -11852,7 +11858,6 @@
               "type": "string",
               "enum": [
                 "playwright",
-                "agent-browser",
                 "dev-browser",
                 "playwright-cli"
               ]
@@ -13900,6 +13905,12 @@
             }
           },
           "additionalProperties": false
+        },
+        "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -15757,6 +15768,12 @@
             }
           },
           "additionalProperties": false
+        },
+        "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -17620,6 +17637,12 @@
               }
             },
             "additionalProperties": false
+          },
+          "disabled_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "[opencode]": {
             "$schema": "http://json-schema.org/draft-07/schema#",
@@ -27294,14 +27317,14 @@
               },
               "git_master": {
                 "default": {
-                  "commit_footer": true,
-                  "include_co_authored_by": true,
+                  "commit_footer": false,
+                  "include_co_authored_by": false,
                   "git_env_prefix": "GIT_MASTER=1"
                 },
                 "type": "object",
                 "properties": {
                   "commit_footer": {
-                    "default": true,
+                    "default": false,
                     "anyOf": [
                       {
                         "type": "boolean"
@@ -27312,7 +27335,7 @@
                     ]
                   },
                   "include_co_authored_by": {
-                    "default": true,
+                    "default": false,
                     "type": "boolean"
                   },
                   "git_env_prefix": {
@@ -27335,7 +27358,6 @@
                     "type": "string",
                     "enum": [
                       "playwright",
-                      "agent-browser",
                       "dev-browser",
                       "playwright-cli"
                     ]
@@ -29383,6 +29405,12 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false
@@ -31240,6 +31268,12 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false

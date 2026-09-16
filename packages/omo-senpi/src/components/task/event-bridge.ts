@@ -78,6 +78,7 @@ export function wireEventBridge(
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
     }
     await tickLeadPollersBestEffort(ctx, state)
+    if (sessionId !== undefined) engine.manager.workpools?.attach({ sessionId, rootSessionId: sessionId, depth: 0, cwd: engine.runtime.cwd() })
     statusUi.scheduleSync()
     taskRpc.attach()
   })

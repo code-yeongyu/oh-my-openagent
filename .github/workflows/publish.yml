@@ -356,6 +356,13 @@ jobs:
         with:
           bun-version: "1.4.2"
 
+      # build-extension.mjs derives its --external list from the runner's builtinModules;
+      # the senpi-compatibility freshness check runs it on node 24, so this job must too, or
+      # the stamped bundle is byte-divergent and rejected as stale (#8329).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
@@ -489,7 +496,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
-          git add -f packages/omo-senpi/plugin/extensions
+          # build-extension.mjs also stamps the version into the agent-toolkit SDK bundle under
+          # plugin/runtime; it must be committed with the extensions or the freshness check
+          # rejects the release commit as stale-output (#8329).
+          git add -f packages/omo-senpi/plugin/extensions packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"

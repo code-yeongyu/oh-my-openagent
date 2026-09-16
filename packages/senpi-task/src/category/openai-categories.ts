@@ -192,7 +192,7 @@ const GPT_FLAGSHIP_GATE_MODELS = ["gpt-6-astra", "gpt-5.6-sol"] as const
 export const OPENAI_CATEGORIES = [
   {
     name: "ultrabrain",
-    config: { model: "openai/gpt-6-astra", variant: "max" },
+    config: { model: "openai-codex/gpt-6-astra", variant: "max" },
     description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveUltrabrainCategoryPromptAppend,
@@ -200,7 +200,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-6-astra", variant: "high" },
+    config: { model: "openai-codex/gpt-6-astra", variant: "high" },
     description: "**MANDATORY: USE deep FOR 3D GRAPHICS, COMPUTER USE, BROWSER USE, BACKEND, LOGIC, ALGORITHMS, CAPTCHA SOLVING, AND MULTIMODAL WORK.** Deep autonomous problem-solving for complex research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,
@@ -222,7 +222,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "unspecified-high",
-    config: { model: "openai/gpt-6-astra", variant: "high" },
+    config: { model: "openai-codex/gpt-6-astra", variant: "high" },
     description: "Tasks that don't fit other categories, high effort required",
     callerGuidance: UNSPECIFIED_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,

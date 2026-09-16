@@ -45,7 +45,7 @@ export function KibitzerStage() {
         </ol>
         <div className="kib-memory mt-4 border-l pl-3">
           <p className="text-text-lo font-mono text-xs">{t("memory")}</p>
-          <p className="text-text-mid mt-2 text-sm">{t("memoryNote")}</p>
+          <p className="text-text-mid prose-cjk mt-2 text-base leading-[1.6]">{t("memoryNote")}</p>
         </div>
         <p className="text-text-lo mt-4 flex items-center gap-2 font-mono text-xs">
           <RotateCcw className="size-3" /> {t("watchAgain")}
@@ -78,7 +78,7 @@ export function KibitzerStage() {
                 <ArrowDown className="size-4" />
                 {t("nudge")}
               </span>
-              <p className="mt-2 text-sm">{t("reason")}</p>
+              <p className="prose-cjk mt-2 text-base leading-[1.6]">{t("reason")}</p>
             </div>
           </li>
           <li className="kib-main-step" style={{ "--i": 2 } as CSSProperties}>

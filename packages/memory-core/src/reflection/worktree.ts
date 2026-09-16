@@ -133,9 +133,11 @@ export async function finalizeReflectionWorktree(
     detail = errorMessage(error)
   }
 
+  // Cleanup is bookkeeping, not integration: demoting a landed reflection to "failed" here would
+  // re-reflect content that is already in the parent. The leftovers are reclaimed by the orphan
+  // sweep instead, so the receipt only annotates the outcome it observed.
   const cleanup = await cleanupReflectionWorktree(worktree)
   if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) {
-    status = "failed"
     detail = [detail, "Reflection cleanup did not fully complete"].filter(Boolean).join("; ")
   }
   return { status, ...(detail ? { detail } : {}), cleanup }

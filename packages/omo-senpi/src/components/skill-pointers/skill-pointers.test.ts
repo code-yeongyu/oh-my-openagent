@@ -134,7 +134,7 @@ describe("omo-senpi skill-pointers component", () => {
       expect(content).toEndWith("</omo-mass-ulw-pointer>")
     })
 
-    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop points at the registered toolkit tool", async () => {
+    it("#when ulw-loop and mass-ulw pointers are injected #then only ulw-loop teaches the eval SDK import", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -148,9 +148,10 @@ describe("omo-senpi skill-pointers component", () => {
       if (typeof massContent !== "string" || typeof loopContent !== "string") {
         throw new Error("expected string skill-pointer messages")
       }
-      expect(loopContent).toContain("tool.omo_agent_toolkit")
+      expect(loopContent).toContain('await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`)')
+      expect(loopContent).not.toMatch(/tool\.omo_agent_toolkit/)
       expect(loopContent).not.toContain("runtime/agent-toolkit")
-      expect(massContent).not.toContain("tool.omo_agent_toolkit")
+      expect(massContent).not.toContain("OMO_AGENT_TOOLKIT_SDK_ROOT")
     })
 
     it("#when overlapping keywords are mentioned #then one pointer per skill is injected in table order", async () => {

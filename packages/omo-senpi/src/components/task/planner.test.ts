@@ -223,7 +223,7 @@ describe("createTaskChildPlanner", () => {
     })
   })
 
-  test("#given subagent_type naming a category rather than an agent #when planned #then category resolution still applies", () => {
+  test("#given subagent_type naming a category rather than an agent #when planned #then it is a typed error instead of a silent category model", () => {
     // given
     const planner = createTaskChildPlanner(
       {},
@@ -240,12 +240,76 @@ describe("createTaskChildPlanner", () => {
     })
 
     // then
-    const resolved = expectResolved(result)
-    expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "anthropic" })
-    expect(resolved.plan.category).toBe("visual-engineering")
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("unknown_target")
+    expect(result.error.message).toContain('"visual-engineering"')
+    expect(result.error.message).toContain('is a category')
+    expect(result.error.message).toContain('category="visual-engineering"')
+    expect(result.error.availableAgents).toContain("explore")
   })
 
-  test("#given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available", () => {
+  test("#given subagent_type naming the architect category #when planned #then no cross-family category model is handed back", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      { categories: { architect: { model: "anthropic/claude-fable-5-1" } } },
+      BUILTIN_AGENTS,
+      () => registry([
+        model("anthropic", "claude-fable-5-1"),
+        model("openai", "gpt-5.6-luna-fast"),
+      ]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Consult on the design.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "architect",
+    })
+
+    // then
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("unknown_target")
+    expect(result.error.message).toContain('category="architect"')
+  })
+
+  test("#given an unknown subagent_type carrying an explicit model #when planned #then the unknown agent name is still a typed error", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Do something.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "code-reviewer",
+      model: "openai/gpt-5.5",
+    })
+
+    // then
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("unknown_target")
+    expect(result.error.message).toContain('"code-reviewer"')
+  })
+
+  test("#given a spec with no category, subagent_type or model #when planned #then it stays a typed invalid_target rejection", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("anthropic", "claude-fable-5-1")]),
+    )
+
+    // when
+    const result = planner({ prompt: "Do something.", parent_session_id: "parent-1", depth: 0 })
+
+    // then
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("invalid_target")
+    expect(result.error.message).toContain("requires a category, subagent_type, or model")
+  })
+
+  test("#given a disabled agent sharing a category name #when planned without an explicit model #then it is a typed error instead of a category fallthrough", () => {
     // given
     const agents = { ...BUILTIN_AGENTS, explore: { name: "explore", disable: true } }
     const planner = createTaskChildPlanner(
@@ -266,10 +330,10 @@ describe("createTaskChildPlanner", () => {
     })
 
     // then
-    const resolved = expectResolved(result)
-    expect(resolved.plan.agentType).toBeUndefined()
-    expect(resolved.plan.category).toBe("explore")
-    expect(resolved.plan.resolved_model?.source).toBe("category")
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("unknown_target")
+    expect(result.error.message).toContain('"explore"')
+    expect(result.error.availableAgents).not.toContain("explore")
   })
 
   test("#given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement", () => {
@@ -582,5 +646,76 @@ describe("createTaskChildPlanner reviewer category routing", () => {
     const resolved = expectResolved(result)
     expect(resolved.plan.model).toBe("anthropic/claude-opus-5")
     expect(resolved.plan.variant).toBe("xhigh")
+  })
+})
+
+describe("createTaskChildPlanner parent independence", () => {
+  // A child's model is a pure function of the child's OWN target: the planner takes no parent
+  // category, no parent model and keeps no per-parent state, so a fable-headed parent category can
+  // never bleed into a child that asked for something else (#8348).
+  test("#given one child spec #when planned after parents routed to two different categories #then the child resolves the same model both times", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([
+        model("anthropic", "claude-fable-5-1"),
+        model("anthropic", "claude-opus-5"),
+        model("openai", "gpt-5.6-luna-fast"),
+      ]),
+    )
+    const child = {
+      prompt: "Find the auth flow.",
+      parent_session_id: "parent-1",
+      depth: 1,
+      subagent_type: "explore",
+    } as const
+
+    // when
+    const fableParent = expectResolved(
+      planner({ prompt: "Design it.", parent_session_id: "root", depth: 0, category: "architect" }),
+    )
+    const childUnderFableParent = expectResolved(planner(child))
+    const highParent = expectResolved(
+      planner({ prompt: "Ship it.", parent_session_id: "root", depth: 0, category: "unspecified-high" }),
+    )
+    const childUnderHighParent = expectResolved(planner(child))
+
+    // then
+    expect(fableParent.plan.model).toBe("anthropic/claude-fable-5-1")
+    expect(highParent.plan.model).toBe("anthropic/claude-opus-5")
+    expect(childUnderFableParent.plan.model).toBe("openai/gpt-5.6-luna-fast")
+    expect(childUnderHighParent.plan.model).toBe(childUnderFableParent.plan.model)
+    expect(childUnderFableParent.plan.category).toBeUndefined()
+    expect(childUnderHighParent.plan.category).toBeUndefined()
+  })
+
+  test("#given a category child spec #when planned after parents routed to two different categories #then only the child's own category decides its model", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([
+        model("anthropic", "claude-fable-5-1"),
+        model("anthropic", "claude-opus-5"),
+      ]),
+    )
+    const child = {
+      prompt: "Ship the fix.",
+      parent_session_id: "parent-1",
+      depth: 1,
+      category: "unspecified-high",
+    } as const
+
+    // when
+    planner({ prompt: "Design it.", parent_session_id: "root", depth: 0, category: "architect" })
+    const childUnderFableParent = expectResolved(planner(child))
+    planner({ prompt: "Ship it.", parent_session_id: "root", depth: 0, category: "unspecified-high" })
+    const childUnderHighParent = expectResolved(planner(child))
+
+    // then
+    expect(childUnderFableParent.plan.model).toBe("anthropic/claude-opus-5")
+    expect(childUnderHighParent.plan.model).toBe(childUnderFableParent.plan.model)
+    expect(childUnderFableParent.plan.category).toBe("unspecified-high")
   })
 })

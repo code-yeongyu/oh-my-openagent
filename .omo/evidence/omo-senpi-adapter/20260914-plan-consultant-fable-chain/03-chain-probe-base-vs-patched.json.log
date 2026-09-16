@@ -1,0 +1,143 @@
+--- probe-BASE exit=0
+{
+  "claude-subscriber(claude-sdk-oauth+opencode) :: plan-consultant": {
+    "kind": "resolved",
+    "model": "claude-sdk-oauth/claude-sonnet-4-6",
+    "fallback": [
+      "claude-sdk-oauth/claude-opus-5"
+    ]
+  },
+  "claude-subscriber(claude-sdk-oauth+opencode) :: explore": {
+    "kind": "model_unavailable"
+  },
+  "claude-subscriber(claude-sdk-oauth+opencode) :: librarian": {
+    "kind": "model_unavailable"
+  },
+  "claude-subscriber(claude-sdk-oauth+opencode) :: plan-reviewer": {
+    "kind": "resolved",
+    "model": "claude-sdk-oauth/claude-opus-5",
+    "variant": "max"
+  },
+  "copilot-only :: plan-consultant": {
+    "kind": "resolved",
+    "model": "github-copilot/claude-opus-5",
+    "variant": "max"
+  },
+  "copilot-only :: explore": {
+    "kind": "resolved",
+    "model": "github-copilot/claude-haiku-4-5"
+  },
+  "copilot-only :: librarian": {
+    "kind": "resolved",
+    "model": "github-copilot/claude-haiku-4-5"
+  },
+  "copilot-only :: plan-reviewer": {
+    "kind": "resolved",
+    "model": "github-copilot/gpt-6-astra",
+    "variant": "high",
+    "fallback": [
+      "github-copilot/claude-opus-5"
+    ]
+  },
+  "kimi-only :: plan-consultant": {
+    "kind": "resolved",
+    "model": "kimi-for-coding/kimi-k3"
+  },
+  "kimi-only :: explore": {
+    "kind": "model_unavailable"
+  },
+  "kimi-only :: librarian": {
+    "kind": "model_unavailable"
+  },
+  "kimi-only :: plan-reviewer": {
+    "kind": "model_unavailable"
+  },
+  "no-chain-model :: plan-consultant": {
+    "kind": "model_unavailable"
+  },
+  "no-chain-model :: explore": {
+    "kind": "resolved",
+    "model": "openai/gpt-5.4-nano"
+  },
+  "no-chain-model :: librarian": {
+    "kind": "resolved",
+    "model": "openai/gpt-5.4-nano"
+  },
+  "no-chain-model :: plan-reviewer": {
+    "kind": "model_unavailable"
+  }
+}
+
+--- probe-PATCHED exit=0
+b3c5e4794 Merge pull request #8257 from code-yeongyu/fix/web-lit-reveal-chrome
+      21
+{
+  "claude-subscriber(claude-sdk-oauth+opencode) :: plan-consultant": {
+    "kind": "resolved",
+    "model": "claude-sdk-oauth/claude-fable-5-1",
+    "variant": "max",
+    "fallback": [
+      "claude-sdk-oauth/claude-opus-5"
+    ]
+  },
+  "claude-subscriber(claude-sdk-oauth+opencode) :: explore": {
+    "kind": "model_unavailable"
+  },
+  "claude-subscriber(claude-sdk-oauth+opencode) :: librarian": {
+    "kind": "model_unavailable"
+  },
+  "claude-subscriber(claude-sdk-oauth+opencode) :: plan-reviewer": {
+    "kind": "resolved",
+    "model": "claude-sdk-oauth/claude-opus-5",
+    "variant": "max"
+  },
+  "copilot-only :: plan-consultant": {
+    "kind": "resolved",
+    "model": "github-copilot/claude-opus-5",
+    "variant": "max"
+  },
+  "copilot-only :: explore": {
+    "kind": "resolved",
+    "model": "github-copilot/claude-haiku-4-5"
+  },
+  "copilot-only :: librarian": {
+    "kind": "resolved",
+    "model": "github-copilot/claude-haiku-4-5"
+  },
+  "copilot-only :: plan-reviewer": {
+    "kind": "resolved",
+    "model": "github-copilot/gpt-6-astra",
+    "variant": "high",
+    "fallback": [
+      "github-copilot/claude-opus-5"
+    ]
+  },
+  "kimi-only :: plan-consultant": {
+    "kind": "resolved",
+    "model": "kimi-for-coding/kimi-k3",
+    "variant": "max"
+  },
+  "kimi-only :: explore": {
+    "kind": "model_unavailable"
+  },
+  "kimi-only :: librarian": {
+    "kind": "model_unavailable"
+  },
+  "kimi-only :: plan-reviewer": {
+    "kind": "model_unavailable"
+  },
+  "no-chain-model :: plan-consultant": {
+    "kind": "model_unavailable"
+  },
+  "no-chain-model :: explore": {
+    "kind": "resolved",
+    "model": "openai/gpt-5.4-nano"
+  },
+  "no-chain-model :: librarian": {
+    "kind": "resolved",
+    "model": "openai/gpt-5.4-nano"
+  },
+  "no-chain-model :: plan-reviewer": {
+    "kind": "model_unavailable"
+  }
+}

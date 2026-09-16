@@ -1,3 +1,57 @@
+## 2026-09-16 — Kibitzer nudges are reference-only
+
+A recalled note used to arrive with no stated posture, and 54% of the hints
+Kibitzer delivered this month were written as orders to the primary agent
+("verify these before ...", "하지 말아야 합니다"), which is advice the agent did
+not ask for and cannot audit. The injected block now names its sender and its
+posture in the header itself - Kibitzer, a background memory advisor, surfaced
+this stored note; it may or may not apply, reference only, the current task
+stands - in English or Korean according to the hint
+(`packages/memory-core/src/recall/render.ts`). The persona's sample block and the
+renderer are pinned to each other byte for byte by `render.test.ts`, so the judge
+is never shown a block the harness does not produce.
+
+The persona asks for the other half of the contract: a hint states what the
+stored note records ("the note records that ..."), and an instruction to the
+agent joins commentary-only and topical-only nudges as a worked bad example
+(`packages/memory-core/src/recall/assets/kibitzer-persona.md`).
+
+The rule is enforced where nudges are admitted instead of being left to the
+model. `describeInvalidHint` in `packages/memory-core/src/recall/gate.ts` answers
+`addresses-agent` for a hint that carries the second person, opens with an
+imperative or negated imperative, or ends in a Korean request form, next to the
+existing `empty`, `too-long`, `multiline` and `decision-commentary` reasons.
+`validateNudges` drops such a hint on the parent side and the sidecar's `nudge`
+tool refuses it at call time with the reason and the fix - restate what the note
+records as a plain observation - keeping the single correction the tool contract
+allows. Only the opening of the sentence is scanned for imperatives, so an
+observation that quotes a rule mid-sentence ("the release note records that
+publish must follow the green-main guard") is still accepted, as are Korean
+plain-form endings. `isValidHint` deliberately keeps its older shape-only
+meaning: pending payloads and stored `omo-kibitzer:nudged` entries were admitted
+under the contract of their own day, and replaying them must not retroactively
+drop a nudge that is already on screen (#8355).
+
+## 2026-09-16 — memory_notice reports only messages compacted out of the live context
+
+`<memory_notice>` told every session that N previous messages had left the live context, with N read
+off `sessionManager.getBranch().length`. The branch is the whole path to the leaf, not what the
+compaction dropped, so a fresh session of fifteen entries and zero compactions announced that twelve
+of its own live messages were gone. The count now comes from the branch's latest compaction entry:
+the `message` entries positioned before its `firstKeptEntryId` - or before the compaction entry
+itself when that id is no longer on the branch - are the ones senpi no longer sends. A branch that
+never compacted counts zero, and a zero count prints no line at all.
+
+The notice is now strictly session-volatile. When the compaction count is zero and there is no save
+nudge and no soul update, the `before_agent_start` handler returns its `systemPrompt` with no message
+at all, so an uncompacted session spends no tokens on a notice that has nothing to report.
+
+The reason the old line existed survives where it belongs. That relevant stored memory arrives on its
+own as `<recalled-memory>` blocks and that there is no recall tool to call are standing facts about
+the toolset, not facts about this turn, so they are one sentence at the end of memory-core's compiled
+REMINDER, present in every prompt whether or not anything compacted. Models still learn there is
+nothing to search for, and they learn it from the block that is always there.
+
 ## 2026-09-13 — Project persisted reflection reports into TUI and RPC
 
 Recap projection requires an explicit positive outcome attempt matching the
@@ -26,6 +80,12 @@ whitespace. The real-runtime QA driver covers actual child commits, exclusions,
 disconnection recovery and source/recipient session switching. Its readiness
 signal is the existing memory binding entry, not an extension-event capability
 that the stdio client did not negotiate.
+
+## 2026-09-13 - Ship the agent toolkit as an eval SDK
+
+Adds `plugin/runtime/agent-toolkit-sdk/sdk.js` at `OMO_AGENT_TOOLKIT_SDK_ROOT`. The SDK imports only Node builtins and binds each call synchronously from `PI_SESSION_ID`, `PI_SESSION_CWD`, and `PI_GOAL_STORE_FILE`; importing it performs no I/O. Missing session facts resolve as operation-tagged failure envelopes. Checkpoints and review blockers use the session's driver snapshot unless explicitly supplied, with authoritative `goal:null` stopping fallback reads. Invalid stores are advisory warnings and are never rewritten.
+
+The host status reader uses the additive `#omo-agent-toolkit-sdk` import map. Build freshness, installer/payload allowlists, node-only input checks, and isolated worker tests cover the new artifact. Generic directory provisioning preserves DAG behavior. This increment retains the old tool registration, runtime alias, and sidecar; their removal is a separate change.
 
 ## 2026-09-12 — Drop the retired agent-name alias notices
 

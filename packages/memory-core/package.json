@@ -13,6 +13,9 @@
     },
     "./personas": {
       "import": "./src/personas/manifest.ts"
+    },
+    "./process-identity": {
+      "import": "./src/locks/process-identity.ts"
     }
   },
   "scripts": {

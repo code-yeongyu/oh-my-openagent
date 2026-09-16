@@ -5,9 +5,17 @@ import { executeBatch } from "./execute-batch"
 import { runSpawn } from "./execute-single"
 import { buildStartSpec, singleSpawnParams } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
+import { resolveTaskKernelTools } from "./kernel-tools"
 import { evaluateSpawnPolicy } from "./spawn-policy"
 import type { TaskToolParamsStatic } from "./params"
-import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDeps, TaskToolDetails } from "./types"
+import type {
+  ResolvedSpawnItem,
+  TaskKernelToolsDetail,
+  TaskSkillSummary,
+  TaskToolContext,
+  TaskToolDeps,
+  TaskToolDetails,
+} from "./types"
 import { resolveRunInBackground, resolveSpawnItems, validateBatchShape, validateTaskTarget } from "./validation"
 
 type TaskExecute = (
@@ -24,6 +32,25 @@ function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToo
 
 function invalidArguments(message: string): AgentToolResult<TaskToolDetails> {
   return result(message, { task_id: "", status: "invalid_arguments", mode: "spawn", reason: message })
+}
+
+/**
+ * What the caller is told about a resolved grant once the spawn settled. A spawn that never started
+ * must NEVER report `granted`: a runner-floor refusal carries its typed code, and any other failed
+ * start reports that the grant reached no child.
+ */
+function deliveredKernelTools(detail: TaskKernelToolsDetail, details: TaskToolDetails): TaskKernelToolsDetail {
+  if (details.failure_kind === "tools_unavailable") {
+    return {
+      requested: detail.requested,
+      status: "refused",
+      error: { code: "tools_unavailable", message: details.reason ?? "Parent kernel tools are unavailable for this child." },
+    }
+  }
+  if (details.task_id.length === 0 || details.failure_kind !== undefined) {
+    return { requested: detail.requested, status: "not_delivered" }
+  }
+  return detail
 }
 
 export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOptions = {}): TaskExecute {
@@ -46,15 +73,35 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
 
     const first = resolved.items[0]
     if (first === undefined) return invalidArguments("Provide at least one task item.")
+
+    // Parent kernel tools are resolved BEFORE any spawn: a refusal must leave zero child sessions.
+    const kernelTools = await resolveTaskKernelTools(deps, ctx, resolved.items, params.tools)
+    if (kernelTools.kind === "denied") {
+      const message = kernelTools.detail.error?.message ?? "Parent kernel tools are unavailable."
+      return result(message, {
+        task_id: "",
+        status: "denied",
+        mode: "spawn",
+        reason: message,
+        kernel_tools: kernelTools.detail,
+      })
+    }
+    const granted = kernelTools.kind === "granted" ? kernelTools : undefined
+    const withKernelTools = (spawned: AgentToolResult<TaskToolDetails>): AgentToolResult<TaskToolDetails> =>
+      granted === undefined
+        ? spawned
+        : { ...spawned, details: { ...spawned.details, kernel_tools: deliveredKernelTools(granted.detail, spawned.details) } }
+
     if (resolved.items.length === 1) {
-      return runSpawn(deps, {
+      return withKernelTools(await runSpawn(deps, {
         params: singleSpawnParams(first, runInBackground),
         signal,
         onUpdate,
         ctx,
+        ...(granted === undefined ? {} : { kernelTools: granted.grant }),
         ...(options.env !== undefined && { env: options.env }),
         ...(options.scheduleDeadline !== undefined && { scheduleDeadline: options.scheduleDeadline }),
-      })
+      }))
     }
 
     const parentSessionId = ctx.sessionManager.getSessionId()
@@ -84,11 +131,11 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
         // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously,
         // so the barrel is warmed here (memoized across every spawn in the process).
         await loadSenpiBarrel()
-        const spec = buildStartSpec(itemParams, target, parentSessionId, deps, ctx.cwd)
+        const spec = buildStartSpec(itemParams, target, parentSessionId, deps, ctx.cwd, granted?.grant)
         if (spec.skills !== undefined) skillSummaries.set(item, spec.skills)
         return deps.manager.start(spec)
       },
     })
-    return batchResult
+    return withKernelTools(batchResult)
   }
 }

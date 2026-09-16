@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { SENPI_LOADER_ALIASES } from "../plugin/scripts/build-extension.mjs"
+import { buildExtension, SENPI_LOADER_ALIASES } from "../plugin/scripts/build-extension.mjs"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
@@ -32,6 +34,20 @@ const EXPECTED_SENPI_LOADER_ALIASES = [
 ] as const
 
 describe("omo-senpi bundle purity", () => {
+  it("#given the eval SDK #when imports and build inputs are inspected #then only node builtins are external and no node_modules are bundled", async () => {
+    const path = join(packageRoot, "plugin", "runtime", "agent-toolkit-sdk", "sdk.js")
+    expect(existsSync(path)).toBe(true)
+    const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
+    expect(imports.length).toBeGreaterThan(0)
+    expect(imports.filter(specifier => !specifier.startsWith("node:"))).toEqual([])
+    const root = await mkdtemp(join(tmpdir(), "sdk-inputs-"))
+    try {
+      const { toolkitSdkInputs } = await buildExtension({ outputPath: join(root, "omo.js") })
+      expect(toolkitSdkInputs.length).toBeGreaterThan(0)
+      expect(toolkitSdkInputs.filter(input => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }, 120_000)
+
   it("#given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers", () => {
     expect(SENPI_LOADER_ALIASES).toEqual([...EXPECTED_SENPI_LOADER_ALIASES])
   })

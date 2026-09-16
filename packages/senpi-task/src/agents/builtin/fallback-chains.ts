@@ -7,48 +7,53 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 // senpi-only difference: every claude-* rung is headed by "claude-sdk-oauth", senpi's Claude subscription
 // lane, so a Claude Pro/Max login outranks the metered `opencode` lane (#8051; see the category chains
 // for the full rationale). model-core stays without it - no other edition has that provider.
+// senpi-only difference: no rung lists "openai", the metered API-key lane; "openai-codex" is the only
+// OpenAI lane (#8300; see the category chains). model-core keeps "openai" for OpenCode.
 // The ulw reviewer agents are absent by design: they resolve their model through the `categories`
 // field on their definition (see resolve-agent-categories.ts), not through a hand-mirrored chain.
+// Parity with the mirror source is enforced by omo-senpi's builtin-agent-chain-parity test (#8259).
 export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   explore: [
-    { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
+    { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
     { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
-    { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.5-plus" },
+    { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
     { providers: ["opencode-go"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go"], model: "minimax-m2.7" },
     { providers: ["claude-sdk-oauth", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
-    { providers: ["openai", "openai-codex"], model: "gpt-5.4-nano" }
+    { providers: ["openai-codex"], model: "gpt-5.4-nano" }
   ],
   librarian: [
-    { providers: ["openai", "openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
+    { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
     { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
-    { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.5-plus" },
+    { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
     { providers: ["opencode-go"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go"], model: "minimax-m2.7" },
     { providers: ["claude-sdk-oauth", "anthropic", "github-copilot"], model: "claude-haiku-4-5" },
-    { providers: ["openai", "openai-codex"], model: "gpt-5.4-nano" }
+    { providers: ["openai-codex"], model: "gpt-5.4-nano" }
   ],
   "plan-consultant": [
-    { providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+    {
+      providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "max",
+    },
     {
       providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5",
       variant: "max",
     },
     {
-      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
-    },
-    { providers: ["opencode-go"], model: "glm-5.2" },
-    { providers: ["kimi-for-coding"], model: "kimi-k3" }
+      providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+      model: "kimi-k3",
+      variant: "max",
+    }
   ],
   "plan-reviewer": [
-    { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "xhigh" },
+    { providers: ["openai-codex"], model: "gpt-6-astra", variant: "xhigh" },
     { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
-    { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "high" },
+    { providers: ["openai-codex", "opencode"], model: "gpt-6-astra", variant: "high" },
     {
       providers: ["claude-sdk-oauth", "anthropic", "github-copilot", "opencode"],
       model: "claude-opus-5",

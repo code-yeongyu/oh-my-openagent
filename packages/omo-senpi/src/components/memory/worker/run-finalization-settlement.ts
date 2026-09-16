@@ -4,6 +4,7 @@ import {
   ensureReflectionCompletion,
   readReflectionCompletion,
 } from "./completion"
+import { classifyReflectionFailure } from "./failure-policy"
 import { readReflectionHealth } from "./health"
 import {
   readRunJson,
@@ -50,10 +51,13 @@ export async function settleReservationRun(
     throw new Error(`Reflection completion identity unavailable for ${current.runId}`)
   }
   let launch
+  let park
   if (active?.runId === current.runId) {
-    const transition = await context.reservation.complete(current.runId, decision.outcome)
+    const failure = classifyReflectionFailure(decision)
+    const transition = await context.reservation.complete(current.runId, decision.outcome, failure === undefined ? undefined : { failure })
     if (transition.launch !== undefined) context.launch?.(transition.launch)
     launch = transition.launch
+    park = transition.park
   }
 
   const healthBefore = await readReflectionHealth(completionsDir)
@@ -96,6 +100,7 @@ export async function settleReservationRun(
     ...(decision.detail === undefined ? {} : { detail: decision.detail }),
     completion,
     ...(launch === undefined ? {} : { launch }),
+    ...(park === undefined ? {} : { park }),
   }
 }
 

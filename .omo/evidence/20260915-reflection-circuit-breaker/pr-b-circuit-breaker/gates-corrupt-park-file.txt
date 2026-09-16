@@ -1,0 +1,32 @@
+# gates after the fail-open park reader + park-file extraction (captured 2026-09-15T08:15:58.823Z)
+
+$ bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+exit: 0
+
+$ bunx tsgo --noEmit -p packages/memory-core/tsconfig.json
+exit: 0
+
+$ bun test packages/memory-core
+(pass) reflection persona asset > #given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present [0.11ms]
+
+ 886 pass
+ 0 fail
+ 5867 expect() calls
+Ran 886 tests across 96 files. [92.50s]
+
+$ bun test --timeout 20000 packages/omo-senpi/src/components/memory
+(pass) memory tool (read-only) > #given an unknown operation #when called #then a structured rejection names the allowed operations [143.73ms]
+
+ 1531 pass
+ 0 fail
+ 6533 expect() calls
+Ran 1531 tests across 195 files. [133.81s]
+exit: 0
+
+$ node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+exit: 0 (omo-senpi extension build is current: .../plugin/extensions/omo.js)
+
+$ node packages/omo-senpi/plugin/scripts/build-install.mjs --check
+exit: 0 (omo-senpi installer is current: .../plugin/scripts/install.mjs)
+
+pure LOC: reservation.ts 233 (was 287), park-file.ts 71, park.ts 132

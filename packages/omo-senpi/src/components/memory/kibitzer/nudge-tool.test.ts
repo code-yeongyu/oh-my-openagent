@@ -6,6 +6,8 @@ import { createKibitzerNudgeTool, KIBITZER_NUDGE_TOOL_NAME } from "./nudge-tool"
 
 const CANDIDATE_PATH = "reference/kubernetes-rollouts.md"
 const HINT = "Drain nodes before a rollout."
+/** The shape the nudge-only contract asks for: what the stored note records, not what to do. */
+const OBSERVATION = "The rollout note records that nodes are drained before a rollout."
 
 /** The candidate set deliberately includes a system/ path: the closure must refuse it even when a
  * buggy collector offers one. */
@@ -155,6 +157,34 @@ describe("createKibitzerNudgeTool", () => {
     const corrected = await tool.execute("call-fact", params(CANDIDATE_PATH, HINT))
     expect(corrected.isError).toBeUndefined()
     expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: HINT }])
+  })
+
+  test.each([
+    "Verify these before continuing.",
+    "Do not rebase the worktree while a child task writes in it.",
+    "You must keep the guard green before publishing.",
+    "머지 전에 그린 메인 가드를 확인하십시오.",
+  ])("#given the agent-addressing hint %s #when nudge is called #then the rejection names the rule and one correction still lands", async (hint) => {
+    // given
+    const { accepted, tool } = launch({ maxItems: 1 })
+
+    // when
+    const rejected = await tool.execute("call-instruction", params(CANDIDATE_PATH, hint))
+
+    // then
+    expect(rejected.isError).toBe(true)
+    const first = rejected.content[0]
+    expect(first?.type).toBe("text")
+    if (first?.type === "text") {
+      expect(first.text).toContain("addresses the agent (second person or imperative)")
+      expect(first.text).toContain("restate what the note records as a plain observation")
+    }
+    expect(accepted).toEqual([])
+
+    // and: the one correction the contract allows is accepted
+    const corrected = await tool.execute("call-observation", params(CANDIDATE_PATH, OBSERVATION))
+    expect(corrected.isError).toBeUndefined()
+    expect(accepted).toEqual([{ path: CANDIDATE_PATH, hint: OBSERVATION }])
   })
 
   test.each([

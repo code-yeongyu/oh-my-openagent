@@ -9,7 +9,7 @@ import type { ChildHandle, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 
 import type { SidecarAdmission } from "./sidecar-admission"
 import type { KibitzerOfferResult } from "./sidecar-contract"
-import { describe, type Child, type Envelope, type SidecarCore, type Turn } from "./sidecar-core"
+import { describe, type Child, type Envelope, type Payload, type SidecarCore, type Turn } from "./sidecar-core"
 import { envelopeInput, merge, payloadOf } from "./sidecar-envelope"
 import { classifyWakeEnd, startFailureEnd } from "./sidecar-outcome"
 import { renderKibitzerReseedPrompt, renderKibitzerSeedPrompt, renderKibitzerWakePrompt } from "./sidecar-prompt"
@@ -28,6 +28,36 @@ export interface WakeTransitions {
 }
 
 export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, admission: SidecarAdmission, recovery: SidecarRecovery): WakeTransitions {
+  /**
+   * The deadline fired while the child was still starting or reviving. The transition holding the
+   * per-session mutex is the very I/O this bounds, so the abort cannot queue behind it: the turn is
+   * settled inline - lease handed back, wake reported as `deadline` - and the transition disposes
+   * the handle that eventually arrives.
+   */
+  async function abandonPendingStart(turn: Turn): Promise<void> {
+    if (turn.abort !== undefined) return
+    turn.abort = "deadline"
+    turns.clearDeadline(turn)
+    await admission.releaseLease(turn)
+    turns.report(turn, { status: "deadline" }, [], undefined)
+  }
+
+  /** What the transition returns once its child I/O finally lands behind an abandoned deadline. */
+  function abandoned(payload: Payload): KibitzerOfferResult {
+    // No child read the envelope: its events and candidates ride the retry, as a start failure's do.
+    core.carry = [payload]
+    recovery.enterBackoff()
+    return { action: "buffered", reason: "backoff" }
+  }
+
+  function disposeHandle(handle: ChildHandle, generation: number): void {
+    try {
+      handle.dispose()
+    } catch (error) {
+      core.warn("omo-senpi kibitzer sidecar dispose failed", { generation, error: describe(error) })
+    }
+  }
+
   function beginTurn(current: Child, turn: Turn, envelope: Envelope): void {
     turn.envelopes.push(envelope)
     current.charsSent += envelope.text.length
@@ -64,16 +94,29 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
       nudge: { offered: core.offered, surfaced: core.surfaced, maxItems, accepted: () => core.accepted },
       budget: () => core.budget,
     })
+    // Armed before the I/O it bounds: a `startChild` that never returns holds the machine-wide wake
+    // lease and this session's mutex, so nothing downstream could ever cut it off.
+    turns.armDeadline(turn, () => {
+      void abandonPendingStart(turn)
+    })
     let handle: ChildHandle
     try {
       handle = await core.options.startChild({ sessionId: core.sessionId, generation, prompt, tools: tools.tools, maxItems })
     } catch (error) {
+      if (turn.abort === "deadline") return abandoned(payload)
       // No child read the envelope and nothing was offered: its events and candidates ride the retry.
+      turns.clearDeadline(turn)
       core.carry = [payload]
       await admission.releaseLease(turn)
       turns.report(turn, startFailureEnd(error), [], undefined)
       recovery.enterBackoff()
       return { action: "buffered", reason: "backoff" }
+    }
+    if (turn.abort === "deadline") {
+      // The wake is already settled and reported: the child that finally arrived begins no turn.
+      await turns.abortHandle(handle, "deadline")
+      disposeHandle(handle, generation)
+      return abandoned(payload)
     }
     core.generations = generation
     core.pendingReseed = undefined
@@ -94,15 +137,29 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
     turn.lease = admitted.lease
     turn.slotWaitMs = admitted.waitedMs
     turns.offerPaths(fresh, turn.wake)
+    turns.armDeadline(turn, () => {
+      void abandonPendingStart(turn)
+    })
     try {
       await current.handle.followUp(text)
     } catch (error) {
+      if (turn.abort === "deadline") {
+        recovery.disposeChild()
+        return abandoned(payload)
+      }
+      turns.clearDeadline(turn)
       core.carry = [payload]
       await admission.releaseLease(turn)
       turns.report(turn, { status: "failed", cause: "child_failed", reason: describe(error) }, [], current)
       recovery.disposeChild()
       recovery.enterBackoff()
       return { action: "buffered", reason: "backoff" }
+    }
+    if (turn.abort === "deadline") {
+      // A revival that outlived the deadline leaves a child running a turn nobody is watching.
+      await turns.abortHandle(current.handle, "deadline")
+      recovery.disposeChild()
+      return abandoned(payload)
     }
     beginTurn(current, turn, { text, payload, steered: false, consumed: true })
     return { action: "followed_up", wake: turn.wake }

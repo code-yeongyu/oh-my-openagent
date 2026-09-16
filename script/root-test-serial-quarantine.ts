@@ -55,6 +55,10 @@ export const ROOT_TEST_SERIAL_QUARANTINE: readonly SerialQuarantineEntry[] = [
     path: "script/build-omo-binary.test.ts",
     reason: "runs a real omo-native plugin staging build against the same shared plugin tree",
   },
+  {
+    path: "packages/senpi-task/src/team/member-extension/residency.test.ts",
+    reason: "cold real-process member revival is starved by concurrent Windows filesystem load under --parallel (run 34958448646)",
+  },
 ] as const
 
 /** Quarantined paths in workflow/bunfig order. */

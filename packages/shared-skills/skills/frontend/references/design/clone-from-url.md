@@ -8,7 +8,7 @@ A `DESIGN.md` whose every token, interaction state, and motion value was read fr
 
 ## Phase 1 — Extract the runtime truth (never guess a value)
 
-Drive a real browser: Codex `browser:control-in-app-browser` first, otherwise the project's `agent-browser` / playwright / dev-browser tooling. Do NOT parse CSS files — minification, CORS, CSS-in-JS, and Tailwind utilities make source unreliable. `getComputedStyle` returns what the browser ACTUALLY rendered, so it is the only source of truth.
+Drive a real browser from js eval: `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need installed Chrome/Chromium/Edge), otherwise write and run a `playwright-core` script against local Chrome (`channel: "chrome"`). Use that script lane for Chrome semantics, stealth, trace, or auth, with persistent contexts on CLONED profiles only. Codex: `browser:control-in-app-browser`. Do NOT parse CSS files — minification, CORS, CSS-in-JS, and Tailwind utilities make source unreliable. `getComputedStyle` returns what the browser ACTUALLY rendered, so it is the only source of truth.
 
 Sweep the page and read, for every meaningful element and every repeated pattern:
 

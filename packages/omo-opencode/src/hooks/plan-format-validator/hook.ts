@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import type { PluginInput } from "@opencode-ai/plugin"
@@ -15,6 +15,94 @@ const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX]?\]/
 const TODO_TASK = /^- \[[ xX]\] [1-9]\d*\. .+$/
 const FINAL_WAVE_TASK = /^- \[[ xX]\] F[1-9]\d*\. .+$/i
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
+
+/**
+ * The five Effort bands the plan template offers. Effort is a size signal, never a wall-clock
+ * estimate: a plan that says "200 hours" is model prose, not a measurement.
+ */
+export const PLAN_EFFORT_BANDS = ["Quick", "Short", "Medium", "Large", "XL"] as const
+export type PlanEffortBand = (typeof PLAN_EFFORT_BANDS)[number]
+
+const EFFORT_LINE = /^(\*\*Effort:\*\*[ \t]*)(.*)$/
+const DURATION_VALUE = /(\d+(?:[.,]\d+)?)\s*(?:-|–|to)?\s*(\d+(?:[.,]\d+)?)?\s*(min(?:ute)?s?|h(?:ou)?rs?|d(?:ay)?s?|w(?:ee)?ks?|mo(?:nth)?s?)\b/i
+
+const HOURS_PER_UNIT: Readonly<Record<string, number>> = {
+  min: 1 / 60,
+  h: 1,
+  d: 8,
+  w: 40,
+  mo: 160,
+}
+
+// Upper bound of agent-hours a band stands for; anything past the last bound is XL.
+const BAND_UPPER_BOUND_HOURS: readonly (readonly [PlanEffortBand, number])[] = [
+  ["Quick", 1],
+  ["Short", 4],
+  ["Medium", 16],
+  ["Large", 40],
+]
+
+function unitKey(unit: string): string {
+  const lower = unit.toLowerCase()
+  if (lower.startsWith("mi")) return "min"
+  if (lower.startsWith("mo")) return "mo"
+  return lower.charAt(0)
+}
+
+/** Maps a written duration ("200 hours", "3 days", "2-3 weeks") to the band that bounds it. */
+export function effortBandForDuration(value: string): PlanEffortBand | null {
+  const match = value.match(DURATION_VALUE)
+  if (match === null) return null
+  const upper = (match[2] ?? match[1] ?? "").replace(",", ".")
+  const unit = match[3] ?? ""
+  const hours = Number.parseFloat(upper) * (HOURS_PER_UNIT[unitKey(unit)] ?? 1)
+  if (!Number.isFinite(hours)) return null
+  for (const [band, bound] of BAND_UPPER_BOUND_HOURS) {
+    if (hours <= bound) return band
+  }
+  return "XL"
+}
+
+type EffortNormalization = {
+  readonly content: string
+  readonly original: string
+  readonly band: PlanEffortBand
+}
+
+/**
+ * Rewrites an `**Effort:**` value that carries a duration to the bounding band. Band values,
+ * localized labels, and anything without a number+unit are left alone.
+ */
+export function normalizePlanEffort(content: string): EffortNormalization | null {
+  const lines = content.split(/\r?\n/)
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? ""
+    const match = line.match(EFFORT_LINE)
+    if (match === null) continue
+    const prefix = match[1] ?? ""
+    const value = (match[2] ?? "").trim()
+    const band = effortBandForDuration(value)
+    if (band === null) return null
+    lines[index] = `${prefix}${band}`
+    const newline = content.includes("\r\n") ? "\r\n" : "\n"
+    return { content: lines.join(newline), original: value, band }
+  }
+  return null
+}
+
+function buildEffortWarning(normalized: EffortNormalization): string {
+  return [
+    "",
+    "<plan-format-warning>",
+    `Effort was written as a duration (\`${normalized.original}\`) and has been replaced with the band \`${normalized.band}\`.`,
+    "Effort is a size band, never a wall-clock estimate. Use exactly one of:",
+    "  Quick (single edit, minutes of agent work) | Short (one focused change, a few files)",
+    "  | Medium (multi-file feature in one session) | Large (several waves, one long session)",
+    "  | XL (multi-session or architectural work).",
+    "Size is communicated by the counted todo rows; do not write hours or days.",
+    "</plan-format-warning>",
+  ].join("\n")
+}
 
 type SectionName = "todo" | "final-wave"
 
@@ -180,7 +268,18 @@ export function createPlanFormatValidatorHook(_ctx: PluginInput) {
       const resolvedPath = resolve(_ctx.directory, filePath)
       if (!existsSync(resolvedPath)) return
 
-      const content = readFileSync(resolvedPath, "utf-8")
+      let content = readFileSync(resolvedPath, "utf-8")
+      const effort = normalizePlanEffort(content)
+      if (effort !== null) {
+        content = effort.content
+        writeFileSync(resolvedPath, content, "utf-8")
+        log(`[plan-format-validator] Plan ${filePath}: Effort "${effort.original}" normalized to ${effort.band}`, {
+          sessionID: input.sessionID,
+          filePath,
+        })
+        output.output = `${output.output}${buildEffortWarning(effort)}`
+      }
+
       const formatStats = analyzeStructuredSections(content)
       if (!formatStats.recognized) return
 

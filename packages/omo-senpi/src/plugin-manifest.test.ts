@@ -40,7 +40,7 @@ function adapterVersionIfPresent(): string | undefined {
 }
 
 describe("OMO Senpi plugin manifest", () => {
-  it("#given a Pi package manifest #when loaded #then it points at exactly one bundled extension and skills directory", () => {
+  it("#given a Pi package manifest #when loaded #then it points at exactly one bundled extension and no manifest skills", () => {
     const manifest = readJsonObject(pluginManifestPath)
     const pi = manifest.pi
 
@@ -50,9 +50,10 @@ describe("OMO Senpi plugin manifest", () => {
     }
 
     expect(Reflect.get(pi, "extensions")).toEqual(["./extensions/omo.js"])
-    // skills-conditional ships in `files` but must NOT join pi.skills: the conditional x-search
-    // skill is contributed at runtime only when an xAI credential exists.
-    expect(Reflect.get(pi, "skills")).toEqual(["./skills"])
+    // Bundled skills are contributed at runtime through resources_discover (bundled-skills
+    // component) so `disabled_skills` can hide them; a manifest entry would load every skill
+    // unfiltered on the launcher's --extension path. skills-conditional stays runtime-only too.
+    expect(Reflect.has(pi, "skills")).toBe(false)
     expect(Reflect.has(pi, "hooks")).toBe(false)
   })
 

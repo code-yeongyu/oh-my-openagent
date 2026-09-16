@@ -6,7 +6,7 @@ const BASE_URL = "https://omo.dev"
  * Public, localized routes only. The primitive showcase `/design` (rendered only when
  * OMO_WEB_SHOWCASE=1, see app/design/page.tsx) is intentionally not listed here.
  */
-const PUBLIC_ROUTES = ["", "/docs", "/manifesto"]
+const PUBLIC_ROUTES = ["", "/docs", "/manifesto", "/manifesto/2026-01"]
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const locales = ["en", "ko", "ja", "zh"]

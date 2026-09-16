@@ -84,9 +84,9 @@ Delegation goes through the `task` tool. Four curated read-only agents have thei
 
 | Agent | Job | Primary | Chain |
 | --- | --- | --- | --- |
-| `explore` | Fast codebase grep and pattern discovery | `gpt-5.6-luna-fast` (low) | `openai\|openai-codex/gpt-5.6-luna-fast (low)` -> `deepseek/deepseek-v4-flash (max)` -> `opencode-go\|bailian-coding-plan/qwen3.5-plus` -> cheaper utility rungs -> `anthropic\|github-copilot/claude-haiku-4-5` -> `openai\|openai-codex/gpt-5.4-nano` |
+| `explore` | Fast codebase grep and pattern discovery | `gpt-5.6-luna-fast` (low) | `openai\|openai-codex/gpt-5.6-luna-fast (low)` -> `deepseek/deepseek-v4-flash (max)` -> `opencode-go\|bailian-coding-plan/qwen3.7-plus` -> cheaper utility rungs -> `anthropic\|github-copilot/claude-haiku-4-5` -> `openai\|openai-codex/gpt-5.4-nano` |
 | `librarian` | Documentation and OSS code search | `gpt-5.6-luna-fast` (low) | Same chain as `explore`. |
-| `plan-consultant` | Pre-planning gap analysis for `/ulw-plan` | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` -> `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` -> `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` -> `opencode-go/glm-5.2` -> `kimi-for-coding/kimi-k3` |
+| `plan-consultant` | Pre-planning gap analysis for `/ulw-plan` | `claude-fable-5-1` (max) | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` -> `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` -> `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)` |
 | `plan-reviewer` | One-shot plan review against clarity, verification, and context criteria | `gpt-6-astra` (xhigh) | `openai\|openai-codex/gpt-6-astra (xhigh)` -> `github-copilot/gpt-6-astra (high)` -> `openai\|openai-codex\|opencode/gpt-6-astra (high)` -> `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` -> two lower rungs listed in the source file -> `opencode-go/glm-5.2` |
 
 The utility rungs elided above are cheap fast models; read the source file for the exact list. They exist so the system degrades gracefully when you don't hold every subscription. If you have a paid tier connected, it's always preferred.
@@ -101,7 +101,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-For a scarce Claude Fable 5 allocation, `plan-consultant` is the default value-per-token placement: it runs before the plan is finalized and can prevent expensive downstream work.
+For a scarce Claude Fable 5 allocation, `plan-consultant` is the default value-per-token placement: it runs before the plan is finalized and can prevent expensive downstream work. The builtin chain already heads it with Claude Fable 5.1 at `max`; pin a lower effort when the allocation is tight:
 
 ```jsonc
 {

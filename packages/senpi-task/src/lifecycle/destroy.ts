@@ -23,6 +23,9 @@ export async function destroyResidentTask(
 ): Promise<void> {
   const claimedEviction = cause === "evict" ? (context.registry.tryClaimEviction?.(taskId) ?? true) : false
   if (cause === "evict" && !claimedEviction) return
+  // Deliberate teardown drops the child's runtime parent kernel-tool binding: nothing may keep a
+  // strong reference to a kernel this child can never be revived onto. Parking never lands here.
+  if (cause !== "fallback_handoff") context.kernelToolBindings?.release(taskId)
   try {
     const handle = context.registry.get(taskId)
     if (handle !== undefined) {

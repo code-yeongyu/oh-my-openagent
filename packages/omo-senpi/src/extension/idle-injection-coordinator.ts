@@ -1,4 +1,4 @@
-export type IdleInjectionSource = "task-completion" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
+export type IdleInjectionSource = "task-completion" | "workpool-aggregate" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
 
 export interface IdleInjection {
   // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
@@ -58,6 +58,7 @@ export class IdleInjectionRetiredError extends Error {
 // flush leads with the most immediate child completion context.
 const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
   "task-completion": 0,
+  "workpool-aggregate": 0,
   "team-message": 1,
   "team-liveness": 2,
   "boulder-continuation": 3,

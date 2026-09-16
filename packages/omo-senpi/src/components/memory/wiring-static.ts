@@ -25,6 +25,7 @@ import { registerMemoryToolSurface } from "./tools"
 import {
   registerReflectionCompletionRenderer,
   registerReflectionHealthRenderer,
+  registerReflectionParkedRenderer,
   type ReflectionCompletionApi,
 } from "./worker"
 import { branchEntryCount, sessionIdFrom } from "./wiring-context"
@@ -72,6 +73,7 @@ export function registerMemoryStatic(input: {
   if (api !== undefined) {
     registerReflectionCompletionRenderer(api)
     registerReflectionHealthRenderer(api)
+    registerReflectionParkedRenderer(api)
   }
   if (hasMemoryCapabilities(pi)) {
     nudgeWiring.register(pi)
@@ -187,6 +189,7 @@ export function registerMemoryStatic(input: {
           ...(request.conversationIds === undefined ? {} : { conversationIds: request.conversationIds }),
         })
         if (result === null) throw new Error("reflection reservation rejected")
+        if (result.status === "parked") throw new Error("manual reflection must bypass the park gate")
         if (result.status === "active") {
           runtime.launch(result.run)
           await onReflectionLaunch?.(identity.identity, result.run)

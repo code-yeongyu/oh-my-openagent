@@ -63,7 +63,7 @@ export default async function policyContinuationExtension(pi: QaAPI): Promise<vo
 
   const context = { logger, config: { getFlag: () => false }, idleCoordinator: coordinator }
   await createUlwExecuteContinuationComponent().register(pi, context)
-  await createUlwLoopComponent({ resolveOmoBin: () => toolkit }).register(pi, context)
+  await createUlwLoopComponent().register(pi, context)
   // Recorded AFTER the components register, so each line reports the queue state the hooks left
   // behind on that edge. `hook_compact` is the host's own compaction interaction.
   pi.on("agent_end", (event) => record({ type: "hook_end", event, pending: coordinator.pendingCount() }))

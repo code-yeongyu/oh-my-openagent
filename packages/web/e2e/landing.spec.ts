@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test"
 
+import { scrollSecret } from "./secret-reading-state"
+
 const STORY_SECTIONS = [
   "secret",
   "ultrawork",
@@ -97,6 +99,43 @@ test.describe("Landing Page", () => {
     expect(new Set(names.map((n) => n.trim())).size).toBe(13)
   })
 
+  test("scrubs the secret words continuously across the full view range", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const litText = page.locator('[data-section="secret"] .lit-progress')
+    await page.locator('[data-section="secret"] .lit-progress.lit-scroll').waitFor()
+    await page.evaluate(() => document.fonts.ready)
+
+    const sampleAt = async (target: number) => {
+      const top = await litText.evaluate((node, progress) => {
+        const rect = node.querySelector(".lit-text")!.getBoundingClientRect()
+        const startTop = innerHeight * 0.8
+        const endTop = innerHeight * 0.5 - rect.height
+        return scrollY + rect.top - startTop + progress * (startTop - endTop)
+      }, target)
+      await page.evaluate(scrollSecret, top)
+      return litText.evaluate((node) => ({
+        progress: Number.parseFloat(getComputedStyle(node).getPropertyValue("--lit-p")),
+        partialWords: Array.from(node.querySelectorAll(".lit-word")).filter((word) => {
+          const position = Number.parseFloat(getComputedStyle(word).backgroundPositionX)
+          return position > 0 && position < 100
+        }).length,
+      }))
+    }
+
+    const early = await sampleAt(0.25)
+    const middle = await sampleAt(0.6)
+    const complete = await sampleAt(1)
+    const rangeEnd = await litText.evaluate((node) => getComputedStyle(node).animationRangeEnd)
+
+    expect(early.progress).toBeLessThan(middle.progress)
+    expect(middle.progress).toBeLessThan(complete.progress)
+    expect(middle.progress).toBeGreaterThan(0.1)
+    expect(middle.progress).toBeLessThan(0.9)
+    expect(middle.partialWords).toBeGreaterThan(0)
+    expect(rangeEnd).not.toBe("entry 0px")
+  })
+
   test("keeps the story readable under reduced motion", async ({ page }) => {
     // given
     await page.emulateMedia({ reducedMotion: "reduce" })
@@ -106,15 +145,15 @@ test.describe("Landing Page", () => {
     const marquee = page.getByTestId("model-marquee").locator(".marquee-track").first()
     await marquee.scrollIntoViewIfNeeded()
     const animation = await marquee.evaluate((node) => getComputedStyle(node).animationName)
-    const litWords = page.locator('[data-section="secret"] .lit-word')
-    await litWords.first().scrollIntoViewIfNeeded()
-    const faintWords = await litWords.evaluateAll(
-      (nodes) => nodes.filter((node) => !node.classList.contains("is-lit")).length,
+    const litText = page.locator('[data-section="secret"] .lit-progress')
+    await litText.scrollIntoViewIfNeeded()
+    const litProgress = await litText.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("--lit-p").trim(),
     )
 
     // then
     expect(animation).toBe("none")
-    expect(faintWords).toBe(0)
+    expect(litProgress).toBe("1")
   })
 
   test("runs independent Kibitzer loops and inserts a static nudge under reduced motion", async ({

@@ -1,7 +1,9 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition, SkillInvocationState } from "../../agents"
+import type { KernelToolErrorCode } from "../../kernel-tools/contract"
 import type { TaskManager } from "../../manager"
+import type { RunnerFailure } from "../../runners/in-process/child-handle"
 import type { ResolvedModelRecord, TaskRunStats } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
@@ -12,6 +14,9 @@ export type TaskToolContext = {
   readonly cwd: string
   readonly sessionManager: { getSessionId(): string }
   readonly getPromptCacheSafeWaitSeconds?: () => number | undefined
+  // Transient parent JS kernel-tool capability, present only while a live JavaScript eval owns this
+  // tool call. Read structurally (readKernelToolsCapability) so the engine pin may predate it.
+  readonly kernelTools?: unknown
 }
 
 // Parent-session ancestry the tool folds into the child spawn: the child's depth is the parent's
@@ -65,6 +70,10 @@ export type TaskToolDeps = {
   // Session-scoped skill-invocation state for plan-gated agents (plan-consultant/plan-reviewer). When absent the
   // invocation gate fails CLOSED: without a resolver there is no proof ulw-plan was invoked.
   readonly resolveSkillInvocations?: (sessionId: string) => SkillInvocationState
+  // The names a child of THIS parent already carries (session builtins plus merged custom tools).
+  // A kernel-tool grant is decided against them before any child exists; absent falls back to the
+  // senpi session builtins (runners/in-process/host-tools.ts).
+  readonly resolveChildToolNames?: () => readonly string[]
 }
 
 export type TaskToolMode = "spawn"
@@ -82,8 +91,28 @@ export type ResolvedSpawnItem =
   | (ResolvedSpawnItemBase & { readonly kind: "category"; readonly category: string })
   | (ResolvedSpawnItemBase & { readonly kind: "subagent_type"; readonly subagentType: string })
 
+export type TaskHandleDetails = {
+  readonly task_id: string
+  readonly run_epoch: number
+}
+
+/**
+ * Machine-readable outcome of a `tools` request:
+ * - "granted": the child was created carrying those wrappers;
+ * - "refused": a typed refusal, always with a code (nothing was granted);
+ * - "not_delivered": the spawn never started, so the resolved grant reached no child.
+ * `granted` is only ever present on the granted status - a failed spawn never claims one.
+ */
+export type TaskKernelToolsDetail = {
+  readonly requested: readonly string[]
+  readonly status: "granted" | "refused" | "not_delivered"
+  readonly granted?: readonly string[]
+  readonly error?: { readonly code: KernelToolErrorCode; readonly message: string }
+}
+
 export type TaskToolItemDetail = {
   readonly task_id: string
+  readonly run_epoch?: number
   readonly task_summary?: string
   readonly name?: string
   readonly category?: string
@@ -99,6 +128,7 @@ export type TaskToolItemDetail = {
 
 export type TaskToolDetails = {
   readonly task_id: string
+  readonly run_epoch?: number
   readonly status: string
   readonly mode: TaskToolMode
   readonly task_summary?: string
@@ -112,9 +142,13 @@ export type TaskToolDetails = {
   readonly run_in_background?: boolean
   readonly queue_position?: number
   readonly items?: readonly TaskToolItemDetail[]
+  // The runner's typed failure kind when a start failed, so the caller can tell a refused parent
+  // kernel-tool grant from a generic runner failure without reading prose.
+  readonly failure_kind?: RunnerFailure["kind"]
   readonly reason?: string
   readonly run_stats?: TaskRunStats
   readonly skills?: TaskSkillSummary
+  readonly kernel_tools?: TaskKernelToolsDetail
 }
 
 export type { TaskToolParamsStatic }

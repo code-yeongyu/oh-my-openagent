@@ -3,6 +3,8 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { KernelToolGrant } from "../kernel-tools/resolve"
 import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type {
   CancelOptions,
@@ -15,6 +17,9 @@ import type {
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
 import type { ExecutionMode } from "./execution-mode"
+import type { TaskConcurrency } from "./concurrency"
+import type { RunnerFailure } from "../runners/in-process/child-handle"
+import type { WorkpoolEngine } from "../workpool/engine"
 
 export type { ExecutionMode } from "./execution-mode"
 
@@ -45,6 +50,9 @@ export type ManagedStartSpec = {
   // the executable definitions against the live parent registries.
   readonly memberScopedToolNames?: readonly string[]
   readonly memberScopedTools?: readonly ToolDefinition[]
+  // TRANSIENT parent kernel-tool grant (item 6). Process-lifetime only: never persisted onto the
+  // record or the v1 spawn_spec, which carry plain launch data exclusively.
+  readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
 }
@@ -77,6 +85,8 @@ export type ManagerStartSpec = {
   readonly allowed_subagents?: readonly string[]
   readonly run_in_background?: boolean
   readonly memberScopedTools?: readonly ToolDefinition[]
+  // TRANSIENT parent kernel-tool grant resolved by the caller against its LIVE capability.
+  readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
 }
@@ -121,6 +131,8 @@ export type StartResult =
   | {
       readonly kind: "started"
       readonly task_id: string
+      // Emitted by the manager; optional for existing host implementations of TaskManager.
+      readonly run_epoch?: number
       readonly status: "running" | "pending"
       readonly name: string
       readonly resolved_model?: ResolvedModelRecord
@@ -145,6 +157,9 @@ export type StartResult =
       readonly resolved_model?: ResolvedModelRecord
       readonly run_in_background: boolean
       readonly error_message: string
+      // The runner's typed failure kind (RunnerFailure["kind"]) when the runner rejected the start,
+      // so a caller can classify the refusal without parsing the sanitized message.
+      readonly failure_kind?: RunnerFailure["kind"]
     }
   | { readonly kind: "residency_denied"; readonly reason: string }
 
@@ -186,6 +201,7 @@ export type TrustedRespawnLaunch = {
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
 export type TaskManagerOptions = {
+  readonly concurrency?: TaskConcurrency
   readonly store: TaskRecordStore
   readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
   readonly planner: ChildPlanner
@@ -204,9 +220,15 @@ export type TaskManagerOptions = {
   // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
   // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
   readonly hostPid?: number
+  // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so
+  // a same-host parked child revives onto the same live parent closures; absent = no kernel tools.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
+  // The names a child of this parent already carries (same list the task tool grant reads).
+  readonly resolveChildToolNames?: () => readonly string[]
 }
 
 export type TaskManager = {
+  readonly workpools?: WorkpoolEngine
   start(spec: ManagerStartSpec): Promise<StartResult>
   startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined

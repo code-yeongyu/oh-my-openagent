@@ -1,5 +1,6 @@
 import { createAstGrepComponent } from "../components/ast-grep"
 import { createBuiltinMcpsComponent } from "../components/builtin-mcps"
+import { createBundledSkillsComponent } from "../components/bundled-skills"
 import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
@@ -26,6 +27,10 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createConfigStartupComponent(),
     // After config-startup so configuration diagnostics print before the profile notice.
     createModelProfileComponent(),
+    // Skill availability is resolved before the startup UI components run, and it stays
+    // outside the native-badge -> onboarding -> advisor adjacency that session-start
+    // ordering pins (session-start-ordering.test.ts).
+    createBundledSkillsComponent(),
     createNativeBadgeComponent(),
     createOnboardingComponent(),
     createInitDeepAdvisorComponent(),

@@ -1,127 +1,113 @@
-# Tier 2 — Chrome stealth (CloakBrowser + agent-browser)
+# Tier 2 — Chrome stealth through playwright-core scripts
 
-Real interaction (clicks, forms, screenshots, video, persistent login) for pages that defeat Tier 1/1.5. Two runtime tools, both installed on demand — neither is vendored in this skill:
-
-- **CloakBrowser** (`pip`) — stealth Chromium with source-level C++ fingerprint patches. The Python wrapper source is MIT; the downloaded Chromium binary is covered by CloakBrowser's separate binary license and is not redistributed by this package. Passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors. Pin **0.5.7**.
-- **agent-browser** (`npm`, Apache-2.0) — native CDP automation CLI that drives CloakBrowser. AX-tree snapshots, `@eN` refs, click/fill/type/scroll, screenshots, video, cookie/state/session management. Pin **0.34.0**.
-
-```
-CloakBrowser (stealth Chromium) <- CDP port 9242 -> agent-browser CLI
-  - 57 C++ fingerprint patches                  - AX-tree snapshots, @eN refs
-  - Canvas/WebGL consistency                    - click / fill / type / scroll
-  - navigator.webdriver = false at C++ source   - screenshot, video record
-  - Humanize mode (mouse curves, timing)        - cookie / state / session mgmt
-```
+For real-Chrome semantics, stealth, traces, or authenticated sessions, WRITE a
+script and run it from the js-eval kernel. Use installed local Chrome, not a
+managed browser download. Ordinary macOS captures on a Bun >= 1.4 kernel use
+`new Bun.WebView()`; Linux/Windows WebView needs installed Chrome/Chromium/Edge.
+Codex's ordinary browser surface is `browser:control-in-app-browser`.
 
 ## Install (one-time)
 
-CloakBrowser runs in a dedicated Python venv. Cross-platform: macOS, Linux, and Windows all supported by both tools (use the venv path convention for your OS).
+Only the user installs these script dependencies, once in the skill's engine
+directory. Stealth plugins run inside scripts, never inside WebView:
 
-The venv lives at a fixed path so every session reuses one stealth-Chromium download instead of creating a new venv per working directory, and every command below calls its interpreter by absolute path — no `activate` step to forget.
-
-```bash
-# CloakBrowser (MIT wrapper source; separate binary license, pin 0.5.7):
-VENV="$HOME/.agents/cloak-venv"          # Windows: %USERPROFILE%\.agents\cloak-venv
-uv venv "$VENV" --python 3.13
-uv pip install --python "$VENV/bin/python" "cloakbrowser==0.5.7"
-"$VENV/bin/python" -c "import cloakbrowser; cloakbrowser.ensure_binary()"   # downloads stealth Chromium on first import
-
-# agent-browser (Apache-2.0, pin 0.34.0):
-bun add -g agent-browser@0.34.0 && agent-browser install
-agent-browser --version   # 0.34.0
+```sh
+cd "$SKILL_DIR/engine"
+test -f package.json || cp templates/package.json package.json
+bun add playwright-core@1.62.1 playwright-extra@4.3.6 puppeteer-extra-plugin-stealth@2.11.2
 ```
 
-Verify CloakBrowser:
-
-```bash
-"$VENV/bin/python" -c "import cloakbrowser; print(cloakbrowser.__version__, cloakbrowser.CHROMIUM_VERSION, cloakbrowser.binary_info()['installed'])"
-# -> 0.5.7  <chromium-version>  True
-```
+Chrome must already be installed. The bundled `templates/playwright_real_chrome.js`
+and `templates/playwright_mobile_chrome.js` resolve these dependencies from their
+parent engine directory. Without optional plugins, templates report the fallback
+and use plain `playwright-core`; do not call that fallback stealth.
 
 ## Launch + drive
 
-NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state everywhere. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch with the clone as the user-data-dir; run any clearing on the clone only.
+Close the source browser before cloning its user-data directory for a consistent
+copy. Preserve its `Local State` alongside the selected profile. Use a private,
+task-owned clone, never the live user-data-dir. NEVER clear the live profile's
+cookies, cache, or site data. For unauthenticated QA, use a fresh task-owned profile.
 
-```bash
-# 1. Launch CloakBrowser with CDP on :9242 (background). cloakbrowser lives only in the venv,
-#    so call its interpreter by absolute path — this works in any shell, activated or not:
-"$HOME/.agents/cloak-venv/bin/python" -c "import asyncio,cloakbrowser; asyncio.run(cloakbrowser.launch_async(headless=False, stealth_args=True, args=['--remote-debugging-port=9242']))" &
+Write `capture.cjs` in the engine directory. `clonePath`, URL, and output path are
+arguments owned by this QA run; keep cookie values out of argv and logs:
 
-# 2. CloakBrowser launches tabless -> agent-browser would say "No page found".
-#    Open the first tab via CDP before any agent-browser command:
-curl -s -X PUT "http://127.0.0.1:9242/json/new?https://example.com"
+```js
+const { chromium: core } = require('playwright-core');
+const { addExtra } = require('playwright-extra');
+const stealth = require('puppeteer-extra-plugin-stealth');
+const [clonePath, url, pngPath] = process.argv.slice(2);
+const chromium = addExtra(core);
+chromium.use(stealth());
 
-# 3. Connect agent-browser. CloakBrowser already patches navigator.webdriver=false at the
-#    C++ source, so NO --init-script is required — only --user-agent to hide HeadlessChrome:
-agent-browser --cdp 9242 \
-  --user-agent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.7680.177 Safari/537.36" \
-  open https://example.com
-
-# 4. Interact:
-agent-browser --cdp 9242 snapshot -i        # interactive elements (@eN refs)
-agent-browser --cdp 9242 click @e3
-agent-browser --cdp 9242 screenshot out.png
-
-# 5. Close when done:
-agent-browser --cdp 9242 close
+async function capture() {
+  const context = await chromium.launchPersistentContext(clonePath, {
+    channel: 'chrome',
+    headless: true,
+    args: ['--disable-blink-features=AutomationControlled'],
+    ignoreDefaultArgs: ['--enable-automation'],
+    viewport: { width: 1280, height: 720 },
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+    await page.screenshot({ path: pngPath });
+    console.log(JSON.stringify({ pngPath, webdriver: await page.evaluate(() => navigator.webdriver) }));
+  } finally {
+    await context.close();
+  }
+}
+capture().catch((error) => { console.error(error); process.exitCode = 1; });
 ```
 
-agent-browser ships its own always-version-matched usage guide — load it instead of guessing flags:
+Run the script from js eval with a bounded process lifetime:
 
-```bash
-agent-browser skills get core            # core workflows, patterns, troubleshooting
-agent-browser skills get core --full     # + full command reference and templates
-agent-browser skills get electron        # Electron apps (VS Code, Slack, Discord, Figma, ...)
-agent-browser skills list                # everything available on the installed version
+```js
+const { promisify } = await import('node:util')
+const { execFile } = await import('node:child_process')
+const result = await promisify(execFile)('node', [scriptPath, clonePath, url, pngPath], { timeout: 45000 })
+console.log(result.stdout)
 ```
+
+For extraction, run a bundled template the same way, supplying its JSON input on
+stdin (`url`, `profileDir: clonePath`, `waitSelector`, `headless`). The template
+returns HTML on stdout. For traces, use `context.tracing.start()` before navigation
+and `context.tracing.stop({ path: tracePath })` before closing. Use `headless: false`
+only with an available display when headed behavior is the criterion.
 
 ## Verify stealth
 
-```bash
-agent-browser --cdp 9242 eval 'navigator.webdriver'   # must print false
-```
-
-Verified 2026-07 with CloakBrowser 0.5.7 + agent-browser 0.34.0: `navigator.webdriver` reads the boolean false with no init-script, bot.sannysoft.com all-green, browserscan.net "Normal" (15/15), nowsecure.nl Turnstile bypassed.
-
-> **agent-browser 0.33.x behavior note:** the daemon now defaults to a 1-hour idle timeout (saves restore state, closes the browser, exits after 1 h of no commands). Set `AGENT_BROWSER_IDLE_TIMEOUT_MS=0` to restore the old always-persist behavior. External WebSocket stream consumers see latest-wins frame delivery; `record` (CDP) and the dashboard are unaffected.
+Inspect the page, screenshot, and requested content. `navigator.webdriver === false`
+checks one browser property, NOT a promise to pass a detector or challenge.
+Persistent challenge pages or missing content are failures, even if the script
+exits zero. Do not keep retrying or silently swap browser tooling.
 
 ## Cookie login (cross-platform)
 
-`scripts/extract_cookies.py` reads cookies from a local browser profile and optionally injects them into the running CDP session. Profile-path resolution and value decryption are per-OS:
+`scripts/extract_cookies.py` exports local-browser cookies with owner-only `0600`
+permissions. Keep exports private and never commit them. For a persistent context,
+load the exported cookies with `context.addCookies(...)`, then navigate/reload.
+Browser- or device-bound login tokens may not transfer to a clone.
 
-| OS | Profile location | Cookie value decryption |
-|----|------------------|--------------------------|
-| macOS | `~/Library/Application Support/<app>/` | Keychain (AES-128-CBC, PBKDF2 salt `saltysalt`) |
-| Linux | `~/.config/<app>/` (Chromium), `~/.mozilla/firefox/` (Firefox) | libsecret/SecretService, then PBKDF2 + AES-128-CBC |
-| Windows | `%LOCALAPPDATA%\<app>\User Data\` | DPAPI (`CryptUnprotectData`) + AES-256-GCM (`os_crypt` key) |
-
-```bash
-# Extract to a file:
-mkdir -p ~/.local/state/omo-cookies
-python3 ../scripts/extract_cookies.py --browser chrome --domain youtube.com --output ~/.local/state/omo-cookies/youtube.cookies.json
-# Extract and inject into the running CDP session:
-python3 ../scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
-```
-
-Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv, so live cookie values do not appear in process listings. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens (SIDTS) that may not transfer across browser profiles. Firefox-family profiles store cookies unencrypted; Chromium-family profiles trigger a one-time OS-keyring prompt on macOS/Linux.
+The helper's `--inject --cdp <port>` targets a task-owned local Chrome CDP endpoint,
+which a script can also use via `chromium.connectOverCDP(...)`. Expose CDP on
+loopback only, never against the live profile. Values travel on stdin, not argv.
 
 ## Anti-patterns
 
-- Do NOT launch CloakBrowser for plain text extraction — use Tier 1.
-- Do NOT pass an `--init-script` for the webdriver flag — CloakBrowser already patches it at source; the only required override is `--user-agent`.
-- Do NOT run agent-browser before creating the first tab via `curl -X PUT .../json/new` — CloakBrowser launches tabless.
-- Do NOT use vanilla Chrome when stealth is needed — always CloakBrowser.
-- Do NOT forget to `close` the session when done.
-- Do NOT inject cookies without reloading the page.
+- Plain text extraction does not need a stealth browser: use the extraction lane.
+- Never launch against, clear, or delete the user's live profile.
+- Never claim stealth from successful startup alone; validate rendered content.
+- Never run plugins without explicit user-installed script dependencies.
 
 ## Troubleshooting
 
-```bash
-# Port 9242 already in use (macOS/Linux):
-lsof -ti:9242 | xargs kill -9
-# agent-browser can't connect:
-curl -s http://127.0.0.1:9242/json/version | head -5   # empty -> CloakBrowser not running
-# Update either tool:
-uv pip install --python "$HOME/.agents/cloak-venv/bin/python" --upgrade "cloakbrowser==0.5.7" && "$HOME/.agents/cloak-venv/bin/python" -c "import cloakbrowser; cloakbrowser.ensure_binary()"
-bun add -g agent-browser@0.34.0
-```
+A missing Chrome executable is a prerequisite failure: report it, do not download
+a replacement. Missing plugins require the one-time setup above; module errors
+inside installed plugins are real failures, not optional-dependency misses.
+A locked profile usually means the source was not cloned or another run owns the
+clone. Use a new task-owned clone instead of killing unrelated browsers.
+
+Always close contexts in `finally`, stop the fixture server, and remove only this
+run's clone and temporary scripts. Preserve requested PNG/trace evidence and record
+the cleanup receipt, including failures.

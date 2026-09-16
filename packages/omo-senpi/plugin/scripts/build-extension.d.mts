@@ -1,3 +1,19 @@
+export interface BuildExtensionOptions {
+  outputPath?: string
+  taskOutputPath?: string
+  memberOutputPath?: string
+  supervisorOutputPath?: string
+  advisorRuntimeOutputPath?: string
+  toolkitSdkOutputPath?: string
+}
+export function buildExtension(options?: BuildExtensionOptions): Promise<{
+  mainInputs: string[]
+  taskInputs: string[]
+  memberInputs: string[]
+  supervisorInputs: string[]
+  advisorRuntimeInputs: string[]
+  toolkitSdkInputs: string[]
+}>
 export const SENPI_LOADER_ALIASES: readonly [
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-agent-core",

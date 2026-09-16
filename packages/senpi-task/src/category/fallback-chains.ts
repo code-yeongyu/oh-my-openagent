@@ -11,6 +11,11 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 //     there AND holds an OpenCode Zen key must not be routed to the metered `opencode/claude-*` lane
 //     (#8051). Rung provider order IS the ranking in resolveModelForDelegateTask, so it goes first,
 //     mirroring senpi's own PROVIDER_PRECEDENCE in retry-fallback/expansion.ts.
+//   - no rung lists "openai", senpi's metered API-key lane; "openai-codex" (ChatGPT subscription)
+//     is the only OpenAI lane, so a machine holding both never routes delegated GPT work to API
+//     billing (#8300). Like vercel/openrouter, an API-key-only registry still resolves through the
+//     resolver's cross-provider fallthrough. model-core keeps "openai": it is OpenCode's single
+//     OpenAI provider id and already covers the ChatGPT login there.
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   "visual-engineering": [
     {
@@ -37,21 +42,21 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     }
   ],
   ultrabrain: [
-    { providers: ["openai", "openai-codex"], model: "gpt-6-astra", variant: "max" },
+    { providers: ["openai-codex"], model: "gpt-6-astra", variant: "max" },
     { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
-    { providers: ["openai", "openai-codex", "opencode"], model: "gpt-6-astra", variant: "max" },
-    { providers: ["openai", "openai-codex"], model: "gpt-5.6-sol", variant: "max" },
+    { providers: ["openai-codex", "opencode"], model: "gpt-6-astra", variant: "max" },
+    { providers: ["openai-codex"], model: "gpt-5.6-sol", variant: "max" },
     { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["openai", "openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "max" }
+    { providers: ["openai-codex", "opencode"], model: "gpt-5.6-sol", variant: "max" }
   ],
   deep: [
     {
-      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      providers: ["openai-codex", "github-copilot", "opencode"],
       model: "gpt-6-astra",
       variant: "high",
     },
     {
-      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      providers: ["openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
       variant: "medium",
     }
@@ -94,7 +99,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   "unspecified-low": [
     { providers: ["xai", "github-copilot", "opencode"], model: "grok-4.6", variant: "xhigh" },
     {
-      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      providers: ["openai-codex", "github-copilot", "opencode"],
       model: "gpt-5.6-terra",
       variant: "high",
     },
@@ -113,7 +118,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ],
   "unspecified-high": [
     {
-      providers: ["openai", "openai-codex", "github-copilot", "opencode"],
+      providers: ["openai-codex", "github-copilot", "opencode"],
       model: "gpt-6-astra",
       variant: "high",
     },

@@ -7,9 +7,11 @@ import {
   type ReflectionCompletionRecord,
   type ReflectionLiveSession,
 } from "./completion"
+import { classifyReflectionFailure } from "./failure-policy"
 import { readReflectionHealth } from "./health"
 import { emitReflectionHealthAlert } from "./health-alert"
 import { describeReflectionLauncher } from "./launcher-identity"
+import { emitReflectionParkAlert } from "./park-alert"
 import type { ReflectionModelResolution } from "./resolve-model"
 import type { ExecutionResult, ReflectionRunResult, SenpiSubprocessRunnerOptions } from "./runner-types"
 
@@ -24,7 +26,12 @@ export async function settleReflectionRun(input: {
   readonly ensureRenderer: (live: ReflectionLiveSession | undefined) => void
   readonly warnedHealth: (key: string) => boolean
 }): Promise<ReflectionRunResult> {
-  const transition = await input.options.reservation.complete(input.run.runId, input.result.outcome)
+  const failure = classifyReflectionFailure(input.result)
+  const transition = await input.options.reservation.complete(
+    input.run.runId,
+    input.result.outcome,
+    failure === undefined ? undefined : { failure },
+  )
   const live = input.options.liveSession?.()
   input.ensureRenderer(live)
   const finishedAt = input.now().toISOString()
@@ -73,6 +80,7 @@ export async function settleReflectionRun(input: {
     observedRunIds: [completion.runId],
     currentLauncher: launcher,
   })
+  await emitReflectionParkAlert(input.options.identity.paths.reflection, input.options.identity.id, live, input.warnedHealth)
   return {
     runId: input.run.runId,
     outcome: input.result.outcome,
@@ -80,6 +88,7 @@ export async function settleReflectionRun(input: {
     ...(input.result.detail === undefined ? {} : { detail: input.result.detail }),
     completion,
     ...(transition.launch === undefined ? {} : { launch: transition.launch }),
+    ...(transition.park === undefined ? {} : { park: transition.park }),
   }
 }
 
@@ -112,5 +121,6 @@ export async function publishFinalizedReflectionRun(input: {
     observedRunIds: [completion.runId],
     ...(launcher === undefined ? {} : { currentLauncher: launcher }),
   })
+  await emitReflectionParkAlert(input.options.identity.paths.reflection, input.options.identity.id, live, input.warnedHealth)
   return { ...input.result, completion }
 }

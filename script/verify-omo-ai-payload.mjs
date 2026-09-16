@@ -22,6 +22,7 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/lsp-daemon/dist/cli.js",
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
+  "plugin/runtime/agent-toolkit-sdk/sdk.js",
 ]
 
 const MIN_SKILL_COUNT = 18

@@ -11,7 +11,7 @@ import { activeStatus, createLogger, sessionEventCtx } from "./ulw-loop.test-sup
 
 const CONTINUATION_PROMPT_TEXT = [
   "Continue the active ulw-loop run.",
-  'Call `tool.omo_agent_toolkit({ operation: "status" })` in this session, inspect the active incomplete goals and the structured nextActions, and keep working until the run is complete or safely checkpointed.',
+  'In a JS eval cell run: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Inspect the active incomplete goals and the structured nextActions, and keep working until the run is complete or safely checkpointed.',
 ].join("\n")
 
 describe("omo-senpi ulw-loop continuation routing through the idle coordinator", () => {
@@ -23,9 +23,8 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
-      resolveOmoBin: () => "/tmp/omo",
       planExists: () => true,
-      runCommand: async (_bin, _args, _options) => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
+      readStatus: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
@@ -46,9 +45,8 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     idleCoordinator.enqueue({ key: "st_done", source: "task-completion", content: "task st_done completed" })
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
-      resolveOmoBin: () => "/tmp/omo",
       planExists: () => true,
-      runCommand: async (_bin, _args, _options) => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
+      readStatus: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
@@ -89,9 +87,8 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
       const delivered: string[] = []
       const idleCoordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content))
       await createUlwLoopComponent({
-        resolveOmoBin: () => "/tmp/omo",
         planExists: () => true,
-        runCommand: async () => ({ code: 0, stdout: activeStatus() }),
+        readStatus: async () => ({ code: 0, stdout: activeStatus() }),
       }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
       // when

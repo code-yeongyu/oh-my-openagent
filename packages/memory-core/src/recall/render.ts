@@ -6,16 +6,17 @@
 import type { RecallNudge } from "./gate"
 
 export const RECALL_HINT_HEADER =
-  "Kibitzer recalled a stored memory. It is a hint, not current state — verify before relying on it; read the source path for full context."
+  "Kibitzer, a background memory advisor, surfaced this stored note. It may or may not apply: reference only; your current task stands."
 
 export const RECALL_HINT_HEADER_KO =
-  "키비처가 저장된 메모리를 짚어줬습니다. 현재 상태가 아니라 힌트입니다 — 의존하기 전에 확인하고, 전체 맥락은 출처 경로를 읽으세요."
+  "백그라운드 메모리 조언자 키비처가 짚어준 저장 메모입니다. 맞을 수도 아닐 수도 있으니 참고만 하고, 하던 작업은 그대로 이어가세요."
 
 /**
  * A gate-judged nudge in the same sourced framing as a lexical candidate: the judge's one-sentence
- * hint takes the place of the description and excerpt, because it already states WHY this memory
- * matters to the next turn. The header stays so the agent reads it as a hint, not as current state,
- * and the source path is what it opens for the full detail the hint had to leave out.
+ * hint takes the place of the description and excerpt, because it already states what the stored
+ * note records. The header names the sender and the posture (reference only, current task stands)
+ * so the block carries no instruction of its own; the source path is there when the agent wants the
+ * detail the hint had to leave out.
  */
 export function renderNudgeBlock(nudge: RecallNudge): string {
   const escapeMarkup = (value: string): string => value

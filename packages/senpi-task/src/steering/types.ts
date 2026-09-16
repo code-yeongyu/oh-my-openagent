@@ -86,7 +86,8 @@ export type CancelOutcome =
 
 export type SteeringEngine = {
   hasPendingSends(taskId: string): boolean
-  sendToTask(input: SendInput): Promise<SendOutcome>
+  // Internal manager grant consumption; ordinary task_send callers never supply a reservation.
+  sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.

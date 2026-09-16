@@ -101,7 +101,7 @@ describe("build:omo-native staged payload", () => {
           expect(manifest.name).toBe("@code-yeongyu/omo-senpi")
 
           // The toolkit CLI is deliberately absent from the Native payload: the loop runs in-process
-          // behind the omo_agent_toolkit tool, and Codex keeps its own staged copy.
+          // behind the eval SDK (OMO_AGENT_TOOLKIT_SDK_ROOT), and Codex keeps its own staged copy.
           expect(existsSync(join(outputDir, "runtime", "agent-toolkit"))).toBe(false)
 
           const skillCount = readdirSync(join(outputDir, "skills"), {

@@ -3,6 +3,7 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 import { createChildProgress } from "../../progress"
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import type { TaskRecord } from "../../state"
+import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import { buildStartSpec } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
@@ -18,6 +19,8 @@ type RunSpawnInput = ForegroundWaitOptions & {
   readonly signal: AbortSignal | undefined
   readonly onUpdate: AgentToolUpdateCallback<TaskToolDetails> | undefined
   readonly ctx: TaskToolContext
+  // Transient grant resolved by the caller against the parent's live kernel-tool capability.
+  readonly kernelTools?: KernelToolGrant
 }
 
 function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToolDetails> {
@@ -73,7 +76,7 @@ export async function runSpawn(
   // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
   // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
   await loadSenpiBarrel()
-  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd)
+  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd, input.kernelTools)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
     const agents = started.error.availableAgents
@@ -106,6 +109,7 @@ export async function runSpawn(
       model: started.model,
       ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
       run_in_background: started.run_in_background,
+      ...(started.failure_kind === undefined ? {} : { failure_kind: started.failure_kind }),
       reason: started.error_message,
       ...(spec.skills === undefined ? {} : { skills: spec.skills }),
     })

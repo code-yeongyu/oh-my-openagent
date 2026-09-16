@@ -1,0 +1,8 @@
+
+packages/omo-senpi/src/components/memory/worker/supervisor-process-identity.test.ts:
+(pass) supervisor start identity > #given one runtime records a pid as the supervisor and reads it back as the parent #when both identities are compared #then they share one scheme [2.53ms]
+
+ 1 pass
+ 0 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [721.00ms]

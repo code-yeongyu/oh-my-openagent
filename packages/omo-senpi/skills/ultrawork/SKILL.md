@@ -71,12 +71,13 @@ exercises the surface; capture the artifact.
      `send-keys` is fine for a boot smoke; NEVER `tmux capture-pane`
      for color / layout / CJK evidence, which degrades truecolor.
   3. Browser use — drive the REAL page from the eval js kernel:
-     `new Bun.WebView()` (navigate / click / type / evaluate /
-     screenshot; bun-1-4 skill) is the default, `playwright-core`
-     when the criterion needs a real Chrome build or its trace, and
-     the `agent-browser` CLI
-     (https://github.com/vercel-labs/agent-browser) only when no
-     kernel path exists. Capture action log + screenshot path. Never
+     (1) `new Bun.WebView()` on Bun >= 1.4 (macOS default;
+     Linux/Windows require installed Chrome/Chromium/Edge).
+     (2) Otherwise, or for Chrome semantics, stealth, trace, or auth,
+     WRITE a `playwright-core` script and run it from the js-eval
+     kernel against local Chrome: `chromium.launch({ channel: "chrome" })`
+     or `launchPersistentContext` on a CLONED profile.
+     Capture action log + screenshot path. Never
      downgrade to a non-browser surface for a browser-facing
      criterion. NEVER clear cookies, cache, or site data
      (`Network.clearBrowserCookies`, `Storage.clearCookies`,

@@ -149,6 +149,7 @@ describe("createMemoryComponent", () => {
       "senpi-memory.reflection-launched",
       "senpi-memory.reflection-summary",
       "senpi-memory.health",
+      "senpi-memory.reflection-parked",
       SOUL_UPDATED_ENTRY_TYPE,
       RECALL_CUSTOM_TYPE,
       NUDGED_ENTRY_TYPE,

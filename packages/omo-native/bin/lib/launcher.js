@@ -150,9 +150,9 @@ export async function runLauncher(args = process.argv.slice(2)) {
   reportLegacyFlatAdoption()
   const command = args[0]
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
-  // omo_agent_toolkit tool. Report that plainly instead of failing on a missing file.
+  // eval SDK the extension publishes. Report that plainly instead of failing on a missing file.
   if (command === "ulw-loop") {
-    console.error("omo ulw-loop is unavailable in this build: use the omo_agent_toolkit tool inside a session (Codex keeps the standalone CLI).")
+    console.error('omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).')
     process.exitCode = 2
     return
   }

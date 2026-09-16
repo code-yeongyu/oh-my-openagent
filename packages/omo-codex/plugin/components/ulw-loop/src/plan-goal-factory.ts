@@ -1,5 +1,13 @@
+import { criteriaFromInput, criterionId, type SuccessCriterionInput } from "./success-criteria-input.js";
+import type { UlwLoopToolkitSurface } from "./surface.js";
 import type { UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 import { UlwLoopError } from "./types.js";
+
+export interface GoalSeedOptions {
+	readonly goalId?: string;
+	readonly surface?: UlwLoopToolkitSurface;
+	readonly successCriteria?: readonly SuccessCriterionInput[];
+}
 
 function cleanLine(line: string): string {
 	return line.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, "").trim();
@@ -38,40 +46,44 @@ function truncateObjective(objective: string): string {
 	return objective.length > 80 ? `${objective.slice(0, 77).trimEnd()}...` : objective;
 }
 
-export function seedDefaultSuccessCriteria(goalIndex: number, objective: string): UlwLoopSuccessCriterion[] {
+// The placeholder must name the exact call that replaces it on the surface the plan is driven from,
+// so a goal seeded without criteria costs one documented call per criterion instead of a doc hunt.
+function replaceVia(goalId: string, id: string, surface: UlwLoopToolkitSurface): string {
+	return surface === "omo-senpi"
+		? `Replace via agentToolkit.steer({ kind: "revise_criterion", source: "finding", goalId: "${goalId}", criterionId: "${id}", scenario, expectedEvidence, evidence, rationale }) (or pass successCriteria to addGoal)`
+		: `Replace via omo-agent-toolkit ulw-loop steer --kind revise_criterion --goal-id ${goalId} --criterion-id ${id} --scenario "<scenario>" --expected-evidence "<proof>" --evidence "<why>" --rationale "<why>"`;
+}
+
+export function seedDefaultSuccessCriteria(
+	goalIndex: number,
+	objective: string,
+	options: Pick<GoalSeedOptions, "goalId" | "surface"> = {},
+): UlwLoopSuccessCriterion[] {
 	const subject = truncateObjective(normalizeObjective(objective) || `Goal ${goalIndex + 1}`);
+	const goalId = options.goalId ?? `G${String(goalIndex + 1).padStart(3, "0")}`;
+	const surface = options.surface ?? "lazycodex";
 	const rows = [
+		["happy", `happy path for: ${subject}`, `observable happy-path proof for goal ${goalIndex + 1}`, true],
+		["edge", "edge case (boundary/empty/malformed)", `boundary or malformed-input proof for: ${subject}`, true],
 		[
-			"C001",
-			"happy",
-			`happy path for: ${subject}`,
-			`Replace via revise_criterion with observable happy-path proof for goal ${goalIndex + 1}.`,
-			true,
-		],
-		[
-			"C002",
-			"edge",
-			"edge case (boundary/empty/malformed)",
-			`Replace via revise_criterion with boundary or malformed-input proof for: ${subject}.`,
-			true,
-		],
-		[
-			"C003",
 			"regression",
 			"regression: adjacent surface still works",
-			`Replace via revise_criterion with regression proof for neighboring behavior after: ${subject}.`,
+			`regression proof for neighboring behavior after: ${subject}`,
 			false,
 		],
 	] as const;
-	return rows.map(([id, userModel, scenario, expectedEvidence, essential]) => ({
-		id,
-		scenario,
-		userModel,
-		expectedEvidence,
-		essential,
-		capturedEvidence: null,
-		status: "pending",
-	}));
+	return rows.map(([userModel, scenario, proof, essential], index) => {
+		const id = criterionId(index);
+		return {
+			id,
+			scenario,
+			userModel,
+			expectedEvidence: `${replaceVia(goalId, id, surface)} with ${proof}.`,
+			essential,
+			capturedEvidence: null,
+			status: "pending",
+		};
+	});
 }
 
 export function deriveGoalCandidates(brief: string): Array<{ title: string; objective: string }> {
@@ -101,23 +113,43 @@ export function deriveGoalCandidates(brief: string): Array<{ title: string; obje
 	}));
 }
 
-export function makeGoal(title: string, objective: string, index: number, now: string): UlwLoopItem {
+export function makeGoal(
+	title: string,
+	objective: string,
+	index: number,
+	now: string,
+	options: GoalSeedOptions = {},
+): UlwLoopItem {
 	const cleanTitle = assertNonEmpty(title, "title");
 	const cleanObjective = assertNonEmpty(objective, "objective");
+	const id = normalizeGoalId(cleanTitle, index);
+	const successCriteria =
+		options.successCriteria === undefined
+			? seedDefaultSuccessCriteria(index, cleanObjective, {
+					goalId: id,
+					...(options.surface === undefined ? {} : { surface: options.surface }),
+				})
+			: criteriaFromInput(options.successCriteria);
 	return {
-		id: normalizeGoalId(cleanTitle, index),
+		id,
 		title: cleanTitle,
 		objective: cleanObjective,
 		status: "pending",
-		successCriteria: seedDefaultSuccessCriteria(index, cleanObjective),
+		successCriteria,
 		attempt: 0,
 		createdAt: now,
 		updatedAt: now,
 	};
 }
 
-export function appendGoalToPlan(plan: UlwLoopPlan, title: string, objective: string, now: string): UlwLoopItem {
-	const goal = makeGoal(title, objective, plan.goals.length, now);
+export function appendGoalToPlan(
+	plan: UlwLoopPlan,
+	title: string,
+	objective: string,
+	now: string,
+	options: GoalSeedOptions = {},
+): UlwLoopItem {
+	const goal = makeGoal(title, objective, plan.goals.length, now, options);
 	plan.goals.push(goal);
 	plan.updatedAt = now;
 	return goal;

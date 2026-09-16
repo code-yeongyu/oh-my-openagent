@@ -6,6 +6,7 @@
 import { validateNudges, type RecallCandidate, type RecallNudge } from "@oh-my-opencode/memory-core"
 import type { ChildHandle, ChildSessionEvent } from "@oh-my-opencode/senpi-task"
 
+import { KIBITZER_WAKE_MAX_TOTAL_MS } from "./sidecar-contract"
 import { describe, isRecord, numberOf, textOf, type Child, type SidecarCore, type Turn } from "./sidecar-core"
 import { isDiagnosticWakeEnd, type KibitzerWakeAbort, type KibitzerWakeEnd, type KibitzerWakeOutcome } from "./sidecar-outcome"
 import { createWakeToolBudget } from "./tools"
@@ -19,7 +20,13 @@ export interface TurnLifecycle {
   observe(event: ChildSessionEvent): void
   /** `usage.input + usage.cacheRead` of the newest assistant message, char/4 fallback. */
   contextEstimate(current: Child): number
-  armDeadline(turn: Turn): void
+  /**
+   * Arms the wake deadline at `min(now + wakeDeadlineMs, turn.totalDeadlineAt)`: the quiet period
+   * every steer re-arms, clamped by the wake's own cap from admission. `onExpire` replaces what a
+   * fired deadline does - `seed` and `followUp` arm it around the child I/O they bound, where there
+   * is no running turn to abort yet.
+   */
+  armDeadline(turn: Turn, onExpire?: () => void): void
   clearDeadline(turn: Turn): void
   /** The sidecar's own abort: recorded first so settlement reads the cause, not the engine's `cancelled`. */
   abortTurn(turn: Turn, cause: KibitzerWakeAbort): Promise<void>
@@ -35,11 +42,13 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
     core.wakeSeq += 1
     core.accepted = []
     core.budget = createWakeToolBudget(core.toolBudget)
+    const startedAt = core.now()
     return {
       wake: core.wakeSeq,
       generation,
       maxItems,
-      startedAt: core.now(),
+      startedAt,
+      totalDeadlineAt: startedAt + KIBITZER_WAKE_MAX_TOTAL_MS,
       accepted: core.accepted,
       budget: core.budget,
       envelopes: [],
@@ -119,11 +128,12 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
 
   // ---- timers and the sidecar's own abort --------------------------------------------------------
 
-  function armDeadline(turn: Turn): void {
+  function armDeadline(turn: Turn, onExpire?: () => void): void {
     clearDeadline(turn)
-    turn.deadline = core.timers.set(() => {
+    const quietMs = Math.min(core.wakeDeadlineMs, Math.max(0, turn.totalDeadlineAt - core.now()))
+    turn.deadline = core.timers.set(onExpire ?? (() => {
       void abortTurn(turn, "deadline")
-    }, core.wakeDeadlineMs)
+    }), quietMs)
   }
 
   function clearDeadline(turn: Turn): void {

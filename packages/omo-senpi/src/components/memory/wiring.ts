@@ -211,9 +211,20 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       // one first-position flush captures everything and the drain must never re-run it.
       const journalFlushed = await shutdownDrain.flushJournal(input)
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
-      await kibitzerRef.current?.onSessionShutdown(input.sessionId)
+      // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
+      // drain deadline: both are started and raced against it, and whichever loses keeps running
+      // detached (the Kibitzer wake lease and the sidecar directory lock are still released).
+      const kibitzer = kibitzerRef.current
+      if (kibitzer !== undefined) {
+        await shutdownDrain.raceDetached(input, "kibitzer-shutdown", () => kibitzer.onSessionShutdown(input.sessionId))
+      }
       const identity = resolveContext(input.sessionId)
-      if (identity !== undefined) await factsWiringFor(identity).cancelActive?.()
+      if (identity !== undefined) {
+        const facts = factsWiringFor(identity)
+        if (facts.cancelActive !== undefined) {
+          await shutdownDrain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
+        }
+      }
       await shutdownDrain.run(input, { journalFlushed })
     },
 

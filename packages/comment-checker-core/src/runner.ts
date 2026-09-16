@@ -43,7 +43,10 @@ export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryIn
     const binaryPath = join(dirname(packageJsonPath), "bin", input.binaryName)
     return input.existsSync(binaryPath) ? binaryPath : null
   } catch (error) {
-    if (error instanceof Error) {
+    // Older embedded Bun runtimes throw ResolveMessage objects, not Error instances.
+    if (error instanceof Error || (
+      typeof error === "object" && error !== null && "name" in error && error.name === "ResolveMessage"
+    )) {
       return null
     }
     throw error

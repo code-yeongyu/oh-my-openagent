@@ -21,7 +21,7 @@ export const TaskToolParams = Type.Object({
     Type.String({ description: "Category name routed to the category worker (a fresh worker session configured by the category's model and skills). Mutually exclusive with subagent_type; required unless category is given." }),
   ),
   subagent_type: Type.Optional(
-    Type.String({ description: "Agent name to invoke directly (e.g. plan-reviewer). Mutually exclusive with category; required unless category is given." }),
+    Type.String({ description: "Agent name to invoke directly (e.g. plan-reviewer). Mutually exclusive with category; required unless category is given. A category name is NOT accepted here: it fails with unknown_target instead of being routed to that category, so pass category=\"<name>\" for a category." }),
   ),
   run_in_background: Type.Optional(
     Type.Boolean({ description: "true (the standard spawn) returns the task id now and delivers the child's result later as a message; false blocks this turn until the child finishes. Omitted counts as false." }),
@@ -31,6 +31,11 @@ export const TaskToolParams = Type.Object({
   load_skills: Type.Optional(
     Type.Array(Type.String(), {
       description: "Skill names whose SKILL.md content is prepended to the child prompt. Defaults to [].",
+    }),
+  ),
+  tools: Type.Optional(
+    Type.Array(Type.String({ minLength: 1 }), {
+      description: "Names of JavaScript tools the calling eval cell defined with tool(fn). They are granted to this child only; define each one before requesting it. Available only for in-process children of a live JavaScript eval, never for curated read-only agents, process/team children or other kernel languages.",
     }),
   ),
   tasks: Type.Optional(
@@ -45,7 +50,7 @@ export const TaskToolParams = Type.Object({
         ),
         description: Type.Optional(Type.String({ description: "Short human label for this task." })),
         category: Type.Optional(Type.String({ description: "Category name for this task." })),
-        subagent_type: Type.Optional(Type.String({ description: "Direct agent name for this task." })),
+        subagent_type: Type.Optional(Type.String({ description: "Direct agent name for this task. Must name an agent, never a category." })),
         name: Type.Optional(Type.String({ description: "Optional stable name for this task." })),
         model: Type.Optional(Type.String({ description: "Model override for this task. Only valid when the item's effective target is subagent_type; rejected with a category target." })),
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),

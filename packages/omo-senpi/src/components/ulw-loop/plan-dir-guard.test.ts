@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "./index"
-import { activeStatus, createLogger, sessionEventCtx, statusArgsFor, TEST_SESSION_ID } from "./ulw-loop.test-support"
+import { activeStatus, createLogger, sessionEventCtx, TEST_SESSION_ID } from "./ulw-loop.test-support"
 
 describe("omo-senpi ulw-loop plan directory guard", () => {
   function withTempCwd(run: (cwd: string) => Promise<void>): Promise<void> {
@@ -15,14 +15,13 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
 
   async function registerWithRealPlanLookup(cwd: string): Promise<{
     pi: FakeExtensionAPI
-    calls: Array<{ bin: string; args: readonly string[]; cwd: string }>
+    calls: Array<{ cwd: string; sessionId: string }>
   }> {
     const pi = new FakeExtensionAPI()
-    const calls: Array<{ bin: string; args: readonly string[]; cwd: string }> = []
+    const calls: Array<{ cwd: string; sessionId: string }> = []
     await createUlwLoopComponent({
-      resolveOmoBin: () => "/tmp/omo",
-      runCommand: async (bin, args, options) => {
-        calls.push({ bin, args, cwd: options.cwd })
+      readStatus: async (cwd, sessionId) => {
+        calls.push({ cwd, sessionId })
         return { code: 0, stdout: activeStatus() }
       },
     }).register(pi, { logger: createLogger(), config: { getFlag: () => false } })
@@ -31,7 +30,7 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
 
   const steeringInput = { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" }
 
-  it("#given a cwd without .omo/ulw-loop #when queued user input arrives #then no toolkit process is spawned", async () => {
+  it("#given a cwd without .omo/ulw-loop #when queued user input arrives #then no status is read", async () => {
     await withTempCwd(async (cwd) => {
       const { pi, calls } = await registerWithRealPlanLookup(cwd)
 
@@ -42,7 +41,7 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
     })
   })
 
-  it("#given an unscoped plan in .omo/ulw-loop #when queued user input arrives #then no toolkit process is spawned", async () => {
+  it("#given an unscoped plan in .omo/ulw-loop #when queued user input arrives #then no status is read", async () => {
     await withTempCwd(async (cwd) => {
       mkdirSync(join(cwd, ".omo", "ulw-loop"), { recursive: true })
       writeFileSync(join(cwd, ".omo", "ulw-loop", "goals.json"), activeStatus())
@@ -55,7 +54,7 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
     })
   })
 
-  it("#given .omo/ulw-loop exists but <sessionId>/goals.json does not #when queued user input arrives #then no toolkit process is spawned", async () => {
+  it("#given .omo/ulw-loop exists but <sessionId>/goals.json does not #when queued user input arrives #then no status is read", async () => {
     await withTempCwd(async (cwd) => {
       mkdirSync(join(cwd, ".omo", "ulw-loop"), { recursive: true })
       const { pi, calls } = await registerWithRealPlanLookup(cwd)
@@ -75,7 +74,7 @@ describe("omo-senpi ulw-loop plan directory guard", () => {
 
       await pi.dispatch("input", steeringInput, sessionEventCtx(cwd))
 
-      expect(calls).toEqual([{ bin: "/tmp/omo", args: statusArgsFor(), cwd }])
+      expect(calls).toEqual([{ cwd, sessionId: TEST_SESSION_ID }])
     })
   })
 })

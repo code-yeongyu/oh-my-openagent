@@ -1,5 +1,6 @@
 import { resolveExecutionMode } from "../../manager"
 import type { ExecutionMode, ManagerStartSpec } from "../../manager"
+import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
 import { taskSkillSummary } from "./skill-result"
@@ -18,6 +19,7 @@ export function buildStartSpec(
   parentSessionId: string,
   deps: TaskToolDeps,
   cwd: string,
+  kernelTools?: KernelToolGrant,
 ): ResolvedManagerStartSpec {
   const ancestry = deps.resolveAncestry?.(parentSessionId)
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
@@ -37,7 +39,17 @@ export function buildStartSpec(
     ...(params.name !== undefined && { name: params.name }),
     ...(params.description !== undefined && { description: params.description }),
     ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),
+    ...(kernelTools !== undefined && { kernelTools }),
   }
+}
+
+// The child's execution mode for a target, resolved exactly as buildStartSpec resolves it. The
+// kernel-tool grant is decided against this same value BEFORE any child session is created.
+export function taskExecutionModeFor(
+  target: { readonly category: string } | { readonly subagentType: string },
+  deps: TaskToolDeps,
+): ExecutionMode {
+  return resolvedTaskExecutionMode(target, deps)
 }
 
 function toExecutionMode(value: string | undefined): ExecutionMode | undefined {

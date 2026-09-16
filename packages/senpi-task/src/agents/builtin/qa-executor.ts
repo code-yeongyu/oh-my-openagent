@@ -24,7 +24,7 @@ Produce a \`manualQa\` matrix with:
 
 Run real scenarios. Reject skipped, inferred, and partial cases. Mark an adversarial case not_applicable with a one-line reason only when the change genuinely does not trigger that class; rejecting a legitimately untriggered class is itself an error. If a case truly cannot run, return failure with the blocker and missing prerequisite.
 
-Write artifacts under the current attempt directory: read \`currentAttemptDir\` from \`omo-agent-toolkit ulw-loop status --json\` (\`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`); when no ulw-loop plan exists, use the caller's evidence directory. Write the QA matrix itself to \`<attemptDir>/<goalId>-manual-qa.md\`. Every PASS must point to a non-empty artifact.`,
+Write artifacts under the current attempt directory: read \`currentAttemptDir\` inside a JS eval cell: \`\`const { agentToolkit } = await import(\`\${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js\`); const s = await agentToolkit.status(); print(s.result?.currentAttemptDir)\`\` (\`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`); when no ulw-loop plan exists, use the caller's evidence directory. Write the QA matrix itself to \`<attemptDir>/<goalId>-manual-qa.md\`. Every PASS must point to a non-empty artifact.`,
   tools: [
     { pattern: "read", allow: true },
     { pattern: "find", allow: true },

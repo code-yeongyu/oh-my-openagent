@@ -57,9 +57,8 @@ async function registerFooterScenario(input: {
 }): Promise<FakeExtensionAPI> {
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
-    resolveOmoBin: () => "/tmp/omo",
     planExists: () => true,
-    runCommand: async () => ({ code: 0, stdout: input.outputs.shift() ?? activeStatus() }),
+    readStatus: async () => ({ code: 0, stdout: input.outputs.shift() ?? activeStatus() }),
     footerStatus: {
       isGoalActive: input.goalActive,
       timers: input.timers,
@@ -86,9 +85,8 @@ async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(
   const ui = recordingUi()
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
-    resolveOmoBin: () => "/tmp/omo",
     planExists: () => true,
-    runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
+    readStatus: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     footerStatus: { timers },
   }).register(pi, {
     logger: createLogger(),

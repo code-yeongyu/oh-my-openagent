@@ -146,6 +146,7 @@ No Metis, no plan file, no execution until the user approves. The UNCLEAR path a
 # <slug> - Work Plan
 ## TL;DR (For humans)
 (What you'll get / Why this approach / What it will NOT do / Effort / Risk / Decisions)
+> Effort is exactly one band - Quick (single edit, minutes of agent work), Short (one focused change, a few files), Medium (multi-file feature in one session), Large (several waves, one long session), XL (multi-session or architectural work). NEVER write hours or days: the counted todo rows are the size signal, and a written duration is rewritten to a band before the user sees the plan.
 ## Scope
 ## Verification strategy
 ## Execution strategy

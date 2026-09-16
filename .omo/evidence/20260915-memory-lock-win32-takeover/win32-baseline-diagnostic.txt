@@ -1,0 +1,36 @@
+# windows-latest baseline diagnostic (no fault injection)
+# run: https://github.com/code-yeongyu/oh-my-openagent/actions/runs/34948709966 (branch diag/8294-win32-probe-baseline @ 612f1636a4 = dev 23c778c5bb + diagnostic test)
+# command: bun test --timeout 30000 packages/memory-core/src/concurrency/win32-probe-diagnostic.test.ts ; then two-process.test.ts
+
+DIAG {"kind":"liveness-after-exit","round":0,"pid":3160,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0.01,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":1,"pid":3288,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":2,"pid":8712,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":3,"pid":5964,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":4,"pid":2768,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":5,"pid":3096,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":6,"pid":1756,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"liveness-after-exit","round":7,"pid":4316,"beforeKill":"alive","exit":{"code":null,"signal":"SIGKILL"},"atExit":"dead","settled":"dead","msUntilDead":0,"probes":1}
+DIAG {"kind":"foreign-probe","round":0,"pid":6228,"ms":2014,"identity":null}
+DIAG {"kind":"foreign-probe","round":1,"pid":6228,"ms":1293,"identity":"win32-creation-date:2026-09-15T08:49:19.3981103Z"}
+DIAG {"kind":"foreign-probe","round":2,"pid":6228,"ms":274,"identity":"win32-creation-date:2026-09-15T08:49:19.3981103Z"}
+DIAG {"kind":"foreign-probe","round":3,"pid":6228,"ms":268,"identity":"win32-creation-date:2026-09-15T08:49:19.3981103Z"}
+DIAG {"kind":"foreign-probe","round":4,"pid":6228,"ms":264,"identity":"win32-creation-date:2026-09-15T08:49:19.3981103Z"}
+DIAG {"kind":"foreign-probe","round":5,"pid":6228,"ms":276,"identity":"win32-creation-date:2026-09-15T08:49:19.3981103Z"}
+DIAG {"kind":"own-lock-record","round":0,"ms":274,"process_start":"win32-creation-date:2026-09-15T08:49:16.5265308Z"}
+DIAG {"kind":"own-lock-record","round":1,"ms":0,"process_start":"win32-creation-date:2026-09-15T08:49:16.5265308Z"}
+DIAG {"kind":"own-lock-record","round":2,"ms":0,"process_start":"win32-creation-date:2026-09-15T08:49:16.5265308Z"}
+DIAG {"kind":"own-lock-record","round":3,"ms":0,"process_start":"win32-creation-date:2026-09-15T08:49:16.5265308Z"}
+DIAG {"kind":"own-lock-record","round":4,"ms":0,"process_start":"win32-creation-date:2026-09-15T08:49:16.5265308Z"}
+DIAG {"kind":"own-lock-record","round":5,"ms":0,"process_start":"win32-creation-date:2026-09-15T08:49:16.5265308Z"}
+DIAG {"kind":"rm-while-held","outcome":"removed","ms":1}
+DIAG {"kind":"rm-after-kill","attempts":1,"ms":0}
+
+(pass) win32 probe diagnostic (#8294) > (a) liveness of a SIGKILLed child right after the parent's exit event [158.31ms]
+(pass) win32 probe diagnostic (#8294) > (b) PowerShell start-identity probe latency for a live foreign pid [4409.76ms]
+(pass) win32 probe diagnostic (#8294) > (c) repeated own-pid createLockRecord cost [275.82ms]
+(pass) win32 probe diagnostic (#8294) > (d) fs.rm maxRetries/retryDelay against a Windows EBUSY [24.96ms]
+Ran 4 tests across 1 file. [7.57s]
+(pass) one memory identity across real Bun processes > #given two synchronized tool writers #when each makes ten writes #then twenty linear commits land with observed lock contention [7835.99ms]
+(pass) one memory identity across real Bun processes > #given two synchronized reflection reservers #when they race one identity #then one is active, one is pending, and completion promotes pending [1293.33ms]
+(pass) one memory identity across real Bun processes > #given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits [14195.41ms]
+Ran 3 tests across 1 file. [24.76s]

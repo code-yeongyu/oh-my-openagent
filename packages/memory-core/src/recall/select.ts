@@ -3,7 +3,7 @@
 // path. matchScore is reused over a description+body haystack (the SearchDocument
 // projection does not fit recall files, so the haystack is composed directly).
 
-import { matchScore, normalizeText, parseQuery } from "../search"
+import { matchScoreNormalized, normalizeText, parseQuery } from "../search"
 import type { RecallDocument } from "./provider"
 
 export interface RecallCandidate {
@@ -15,6 +15,22 @@ export interface RecallCandidate {
 
 /** Excerpt window length. Internal, deliberately not a config knob. */
 const EXCERPT_CHARS = 200
+
+/**
+ * Normalized `description\nbody` per document object. RecallCorpusCache hands out the same document
+ * objects for as long as HEAD has not moved, so this memo is naturally per corpus revision and a
+ * moved HEAD (fresh objects) drops it. Composing and normalizing the haystack per document per
+ * QUERY was ~20ms per query pass at a 4.2MB corpus (#8335); the scores it feeds are unchanged.
+ */
+const NORMALIZED_HAYSTACKS = new WeakMap<RecallDocument, string>()
+
+function normalizedHaystack(document: RecallDocument): string {
+  const cached = NORMALIZED_HAYSTACKS.get(document)
+  if (cached !== undefined) return cached
+  const haystack = normalizeText(`${document.description}\n${document.body}`)
+  NORMALIZED_HAYSTACKS.set(document, haystack)
+  return haystack
+}
 
 export interface SelectRecallOptions {
   readonly maxItems: number
@@ -38,10 +54,10 @@ export function selectRecallCandidates(
   for (const document of documents) {
     if (options.surfaced.has(document.path) || options.excludePaths?.has(document.path)) continue
 
-    const haystack = `${document.description}\n${document.body}`
+    const haystack = normalizedHaystack(document)
     let best: number | null = null
     for (const parsed of parsedQueries) {
-      const score = matchScore(haystack, parsed)
+      const score = matchScoreNormalized(haystack, parsed)
       if (score === null) continue
       if (best === null || score < best) best = score
     }

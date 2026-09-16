@@ -17,6 +17,7 @@ on:
           - reply-listener
           - dag-race
           - memfs-restore
+          - memory-two-process
           - senpi-overflow
           - full-shard-2
       iterations:
@@ -127,6 +128,12 @@ jobs:
               [ordered]@{
                 Phase = "test"
                 Arguments = [string[]]@("test", "packages/omo-senpi/src/components/memory/commands/memfs-extra.test.ts")
+              }
+            )
+            "memory-two-process" = @(
+              [ordered]@{
+                Phase = "test"
+                Arguments = [string[]]@("test", "packages/memory-core/src/concurrency/two-process.test.ts")
               }
             )
             "senpi-overflow" = @()

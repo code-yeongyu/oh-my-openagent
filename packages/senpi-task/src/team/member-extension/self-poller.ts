@@ -96,7 +96,7 @@ export function createMemberSelfPoller(deps: MemberSelfPollerDeps): MemberSelfPo
       })
     },
     async checkPendingAcks() {
-      if (stopped) return
+      if (stopped || pending.size === 0) return
       await withLease(checkPendingUnderLease)
     },
     async recoverReservations() {

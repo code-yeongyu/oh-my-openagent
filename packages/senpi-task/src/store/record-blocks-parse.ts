@@ -89,7 +89,20 @@ export function parseOptionalPendingSteering(
       warnings?.push(`pending_steering[${index}] at ${path}: entry has invalid deliver_as, dropped`)
       continue
     }
-    entries.push({ id, message, deliver_as: deliverAs })
+    const pool = candidate["workpool"]
+    if (pool !== undefined) {
+      if (!isRecord(pool) || typeof pool["pool_id"] !== "string" || !/^wp_[0-9a-f]{32}$/.test(pool["pool_id"]) ||
+        typeof pool["item_id"] !== "string" || pool["item_id"] !== id || !/^wi_[0-9a-f]{32}$/.test(id) ||
+        typeof pool["key"] !== "string" || pool["key"].trim().length === 0 ||
+        typeof pool["generation"] !== "number" || !Number.isSafeInteger(pool["generation"]) || pool["generation"] < 1 ||
+        typeof pool["run_epoch"] !== "number" || !Number.isSafeInteger(pool["run_epoch"]) || pool["run_epoch"] < 0) {
+        warnings?.push(`pending_steering[${index}] at ${path}: invalid workpool correlation, dropped`)
+        continue
+      }
+      entries.push({ id, message, deliver_as: deliverAs, workpool: {
+        pool_id: pool["pool_id"], item_id: pool["item_id"], key: pool["key"], generation: pool["generation"], run_epoch: pool["run_epoch"],
+      } })
+    } else entries.push({ id, message, deliver_as: deliverAs })
   }
   return entries
 }

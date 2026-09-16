@@ -28,6 +28,7 @@ import {
 import { classifyGhostActive } from "./run-ghost-active"
 import { classifyRunProcess, isLauncherDead, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
+import { sweepReflectionRunOrphans, type ReflectionSweepLogger } from "./run-reconciliation-sweep"
 import { waitForRunSentinel, type SentinelWaitResult } from "./run-sentinel"
 import { sweepStrandedRunTemporaries } from "./run-temporaries"
 
@@ -45,6 +46,7 @@ export interface ReflectionRunReconciliationOptions {
   readonly waitUntil?: (deadlineAt: number) => Promise<void>
   readonly signalProcessGroup?: (pid: number, signal: NodeJS.Signals) => void
   readonly withWriterLock?: <T>(operation: () => Promise<T>) => Promise<T>
+  readonly logger?: ReflectionSweepLogger
   /** Bind-time maintenance defers when another session is scheduling this identity. */
   readonly deferOnSchedulerContention?: boolean
 }
@@ -80,6 +82,7 @@ export async function reconcileReflectionRuns(
       const result = await reconcileRun(context, runDir, ledger)
       if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
     }
+    await sweepReflectionRunOrphans(context)
     return results
   } catch (error) {
     if (context.deferOnSchedulerContention && error instanceof LockContentionError) return []
@@ -207,6 +210,9 @@ async function hasMatchingOutcome(
   return runOutcomeMatchesLedger(ledger, outcome)
 }
 
+const SUPERVISOR_DIED_DETAIL = "reflection supervisor died before publishing an outcome"
+const CHILD_KILLED_AFTER_DEADLINE_DETAIL = "reflection child outlived its deadline after the supervisor died and was killed"
+
 async function reconcileDeadSupervisor(
   context: ReconcileContext,
   runDir: string,
@@ -214,11 +220,13 @@ async function reconcileDeadSupervisor(
 ): Promise<ReflectionRunReconcileResult | undefined> {
   let child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
   if (child === "unknown") return await abandonReservationRun(context, runDir, ledger)
-  if (child === "dead" || child === "absent") return await failReservationRun(context, runDir, ledger, "failed")
+  if (child === "dead" || child === "absent") {
+    return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child))
+  }
   const wait = context.waitUntil ?? ((deadlineAt) => waitForTime(deadlineAt, context.now))
   await wait(ledger.hardDeadlineAt)
   child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
-  if (child === "dead") return await failReservationRun(context, runDir, ledger, "failed")
+  if (child === "dead") return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child))
   if (child === "unknown") return await abandonReservationRun(context, runDir, ledger)
   const signal = context.signalProcessGroup ?? signalRecordedProcessGroup
   if (ledger.childPid !== undefined) signal(ledger.childPid, "SIGTERM")
@@ -229,7 +237,18 @@ async function reconcileDeadSupervisor(
     signal(ledger.childPid, "SIGKILL")
     child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
   }
-  return child === "dead" ? await failReservationRun(context, runDir, ledger, "timed_out") : undefined
+  return child === "dead"
+    ? await failReservationRun(context, runDir, ledger, "timed_out", `${CHILD_KILLED_AFTER_DEADLINE_DETAIL}\n${deadProcesses(ledger)}`)
+    : undefined
+}
+
+function deadRunDetail(ledger: ReservationRunLedger, child: "dead" | "absent"): string {
+  const childState = child === "absent" ? "no child was recorded" : "the child is dead too"
+  return `${SUPERVISOR_DIED_DETAIL}; ${childState}\n${deadProcesses(ledger)}`
+}
+
+function deadProcesses(ledger: ReservationRunLedger): string {
+  return `supervisor pid ${ledger.pid ?? "unknown"}, child pid ${ledger.childPid ?? "unknown"}`
 }
 
 async function directoryNames(path: string): Promise<readonly string[]> {

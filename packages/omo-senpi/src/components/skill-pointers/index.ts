@@ -175,10 +175,10 @@ function handleInput(
   return { action: "continue" }
 }
 
-// Native no longer ships a toolkit CLI: the loop is driven by the registered tool. The session id
-// still travels explicitly because an eval kernel does not inherit the session env.
+// Native ships the loop as an eval SDK, not a tool or a CLI. The SDK binds the session from the
+// host env, so the scope here is informational: it tells the model where this session's state lives.
 function ulwLoopToolSentence(sessionScope: string | null): string {
-  const base = ' Drive every ulw-loop operation with the registered tool, for example `tool.omo_agent_toolkit({ operation: "status" })`; do not spawn a CLI.'
+  const base = ' Drive every ulw-loop operation from a JS eval cell through the SDK: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); never call a tool named omo_agent_toolkit and never spawn a CLI.'
   if (sessionScope === null) return base
   return `${base} This session's state lives under .omo/ulw-loop/${sessionScope}/.`
 }

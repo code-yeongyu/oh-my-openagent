@@ -1,139 +1,93 @@
-/// <reference types="bun-types" />
-
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { mkdirSync, writeFileSync } from "node:fs"
-import {
-	clearSkillCache,
-	resolveSkillContent,
-	resolveMultipleSkills,
-	resolveSkillContentAsync,
-	resolveMultipleSkillsAsync,
-} from "./skill-content"
-
-function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
-	const dir = join(baseDir, "skills", namespace, name)
-	mkdirSync(dir, { recursive: true })
-	const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
-	writeFileSync(join(dir, "SKILL.md"), yaml)
-}
+import { join } from "node:path"
+import { devBrowserSkill } from "../builtin-skills/skills/dev-browser"
+import { clearSkillCache, resolveSkillContent, resolveMultipleSkills, resolveMultipleSkillsAsync } from "./skill-content"
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
 
 beforeEach(() => {
-	clearSkillCache()
-	originalEnv = {
-		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
-		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-	}
-	const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
-	testConfigDir = join(tmpdir(), unique)
-	process.env.CLAUDE_CONFIG_DIR = testConfigDir
-	process.env.OPENCODE_CONFIG_DIR = testConfigDir
+  clearSkillCache()
+  originalEnv = {
+    CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+    OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+  }
+  testConfigDir = mkdtempSync(join(tmpdir(), "skill-browser-provider-"))
+  process.env.CLAUDE_CONFIG_DIR = testConfigDir
+  process.env.OPENCODE_CONFIG_DIR = testConfigDir
 })
 
 afterEach(() => {
-	clearSkillCache()
-	for (const [key, value] of Object.entries(originalEnv)) {
-		if (value !== undefined) {
-			process.env[key] = value
-		} else {
-			delete process.env[key]
-		}
-	}
+  clearSkillCache()
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+  rmSync(testConfigDir, { recursive: true, force: true })
 })
 
-describe("resolveSkillContent with browserProvider", () => {
-	it("should resolve agent-browser skill when browserProvider is 'agent-browser'", () => {
-		// given: browserProvider set to agent-browser
-		const options = { browserProvider: "agent-browser" as const }
+describe("skill content browser provider selection", () => {
+  test("resolves the selected dev browser builtin", () => {
+    // Given: an explicit alternate provider.
+    const options = { browserProvider: "dev-browser" as const }
+    // When: resolving its content.
+    const result = resolveSkillContent("dev-browser", options)
+    // Then: the real selected template is returned unchanged.
+    expect(result).toBe(devBrowserSkill.template)
+  })
 
-		// when: resolving content for 'agent-browser'
-		const result = resolveSkillContent("agent-browser", options)
+  test("omits the alternate builtin when the provider defaults to playwright", () => {
+    // Given: no browser override.
+    const name = "dev-browser"
+    // When: resolving the alternate builtin.
+    const result = resolveSkillContent(name)
+    // Then: the alternate provider is not selected.
+    expect(result).toBeNull()
+  })
 
-		// then: returns agent-browser template
-		expect(result).not.toBeNull()
-		expect(result).toContain("agent-browser")
-	})
+  test("omits playwright when the dev browser provider is selected", () => {
+    // Given: an explicit alternate provider.
+    const options = { browserProvider: "dev-browser" as const }
+    // When: resolving the default builtin.
+    const result = resolveSkillContent("playwright", options)
+    // Then: only the selected provider is available.
+    expect(result).toBeNull()
+  })
 
-	it("should return null for agent-browser when browserProvider is default", () => {
-		// given: no browserProvider (defaults to playwright)
+  test("resolves selected browser and unrelated skills together", () => {
+    // Given: a mixed request with an explicit provider.
+    const names = ["dev-browser", "git-master"]
+    // When: resolving the request.
+    const result = resolveMultipleSkills(names, { browserProvider: "dev-browser" })
+    // Then: both requested skill ids resolve.
+    expect([...result.resolved.keys()]).toEqual(names)
+    expect(result.notFound).toEqual([])
+  })
 
-		// when: resolving content for 'agent-browser'
-		const result = resolveSkillContent("agent-browser")
+  test("reports the retired builtin as missing", () => {
+    // Given: a request for the former builtin id.
+    const name = ["agent", "browser"].join("-")
+    // When: resolving it through the default path.
+    const result = resolveMultipleSkills([name])
+    // Then: no retired builtin is returned.
+    expect([...result.resolved.keys()]).toEqual([])
+    expect(result.notFound).toEqual([name])
+  })
 
-		// then: returns null because agent-browser is not in default builtin skills
-		expect(result).toBeNull()
-	})
-
-	it("should return null for playwright when browserProvider is agent-browser", () => {
-		// given: browserProvider set to agent-browser
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving content for 'playwright'
-		const result = resolveSkillContent("playwright", options)
-
-		// then: returns null because playwright is replaced by agent-browser
-		expect(result).toBeNull()
-	})
-})
-
-describe("resolveMultipleSkills with browserProvider", () => {
-	it("should resolve agent-browser when browserProvider is set", () => {
-		// given: agent-browser and git-master requested with browserProvider
-		const skillNames = ["agent-browser", "git-master"]
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving multiple skills
-		const result = resolveMultipleSkills(skillNames, options)
-
-		// then: both resolved
-		expect(result.resolved.has("agent-browser")).toBe(true)
-		expect(result.resolved.has("git-master")).toBe(true)
-		expect(result.notFound).toHaveLength(0)
-	})
-
-	it("should not resolve agent-browser without browserProvider option", () => {
-		// given: agent-browser requested without browserProvider
-		const skillNames = ["agent-browser"]
-
-		// when: resolving multiple skills
-		const result = resolveMultipleSkills(skillNames)
-
-		// then: agent-browser not found
-		expect(result.resolved.has("agent-browser")).toBe(false)
-		expect(result.notFound).toContain("agent-browser")
-	})
-})
-
-describe("resolveMultipleSkillsAsync with browserProvider filtering", () => {
-	it("should exclude discovered agent-browser when browserProvider is playwright", async () => {
-		// given: playwright is the selected browserProvider (default)
-		const skillNames = ["playwright", "git-master"]
-		const options = { browserProvider: "playwright" as const }
-
-		// when: resolving multiple skills
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: playwright resolved, agent-browser would be excluded if discovered
-		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.resolved.has("git-master")).toBe(true)
-		expect(result.notFound).not.toContain("playwright")
-	})
-
-	it("should exclude discovered playwright when browserProvider is agent-browser", async () => {
-		// given: agent-browser is the selected browserProvider
-		const skillNames = ["agent-browser", "git-master"]
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving multiple skills
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: agent-browser resolved, playwright would be excluded if discovered
-		expect(result.resolved.has("agent-browser")).toBe(true)
-		expect(result.resolved.has("git-master")).toBe(true)
-		expect(result.notFound).not.toContain("agent-browser")
-	})
+  test("filters an actual discovered playwright skill for the alternate provider", async () => {
+    // Given: a discoverable default-provider override.
+    const skillDirectory = join(testConfigDir, "skills", "playwright")
+    mkdirSync(skillDirectory, { recursive: true })
+    writeFileSync(join(skillDirectory, "SKILL.md"), "---\nname: playwright\ndescription: fixture\n---\nfixture content")
+    // When: resolving under the alternate provider.
+    const result = await resolveMultipleSkillsAsync(["dev-browser", "playwright"], {
+      browserProvider: "dev-browser",
+      directory: testConfigDir,
+    })
+    // Then: discovered default-provider content cannot override selection.
+    expect([...result.resolved.keys()]).toEqual(["dev-browser"])
+    expect(result.notFound).toEqual(["playwright"])
+  })
 })

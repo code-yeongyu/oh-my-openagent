@@ -95,6 +95,33 @@ describe("formatStatusTarget", () => {
     )
   })
 
+  // A record carrying BOTH identities is a task whose caller wrote a subagent_type that a category
+  // ended up resolving (#8348). The category must never silently erase the name the caller wrote:
+  // the model and the target that selected it have to travel together in the same view.
+  test("#given a record carrying both the asked-for agent and the resolving category #when formatted #then both targets ride the model", () => {
+    // given / when / then
+    expect(
+      formatStatusTarget({
+        category: "architect",
+        agentType: "architect",
+        resolvedModel: {
+          provider: "anthropic",
+          model_id: "claude-fable-5-1",
+          display: "claude-fable-5-1",
+          reasoning: "xhigh",
+          source: "category",
+        },
+      }),
+    ).toBe("agent:architect\u2192category:architect(anthropic/claude-fable-5-1:xhigh)")
+  })
+
+  test("#given a record whose asked-for agent differs from the resolving category #when formatted #then the asked-for name is kept", () => {
+    // given / when / then
+    expect(formatStatusTarget({ category: "visual-engineering", agentType: "frontend-worker" })).toBe(
+      "agent:frontend-worker\u2192category:visual-engineering",
+    )
+  })
+
 
   test("#given resolved model metadata with effort and variant #when formatted #then reasoning effort wins in the status target", () => {
     // given / when / then

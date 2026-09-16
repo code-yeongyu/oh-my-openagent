@@ -3364,8 +3364,8 @@ describe("sisyphus-task", () => {
   })
 
   describe("browserProvider propagation", () => {
-    test("should resolve agent-browser skill when browserProvider is passed", async () => {
-      // given - task configured with browserProvider: "agent-browser"
+    test("should resolve dev-browser skill when browserProvider is passed", async () => {
+      // given - task configured with an alternate browser provider
       const { createDelegateTask } = require("./tools")
       let promptBody: CapturedPromptBody = {}
 
@@ -3395,7 +3395,7 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
-         browserProvider: "agent-browser",
+         browserProvider: "dev-browser",
        })
 
       const toolContext = {
@@ -3405,34 +3405,34 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - request agent-browser skill
+      // when - request dev-browser skill
       await tool.execute(
         {
           description: "Test browserProvider propagation",
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          load_skills: ["agent-browser"],
+          load_skills: ["dev-browser"],
         },
         toolContext
       )
 
-      // then - agent-browser skill should be resolved
+      // then - dev-browser skill should be resolved
       expect(promptBody).toBeDefined()
       expect(promptBody.system).toBeDefined()
       expect(promptBody.system).toContain("<Category_Context>")
       expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
     }, { timeout: 20000 })
 
-    test("should resolve configured agent-browser skill when browserProvider is not set", async () => {
+    test("should resolve a configured custom browser skill when browserProvider is not set", async () => {
       // given - delegate_task without browserProvider
       const { createDelegateTask } = require("./tools")
       const nativeSkills = {
         all: async () => [{
-          name: "agent-browser",
+          name: "custom-browser",
           description: "Browser automation skill",
-          location: "/native/agent-browser/SKILL.md",
-          content: "Agent browser instructions",
+          location: "/native/custom-browser/SKILL.md",
+          content: "Custom browser instructions",
         }],
         get: async () => undefined,
       }
@@ -3468,14 +3468,14 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - request agent-browser skill without browserProvider
+      // when - request custom browser skill without browserProvider
       const result = await tool.execute(
         {
           description: "Test missing browserProvider",
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          load_skills: ["agent-browser"],
+          load_skills: ["custom-browser"],
         },
         toolContext
       )

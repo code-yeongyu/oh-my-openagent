@@ -29,6 +29,7 @@ export async function cleanupExpiredRecords(context: LifecycleContext): Promise<
   // Crash recovery before anything else: finish the interrupted expunges of a previous sweep.
   for (const taskId of context.store.listExpunging()) {
     context.store.completeExpunge(taskId)
+    context.kernelToolBindings?.release(taskId)
     deleted.push(taskId)
   }
 
@@ -51,8 +52,10 @@ export async function cleanupExpiredRecords(context: LifecycleContext): Promise<
     if (orphanPid !== undefined && context.signaller.isAlive(orphanPid)) {
       await destroyResidentTask(context, record.task_id, "ttl", orphanPid)
     }
-    // Phase 2: children dir, spill, log, then drop the tombstone.
+    // Phase 2: children dir, spill, log, then drop the tombstone. An expunged record can never be
+    // revived, so its runtime parent kernel-tool binding goes with it.
     context.store.completeExpunge(record.task_id)
+    context.kernelToolBindings?.release(record.task_id)
     deleted.push(record.task_id)
   }
   return { deleted, retained }

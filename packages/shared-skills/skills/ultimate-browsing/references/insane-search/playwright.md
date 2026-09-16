@@ -16,10 +16,10 @@
 
 ### 의존성
 
-```bash
-claude mcp list 2>/dev/null | grep -q playwright && echo "OK" || echo "NOT CONNECTED"
-claude mcp add playwright -- npx @playwright/mcp@latest
-```
+이 항목은 이미 연결된 MCP를 사용하는 엔진 어댑터의 설명이다.
+새 브라우저 세션은 js eval의 Bun.WebView(Bun >= 1.4, macOS 기본;
+Linux/Windows는 설치된 Chrome/Chromium/Edge 필요), 그 외 또는 Chrome 동작·stealth·trace·인증은
+로컬 Chrome을 제어하는 `playwright-core` 스크립트로 실행한다. MCP를 새로 설치하지 않는다.
 
 ### 기본 워크플로
 
@@ -56,11 +56,11 @@ claude mcp add playwright -- npx @playwright/mcp@latest
 # Node (시스템 설치)
 node -v   # v18+ 권장
 
-# Playwright + stealth 플러그인
-npm i -g playwright playwright-extra puppeteer-extra-plugin-stealth
-
-# 시스템 Chrome 바이너리 (번들 Chromium 아님)
-npx playwright install chrome
+# 사용자가 엔진 디렉터리에서 한 번 설치하는 스크립트 의존성
+cd "$SKILL_DIR/engine"
+test -f package.json || cp templates/package.json package.json
+bun add playwright-core@1.62.1 playwright-extra@4.3.6 puppeteer-extra-plugin-stealth@2.11.2
+# Chrome은 이미 시스템에 설치되어 있어야 한다. 브라우저 다운로드 명령은 없다.
 ```
 
 ### 호출 (engine 내부)
@@ -81,7 +81,8 @@ attempt, html = run_playwright_fallback(
 ### 데스크톱 템플릿 (`playwright_real_chrome.js`)
 
 ```js
-const { chromium } = require('playwright-extra');
+const { addExtra } = require('playwright-extra');
+const chromium = addExtra(require('playwright-core').chromium);
 const stealth = require('puppeteer-extra-plugin-stealth')();
 chromium.use(stealth);
 
@@ -95,7 +96,9 @@ const ctx = await chromium.launchPersistentContext(profileDir, {
 ### 모바일 템플릿 (`playwright_mobile_chrome.js`)
 
 ```js
-const { chromium, devices } = require('playwright-extra');
+const { devices } = require('playwright-core');
+const { addExtra } = require('playwright-extra');
+const chromium = addExtra(require('playwright-core').chromium);
 const iPhone = devices['iPhone 13 Pro'];
 
 const ctx = await chromium.launchPersistentContext(profileDir, {
@@ -126,8 +129,8 @@ const ctx = await chromium.launchPersistentContext(profileDir, {
 
 ## 디버깅 팁
 
-- `profileDir`를 고정 경로로 두면 세션·쿠키가 유지되어 재시도 빠름 (`/tmp/.insane_pw_profile`)
-- Akamai 재시도가 잦으면 `profileDir`를 삭제해 fresh 상태로 리셋
+- 템플릿은 js eval에서 스크립트로 실행한다. `profileDir`는 작업 전용 경로나 사용자 프로필의 복제본만 사용한다.
+- 사용자의 실제 프로필을 실행·초기화·삭제하지 않는다. 작업 종료 시 컨텍스트를 닫고 작업 전용 복제본만 정리한다.
 - 실패 시 `result.trace`의 `error` 필드에 Node stderr 200자가 포함됨
 
 ## 사이트 예시 (독자 이해용, 코드 분기 근거 아님)

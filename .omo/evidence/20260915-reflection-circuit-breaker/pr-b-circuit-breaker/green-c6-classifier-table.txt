@@ -1,0 +1,34 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/components/memory/worker/failure-policy.test.ts:
+(pass) reflection failure classification for the park policy > #given a merged outcome #when classified #then there is no failure signal [0.58ms]
+(pass) reflection failure classification for the park policy > #given a no_changes outcome #when classified #then there is no failure signal [2.69ms]
+(pass) reflection failure classification for the park policy > #given timed_out/deadline_exceeded with detail undefined #when classified #then the failure is retryable [0.19ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "OpenAI API error (429): {\"type\":\"usage_limit_reached\"}" #when classified #then the failure is retryable [0.29ms]
+(pass) reflection failure classification for the park policy > #given failed/spawn_failed with detail "provider_unavailable:OpenAI API error (429): Too Many Requests" #when classified #then the failure is retryable [0.07ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "503: {\"message\":\"All providers are temporarily cooling down\"}" #when classified #then the failure is retryable [0.09ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "Error: EAGAIN: resource temporarily unavailable, posix_spawn" #when classified #then the failure is retryable [0.07ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "Error: connect ECONNRESET" #when classified #then the failure is retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "Error: request to https://api.example failed, reason: ETIMEDOUT" #when classified #then the failure is retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given failed/supervisor_failed with detail "reflection supervisor died before publishing an outcome; the child is dead too\nsupervisor pid 1, child pid 2" #when classified #then the failure is retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given parent_dirty/%s with detail undefined #when classified #then the failure is retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given merge_conflict/%s with detail "Recorded preimage for 'reference/lessons/operating-lessons.md'" #when classified #then the failure is retryable [0.11ms]
+(pass) reflection failure classification for the park policy > #given failed/%s with detail undefined #when classified #then the failure is retryable [2.64ms]
+(pass) reflection failure classification for the park policy > #given failed/spawn_failed with detail "Error: Model \"apitopia/kimi-for-coding-highspeed\" not found. Use --list-models to see available models." #when classified #then the failure is not retryable [0.14ms]
+(pass) reflection failure classification for the park policy > #given failed/spawn_failed with detail "memory reflection exhausted every quick candidate" #when classified #then the failure is not retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "No API key found for zai.\n\nUse /login to log into a provider" #when classified #then the failure is not retryable [0.07ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "ENOENT: no such file or directory, open '/home/u/.omo/binary-runtime/0.0.0-omob.x/dist/modes/interactive/theme/dark.json'" #when classified #then the failure is not retryable [0.06ms]
+(pass) reflection failure classification for the park policy > #given failed/child_exit with detail "sandbox-exec: execvp() of 'senpi' failed: No such file or directory" #when classified #then the failure is not retryable [0.06ms]
+(pass) reflection failure classification for the park policy > #given failed/supervisor_failed with detail "memory run supervisor exited with 0" #when classified #then the failure is not retryable [0.06ms]
+(pass) reflection failure classification for the park policy > #given failed/invalid_target with detail "Dream changed paths outside targetDoc" #when classified #then the failure is not retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given failed/completion_validation with detail "Git administration file was altered" #when classified #then the failure is not retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given dirty_uncommitted/completion_validation with detail "worktree has uncommitted changes" #when classified #then the failure is not retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given failed/missing_validated_tip with detail undefined #when classified #then the failure is not retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given failed/missing_worktree with detail undefined #when classified #then the failure is not retryable [0.05ms]
+(pass) reflection failure classification for the park policy > #given two failures whose stderr differs only in stack frames #when classified #then they share a fingerprint [0.09ms]
+(pass) reflection failure classification for the park policy > #given a failure with a long detail #when classified #then the signal carries reason and a bounded detail [0.16ms]
+
+ 26 pass
+ 0 fail
+ 38 expect() calls
+Ran 26 tests across 1 file. [1.74s]

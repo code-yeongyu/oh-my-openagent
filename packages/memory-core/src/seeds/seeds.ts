@@ -2,7 +2,8 @@
  * Default memory seeding — letta parity port (plan todo 33).
  *
  * Seeds a fresh memory repo with system/persona.md + system/human.md +
- * system/boundaries.md rendered with frontmatter, then delegates to GitMemoryRepo.init which
+ * system/boundaries.md + system/self-aware.md + reference/self/observations.md
+ * rendered with frontmatter, then delegates to GitMemoryRepo.init which
  * writes, stages, and commits them as a single initial commit
  * ("chore: initialize local memory"). If the repo already has a HEAD
  * commit, GitMemoryRepo.init returns the existing HEAD unchanged — the
@@ -25,6 +26,8 @@ import {
   DEFAULT_BOUNDARIES_BODY,
   DEFAULT_HUMAN_BODY,
   DEFAULT_PERSONA_BODY,
+  DEFAULT_SELF_AWARE_BODY,
+  DEFAULT_SELF_OBSERVATIONS_BODY,
 } from "./default-memory"
 import {
   MEMORY_DISCIPLINE_SKILL_CONTENT,
@@ -36,10 +39,16 @@ export { DEFAULT_MEMORY_BLOCK_LABELS } from "./default-memory"
 const PERSONA_PATH = "system/persona.md"
 const HUMAN_PATH = "system/human.md"
 const BOUNDARIES_PATH = "system/boundaries.md"
+const SELF_AWARE_PATH = "system/self-aware.md"
+const SELF_OBSERVATIONS_PATH = "reference/self/observations.md"
 
 const PERSONA_DESCRIPTION = "Persona - who I am"
 const HUMAN_DESCRIPTION = "Person - Human"
 const BOUNDARIES_DESCRIPTION = "Boundaries - what the person told me not to do, in their words"
+const SELF_AWARE_DESCRIPTION =
+  "Self-aware - how I look from outside: what my person, reviewers, tests, and tools showed about my behavior, with sources"
+const SELF_OBSERVATIONS_DESCRIPTION =
+  "Self-observations journal - external reactions to my behavior (corrections, gate verdicts, test contradictions), one line each, appended as they happen; reflection promotes to system/self-aware.md"
 const HUMAN_ALIASES: readonly string[] = []
 
 export interface DefaultSeedFile extends GitSeedFile {}
@@ -50,8 +59,9 @@ export interface InitMemorySeedsOptions {
 
 /**
  * Build the default seed files: system/persona.md + system/human.md +
- * system/boundaries.md with frontmatter rendered from the content constants,
- * plus the memory-discipline skill (pre-rendered, SKILL.md frontmatter).
+ * system/boundaries.md + system/self-aware.md + reference/self/observations.md
+ * with frontmatter rendered from the content constants, plus the
+ * memory-discipline skill (pre-rendered, SKILL.md frontmatter).
  *
  * Pure — no filesystem access. Safe to call repeatedly.
  */
@@ -71,6 +81,14 @@ export function buildDefaultSeedFiles(): readonly DefaultSeedFile[] {
     {
       relativePath: BOUNDARIES_PATH,
       content: renderMemoryFile({ description: BOUNDARIES_DESCRIPTION }, DEFAULT_BOUNDARIES_BODY),
+    },
+    {
+      relativePath: SELF_AWARE_PATH,
+      content: renderMemoryFile({ description: SELF_AWARE_DESCRIPTION }, DEFAULT_SELF_AWARE_BODY),
+    },
+    {
+      relativePath: SELF_OBSERVATIONS_PATH,
+      content: renderMemoryFile({ description: SELF_OBSERVATIONS_DESCRIPTION }, DEFAULT_SELF_OBSERVATIONS_BODY),
     },
     {
       relativePath: MEMORY_DISCIPLINE_SKILL_PATH,

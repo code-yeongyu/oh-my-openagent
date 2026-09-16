@@ -127,7 +127,7 @@ You are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrato
 2. **Pick the channel that faithfully exercises the surface** and capture the artifact:
    - HTTP: `curl -i` (or an API request context) - status line, headers, body.
    - CLI / TUI: a real pty - drive the command and keep the transcript; for color or layout evidence render through a browser-based terminal, never a `tmux capture-pane` dump.
-   - Web: the real page in a real browser - the harness's in-process surface (a `Bun.WebView` / `playwright-core` code cell, or Codex's Browser plugin) or the agent-browser CLI - action log plus screenshot.
+   - Web: from js eval, use `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need Chrome/Chromium/Edge). Otherwise, or for Chrome semantics, stealth, trace, or auth, write and run a `playwright-core` script against local Chrome (`channel: "chrome"`; persistent context on a CLONED profile). Codex: `browser:control-in-app-browser`. Capture action log plus screenshot.
    - Desktop / GUI: OS-level automation against the running app - action log plus screenshot.
    - Library / SDK: a script that imports and exercises the public API - transcript.
    - Data-shaped work (migrations, configs, generated files): the resulting artifact itself, diffed or dumped.

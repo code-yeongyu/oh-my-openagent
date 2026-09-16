@@ -1,11 +1,27 @@
 import { join } from "node:path"
 
 import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
-import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan } from "./types"
+import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
 
 export function nowIso(now: () => number): string {
   return new Date(now()).toISOString()
+}
+
+/**
+ * The manager's floor for parent kernel tools: a TEAM MEMBER runs out of process and can never
+ * reach a parent JavaScript kernel, so a member spec that carries a grant is refused before a
+ * record exists - never spawned silently without the tools its caller believes it has.
+ */
+export function memberKernelToolRefusal(spec: ManagerStartSpec): Extract<StartResult, { kind: "plan_unresolved" }> | undefined {
+  if (spec.team_role !== "member" || spec.kernelTools === undefined) return undefined
+  return {
+    kind: "plan_unresolved",
+    error: {
+      code: "invalid_target",
+      message: "Team members run out of process and cannot reach a parent JavaScript kernel, so they never receive parent kernel tools.",
+    },
+  }
 }
 
 export function buildRecordInput(input: {
@@ -99,6 +115,7 @@ export function buildManagedSpec(input: {
     ...(spec.memberScopedTools !== undefined
       ? { memberScopedToolNames: spec.memberScopedTools.map((tool) => tool.name) }
       : {}),
+    ...(spec.kernelTools !== undefined ? { kernelTools: spec.kernelTools } : {}),
     ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
     ...(memberEnv !== undefined ? { memberEnv } : {}),
   }

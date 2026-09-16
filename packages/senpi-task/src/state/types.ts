@@ -138,6 +138,13 @@ export type PendingSteeringEntry = {
   readonly id: string
   readonly message: string
   readonly deliver_as: "steer" | "followUp"
+  readonly workpool?: {
+    readonly pool_id: string
+    readonly item_id: string
+    readonly key: string
+    readonly generation: number
+    readonly run_epoch: number
+  }
 }
 
 export type TaskRecordInput = {

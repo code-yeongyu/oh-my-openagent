@@ -54,6 +54,7 @@ Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO N
 - category routes to the category worker. Available categories:
 ${renderCategoryList(categories)}
 - subagent_type invokes a loaded agent directly. Available agents: ${agentNames}${gatedLine}${planReviewerNotice}
+  A subagent_type that names no loaded agent fails with unknown_target; a category name belongs in category, never in subagent_type.
 
 Blank provider padding is normalized automatically; do not add filler values.
 load_skills prepends named skills. run_in_background=true returns the task id at once and the child's result arrives later as a message; false blocks this turn until the child finishes.

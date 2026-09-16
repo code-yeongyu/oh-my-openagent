@@ -6,14 +6,14 @@ The main agent runs in your session and delegates through the `task` tool: categ
 
 ### Current Agent Model Chains
 
-The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi rungs. The OpenCode edition uses `kimi-for-coding` for the same Kimi chain positions. The same resolved chain is used at spawn time and again if runtime retry fallback needs to recover.
+The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi rungs. The OpenCode edition uses `kimi-for-coding` for the same Kimi chain positions. Senpi also lists no `openai` rung: that id is its metered API-key lane, so every GPT rung and the `ultrabrain`, `deep`, and `unspecified-high` defaults route through `openai-codex` (the ChatGPT subscription lane) there, and a machine holding both an API key and a ChatGPT login is never billed per token for delegated work. An API-key-only Senpi registry still resolves the same way a `vercel`-only one does (cross-provider fallthrough). The OpenCode edition keeps `openai`, its single OpenAI provider id. The same resolved chain is used at spawn time and again if runtime retry fallback needs to recover.
 
 | Role | Primary | Full fallback chain |
 | --- | --- | --- |
 | **main agent** | your session model | No chain of its own. Claude Opus 5 or GPT 5.6 Sol recommended; mid-session fallback follows the harness retry chains. |
-| **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **plan-consultant** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/glm-5.2` → `kimi-coding\|kimi-for-coding/kimi-k3`
+| **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
+| **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
 | **plan-reviewer** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 | **category: visual-engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
 | **category: architect** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` |
@@ -452,7 +452,7 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 
 ### Built-in Skill Sets
 
-The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`, `frontend`, `git-master`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
+Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git-master`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
 
 #### init-deep
 
@@ -462,7 +462,7 @@ The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`
 | ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **git-master**         | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced).                              |
 | **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
-| **agent-browser**      | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
+| **visual-qa**          | Browser rendering and screenshot evidence               | Bun.WebView from js eval, or a written playwright-core script against local Chrome for Chrome semantics, stealth, traces, and cloned authenticated profiles. |
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
 | **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
 | **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation gate review. The orchestrator runs manual QA on the real surface, then one gate reviewer audits goal, code quality, security, missed context, and the QA evidence. Passes only on a clean QA matrix plus APPROVE.                                                                                                                     |
@@ -505,46 +505,31 @@ The built-in skill registry contains `agent-browser`, `debugging`, `dev-browser`
 
 ### Browser Automation Options
 
-Oh-My-OpenAgent provides four browser automation providers (`playwright`, `agent-browser`, `dev-browser`, `playwright-cli`), configurable via `browser_automation_engine.provider`.
+Shipped browser guidance uses two tiers from the js-eval kernel. In Codex,
+prefer `browser:control-in-app-browser` for ordinary page control. The retired
+CLI provider and its builtin skill are no longer shipped. An obsolete
+`browser_automation_engine.provider` value fails validation; doctor names the
+rejected value and directs users to Bun.WebView / playwright-core scripts.
+Remove the obsolete override rather than installing a retired CLI.
 
-#### Option 1: Playwright MCP (Default)
+#### Option 1: Bun.WebView
 
-```yaml
-mcp:
-  playwright:
-    command: npx
-    args: ["@playwright/mcp@latest"]
-```
+On Bun >= 1.4, use `new Bun.WebView()`. macOS defaults to system WebKit;
+Linux/Windows require installed Chrome/Chromium/Edge. Capture PNG with
+`await Bun.write(pngPath, await view.screenshot())` and close the WebView.
+WebView is headless, WebKit has no CDP, and `type()` emits no keyboard events.
 
-**Usage**:
+#### Option 2: playwright-core scripts with local Chrome
 
-```
-/playwright Navigate to example.com and take a screenshot
-```
+Otherwise, or for Chrome semantics, stealth, trace, or authenticated profiles,
+WRITE a `playwright-core` script and run it from js eval against installed Chrome
+(`chromium.launch({ channel: "chrome" })`). The user installs `playwright-core`
+once if absent; no managed browser download is required. For persistent auth,
+CLONE the profile before `launchPersistentContext`; never launch against or clear
+the live profile. The `ultimate-browsing` skill documents optional, user-installed
+script-only stealth plugins. Close all browser contexts after capture.
 
-#### Option 2: Agent Browser CLI (Vercel)
-
-```json
-{
-  "browser_automation_engine": {
-    "provider": "agent-browser"
-  }
-}
-```
-
-**Requires installation**:
-
-```bash
-bun add -g agent-browser
-```
-
-**Usage**:
-
-```
-Use agent-browser to navigate to example.com and extract the main heading
-```
-
-**Capabilities (Both Providers)**:
+**Browser QA capabilities (choose the tier that supports the criterion)**:
 
 - Navigate and interact with web pages
 - Take screenshots and PDFs
@@ -586,7 +571,7 @@ Same-named skill at higher priority overrides lower.
 
 Loaded skill display priority follows this order: `project > user > opencode > builtin/plugin`.
 
-Disable built-in skills via `disabled_skills: ["playwright"]` in config.
+Disable built-in skills via `disabled_skills: ["playwright"]` in config; the same key at the shared base of `~/.omo/omo.jsonc` hides a skill on every harness, including the bundled `frontend` / `visual-qa` skills on OmO Native.
 
 ### Category + Skill Combo Strategies
 

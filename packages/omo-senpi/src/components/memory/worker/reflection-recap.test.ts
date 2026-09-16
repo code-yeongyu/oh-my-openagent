@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile, symlink, rename } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, symlink, lstat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { deliverReflectionCompletion } from "./completion-delivery"
@@ -113,15 +113,27 @@ test("#given an interrupted positional read #when retried #then the same offset 
   expect(report).toMatchObject({ status: "available", text: item.report })
 })
 
-test.each(["replacement", "size change"])("#given a %s during the read #when checked #then changing output is unavailable", async (change) => {
+test("#given a replacement during the read #when checked #then changing output is unavailable", async () => {
+  const item = await fixture()
+  const path = join(item.runDir, "child-stdout.log")
+  let comparedPath = false
+  const report = await readReflectionReport(item.runDir, undefined, lstat, (opened, current) => {
+    comparedPath = true
+    expect(opened.isFile()).toBe(true)
+    expect(current.isFile()).toBe(true)
+    return false
+  })
+  expect(comparedPath).toBe(true)
+  expect(report).toEqual({ status: "unavailable", reason: "changing_file" })
+  expect(await lstat(path)).toBeDefined()
+})
+
+test("#given a size change during the read #when checked #then changing output is unavailable", async () => {
   const item = await fixture()
   const path = join(item.runDir, "child-stdout.log")
   const report = await readReflectionReport(item.runDir, async (file, buffer, offset) => {
     const read = await file.read(buffer, offset, buffer.length - offset, offset)
-    if (change === "replacement") {
-      await writeFile(`${path}.replacement`, item.report)
-      await rename(`${path}.replacement`, path)
-    } else await writeFile(path, "changed\n")
+    await writeFile(path, "changed\n")
     return read.bytesRead
   })
   expect(report).toEqual({ status: "unavailable", reason: "changing_file" })

@@ -423,9 +423,9 @@ The main agent has no chain of its own: it runs on your session model (Claude Op
 
 | Agent | Default Model | Provider Priority |
 | --- | --- | --- |
-| **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **plan-consultant** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/glm-5.2` → `kimi-for-coding/kimi-k3`
+| **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
+| **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
 | **plan-reviewer** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 
 #### Category Provider Chains
@@ -491,9 +491,9 @@ The OpenCode edition's orchestration key (`sisyphus_agent`) and its file-based t
 
 Skills bring domain-specific expertise and embedded MCPs.
 
-Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
+Selected built-in skills: `playwright`, `playwright-cli`, `dev-browser`, `git-master`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
 
-Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
+Disable built-in skills: `{ "disabled_skills": ["playwright"] }`. `disabled_skills` is also a shared base key of `~/.omo/omo.jsonc`, honored by every harness including OmO Native (for example `{ "disabled_skills": ["frontend", "visual-qa"] }`); user and project layers are unioned. `skills.enable` below only filters config-sourced skills, not builtin, native, or bundled ones - use `disabled_skills` to hide those.
 
 #### Skills Configuration
 
@@ -716,18 +716,26 @@ Available commands: `goal`, `refactor`, `ulw-execute`, `stop-continuation`, `rem
 
 ### Browser Automation
 
+`browser_automation_engine.provider` accepts only the three values below.
+Unsupported values fail schema validation and `oh-my-opencode doctor` reports
+both the rejected value and the replacement: use the built-in browser path:
+Bun.WebView / playwright-core scripts. Remove the obsolete provider override
+from the active `[opencode]` block in `omo.jsonc` (including project/profile
+layers); it is not silently mapped to another provider.
+
 | Provider               | Interface | Installation                                        |
 | ---------------------- | --------- | --------------------------------------------------- |
 | `playwright` (default) | MCP tools | Auto-installed via npx                              |
-| `agent-browser`        | Bash CLI  | `bun add -g agent-browser && agent-browser install` |
 | `dev-browser`          | Skill     | Uses persistent dev-browser state                   |
 | `playwright-cli`       | Bash CLI  | Uses the token-efficient `@playwright/cli`           |
 
-Switch provider:
-
-```json
-{ "browser_automation_engine": { "provider": "agent-browser" } }
-```
+Browser skills use two tiers from js eval: `new Bun.WebView()` on Bun >= 1.4
+(macOS default; Linux/Windows require installed Chrome/Chromium/Edge), otherwise
+write and run a `playwright-core` script against local Chrome (`channel: "chrome"`).
+Use the script tier for Chrome semantics, stealth, traces, and authenticated
+profiles; `launchPersistentContext` receives a CLONED profile, never the live one.
+Codex uses `browser:control-in-app-browser` for ordinary page control. These are
+skill execution paths, not new values of `browser_automation_engine.provider`.
 
 ### Tmux Integration
 
@@ -760,8 +768,10 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 Configure git commit behavior:
 
 ```json
-{ "git_master": { "commit_footer": true, "include_co_authored_by": true } }
+{ "git_master": { "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
 ```
+
+`commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Commits keep your own git author and committer, and omo never adds a `Co-authored-by` trailer; `include_co_authored_by` is a deprecated no-op kept so existing configs still validate.
 
 This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-senpi-harness).
 

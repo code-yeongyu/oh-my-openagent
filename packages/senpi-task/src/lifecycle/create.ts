@@ -23,7 +23,12 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
     destroyResidentTask: (taskId: string, cause: DestroyCause) => destroyResidentTask(context, taskId, cause),
     rollbackDetachedRevival: (prior) => rollbackDetachedRevival(context, prior),
     reclaimIdleResidents: () => reclaimIdleResidents(context),
-    dispose: stopIdleReclaimer,
+    // Parent shutdown: the kernel that owns every granted closure dies with this engine, so the
+    // whole runtime binding map goes too - no strong reference to a disposed kernel survives.
+    dispose: () => {
+      stopIdleReclaimer()
+      context.kernelToolBindings?.releaseAll()
+    },
     admitResident: (parentSessionId: string) => admitResident(context, parentSessionId),
     reconcileOnSessionStart: (parentSessionId?: string) => reconcileOnSessionStart(context, parentSessionId),
     cleanupExpiredRecords: cleanup,

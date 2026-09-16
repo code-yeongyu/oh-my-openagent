@@ -146,7 +146,7 @@ describe("resolveAgent category stage", () => {
     const result = expectUnavailable(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.attemptedModel).toBe("openai/gpt-6-astra")
+    expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
   })
 
   test("#given a definition model alongside categories #when both are available #then the direct model wins", () => {
@@ -169,7 +169,7 @@ describe("resolveAgent category stage", () => {
     const result = expectUnavailable(resolveAgent("categorized", agents, undefined))
 
     // then
-    expect(result.attemptedModel).toBe("openai/gpt-6-astra")
+    expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
   })
 
   test("#given the ulw reviewer builtins #when reading their definitions #then each declares its ordered model-policy categories", () => {
@@ -189,7 +189,7 @@ describe("resolveAgent category stage", () => {
   })
 
   test("#given a category whose head model is unavailable #when a later rung wins #then requested_model is the selected model, not the head", () => {
-    // given: unspecified-high's head is openai/gpt-6-astra; only its glm-5.3 rung exists here.
+    // given: unspecified-high's head is openai-codex/gpt-6-astra; only its glm-5.3 rung exists here.
     const definition: AgentDefinition = { name: "probe", categories: ["unspecified-high"] }
     const glmOnlyRegistry = registry([model("zai-coding-plan", "glm-5.3")])
 
@@ -211,7 +211,7 @@ describe("resolveAgent category stage", () => {
     // given: getAvailable() returns a non-array (unparseable), but find() works. The direct-model
     // path documents this degradation, so a categorized agent must not lose it.
     const definition: AgentDefinition = { name: "probe", categories: ["unspecified-high"] }
-    const available = [model("openai", "gpt-6-astra")]
+    const available = [model("openai-codex", "gpt-6-astra")]
     const malformedRegistry = {
       getAvailable: (): unknown => ({ notAnArray: true }),
       find: (provider: string, modelId: string) =>
@@ -224,7 +224,7 @@ describe("resolveAgent category stage", () => {
     // then
     expect(resolution.kind).toBe("resolved")
     if (resolution.kind !== "resolved") return
-    expect(resolution.model).toBe("openai/gpt-6-astra")
+    expect(resolution.model).toBe("openai-codex/gpt-6-astra")
   })
 
   test("#given a user category model override that is unavailable #when resolution fails #then the attempted model names the user model, not the builtin", () => {

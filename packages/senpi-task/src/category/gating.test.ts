@@ -118,7 +118,7 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("openai/gpt-6-astra")
+      expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
       expect(result.availableCategories).not.toContain("ultrabrain")
     })
 
@@ -179,7 +179,7 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("openai/gpt-6-astra")
+      expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
       expect(result.availableCategories).not.toContain("deep")
     })
 

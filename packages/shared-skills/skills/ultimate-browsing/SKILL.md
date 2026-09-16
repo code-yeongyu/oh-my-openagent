@@ -7,7 +7,7 @@ description: "Renders, drives, and screenshots web pages: JS-rendered sources, c
 
 Web access for everything a plain fetch cannot finish: a page that renders in JS, a click or a form, a screenshot, a login that must persist across pages, or a host that blocks generic fetchers (WAF / 403 / Cloudflare). Start at the cheapest tier that can do the job and climb only when it cannot:
 
-**Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — a real browser**: 2a a code-driven kernel browser, 2b Chrome stealth (CloakBrowser + agent-browser) when the page fights back.
+**Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — a real browser**: 2a Bun.WebView, 2b a local-Chrome `playwright-core` script from js eval for Chrome semantics, stealth, trace, or auth.
 
 ## PHASE 0 — ROUTE FIRST (MANDATORY)
 
@@ -86,33 +86,26 @@ Routing table, per-platform auth (set `TWITTER_*` env vars, `gh auth login`, a t
 
 ### Tier 2a — kernel browser (default)
 
-Drive the page from the code cell you are already in, with no CLI process and no open CDP port. On a Bun >= 1.4 runtime that is `new Bun.WebView()` (`navigate`, `click`, `type`, `evaluate`, `screenshot`, raw `cdp`); elsewhere it is `playwright-core`/`puppeteer-core` against the local Chrome. Snapshots and screenshots come back in-process, so this is the cheapest way to answer "what does the page actually render".
+Use `new Bun.WebView()` from the js-eval kernel on Bun >= 1.4: macOS defaults to system WebKit; Linux/Windows need installed Chrome/Chromium/Edge. WebView is headless, WebKit has no CDP, and `type()` emits no keyboard events. For other kernels or when those differences matter, use 2b.
 
 ```js
-await using view = new Bun.WebView({ width: 1280, height: 800 })
-await view.navigate(url)
-const title = await view.evaluate("document.title")
-await view.screenshot({ path: "/tmp/page.png" })
+const view = new Bun.WebView({ width: 1280, height: 800 })
+try {
+  await view.navigate(url)
+  const title = await view.evaluate("document.title")
+  await Bun.write(pngPath, await view.screenshot())
+} finally {
+  view[Symbol.dispose]()
+}
 ```
 
-Climb to 2b when the site detects automation (Turnstile, FingerprintJS, "unusual traffic"), when the flow needs a persistent logged-in profile or injected cookies, or when the kernel browser cannot reach the page at all.
+Use 2b for real-Chrome semantics, stealth, trace, authenticated profiles, or a page the kernel browser cannot reach.
 
 ### Tier 2b — Chrome stealth (blocked or logged-in pages)
 
-CloakBrowser is a stealth Chromium with source-level fingerprint patches that passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors; agent-browser is the CDP automation CLI that drives it. Both are runtime-installed tools (not vendored here). Full setup, version pins, launch flow, cookie login, and cross-platform notes are in [references/chrome-stealth.md](references/chrome-stealth.md).
+WRITE a `playwright-core` script and run it from js eval against installed local Chrome: `chromium.launch({ channel: "chrome" })`, or `launchPersistentContext` on a task-owned profile. For authenticated state, CLONE the user's profile first (`rsync -a <profile>/ <tmp-clone>/`); NEVER launch against or clear cookies/cache/site data from the live profile. Codex: prefer `browser:control-in-app-browser` for ordinary page control.
 
-NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state everywhere. If the task needs that profile's login state, clone the profile directory first (`rsync -a <profile>/ <tmp-clone>/`) and launch CloakBrowser / agent-browser with the clone as the user-data-dir; run any clearing on the clone only.
-
-```bash
-# 1. Launch CloakBrowser with CDP on :9242 (see chrome-stealth.md for install + venv).
-# 2. CloakBrowser launches tabless — open the first tab via CDP before any agent-browser command:
-curl -s -X PUT "http://127.0.0.1:9242/json/new?https://example.com"
-# 3. Drive it with agent-browser over CDP:
-agent-browser --cdp 9242 snapshot -i        # interactive elements (@eN refs)
-agent-browser --cdp 9242 click @e3
-agent-browser --cdp 9242 screenshot out.png
-agent-browser --cdp 9242 close
-```
+Keep the engine's Playwright templates for script-based extraction. Stealth is optional: the user installs `playwright-extra` + `puppeteer-extra-plugin-stealth` once in the engine directory and the script wraps the `playwright-core` browser type. Setup, persistent-context arguments, screenshots, and cleanup are in [references/chrome-stealth.md](references/chrome-stealth.md). A stealth flag is not proof of access: inspect the rendered result and report challenges that remain.
 
 ### Cookie login (cross-platform)
 
@@ -134,14 +127,11 @@ Cookie export files are written with owner-only `0600` permissions. Do not place
 |------|-------------|
 | [references/insane-search/README.md](references/insane-search/README.md) | Tier-1 engine harness (R1-R7, Phase 0 API index, no-site-name rule) + its `*.md` deep-dives |
 | [references/agent-reach/README.md](references/agent-reach/README.md) | Tier-1.5 routing table, platform auth, per-category `*.md` |
-| [references/chrome-stealth.md](references/chrome-stealth.md) | Tier-2 CloakBrowser + agent-browser install, CDP flow, version pins, cookie login |
+| [references/chrome-stealth.md](references/chrome-stealth.md) | Tier-2 playwright-core scripts, optional stealth setup, cloned profiles, cookie login |
 
 ## Environment variables
 
 ```bash
-CLOAK_CDP_PORT=9242              # CloakBrowser CDP port (default 9242)
-AGENT_BROWSER_USER_AGENT="..."   # override UA to hide HeadlessChrome
-AGENT_BROWSER_HEADED=1           # show the browser window
 # agent-reach auth: set the channel-specific env vars from each tool's docs only if you have access
 # insane-search needs no env vars — it auto-installs deps on first run
 ```
@@ -149,9 +139,7 @@ AGENT_BROWSER_HEADED=1           # show the browser window
 ## Anti-patterns
 
 - Do NOT launch Chrome stealth for plain text extraction — use Tier 1.
-- Do NOT pass an `--init-script` for the webdriver flag — CloakBrowser already patches it at source; the only required override is `--user-agent`.
-- Do NOT run agent-browser before creating the first tab via `curl -X PUT .../json/new` — CloakBrowser launches tabless.
-- Do NOT use vanilla Chrome when stealth is needed — always CloakBrowser.
-- Do NOT forget to `close` the session when done.
+- Use stealth plugins only in an explicitly installed script environment, not injected into WebView.
+- Close every WebView/browser context when done and remove only task-owned profile clones.
 - Do NOT inject cookies without reloading the page.
 - Do NOT hardcode site domains/selectors into `engine/**` or `waf_profiles.yaml` — runtime hints only (see the no-site-name rule in the insane-search reference).

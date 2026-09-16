@@ -77,7 +77,8 @@ An operations ledger read at night. The whole site is one framed sheet of ink ru
 | Level      | CSS                                       | Weight | Line | Tracking                                      | Usage                                                              |
 | ---------- | ----------------------------------------- | ------ | ---- | --------------------------------------------- | ------------------------------------------------------------------ |
 | Display    | `clamp(2.5rem, 1.35rem + 4.4vw, 5.25rem)` | 500    | 0.98 | -0.03em                                       | Hero H1 (2 lines max, `text-wrap: balance`, container `max-w-6xl`) |
-| Title      | `clamp(2rem, 1.3rem + 2.4vw, 3.25rem)`    | 500    | 1.04 | -0.025em                                      | Section headlines, manifesto H2                                    |
+| Title      | `clamp(2rem, 1.3rem + 2.4vw, 3.25rem)`    | 500    | 1.04 | -0.025em                                      | Manifesto H2, page-level titles                                    |
+| Feature    | `clamp(2rem, 1.5rem + 1.6vw, 2.5rem)`     | 500    | 1.1  | -0.025em                                      | Landing section headlines via `SectionHeader` (§15)                |
 | Heading    | `1.5rem`                                  | 500    | 1.2  | -0.015em                                      | Ledger row titles, bento card titles                               |
 | Subheading | `1.125rem`                                | 500    | 1.35 | -0.01em                                       | Agent names, terminal pane titles                                  |
 | Numeral    | `clamp(2rem, 1.4rem + 2vw, 2.75rem)`      | 500    | 1.0  | -0.03em, `font-variant-numeric: tabular-nums` | Proof strip                                                        |
@@ -123,12 +124,12 @@ An operations ledger read at night. The whole site is one framed sheet of ink ru
 - Section rhythm: `py-16 lg:py-24`; the hero → proof strip and reviews → CTA gaps use `--space-40`. Sections are chapters; do not cramp.
 - Hero: `cover` pattern, `min-h-[100dvh]` (never `h-screen`), `grid-template-rows: auto 1fr auto` with nav / content / proof-strip anchor.
 - Docs shell: `fixed-sidenav-shell` — `grid-template-columns: 16rem minmax(0, 1fr)`, `min-block-size: 0` on the grid and both children, `<main>` is the scroll owner (`overflow: auto`), sidebar sticky inside its column. On < lg the sidebar collapses into a top disclosure; `<main>` keeps `min-inline-size: 0` and prose gets `overflow-wrap: anywhere`, code blocks `overflow-x: auto` — this fixes the recorded 390px horizontal overflow debt instead of carrying it.
-- Manifesto: `content-limiter` at 68ch for prose; section breaks are ruled by `--line`, not by background swaps.
+- Manifesto: `content-limiter` at 68ch for prose; section breaks are ruled by `--line`, not by background swaps. The 2026-09-14 text (`/manifesto`) is read, not scanned: title (Display) → two-line subtitle (Title, `--text-mid`) → byline in Meta mono (`author · date`) → series note (Body/sm italic) → four chapters whose every paragraph is its own `lit-read` block in line mode (§10 `lit-lines`: each authored line lights as it crosses the fixed reading line, so one line is mid-sweep at a time and the reveal unit is the line-break unit) at Lead+1 (`text-xl` / `text-2xl` ≥ md, lh 1.7, `.prose-cjk`), `space-y-8` between paragraphs, `space-y-10` under the chapter Title → closing lead as one more reading block, `just ulw ulw` in mono Display, the CTA button, and a Body/sm footnote ruled by `--line` that links the archive. The January 2026 text lives at `/manifesto/2026-01` unchanged in look, under a ruled `ink-1` banner (`archive-banner.tsx`: Eyebrow `Old version · date`, one Body line on what it argued, link back).
 
 ### Rules
 
 - Grid for multi-column; no flexbox percentage math.
-- Radius scale: **0px** for panels, rows, cards, terminals; **2px** for buttons, chips, inputs; **50%** for status dots only. `rounded-xl`/`rounded-3xl` are gone.
+- Radius scale: **0px** for panels, rows, cards, terminals; **2px** for buttons, chips, inputs; **50%** for status dots only. The work-media and message exceptions in §15 do not change this default.
 - Cards exist only as bento cells inside a ruled grid (agents). No free-floating cards with borders + shadows.
 
 ## 5. Components (primitives + states)
@@ -288,7 +289,8 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 
 `hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta`. Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
 
-- **secret**: the fold. Title = "we'd rather you never read this", body rendered by `LitText` (words light `--text-faint` → `--text-hi` as the paragraph scrolls from the viewport bottom to 35% height), then a `Reveal`ed accent line ("still curious?") that opens the feature story.
+- **secret**: the fold. The body alone owns the word sweep, from its top at 80vh until its bottom reaches 50vh. Every word then remains fully lit for `--lit-read-hold: 18vh` of additional scroll with the follow-up fully hidden. The follow-up has an independent opacity/rise animation over `--lit-follow-fade: 22vh`, starting only after both the reading hold and its untransformed top crossing the viewport midpoint. `--lit-follow-gap: 1.25em` preserves the existing prose paragraph gap (40px mobile, about 64px desktop); `--lit-follow-rise: var(--space-6)` preserves the 24px rise. No extra layout space or time-based delay is added. Anchoring completion to the body's bottom, not the combined block or its containment range, keeps taller Korean mobile paragraphs correct and the follow-up on-screen while appearing.
+- The secret body preserves authored newline boundaries with `white-space: pre-line`. English uses three short sentences, one per line on desktop; each sentence may wrap naturally on mobile. Whitespace stays outside animated word spans, preserving both readable spacing and the continuous sweep.
 - **ultrawork**: prompt line with the keyword as a `--accent-16` mark + three revealed steps. No product jargon in the copy.
 - **multi-model**: two `Marquee` rows of tuned profile chips (opposite directions, 36s / 44s, pause on hover). The chip list is data (`story-data.ts`) and never names families outside Claude / GPT / Kimi / Grok / GLM / DeepSeek.
 - **mass-ulw**: the existing desktop-app DAG (`dag/`) on a research → dataset → model → deck scenario (`scenario-data.ts`).
@@ -300,28 +302,28 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 
 ### §10 primitives (`components/landing/story-primitives.tsx`, `lit-text.tsx`; CSS in `design-system.css` §10)
 
-| Primitive      | Motion                                                                                                                  | Reduced motion                                                        |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `Marquee`      | `translateX(-100%)` linear, duplicated track, pause on hover                                                            | static wrapped row, duplicate hidden                                  |
-| `Ticker`       | `translateY(-50%)` linear, duplicated list, pause on hover                                                              | static list, duplicate hidden                                         |
-| `LitText`      | scroll progress → `.is-lit` per word, 600ms color transition                                                            | all words lit                                                         |
-| `.kib-stage`   | Independent 4.5s watch / 14s main loops; 14s traveling nudge inserts before verification; iteration-driven turn counter | both loops visible, nudge inserted, corrected next step, no animation |
-| `RotatingWord` | `steps(n)` vertical track, 1.6s per word, 1.1em clip                                                                    | first word only                                                       |
+| Primitive                  | Motion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Reduced motion                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Marquee`                  | `translateX(-100%)` linear, duplicated track, pause on hover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | static wrapped row, duplicate hidden                                                  |
+| `Ticker`                   | `translateY(-50%)` linear, duplicated list, pause on hover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | static list, duplicate hidden                                                         |
+| `LitProgress` / `LitWords` | JS registers interpolated `--lit-p` before enabling the named body view timeline; longhand range `cover 20vh → cover calc(100% - 50vh)` works for short and taller-than-viewport bodies. Independent follow range starts after `max(--lit-read-hold, --lit-follow-gap)` beyond word completion and lasts `--lit-follow-fade`. Per-word gradient sweep + `--lit-blur` 4px→0 with a 3-unit overlap (react-bits `ScrollReveal` mechanism, no tilt). If registration or either timeline is unavailable/inactive, an IntersectionObserver gates animation-frame geometry sampling while the block intersects; it does not rely on intersection-ratio changes, which stop for fully visible or viewport-spanning blocks. The `.lit-follow` element is optional (a block without one sweeps its words alone). `LitWords` accepts `parts` so a run of words can sit inside an external link (`.lit-link`: accent underline, thicker on hover/focus) while the sweep continues across it. **`lit-read` variant** (manifesto paragraphs): unread words sit at `--text-lo` instead of `--text-faint`, `--lit-blur` is 2px, and `[data-lit-mode="pending"]` forces `--lit-p: 1`, so the page reads in full before hydration and under JS failure. **`lit-lines` mode** (`LitProgress lines` + `LitWords lines`): every authored line renders as a `.lit-line` block with its own `--lit-count` and its own `view()` timeline, range `cover calc(100vh - --lit-line - --lit-band) → cover calc(100% - --lit-line + --lit-band)` (`--lit-line: 50vh`, `--lit-band: 1vh`), so words light exactly while their line crosses the reading line; lines never overlap vertically, so at most one line (plus the first words of the next) is in transition. The parent's named-timeline sweep is disabled in this mode; the observer fallback samples each line's rect against the same reading line. | `--lit-p: 1`, follow fully visible, plain `--text-hi`, no gradient, blur or transform |
+| `.kib-stage`               | Independent 4.5s watch / 14s main loops; 14s traveling nudge inserts before verification; iteration-driven turn counter                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | both loops visible, nudge inserted, corrected next step, no animation                 |
+| `RotatingWord`             | `steps(n)` vertical track, 1.6s per word, 1.1em clip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | first word only                                                                       |
 
-All five are CSS keyframes or one IntersectionObserver; no scroll listeners, no motion library (§6 rule unchanged).
+All five use CSS keyframes or IntersectionObserver; no scroll listeners, no motion library (§6 rule unchanged). The lit fallback samples geometry on animation frames only while intersecting, stops when off-screen/hidden, and recomputes on re-entry, visibility changes, resize and `scrollend` (one event per settled gesture, so a jump that skips a block still lands it in the right state). Its progress is reversible and based on scroll distance, never elapsed time.
 
 ## 10. Verification Matrix
 
-| Scenario           | Surface                         | Evidence                                                                                                                                                                       |
-| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Primitive showcase | `/design` (dev) at 375/768/1280 | Screenshot per primitive state before product screens                                                                                                                          |
-| Landing fidelity   | `/` at 375/768/1280 (+ `/ko`)   | Screenshots; hero matches concept B structure; `scrollWidth <= innerWidth` at 375                                                                                              |
-| Manifesto          | `/manifesto` at 375/1280        | Screenshots; no overflow at 375                                                                                                                                                |
-| Docs shell         | `/docs` at 375/1280             | Screenshots; sidebar toggle, search, hash nav; **no horizontal overflow at 375** (debt closed)                                                                                 |
-| 3D hero            | `/` desktop                     | Canvas present; drag before/after screenshots; poster-only with `prefers-reduced-motion` and with WebGL disabled; chunk size + route-table proof                               |
-| Motion             | `/`                             | Reveal fires once; terminal typewriter gated by visibility; reduced-motion final frames                                                                                        |
-| Gates              | `packages/web`                  | `format:check`, `lint`, `type-check`, `opennextjs-cloudflare build`, Playwright e2e, Lighthouse (real Chromium, prod build): perf ≥ 90 mobile / ≥ 95 desktop, a11y/BP/SEO ≥ 95 |
-| Token compliance   | `packages/web`                  | `rg` for raw hex outside `DESIGN.md` and `app/styles/design-system.css` returns only `lib/og/palette.ts` (satori has no CSS variables; it mirrors §2)                          |
+| Scenario           | Surface                                           | Evidence                                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitive showcase | `/design` (dev) at 375/768/1280                   | Screenshot per primitive state before product screens                                                                                                                                                                         |
+| Landing fidelity   | `/` at 375/768/1280 (+ `/ko`)                     | Screenshots; hero matches concept B structure; `scrollWidth <= innerWidth` at 375                                                                                                                                             |
+| Manifesto          | `/manifesto` and `/manifesto/2026-01` at 375/1280 | Screenshots (header, chapters mid-sweep, closing, archive banner); words above the reading line lit and below it `--text-lo`; reduced motion fully lit; footnote link reaches the archive; no overflow at 375 on either route |
+| Docs shell         | `/docs` at 375/1280                               | Screenshots; sidebar toggle, search, hash nav; **no horizontal overflow at 375** (debt closed)                                                                                                                                |
+| 3D hero            | `/` desktop                                       | Canvas present; drag before/after screenshots; poster-only with `prefers-reduced-motion` and with WebGL disabled; chunk size + route-table proof                                                                              |
+| Motion             | `/`                                               | Reveal fires once; terminal typewriter gated by visibility; reduced-motion final frames                                                                                                                                       |
+| Gates              | `packages/web`                                    | `format:check`, `lint`, `type-check`, `opennextjs-cloudflare build`, Playwright e2e, Lighthouse (real Chromium, prod build): perf ≥ 90 mobile / ≥ 95 desktop, a11y/BP/SEO ≥ 95                                                |
+| Token compliance   | `packages/web`                                    | `rg` for raw hex outside `DESIGN.md` and `app/styles/design-system.css` returns only `lib/og/palette.ts` (satori has no CSS variables; it mirrors §2)                                                                         |
 
 ## 11. Redesign audit (what the previous site got wrong, per `redesign-skill`)
 
@@ -339,7 +341,7 @@ All five are CSS keyframes or one IntersectionObserver; no scroll listeners, no 
 - Any mention of investors, accelerators, or "backed by" lines anywhere on the site, in OG images, or in metadata. (Confidential; the reference site herdr.dev carries one — do not mirror it.)
 - Raw hex or rgba outside this file, `app/styles/design-system.css`, and `lib/og/palette.ts`.
 - `#000000`, `#ffffff`, purple/blue gradients, decorative cyan, per-section accent colors.
-- Border radius other than 0 / 2px / 50%.
+- Border radius other than 0 / 2px / 50%, except the scoped work-media and message tokens in §15.
 - `h-screen`; `max-height` animations; animating layout properties.
 - Three-equal-column feature card grids; floating bordered cards with shadows.
 - Emojis in JSX, alt text, or visible UI. Icons are SVG (Lucide / Phosphor).
@@ -353,3 +355,97 @@ All five are CSS keyframes or one IntersectionObserver; no scroll listeners, no 
 - `/design` showcase route is dev-only and not localized.
 - The 3D poster is rendered once per design change by `scripts/render-graph-poster.mjs` (Playwright screenshot of the mounted scene); it is a committed asset, not generated at build.
 - Satori cannot read CSS variables, so `lib/og/palette.ts` duplicates §2 values; a `scripts/check-og-palette.mjs` diff against `design-system.css` guards drift.
+
+## 14. Brand OG image (2026-09-14)
+
+The supplied Figma OG composition supersedes the dark graph OG in §11, for
+social images only. Its API geometry supplies the original cat and designed-vector
+OmO wordmark. The wordmark is not typeset. The new headline uses the source's
+Roboto Mono family, Regular 400 followed by Bold 700.
+
+- Canvas: 1200 x 630 PNG. White `#ffffff` paper and `#0a0a0a` ink are explicit
+  reference-specific exceptions to §2/§12. No gradient, border, shadow, or graph.
+- Composition: cat at (162, 196), width 282, original 325.0923:289.9436 aspect.
+  Wordmark at (494, 204), width 390, original 499:156 aspect.
+- Headline: (494, 349), Roboto Mono 36 px, 46 px line height, zero tracking.
+  Two unbroken lines: “Your tool for real work.” (400), “But it's an agent.” (700).
+  The original tagline's special capital-O glyph does not occur in the new copy.
+- Proof: lower-left (48, bottom 42), 40 px GitHub mark, 16 px gap, Roboto Mono
+  36 px. Whole-thousand floor, uppercase K and plus, e.g. 69,999 → `69K+ Stars`.
+  Counts below 1,000 remain exact. No extra download figure or website label.
+- Star states: fresh/cached for up to 5 minutes; last known good for at most
+  24 hours on GitHub failure; otherwise `GitHub` without an invented count.
+  Degraded responses are not cached, allowing immediate recovery.
+- Both social routes render on demand, not as build snapshots. Fonts and artwork
+  are bundled into the renderer; no runtime font CDN, Figma URL, or npm request.
+- Accessibility/QA: descriptive metadata alt, high-contrast text, native-size
+  PNG plus 600/375 px preview inspection; check full vector silhouettes and
+  unbroken text at every scale. No client JavaScript or interaction is added.
+
+## 15. Readable work surfaces (2026-09-14)
+
+This is a restrained visual refinement of the existing landing, informed by
+the readable conversation illustrations and selective softness at
+`sisyphuslabs.ai/en`. The reference contributes local presentation, not its
+copy, persona, rounded navigation or waitlist positioning.
+
+The headline, authored locale copy, section order, cat/wordmark, cyan palette,
+install controls, DAG nodes and Secret reading sequence stay unchanged.
+The hero remains the editorial split and the actual desktop DAG, not the
+historical 3D concept described in §9.
+
+### Type and whitespace
+
+- Feature titles rendered by `SectionHeader` use `.type-feature`:
+  `clamp(2rem, 1.5rem + 1.6vw, 2.5rem)`, weight 500, line-height 1.1,
+  tracking -0.025em and balanced wrapping. Hero, Secret and CTA display
+  roles do not change. Existing CJK heading rules still apply.
+- Feature introductions use the existing 18px Lead role with 1.7 leading
+  and a 60ch measure, rather than increasing to 20px beside the work media.
+- The ultrawork request uses the existing 16px Body role and wraps in a
+  shrinking grid track; its keyword remains an unbroken inline mark.
+  Request and response rows use 20px padding, rising to 24px horizontally
+  above the small breakpoint.
+- The desktop illustration's request and assistant response use the
+  existing 14px Body/sm role with 1.625 leading. Human text is not
+  truncated; graph metadata and graph-node geometry stay compact.
+- Kibitzer memory and nudge prose use the 16px Body role with 1.6 leading.
+  The stage padding is 20px on mobile and 32px from the medium breakpoint,
+  retaining the current 32px/48px column gaps and insertion slot.
+
+### Scoped surface tokens
+
+- `--radius-work: 12px`: outside shell of the ultrawork exchange, hero
+  graph panel, desktop work illustration and Kibitzer stage only.
+- `--radius-message: 8px`: the existing user message bubble and Kibitzer
+  nudge only. Nested controls, graph nodes, rows and install bars retain
+  their existing radii.
+- Reuse ink surfaces and hairlines; no new color, shadow, glow or image.
+  Clip the terminal/exchange shells at their rounded outside edge.
+  The Kibitzer stage must not clip its travelling nudge.
+
+### Motion, accessibility and verification
+
+All existing work-progress and memory-intervention clocks, visibility gates,
+states and reduced-motion alternatives are preserved. Surface softness adds
+no animation or JavaScript.
+
+Feature labels rendered by `SectionHeader` keep their status colors but do
+not pulse: the labels name capabilities, not live work. Use the existing
+Eyebrow `className` hook for this local override; other status indicators
+and the shared Eyebrow component keep their current behavior.
+
+Reduced-motion model tracks take the available width before wrapping.
+Stopping the animation while retaining `max-content` width would leave
+profiles outside the viewport. Normal-motion marquee sizing is unchanged.
+
+The mobile evaluator must read the entire request and keyword without
+horizontal clipping. The CJK reader must retain authored copy and wrapping.
+The motion-sensitive reader must see the completed graph, inserted memory
+nudge and corrected verification step.
+
+Use before/after Chromium screenshots at 375/768/1440 for English and Korean,
+plus Japanese/Chinese smoke. Check each changed panel's own scroll width,
+not just the root's clipped overflow. Exercise Copy, navigation, DAG controls,
+normal progress/memory and reduced-motion states. Keep frame and nudge
+containment visible in the evidence. No new accessibility debt is accepted.

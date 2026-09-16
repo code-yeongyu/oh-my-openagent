@@ -86,14 +86,21 @@ export function sanitizeReflectionReport(text: string): string {
 }
 
 type ReadReportChunk = (file: FileHandle, buffer: Buffer, offset: number) => Promise<number>
+type ReadPathStat = (path: string) => Promise<Stats>
+type SamePathFile = (opened: Stats, current: Stats) => boolean
 const readReportChunk: ReadReportChunk = async (file, buffer, offset) =>
   (await file.read(buffer, offset, buffer.length - offset, offset)).bytesRead
 
-export async function readReflectionReport(runDir: string, readChunk: ReadReportChunk = readReportChunk): Promise<ReflectionReport> {
+export async function readReflectionReport(
+  runDir: string,
+  readChunk: ReadReportChunk = readReportChunk,
+  readPathStat: ReadPathStat = lstat,
+  samePathFile: SamePathFile = sameFile,
+): Promise<ReflectionReport> {
   const unavailable = (reason: string): ReflectionReport => ({ status: "unavailable", reason })
   const path = join(runDir, "child-stdout.log")
   try {
-    const before = await lstat(path)
+    const before = await readPathStat(path)
     if (!before.isFile() || !confined(await realpath(runDir), await realpath(path))) return unavailable("unsafe_file")
     const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
     try {
@@ -106,7 +113,7 @@ export async function readReflectionReport(runDir: string, readChunk: ReadReport
         if (bytesRead === 0) return unavailable("incomplete_output")
         offset += bytesRead
       }
-      if (!sameFile(opened, await file.stat()) || !sameFile(opened, await lstat(path))) return unavailable("changing_file")
+      if (!sameFile(opened, await file.stat()) || !samePathFile(opened, await readPathStat(path))) return unavailable("changing_file")
       if (buffer.length === 0) return unavailable("empty_output")
       const sourceTruncated = opened.size > REFLECTION_REPORT_MAX_BYTES
       const end = sourceTruncated ? buffer.subarray(0, REFLECTION_REPORT_MAX_BYTES).lastIndexOf(10) + 1 : buffer.length

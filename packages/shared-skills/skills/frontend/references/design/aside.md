@@ -1,7 +1,7 @@
 # Design System Inspired by Aside
 
 > Category: Developer Tools & IDEs
-> AI browser agent. Bright product-app marketing, custom display type, soft squircle controls, agent-browser product framing.
+> AI browser agent. Bright product-app marketing, custom display type, soft squircle controls, browser-product framing.
 
 ## Provenance
 

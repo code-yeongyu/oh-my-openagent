@@ -20,6 +20,7 @@ pathIgnorePatterns = [
   "packages/senpi-task/src/dag/scheduler.test.ts",
   "packages/omo-native/test/payload.test.ts",
   "script/build-omo-binary.test.ts",
+  "packages/senpi-task/src/team/member-extension/residency.test.ts",
 ]
 
 [loader]

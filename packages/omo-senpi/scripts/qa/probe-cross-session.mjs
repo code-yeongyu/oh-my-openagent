@@ -153,9 +153,7 @@ async function runExtensionChild(sessionId) {
     ),
   ])
   const pi = new FakeExtensionAPI()
-  await createUlwLoopComponent({
-    resolveOmoBin: () => toolkitBin,
-  }).register(pi, {
+  await createUlwLoopComponent().register(pi, {
     logger: {
       info() {},
       warn() {},

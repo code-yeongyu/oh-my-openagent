@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url"
 
 import type { ComponentLogger } from "./types"
 
-export const DAG_SDK_ROOT_ENV = "OMO_DAG_SDK_ROOT"
+import { createSdkRootProvisioning, DAG_SDK_ROOT_ENV } from "./sdk-root-provisioning"
+export { DAG_SDK_ROOT_ENV } from "./sdk-root-provisioning"
 
 export interface DagSdkRootProvisioningOptions {
   // Defaults to the running extension's own ../runtime/dag (extensions/omo.js layout), falling back
@@ -23,17 +24,11 @@ function resolveDefaultBaseDir(importerUrl: string = import.meta.url): string {
 
 export function createDagSdkRootProvisioning(options: DagSdkRootProvisioningOptions = {}): () => void {
   const baseDir = options.baseDir ?? resolveDefaultBaseDir()
-  const logger = options.logger
-
-  return () => {
-    try {
-      // Never publish a path that is not there: an eval cell importing from a missing root gets a
-      // worse error than one that finds the env unset.
-      if (!existsSync(baseDir)) return
-      process.env[DAG_SDK_ROOT_ENV] = baseDir
-    } catch (error) {
-      // Env provisioning must never kill extension activation: log and continue.
-      logger?.warn("omo-senpi dag sdk root provisioning failed", { error })
-    }
-  }
+  return createSdkRootProvisioning({
+    envKey: DAG_SDK_ROOT_ENV,
+    packagedRelativeDir: "../runtime/dag",
+    sourceTreeRelativeDir: "../../plugin/runtime/dag",
+    baseDir,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
 }

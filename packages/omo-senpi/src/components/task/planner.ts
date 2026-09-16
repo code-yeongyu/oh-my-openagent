@@ -26,9 +26,11 @@ const NO_REGISTRY_MESSAGE = "No senpi model registry is available yet to resolve
 // The category-and-agent resolving ChildPlanner the manager consumes. Resolution order:
 // 1. a subagent_type naming a known agent wins: an explicit `model` keeps the headless explicit
 //    path (agent persona attached, no registry access); otherwise the agent's model chain resolves
-//    against the live registry and a missing registry fails closed as model_unavailable.
+//    against the live registry and a missing registry fails closed as model_unavailable. A
+//    subagent_type naming no enabled agent is a typed unknown_target error - never a category
+//    lookup of the same string (#8348).
 // 2. an explicit `model` alone is honored verbatim, before any registry access.
-// 3. a category (or a subagent_type naming a category) resolves against omo.json + the registry.
+// 3. a category resolves against omo.json + the registry.
 // Whatever path resolved, the plan then inherits the parent's effective execution tier
 // (fast-mode-inheritance.ts) so a fast parent never delegates to a standard-tier child.
 export function createTaskChildPlanner(
@@ -41,7 +43,7 @@ export function createTaskChildPlanner(
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
       const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig)
-      if (agentResolution !== undefined) return agentResolution
+      return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
@@ -55,7 +57,7 @@ export function createTaskChildPlanner(
       }
     }
 
-    const categoryName = spec.category ?? spec.subagent_type
+    const categoryName = spec.category
     if (categoryName === undefined) {
       return { kind: "error", error: { code: "invalid_target", message: "A task requires a category, subagent_type, or model." } }
     }
@@ -81,8 +83,9 @@ export function createTaskChildPlanner(
   }
 }
 
-// Agent-first target handling. Unknown and disabled names may retain category fallback, but a known
-// disabled name cannot use an explicit model to bypass agent disablement.
+// Agent-first target handling. `undefined` means "this name is no enabled agent" - unknown or
+// disabled alike, with or without an explicit model, so a disabled agent can never be revived by a
+// call-site model. The caller turns that into a typed error; it is never a category lookup.
 function resolveAgentTarget(
   agentName: string,
   explicitModel: string | undefined,
@@ -90,19 +93,6 @@ function resolveAgentTarget(
   resolveRegistry: ResolveModelRegistry,
   omoConfig: OmoConfig,
 ): PlanResolution | undefined {
-  const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
-  if (definition?.disable === true) {
-    if (explicitModel === undefined || explicitModel.length === 0) return undefined
-    return {
-      kind: "error",
-      error: {
-        code: "unknown_target",
-        message: `Target "${agentName}" not found.`,
-        availableAgents: listAvailableAgents(agents),
-      },
-    }
-  }
-
   if (explicitModel !== undefined && explicitModel.length > 0) {
     const resolution = resolveAgent(agentName, agents, undefined, { modelOverride: explicitModel })
     if (resolution.kind !== "resolved") return undefined
@@ -130,6 +120,33 @@ function resolveAgentTarget(
   return undefined
 }
 
+// A subagent_type names an AGENT. When it names none, the caller is told so by name and pointed at
+// the valid targets - and, when the string happens to be a category key, at the `category` field it
+// meant. Falling through to a category lookup instead (the pre-#8348 behavior) silently handed the
+// caller another family's model with no error and no warning.
+function unresolvableAgentTarget(
+  agentName: string,
+  availableAgents: readonly string[],
+  resolveRegistry: ResolveModelRegistry,
+  omoConfig: OmoConfig,
+): PlanResolution {
+  const registry = resolveRegistry()
+  const category = registry === undefined ? undefined : resolveCategory(agentName, omoConfig, registry)
+  const categoryHint =
+    category !== undefined && category.kind !== "not_found"
+      ? ` "${agentName}" is a category, not an agent — use category="${agentName}" instead.`
+      : ""
+  return {
+    kind: "error",
+    error: {
+      code: "unknown_target",
+      message: `Subagent type "${agentName}" is not an available agent.${categoryHint}`,
+      availableAgents,
+      ...(category !== undefined ? { availableCategories: category.availableCategories } : {}),
+    },
+  }
+}
+
 function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
   // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
@@ -148,6 +165,9 @@ function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedMod
     agentType: resolution.agentType,
     ...(resolution.instructions !== undefined ? { instructions: resolution.instructions } : {}),
     ...(resolution.toolAllowlist !== undefined ? { toolAllowlist: resolution.toolAllowlist } : {}),
+    // The denylist must travel too: it becomes the record's tool_deny -> ChildSpec.toolDenylist ->
+    // senpi excludeTools, and a deny-only agent is otherwise invisible to every policy check.
+    ...(resolution.toolDenylist !== undefined ? { toolDenylist: resolution.toolDenylist } : {}),
     ...(resolution.agentExecutionMode !== undefined ? { agentExecutionMode: resolution.agentExecutionMode } : {}),
     ...(resolution.allowedSubagents !== undefined ? { allowedSubagents: resolution.allowedSubagents } : {}),
     ...(resolution.maxDepth !== undefined ? { maxDepth: resolution.maxDepth } : {}),

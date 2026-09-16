@@ -58,8 +58,8 @@ const memberEntryPath = join(repoRoot, "packages", "senpi-task", "src", "team", 
 const memberOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-member.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-member.js")
 const supervisorEntryPath = join(packageRoot, "src", "components", "memory", "worker", "memory-run-supervisor.ts")
 const supervisorOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "memory-run-supervisor.mjs") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "memory-run-supervisor.mjs")
-const toolkitRuntimeEntryPath = join(packageRoot, "src", "extension", "omo-agent-toolkit.ts")
-const toolkitRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-agent-toolkit.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-agent-toolkit.js")
+const toolkitSdkEntryPath = join(packageRoot, "src", "extension", "agent-toolkit-sdk.ts")
+const toolkitSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const builtinModuleNames = builtinModules
@@ -67,11 +67,12 @@ const builtinModuleNames = builtinModules
   .sort()
 const externalSpecifiers = [
   "#omo-task-runtime",
-  "#omo-agent-toolkit-runtime",
+  "#omo-agent-toolkit-sdk",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
 ]
+const sdkExternalSpecifiers = [...builtinModuleNames, ...builtinModuleNames.map(name => `node:${name}`)]
 const BUILD_SETTINGS = JSON.stringify({
   target: "node",
   format: "esm",
@@ -104,11 +105,11 @@ export async function buildExtension(options = {}) {
   const advisorRuntimeOutput = options.advisorRuntimeOutputPath ?? (options.outputPath === undefined
     ? advisorRuntimeOutputPath
     : join(dirname(output), "omo-init-deep-advisor.js"))
-  const toolkitRuntimeOutput = options.toolkitRuntimeOutputPath ?? (options.outputPath === undefined
-    ? toolkitRuntimeOutputPath
-    : join(dirname(output), "omo-agent-toolkit.js"))
+  const toolkitSdkOutput = options.toolkitSdkOutputPath ?? (options.outputPath === undefined
+    ? toolkitSdkOutputPath
+    : join(dirname(output), "runtime", "agent-toolkit-sdk", "sdk.js"))
+  const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
-  const toolkitRuntimeInputs = await buildEntry(toolkitRuntimeEntryPath, toolkitRuntimeOutput, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
@@ -118,10 +119,10 @@ export async function buildExtension(options = {}) {
   await Promise.all([
     stageRuntimePersonas(repoRoot, dirname(output)),
   ])
-  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, toolkitRuntimeInputs }
+  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, toolkitSdkInputs }
 }
 
-async function buildEntry(entry, output, buildDefines) {
+async function buildEntry(entry, output, buildDefines, externals = externalSpecifiers) {
   await mkdir(dirname(output), { recursive: true })
   const metafile = `${output}.meta.json`
   try {
@@ -129,7 +130,7 @@ async function buildEntry(entry, output, buildDefines) {
       "build", entry, "--target", "node", "--format", "esm", "--outfile", output,
       "--minify-syntax", "--minify-whitespace", `--metafile=${metafile}`,
       ...Object.entries(buildDefines).flatMap(([name, value]) => ["--define", `${name}=${JSON.stringify(value)}`]),
-      ...externalSpecifiers.flatMap((specifier) => ["--external", specifier]),
+      ...externals.flatMap((specifier) => ["--external", specifier]),
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
     await minifyBundle(output)
@@ -139,7 +140,7 @@ async function buildEntry(entry, output, buildDefines) {
       metafile,
       buildDefines,
       repoRoot,
-      buildSettings: BUILD_SETTINGS,
+      buildSettings: JSON.stringify({ settings: BUILD_SETTINGS, externals }),
       buildScriptPath: fileURLToPath(import.meta.url),
     })
   } finally {
@@ -161,6 +162,11 @@ export async function checkExtensionCurrent(options = {}) {
   const advisorRuntimeOutput = options.advisorRuntimeOutputPath ?? (options.outputPath === undefined
     ? advisorRuntimeOutputPath
     : join(dirname(output), "omo-init-deep-advisor.js"))
+  const toolkitSdkOutput = options.toolkitSdkOutputPath ?? (options.outputPath === undefined
+    ? toolkitSdkOutputPath
+    : join(dirname(output), "runtime", "agent-toolkit-sdk", "sdk.js"))
+  const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
+  if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
   const currentMain = await readBuiltEntry(output)
   if (currentMain === undefined) return { ok: false, reason: "missing-output", output }
   const currentTask = await readBuiltEntry(taskOutput)
@@ -184,6 +190,7 @@ export async function checkExtensionCurrent(options = {}) {
   const expectedMemberOutput = join(tempRoot, "omo-member.js")
   const expectedSupervisorOutput = join(tempRoot, "memory-run-supervisor.mjs")
   const expectedAdvisorRuntimeOutput = join(tempRoot, "omo-init-deep-advisor.js")
+  const expectedToolkitSdkOutput = join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
   try {
     await buildExtension({
       outputPath: expectedOutput,
@@ -191,7 +198,11 @@ export async function checkExtensionCurrent(options = {}) {
       memberOutputPath: expectedMemberOutput,
       supervisorOutputPath: expectedSupervisorOutput,
       advisorRuntimeOutputPath: expectedAdvisorRuntimeOutput,
+      toolkitSdkOutputPath: expectedToolkitSdkOutput,
     })
+    if (!artifactsMatch(currentToolkitSdk, await readFile(expectedToolkitSdkOutput, "utf8"))) {
+      return { ok: false, reason: "stale-output", output: toolkitSdkOutput }
+    }
     if (!artifactsMatch(currentMain, await readFile(expectedOutput, "utf8"))) {
       return { ok: false, reason: "stale-output", output }
     }

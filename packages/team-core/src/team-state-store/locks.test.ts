@@ -254,3 +254,85 @@ test("detects and reaps stale lock entries", async () => {
   await expect(readFile(lockPath, "utf8")).rejects.toThrow()
   await rm(rootDirectory, { recursive: true, force: true })
 })
+
+test("#given a lock for this pid from a prior process incarnation #when detectStaleLock runs #then it is stale even while the pid is live", async () => {
+  // given
+  const { detectStaleLock, lockOwnerInstanceId } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-pid-reuse-")
+  const lockPath = join(rootDirectory, "lock")
+  const priorInstanceId = "00000000-0000-4000-8000-000000000001"
+  expect(priorInstanceId).not.toBe(lockOwnerInstanceId)
+  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n${priorInstanceId}\n`)
+
+  // when
+  const staleDetected = await detectStaleLock(lockPath, 300_000)
+
+  // then
+  expect(staleDetected).toBe(true)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("#given this process already owns the lock payload #when detectStaleLock runs #then it is not stale", async () => {
+  // given
+  const { detectStaleLock, lockOwnerInstanceId } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-same-instance-")
+  const lockPath = join(rootDirectory, "lock")
+  await writeFile(lockPath, `self-owner\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`)
+
+  // when
+  const staleDetected = await detectStaleLock(lockPath, 300_000)
+
+  // then
+  expect(staleDetected).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("#given a recycled-pid lock file #when withLock runs #then it reaps and acquires without waiting out the lock timeout", async () => {
+  // given
+  const { withLock, lockOwnerInstanceId } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-pid-reuse-acquire-")
+  const lockPath = join(rootDirectory, "lock")
+  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n00000000-0000-4000-8000-000000000002\n`)
+  expect(lockOwnerInstanceId).not.toBe("00000000-0000-4000-8000-000000000002")
+
+  // when
+  const result = await withLock(lockPath, async () => "acquired", { staleAfterMs: 300_000 })
+
+  // then
+  expect(result).toBe("acquired")
+  await expect(readFile(lockPath, "utf8")).rejects.toThrow()
+  await rm(rootDirectory, { recursive: true, force: true })
+}, 2_000)
+
+test("#given legacy 3-line payloads #when detectStaleLock runs #then only a dead pid is stale", async () => {
+  const { detectStaleLock } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-legacy-3line-")
+  const livePath = join(rootDirectory, "live.lock")
+  const deadPath = join(rootDirectory, "dead.lock")
+  await writeFile(livePath, `legacy-live\n${process.pid}\n${Date.now()}\n`)
+  await writeFile(deadPath, `legacy-dead\n999999999\n${Date.now() - 600_000}\n`)
+  expect(await detectStaleLock(livePath, 300_000)).toBe(false)
+  expect(await detectStaleLock(deadPath, 300_000)).toBe(true)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("#given a lock held by a live foreign pid #when detectStaleLock runs #then it is not stale", async () => {
+  const { detectStaleLock } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-foreign-live-")
+  const lockPath = join(rootDirectory, "lock")
+  const child = Bun.spawn([process.execPath, "-e", "process.stdin.resume()"], { stdin: "pipe", stdout: "ignore", stderr: "ignore" })
+  try {
+    const childPid = child.pid
+    if (childPid === undefined) throw new Error("foreign holder spawn produced no pid")
+    process.kill(childPid, 0)
+    await writeFile(lockPath, `foreign-owner\n${childPid}\n${Date.now()}\nforeign-instance\n`)
+    expect(await detectStaleLock(lockPath, 300_000)).toBe(false)
+    child.kill()
+    await child.exited
+    expect(await detectStaleLock(lockPath, 300_000)).toBe(true)
+  } finally {
+    child.kill()
+    await child.exited
+    await rm(rootDirectory, { recursive: true, force: true })
+  }
+})

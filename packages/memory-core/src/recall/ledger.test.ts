@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs"
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { RecallLedger, sanitizeSessionFilename } from "./ledger"
+import { RecallLedger, recallLedgerDiskReads, sanitizeSessionFilename } from "./ledger"
 
 const tempDirs: string[] = []
 
@@ -163,6 +163,86 @@ describe("RecallLedger", () => {
 
     // then
     expect(await readdir(dir)).toEqual([])
+  })
+
+  it("#given an unchanged session file #when surfaced paths are read twice #then the file is parsed once", async () => {
+    // given: recall reads this ledger on every prompt and every tool call (#8335)
+    const dir = await createLedgerDir()
+    const ledger = new RecallLedger(dir)
+    await writeFile(
+      join(dir, "session-1.json"),
+      `${JSON.stringify({
+        version: 1,
+        surfaced: { "reference/a.md": { hash: "aaaa", at: "2026-09-16T00:00:00.000Z" } },
+      }, null, 2)}\n`,
+      "utf8",
+    )
+    const before = recallLedgerDiskReads()
+
+    // when
+    const first = await ledger.surfacedPaths("session-1")
+    const second = await ledger.surfacedPaths("session-1")
+
+    // then
+    expect(first).toEqual(new Set(["reference/a.md"]))
+    expect(second).toEqual(first)
+    expect(recallLedgerDiskReads() - before).toBe(1)
+  })
+
+  it("#given this instance's own markSurfaced #when surfaced paths are read #then the write updated the cache", async () => {
+    // given
+    const dir = await createLedgerDir()
+    const ledger = new RecallLedger(dir)
+    await ledger.markSurfaced("session-1", [{ path: "reference/a.md", hash: "aaaa" }])
+    await ledger.surfacedPaths("session-1")
+
+    // when
+    await ledger.markSurfaced("session-1", [{ path: "notes/b.md", hash: "bbbb" }])
+    const before = recallLedgerDiskReads()
+    const surfaced = await ledger.surfacedPaths("session-1")
+
+    // then
+    expect(surfaced).toEqual(new Set(["reference/a.md", "notes/b.md"]))
+    expect(recallLedgerDiskReads() - before).toBe(0)
+  })
+
+  it("#given an external rewrite of the session file #when surfaced paths are read #then the new content wins", async () => {
+    // given: another process (or another instance) can own the same ledger file
+    const dir = await createLedgerDir()
+    const ledger = new RecallLedger(dir)
+    await ledger.markSurfaced("session-1", [{ path: "reference/a.md", hash: "aaaa" }])
+    expect(await ledger.surfacedPaths("session-1")).toEqual(new Set(["reference/a.md"]))
+
+    // when
+    await writeFile(
+      join(dir, "session-1.json"),
+      `${JSON.stringify({
+        version: 1,
+        surfaced: {
+          "reference/a.md": { hash: "aaaa", at: "2026-09-16T00:00:00.000Z" },
+          "notes/external.md": { hash: "cccc", at: "2026-09-16T00:00:00.000Z" },
+        },
+      }, null, 2)}\n`,
+      "utf8",
+    )
+    const surfaced = await ledger.surfacedPaths("session-1")
+
+    // then
+    expect(surfaced).toEqual(new Set(["reference/a.md", "notes/external.md"]))
+  })
+
+  it("#given a deleted session file #when surfaced paths are read #then the cached set is dropped", async () => {
+    // given
+    const dir = await createLedgerDir()
+    const ledger = new RecallLedger(dir)
+    await ledger.markSurfaced("session-1", [{ path: "reference/a.md", hash: "aaaa" }])
+    expect(await ledger.surfacedPaths("session-1")).toEqual(new Set(["reference/a.md"]))
+
+    // when
+    await rm(join(dir, "session-1.json"))
+
+    // then
+    expect(await ledger.surfacedPaths("session-1")).toEqual(new Set())
   })
 
   it("#given a ledger dir that does not exist yet #when entries are marked #then the directory is created", async () => {

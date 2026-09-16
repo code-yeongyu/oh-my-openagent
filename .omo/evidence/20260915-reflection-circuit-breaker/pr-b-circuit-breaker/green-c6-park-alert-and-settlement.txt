@@ -1,0 +1,22 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-park.test.ts:
+(pass) reflection settlement feeds the park policy > #given a run whose child died on a missing model #when reconciliation settles it #then the park streak records a non-retryable failure with the cause fingerprint [264.76ms]
+(pass) reflection settlement feeds the park policy > #given a run whose child died on a rate limit #when reconciliation settles it #then the park streak records a retryable failure [249.09ms]
+
+packages/omo-senpi/src/components/memory/worker/run-finalization-crash.test.ts:
+(pass) reflection finalization crash recovery > #given integration landed before its checkpoint #when finalization retries #then receipt recovery settles exactly once [477.44ms]
+(pass) reflection finalization crash recovery > #given merge cleanup and settlement completed before final publication #when retried #then completion and final repair without duplicate settlement [508.46ms]
+(pass) reflection finalization crash recovery > #given a pressure dream merges above its token target #when finalization validates committed system memory #then the merge records a budget_not_met warning [528.71ms]
+(pass) reflection finalization crash recovery > #given parent_dirty was checkpointed before cleanup #when finalization retries #then the durable decision and user edit are preserved [388.85ms]
+
+packages/omo-senpi/src/components/memory/worker/park-alert.test.ts:
+(pass) reflection park alert > #given a parked identity and a live UI #when the alert is emitted twice in one session #then one entry and one warning appear [1.03ms]
+(pass) reflection park alert > #given an identity that is not parked #when the alert is emitted #then nothing is appended [0.56ms]
+(pass) reflection park alert > #given no park file #when the alert is emitted #then nothing is appended [0.23ms]
+(pass) reflection park alert > #given a parked identity #when a second session binds #then it is told once as well [0.39ms]
+
+ 10 pass
+ 0 fail
+ 31 expect() calls
+Ran 10 tests across 3 files. [3.15s]

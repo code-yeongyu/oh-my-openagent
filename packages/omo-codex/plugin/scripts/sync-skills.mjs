@@ -274,6 +274,19 @@ async function adaptSkillForCodex(skillName) {
 	await writeCodexSkillDisplayMetadata(skillName);
 }
 
+// Read-only inventory shared by generation and shipped-payload validation.
+export async function getSkillOutputManifest() {
+	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
+	const sharedSkillNames = sharedSkillEntries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => entry.name)
+		.sort();
+	return {
+		root: skillsRoot,
+		names: [...new Set([...componentSkillNames, ...sharedSkillNames])],
+	};
+}
+
 async function syncSkills() {
 	await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	await mkdir(skillsRoot, { recursive: true });
@@ -292,13 +305,8 @@ async function syncSkills() {
 	);
 	await adaptSkillForCodex("ultrawork");
 
-	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
-	const sharedSkillNames = sharedSkillEntries
-		.filter((entry) => entry.isDirectory())
-		.map((entry) => entry.name)
-		.sort();
-
-	for (const skillName of sharedSkillNames) {
+	const { names } = await getSkillOutputManifest();
+	for (const skillName of names) {
 		if (componentSkillNames.has(skillName)) continue;
 		const sharedSkillSource = join(sharedSkillsRoot, skillName);
 		await cp(sharedSkillSource, join(skillsRoot, skillName), {

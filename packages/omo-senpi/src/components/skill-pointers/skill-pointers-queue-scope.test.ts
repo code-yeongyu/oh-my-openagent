@@ -37,7 +37,7 @@ describe("omo-senpi skill-pointers queued prompts and session scope", () => {
 
       expectPointerInjections(pi, result, [{ customType: ULW_LOOP_CUSTOM_TYPE, skillName: "ulw-loop" }])
       const content = pi.messages[0]?.message["content"]
-      expect(content).toContain("tool.omo_agent_toolkit")
+      expect(content).toContain('await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`)')
       expect(content).toContain(".omo/ulw-loop/session-a-weird/")
     })
 

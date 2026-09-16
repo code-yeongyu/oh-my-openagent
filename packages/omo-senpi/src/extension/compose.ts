@@ -1,6 +1,7 @@
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
+import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
@@ -60,10 +61,17 @@ export function composeOmoSenpiExtension(
 ): (pi: unknown) => Promise<void> {
   const logger = options.logger ?? defaultLogger
   const provisionDagSdkRoot = createDagSdkRootProvisioning({ logger })
+  const provisionAgentToolkitSdkRoot = createSdkRootProvisioning({
+    envKey: AGENT_TOOLKIT_SDK_ROOT_ENV,
+    packagedRelativeDir: "../runtime/agent-toolkit-sdk",
+    sourceTreeRelativeDir: "../../plugin/runtime/agent-toolkit-sdk",
+    logger,
+  })
 
   return async (pi: unknown): Promise<void> => {
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
+    provisionAgentToolkitSdkRoot()
 
     const missing = getMissingCapabilities(pi)
     if (missing.length > 0 || !isSenpiExtensionAPI(pi)) {

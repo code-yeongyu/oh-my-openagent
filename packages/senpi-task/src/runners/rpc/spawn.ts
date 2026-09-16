@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 
 import type { RpcRunnerSpec } from "../types"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
-import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
+import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES, WORKPOOL_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
 import {
   detectBunBinary,
   detectCompiledEngine,
@@ -150,7 +150,7 @@ function buildChildProfile(
   resolved: RpcSpawnRuntime,
 ): { readonly env: NodeJS.ProcessEnv; readonly spec: RpcSpawnSpec } {
   const env: NodeJS.ProcessEnv = { ...resolved.parentEnv }
-  for (const name of MEMBER_PROCESS_ENV_NAMES) delete env[name]
+  for (const name of [...MEMBER_PROCESS_ENV_NAMES, ...WORKPOOL_PROCESS_ENV_NAMES]) delete env[name]
   Object.assign(env, spec.memberEnv)
   env[SESSION_DIR_ENV] = resolveChildSessionDir(spec.state_dir, spec.task_id)
   env[OMO_SENPI_TASK_RPC_CHILD] = "1"

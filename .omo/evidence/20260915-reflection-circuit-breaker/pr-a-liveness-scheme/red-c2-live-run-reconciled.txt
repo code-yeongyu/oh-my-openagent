@@ -1,0 +1,30 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-senpi/src/components/memory/worker/run-reconciliation-liveness.test.ts:
+53 |       reservation: item.store,
+54 |       waitForOutcome: async () => "timeout",
+55 |     })
+56 | 
+57 |     // then
+58 |     expect(results).toEqual([])
+                         ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "outcome": "failed",
++     "runId": "run-orphan",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 6
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix-reflection-liveness-scheme/packages/omo-senpi/src/components/memory/worker/run-reconciliation-liveness.test.ts:58:21)
+(fail) reconciliation against a live run whose ledger uses another start-identity scheme > #given a live supervisor recorded with ps-lstart while this process reads another scheme #when reconciled within the deadline #then the run stays active and its worktree is untouched [271.64ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1127.00ms]

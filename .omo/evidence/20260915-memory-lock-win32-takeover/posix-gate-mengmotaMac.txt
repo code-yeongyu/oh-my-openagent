@@ -1,0 +1,74 @@
+host: mengmotaMac Darwin arm64 bun 1.4.2
+head: 27b1e65188a1b23e12edb30bec15966931ef58d9
+$ bun test --timeout 20000 packages/memory-core/src/concurrency packages/memory-core/src/locks
+(pass) sweepStaleLockCandidates > #given stale and fresh candidates #when swept #then only stale candidates are deleted [1.84ms]
+(pass) sweepStaleLockCandidates > #given a missing locks directory #when swept #then nothing is swept [0.32ms]
+(pass) sweepStaleLockCandidates > #given a legal lock name containing .candidate- #when swept #then the live lock survives [0.50ms]
+(pass) sweepStaleLockCandidates > #given one sharing-failing candidate and one removable candidate #when stale candidates are swept #then the failure is bounded and the rest are reclaimed [0.75ms]
+(pass) sweepStaleLockCandidates > #given persistent sharing failure #when repeated acquisitions run #then every tracked leak is retried and healthy acquisition reclaims them [3.17ms]
+(pass) sweepStaleLockCandidates > #given a tracked candidate directory disappears #when the sweep sees ENOENT #then the path is untracked [0.69ms]
+(pass) sweepStaleLockCandidates > #given a stale candidate #when the first lock in that directory is acquired #then the candidate is swept [0.95ms]
+(pass) process start identity cache > #given concurrent own-process probes #when the OS answers #then one lookup serves every caller and later locks [0.13ms]
+(pass) process start identity cache > #given an unavailable own identity #when a later request probes #then unknown is not cached [0.09ms]
+(pass) process start identity cache > #given a rejected own lookup #when requested again #then the error propagates and the lookup is not poisoned [0.08ms]
+(pass) process start identity cache > #given another pid is reused or exits #when ownership is checked again #then every check reads the OS [0.07ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given the default domain #when two leases are held #then the third contender is turned away busy after its bounded wait and its ticket is gone [419.82ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given ten contenders and two slots #when slots are released one at a time #then every contender acquires, in ticket order, with never more than two leases live [107.26ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a dead owner recorded on both slots #when a contender arrives #then both are reclaimed on the liveness proof and the new owner is recorded [12.32ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a live owner on every slot #when a contender waits its budget #then no record is touched: a live owner is never stolen [405.73ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a live pid whose recorded start identity conflicts #when a contender arrives #then the reused pid is reclaimed, while an unprovable identity keeps its slot [411.32ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a dead owner's ticket at the head of the queue #when a contender arrives #then the dead ticket is reaped and the contender proceeds; a live owner's ticket ahead is honoured [404.03ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a waiting contender #when its signal aborts #then the wait ends promptly with the abort reason and no ticket is left behind [9.63ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a callback #when it completes or throws #then the slot is released either way [7.93ms]
+(pass) recall-wake lock domain: counting FIFO lease > #given a lock path builder #when slots are numbered #then each slot has its own file under the locks directory on every platform [0.28ms]
+(pass) lock domain paths > #given the runtime lock directory #when domain paths are resolved #then every protocol has a stable confined name [0.82ms]
+(pass) lock domain paths > #given hostile and distinct run ids #when finalization paths are resolved #then names remain confined and distinct [0.30ms]
+(pass) darwin process start time > #given a freshly spawned child #when the probe reads its start time #then the value brackets the spawn instant [1.76ms]
+(pass) darwin process start time > #given the current pid #when the probe and /bin/ps are both consulted #then they report the same instant [18.80ms]
+(pass) darwin process start time > #given pids that cannot be inspected #when the probe reads them #then it reports null instead of a guess [0.18ms]
+(pass) darwin process start time > #given the lock identity API #when it resolves the current pid #then it publishes the spawn-free epoch identity [0.16ms]
+(pass) darwin process start time > #given a dead pid #when the lock identity API resolves it #then it reports null so the lock counts as stale [0.14ms]
+(skip) win32 process creation time > #given a freshly spawned child #when kernel32 reads its creation time #then the value brackets the spawn instant
+(skip) win32 process creation time > #given the current pid #when kernel32 and PowerShell are both consulted #then they report the same FILETIME
+(skip) win32 process creation time > #given pids that cannot be inspected #when kernel32 reads them #then it reports null instead of a guess
+(skip) win32 process creation time > #given the lock identity API #when it resolves the current pid and a dead pid #then it publishes the spawn-free FILETIME identity and null
+(pass) start identity comparison > #given two identities in one scheme #when they disagree #then the conflict is reported so pid reuse is caught [0.11ms]
+(pass) start identity comparison > #given identities in different schemes #when they are compared #then no conflict is reported so a live owner keeps its lock [0.09ms]
+(pass) start identity comparison > #given an identity with no scheme separator #when it is compared #then no conflict is reported [0.09ms]
+(pass) start identity comparison > #given identical identities #when they are compared #then no conflict is reported [0.08ms]
+(pass) real subprocess lock contention > #given two Bun subprocess writers #when they contend on one counter #then critical-section log entries never interleave [51.85ms]
+(pass) real subprocess lock contention > #given a SIGKILLed Bun lock holder #when another process acquires #then proven-dead ownership is recovered [16.43ms]
+(pass) real subprocess lock contention > #given a live Bun lock holder #when a contender tries immediately #then the live owner is never stolen [13.29ms]
+(pass) subprocess lock holder lifecycle > #given a hold-mode worker that reported entered #when the parent ends its stdin #then the worker exits by itself within the bound [12.94ms]
+(pass) subprocess lock holder lifecycle > #given a wrapper that spawns the hold-mode worker and SIGKILLs itself once entered #when the wrapper dies #then the ORIGINAL worker is terminal within the bound [31.77ms]
+(pass) subprocess lock holder lifecycle > #given a hold-mode worker still holding the lock when its test ends #when the test returns #then it is handed to afterEach [12.36ms]
+(pass) subprocess lock holder lifecycle > #given the holder handed to afterEach #when afterEach has run #then no tracked child remains alive [0.08ms]
+(pass) cross-process lock protocol > #given an absent lock #when it is acquired and released #then the complete record is published and removed [0.99ms]
+(pass) cross-process lock protocol > #given an owned lock #when another owner acquires it #then a typed retriable contention error is raised [1.20ms]
+(pass) cross-process lock protocol > #given a lock whose nonce changed #when the former owner releases #then the replacement remains held [0.40ms]
+(pass) cross-process lock protocol > #given a live PID with a different process start #when acquisition is attempted #then PID reuse is recovered [1.85ms]
+(pass) cross-process lock protocol > #given a very old lock whose owner is live #when acquisition is attempted #then age alone never permits recovery [0.71ms]
+(pass) cross-process lock protocol > #given a dead owner on another host #when acquisition is attempted #then recovery fails closed [0.73ms]
+(pass) cross-process lock protocol > #given a dead primary owner and a dead recovery-lock owner #when a contender acquires #then both stale files are reclaimed without manual deletion [2.33ms]
+(pass) cross-process lock protocol > #given a dead primary owner and a LIVE recovery-lock owner #when a contender acquires #then the recovery holder is never displaced and contention is raised [202.60ms]
+(pass) cross-process lock protocol > #given a dead recovery-lock owner on another host #when a contender acquires #then the recovery lock is not reclaimed [205.86ms]
+(pass) cross-process lock protocol > #given a callback under a lock #when the callback fails #then withLock releases only its own lock [3.18ms]
+(pass) one memory identity across real Bun processes > #given two synchronized tool writers #when each makes ten writes #then twenty linear commits land with observed lock contention [1432.93ms]
+(pass) one memory identity across real Bun processes > #given two synchronized reflection reservers #when they race one identity #then one is active, one is pending, and completion promotes pending [72.54ms]
+(pass) one memory identity across real Bun processes > #given a writer SIGKILLed while holding the shared lock #when its peer continues #then liveness takeover completes twenty clean commits [1363.71ms]
+(skip) win32 process creation time > #given a freshly spawned child #when kernel32 reads its creation time #then the value brackets the spawn instant
+(skip) win32 process creation time > #given the current pid #when kernel32 and PowerShell are both consulted #then they report the same FILETIME
+(skip) win32 process creation time > #given pids that cannot be inspected #when kernel32 reads them #then it reports null instead of a guess
+(skip) win32 process creation time > #given the lock identity API #when it resolves the current pid and a dead pid #then it publishes the spawn-free FILETIME identity and null
+ 51 pass
+ 4 skip
+ 0 fail
+ 195 expect() calls
+Ran 55 tests across 8 files. [5.68s]
+$ bun test --timeout 20000 packages/memory-core
+ 886 pass
+ 4 skip
+ 0 fail
+ 5868 expect() calls
+Ran 890 tests across 96 files. [81.69s]
+
