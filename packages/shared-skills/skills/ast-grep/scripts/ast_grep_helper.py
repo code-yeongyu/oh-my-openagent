@@ -18,7 +18,7 @@ USAGE
     ast_grep_helper.py scan RULE_FILE [PATH...] [--apply] [--report-style STYLE]
     ast_grep_helper.py test [-c CONFIG] [-t TEST_DIR] [-U]
     ast_grep_helper.py new {project,rule,test,util} [NAME] [--lang LANG]
-    ast_grep_helper.py langs                # list 25 supported languages
+    ast_grep_helper.py langs                # list built-in and configured custom languages
     ast_grep_helper.py doctor               # check binary availability + version
     ast_grep_helper.py install              # delegate to ../install.sh / install.ps1
     ast_grep_helper.py validate PATTERN [--lang LANG]   # offline pattern hint check only
@@ -109,6 +109,9 @@ LANG_ALIASES: dict[str, str] = {
     "sol": "solidity",
     "golang": "go",
 }
+
+CUSTOM_LANGUAGE_ENV = "OMO_AST_GREP_EXTRA_LANGUAGES"
+SGCONFIG_FILENAMES = ("sgconfig.yml", "sgconfig.yaml")
 
 # Default search timeout (5 min). ast-grep calls can be slow on huge repos.
 DEFAULT_TIMEOUT_S = 300
@@ -368,12 +371,90 @@ def validate_pattern(pattern: str, lang: Optional[str]) -> list[str]:
     return hints
 
 
+def normalize_lang_name(lang: str) -> str:
+    return lang.strip().lower()
+
+
+def read_extra_languages_env() -> set[str]:
+    raw = os.environ.get(CUSTOM_LANGUAGE_ENV, "")
+    return {
+        normalize_lang_name(part)
+        for part in raw.split(",")
+        if normalize_lang_name(part)
+    }
+
+
+def find_sgconfig(start: Optional[Path] = None) -> Optional[Path]:
+    cur = (start or Path.cwd()).resolve()
+    if cur.is_file():
+        cur = cur.parent
+
+    while True:
+        for filename in SGCONFIG_FILENAMES:
+            candidate = cur / filename
+            if candidate.is_file():
+                return candidate
+        parent = cur.parent
+        if parent == cur:
+            return None
+        cur = parent
+
+
+def read_custom_languages_from_sgconfig(path: Path) -> set[str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return set()
+
+    languages: set[str] = set()
+    in_custom_languages = False
+    section_indent: Optional[int] = None
+    child_indent: Optional[int] = None
+
+    for raw in lines:
+        stripped = raw.split("#", 1)[0].rstrip().lstrip("\ufeff")
+        if not stripped.strip():
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+
+        if not in_custom_languages:
+            if re.match(r"^\s*customLanguages\s*:\s*$", stripped):
+                in_custom_languages = True
+                section_indent = indent
+            continue
+
+        if section_indent is not None and indent <= section_indent:
+            break
+        if child_indent is None:
+            child_indent = indent
+        if indent != child_indent:
+            continue
+
+        key = stripped.strip().split(":", 1)[0].strip().strip("'\"")
+        if re.match(r"^[A-Za-z][A-Za-z0-9_.-]*$", key):
+            languages.add(normalize_lang_name(key))
+
+    return languages
+
+
+def configured_custom_languages() -> set[str]:
+    languages = read_extra_languages_env()
+    sgconfig = find_sgconfig()
+    if sgconfig:
+        languages.update(read_custom_languages_from_sgconfig(sgconfig))
+    return languages
+
+
 def normalize_lang(lang: Optional[str]) -> Optional[str]:
     if not lang:
         return None
-    canonical = LANG_ALIASES.get(lang.lower(), lang.lower())
-    if canonical not in LANGUAGES:
-        err(f"unknown language '{lang}'. Run 'ast_grep_helper.py langs' for the full list.")
+    normalized = normalize_lang_name(lang)
+    canonical = LANG_ALIASES.get(normalized, normalized)
+    if canonical not in LANGUAGES and canonical not in configured_custom_languages():
+        err(
+            f"unknown language '{lang}'. Run 'ast_grep_helper.py langs', add it to sgconfig.yml "
+            f"customLanguages, or set {CUSTOM_LANGUAGE_ENV}."
+        )
         sys.exit(1)
     return canonical
 
@@ -568,6 +649,12 @@ def cmd_langs(_args: argparse.Namespace) -> int:
     print("Aliases accepted by --lang:")
     for alias, canonical in sorted(LANG_ALIASES.items()):
         print(f"  {alias:<8} -> {canonical}")
+    custom_languages = configured_custom_languages()
+    if custom_languages:
+        print()
+        print("Configured custom languages:")
+        for lang in sorted(custom_languages):
+            print(f"  {lang}")
     return 0
 
 
