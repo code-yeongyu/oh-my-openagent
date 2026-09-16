@@ -130,4 +130,36 @@ describe("buildPlanDemoteConfig", () => {
     expect(result).toEqual({ mode: "subagent", hidden: true, model: "anthropic/claude-opus-4-7" })
     expect(Object.keys(result)).toEqual(["mode", "hidden", "model"])
   })
+
+  test("carries a canonical models chain from prometheus through to the demoted plan config (issue #6868)", () => {
+    //#given
+    const prometheusConfig = {
+      models: [{ model: "anthropic/claude-fable-5", reasoning: "xhigh" }, "opencode-go/kimi-k3"],
+    }
+
+    //#when
+    const result = buildPlanDemoteConfig(prometheusConfig, undefined)
+
+    //#then
+    expect(result.models).toEqual([
+      { model: "anthropic/claude-fable-5", reasoning: "xhigh" },
+      "opencode-go/kimi-k3",
+    ])
+  })
+
+  test("plan override models win over prometheus models", () => {
+    //#given
+    const prometheusConfig = {
+      models: ["anthropic/claude-fable-5"],
+    }
+    const planOverride = {
+      models: ["openai/gpt-5.4"],
+    }
+
+    //#when
+    const result = buildPlanDemoteConfig(prometheusConfig, planOverride)
+
+    //#then
+    expect(result.models).toEqual(["openai/gpt-5.4"])
+  })
 })
