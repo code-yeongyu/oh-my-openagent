@@ -24,6 +24,7 @@ export interface CodexGoalReconciliation {
 	snapshot: CodexGoalSnapshot;
 	warnings: string[];
 	errors: string[];
+	nextActions: string[];
 }
 
 export interface ReconcileCodexGoalOptions {
@@ -111,12 +112,13 @@ export function reconcileCodexGoalSnapshot(
 	const effectiveSnapshot = snapshot ?? { available: false, raw: null };
 	const errors: string[] = [];
 	const warnings: string[] = [];
+	const nextActions: string[] = [];
 
 	const expected = options.expectedObjective;
 	const normalizedExpected = normalizeObjective(expected);
 	if (!effectiveSnapshot.available) {
-		warnings.push(`call get_goal; if none, create_goal with codexObjective "${expected}" verbatim`);
-		return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, errors };
+		nextActions.push(`call get_goal; if none, create_goal with codexObjective "${expected}" verbatim`);
+		return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, errors, nextActions };
 	}
 
 	const accepted = new Set(
@@ -132,11 +134,11 @@ export function reconcileCodexGoalSnapshot(
 
 	const actualStatus = effectiveSnapshot.status ?? "unknown";
 	if (actualStatus === "paused" || actualStatus === "usage_limited" || actualStatus === "budget_limited") {
-		warnings.push("/goal resume or raise the budget");
+		nextActions.push("/goal resume or raise the budget");
 	}
 	if (actualStatus === "complete")
-		warnings.push(`driver closed early: call create_goal with codexObjective "${expected}" verbatim`);
-	return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, errors };
+		nextActions.push(`driver closed early: call create_goal with codexObjective "${expected}" verbatim`);
+	return { ok: errors.length === 0, snapshot: effectiveSnapshot, warnings, errors, nextActions };
 }
 
 export function formatCodexGoalReconciliation(reconciliation: CodexGoalReconciliation): string {

@@ -28,7 +28,7 @@ export async function validateCheckpointCodexGoal(input: {
 	if (!reconciliation.ok) throw new CodexGoalSnapshotError(formatCodexGoalReconciliation(reconciliation));
 	return {
 		raw: snapshot?.raw,
-		nextActions: reconciliation.warnings,
+		nextActions: reconciliation.nextActions,
 		warnings: reconciliation.warnings.filter((warning) => warning.startsWith("driver_objective_differs")),
 	};
 }

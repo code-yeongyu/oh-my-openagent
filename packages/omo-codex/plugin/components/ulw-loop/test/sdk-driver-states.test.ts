@@ -76,9 +76,9 @@ describe("SDK driver-goal states", () => {
 
 			expect(closed.ok).toBe(true);
 			if (closed.ok) {
-				expect([...(closed.warnings ?? []), ...closed.nextActions].join(" ")).not.toContain(
-					"driver_objective_differs",
-				);
+				const resultWarnings =
+					"warnings" in closed.result ? ((closed.result as { warnings?: readonly string[] }).warnings ?? []) : [];
+				expect([...resultWarnings, ...closed.nextActions].join(" ")).not.toContain("driver_objective_differs");
 			}
 		});
 	});
@@ -115,7 +115,13 @@ describe("SDK driver-goal states", () => {
 
 			expect(closed.ok).toBe(true);
 			if (closed.ok) {
-				expect([...(closed.warnings ?? []), ...closed.nextActions].join(" ")).toContain("driver_objective_differs");
+				// #8333: driver_objective_differs is a warning, not a next-action.
+				// It lives in result.warnings, not top-level nextActions.
+				const resultWarnings =
+					"warnings" in closed.result ? ((closed.result as { warnings?: readonly string[] }).warnings ?? []) : [];
+				expect(resultWarnings.join(" ")).toContain("driver_objective_differs");
+				// Crucially: nextActions must NOT suggest create_goal when a goal already exists.
+				expect(closed.nextActions.join(" ")).not.toContain("create_goal");
 			}
 		});
 	});

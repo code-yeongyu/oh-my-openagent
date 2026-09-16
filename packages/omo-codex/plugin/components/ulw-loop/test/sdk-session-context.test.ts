@@ -167,3 +167,30 @@ describe("agent toolkit session context", () => {
 		});
 	});
 });
+
+describe("agent toolkit cwd fallback (#8332)", () => {
+	it("#when cwd is empty #then falls back to process.cwd() instead of throwing immediately", async () => {
+		const cwd = await makeWorkdir();
+		const sessionId = "session-cwd-fallback";
+		await seedSession(cwd, sessionId);
+
+		// In a worker thread, process.cwd() returns the worktree root (not the session dir),
+		// so the plan won't be found — but the important thing is that createAgentToolkit
+		// does NOT throw ULW_LOOP_CWD_REQUIRED. It should succeed construction and only
+		// fail at the plan-read level (ULW_LOOP_PLAN_MISSING), proving the cwd fallback worked.
+		const toolkit = createAgentToolkit({ cwd: "", sessionId, surface: "lazycodex" });
+		const status = await toolkit.status();
+		// The toolkit was created (no CWD_REQUIRED throw), but plan may not be found at process.cwd()
+		if (!status.ok) {
+			expect(status.error.code).not.toBe("ULW_LOOP_CWD_REQUIRED");
+		}
+	});
+
+	it("#when cwd is whitespace-only #then does not throw CWD_REQUIRED", async () => {
+		const toolkit = createAgentToolkit({ cwd: "   ", sessionId: "session-cwd-ws", surface: "lazycodex" });
+		const status = await toolkit.status();
+		if (!status.ok) {
+			expect(status.error.code).not.toBe("ULW_LOOP_CWD_REQUIRED");
+		}
+	});
+});

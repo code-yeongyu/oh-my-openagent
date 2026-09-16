@@ -176,7 +176,7 @@ describe("reconcileCodexGoalSnapshot", () => {
 		// then
 		expect(reconciliation.ok).toBe(true);
 		expect(reconciliation.errors).toHaveLength(0);
-		expect(reconciliation.warnings.join(" ")).toContain("/goal resume");
+		expect(reconciliation.nextActions.join(" ")).toContain("/goal resume");
 	});
 });
 
@@ -193,5 +193,58 @@ describe("formatCodexGoalReconciliation", () => {
 
 		// then
 		expect(formatted).toMatch(/objective|status/i);
+	});
+});
+
+describe("reconcileCodexGoalSnapshot – nextActions vs warnings separation (#8333)", () => {
+	it("puts create_goal guidance in nextActions when snapshot is unavailable", () => {
+		const result = reconcileCodexGoalSnapshot({ available: false, raw: null }, { expectedObjective: "X" });
+
+		expect(result.nextActions).toHaveLength(1);
+		expect(result.nextActions[0]).toContain("create_goal");
+		expect(result.warnings).toHaveLength(0);
+	});
+
+	it("does NOT put create_goal in nextActions when goal exists with differing objective", () => {
+		const result = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "different obj", status: "active", raw: null },
+			{ expectedObjective: "expected obj" },
+		);
+
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toContain("driver_objective_differs");
+		expect(result.nextActions).toHaveLength(0);
+		expect(result.nextActions.join(" ")).not.toContain("create_goal");
+	});
+
+	it("does NOT put create_goal in nextActions when goal matches", () => {
+		const result = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "X", status: "active", raw: null },
+			{ expectedObjective: "X" },
+		);
+
+		expect(result.warnings).toHaveLength(0);
+		expect(result.nextActions).toHaveLength(0);
+	});
+
+	it("puts resume guidance in nextActions for paused goal", () => {
+		const result = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "X", status: "paused", raw: null },
+			{ expectedObjective: "X" },
+		);
+
+		expect(result.nextActions).toHaveLength(1);
+		expect(result.nextActions[0]).toContain("/goal resume");
+		expect(result.warnings).toHaveLength(0);
+	});
+
+	it("puts create_goal in nextActions for early-closed goal", () => {
+		const result = reconcileCodexGoalSnapshot(
+			{ available: true, objective: "X", status: "complete", raw: null },
+			{ expectedObjective: "X" },
+		);
+
+		expect(result.nextActions).toHaveLength(1);
+		expect(result.nextActions[0]).toContain("create_goal");
 	});
 });

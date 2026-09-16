@@ -45,8 +45,7 @@ function validateCodexGoalJson(raw: string | undefined): void {
 	}
 }
 
-function validateContext(context: ToolkitContext): void {
-	if (!context.cwd.trim()) throw new UlwLoopError("cwd is required.", "ULW_LOOP_CWD_REQUIRED");
+function validateContext(context: ToolkitContext): ToolkitContext {
 	const sessionId = context.sessionId.trim();
 	if (!sessionId)
 		throw new UlwLoopError("ULW_LOOP_SESSION_ID_REQUIRED: sessionId is required.", "ULW_LOOP_SESSION_ID_REQUIRED");
@@ -58,6 +57,17 @@ function validateContext(context: ToolkitContext): void {
 		);
 	if (context.surface !== "omo-senpi" && context.surface !== "lazycodex")
 		throw new UlwLoopError("surface must be omo-senpi or lazycodex.", "ULW_LOOP_SURFACE_INVALID");
+	if (!context.cwd.trim()) {
+		const fallback = process.cwd();
+		if (!fallback)
+			throw new UlwLoopError(
+				'PI_SESSION_CWD is required. Remediation: set env("PI_SESSION_CWD", "<session cwd>") in the eval kernel, or restart the session.',
+				"ULW_LOOP_CWD_REQUIRED",
+			);
+		console.warn("[ulw-loop] PI_SESSION_CWD was empty after kernel reload; falling back to process.cwd():", fallback);
+		return { ...context, cwd: fallback };
+	}
+	return context;
 }
 
 function errorDetails(error: UlwLoopError): ToolkitError {
@@ -101,8 +111,8 @@ function checkpointWithValidatedSnapshot(
 }
 
 export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDependencies = {}): AgentToolkit {
-	validateContext(context);
-	const scope: UlwLoopScope = { sessionId: context.sessionId };
+	const resolvedContext = validateContext(context);
+	const scope: UlwLoopScope = { sessionId: resolvedContext.sessionId };
 	const notify = async <Operation extends UlwLoopOperation>(
 		operation: Operation,
 		response: ToolkitResponseFor<Operation>,
@@ -119,7 +129,11 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 			const nextActions = typeof result === "object" && result !== null ? nextActionsFrom(result) : [];
 			return await notify(operation, { ok: true, operation, result, nextActions });
 		} catch (error) {
-			if (error instanceof UlwLoopError && error.code === "ULW_LOOP_PLAN_MISSING" && context.surface === "omo-senpi")
+			if (
+				error instanceof UlwLoopError &&
+				error.code === "ULW_LOOP_PLAN_MISSING" &&
+				resolvedContext.surface === "omo-senpi"
+			)
 				return notify(
 					operation,
 					failure(
@@ -168,15 +182,16 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 			}
 		},
 		help: () => invoke("help", async () => ULW_LOOP_MANIFEST),
-		createGoals: (args) => invoke("create-goals", () => createUlwLoopPlan(context.cwd, args, scope, context.surface)),
+		createGoals: (args) =>
+			invoke("create-goals", () => createUlwLoopPlan(resolvedContext.cwd, args, scope, resolvedContext.surface)),
 		status: () =>
 			invoke("status", async () => {
-				const plan = await readUlwLoopPlan(context.cwd, scope);
+				const plan = await readUlwLoopPlan(resolvedContext.cwd, scope);
 				const active = plan.goals.find((goal) => goal.id === plan.activeGoalId);
 				return {
 					plan,
 					summary: summarizeUlwLoopPlan(plan),
-					nextActions: statusNextActions(plan, context.surface),
+					nextActions: statusNextActions(plan, resolvedContext.surface),
 					// Attempt directories are an evidence-layout v2 concept; a v1 plan must not advertise one.
 					...(active === undefined || plan.evidenceLayoutVersion !== 2
 						? {}
@@ -187,22 +202,22 @@ export function createAgentToolkit(context: ToolkitContext, deps: AgentToolkitDe
 		checkpoint: (args: CheckpointArgs) =>
 			invoke("checkpoint", () =>
 				args.printTemplate === true
-					? checkpointTemplate(context.cwd, scope, args.goalId, { surface: context.surface })
-					: checkpointWithValidatedSnapshot(context, scope, args),
+					? checkpointTemplate(resolvedContext.cwd, scope, args.goalId, { surface: resolvedContext.surface })
+					: checkpointWithValidatedSnapshot(resolvedContext, scope, args),
 			),
-		steer: (args) => invoke("steer", () => steerUlwLoop(context.cwd, args, scope)),
-		addGoal: (args) => invoke("add-goal", () => addUlwLoopGoal(context.cwd, args, scope)),
+		steer: (args) => invoke("steer", () => steerUlwLoop(resolvedContext.cwd, args, scope)),
+		addGoal: (args) => invoke("add-goal", () => addUlwLoopGoal(resolvedContext.cwd, args, scope)),
 		criteria: (args) =>
 			invoke("criteria", async () => {
-				const plan = await readUlwLoopPlan(context.cwd, scope);
+				const plan = await readUlwLoopPlan(resolvedContext.cwd, scope);
 				const goal = plan.goals.find((candidate) => candidate.id === args.goalId);
 				if (goal === undefined)
 					throw new UlwLoopError(`Unknown ulw-loop id: ${args.goalId}.`, "ULW_LOOP_GOAL_NOT_FOUND");
 				return { goalId: goal.id, criteria: goal.successCriteria };
 			}),
-		recordEvidence: (args) => invoke("record-evidence", () => recordEvidence(context.cwd, args, scope)),
+		recordEvidence: (args) => invoke("record-evidence", () => recordEvidence(resolvedContext.cwd, args, scope)),
 		recordReviewBlockers: (args) =>
-			invoke("record-review-blockers", () => recordFinalReviewBlockers(context.cwd, args, scope)),
+			invoke("record-review-blockers", () => recordFinalReviewBlockers(resolvedContext.cwd, args, scope)),
 	};
 	return toolkit;
 }
