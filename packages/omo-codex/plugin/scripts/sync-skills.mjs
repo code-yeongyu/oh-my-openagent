@@ -196,7 +196,7 @@ function applyCodexSkillOverlays(skillName, content) {
 			.replace(startWorkOriginalHardRule, startWorkCodexHardRule);
 	}
 	if (skillName === "review-work" && !content.includes("When `review-work` is used as a final implementation")) {
-		return content.replace(reviewWorkAnchor, `${reviewWorkCodexGate}\n${reviewWorkAnchor}`);
+		return content.replace(reviewWorkAnchor, `${reviewWorkCodexGate}${reviewWorkAnchor}`);
 	}
 	return content;
 }
