@@ -1,0 +1,30 @@
+== Lane A: outputless dead child must NEVER be published as completed ==
+parent=ses_fc50abb60ffeRXMepYV0Hx2wHS
+  status[ses_fc50abaeeffe60FUdPK67nhRa2]: <absent>
+  status[ses_fc50abaeeffe60FUdPK67nhRa2]: busy
+  status[ses_fc50abaeeffe60FUdPK67nhRa2]: <absent>
+child=ses_fc50abaeeffe60FUdPK67nhRa2 content dump (must show assistant with zero content parts):
+  msg[user] parts=[{"type":"text","hasText":true}]
+  msg[assistant] parts=[]
+after 3 polls: task.status=running completedAt=<undefined> (no false success)
+Lane A PASS
+== Lane B: ENVIRONMENT BLOCKER probe (healthy-content generation) ==
+  Attempting the production-identical launch path; the sandbox
+  harness stack aborts every child run before any assistant content
+  is persisted (MessageAbortedError within ~50ms, all wire dialects).
+  Positive live completion could not be driven here; see README.
+launched task=bg_718cf54b (watching live task via getTask)
+  msg[user] parts=["text"]
+  msg[assistant] parts=[] error=MessageAbortedError
+observed: task.status=running after 20s (manager refuses outputless completion)
+BLOCKER RECORDED: positive live completion not drivable in this environment.
+Lane B DONE (blocker documented)
+== Lane C: terminal-interrupted startup failure must fail explicitly (#7337) ==
+parent=ses_fc50a6286ffefSIb3bic8L5M6N
+  status[ses_fc50a626fffef7ecM04LsYbu2j]: <absent>
+  status[ses_fc50a42e4ffeC8cm1Ll2yvDEY5]: <absent>
+  status[ses_fc50a2388fferQhdsEDqEck589]: <absent>
+BLOCKER RECORDED: 'interrupted' status never observable post-abort in this
+environment (status transitions straight to absent); the interrupted-route
+failure path stays pinned by manager.polling.test.ts unit coverage.
+QA LANE RESULT: PASS

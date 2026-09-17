@@ -1,0 +1,6 @@
+(fail) BackgroundManager pollRunningTasks > #given a session whose messages fetch fails while completion is being decided > #when session status is "interrupted" and messages fetch throws #then the task keeps waiting instead of false-completing [1.87ms]
+(fail) BackgroundManager pollRunningTasks > #given a session whose messages fetch fails while completion is being decided > #when session status is idle and messages fetch throws #then the task keeps waiting instead of false-completing [1.37ms]
+(fail) BackgroundManager pollRunningTasks > #given a session whose messages fetch fails while completion is being decided > #when session.idle fires and messages fetch throws #then the task keeps waiting instead of false-completing [35.67ms]
+(fail) BackgroundManager pollRunningTasks > #given a concurrent completion racing the startup-failure teardown > #when the task completes during failure teardown awaits #then failCrashedTask does not overwrite the completed state [3.29ms]
+ 17 pass
+ 4 fail

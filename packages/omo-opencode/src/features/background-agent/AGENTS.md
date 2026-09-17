@@ -54,6 +54,8 @@ Two signals combined:
 
 Both must agree before marking a task complete. Prevents premature completion on brief pauses.
 
+Every completion route reconciles child-session output via `resolveSessionOutputState()` (`"output" | "no-output" | "unknown"`; at least one assistant/tool message with text, reasoning, or tool content). A terminal non-idle status (`interrupted`) with output completes; verified without output the task is torn down (session abort + tmux pane callback) and routed through `failCrashedTask()` as an explicit error (#7337). An indeterminate observation (messages fetch error) never completes: idle/missing-status and interrupted sessions keep waiting under the stale/TTL timeouts because they are recoverable. `failCrashedTask()` only fails still-running tasks, so a concurrent completion during teardown awaits is never overwritten (#7337).
+
 ## CONCURRENCY MODEL
 
 - Key format: `{providerID}/{modelID}` (e.g., `anthropic/claude-opus-4-7`)
