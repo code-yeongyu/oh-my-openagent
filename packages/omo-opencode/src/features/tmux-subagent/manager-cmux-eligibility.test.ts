@@ -162,7 +162,7 @@ describe("TmuxSessionManager cmux eligibility", () => {
 
 	test("#given cmux fake TMUX #when isolation is window #then unsupported container spawn stays disabled", async () => {
 		// given
-		process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+		process.env.TMUX = "/tmp/cmux-omo/workspace,surface,pane"
 		const environmentEligible = selectTmuxManagerEnvironmentPredicate("window")
 		const queryWindowState = mock(async (): Promise<WindowState | null> => null)
 		const context = unsafeTestValue<PluginInput>({

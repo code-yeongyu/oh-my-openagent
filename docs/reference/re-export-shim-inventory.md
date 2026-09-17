@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-08-31. Total shim exports found: 256.
+Snapshot date: 2026-09-01. Total shim exports found: 257.
 
 ## Aggregate By Target Package
 
@@ -29,7 +29,7 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `@oh-my-opencode/rules-engine` | 4 |
 | `@oh-my-opencode/skills-loader-core` | 65 |
 | `@oh-my-opencode/team-core` | 45 |
-| `@oh-my-opencode/tmux-core` | 3 |
+| `@oh-my-opencode/tmux-core` | 4 |
 | `@oh-my-opencode/utils` | 53 |
 
 ## Exhaustive Shim Paths
@@ -274,6 +274,7 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/shared/session-idle-settle.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/skill-path-resolver.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/shared/snake-case.ts` | `@oh-my-opencode/utils` |
+| `packages/omo-opencode/src/shared/tmux/cmux-cli.ts` | `@oh-my-opencode/tmux-core` |
 | `packages/omo-opencode/src/shared/tmux/cmux-detect.ts` | `@oh-my-opencode/tmux-core` |
 | `packages/omo-opencode/src/shared/tmux/runner.ts` | `@oh-my-opencode/tmux-core` |
 | `packages/omo-opencode/src/shared/tmux/tmux-utils/spawn-process.ts` | `@oh-my-opencode/tmux-core` |
