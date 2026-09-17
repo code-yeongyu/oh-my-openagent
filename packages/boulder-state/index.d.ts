@@ -160,6 +160,15 @@ export declare function getWorkForSession(directory: string, sessionId: string):
 export declare function getWorkResumeOptions(directory: string): BoulderWorkResumeOption[]
 export declare function normalizeSessionId(sessionId: string, platform?: "codex" | "opencode" | "senpi"): string
 export declare function readBoulderState(directory: string): BoulderState | null
+export declare function reconcileStaleBoulderWorks(
+  directory: string,
+  options?: {
+    readonly staleThresholdMs?: number
+    readonly nowMs?: number
+    readonly resolveSessionDir?: (sessionId: string) => string | undefined
+  },
+): BoulderState | null
+export declare function resumeBoulderWork(directory: string, workId: string): BoulderState | null
 export declare function resolveBoulderPlanPath(
   directory: string,
   state: Pick<BoulderState, "active_plan" | "worktree_path">,
