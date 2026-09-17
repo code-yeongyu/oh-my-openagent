@@ -1,5 +1,6 @@
 import type { OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
+import { classifySyncOutcome, type SyncOutcomeState } from "./sync-session-turns"
 import { normalizeSDKResponse } from "../../shared"
 
 function escapeRegExp(value: string): string {
@@ -59,7 +60,7 @@ export async function fetchSyncResult(
   sessionID: string,
   anchorMessageCount?: number,
   options?: { strictAbortRecovery?: boolean; deliverableTag?: string }
-): Promise<{ ok: true; textContent: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; textContent: string; endState: SyncOutcomeState } | { ok: false; error: string }> {
   const messagesResult = await client.session.messages({
     path: { id: sessionID },
   })
@@ -73,6 +74,8 @@ export async function fetchSyncResult(
   })
 
   const messagesAfterAnchor = anchorMessageCount !== undefined ? messages.slice(anchorMessageCount) : messages
+
+  const endState = classifySyncOutcome(messagesAfterAnchor)
 
   if (anchorMessageCount !== undefined && messagesAfterAnchor.length === 0) {
     return {
@@ -122,11 +125,11 @@ export async function fetchSyncResult(
     if (options.deliverableTag) {
       const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
       if (tagged) {
-        return { ok: true, textContent: tagged }
+        return { ok: true, textContent: tagged, endState }
       }
     }
 
-    return { ok: true, textContent: lastContent }
+    return { ok: true, textContent: lastContent, endState }
   }
 
   // Prefer an explicit deliverable envelope (e.g. `<plan>...</plan>`) when the
@@ -137,7 +140,7 @@ export async function fetchSyncResult(
   if (options?.deliverableTag) {
     const tagged = extractTaggedDeliverable(assistantMessages, options.deliverableTag)
     if (tagged) {
-      return { ok: true, textContent: tagged }
+      return { ok: true, textContent: tagged, endState }
     }
   }
 
@@ -160,5 +163,5 @@ export async function fetchSyncResult(
     }
   }
 
-  return { ok: true, textContent }
+  return { ok: true, textContent, endState }
 }
