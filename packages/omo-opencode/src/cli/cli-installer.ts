@@ -28,7 +28,9 @@ import { runCodexInstaller } from "./install-codex"
 import { runSenpiInstaller } from "./install-senpi"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
+import { applyInstallConfigScope, resolveNonTuiInstallScope } from "./install-config-scope"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
+import { getConfigDir } from "./config-manager/config-context"
 import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -45,6 +47,21 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     )
     console.log()
     return 1
+  }
+
+  const scopeResolution = resolveNonTuiInstallScope(args.configScope)
+  if (!scopeResolution.ok) {
+    printHeader(false)
+    printError("Validation failed:")
+    for (const err of scopeResolution.error.split("\n")) {
+      console.log(`  ${SYMBOLS.bullet} ${err}`)
+    }
+    console.log()
+    return 1
+  }
+  if (scopeResolution.scope) {
+    const scopedDir = applyInstallConfigScope(scopeResolution.scope, scopeResolution.roots)
+    printInfo(`Config scope: ${scopeResolution.scope} ${SYMBOLS.arrow} ${color.dim(scopedDir)}`)
   }
 
   const config = argsToConfig(args)
@@ -112,7 +129,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
     )
     try {
-      ensureTuiPluginEntry()
+      ensureTuiPluginEntry({ configDir: getConfigDir() })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       printWarning(`Could not update OpenCode TUI config: ${message}`)
