@@ -1,0 +1,12 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/run/runner.telemetry.test.ts:
+Session: ses_test
+Session: ses_test
+
+  ⚙ read_file filePath=/src/index.ts  
+
+ 197 pass
+ 0 fail
+ 401 expect() calls
+Ran 197 tests across 28 files. [6.98s]

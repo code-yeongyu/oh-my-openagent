@@ -215,6 +215,28 @@ describe("MonitorOutputInjector injection route", () => {
       })
       expect(harness.injector.getPendingBatches(record.id)).toEqual([])
     })
+
+    test("#when the route flushes #then dispatched text parts are synthetic so OpenCode's ensureTitle real-user count is not defeated (#5544)", async () => {
+      // given
+      const record = createRecord()
+      const batch = createBatch(5)
+      const harness = createHarness()
+      harness.injector.queueBatch(record, batch)
+
+      // when
+      await harness.injector.flushMonitor(record.id)
+
+      // then
+      expect(harness.calls).toHaveLength(1)
+      const body = harness.calls[0]?.input.body as {
+        parts?: Array<{ type?: string; text?: string; synthetic?: boolean }>
+      }
+      const parts = body.parts ?? []
+      expect(parts.length).toBeGreaterThan(0)
+      for (const part of parts) {
+        expect(part.synthetic).toBe(true)
+      }
+    })
   })
 
   describe("#given two concurrent flushes target the same batch sequence", () => {

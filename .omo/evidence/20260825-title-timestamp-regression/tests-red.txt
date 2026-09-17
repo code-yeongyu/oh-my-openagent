@@ -1,0 +1,182 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/run/session-resolver.test.ts:
+83 |     // when
+84 |     const result = await resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
+85 | 
+86 |     // then
+87 |     expect(result).toBe("new-session-id")
+88 |     expect(mockClient.session.create).toHaveBeenCalledWith({
+                                           ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+@@ -10,3 +10,3 @@
+        ],
++       "title": "oh-my-openagent run",
+      },
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/cli/run/session-resolver.test.ts:88:39)
+(fail) resolveSession > creates new session when no session ID provided [3.54ms]
+108 |     // then: a pre-set title makes OpenCode's ensureTitle skip forever (#5544)
+109 |     const createCall = (mockClient.session.create as ReturnType<typeof mock> & {
+110 |       mock: { calls: Array<[{ body: Record<string, unknown> }]> }
+111 |     }).mock.calls[0]?.[0]
+112 |     expect(createCall?.body).toBeDefined()
+113 |     expect("title" in createCall.body).toBe(false)
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/cli/run/session-resolver.test.ts:113:40)
+(fail) resolveSession > creates sessions without a custom title so OpenCode auto-titles from the task (#5544) [0.41ms]
+126 |     const result = await resolveSession({ client: mockClient, directory, retryDelayMs: 1 })
+127 | 
+128 |     // then
+129 |     expect(result).toBe("retried-session-id")
+130 |     expect(mockClient.session.create).toHaveBeenCalledTimes(2)
+131 |     expect(mockClient.session.create).toHaveBeenCalledWith({
+                                            ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+    Expected: [
+  {
+    body: {
+      permission: [
+        {
+          permission: "question",
+          action: "deny",
+          pattern: "*",
+        }
+      ],
+    },
+    query: {
+      directory: "/test-project",
+    },
+  }
+]
+    Received:
+              1: [
+  {
+    body: {
+      title: "oh-my-openagent run",
+      permission: [
+        {
+          permission: "question",
+          action: "deny",
+          pattern: "*",
+        }
+      ],
+    },
+    query: {
+      directory: "/test-project",
+    },
+  }
+]
+              2: [
+  {
+    body: {
+      title: "oh-my-openagent run",
+      permission: [
+        {
+          permission: "question",
+          action: "deny",
+          pattern: "*",
+        }
+      ],
+    },
+    query: {
+      directory: "/test-project",
+    },
+  }
+]
+
+    Number of calls: 2
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/cli/run/session-resolver.test.ts:131:39)
+(fail) resolveSession > retries session creation on failure [7.84ms]
+
+packages/omo-opencode/src/features/team-mode/member-session-routing.test.ts:
+24 | 
+25 |     // then
+26 |     expect(body.parts).toHaveLength(1)
+27 |     const part = body.parts[0]
+28 |     expect(part.type).toBe("text")
+29 |     expect(part.synthetic).toBe(true)
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/features/team-mode/member-session-routing.test.ts:29:28)
+(fail) buildMemberPromptBody — OpenCode synthetic marking (#5544) > #given a member envelope is delivered live #when the prompt body is built #then its text part is synthetic so OpenCode's ensureTitle real-user count is not defeated [0.82ms]
+52 |     expect(body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-5" })
+53 |     expect(body.variant).toBe("high")
+54 |     expect(body.temperature).toBe(0.2)
+55 |     expect(body.topP).toBe(0.9)
+56 |     expect(body.maxOutputTokens).toBe(8192)
+57 |     expect(body.parts[0]?.synthetic).toBe(true)
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/features/team-mode/member-session-routing.test.ts:57:38)
+(fail) buildMemberPromptBody — OpenCode synthetic marking (#5544) > #given a member with routing metadata #when the prompt body is built #then agent, model, and tuning fields are preserved alongside the synthetic part [0.26ms]
+
+packages/omo-opencode/src/features/monitor/injection-route.test.ts:
+232 |         parts?: Array<{ type?: string; text?: string; synthetic?: boolean }>
+233 |       }
+234 |       const parts = body.parts ?? []
+235 |       expect(parts.length).toBeGreaterThan(0)
+236 |       for (const part of parts) {
+237 |         expect(part.synthetic).toBe(true)
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/features/monitor/injection-route.test.ts:237:32)
+(fail) MonitorOutputInjector injection route > #given an idle parent session and a pending monitor batch > #when the route flushes #then dispatched text parts are synthetic so OpenCode's ensureTitle real-user count is not defeated (#5544) [3.58ms]
+
+packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.test.ts:
+63 |       // then
+64 |       expect(promptAsyncCalls).toHaveLength(1)
+65 |       const parts = promptAsyncCalls[0]?.body.parts ?? []
+66 |       expect(parts.length).toBeGreaterThan(0)
+67 |       for (const part of parts) {
+68 |         expect(part.synthetic).toBe(true)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.test.ts:68:32)
+(fail) sendParentWakePrompt — OpenCode synthetic marking (#5544) > #given a reply wake is flushed #when the prompt is dispatched #then every text part is synthetic so OpenCode's ensureTitle real-user count is not defeated [155.30ms]
+88 |       expect(promptAsyncCalls).toHaveLength(1)
+89 |       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+90 |       const parts = promptAsyncCalls[0]?.body.parts ?? []
+91 |       expect(parts.length).toBeGreaterThan(0)
+92 |       for (const part of parts) {
+93 |         expect(part.synthetic).toBe(true)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5544/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.test.ts:93:32)
+(fail) sendParentWakePrompt — OpenCode synthetic marking (#5544) > #given a noReply wake is flushed #when the prompt is dispatched #then its text part is synthetic and keeps the internal marker [156.21ms]
+
+ 10 pass
+ 8 fail
+ 54 expect() calls
+Ran 18 tests across 4 files. [1145.00ms]
