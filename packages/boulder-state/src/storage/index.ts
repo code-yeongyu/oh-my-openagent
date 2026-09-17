@@ -11,6 +11,7 @@ export {
   getWorkResumeOptions,
   readBoulderState,
 } from "./read-state"
+export { reconcileStaleBoulderWorks, resumeBoulderWork } from "./reconcile"
 export { appendSessionId, appendSessionIdForWork } from "./session"
 export { endTaskTimer, startTaskTimer, upsertTaskSessionState, upsertTaskSessionStateForWork } from "./task"
 export { addBoulderWork, clearBoulderState, completeBoulder, createBoulderState, generateWorkId, selectActiveWork, writeBoulderState } from "./write-state"
