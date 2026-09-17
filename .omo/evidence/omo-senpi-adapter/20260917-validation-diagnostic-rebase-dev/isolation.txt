@@ -1,0 +1,5 @@
+real ~/.senpi/agent exists: no
+real ~/.omo/agent exists: no
+realSenpiUntouched: true (paths absent; no live senpi driver writes)
+isolated agent-dir: n/a (drive.mjs --self-test only; live senpi binary absent)
+senpi binary: ABSENT

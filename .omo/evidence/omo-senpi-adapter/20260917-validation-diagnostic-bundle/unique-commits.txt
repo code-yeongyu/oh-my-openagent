@@ -1,0 +1,2 @@
+32c5e10dd build(omo-senpi): regenerate extension bundles after config diagnostic rebase
+a9d2694cb fix(config): name unrecognized keys in validation diagnostics

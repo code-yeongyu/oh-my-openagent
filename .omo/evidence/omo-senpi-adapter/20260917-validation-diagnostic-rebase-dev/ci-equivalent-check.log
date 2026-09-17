@@ -1,0 +1,38 @@
+## CI-equivalent build-extension --check (source runtime dists hidden)
+runtime dist not built locally; skipping freshness check: /workspace/packages/lsp-daemon/dist
+runtime dist not built locally; skipping freshness check: /workspace/packages/ast-grep-mcp/dist/cli.js
+x-search conditional skill not staged locally; skipping freshness check: /workspace/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 47 modules in 5ms
+
+  sdk.js  112.97 KB  (entry point)
+
+Bundled 996 modules in 52ms
+
+  omo.js  1.78 MB  (entry point)
+
+Bundled 746 modules in 44ms
+
+  omo-task.js  1.16 MB  (entry point)
+
+Bundled 145 modules in 14ms
+
+  omo-member.js  200.67 KB  (entry point)
+
+Bundled 151 modules in 9ms
+
+  memory-run-supervisor.mjs  42.39 KB  (entry point)
+
+Bundled 161 modules in 8ms
+
+  omo-init-deep-advisor.js  86.65 KB  (entry point)
+
+omo-senpi extension build is current: /workspace/packages/omo-senpi/plugin/extensions/omo.js
+extension-check-exit:0
+
+## build-install --check
+Bundled 7 modules in 2ms
+
+  install.mjs  20.66 KB  (entry point)
+
+omo-senpi installer is current: /workspace/packages/omo-senpi/plugin/scripts/install.mjs
+install-check-exit:0

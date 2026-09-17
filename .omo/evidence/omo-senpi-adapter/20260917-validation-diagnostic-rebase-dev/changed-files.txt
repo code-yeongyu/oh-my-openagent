@@ -1,0 +1,6 @@
+packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+packages/omo-senpi/plugin/extensions/omo-member.js
+packages/omo-senpi/plugin/extensions/omo-task.js
+packages/omo-senpi/plugin/extensions/omo.js
+packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js

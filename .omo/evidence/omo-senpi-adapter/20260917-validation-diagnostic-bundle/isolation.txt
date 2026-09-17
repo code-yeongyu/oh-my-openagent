@@ -1,0 +1,4 @@
+realSenpiAgentDir=/home/ubuntu/.senpi/agent
+exists=no
+realOmoAgentDir=/home/ubuntu/.omo/agent
+exists=no

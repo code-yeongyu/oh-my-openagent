@@ -1,0 +1,11 @@
+## build-extension --check
+ENOENT: no such file or directory, open '/tmp/oh-my-openagent-wt/fix-validation-diagnostic-names-unknown-keys/packages/omo-senpi/plugin/runtime/lsp-daemon/dist/.omo-runtime-manifest.json'
+exit:1
+
+## build-install --check
+Bundled 7 modules in 3ms
+
+  install.mjs  20.66 KB  (entry point)
+
+omo-senpi installer is current: /tmp/oh-my-openagent-wt/fix-validation-diagnostic-names-unknown-keys/packages/omo-senpi/plugin/scripts/install.mjs
+exit:0

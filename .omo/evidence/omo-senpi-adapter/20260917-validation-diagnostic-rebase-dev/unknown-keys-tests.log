@@ -1,0 +1,15 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-config-core/src/loader/unknown-keys.test.ts:
+(pass) loadOmoConfig unknown-key tolerance > #given a user layer with a valid category and a retired root key #when loading the senpi view #then the category loads and one unknown-keys diagnostic names the ignored key [5.35ms]
+(pass) loadOmoConfig unknown-key tolerance > #given retired keys nested in a profile and a senpi block #when loading the active profile #then both are stripped and the diagnostic carries dotted paths [2.31ms]
+(pass) loadOmoConfig unknown-key tolerance > #given a prototype-pollution key beside a valid block #when loading the senpi view #then the whole layer is rejected instead of stripped [0.59ms]
+(pass) loadOmoConfig unknown-key tolerance > #given a prototype-pollution key nested under an otherwise valid agent #when loading the senpi view #then the whole layer is rejected instead of loaded [0.54ms]
+(pass) loadOmoConfig unknown-key tolerance > #given a malformed known value #when loading the senpi view #then the layer is rejected with a validation diagnostic [0.62ms]
+(pass) loadOmoConfig unknown-key tolerance > #given an unrecognized key beside a real schema violation #when loading the senpi view #then the diagnostic names both [1.26ms]
+
+ 6 pass
+ 0 fail
+ 28 expect() calls
+Ran 6 tests across 1 file. [509.00ms]
+unknown-keys-exit:0

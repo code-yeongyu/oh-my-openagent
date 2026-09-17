@@ -1,0 +1,3 @@
+ packages/omo-senpi/plugin/extensions/omo-task.js | 4 ++--
+ packages/omo-senpi/plugin/extensions/omo.js      | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)

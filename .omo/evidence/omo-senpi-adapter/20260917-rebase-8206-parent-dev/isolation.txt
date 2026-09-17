@@ -1,0 +1,13 @@
+date_utc=2026-09-17T12:36:44Z
+node=v24.21.0
+bun=1.4.2
+branch=fix/validation-diagnostic-names-unknown-keys
+parent_dev=fc7b12ac7c011b3317036f5cb47ecd4f77798d26
+lsp_daemon_dist_at_check=no
+ast_grep_dist_at_check=no
+real_senpi_agent=absent
+real_omo_agent=absent
+senpi_bin=absent
+realSenpiUntouched=true
+isolated agent-dir: n/a (drive.mjs --self-test only; live senpi binary absent)
+note=test-setup later built a gitignored lsp-daemon/dist; --check was run with it absent

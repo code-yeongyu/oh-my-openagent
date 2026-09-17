@@ -1,0 +1,5 @@
+f544bacd0 build(omo-senpi): regenerate bundles after rebase onto parent/dev
+67d390e37 docs(evidence): record Node 24 senpi --check freshness QA
+0b026212a docs(evidence): record the parent/dev rebase QA for the diagnostic
+7907ffca9 docs(evidence): record the senpi bundle freshness QA for the diagnostic rebase
+b8315cf89 fix(config): name unrecognized keys in validation diagnostics

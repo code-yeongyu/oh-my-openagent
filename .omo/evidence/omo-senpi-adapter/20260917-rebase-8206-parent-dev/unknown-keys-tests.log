@@ -1,0 +1,21 @@
+bun test v1.4.2 (744846f84)
+
+packages/omo-config-core/src/loader/unknown-keys.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm notice
+npm notice New major version of npm available! 11.19.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+(pass) loadOmoConfig unknown-key tolerance > #given a user layer with a valid category and a retired root key #when loading the senpi view #then the category loads and one unknown-keys diagnostic names the ignored key [10.40ms]
+(pass) loadOmoConfig unknown-key tolerance > #given retired keys nested in a profile and a senpi block #when loading the active profile #then both are stripped and the diagnostic carries dotted paths [2.65ms]
+(pass) loadOmoConfig unknown-key tolerance > #given a prototype-pollution key beside a valid block #when loading the senpi view #then the whole layer is rejected instead of stripped [0.59ms]
+(pass) loadOmoConfig unknown-key tolerance > #given a prototype-pollution key nested under an otherwise valid agent #when loading the senpi view #then the whole layer is rejected instead of loaded [0.61ms]
+(pass) loadOmoConfig unknown-key tolerance > #given a malformed known value #when loading the senpi view #then the layer is rejected with a validation diagnostic [0.62ms]
+(pass) loadOmoConfig unknown-key tolerance > #given an unrecognized key beside a real schema violation #when loading the senpi view #then the diagnostic names both [1.28ms]
+
+ 6 pass
+ 0 fail
+ 28 expect() calls
+Ran 6 tests across 1 file. [2.91s]
+unknown-keys-exit:0

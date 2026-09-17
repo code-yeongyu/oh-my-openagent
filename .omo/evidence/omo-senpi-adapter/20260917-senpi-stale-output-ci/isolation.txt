@@ -1,0 +1,11 @@
+date_utc=2026-09-17T10:39:49Z
+node=/home/ubuntu/.nvm/versions/node/v24.21.0/bin/node v24.21.0
+bun=/home/ubuntu/.bun/bin/bun 1.4.2
+head=3b47dd8ffed50d057a95adde305cb2ce738e163f
+branch=fix/validation-diagnostic-names-unknown-keys
+lsp_daemon_dist_exists=yes
+ast_grep_dist_exists=no
+real_senpi_agent=absent
+real_omo_agent=absent
+senpi_bin=absent
+hid_lsp_daemon_dist=/tmp/hidden-lsp-daemon-dist-evidence-8006

@@ -1,0 +1,2 @@
+8ae828e68 docs(evidence): record the senpi bundle freshness QA for the diagnostic rebase
+9a1c05cf6 fix(config): name unrecognized keys in validation diagnostics

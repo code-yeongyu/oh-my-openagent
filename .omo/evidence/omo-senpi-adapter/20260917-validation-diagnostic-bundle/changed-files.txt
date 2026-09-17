@@ -1,0 +1,8 @@
+M	packages/omo-config-core/src/loader/loader.ts
+M	packages/omo-config-core/src/loader/unknown-keys.test.ts
+M	packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+M	packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+M	packages/omo-senpi/plugin/extensions/omo-member.js
+M	packages/omo-senpi/plugin/extensions/omo-task.js
+M	packages/omo-senpi/plugin/extensions/omo.js
+M	packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js

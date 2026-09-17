@@ -1,0 +1,7 @@
+ packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs | 2 +-
+ packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js  | 2 +-
+ packages/omo-senpi/plugin/extensions/omo-member.js             | 2 +-
+ packages/omo-senpi/plugin/extensions/omo-task.js               | 2 +-
+ packages/omo-senpi/plugin/extensions/omo.js                    | 2 +-
+ packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js     | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
