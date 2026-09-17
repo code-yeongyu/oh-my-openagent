@@ -1,0 +1,10 @@
+$ bunx oh-my-openagent uninstall --platform=opencode --config-dir $SMOKE/config --project $SMOKE/project  (source entry: bun packages/omo-opencode/src/cli/index.ts)
+exit=0
+- Scanned OpenCode agents directory /tmp/opencode/6322-smoke-FvVb/config/agent
+- Scanned OpenCode agents directory /tmp/opencode/6322-smoke-FvVb/project/.opencode/agent
+- Removed omo agent definition /tmp/opencode/6322-smoke-FvVb/config/agent/hephaestus.md
+- Removed omo agent definition /tmp/opencode/6322-smoke-FvVb/config/agent/sisyphus.md
+- Removed omo agent definition /tmp/opencode/6322-smoke-FvVb/config/agent/prometheus.md
+- Removed omo agent definition /tmp/opencode/6322-smoke-FvVb/project/.opencode/agent/atlas.md
+--- remaining in config/agent:
+my-agent.md

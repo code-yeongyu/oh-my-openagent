@@ -35,7 +35,9 @@ describe("cli-program", () => {
     // then
     expect(cleanupBlock).not.toBeNull()
     expect(cleanupBlock?.[1]).toContain('new Option("--platform <platform>"')
-    expect(cleanupBlock?.[1]).toContain('.choices(["codex"])')
+    expect(cleanupBlock?.[1]).toContain('"codex"')
+    expect(cleanupBlock?.[1]).toContain('"opencode"')
+    expect(cleanupBlock?.[1]).toContain('"both"')
     expect(cleanupBlock?.[1]).toContain("--codex-home")
     expect(cleanupBlock?.[1]).toContain("--project")
   })
