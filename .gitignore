@@ -2,6 +2,11 @@
 .omo/*
 !.omo/rules/
 !.omo/rules/**
+!.omo/evidence/
+!.omo/evidence/**
+!.omo/init-deep.json
+!.omo/fixtures/
+!.omo/fixtures/**
 packages/*/.omo/*
 .sisyphus/*
 !.sisyphus/rules/
@@ -11,6 +16,20 @@ node_modules/
 # Build output
 dist/
 packages/omo-codex/plugin/skills/
+!packages/omo-codex/plugin/skills/init-deep/
+!packages/omo-codex/plugin/skills/init-deep/**
+!packages/omo-codex/plugin/skills/ulw-plan/
+!packages/omo-codex/plugin/skills/ulw-plan/**
+packages/omo-senpi/plugin/skills/
+!packages/omo-senpi/plugin/skills/init-deep/
+!packages/omo-senpi/plugin/skills/init-deep/**
+!packages/omo-senpi/plugin/skills/onboarding/
+!packages/omo-senpi/plugin/skills/onboarding/**
+
+# Stray session artifacts
+local-ignore/
+.local-ignore/
+--out-dir/
 
 # Platform binaries (built, not committed)
 packages/*/bin/oh-my-opencode
@@ -48,6 +67,12 @@ oauth-success.html
 .dori-sync/
 .dori/
 .playwright-mcp/
+
+# Eval outputs (sanctioned, tracked intentionally)
+!.agents/skills/work-with-pr-workspace/**/outputs/
+!.agents/skills/work-with-pr-workspace/**/outputs/**
+!.opencode/skills/work-with-pr-workspace/**/outputs/
+!.opencode/skills/work-with-pr-workspace/**/outputs/**
 
 # Debugging / session artifacts (skill workspace residue)
 .debugging

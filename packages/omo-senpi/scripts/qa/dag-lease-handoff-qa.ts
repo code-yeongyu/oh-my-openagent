@@ -10,6 +10,8 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { resolveOutDir } from "./resolve-out-dir"
+
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { ManagedChildHandle, ManagedRunner, ManagedStartSpec, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import { createDagFileStore, createDagManager, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
@@ -22,7 +24,7 @@ const RUN_ID = "run-lease-handoff" as DagRunId
 const SESSION_ID = "session-lease-handoff"
 const POLL_MS = 100
 
-const outDir = process.argv[2] ?? join(tmpdir(), "dag-lease-handoff-qa")
+const outDir = resolveOutDir("dag-lease-handoff-qa")
 const failures: string[] = []
 const report: Record<string, unknown> = {}
 

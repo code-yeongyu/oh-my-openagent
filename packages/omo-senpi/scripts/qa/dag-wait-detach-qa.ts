@@ -9,6 +9,8 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { resolveOutDir } from "./resolve-out-dir"
+
 import {
   applyDagSchedulerEvent,
   compileDag,
@@ -30,7 +32,7 @@ const ROOT_SESSION = "session-detach-qa"
 const RUN_ID = "run-wait-detach" as DagRunId
 const RUN_NAME = "wait detach qa"
 
-const outDir = process.argv[2] ?? join(tmpdir(), "dag-wait-detach-qa")
+const outDir = resolveOutDir("dag-wait-detach-qa")
 const failures: string[] = []
 const report: Record<string, unknown> = {}
 

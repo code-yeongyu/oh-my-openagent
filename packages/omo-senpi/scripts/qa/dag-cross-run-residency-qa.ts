@@ -11,6 +11,8 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { resolveOutDir } from "./resolve-out-dir"
+
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import {
   createTaskLifecycle,
@@ -40,7 +42,7 @@ const PARENT_SESSION = "session-cross-run-qa"
 const ROOT_SESSION = "session-cross-run-qa"
 const RESIDENCY_CAP = 2
 
-const outDir = process.argv[2] ?? join(tmpdir(), "dag-cross-run-residency-qa")
+const outDir = resolveOutDir("dag-cross-run-residency-qa")
 const failures: string[] = []
 const report: Record<string, unknown> = { residency_cap: RESIDENCY_CAP }
 
