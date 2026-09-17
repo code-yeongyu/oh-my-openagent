@@ -1,0 +1,10 @@
+﻿opencode.exe : [0m
+Au caractère C:\nvm4w\nodejs\opencode.ps1:14 : 3
++   & "$basedir/node_modules/opencode-ai/bin/opencode.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([0m:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+> Sisyphus - ultraworker ┬À GLM-5.2
+[0m
+ok
