@@ -21,6 +21,7 @@ export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
   /(?:^|\s)503(?:\s|$)/,
   /(?:^|\s)529(?:\s|$)/,
   /使用上限/,
+  /用量上限/,
   /频率限制/,
   /请求过于频繁/,
   /暂时不可用/,

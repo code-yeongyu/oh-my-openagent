@@ -249,13 +249,14 @@ describe("model-error-classifier", () => {
       { message: "额度不足" },
       { message: "账户余额不足" },
       { message: "免费额度已耗尽" },
+      { message: "已达到 Token Plan 用量上限：请升级 Token Plan 套餐或购买积分补充用量。 (2056)" },
     ]
 
     //#when
     const results = errors.map((error) => shouldRetryError(error))
 
     //#then
-    expect(results).toEqual([false, false, false, false])
+    expect(results).toEqual([false, false, false, false, false])
   })
 
   test("treats HTTP 429 rate limit message as retryable", () => {
