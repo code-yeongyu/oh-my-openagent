@@ -271,9 +271,10 @@ jobs:
             export XDG_STATE_HOME="${SMOKE_ROOT}/xdg/state"
             export XDG_CACHE_HOME="${SMOKE_ROOT}/xdg/cache"
             export OMO_CODING_AGENT_DIR="${SMOKE_ROOT}/agent"
-            # Node's Windows os.homedir() follows USERPROFILE; HOME alone is
-            # only the Git Bash shell view and does not control provisioning.
-            if [[ "$TARGET" == windows-* ]]; then
+            if command -v cygpath >/dev/null 2>&1; then
+              export USERPROFILE="$(cygpath -w "${SMOKE_ROOT}/home")"
+              export OMO_CODING_AGENT_DIR="$(cygpath -w "${SMOKE_ROOT}/agent")"
+            elif [[ "$TARGET" == windows-* ]]; then
               export USERPROFILE="${HOME}"
             fi
           }
@@ -649,6 +650,10 @@ jobs:
             export XDG_STATE_HOME="${SMOKE_ROOT}/xdg/state"
             export XDG_CACHE_HOME="${SMOKE_ROOT}/xdg/cache"
             export OMO_CODING_AGENT_DIR="${SMOKE_ROOT}/agent"
+            if command -v cygpath >/dev/null 2>&1; then
+              export USERPROFILE="$(cygpath -w "${SMOKE_ROOT}/home")"
+              export OMO_CODING_AGENT_DIR="$(cygpath -w "${SMOKE_ROOT}/agent")"
+            fi
           }
 
           if [ "$GLIBC_EXISTS" != "true" ]; then
