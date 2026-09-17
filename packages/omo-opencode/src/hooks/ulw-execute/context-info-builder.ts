@@ -3,6 +3,7 @@ import {
   getPlanProgress,
   getWorkResumeOptions,
   readBoulderState,
+  reconcileStaleBoulderWorks,
   selectActiveWork,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
@@ -41,6 +42,16 @@ export function buildUlwExecuteContextInfo(params: {
     preferredPlanPath = null,
   } = params
   const directory = ctx.directory
+
+  // Reconcile stale works before reading resume options: a work whose
+  // ulw-execute session died abnormally stays "active" forever without
+  // this pass (#8413). Never throws; never rewrites a healthy file.
+  try {
+    reconcileStaleBoulderWorks(directory)
+  } catch {
+    // Reconcile is advisory — a failure must never block the context build.
+  }
+
   const resumeOptions = getWorkResumeOptions(directory).filter(
     (option) => option.status === "active" || option.status === "paused",
   )
