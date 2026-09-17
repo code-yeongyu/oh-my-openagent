@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [5.0.0-beta.69] - 2026-09-17
-
 ### Engine: senpi 2026.9.17-3
 
 **The published engine ships its tree-sitter assets again.** senpi's publish staging copied a bundled workspace's `dist` but not its `assets`, so the tarball carried compile-time `type: "file"` imports pointing outside the package. Any consumer bundling it with `bun build --compile` — omo's own release binaries included — failed to resolve them. (senpi [#1800](https://github.com/code-yeongyu/senpi/issues/1800))
