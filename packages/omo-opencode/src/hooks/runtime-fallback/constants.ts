@@ -16,6 +16,7 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
   timeout_seconds: 30,
+  first_prompt_watchdog_seconds: 90,
   notify_on_fallback: true,
   restore_primary_after_cooldown: false,
 }
@@ -40,4 +41,4 @@ export const HOOK_NAME = "runtime-fallback"
  * practice) yet much shorter than the 30-minute outer poll timeout that
  * would otherwise be the only safety net.
  */
-export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 90_000
+export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = DEFAULT_CONFIG.first_prompt_watchdog_seconds * 1000
