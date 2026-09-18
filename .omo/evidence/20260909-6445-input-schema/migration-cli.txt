@@ -1,0 +1,42 @@
+{
+  "dryRun": false,
+  "journalResumed": false,
+  "migratedFrom": [
+    "<sandbox>/home-migrated/.config/opencode/oh-my-openagent.json"
+  ],
+  "migrations": [
+    {
+      "diagnostics": [],
+      "movePlan": [
+        {
+          "from": "<sandbox>/home-migrated/.config/opencode/oh-my-openagent.json",
+          "to": "<sandbox>/home-migrated/.omo/migration-backup-2026-09-09T12-18-52-946Z-opencode-config/.config/opencode/oh-my-openagent.json"
+        }
+      ],
+      "status": "migrated",
+      "targetPath": "<sandbox>/home-migrated/.omo/omo.jsonc",
+      "transform": {
+        "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+        "[opencode]": {
+          "model_fallback": false
+        }
+      }
+    },
+    {
+      "diagnostics": [],
+      "movePlan": [],
+      "status": "migrated",
+      "targetPath": "<sandbox>/home-migrated/.omo/omo.jsonc",
+      "transform": {
+        "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+        "[opencode]": {
+          "model_fallback": false
+        },
+        "_migrations": [
+          "2026-07-opencode-config-unification"
+        ]
+      }
+    }
+  ],
+  "skippedConflictCount": 0
+}

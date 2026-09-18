@@ -1,0 +1,109 @@
+{
+  "dryRun": false,
+  "journalResumed": false,
+  "migratedFrom": [
+    "<SANDBOX>/home/.config/opencode/oh-my-openagent.json"
+  ],
+  "migrations": [
+    {
+      "diagnostics": [],
+      "movePlan": [
+        {
+          "from": "<SANDBOX>/home/.config/opencode/oh-my-openagent.json",
+          "to": "<SANDBOX>/home/.omo/migration-backup-2026-09-16T15-52-52-860Z-opencode-config/.config/opencode/oh-my-openagent.json"
+        }
+      ],
+      "status": "migrated",
+      "targetPath": "<SANDBOX>/home/.omo/omo.jsonc",
+      "transform": {
+        "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+        "[opencode]": {
+          "model_fallback": false
+        }
+      }
+    },
+    {
+      "diagnostics": [],
+      "movePlan": [],
+      "status": "migrated",
+      "targetPath": "<SANDBOX>/home/.omo/omo.jsonc",
+      "transform": {
+        "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+        "[opencode]": {
+          "model_fallback": false
+        },
+        "_migrations": [
+          "2026-07-opencode-config-unification"
+        ]
+      }
+    }
+  ],
+  "skippedConflictCount": 0
+}
+Resolving dependencies
+Resolved, downloaded and extracted [102]
+Saved lockfile
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+<SANDBOX>/migrated.json valid
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+<WORKTREE>/.omo/evidence/20260909-6445-input-schema/valid-unified-migrated.json valid
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+<WORKTREE>/.omo/evidence/20260909-6445-input-schema/valid-unified-profile.json valid
+unknown format "uri" ignored in schema at path "#/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/model_capabilities/properties/source_url"
+<WORKTREE>/.omo/evidence/20260909-6445-input-schema/valid-flat.json valid
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+<WORKTREE>/.omo/evidence/20260909-6445-input-schema/invalid-git-master.json invalid
+[
+  {
+    instancePath: '/[opencode]/git_master',
+    schemaPath: '#/properties/%5Bopencode%5D/properties/git_master/type',
+    keyword: 'type',
+    params: { type: 'object' },
+    message: 'must be object'
+  }
+]
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+<WORKTREE>/.omo/evidence/20260909-6445-input-schema/invalid-profiles.json invalid
+[
+  {
+    instancePath: '/profiles',
+    schemaPath: '#/properties/profiles/type',
+    keyword: 'type',
+    params: { type: 'object' },
+    message: 'must be object'
+  }
+]
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+unknown format "uri" ignored in schema at path "#/properties/profiles/additionalProperties/properties/%5Bopencode%5D/properties/model_capabilities/properties/source_url"
+<WORKTREE>/.omo/evidence/20260909-6445-input-schema/invalid-unknown.json invalid
+[
+  {
+    instancePath: '',
+    schemaPath: '#/additionalProperties',
+    keyword: 'additionalProperties',
+    params: { additionalProperty: 'unexpected' },
+    message: 'must NOT have additional properties'
+  }
+]
+HOST_DB_BEFORE=8104
+{"status":"PASS","healthy":true,"call_omo_agent":true,"serverExited":true}
+HOST_DB_AFTER=8104
+SCHEMA_QA_PASS_HOST_DB_UNCHANGED_RESOURCES_REMOVED

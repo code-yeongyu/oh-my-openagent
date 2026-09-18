@@ -2,7 +2,7 @@ import { z } from "zod"
 import { OhMyOpenCodeConfigSchema } from "../packages/omo-opencode/src/config/schema"
 
 export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
-  const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
+  const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema.partial({ git_master: true }), {
     target: "draft-7",
     unrepresentable: "any",
   }) as Record<string, unknown>

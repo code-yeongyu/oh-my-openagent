@@ -1,0 +1,6 @@
+Command: bash .omo/evidence/20260909-6445-input-schema/commands.sh
+Selected output; full data-validation results are in schema-consumer-green.txt.
+HOST_DB_BEFORE=8083
+{"status":"PASS","healthy":true,"call_omo_agent":true,"serverExited":true}
+HOST_DB_AFTER=8083
+SCHEMA_QA_PASS_HOST_DB_UNCHANGED_RESOURCES_REMOVED

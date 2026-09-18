@@ -1,0 +1,32 @@
+bun test v1.4.0 (34cbb9a40)
+
+script/build-schema.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+(pass) build-schema-document > #given defaulted git_master #when generating the flat schema #then omission is allowed [5.75ms]
+(pass) build-schema-document > generates schema with skills property [1.77ms]
+
+script/build-omo-schema.test.ts:
+(pass) build-omo-schema-document > #given defaulted profiles #when generating the schema #then omission is allowed [3.42ms]
+(pass) build-omo-schema-document > #given an embedded root schema #when generated #then git_master is optional [2.22ms]
+(pass) build-omo-schema-document > #given an embedded profile schema #when generated #then git_master is optional [2.03ms]
+(pass) build-omo-schema-document > #given the omo config schema #when generated #then it is a draft-7 document with the config sections [1.95ms]
+(pass) build-omo-schema-document > #given the strict root object #when generated #then $schema is an allowed property and extras are rejected [2.02ms]
+(pass) build-omo-schema-document > #given the todo-4 and todo-15 golden migrated document #when validated by the generated schema #then base and profile OpenCode blocks validate [49.19ms]
+(pass) build-omo-schema-document > #given an out-of-range OpenCode team maximum #when validated by the generated schema #then root and profile blocks are rejected [34.45ms]
+(pass) build-omo-schema-document > #given an unknown top-level key #when validated by the generated schema #then it is rejected [37.71ms]
+(pass) build-omo-schema-document > #given embedded OpenCode schemas #when serialized #then only the composed document declares an identifier [7.79ms]
+(pass) build-omo-schema-document > #given the schema generator #when it runs twice #then it produces no diff [5.98ms]
+
+tests/omo-schema-freshness.test.ts:
+(pass) omo schema freshness > #given the current Zod schema #when regenerated #then it matches the committed artifact [6.14ms]
+(pass) omo schema freshness > #given the docs example omo.json #when parsed by OmoConfigSchema #then it validates [6.84ms]
+(pass) omo schema freshness > #given the docs example #when read #then it points at the documented dev-branch schema URL [0.18ms]
+
+ 15 pass
+ 0 fail
+ 32 expect() calls
+Ran 15 tests across 3 files. [6.10s]
