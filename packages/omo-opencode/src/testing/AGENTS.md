@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Naming gotcha: despite the directory name, this is PRODUCTION init code. `create-plugin-module.ts` hosts `createPluginModule()` whose inner `serverPlugin` runs the real staged plugin init (installAgentSortShim → initConfigContext → … → dispose; full sequence documented in root AGENTS.md INITIALIZATION FLOW). `src/index.ts`, the build entry, is a thin re-export of `createPluginModule()`. It lives here because the factory takes a `Partial<PluginModuleDeps>` overrides bag (~30 injectable dependencies), letting tests swap any init stage without `mock.module()`. The other resident, `module-mock-lifecycle.ts`, is the repo-wide `bun:test` mock hygiene layer preloaded by root `test-setup.ts`. No barrel `index.ts`; consumers import file paths directly.
+Naming gotcha: despite the directory name, this is PRODUCTION init code. `create-plugin-module.ts` hosts `createPluginModule()` whose inner `serverPlugin` runs the real staged plugin init (raiseProcessListenersCap → installAgentSortShim → initConfigContext → … → dispose; full sequence documented in root AGENTS.md INITIALIZATION FLOW). `src/index.ts`, the build entry, is a thin re-export of `createPluginModule()`. It lives here because the factory takes a `Partial<PluginModuleDeps>` overrides bag (~30 injectable dependencies), letting tests swap any init stage without `mock.module()`. The other resident, `module-mock-lifecycle.ts`, is the repo-wide `bun:test` mock hygiene layer preloaded by root `test-setup.ts`. No barrel `index.ts`; consumers import file paths directly.
 
 ## KEY FILES
 
