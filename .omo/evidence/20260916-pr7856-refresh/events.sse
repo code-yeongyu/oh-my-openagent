@@ -1,0 +1,6 @@
+data: {"payload":{"id":"evt_0ab025ddf001u2VEatyY7jWcIe","type":"server.connected","properties":{}}}
+
+data: {"directory":"global","project":"global","payload":{"type":"project.updated","properties":{"id":"global","worktree":"/","sandboxes":[],"time":{"created":1789575454194,"updated":1789575454194}},"id":"evt_0ab025df6001wefaLoMSMZvhzs"}}
+
+data: {"directory":"/qa/migration/home/project","project":"global","payload":{"id":"evt_0ab02796b001ztd1hAE9kyolAB","type":"tui.toast.show","properties":{"title":"Configuration migrated","message":"Migrated 1 legacy source. Kept 2 existing values.","variant":"success","duration":5000}}}
+

@@ -1,0 +1,122 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/startup-migration.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+(pass) runOpenCodeStartupMigration > #given both legacy source groups #when startup migration runs #then it migrates, moves, and reports that the chain must reload [13.35ms]
+(pass) runOpenCodeStartupMigration > #given a legacy source on another filesystem #when its backup rename throws EXDEV #then startup copies and removes the source [1.52ms]
+(pass) runOpenCodeStartupMigration > #given a backup rename fails for another reason #when startup migration runs #then it preserves the source and reports the error [0.74ms]
+(pass) runOpenCodeStartupMigration > #given no legacy source #when startup migration runs #then it does not create a target or backups [0.24ms]
+(pass) runOpenCodeStartupMigration > #given an invalid transformed document #when startup migration runs #then validation aborts before target and source changes [0.92ms]
+(pass) runOpenCodeStartupMigration > #given a journal recorded the target write #when recovery crosses filesystems #then it copies the backup before evaluating migration sources [1.11ms]
+
+packages/omo-config-core/src/migration/transaction.test.ts:
+(pass) runMigration transaction ownership > #given two callers overlap #when one holds the exclusive lock #then one migration commits and the other observes completed state on retry [1.56ms]
+(pass) runMigration transaction ownership > #given a live owner whose lease is fresh #when another caller attempts takeover #then the lock is not stolen [0.23ms]
+(pass) runMigration transaction ownership > #given a migration lasts beyond its initial lease #when it renews at transaction boundaries #then fresh ownership is never stolen [0.53ms]
+(pass) runMigration transaction ownership > #given a false predicate and no journal #when entering the transaction #then no target or source is written [0.21ms]
+
+packages/omo-config-core/src/migration/in-place.test.ts:
+(pass) runMigration replace-target mode > #given a crash after journaling an in-place rewrite #when migration resumes #then deletions, additions, and the marker are replayed exactly [2.11ms]
+
+packages/omo-config-core/src/migration/merge-commit.test.ts:
+(pass) runMigration > #given a legacy value collides with a target value #when migrating #then the target value wins with a skipped diagnostic [0.63ms]
+(pass) runMigration > #given a user target marker #when a project target is discovered later #then the project target migrates independently [0.84ms]
+(pass) runMigration > #given distinct migration ids for one target #when each group has a source #then each id runs once without suppressing the other [0.97ms]
+(pass) runMigration > #given a transformed document rejected by OmoConfigSchema #when migrating #then target and sources are untouched [2.69ms]
+
+packages/omo-config-core/src/migration/lock.test.ts:
+(pass) acquireMigrationLock > #given an expired lock owned by a dead process #when acquiring #then compare-and-remove takeover creates a new owner lease [1.63ms]
+(pass) acquireMigrationLock > #given a fresh lock owned by a live process #when acquiring #then the active owner is not displaced [1.20ms]
+(pass) acquireMigrationLock > #given a live owner whose lease only just expired #when acquiring #then the safety margin prevents premature takeover [0.37ms]
+(pass) acquireMigrationLock > #given a lock owner #when the lease is renewed #then its timestamp is replaced before release [0.22ms]
+(pass) acquireMigrationLock > #given transient mutation guard contention #when the owner releases #then it retries and removes the lock [3.96ms]
+(pass) acquireMigrationLock > #given persistent mutation guard contention #when release retries are exhausted #then the ownership-matched fallback removes the lock [85.89ms]
+(pass) acquireMigrationLock > #given a stale mutation guard owned by a live process #when taking over and releasing #then the guard cannot wedge either mutation [8.51ms]
+
+packages/omo-config-core/src/migration/predicate.test.ts:
+(pass) shouldRunMigration > #given no legacy sources #when evaluating a target without a marker #then migration is not triggered [0.23ms]
+(pass) shouldRunMigration > #given a target marker for this migration #when legacy sources exist #then migration is not triggered [0.14ms]
+(pass) shouldRunMigration > #given legacy sources and no target marker #when evaluating a distinct target migration pair #then migration is triggered [0.12ms]
+
+packages/omo-config-core/src/migration/recovery.test.ts:
+(pass) runMigration recovery > #given a crash after journal-written #when the next entrypoint runs #then it resumes before predicate evaluation [0.81ms]
+(pass) runMigration recovery > #given a crash after target-written #when the next entrypoint runs #then it resumes before predicate evaluation [0.33ms]
+(pass) runMigration recovery > #given a crash after target-recorded #when the next entrypoint runs #then it resumes before predicate evaluation [0.30ms]
+(pass) runMigration recovery > #given a crash after source-moved #when the next entrypoint runs #then it resumes before predicate evaluation [0.30ms]
+(pass) runMigration recovery > #given a crash after source-recorded #when the next entrypoint runs #then it resumes before predicate evaluation [0.36ms]
+
+packages/omo-config-core/src/migration/batch.test.ts:
+(pass) runMigrations > #given a long-expired lock owned by a live process #when the next batch starts #then it reclaims the stale lease and completes [0.44ms]
+(pass) runMigrations > #given a pending journal #when plans are discovered #then recovery finishes before discovery and dry run creates no new migration writes [0.37ms]
+
+packages/omo-opencode/src/config-migration/reasoning-unification.test.ts:
+(pass) 2026-08 reasoning unification migration > #given the canonical legacy fixture #when transformed #then rules one through eight match exact expected output [6.58ms]
+(pass) 2026-08 reasoning unification migration > #given canonical reasoning outranking legacy keys #when transformed #then the journal reports reasoning as the winner [0.21ms]
+(pass) 2026-08 reasoning unification migration > #given an existing user omo config #when planned and executed #then dry-run, backup, journaled execution, and marker use the existing engine [11.94ms]
+(pass) 2026-08 reasoning unification migration > #given typed harness blocks, profiles, and unrelated opencode values #when transformed #then typed records recurse and opencode rewrites only known agent and category keys [0.38ms]
+
+packages/omo-opencode/src/config-migration/config-migration-export.test.ts:
+(pass) config-migration public subpath > #given the package manifest #when resolving config-migration #then its dedicated public subpath points only at the dependency-clean module [0.39ms]
+(pass) config-migration public subpath > #given the config-migration entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code [14.68ms]
+(pass) config-migration public subpath > #given a fixture with a side-effect OpenCode SDK import #when auditing its module graph #then reports the forbidden import [0.57ms]
+
+packages/omo-opencode/src/config-migration/migration-executor.test.ts:
+(pass) executeLegacyConfigMigrationPlan > #given a plan whose predicate is false #when executing #then creates no directories or files [4.86ms]
+
+packages/omo-opencode/src/config-migration/migration-plans.test.ts:
+(pass) legacy config migration plans > #given user, profile, config.jsonc, project, and sidecar fixtures #when planning and executing #then distinct group markers and exact backup destinations preserve every source [29.66ms]
+(pass) legacy config migration plans > #given overlapping legacy [omo] and [senpi] blocks #when previewing and migrating config.jsonc #then both results report the transform conflict [11.90ms]
+
+packages/omo-opencode/src/config-migration/discovery.test.ts:
+(pass) legacy config discovery > #given a custom active profile, default config, Tauri config, and walked project config #when discovering sources #then roots are deduplicated and separated from config.jsonc [0.84ms]
+(pass) legacy config discovery > #given an injected Windows filesystem #when its short path expands through realpath #then discovery keeps the canonical source within the config root [1.39ms]
+(pass) legacy config discovery > #given win32, WSL, trailing separators, casing, and a symlinked profile directory #when discovering #then injected path semantics keep each source canonical [3.04ms]
+
+packages/omo-opencode/src/config-migration/transform-config-jsonc.test.ts:
+(pass) config.jsonc migration transform > #given both [omo] and [senpi] blocks #when transforming config.jsonc #then [senpi] wins and the overlap is diagnostic [0.44ms]
+
+packages/omo-opencode/src/config-migration/discovery-windows-host.test.ts:
+(pass) legacy config discovery on Windows hosts > #given posix path operations on a Windows host #when XDG, APPDATA, and Tauri sources exist #then discovers all roots and canonically deduplicates the XDG root [0.69ms]
+(pass) legacy config discovery on Windows hosts > #given a non-Windows host #when discovering the default XDG and Tauri roots #then source paths remain unchanged [0.47ms]
+
+packages/omo-opencode/src/config-migration/transform-opencode.test.ts:
+(pass) OpenCode config migration transform > #given root and profile configs, config.jsonc, and a project config #when transformed #then the golden unified documents parse through OmoConfigSchema [7.15ms]
+(pass) OpenCode config migration transform > #given an identical profile subtree and a sidecar recording a reverted migration #when transformed #then agent-only profile data is omitted [0.32ms]
+(pass) OpenCode config migration transform > #given legacy config keys #when transforming #then their current omo equivalents are retained without file-level rewrites [0.23ms]
+(pass) OpenCode config migration transform > #given a legacy OpenCode source with agents, categories, and model/provider fields #when transformed #then agents and categories are omitted while model/provider fields remain [0.88ms]
+(pass) OpenCode config migration transform > #given empty, malformed, and agents/categories-only legacy inputs #when transformed #then outputs parse through OmoConfigSchema without agents or categories [0.48ms]
+
+packages/omo-opencode/src/testing/create-plugin-module.test.ts:
+(pass) createPluginModule() > #given plugin config sets i18n.locale to zh > #then production startup applies the configured locale [21.29ms]
+(pass) createPluginModule() > #given OpenCode server config is present > #then startup self-heals the matching TUI plugin entry [3.77ms]
+(pass) createPluginModule() > #given OpenCode server config is present > #given sidebar is disabled #then startup still writes the TUI entry for BTW [7.34ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then startup exposes them through a runtime skill source URL [4.21ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #given the runtime skill source server is unavailable #then startup continues without a source URL [4.24ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then dispose stops the started TUI state mirror [6.43ms]
+(pass) createPluginModule() > #given bundled security skills are enabled > #then dispose stops the runtime skill source [1.79ms]
+(pass) createPluginModule() > #given security-research is disabled > #then startup still exposes security-review through the runtime skill source [2.01ms]
+(pass) createPluginModule() > #given duplicate OMO plugin entries are configured > #then startup warns and returns no prompt-producing hooks [1.97ms]
+(pass) createPluginModule() > #given startup migration consumes legacy configuration > #given conflicting overrides #then startup logs the dropped keys [1.87ms]
+(pass) createPluginModule() > #given startup migration consumes legacy configuration > #given a conflicting override holds a credential #then only the key path is logged [1.52ms]
+(pass) createPluginModule() > #given startup migration consumes legacy configuration > #then startup reloads the config and emits one migration summary toast [1.44ms]
+(pass) createPluginModule() > #given serverPlugin is initialized twice in one process > #then startup migration predicates run only once [13.74ms]
+(pass) createPluginModule() > #given startup migration fails > #then startup keeps defaults and reports one loud error toast [48.96ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep never resolves #then startup still completes fire-and-forget [1.52ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep rejects #then the failure is logged and cannot propagate into startup [0.54ms]
+(pass) createPluginModule() > #given the omo process sweep during plugin init > #when the sweep throws synchronously #then startup still completes [0.43ms]
+
+packages/omo-opencode/src/testing/create-plugin-module-live-route.test.ts:
+(pass) createPluginModule() — live-server-route wiring > #given a never-resolving probe fetch injected via warmLiveServerProbe dep > #when server(input) is called #then it resolves in under 3s and returns hooks (fire-and-forget / 409-readiness) [1.38ms]
+(pass) createPluginModule() — live-server-route wiring > #given standard plugin input with serverUrl and client > #when server(input) completes #then initLiveServerRoute received inProcessClient === input.client (reference equality) [0.65ms]
+(pass) createPluginModule() — live-server-route wiring > #given config with experimental.disable_live_parent_wake_routing: true > #when server(input) completes #then setLiveParentWakeRoutingDisabled(true) is called [0.69ms]
+(pass) createPluginModule() — live-server-route wiring > #given config without experimental block > #when server(input) completes #then setLiveParentWakeRoutingDisabled(false) is called [0.56ms]
+(pass) createPluginModule() — live-server-route wiring > #given duplicate OMO plugin detected > #when server(input) early-returns #then initLiveServerRoute is not called [0.27ms]
+
+ 75 pass
+ 0 fail
+ 265 expect() calls
+Ran 75 tests across 18 files. [10.27s]

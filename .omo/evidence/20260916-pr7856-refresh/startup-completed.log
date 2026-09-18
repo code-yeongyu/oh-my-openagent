@@ -1,0 +1,1 @@
+[2026-09-16T16:17:41.073Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":["/qa/migration/home/project/.opencode/oh-my-opencode.json"],"skippedConflictCount":2,"skippedConflictPaths":["[opencode].disabled_providers","[opencode].model_fallback"]}

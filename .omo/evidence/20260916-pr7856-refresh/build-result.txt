@@ -1,0 +1,13 @@
+Command: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always bun run build
+Exit: 0
+Final captured output:
+
+Built omo-senpi extensions: <WORKTREE>/packages/omo-senpi/plugin/extensions/omo.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-task.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-member.js, <WORKTREE>/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, <WORKTREE>/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to <WORKTREE>/packages/omo-senpi/plugin/skills
+generated directive is current: <WORKTREE>/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 7 modules in 7ms
+
+  install.mjs  20.66 KB  (entry point)
+
+Built omo-senpi installer: <WORKTREE>/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed

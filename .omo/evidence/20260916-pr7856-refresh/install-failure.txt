@@ -1,0 +1,8 @@
+Command: bun install --frozen-lockfile
+Prepare failed before full build; representative captured error:
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+fatal: transport 'file' not allowed
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers

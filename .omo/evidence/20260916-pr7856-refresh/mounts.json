@@ -1,0 +1,26 @@
+[
+  {
+    "Type": "bind",
+    "Source": "<WORKTREE>/node_modules/zod",
+    "Destination": "/plugin/node_modules/zod",
+    "Mode": "ro",
+    "RW": false,
+    "Propagation": "rprivate"
+  },
+  {
+    "Type": "bind",
+    "Source": "<WORKTREE>/.omo/evidence/20260916-pr7856-refresh",
+    "Destination": "/evidence",
+    "Mode": "",
+    "RW": true,
+    "Propagation": "rprivate"
+  },
+  {
+    "Type": "bind",
+    "Source": "<WORKTREE>/dist",
+    "Destination": "/plugin/dist",
+    "Mode": "ro",
+    "RW": false,
+    "Propagation": "rprivate"
+  }
+]

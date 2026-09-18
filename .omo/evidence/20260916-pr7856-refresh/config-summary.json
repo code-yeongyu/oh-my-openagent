@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "plugin": [
+    "file:///plugin/dist/index.js"
+  ],
+  "agentNames": [
+    "plan",
+    "build",
+    "explore",
+    "Sisyphus - ultraworker",
+    "Hephaestus - Deep Agent",
+    "Prometheus - Plan Builder",
+    "librarian",
+    "Metis - Plan Consultant",
+    "Momus - Plan Critic",
+    "multimodal-looker",
+    "oracle",
+    "Sisyphus-Junior"
+  ]
+}

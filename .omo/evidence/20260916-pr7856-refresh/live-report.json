@@ -1,0 +1,49 @@
+{
+  "surface": "real OpenCode 1.18.30; sole built default plugin; global SSE before GET /config",
+  "environment": {
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "HOME": "/qa/migration/home",
+    "OPENCODE_TEST_HOME": "/qa/migration/home",
+    "XDG_CONFIG_HOME": "/qa/migration/config",
+    "XDG_DATA_HOME": "/qa/migration/data",
+    "XDG_STATE_HOME": "/qa/migration/state",
+    "XDG_CACHE_HOME": "/qa/migration/cache",
+    "TMPDIR": "/qa/migration/tmp",
+    "OPENCODE_DISABLE_AUTOUPDATE": "1",
+    "OPENCODE_DISABLE_MODELS_FETCH": "1",
+    "OMO_DISABLE_POSTHOG": "1",
+    "OMO_DISABLE_PROCESS_CLEANUP": "1"
+  },
+  "passed": true,
+  "health": {
+    "healthy": true,
+    "version": "1.18.30"
+  },
+  "subscribedBeforeConfig": true,
+  "payload": {
+    "journalResumed": false,
+    "migratedFrom": [
+      "/qa/migration/home/project/.opencode/oh-my-opencode.json"
+    ],
+    "skippedConflictCount": 2,
+    "skippedConflictPaths": [
+      "[opencode].disabled_providers",
+      "[opencode].model_fallback"
+    ]
+  },
+  "markerAfter": [
+    "2026-07-opencode-config-unification",
+    "2026-08-reasoning-unification"
+  ],
+  "eventTypes": [
+    "server.connected",
+    "project.updated",
+    "tui.toast.show"
+  ],
+  "targetValuesPreserved": true,
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "isolatedDbCount": "0"
+}

@@ -1,0 +1,32 @@
+{
+  "legacy": {
+    "disabled_providers": [
+      "qa-legacy-provider"
+    ],
+    "model_fallback": true
+  },
+  "unified": {
+    "[opencode]": {
+      "disabled_providers": [
+        "qa-kept-provider"
+      ],
+      "model_fallback": false,
+      "telemetry": false,
+      "disabled_mcps": [
+        "websearch",
+        "context7",
+        "grep_app",
+        "lsp"
+      ],
+      "disabled_skills": [
+        "security-research",
+        "security-review"
+      ]
+    }
+  },
+  "opencode": {
+    "plugin": [
+      "file:///plugin/dist/index.js"
+    ]
+  }
+}
