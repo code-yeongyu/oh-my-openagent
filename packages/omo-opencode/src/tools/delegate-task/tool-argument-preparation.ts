@@ -1,5 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
+import { normalizeContinuationTaskID } from "./task-id"
 import { log } from "../../shared/logger"
 
 export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx: ToolContextWithMetadata): Promise<DelegateTaskArgs> {
@@ -81,7 +82,7 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     ? loadSkills.filter((value): value is string => typeof value === "string")
     : []
 
-  const taskID = typeof args.task_id === "string" ? args.task_id : undefined
+  const taskID = normalizeContinuationTaskID(args.task_id)
   const command = typeof args.command === "string" ? args.command : undefined
 
 
