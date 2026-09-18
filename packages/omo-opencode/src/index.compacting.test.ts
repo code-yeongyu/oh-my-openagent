@@ -279,4 +279,131 @@ describe("experimental.compaction.autocontinue handler", () => {
     expect(restoreContextMock).toHaveBeenCalledTimes(2)
     expect(restoreTodosMock).toHaveBeenCalledTimes(2)
   })
+
+  it("reroutes autocontinue to the working model when the compaction model differs", async () => {
+    //#given
+    const restoreContextMock = mock(async () => true)
+    const restoreTodosMock = mock(async () => {})
+    const promptAsyncMock = mock(async () => ({}))
+    const client = {
+      session: {
+        messages: mock(async () => [
+          {
+            id: "msg_working_1",
+            info: {
+              agent: "Sisyphus - ultraworker",
+              model: { providerID: "opencode-go", modelID: "deepseek-v4.1-flash", variant: "max" },
+              time: { created: 1 },
+            },
+            parts: [{ type: "text" }],
+          },
+          {
+            id: "msg_compaction_1",
+            info: {
+              agent: "Sisyphus - ultraworker",
+              model: { providerID: "zai-coding-plan", modelID: "glm-5.3-flash" },
+              time: { created: 2 },
+            },
+            parts: [{ type: "compaction" }],
+          },
+        ]),
+        promptAsync: promptAsyncMock,
+      },
+    }
+    const handler = createCompactionAutocontinueHandler(
+      {
+        compactionContextInjector: { restore: restoreContextMock },
+        compactionTodoPreserver: { restore: restoreTodosMock },
+      },
+      { client, directory: "C:/work" },
+    )
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_reroute", agent: "Sisyphus - ultraworker" }, output)
+
+    //#then
+    expect(output.enabled).toBe(false)
+    expect(restoreContextMock).toHaveBeenCalledWith("ses_reroute")
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+    const call = promptAsyncMock.mock.calls[0] as unknown as [
+      {
+        path: { id: string }
+        query?: { directory?: string }
+        body: {
+          agent?: string
+          model: { providerID: string; modelID: string }
+          parts: Array<{ type: string; text: string; metadata?: Record<string, unknown> }>
+        }
+      },
+    ]
+    const request = call[0]
+    expect(request.path.id).toBe("ses_reroute")
+    expect(request.query?.directory).toBe("C:/work")
+    expect(request.body.agent).toBe("Sisyphus - ultraworker")
+    expect(request.body.model).toEqual({ providerID: "opencode-go", modelID: "deepseek-v4.1-flash" })
+    expect(request.body.parts[0]?.text).toContain("Continue if you have next steps")
+    expect(request.body.parts[0]?.metadata?.compaction_continue).toBe(true)
+  })
+
+  it("keeps autocontinue enabled when the compaction model matches the working model", async () => {
+    //#given
+    const promptAsyncMock = mock(async () => ({}))
+    const client = {
+      session: {
+        messages: mock(async () => [
+          {
+            id: "msg_working_2",
+            info: {
+              agent: "Sisyphus - ultraworker",
+              model: { providerID: "zai-coding-plan", modelID: "glm-5.3-flash" },
+              time: { created: 1 },
+            },
+            parts: [{ type: "text" }],
+          },
+          {
+            id: "msg_compaction_2",
+            info: {
+              agent: "Sisyphus - ultraworker",
+              model: { providerID: "zai-coding-plan", modelID: "glm-5.3-flash" },
+              time: { created: 2 },
+            },
+            parts: [{ type: "compaction" }],
+          },
+        ]),
+        promptAsync: promptAsyncMock,
+      },
+    }
+    const handler = createCompactionAutocontinueHandler({}, { client })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_same_model" }, output)
+
+    //#then
+    expect(output.enabled).toBe(true)
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+  })
+
+  it("keeps autocontinue enabled when the session message lookup fails", async () => {
+    //#given
+    const promptAsyncMock = mock(async () => ({}))
+    const client = {
+      session: {
+        messages: mock(async () => {
+          throw new Error("lookup unavailable")
+        }),
+        promptAsync: promptAsyncMock,
+      },
+    }
+    const handler = createCompactionAutocontinueHandler({}, { client })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_lookup_failure" }, output)
+
+    //#then
+    expect(output.enabled).toBe(true)
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+  })
 })
