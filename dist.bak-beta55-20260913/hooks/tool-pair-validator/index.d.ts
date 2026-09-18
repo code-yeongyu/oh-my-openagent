@@ -1,1 +1,0 @@
-export { createToolPairValidatorHook } from "./hook";

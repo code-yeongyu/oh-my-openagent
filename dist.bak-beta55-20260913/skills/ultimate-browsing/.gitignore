@@ -1,3 +1,0 @@
-__pycache__/
-*.pyc
-.DS_Store

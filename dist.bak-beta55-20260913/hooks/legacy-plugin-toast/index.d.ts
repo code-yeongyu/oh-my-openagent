@@ -1,1 +1,0 @@
-export { createLegacyPluginToastHook } from "./hook";
