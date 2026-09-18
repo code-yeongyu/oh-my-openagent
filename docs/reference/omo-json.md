@@ -175,7 +175,13 @@ To opt in to the body footer:
 }
 ```
 
+Attribution can also be disabled through:
+- Git config: `git config --global omo.attribution false` (or `sisyphus.attribution false`)
+- Environment variables: `NO_AI_ATTRIBUTION=1`, `OMO_NO_COMMIT_ATTRIBUTION=1`, or `OMO_GIT_ATTRIBUTION=0`
+- GPG commit signing: Repositories configured with `commit.gpgsign = true` automatically suppress third-party trailers and promotional footers unless explicitly enabled in configuration.
+
 The block may live at the shared top level, in `[senpi]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Senpi harness.
+
 
 ### `models` (shared catalog)
 
