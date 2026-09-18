@@ -3,6 +3,11 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
+// DefaultResourceLoader's ESM extension loading produces backslash-escaped paths
+// inside the generated import on Windows, so the marker factory never fires.
+// Skip the entire suite until senpi's loader handles Windows paths. (#8436)
+const isWindows = process.platform === "win32"
+
 import {
   createAgentSession,
   createReadToolDefinition,
@@ -30,7 +35,7 @@ function makeParentTool(name: string, onExecute: () => void): ToolDefinition {
   }
 }
 
-describe("in-process child extension suppression", () => {
+describe.skipIf(isWindows)("in-process child extension suppression", () => {
   test("#given an agent dir with a marker extension #when a child boots through the runner #then the factory never runs and parent tools survive", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "senpi-task-runner-marker-"))

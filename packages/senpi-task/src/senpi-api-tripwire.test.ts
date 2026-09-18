@@ -3,6 +3,9 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
+// See marker-suppression.test.ts — same DefaultResourceLoader ESM-on-Windows issue.
+const isWindows = process.platform === "win32"
+
 import {
   SessionManager,
   createAgentSession,
@@ -81,7 +84,7 @@ describe("pinned Senpi API surface", () => {
     expect(defineTool(sample)).toBe(sample)
   })
 
-  test("#given agent dir marker extension #when session boots with minimal loader #then marker factory is not invoked", async () => {
+  test.skipIf(isWindows)("#given agent dir marker extension #when session boots with minimal loader #then marker factory is not invoked", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "senpi-task-marker-"))
     const agentDir = join(rootDir, "agent")
