@@ -3,7 +3,7 @@ import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { registerBtwSideTui } from "./features/btw-side"
 import { computeView, viewKey } from "./features/tui-sidebar/compute-view"
 import { POLL_INTERVAL_MS } from "./features/tui-sidebar/constants"
-import { deriveAgents, deriveConfig, deriveJobBoard, deriveLoop, deriveRoster } from "./features/tui-sidebar/derivers"
+import { deriveAgents, deriveConfig, deriveJobBoard, deriveLoop, deriveLsp, deriveRoster } from "./features/tui-sidebar/derivers"
 import type { ViewNode } from "./features/tui-sidebar/element-helpers"
 import { readMirror } from "./features/tui-sidebar/mirror-io"
 import { buildViewNodes } from "./features/tui-sidebar/render-view"
@@ -101,6 +101,7 @@ async function readView(directory: string): Promise<SidebarView> {
     agents: deriveAgents(mirror),
     jobs: deriveJobBoard(mirror),
     loop: deriveLoop(mirror),
+    lsp: deriveLsp(mirror),
   })
 }
 

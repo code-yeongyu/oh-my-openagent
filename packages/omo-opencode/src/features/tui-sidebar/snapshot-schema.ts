@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import { MIRROR_SCHEMA_VERSION } from "./constants"
-import type { AgentStatus, LoopLive } from "./state-types"
+import type { AgentStatus, LspClientState, LoopLive } from "./state-types"
 import type { BackgroundTaskStatus } from "../background-agent/types"
 
 const AGENT_STATUS_VALUES = [
@@ -24,6 +24,15 @@ const BACKGROUND_TASK_STATUS_VALUES = [
 const AgentRowSchema = z.object({
   name: z.string(),
   status: z.enum(AGENT_STATUS_VALUES),
+})
+
+const LSP_CLIENT_STATE_VALUES = ["initializing", "alive", "dead"] as const satisfies readonly LspClientState[]
+
+const LspClientRowSchema = z.object({
+  serverId: z.string(),
+  root: z.string(),
+  state: z.enum(LSP_CLIENT_STATE_VALUES),
+  refCount: z.number().int().nonnegative(),
 })
 
 const JobRowSchema = z.object({
@@ -51,6 +60,7 @@ export const TuiRuntimeSnapshotSchema = z.object({
   activeAgents: z.array(AgentRowSchema),
   jobBoard: z.array(JobRowSchema),
   loop: LoopLiveSchema.nullable(),
+  lspClients: z.array(LspClientRowSchema),
 })
 
 export type TuiRuntimeSnapshot = z.infer<typeof TuiRuntimeSnapshotSchema>

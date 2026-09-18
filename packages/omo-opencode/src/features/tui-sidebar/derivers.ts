@@ -1,4 +1,4 @@
-import { MAX_AGENTS, MAX_JOBS } from "./constants"
+import { MAX_AGENTS, MAX_JOBS, MAX_LSP_CLIENTS } from "./constants"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
 import type {
   AgentsState,
@@ -6,6 +6,8 @@ import type {
   JobBoardState,
   JobRow,
   LoopState,
+  LspState,
+  LspClientRow,
   RosterRow,
   RosterState,
 } from "./state-types"
@@ -68,6 +70,13 @@ export function deriveLoop(snap: TuiRuntimeSnapshot | null): LoopState {
   return snap?.loop ?? { kind: "none" }
 }
 
+export function deriveLsp(snap: TuiRuntimeSnapshot | null): LspState {
+  if (!snap || snap.lspClients.length === 0) {
+    return { kind: "none" }
+  }
+  return { kind: "list", clients: [...snap.lspClients].sort(compareLspClients).slice(0, MAX_LSP_CLIENTS) }
+}
+
 function compareRosterRows(left: RosterRow, right: RosterRow): number {
   return left.label.localeCompare(right.label)
 }
@@ -79,4 +88,20 @@ function compareJobs(left: JobRow, right: JobRow): number {
   }
 
   return left.title.localeCompare(right.title)
+}
+
+function compareLspClients(left: LspClientRow, right: LspClientRow): number {
+  const priority = lspPriority(left) - lspPriority(right)
+  return priority !== 0 ? priority : left.serverId.localeCompare(right.serverId)
+}
+
+function lspPriority(client: LspClientRow): number {
+  switch (client.state) {
+    case "initializing":
+      return 0
+    case "alive":
+      return 1
+    case "dead":
+      return 2
+  }
 }
