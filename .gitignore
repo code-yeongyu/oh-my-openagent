@@ -71,3 +71,4 @@ plans/
 !.omo/fixtures/
 !.omo/fixtures/**
 !.omo/init-deep.json
+dist.bak-*/
