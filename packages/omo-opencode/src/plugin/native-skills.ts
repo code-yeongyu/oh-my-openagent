@@ -41,6 +41,48 @@ export function getPluginInputNativeSkills(ctx: PluginContext): NativeSkills | u
   return isNativeSkills(value) ? value : undefined
 }
 
+function normalizeUnionSkillName(name: string): string {
+  return name.toLowerCase()
+}
+
+function flattenSyncDirs(value: string[] | Promise<string[]> | undefined): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((dir): dir is string => typeof dir === "string")
+}
+
+export function createUnionNativeSkills(primary: NativeSkills | undefined, secondary: NativeSkills): NativeSkills {
+  const mergeAll = async (): Promise<Awaited<ReturnType<NativeSkills["all"]>>> => {
+    const [primarySettled, secondarySettled] = await Promise.allSettled([
+      primary ? primary.all() : Promise.resolve([]),
+      secondary.all(),
+    ])
+    const collected: Awaited<ReturnType<NativeSkills["all"]>> = []
+    for (const settled of [primarySettled, secondarySettled]) {
+      if (settled.status === "fulfilled") collected.push(...settled.value)
+    }
+    const byName = new Map<string, Awaited<ReturnType<NativeSkills["all"]>>[number]>()
+    for (const skill of collected) {
+      const key = normalizeUnionSkillName(skill.name)
+      if (!byName.has(key)) byName.set(key, skill)
+    }
+    return Array.from(byName.values())
+  }
+
+  return {
+    all: mergeAll,
+    async get(name) {
+      return (await mergeAll()).find((skill) => skill.name === name)
+    },
+    dirs() {
+      const dirs = new Set<string>()
+      for (const source of [primary, secondary]) {
+        for (const dir of flattenSyncDirs(source?.dirs())) dirs.add(dir)
+      }
+      return Array.from(dirs)
+    },
+  }
+}
+
 export function createNativeSkills(input: { readonly client: PluginContext["client"]; readonly directory: string }): NativeSkills {
   const load = async () => {
     const generatedClient = getGeneratedClientFromPluginClient(input.client)
