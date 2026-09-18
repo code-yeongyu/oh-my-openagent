@@ -35,6 +35,15 @@ export function agentEndOutcome(
       },
     }
   }
+  if (assistantMessageHasToolCall(assistant)) {
+    return {
+      status: "error",
+      failure: {
+        kind: "child-turn-failed",
+        message: "RPC child turn ended after a tool call without a terminal assistant response",
+      },
+    }
+  }
   const messageText = assistant === undefined ? undefined : extractAssistantText(assistant)
   const final = messageText ?? (observedText !== baseline ? observedText : undefined)
   if (final !== undefined && final.length > 0) return { status: "completed", finalResponse: final }
@@ -79,6 +88,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isAssistantRecord(value: unknown): value is Record<string, unknown> {
   return isRecord(value) && value.role === "assistant"
+}
+
+export function assistantMessageHasToolCall(message: unknown): boolean {
+  return isAssistantRecord(message)
+    && Array.isArray(message.content)
+    && message.content.some((part: unknown) => isRecord(part) && part.type === "toolCall")
 }
 
 function readString(value: unknown): string | undefined {
