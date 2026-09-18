@@ -1,0 +1,12 @@
+import { getServerBasicAuthHeader as resolveServerBasicAuthHeader } from "./opencode-server-auth";
+import { log as writeLog } from "./logger";
+type FetchImplementation = typeof fetch;
+type LogImplementation = typeof writeLog;
+type ServerBasicAuthHeaderResolver = typeof resolveServerBasicAuthHeader;
+export declare function _setFetchImplementationForTesting(fetchImplementation: FetchImplementation | undefined): void;
+export declare function _setLogImplementationForTesting(logImplementation: LogImplementation | undefined): void;
+export declare function _setServerBasicAuthHeaderResolverForTesting(resolver: ServerBasicAuthHeaderResolver | undefined): void;
+export declare function getServerBaseUrl(client: unknown): string | null;
+export declare function patchPart(client: unknown, sessionID: string, messageID: string, partID: string, body: Record<string, unknown>): Promise<boolean>;
+export declare function deletePart(client: unknown, sessionID: string, messageID: string, partID: string): Promise<boolean>;
+export {};

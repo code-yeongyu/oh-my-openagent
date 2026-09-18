@@ -1,0 +1,2 @@
+import type { AutoRetryDispatchOutcome, HookDeps } from "./types";
+export declare function createAutoRetryDispatcher(deps: HookDeps, scheduleSessionFallbackTimeout: (sessionID: string, resolvedAgent?: string) => void, clearSessionFallbackTimeout: (sessionID: string) => void): (sessionID: string, newModel: string, resolvedAgent: string | undefined, source: string) => Promise<AutoRetryDispatchOutcome>;

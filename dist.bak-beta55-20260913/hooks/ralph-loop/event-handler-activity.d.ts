@@ -1,0 +1,10 @@
+import type { PluginInput } from "@opencode-ai/plugin";
+import type { RalphLoopOptions } from "./types";
+import type { RalphLoopEventHandlerOptions } from "./event-handler-types";
+export declare const RAPID_IDLE_DEDUP_MS = 500;
+export declare function sleep(ms: number): Promise<void>;
+export declare function hasActiveBackgroundTasks(backgroundManager: RalphLoopOptions["backgroundManager"], sessionID: string): boolean;
+export declare function getRuntimeRetryActivitySessionID(eventType: string, props: Record<string, unknown> | undefined): string | undefined;
+export declare function isSyntheticIdle(props: Record<string, unknown> | undefined): boolean;
+export declare function isAbortError(error: unknown): boolean;
+export declare function latestUserMessageIsInProgress(ctx: PluginInput, options: RalphLoopEventHandlerOptions, sessionID: string, now: number): Promise<boolean>;

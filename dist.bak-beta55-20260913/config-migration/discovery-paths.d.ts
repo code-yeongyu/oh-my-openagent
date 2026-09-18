@@ -1,0 +1,11 @@
+import { type ConfigMigrationDiscoveryOptions, type ConfigMigrationPathOperations } from "./types";
+export declare const CONFIG_FILE_NAMES: readonly ["oh-my-openagent.jsonc", "oh-my-openagent.json", "oh-my-opencode.jsonc", "oh-my-opencode.json"];
+export declare function isWindowsPathOperations(options: ConfigMigrationDiscoveryOptions): boolean;
+export declare function discoveryFileSystem(options: ConfigMigrationDiscoveryOptions): import("./types").ConfigMigrationDiscoveryFileSystem;
+export declare function usesWindowsPathSemantics(options: ConfigMigrationDiscoveryOptions): boolean;
+export declare function hostPathOperations(options: ConfigMigrationDiscoveryOptions): ConfigMigrationPathOperations;
+export declare function canonicalPath(path: string, options: ConfigMigrationDiscoveryOptions): string;
+export declare function pathKey(path: string, options: ConfigMigrationDiscoveryOptions): string;
+export declare function configPaths(directory: string, options: ConfigMigrationDiscoveryOptions): readonly string[];
+export declare function profileDirectories(root: string, options: ConfigMigrationDiscoveryOptions): readonly string[];
+export declare function projectDirectories(options: ConfigMigrationDiscoveryOptions): readonly string[];

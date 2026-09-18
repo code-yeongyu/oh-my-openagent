@@ -1,0 +1,95 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - errorlint
+    - nilerr
+    - nilnil
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - contextcheck
+    - fatcontext
+    - copyloopvar
+    - intrange
+    - usetesting
+    - testifylint
+    - gofumpt
+    - goimports
+    - whitespace
+    - misspell
+    - unconvert
+    - unparam
+    - ineffassign
+    - dupword
+    - gocognit
+    - gocyclo
+    - funlen
+    - lll
+    - nestif
+    - dupl
+    - revive
+    - unused
+    - exhaustive
+    - gosec
+    - sloglint
+    - perfsprint
+    - prealloc
+    - makezero
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+  gocognit:
+    min-complexity: 25
+  gocyclo:
+    min-complexity: 15
+  funlen:
+    lines: 90
+    statements: 60
+  lll:
+    line-length: 120
+    tab-width: 4
+  nestif:
+    min-complexity: 4
+  exhaustive:
+    default-signifies-exhaustive: false
+    check: [switch, map]
+  sloglint:
+    no-mixed-args: true
+    attr-only: true
+    no-global: all
+    context: scope
+    static-msg: true
+    no-raw-keys: true
+    key-naming-case: snake
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\\.go
+      linters: [funlen, lll, dupl, gosec]
+    - path: \\.pb\\.go$
+      linters: [all]
+    - path: \\.connect\\.go$
+      linters: [all]

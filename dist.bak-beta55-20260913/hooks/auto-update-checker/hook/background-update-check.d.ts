@@ -1,0 +1,36 @@
+import type { PluginInput } from "@opencode-ai/plugin";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { runBunInstallWithDetails } from "../../../cli/config-manager";
+import { log } from "../../../shared/logger";
+import { getOpenCodeCacheDir, getOpenCodeConfigPaths } from "../../../shared";
+import { invalidatePackage } from "../cache";
+import { extractChannel } from "../version-channel";
+import { findPluginEntry, getCachedVersion, getLatestVersion, syncCachePackageJsonToIntent } from "../checker";
+import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts";
+type BackgroundUpdateCheckDeps = {
+    existsSync: typeof existsSync;
+    join: typeof join;
+    runBunInstallWithDetails: typeof runBunInstallWithDetails;
+    log: typeof log;
+    getOpenCodeCacheDir: typeof getOpenCodeCacheDir;
+    getOpenCodeConfigPaths: typeof getOpenCodeConfigPaths;
+    invalidatePackage: typeof invalidatePackage;
+    extractChannel: typeof extractChannel;
+    findPluginEntry: typeof findPluginEntry;
+    getCachedVersion: typeof getCachedVersion;
+    getLatestVersion: typeof getLatestVersion;
+    syncCachePackageJsonToIntent: typeof syncCachePackageJsonToIntent;
+    showUpdateAvailableToast: typeof showUpdateAvailableToast;
+    showAutoUpdatedToast: typeof showAutoUpdatedToast;
+    /**
+     * Returns the workspace directory hosting the currently loaded plugin
+     * module, or `null` if the plugin is not running from a standard install
+     * layout. Used to detect OpenCode-managed sandboxes (see #4318).
+     */
+    getModuleHostingWorkspace: () => string | null;
+};
+type BackgroundUpdateCheckRunner = (ctx: PluginInput, autoUpdate: boolean, getToastMessage: (isUpdate: boolean, latestVersion?: string) => string) => Promise<void>;
+export declare function createBackgroundUpdateCheckRunner(overrides?: Partial<BackgroundUpdateCheckDeps>): BackgroundUpdateCheckRunner;
+export declare const runBackgroundUpdateCheck: BackgroundUpdateCheckRunner;
+export {};

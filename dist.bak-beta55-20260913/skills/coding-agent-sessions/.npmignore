@@ -1,0 +1,10 @@
+.omo/
+.gitignore
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+pyrightconfig.json
+scripts/tests/

@@ -1,0 +1,12 @@
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types";
+import type { BackgroundTask, BackgroundTaskAttempt, BackgroundTaskStatus } from "./types";
+type TerminalAttemptStatus = Extract<BackgroundTaskStatus, "completed" | "error" | "cancelled" | "interrupt">;
+export declare function getCurrentAttempt(task: BackgroundTask): BackgroundTaskAttempt | undefined;
+export declare function ensureCurrentAttempt(task: BackgroundTask, model?: DelegatedModelConfig | undefined): BackgroundTaskAttempt;
+export declare function projectTaskFromCurrentAttempt(task: BackgroundTask): BackgroundTask;
+export declare function startAttempt(task: BackgroundTask, model: DelegatedModelConfig | undefined): BackgroundTaskAttempt;
+export declare function bindAttemptSession(task: BackgroundTask, attemptID: string, sessionID: string, model: DelegatedModelConfig | undefined): BackgroundTaskAttempt | undefined;
+export declare function finalizeAttempt(task: BackgroundTask, attemptID: string, status: TerminalAttemptStatus, error?: string): BackgroundTaskAttempt | undefined;
+export declare function scheduleRetryAttempt(task: BackgroundTask, failedAttemptID: string, nextModel: DelegatedModelConfig, error?: string): BackgroundTaskAttempt | undefined;
+export declare function findAttemptBySession(task: BackgroundTask, sessionID: string): BackgroundTaskAttempt | undefined;
+export {};

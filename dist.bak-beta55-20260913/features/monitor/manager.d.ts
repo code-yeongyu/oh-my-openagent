@@ -1,0 +1,35 @@
+import { type MonitorManagerDeps, type MonitorManagerOptions } from "./manager-internals";
+import type { MonitorId, MonitorManager as MonitorManagerContract, MonitorManagerEvent, MonitorOutputQuery, MonitorOutputResult, MonitorRecord, MonitorStartOpts } from "./types";
+export type { MonitorManagerDeps, MonitorManagerOptions };
+export declare class MonitorManager implements MonitorManagerContract {
+    private readonly options;
+    private readonly monitors;
+    private readonly monitorsByParentSession;
+    private readonly scheduledFlushTimers;
+    private readonly config;
+    private readonly scheduler;
+    private readonly registerCleanup;
+    private readonly unregisterCleanup;
+    private readonly logger;
+    private shutdownTriggered;
+    constructor(options: MonitorManagerOptions);
+    start(opts: MonitorStartOpts): Promise<MonitorRecord>;
+    stop(id: MonitorId): Promise<void>;
+    list(sessionId: string): MonitorRecord[];
+    get(id: MonitorId): MonitorRecord | undefined;
+    getOutput(id: MonitorId, opts: MonitorOutputQuery): MonitorOutputResult;
+    stopSessionMonitors(sessionId: string): Promise<void>;
+    handleEvent(event: MonitorManagerEvent): void;
+    shutdown(): Promise<void>;
+    private createId;
+    private scheduleFlush;
+    private clearScheduledFlush;
+    private addMonitor;
+    private assertSessionCapacity;
+    private isBackgroundSession;
+    private isTerminalStatus;
+    private removeMonitor;
+    private enforceTerminalRetention;
+    private flushSessionMonitors;
+}
+export declare function createMonitorManager(options: MonitorManagerOptions): MonitorManager;

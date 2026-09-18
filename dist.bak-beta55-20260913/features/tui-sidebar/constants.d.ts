@@ -1,0 +1,10 @@
+export declare const MIRROR_DIR_NAME = "tui-state";
+export declare const MIRROR_SCHEMA_VERSION = 1;
+export declare const STALE_MS = 6000;
+export declare const LOOP_FRESH_MS = 120000;
+export declare const POLL_INTERVAL_MS = 1000;
+export declare const HEARTBEAT_MS = 2000;
+export declare const WRITE_DEBOUNCE_MS = 250;
+export declare const MAX_AGENTS = 12;
+export declare const MAX_JOBS = 12;
+export declare const LABEL_MAX = 24;

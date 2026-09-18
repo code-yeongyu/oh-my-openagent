@@ -1,0 +1,23 @@
+import { resolveCleanupPlatform } from "./cleanup-command";
+import type { InstallArgs } from "./types";
+type InstallCommandOptions = {
+    readonly tui?: boolean;
+    readonly claude?: InstallArgs["claude"];
+    readonly openai?: InstallArgs["openai"];
+    readonly gemini?: InstallArgs["gemini"];
+    readonly copilot?: InstallArgs["copilot"];
+    readonly platform?: InstallArgs["platform"];
+    readonly opencodeZen?: InstallArgs["opencodeZen"];
+    readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"];
+    readonly kimiForCoding?: InstallArgs["kimiForCoding"];
+    readonly opencodeGo?: InstallArgs["opencodeGo"];
+    readonly bailianCodingPlan?: InstallArgs["bailianCodingPlan"];
+    readonly minimaxCnCodingPlan?: InstallArgs["minimaxCnCodingPlan"];
+    readonly minimaxCodingPlan?: InstallArgs["minimaxCodingPlan"];
+    readonly vercelAiGateway?: InstallArgs["vercelAiGateway"];
+    readonly codexAutonomous?: InstallArgs["codexAutonomous"];
+    readonly skipAuth?: boolean;
+};
+export declare function resolveInstallArgs(options: InstallCommandOptions, invocationName?: string | undefined): InstallArgs;
+export { resolveCleanupPlatform };
+export declare function runCli(): void;

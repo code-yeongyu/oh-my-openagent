@@ -1,0 +1,22 @@
+package main
+
+import (
+	"context"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"$module/internal/cmd"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	if err := cmd.Execute(ctx); err != nil {
+		slog.Error("fatal", slog.Any("err", err))
+		os.Exit(1)
+	}
+}

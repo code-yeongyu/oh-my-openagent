@@ -1,0 +1,18 @@
+import type { PluginInput } from "@opencode-ai/plugin";
+import { promptSyncWithModelSuggestionRetry, promptWithModelSuggestionRetry } from "./model-suggestion-retry";
+type OpencodeClient = PluginInput["client"];
+type PromptAsyncArgs = Parameters<OpencodeClient["session"]["promptAsync"]>[0];
+type SessionMessagesArgs = Parameters<OpencodeClient["session"]["messages"]>[0];
+type PromptRetryClient = Parameters<typeof promptWithModelSuggestionRetry>[0];
+type PromptRetryArgs = Parameters<typeof promptWithModelSuggestionRetry>[1];
+type PromptSyncRetryClient = Parameters<typeof promptSyncWithModelSuggestionRetry>[0];
+type PromptSyncRetryArgs = Parameters<typeof promptSyncWithModelSuggestionRetry>[1];
+export declare function routeSessionPrompt(args: PromptAsyncArgs, directory: string): PromptAsyncArgs;
+export declare function routePromptRetry(args: PromptRetryArgs, directory: string): PromptRetryArgs;
+export declare function routePromptSyncRetry(args: PromptSyncRetryArgs, directory: string): PromptSyncRetryArgs;
+export declare function routeSessionMessages(args: SessionMessagesArgs, directory: string): SessionMessagesArgs;
+export declare function promptAsyncInDirectory(client: OpencodeClient, args: PromptAsyncArgs, directory: string): Promise<unknown>;
+export declare function promptWithRetryInDirectory(client: PromptRetryClient, args: PromptRetryArgs, directory: string): Promise<void>;
+export declare function promptSyncWithRetryInDirectory(client: PromptSyncRetryClient, args: PromptSyncRetryArgs, directory: string): Promise<void>;
+export declare function messagesInDirectory(client: OpencodeClient, args: SessionMessagesArgs, directory: string): Promise<unknown>;
+export {};

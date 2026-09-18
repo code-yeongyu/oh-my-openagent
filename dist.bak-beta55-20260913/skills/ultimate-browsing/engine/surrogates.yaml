@@ -1,0 +1,60 @@
+# Surrogate routes — third-party services serving a COPY of a page when the
+# live origin blocks the fetch chain (Phase 2.5, between grid and Playwright).
+#
+# Rules (same discipline as waf_profiles.yaml):
+#   * Site-agnostic infrastructure ONLY (No-Site-Name Rule): every host here
+#     must work for any target URL. No target-site domains, selectors, brand
+#     names.
+#   * Surrogate routes ROT — the 2026-08 probe found 4 of 6 known routes dead
+#     or returning stubs. Entries must carry `last_verified` (ISO date) and a
+#     passing liveness record in the PR that adds them; refresh quarterly.
+#     Entries older than 90 days are tried after fresh ones and flagged.
+#   * kind semantics:
+#       archive — serves a dated snapshot; provenance=snapshot, trust=archive.
+#       reader  — re-renders the LIVE page server-side; provenance=live.
+#       proxy   — raw forwarding relay; MITM by construction, trust=untrusted,
+#                 skipped unless the caller passes --allow-proxy, and never
+#                 receives Cookie/Authorization headers.
+#   * keys:
+#       discovery.json_pointer — dotted path into the discovery JSON payload.
+#       host_rotation — try hostile-domain cousins in order (one may be
+#                 blocked while another answers).
+#       enabled_env — entry is inert until that env var is set (key-gated).
+#       min_body_bytes — response floor; below it the body is a stub/error.
+wayback:
+  kind: archive
+  trust: archive
+  enabled: true
+  last_verified: 2026-08-09
+  discovery:
+    url: "https://archive.org/wayback/available?url={target}"
+    flag_pointer: "archived_snapshots.closest.available"
+    snapshot_url_pointer: "archived_snapshots.closest.url"
+    snapshot_timestamp_pointer: "archived_snapshots.closest.timestamp"
+  min_body_bytes: 3072
+
+archive_today:
+  kind: archive
+  trust: archive
+  enabled: true
+  last_verified: 2026-08-09
+  host_rotation: ["archive.ph", "archive.md", "archive.li", "archive.is"]
+  fetch: "https://{host}/newest/{target}"
+  min_body_bytes: 3072
+
+jina_reader:
+  kind: reader
+  trust: archive
+  enabled: true
+  enabled_env: JINA_API_KEY
+  last_verified: 2026-08-09
+  fetch: "https://r.jina.ai/{target}"
+  min_body_bytes: 512
+
+anon_relay_example:
+  kind: proxy
+  trust: untrusted
+  enabled: false
+  last_verified: 2026-08-09
+  fetch: "https://relay.invalid/?u={target}"
+  min_body_bytes: 3072

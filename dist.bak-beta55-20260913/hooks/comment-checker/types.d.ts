@@ -1,0 +1,1 @@
+export type { ApplyPatchAccumulator, ApplyPatchFileMetadata, CheckResult, CheckerEdit, CommentFilter, CommentInfo, CommentType, FileComments, FilterResult, HookInput, PendingCall, ResolveCommentCheckerBinaryInput, RunCommentCheckerInput, RunCommentCheckerOptions, SpawnFn, SpawnProcess, SpawnSignal, } from "@oh-my-opencode/comment-checker-core";

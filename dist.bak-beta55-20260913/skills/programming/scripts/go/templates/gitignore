@@ -1,0 +1,15 @@
+bin/
+coverage.out
+coverage.html
+*.test
+*.prof
+
+.idea/
+.vscode/
+*.swp
+
+.env
+.env.local
+
+*.pem
+*.key
