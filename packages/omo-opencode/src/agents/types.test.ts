@@ -1,11 +1,84 @@
 import { describe, test, expect } from "bun:test";
 import {
+  buildClaudeThinkingConfig,
+  CLAUDE_THINKING_BUDGET_BY_VARIANT,
   isGptModel,
   isGeminiModel,
   isGlmModel,
   isGptNativeSisyphusModel,
   isMiniMaxModel,
+  resolveClaudeThinkingBudget,
 } from "./types";
+
+describe("resolveClaudeThinkingBudget", () => {
+  test("#given no variant #then returns the legacy default budget", () => {
+    expect(resolveClaudeThinkingBudget(undefined)).toBe(32000);
+  });
+
+  test("#given each canonical reasoning level #then returns a strictly increasing budget ladder", () => {
+    // given
+    const levels = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+    // when
+    const budgets = levels.map((level) => resolveClaudeThinkingBudget(level));
+
+    // then
+    expect(budgets).toEqual([4096, 8192, 16000, 32000, 48000, 60000]);
+    for (let index = 1; index < budgets.length; index += 1) {
+      const previous = budgets[index - 1];
+      const current = budgets[index];
+      if (previous === undefined || current === undefined) throw new Error("unreachable");
+      expect(current).toBeGreaterThan(previous);
+    }
+  });
+
+  test("#given high variant #then matches the legacy default budget", () => {
+    expect(resolveClaudeThinkingBudget("high")).toBe(32000);
+  });
+
+  test("#given variant lookup #then is case-insensitive", () => {
+    expect(resolveClaudeThinkingBudget("MAX")).toBe(60000);
+    expect(resolveClaudeThinkingBudget("Low")).toBe(8192);
+  });
+
+  test("#given off or unknown or empty variant #then falls back to the legacy default budget", () => {
+    expect(resolveClaudeThinkingBudget("off")).toBe(32000);
+    expect(resolveClaudeThinkingBudget("turbo")).toBe(32000);
+    expect(resolveClaudeThinkingBudget("")).toBe(32000);
+  });
+
+  test("#given the exported tier map #then every budget satisfies the Anthropic minimum of 1024", () => {
+    for (const budget of Object.values(CLAUDE_THINKING_BUDGET_BY_VARIANT)) {
+      expect(budget).toBeGreaterThanOrEqual(1024);
+    }
+  });
+});
+
+describe("buildClaudeThinkingConfig", () => {
+  test("#given manual-path Claude model without variant #then emits the legacy default budget", () => {
+    expect(buildClaudeThinkingConfig("anthropic/claude-sonnet-5")).toEqual({
+      thinking: { type: "enabled", budgetTokens: 32000 },
+    });
+  });
+
+  test("#given manual-path Claude model with low vs max variant #then emits different budgets", () => {
+    // given
+    const model = "anthropic/claude-sonnet-5";
+
+    // when
+    const low = buildClaudeThinkingConfig(model, "low");
+    const max = buildClaudeThinkingConfig(model, "max");
+
+    // then
+    expect(low).toEqual({ thinking: { type: "enabled", budgetTokens: 8192 } });
+    expect(max).toEqual({ thinking: { type: "enabled", budgetTokens: 60000 } });
+  });
+
+  test("#given adaptive-path Claude model #then emits no thinking config regardless of variant", () => {
+    expect(buildClaudeThinkingConfig("anthropic/claude-opus-4-7", "max")).toEqual({});
+    expect(buildClaudeThinkingConfig("anthropic/claude-fable-5", "low")).toEqual({});
+  });
+});
 
 describe("isGptNativeSisyphusModel", () => {
   test("allows GPT-5.x where x >= 4", () => {
