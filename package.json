@@ -246,5 +246,8 @@
     "path-to-regexp": "^8.4.2",
     "@types/node": "26.2.0"
   },
-  "trustedDependencies": []
+  "trustedDependencies": [],
+  "patchedDependencies": {
+    "@code-yeongyu/senpi@2026.9.13": "patches/@code-yeongyu%2Fsenpi@2026.9.13.patch"
+  }
 }
