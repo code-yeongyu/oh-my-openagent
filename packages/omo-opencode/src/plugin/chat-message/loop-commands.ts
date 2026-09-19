@@ -27,8 +27,12 @@ export function handleGoalMessage(args: {
 
   switch (parsed.kind) {
     case "setObjective":
-      hooks.goal.setGoal(input.sessionID, parsed.objective)
-      log("[chat-message] Goal set", { sessionID: input.sessionID, objective: parsed.objective })
+      try {
+        hooks.goal.setGoal(input.sessionID, parsed.objective)
+        log("[chat-message] Goal set", { sessionID: input.sessionID, objective: parsed.objective })
+      } catch (err) {
+        log("[chat-message] Goal set failed (non-fatal)", { sessionID: input.sessionID, error: err instanceof Error ? err.message : String(err) })
+      }
       break
     case "setStatus":
       if (parsed.status === "paused") {
