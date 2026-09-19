@@ -1,6 +1,5 @@
 import {
   fetchSDKMessages,
-  findNearestMessageWithFieldsFromMessages,
   type SDKMessage,
 } from "../features/hook-message-injector/sdk-message-lookup"
 import { log } from "../shared/logger"
@@ -65,6 +64,65 @@ function sortAscending(messages: readonly SDKMessage[]): SDKMessage[] {
   })
 }
 
+type RuntimeMessageInfo = {
+  readonly agent?: string
+  readonly role?: string
+  readonly model?: { readonly providerID?: string; readonly modelID?: string }
+  readonly providerID?: string
+  readonly modelID?: string
+}
+
+function readRuntimeInfo(message: SDKMessage | null | undefined): RuntimeMessageInfo | undefined {
+  return message?.info as RuntimeMessageInfo | undefined
+}
+
+function hasAgentAndModel(message: SDKMessage): boolean {
+  const info = readRuntimeInfo(message)
+  if (!info) return false
+  const providerID = info.model?.providerID ?? info.providerID
+  const modelID = info.model?.modelID ?? info.modelID
+  return Boolean(info.agent && providerID && modelID)
+}
+
+function isInternalContinuationMessage(message: SDKMessage): boolean {
+  const parts = Array.isArray(message.parts) ? message.parts : []
+  return parts.some((part) => {
+    const candidate = part as
+      | { synthetic?: boolean; metadata?: { readonly [key: string]: unknown } }
+      | undefined
+    if (!candidate) return false
+    if (candidate.synthetic === true) return true
+    return candidate.metadata?.["compaction_continue"] === true
+  })
+}
+
+function isCompactionArtifact(message: SDKMessage): boolean {
+  if (hasCompactionPart(message)) return true
+  return readRuntimeInfo(message)?.agent === "compaction"
+}
+
+// The working model/agent must be the session's active model from before the
+// compaction. Never resolve it from compaction summaries or internal
+// auto-continue prompts: those used to be picked up as the "nearest message
+// with fields", which re-issued every subsequent continue on the summary's or
+// previous continue's model (e.g. glm-5.3-flash) and silently switched the
+// session away from the user's selected model via a self-sustaining loop.
+function pickActiveSessionMessage(sorted: readonly SDKMessage[]): SDKMessage | null {
+  const clean = sorted.filter(
+    (message) => !isCompactionArtifact(message) && !isInternalContinuationMessage(message),
+  )
+  for (let index = clean.length - 1; index >= 0; index -= 1) {
+    const message = clean[index]
+    if (readRuntimeInfo(message)?.role === "assistant" && hasAgentAndModel(message)) return message
+  }
+  for (let index = clean.length - 1; index >= 0; index -= 1) {
+    const message = clean[index]
+    if (hasAgentAndModel(message)) return message
+  }
+  return null
+}
+
+
 export function resolveCompactionContinueModels(
   messages: readonly SDKMessage[],
 ): CompactionContinueRerouteDecision | null {
@@ -79,13 +137,10 @@ export function resolveCompactionContinueModels(
     }
   }
 
-  const nearest = findNearestMessageWithFieldsFromMessages(sorted)
-  const workingModel =
-    nearest?.model?.providerID && nearest.model.modelID
-      ? { providerID: nearest.model.providerID, modelID: nearest.model.modelID }
-      : null
+  const active = pickActiveSessionMessage(sorted)
+  const workingModel = readMessageModel(active)
 
-  return { triggerModel, workingModel, workingAgent: nearest?.agent ?? null }
+  return { triggerModel, workingModel, workingAgent: readRuntimeInfo(active)?.agent ?? null }
 }
 
 export function shouldRerouteCompactionContinue(
