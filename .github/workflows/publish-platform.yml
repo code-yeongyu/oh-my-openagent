@@ -66,6 +66,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
+      - name: Apply native engine patches
+        run: node packages/omo-native/bin/senpi-patch.mjs
+
       - name: Validate release inputs
         id: validate
         env:
@@ -385,6 +388,31 @@ jobs:
               ;;
           esac
         timeout-minutes: 20
+
+      - name: Smoke compiled workers and RPC
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        env:
+          SMOKE_DIR: ${{ runner.temp }}/release-binary-rpc
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.platform }}"
+          case "$TARGET" in
+            darwin-arm64|linux-x64|linux-x64-baseline|windows-x64|windows-x64-baseline)
+              trap 'rm -rf "$SMOKE_DIR"' EXIT
+              BINARY=".omo/release-binaries/omo-${TARGET}"
+              if [[ "$TARGET" == windows-* ]]; then BINARY="${BINARY}.exe"; fi
+              bun test script/senpi-worker-compile.test.ts
+              bun script/qa/dependency-audit-capture.ts --phase post \
+                --binary "$BINARY" --out "$SMOKE_DIR" --case rpc --case extension
+              jq -e '.complete == true and .pass == true and ([.cases[].case] == ["rpc", "extension"]) and all(.cases[]; .pass == true and .exitCode == 0)' "$SMOKE_DIR/summary.json"
+              ;;
+            *)
+              # Non-native legs retain their existing platform smoke policy.
+              # Windows arm64 remains checksum-only: runtime behavior is unverified.
+              echo "Compiled RPC smoke requires a native runner for ${TARGET}"
+              ;;
+          esac
+        timeout-minutes: 10
 
       - name: Upload release binary artifact
         if: steps.release-assets.outputs.binary_exists != 'true'

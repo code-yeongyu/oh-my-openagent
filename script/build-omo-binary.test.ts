@@ -9,13 +9,16 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
+  truncateSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { z } from "zod"
 import {
   assertBinarySizeBudget,
   assertEngineGraphBundled,
@@ -355,6 +358,29 @@ describe("runtime manifest", () => {
 })
 
 describe("size budget", () => {
+  test.each([
+    ["darwin-arm64", 104_857_600, true],
+    ["darwin-arm64", 104_857_601, false],
+    ["linux-x64", 104_857_601, true],
+    ["windows-x64", 157_286_400, true],
+    ["windows-x64", 157_286_401, false],
+  ] as const)("#given %s at %d bytes #when its target budget is enforced #then accepted is %s", (target, size, accepted) => {
+    // given
+    const root = makeTempDir("omo-size-boundary-")
+    const binary = join(root, "binary")
+    try {
+      writeFileSync(binary, "")
+      truncateSync(binary, size)
+      // when
+      const enforce = (): void => assertBinarySizeBudget(target, binary)
+      // then
+      if (accepted) expect(enforce).not.toThrow()
+      else expect(enforce).toThrow(new RegExp(target))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a synthetic oversize binary #when the budget is enforced #then it fails loud naming the target", () => {
     // given
     const stageDir = makeTempDir("omo-size-")
@@ -589,6 +615,45 @@ describe("plugin staging isolation guard", () => {
 })
 
 describe("engine graph bundling", () => {
+  test("#given a release build #when it reaches the compiler #then flags and both ordered entries satisfy the contract", () => {
+    // given: intercept only the target compiler; staging and the asset probe run normally.
+    const root = makeTempDir("omo-compile-argv-")
+    const capture = join(root, "argv.json")
+    try {
+      // when
+      const result = spawnSync(process.execPath, [join(scriptDir, "release-compile-argv.fixture.ts"), capture, root], {
+        cwd: repoRoot, encoding: "utf8", timeout: 120_000,
+      })
+      // then: independent flags may move; only entry order determines the executable's main.
+      expect(result.status, result.stderr).toBe(0)
+      const { command, args } = z.object({ command: z.string(), args: z.array(z.string()) }).parse(JSON.parse(readFileSync(capture, "utf8")))
+      expect(command).toBe("bun")
+      expect(args[0]).toBe("build")
+      for (const flag of ["--compile", "--target=bun-linux-x64", "--splitting", "--minify", "--keep-names", "--compile-autoload-package-json", "--no-compile-autoload-dotenv", "--no-compile-autoload-bunfig"]) {
+        expect(args).toContain(flag)
+      }
+      expect(args).not.toContain("--minify-whitespace")
+      const main = args.indexOf(join(repoRoot, "packages/omo-native/compile-entry.ts"))
+      const worker = args.indexOf(realpathSync(join(repoRoot, "node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js")))
+      expect(main).toBeGreaterThanOrEqual(0)
+      expect(worker).toBeGreaterThanOrEqual(0)
+      expect(main).toBeLessThan(worker)
+      expect(args).toContain(`--root=${repoRoot}`)
+      expect(args.some((arg) => arg.startsWith("--define=SENPI_RPC_SESSION_WORKER_ENTRY="))).toBe(true)
+      expect(args.some((arg) => arg.startsWith("--asset="))).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 150_000)
+
+  test("#given recorded splitting output #when parsed #then the observed 4476 modules are extracted", () => {
+    // given: recorded two-entry splitting probe; not a production count pin.
+    const output = "\n [300ms]  bundle  4476 modules\n\n [132ms]  compile  /tmp/x\n"
+    // when / then
+    expect(parseBundledModuleCount(output)).toBe(4476)
+    expect(assertEngineGraphBundled(output)).toBe(4476)
+  })
+
   test("#given the compiled OMO entry #when its engine imports are inspected #then both retain the standard patched engine literal", () => {
     // given
     const compileEntrySource = readFileSync(
