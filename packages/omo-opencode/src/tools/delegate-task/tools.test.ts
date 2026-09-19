@@ -594,7 +594,7 @@ describe("sisyphus-task", () => {
       expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
-    test("prefers category over subagent_type when both are provided", async () => {
+    test("throws error when both category and subagent_type are provided", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
@@ -649,11 +649,10 @@ describe("sisyphus-task", () => {
         load_skills: [],
       }
 
-      //#when
-      await tool.execute(args, toolContext)
-
-      //#then - category takes precedence, subagent_type is overridden to sisyphus-junior
-      expect(requireCapturedLaunchInput(launchInput).agent).toBe("Sisyphus-Junior")
+      //#when / #then - providing both category and subagent_type is an error
+      await expect(tool.execute(args, toolContext)).rejects.toThrow(
+        "task() received both category and subagent_type"
+      )
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
