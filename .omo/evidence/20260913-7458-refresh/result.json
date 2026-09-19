@@ -1,0 +1,26 @@
+{
+  "opencode": "1.18.30",
+  "bun": "1.4.0",
+  "node": "v24.18.0",
+  "health": true,
+  "loadedTupleOptions": "tuple-7458",
+  "sse": [
+    "server.connected",
+    "session.created"
+  ],
+  "pinned": {
+    "entry": "oh-my-openagent@4.19.4",
+    "isPinned": true,
+    "pinnedVersion": "4.19.4",
+    "isLocalDev": false
+  },
+  "localTuple": {
+    "findPluginEntry": null,
+    "isLocalDev": true
+  },
+  "isolatedSessions": 1,
+  "isolatedHomeAndAllXdg": true,
+  "projectOutsideCheckout": true,
+  "childEnvironmentAllowlisted": true,
+  "before": 8102
+}

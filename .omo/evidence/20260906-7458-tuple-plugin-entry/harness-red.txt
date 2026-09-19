@@ -1,0 +1,17 @@
+variant: red
+opencode: 1.18.29
+server_ready: yes
+config_plugin_array: [tuple(opencode-auto-resume), oh-my-openagent@4.19.4, file://probe.js]
+sse_session_event_types: 
+probe_hook_fired_on_session_created: yes
+real_db: /Users/sungsoopark/.local/share/opencode/opencode.db
+real_db_sessions_before: 8077
+real_db_sessions_after: 8077
+serve_plugin_notes: none
+--- probe decision (fixed functions under real session.created) ---
+{
+  "ok": true,
+  "directory": "/private/var/folders/13/yyrkyfts6qsg303mcwpwzq200000gn/T/oqa-xdg.XXXXXX.Kh7H2dslEF/proj",
+  "findPluginEntry": null,
+  "isLocalDev": false
+}

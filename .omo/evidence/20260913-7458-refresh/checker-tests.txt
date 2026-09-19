@@ -1,0 +1,66 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+(pass) auto-update-checker/checker > getLatestVersion > accepts channel parameter [25.28ms]
+(pass) auto-update-checker/checker > getLatestVersion > accepts latest channel [0.32ms]
+(pass) auto-update-checker/checker > getLatestVersion > works without channel (defaults to latest) [0.95ms]
+(pass) auto-update-checker/checker > getLatestVersion > falls back to latest when the channel is missing [0.23ms]
+(pass) auto-update-checker/checker > getLatestVersion > returns null when the registry responds with an error status [0.24ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/package-json-locator.test.ts:
+(pass) findPackageJsonUp > finds a package.json whose name is the canonical oh-my-opencode [1.75ms]
+(pass) findPackageJsonUp > finds a package.json whose name is the aliased oh-my-openagent (GH-3257) [1.23ms]
+(pass) findPackageJsonUp > walks up directories to find the matching package.json [1.59ms]
+(pass) findPackageJsonUp > ignores unrelated package.json files [1.79ms]
+(pass) findPackageJsonUp > returns null when no package.json exists [0.93ms]
+(pass) findPackageJsonUp > #given the interim @oh-my-opencode/omo-opencode manifest between the file and an accepted root #when walking up #then skips it and returns the accepted manifest [2.05ms]
+(pass) findPackageJsonUp > #given no accepted-name manifest within the 10-level-capped walk #when walking up #then returns null [1.49ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/cached-version.test.ts:
+(pass) getCachedVersion (GH-3257) > returns the version when the package is installed under oh-my-opencode [1.67ms]
+(pass) getCachedVersion (GH-3257) > returns the version when the package is installed under oh-my-openagent [1.23ms]
+(pass) getCachedVersion (GH-3257) > prefers oh-my-opencode when both are installed [2.02ms]
+(pass) getCachedVersion (GH-3257) > returns null when neither candidate exists and fallbacks find nothing [1.12ms]
+(pass) getCachedVersion (GH-3257) > prefers the loaded module's package.json over flat-install candidates [2.48ms]
+(pass) getCachedVersion (GH-3257) > falls back to installed candidates when module-relative lookup throws a non-Error [2.18ms]
+(pass) getCachedVersion (GH-3257) > tries the next candidate when reading a candidate throws a non-Error [1.58ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/pinned-version-updater.test.ts:
+(pass) pinned-version-updater > updatePinnedVersion > updates pinned version in config [3.67ms]
+(pass) pinned-version-updater > updatePinnedVersion > returns false when entry not found [1.71ms]
+(pass) pinned-version-updater > updatePinnedVersion > returns false when no plugin array exists [1.62ms]
+(pass) pinned-version-updater > revertPinnedVersion > reverts from failed version back to original entry [2.14ms]
+(pass) pinned-version-updater > revertPinnedVersion > reverts to unpinned entry [0.83ms]
+(pass) pinned-version-updater > revertPinnedVersion > returns false when failed version not found [1.54ms]
+(pass) pinned-version-updater > update then revert roundtrip > config returns to original state after update + revert [1.76ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/bundled-version.test.ts:
+(pass) getBundledVersion (GH-4211) > returns the published root package version, not the workspace-internal one [1.51ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/plugin-entry.test.ts:
+(pass) findPluginEntry > returns unpinned for bare package name [3.82ms]
+(pass) findPluginEntry > returns unpinned for latest dist-tag [1.26ms]
+(pass) findPluginEntry > returns unpinned for beta dist-tag [2.79ms]
+(pass) findPluginEntry > returns pinned for explicit semver [1.30ms]
+(pass) findPluginEntry > finds preferred plugin entry [4.74ms]
+(pass) findPluginEntry > finds legacy plugin entry [1.31ms]
+(pass) findPluginEntry > finds preferred plugin entry with pinned version [1.65ms]
+(pass) findPluginEntry > returns null for unrelated plugin entry [1.30ms]
+(pass) findPluginEntry > finds the plugin entry when a tuple-style entry precedes it [1.43ms]
+(pass) findPluginEntry > reads user config from profile dir even when OPENCODE_CONFIG_DIR changes after import [5.79ms]
+
+packages/omo-opencode/src/hooks/auto-update-checker/checker/catch-fallbacks.test.ts:
+(pass) auto-update checker catch fallbacks > returns null when latest version fetch throws an Error [2.97ms]
+(pass) auto-update checker catch fallbacks > returns null when latest version fetch throws a non-Error [0.24ms]
+(pass) auto-update checker catch fallbacks > returns null when local dev package JSON is malformed [1.64ms]
+(pass) auto-update checker catch fallbacks > returns null when local dev version read throws a non-Error [5.31ms]
+
+ 41 pass
+ 0 fail
+ 71 expect() calls
+Ran 41 tests across 7 files. [8.97s]
