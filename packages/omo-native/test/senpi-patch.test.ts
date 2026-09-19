@@ -1,18 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
 const BUNDLED_ANTHROPIC_MESSAGES = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
+const BUNDLED_TERMINAL_IMAGE = "node_modules/@earendil-works/pi-tui/dist/terminal-image.js"
 const FLOOR = "2.1.251"
 
 const roots: string[] = []
 
-type Fixture = { root: string; anthropicMessages: string }
+type Fixture = { root: string; anthropicMessages: string; terminalImage: string }
 
 function anthropicMessagesSource(claudeCodeVersion: string): string {
   return [
@@ -44,7 +45,11 @@ function createFixture(claudeCodeVersion: string): Fixture {
   const anthropicMessages = join(root, BUNDLED_ANTHROPIC_MESSAGES)
   mkdirSync(dirname(anthropicMessages), { recursive: true })
   writeFileSync(anthropicMessages, anthropicMessagesSource(claudeCodeVersion))
-  return { root, anthropicMessages }
+  const installedSenpiRoot = dirname(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))))
+  const bundledTui = join(root, "node_modules", "@earendil-works", "pi-tui")
+  cpSync(join(installedSenpiRoot, "node_modules", "@earendil-works", "pi-tui"), bundledTui, { recursive: true })
+  const terminalImage = join(root, BUNDLED_TERMINAL_IMAGE)
+  return { root, anthropicMessages, terminalImage }
 }
 
 function runPatch(root: string) {
@@ -59,6 +64,38 @@ afterEach(() => {
 })
 
 describe("senpi-patch claudeCodeVersion floor", () => {
+  describe("#given Ghostty uses the bundled terminal-image capability detector", () => {
+    describe("#when the patch script prepares the installed Senpi runtime", () => {
+      test("#then Ghostty opts into Kitty Unicode placeholders so images move with transcript rows", () => {
+        const fixture = createFixture(FLOOR)
+        const result = runPatch(fixture.root)
+        expect(result.status).toBe(0)
+        expect(readFileSync(fixture.terminalImage, "utf8")).toContain(
+          'return { images: "kitty", trueColor: true, hyperlinks: true, kittyUnicodePlaceholders: true };',
+        )
+        const observed = spawnSync(
+          "node",
+          [
+            "--input-type=module",
+            "--eval",
+            `import { getCapabilities, renderImage } from ${JSON.stringify(pathToFileURL(fixture.terminalImage).href)}; const image = renderImage("YQ==", { widthPx: 18, heightPx: 36 }, { maxWidthCells: 2, maxHeightCells: 2, imageId: 0x010203 }); console.log(JSON.stringify({ capabilities: getCapabilities(), image }));`,
+          ],
+          {
+            encoding: "utf8",
+            env: { ...process.env, TERM_PROGRAM: "ghostty", TERM: "xterm-ghostty", TMUX: "" },
+          },
+        )
+        expect(observed.status).toBe(0)
+        const rendered = JSON.parse(observed.stdout)
+        expect(rendered.capabilities).toMatchObject({ images: "kitty", kittyUnicodePlaceholders: true })
+        expect(rendered.image.sequence).toContain("U=1")
+        expect(rendered.image.sequence).not.toContain("C=1")
+        expect(rendered.image.lines).toHaveLength(2)
+        expect(rendered.image.lines.every((line: string) => line.includes(String.fromCodePoint(0x10eeee)))).toBe(true)
+      })
+    })
+  })
+
   describe("#given a bundled pi-ai claudeCodeVersion below the 2.1.251 floor", () => {
     describe("#when the patch script runs as postinstall does", () => {
       test("#then the version is rewritten to the floor", () => {

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
 const engineEntry = import.meta.resolve("@code-yeongyu/senpi")
+const terminalImageSource = readFileSync(new URL("../node_modules/@earendil-works/pi-tui/dist/terminal-image.js", engineEntry), "utf8")
 // The source map preserves upstream input even after postinstall prepared the installed JS.
 const rpcMap = JSON.parse(readFileSync(new URL("./modes/rpc/rpc-mode.js.map", engineEntry), "utf8"))
 const rpcSource = new Bun.Transpiler({ loader: "ts" }).transformSync(rpcMap.sourcesContent[0])
@@ -65,6 +66,9 @@ function engineFixture(source = rpcSource) {
   const apiDir = join(root, "node_modules", "@earendil-works", "pi-ai", "dist", "api")
   mkdirSync(apiDir, { recursive: true })
   writeFileSync(join(apiDir, "anthropic-messages.js"), 'const claudeCodeVersion = "2.1.251";\n')
+  const terminalImagePath = join(root, "node_modules", "@earendil-works", "pi-tui", "dist", "terminal-image.js")
+  mkdirSync(join(root, "node_modules", "@earendil-works", "pi-tui", "dist"), { recursive: true })
+  writeFileSync(terminalImagePath, terminalImageSource)
   return { root, rpcPath }
 }
 

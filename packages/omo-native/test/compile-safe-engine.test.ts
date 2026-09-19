@@ -55,6 +55,11 @@ function createEngine(): string {
   write(join(mdnCss, "at-rules.json"), JSON.stringify(AT_RULES))
   write(join(mdnCss, "properties.json"), JSON.stringify(PROPERTIES))
   write(join(mdnCss, "syntaxes.json"), JSON.stringify(SYNTAXES))
+  const installedSenpiRoot = dirname(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))))
+  write(
+    join(root, "node_modules", "@earendil-works", "pi-tui", "dist", "terminal-image.js"),
+    readFileSync(join(installedSenpiRoot, "node_modules", "@earendil-works", "pi-tui", "dist", "terminal-image.js"), "utf8"),
+  )
   return root
 }
 
