@@ -114,7 +114,8 @@ describe("skill tool - dynamic description cache invalidation", () => {
 
       const refreshedResult = await refreshedTool.execute({ name: "second-skill" }, mockContext)
 
-      expect(refreshedTool.description).toContain("second-skill")
+      expect(refreshedResult).toContain("Second skill body")
+      expect(refreshedTool.description).not.toContain("second-skill")
     } finally {
       process.chdir(originalDirectory)
       clearSkillCache()
