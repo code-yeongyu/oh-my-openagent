@@ -100,7 +100,11 @@ async function runSupervisor(runDir: string): Promise<void> {
   const stderrFd = openSync(manifest.stderrPath, "w")
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
-    detached: true,
+    // POSIX keeps a detached process group so the group kill reaches the whole tree. On win32 the
+    // bootstrap must stay inside the supervisor: Windows Terminal can hand a detached child a fresh
+    // visible console even with windowsHide, and an abrupt supervisor exit should take the
+    // bootstrap down instead of orphaning it.
+    detached: platform !== "win32",
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
     windowsHide: true,
   })
