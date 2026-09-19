@@ -1,0 +1,13 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/plugin/background-task-events.test.ts:
+(pass) #given notifications=false #when terminal lifecycle arrives #then manager receives it exactly once [10.53ms]
+(pass) #given notifications=true #when terminal lifecycle arrives #then manager receives it exactly once [0.40ms]
+(pass) #given recovery decision and awaiting retry #when old grace expires #then error stays hidden until recovery ends [0.43ms]
+(pass) #given real runtime fallback accepted #when dispatch is held beyond grace #then visibility follows retry state [3.65ms]
+(pass) #given real runtime fallback failed #when dispatch is held beyond grace #then visibility follows retry state [0.93ms]
+
+ 5 pass
+ 0 fail
+ 24 expect() calls
+Ran 5 tests across 1 file. [6.42s]

@@ -1613,9 +1613,10 @@ describe("createEventHandler - event hook isolation", () => {
 						calls.push("claudeCodeHooks")
 					},
 				},
-				backgroundNotificationHook: {
+				backgroundTaskEvents: {
+					beginDecision: () => undefined,
 					event: async () => {
-						calls.push("backgroundNotificationHook")
+						calls.push("backgroundTaskEvents")
 					},
 				},
 				sessionNotification: async () => {
@@ -1649,7 +1650,7 @@ describe("createEventHandler - event hook isolation", () => {
 			"autoUpdateChecker",
 			"legacyPluginToast",
 			"claudeCodeHooks",
-			"backgroundNotificationHook",
+			"backgroundTaskEvents",
 			"sessionNotification",
 			"runtimeFallback",
 			"writeExistingFileGuard",

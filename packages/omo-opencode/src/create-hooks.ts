@@ -77,6 +77,7 @@ export function createHooks(args: {
     isHookEnabled,
     safeHookEnabled,
     backgroundManager,
+    isRecoveryPending: (sessionID) => core.runtimeFallback?.isRecoveryPending(sessionID) ?? false,
   })
 
   const skill = createSkillHooks({

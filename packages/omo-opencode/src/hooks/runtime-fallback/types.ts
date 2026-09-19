@@ -72,6 +72,7 @@ export interface RuntimeFallbackOptions {
 }
 
 export interface RuntimeFallbackHook {
+  isRecoveryPending: (sessionID: string) => boolean
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
   "chat.message"?: (input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string }; variant?: string }, output: { message: { model?: { providerID: string; modelID: string }; variant?: string }; parts?: Array<{ type: string; text?: string }> }) => Promise<void>
   dispose?: () => void

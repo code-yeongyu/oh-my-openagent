@@ -1,0 +1,40 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/plugin/background-task-events.test.ts:
+(pass) #given recovery declined #when decision finishes #then terminal error becomes visible immediately [5.19ms]
+(pass) #given recovery exhausted #when decision finishes #then terminal error becomes visible immediately [0.54ms]
+(pass) #given recovery exception #when decision finishes #then terminal error becomes visible immediately [0.53ms]
+(pass) #given overlapping error decisions #when one completes #then the other still hides the error [0.43ms]
+(pass) #given accepted fallback then exhausted #when real timeout finishes #then terminal latch is visible [2.44ms]
+(pass) #given accepted fallback then no-models #when real timeout finishes #then terminal latch is visible [0.45ms]
+(pass) #given notifications=false #when terminal lifecycle arrives #then manager receives it exactly once [0.39ms]
+(pass) #given notifications=true #when terminal lifecycle arrives #then manager receives it exactly once [0.18ms]
+(pass) #given recovery decision and awaiting retry #when old grace expires #then error stays hidden until recovery ends [0.15ms]
+(pass) #given real runtime fallback accepted #when dispatch is held beyond grace #then visibility follows retry state [2.20ms]
+(pass) #given real runtime fallback failed #when dispatch is held beyond grace #then visibility follows retry state [1.19ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.test.ts:
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a stale promptAsync reservation that releases shortly after #when auto retry runs #then the fallback dispatch is retried instead of silently abandoned [0.87ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the retried dispatch fails ambiguously after the reservation releases #when auto retry runs #then the pending fallback is preserved as possibly accepted [0.33ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given the failed assistant is still active #when auto retry runs #then the fallback dispatch is queued until the assistant unblocks [0.47ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session WE internally aborted whose dangling assistant turn has no finish, no output and no terminal error #when auto retry runs #then the fallback dispatch fires immediately instead of looping forever on active-queue [0.23ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a session NOT internally aborted whose assistant turn is genuinely active #when auto retry runs #then the dispatch is still withheld (active-check preserved for live turns) [0.23ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given an inherited agent variant #when a base fallback is dispatched #then pending state stores the effective variant identity [0.70ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a category-inherited variant #when a base fallback is dispatched #then pending state stores the effective variant identity [0.50ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a registered session category has reasoning #when its fallback is dispatched through another agent #then category reasoning qualifies the prompt and pending identity [0.39ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given an older fallback is awaiting #when a variant-qualified next fallback is accepted as queued #then effective pending state is preserved [1.19ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given manual model change replaces state during a failed dispatch #when rollback runs #then the replacement state is preserved [0.26ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a fallback prompt is queued behind an active assistant #when state is replaced before the queue drains #then the stale generation never reaches promptAsync [0.37ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given state is replaced while fallback message lookup is pending #when the lookup completes #then the stale generation cannot dispatch or arm a watchdog [0.22ms]
+(pass) createAutoRetryDispatcher reserved-session retry (#5109) > #given a manual reset starts a new retry while the old dispatcher is awaiting messages #when the old generation completes #then it cannot clear the new generation in-flight marker [0.30ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts:
+(pass) createFallbackTimeoutHelpers > #given timeout fallback dispatch is blocked #when the timeout fires #then fallback state is restored [3.04ms]
+(pass) createFallbackTimeoutHelpers > #given an accepted fallback is awaiting its result #when timeout escalation is blocked #then the restored awaiting state keeps a timeout armed [2.66ms]
+(pass) createFallbackTimeoutHelpers > #given a timeout belongs to an older state generation #when that generation is replaced before its callback runs #then it never aborts the replacement request [0.24ms]
+(pass) createFallbackTimeoutHelpers > #given timeout callback awaits abort #when manual model change replaces state #then the stale generation never dispatches [0.21ms]
+
+ 28 pass
+ 0 fail
+ 96 expect() calls
+Ran 28 tests across 3 files. [2.67s]

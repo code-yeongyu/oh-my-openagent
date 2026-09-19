@@ -1,0 +1,10 @@
+bun test v1.4.0 (34cbb9a40)
+
+Command:
+bun test packages/omo-opencode/src/plugin/background-task-events.test.ts packages/omo-opencode/src/plugin/event.test.ts packages/omo-opencode/src/features/background-agent/ packages/omo-opencode/src/tools/delegate-task/ packages/omo-opencode/src/hooks/runtime-fallback/ packages/omo-opencode/src/hooks/background-notification/
+
+1603 pass
+0 fail
+3816 expect() calls
+Ran 1603 tests across 140 files. [37.09s]
+Exit code: 0

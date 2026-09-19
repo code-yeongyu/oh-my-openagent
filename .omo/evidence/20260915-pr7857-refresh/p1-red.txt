@@ -1,0 +1,38 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/features/background-agent/manager.test.ts:
+6086 |       manager.handleEvent({ type: "session.error", properties: { sessionID: task.sessionId, error: { name: "ProviderModelNotFoundError", message } } })
+6087 |       nowSpy.mockReturnValue(1_019_999)
+6088 |       expect(manager.getTerminalChildError(task.sessionId!)).toBeNull()
+6089 |       nowSpy.mockReturnValue(1_020_000)
+6090 |       //#then
+6091 |       expect(manager.getTerminalChildError(task.sessionId!)).toBe(message)
+                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "Model not found: openai/pr7857-missing"
+Received: null
+
+      at <anonymous> (<repo>/packages/omo-opencode/src/features/background-agent/manager.test.ts:6091:62)
+(fail) BackgroundManager.handleEvent - session.error > records terminal errors for sync-attached completed tasks without changing background state [11.40ms]
+6086 |       manager.handleEvent({ type: "session.error", properties: { sessionID: task.sessionId, error: { name: "ProviderModelNotFoundError", message } } })
+6087 |       nowSpy.mockReturnValue(1_019_999)
+6088 |       expect(manager.getTerminalChildError(task.sessionId!)).toBeNull()
+6089 |       nowSpy.mockReturnValue(1_020_000)
+6090 |       //#then
+6091 |       expect(manager.getTerminalChildError(task.sessionId!)).toBe(message)
+                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "Model not found: openai/pr7857-missing"
+Received: null
+
+      at <anonymous> (<repo>/packages/omo-opencode/src/features/background-agent/manager.test.ts:6091:62)
+(fail) BackgroundManager.handleEvent - session.error > records terminal errors for sync-attached error tasks without changing background state [0.52ms]
+(pass) BackgroundManager.handleEvent - session.error > does not record terminal errors for sync-attached historical attempts [0.44ms]
+
+ 1 pass
+ 198 filtered out
+ 2 fail
+ 10 expect() calls
+Ran 3 tests across 1 file. [2.98s]

@@ -116,6 +116,13 @@ export function createRuntimeFallbackHook(
   }
 
   return {
+    isRecoveryPending: (sessionID: string) =>
+      deps.sessionRetryInFlight.has(sessionID) || (
+        deps.sessionAwaitingFallbackResult.has(sessionID) && (
+          deps.sessionStates.get(sessionID)?.pendingFallbackModel !== undefined ||
+          deps.sessionFallbackTimeouts.has(sessionID)
+        )
+      ),
     event: eventHandler,
     "chat.message": chatMessageHandler,
     dispose,

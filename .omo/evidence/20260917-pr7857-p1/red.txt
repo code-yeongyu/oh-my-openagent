@@ -1,0 +1,42 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/plugin/background-task-events.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+npm notice
+npm notice New major version of npm available! 10.9.2 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+30 |     const clock = spyOn(Date, "now").mockReturnValue(1000)
+31 |     try {
+32 |       const dispatch = createEventHookDispatcher(continuation as CreatedHooks, createEventHookRunner())
+33 |       await dispatch(terminal)
+34 |       clock.mockReturnValue(21000)
+35 |       expect(forwarded).toHaveBeenCalledTimes(1)
+                             ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 1
+Received number of calls: 0
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/plugin/background-task-events.test.ts:35:25)
+(fail) #given notifications=false #when terminal lifecycle arrives #then manager receives it exactly once [8.36ms]
+(pass) #given notifications=true #when terminal lifecycle arrives #then manager receives it exactly once [1.32ms]
+54 |   } } } as CreatedHooks, createEventHookRunner())
+55 |   const running = dispatch(terminal)
+56 |   try {
+57 |     await entered.promise
+58 |     clock.mockReturnValue(21000)
+59 |     expect(manager.getTerminalChildError("child")).toBeNull()
+                                                        ^
+error: expect(received).toBeNull()
+
+Received: "Model not found: qa/missing"
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/plugin/background-task-events.test.ts:59:52)
+(fail) #given recovery decision and awaiting retry #when old grace expires #then error stays hidden until recovery ends [0.78ms]
+
+ 1 pass
+ 2 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [5.57s]

@@ -1,0 +1,88 @@
+{
+  "case": "recovery",
+  "passed": true,
+  "observations": [
+    {
+      "sessionID": "ses_f510f4d69ffeex9xHEljbFY6ff",
+      "eventID": "evt_0aef0b2bf001BNL91adjG7RIp8",
+      "forwardingCount": 1,
+      "notificationHookDisabled": true,
+      "recoveryPending": true,
+      "futureVisibility": null,
+      "clockProbeOffsetMs": 60000
+    },
+    {
+      "sessionID": "ses_f510f4d69ffeex9xHEljbFY6ff",
+      "eventID": "evt_0aef0b2bd001IbycYpcTqRdq1E",
+      "forwardingCount": 1,
+      "notificationHookDisabled": true,
+      "recoveryPending": true,
+      "futureVisibility": null,
+      "clockProbeOffsetMs": 60000
+    }
+  ],
+  "errors": [
+    {
+      "id": "evt_0aef0b2bd001IbycYpcTqRdq1E",
+      "type": "session.error",
+      "properties": {
+        "sessionID": "ses_f510f4d69ffeex9xHEljbFY6ff",
+        "error": {
+          "name": "UnknownError",
+          "data": {
+            "message": "Model not found: openai/pr7857-missing."
+          }
+        }
+      }
+    },
+    {
+      "id": "evt_0aef0b2bf001BNL91adjG7RIp8",
+      "type": "session.error",
+      "properties": {
+        "sessionID": "ses_f510f4d69ffeex9xHEljbFY6ff",
+        "error": {
+          "name": "UnknownError",
+          "data": {
+            "message": "ProviderModelNotFoundError: Model not found: openai/pr7857-missing.\n    at <anonymous> (/$bunfs/root/chunk-3yjk1w4m.js:439:94278)\n    at SessionPrompt.getModel (/$bunfs/root/chunk-jsvjjq7j.js:1142:11505)\n    at SessionPrompt.getModel (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:908)\n    at SessionPrompt.run (/$bunfs/root/chunk-jsvjjq7j.js:1142:15339)\n    at SessionPrompt.run (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:10503)\n    at SessionRunState.ensureRunning (/$bunfs/root/chunk-jsvjjq7j.js:1142:15308)\n    at SessionRunState.ensureRunning (definition) (/$bunfs/root/chunk-jsvjjq7j.js:2:8188)\n    at SessionPrompt.loop (/$bunfs/root/chunk-jsvjjq7j.js:1142:10225)\n    at SessionPrompt.loop (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:15244)\n    at SessionPrompt.prompt (/$bunfs/root/chunk-mjh4q85p.js:4:13569)\n    at SessionPrompt.prompt (definition) (/$bunfs/root/chunk-jsvjjq7j.js:1142:9844)"
+          }
+        }
+      }
+    }
+  ],
+  "provider": [
+    {
+      "branch": "tool-call"
+    },
+    {
+      "branch": "recovery-model",
+      "model": "gpt-fake"
+    },
+    {
+      "branch": "caller-received",
+      "output": "Task continued and completed in 11s.\n\n---\n\nPR7857_RECOVERED\n\n<task_metadata>\nsession_id: ses_f510f4d69ffeex9xHEljbFY6ff\ntask_id: ses_f510f4d69ffeex9xHEljbFY6ff\nsubagent: build\n</task_metadata>"
+    }
+  ],
+  "isolation": {
+    "cleanEnvironment": true,
+    "inheritedConfig": false,
+    "inheritedCredentials": false,
+    "inheritedSkills": false,
+    "sandbox": "<temp>",
+    "executionSurface": "isolated-native",
+    "hostSessionsBefore": 8104,
+    "hostSessionsAfter": 8104
+  },
+  "publicSkillAssetsStaged": true,
+  "configuredProbe": true,
+  "probeRegistered": true,
+  "opencodeVersion": "1.18.30",
+  "database": {
+    "childMessageRoles": [
+      "user",
+      "user",
+      "assistant"
+    ],
+    "matchingChildErrorObserved": true
+  },
+  "sandboxRemoved": true
+}

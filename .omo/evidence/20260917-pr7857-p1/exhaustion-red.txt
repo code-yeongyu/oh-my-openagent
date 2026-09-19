@@ -1,0 +1,37 @@
+bun test v1.4.0 (34cbb9a40)
+
+packages/omo-opencode/src/plugin/background-task-events.test.ts:
+63 |       expect(runtime.isRecoveryPending("child")).toBe(true)
+64 |       expect(manager.getTerminalChildError("child")).toBeNull()
+65 |       if (terminalReason === "no-models") agent.fallback_models = []
+66 |       await clock.advanceBy(1)
+67 |       expect(aborts).toBe(1)
+68 |       expect(runtime.isRecoveryPending("child")).toBe(false)
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/plugin/background-task-events.test.ts:68:50)
+(fail) #given accepted fallback then exhausted #when real timeout finishes #then terminal latch is visible [16.16ms]
+63 |       expect(runtime.isRecoveryPending("child")).toBe(true)
+64 |       expect(manager.getTerminalChildError("child")).toBeNull()
+65 |       if (terminalReason === "no-models") agent.fallback_models = []
+66 |       await clock.advanceBy(1)
+67 |       expect(aborts).toBe(1)
+68 |       expect(runtime.isRecoveryPending("child")).toBe(false)
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/plugin/background-task-events.test.ts:68:50)
+(fail) #given accepted fallback then no-models #when real timeout finishes #then terminal latch is visible [0.81ms]
+
+ 0 pass
+ 9 filtered out
+ 2 fail
+ 8 expect() calls
+Ran 2 tests across 1 file. [3.50s]

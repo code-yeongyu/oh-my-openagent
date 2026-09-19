@@ -35,12 +35,12 @@ export function createEventHookRunner(): EventHookRunner {
 }
 
 export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafely: EventHookRunner) {
-  return async (input: EventInput): Promise<void> => {
+  const dispatch = async (input: EventInput): Promise<void> => {
     await runEventHookSafely("autoUpdateChecker", hooks.autoUpdateChecker?.event, input);
     await runEventHookSafely("astGrepSgProvision", hooks.astGrepSgProvision?.event, input);
     await runEventHookSafely("legacyPluginToast", hooks.legacyPluginToast?.event, input);
     await runEventHookSafely("claudeCodeHooks", hooks.claudeCodeHooks?.event, input);
-    await runEventHookSafely("backgroundNotificationHook", hooks.backgroundNotificationHook?.event, input);
+    await runEventHookSafely("backgroundTaskEvents", hooks.backgroundTaskEvents?.event, input);
     await runEventHookSafely("sessionNotification", hooks.sessionNotification, input);
     await runEventHookSafely("todoContinuationEnforcer", hooks.todoContinuationEnforcer?.handler, input);
     await runEventHookSafely("unstableAgentBabysitter", hooks.unstableAgentBabysitter?.event, input);
@@ -67,5 +67,13 @@ export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafel
     await runEventHookSafely("writeExistingFileGuard", hooks.writeExistingFileGuard?.event, input);
     await runEventHookSafely("atlasHook", hooks.atlasHook?.handler, input);
     await runEventHookSafely("autoSlashCommand", hooks.autoSlashCommand?.event, input);
+  };
+  return async (input: EventInput): Promise<void> => {
+    const finishDecision = hooks.backgroundTaskEvents?.beginDecision(input);
+    try {
+      await dispatch(input);
+    } finally {
+      finishDecision?.();
+    }
   };
 }

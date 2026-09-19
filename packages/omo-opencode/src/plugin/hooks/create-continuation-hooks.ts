@@ -12,8 +12,10 @@ import {
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
+import { createBackgroundTaskEvents } from "../background-task-events"
 
 export type ContinuationHooks = {
+  backgroundTaskEvents: ReturnType<typeof createBackgroundTaskEvents>
   stopContinuationGuard: ReturnType<typeof createStopContinuationGuardHook> | null
   compactionContextInjector: ReturnType<typeof createCompactionContextInjector> | null
   compactionTodoPreserver: ReturnType<typeof createCompactionTodoPreserverHook> | null
@@ -29,6 +31,7 @@ export function createContinuationHooks(args: {
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
   backgroundManager: BackgroundManager
+  isRecoveryPending?: (sessionID: string) => boolean
 }): ContinuationHooks {
   const {
     ctx,
@@ -70,8 +73,12 @@ export function createContinuationHooks(args: {
         createUnstableAgentBabysitter({ ctx, backgroundManager, pluginConfig }))
     : null
 
+  const backgroundNotifications = createBackgroundNotificationHook(backgroundManager)
+  const backgroundTaskEvents = createBackgroundTaskEvents(
+    backgroundManager, backgroundNotifications.event, args.isRecoveryPending,
+  )
   const backgroundNotificationHook = isHookEnabled("background-notification")
-    ? safeHook("background-notification", () => createBackgroundNotificationHook(backgroundManager))
+    ? backgroundNotifications
     : null
 
   const atlasHook = isHookEnabled("atlas")
@@ -87,6 +94,7 @@ export function createContinuationHooks(args: {
     : null
 
   return {
+    backgroundTaskEvents,
     stopContinuationGuard,
     compactionContextInjector,
     compactionTodoPreserver,
