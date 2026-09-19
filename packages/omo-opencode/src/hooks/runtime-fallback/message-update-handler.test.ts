@@ -4,7 +4,9 @@ import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { getGitHubCopilotRateLimitState, isGitHubCopilotRetryPending } from "./copilot-rate-limit"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -116,13 +118,13 @@ function createRuntimeFallbackDeps(operations: string[]): HookDeps {
       restore_primary_after_cooldown: false,
     },
     options: undefined,
-    pluginConfig: {
+    pluginConfig: unsafeTestValue<NonNullable<HookDeps["pluginConfig"]>>({
       categories: {
         test: {
           fallback_models: ["litellm/openai.eu.gpt-5.5"],
         },
       },
-    },
+    }),
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
@@ -186,6 +188,45 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     ])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
   })
+
+  it("#given a Copilot 429 with delayed agent resolution #when message update handling begins #then the retry window is armed before resolution completes", async () => {
+    // given
+    const sessionID = "session-copilot-rate-limit-race"
+    const operations: string[] = []
+    let releaseAgentResolution: (() => void) | undefined
+    const agentResolution = new Promise<string | undefined>((resolve) => {
+      releaseAgentResolution = () => resolve(undefined)
+    })
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    const helpers = {
+      ...createRuntimeFallbackHelpers(deps, operations),
+      resolveAgentForSessionFromContext: async () => agentResolution,
+    }
+    const handler = createMessageUpdateHandler(deps, helpers)
+
+    // when
+    const handling = handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "github-copilot/gpt-5.5",
+        error: { statusCode: 429, response: { headers: { "Retry-After": "60" } } },
+      },
+    })
+    await Promise.resolve()
+
+    // then
+    expect(
+      isGitHubCopilotRetryPending(
+        getGitHubCopilotRateLimitState(deps),
+        "github-copilot/gpt-5.5",
+        Date.now(),
+      ),
+    ).toBe(true)
+    releaseAgentResolution?.()
+    await handling
+  })
 })
 
 
@@ -220,7 +261,8 @@ describe('Internal abort suppression guard (Layer-2)', () => {
     const deps = createRuntimeFallbackDeps(operations)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionAwaitingFallbackResult.add(sessionID)
-    deps.sessionStatusRetryKeys.set(sessionID, 'retry-key-1') // marker that visible-path would clear
+    const retryKeys = new Set(["retry-key-1"])
+    deps.sessionStatusRetryKeys.set(sessionID, retryKeys) // marker that visible-path would clear
     const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
 
     // when: assistant message update with NO error (the abort omo itself caused)
@@ -228,7 +270,7 @@ describe('Internal abort suppression guard (Layer-2)', () => {
 
     // then: guard returns early — sessionStatusRetryKeys is PRESERVED (visible-path skipped)
     // sessionAwaitingFallbackResult is also PRESERVED
-    expect(deps.sessionStatusRetryKeys.get(sessionID)).toBe('retry-key-1')
+    expect(deps.sessionStatusRetryKeys.get(sessionID)).toBe(retryKeys)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(operations).toEqual([])
   })
