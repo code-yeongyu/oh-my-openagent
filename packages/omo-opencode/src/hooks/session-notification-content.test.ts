@@ -36,6 +36,42 @@ describe("buildReadyNotificationContent", () => {
         message: "Agent is ready for input\nUser: Investigate this flaky test\nAssistant: Final answer line",
       })
     })
+
+    test("#when last assistant has gateway usage #then it appends cost tok/s and winning model", async () => {
+      const ctx = {
+        directory: "/tmp/test",
+        client: {
+          session: {
+            get: async () => ({ data: { title: "Bugfix session" } }),
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "hi" }],
+                },
+                {
+                  info: {
+                    role: "assistant",
+                    cost: 9.99,
+                    modelID: "requested-combo",
+                    usage: { cost: 0.0123, tokens_per_second: 80.5, model: "winner-model" },
+                  },
+                  parts: [{ type: "text", text: "done" }],
+                },
+              ],
+            }),
+          },
+        },
+      }
+
+      const result = await buildReadyNotificationContent(ctx, {
+        sessionID: "ses_123",
+        baseTitle: "OpenCode",
+        baseMessage: "Agent is ready for input",
+      })
+
+      expect(result.message).toContain("cost $0.0123 · tok/s 80.5 · model winner-model")
+    })
   })
 
   describe("#given session APIs do not provide rich data", () => {
