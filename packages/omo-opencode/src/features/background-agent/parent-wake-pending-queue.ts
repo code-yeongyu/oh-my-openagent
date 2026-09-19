@@ -6,6 +6,12 @@ import {
   type ParentWakePromptContext,
   type PendingParentWake,
 } from "./parent-wake-dedupe"
+import {
+  extractNotificationHeaders,
+  extractNotificationTaskIds,
+  logParentWakeLedger,
+  nextParentWakeLedgerId,
+} from "./parent-wake-ledger"
 import { unrefTimerHandle } from "./parent-wake-timer-handle"
 
 type ParentWakePendingQueueOptions = {
@@ -63,15 +69,23 @@ export class ParentWakePendingQueue {
         delete pendingWake.noReplyAdmittedAt
         delete pendingWake.noAssistantOutputRetryCount
       }
+      logParentWakeLedger("merged", sessionID, pendingWake, {
+        addedHeaders: extractNotificationHeaders([notification]),
+        addedTaskIds: extractNotificationTaskIds([notification]),
+        notificationsChanged,
+      })
       return
     }
 
-    this.pendingParentWakes.set(sessionID, {
+    const newWake: PendingParentWake = {
       promptContext: resolvedPromptContext,
       notifications: [notification],
       shouldReply,
       queuedAt: now,
-    })
+      ledgerId: nextParentWakeLedgerId(),
+    }
+    this.pendingParentWakes.set(sessionID, newWake)
+    logParentWakeLedger("queued", sessionID, newWake)
   }
 
   requeueWake(sessionID: string, latestWake: PendingParentWake): void {
@@ -97,11 +111,15 @@ export class ParentWakePendingQueue {
       if (noAssistantOutputRetryCount > 0) {
         pendingWake.noAssistantOutputRetryCount = noAssistantOutputRetryCount
       }
+      pendingWake.ledgerId ??= latestWake.ledgerId
+      logParentWakeLedger("requeued", sessionID, pendingWake, { mergedIntoPending: true })
       return
     }
     const clonedWake = cloneParentWake(latestWake)
     clonedWake.queuedAt ??= now
+    clonedWake.ledgerId ??= nextParentWakeLedgerId()
     this.pendingParentWakes.set(sessionID, clonedWake)
+    logParentWakeLedger("requeued", sessionID, clonedWake, { mergedIntoPending: false })
   }
 
   scheduleFlush(sessionID: string, operation: () => Promise<void>, delayMs?: number): void {
