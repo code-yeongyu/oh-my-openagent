@@ -1,0 +1,14 @@
+{
+  "args": [
+    "plugin",
+    "marketplace",
+    "add",
+    "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/omo-local"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm",
+  "ok": true,
+  "status": 0,
+  "stdout": "Adding marketplace...\n✔ Marketplace 'omo-local' added successfully\n{\n  \"name\": \"omo-local\",\n  \"type\": \"directory\"\n}\n",
+  "stderr": "",
+  "error": null
+}

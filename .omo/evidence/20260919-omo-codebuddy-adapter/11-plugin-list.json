@@ -1,0 +1,11 @@
+{
+  "args": [
+    "plugin",
+    "list"
+  ],
+  "ok": true,
+  "status": 0,
+  "stdout": "No plugins installed. Use `codebuddy plugin install` to install a plugin.\n",
+  "stderr": "",
+  "error": null
+}

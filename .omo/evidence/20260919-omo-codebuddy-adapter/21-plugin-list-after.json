@@ -1,0 +1,12 @@
+{
+  "args": [
+    "plugin",
+    "list"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.jmmLla20tE",
+  "ok": true,
+  "status": 0,
+  "stdout": "No plugins installed. Use `codebuddy plugin install` to install a plugin.\n",
+  "stderr": "",
+  "error": null
+}

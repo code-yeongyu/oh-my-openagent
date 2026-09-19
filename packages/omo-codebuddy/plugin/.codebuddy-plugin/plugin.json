@@ -1,0 +1,26 @@
+{
+  "name": "omo",
+  "version": "5.0.0-beta.78",
+  "description": "oh-my-openagent (omo) for CodeBuddy: ultrawork mode, ulw workflow skills, workflow agents, continuation of unfinished work plans, comment checking, and the omo MCP servers.",
+  "author": {
+    "name": "oh-my-openagent"
+  },
+  "homepage": "https://github.com/code-yeongyu/oh-my-openagent",
+  "repository": "https://github.com/code-yeongyu/oh-my-openagent",
+  "license": "MIT",
+  "keywords": [
+    "omo",
+    "oh-my-openagent",
+    "ultrawork",
+    "ulw",
+    "agents",
+    "workflow",
+    "codebuddy"
+  ],
+  "category": "开发工具",
+  "commands": ["./commands/"],
+  "agents": ["./agents/"],
+  "skills": ["./skills/"],
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
+}

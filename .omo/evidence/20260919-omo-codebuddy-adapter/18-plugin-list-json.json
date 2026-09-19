@@ -1,0 +1,13 @@
+{
+  "args": [
+    "plugin",
+    "list",
+    "--json"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm",
+  "ok": true,
+  "status": 0,
+  "stdout": "[\n  {\n    \"id\": \"omo@omo-local\",\n    \"version\": \"5.0.0-beta.78\",\n    \"scope\": \"user\",\n    \"enabled\": true,\n    \"installPath\": \"/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/cache/omo-local/omo/5.0.0-beta.78\"\n  }\n]\n",
+  "stderr": "",
+  "error": null
+}

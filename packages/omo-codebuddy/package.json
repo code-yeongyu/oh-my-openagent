@@ -1,0 +1,33 @@
+{
+  "name": "@oh-my-opencode/omo-codebuddy",
+  "version": "5.0.0-beta.78",
+  "type": "module",
+  "private": true,
+  "description": "CodeBuddy harness adapter for oh-my-openagent.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./protocol": {
+      "types": "./src/protocol/index.ts",
+      "import": "./src/protocol/index.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "bun scripts/build-plugin.mjs",
+    "build:check": "bun scripts/build-plugin.mjs --check",
+    "install:local": "bun scripts/install-local.mjs install",
+    "uninstall:local": "bun scripts/install-local.mjs uninstall",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src test"
+  },
+  "dependencies": {
+    "@oh-my-opencode/boulder-state": "workspace:*",
+    "@oh-my-opencode/comment-checker-core": "workspace:*",
+    "@oh-my-opencode/prompts-core": "workspace:*",
+    "@oh-my-opencode/shared-skills": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
+  }
+}

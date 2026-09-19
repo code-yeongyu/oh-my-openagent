@@ -1,0 +1,12 @@
+{
+  "marketplace": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/omo-local",
+  "plugin": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/omo-local/plugins/omo",
+  "mode": "copy",
+  "settingsPath": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/settings.json",
+  "nextSteps": [
+    "codebuddy plugin marketplace add /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/omo-local   # registers the local marketplace",
+    "codebuddy plugin install omo@omo-local   # installs into the versioned plugin cache",
+    "codebuddy --plugin-dir /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/omo-local/plugins/omo   # or one-shot session, no install",
+    "in a running session / the IDE: /plugin marketplace add /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm/.codebuddy/plugins/omo-local, then /plugin install omo@omo-local"
+  ]
+}

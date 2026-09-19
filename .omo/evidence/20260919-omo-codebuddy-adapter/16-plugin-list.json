@@ -1,0 +1,12 @@
+{
+  "args": [
+    "plugin",
+    "list"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.jmmLla20tE",
+  "ok": true,
+  "status": 0,
+  "stdout": "Installed plugins:\n\n  > omo@omo-local\n    Version: 5.0.0-beta.78\n    Scope: user\n    Status: enabled\n",
+  "stderr": "",
+  "error": null
+}

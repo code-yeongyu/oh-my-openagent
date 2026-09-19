@@ -1,0 +1,11 @@
+{
+  "args": [
+    "plugin",
+    "--help"
+  ],
+  "ok": true,
+  "status": 0,
+  "stdout": "Usage: codebuddy plugin [options] [command]\n\nManage CodeBuddy Code plugins\n\nOptions:\n  -h, --help                           display help for command\n\nCommands:\n  validate <path>                      Validate a plugin or marketplace\n                                       manifest\n  list|ls [options]                    List installed plugins\n  marketplace                          Manage CodeBuddy Code marketplaces\n  install|i [options] <plugin>         Install a plugin from available\n                                       marketplaces (use plugin@marketplace for\n                                       specific marketplace)\n  uninstall|remove [options] <plugin>  Uninstall an installed plugin\n  prune|autoremove [options]           Remove auto-installed dependencies that\n                                       are no longer needed\n  enable [options] <plugin>            Enable a disabled plugin\n  disable [options] <plugin>           Disable an enabled plugin\n  update [options] <plugin>            Update a plugin to the latest version\n                                       (restart required to apply)\n  help [command]                       display help for command\n",
+  "stderr": "",
+  "error": null
+}

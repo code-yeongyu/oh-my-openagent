@@ -1,0 +1,23 @@
+{
+  "scope": "user",
+  "installed": {
+    "marketplace": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/omo-codebuddy-install-nnIv6v/.codebuddy/plugins/omo-local",
+    "plugin": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/omo-codebuddy-install-nnIv6v/.codebuddy/plugins/omo-local/plugins/omo",
+    "mode": "copy"
+  },
+  "afterInstall": {
+    "marketplace": true,
+    "plugin": true,
+    "settings": true
+  },
+  "installedPluginRuns": true,
+  "removed": {
+    "marketplace": true,
+    "settingsEntry": true
+  },
+  "afterUninstall": {
+    "marketplace": false,
+    "plugin": false,
+    "settingsHasOurEntry": false
+  }
+}

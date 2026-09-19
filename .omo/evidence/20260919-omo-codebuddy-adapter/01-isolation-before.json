@@ -1,0 +1,16 @@
+{
+  "realProfile": {
+    "path": "/Users/leo/.codebuddy/settings.json",
+    "exists": true,
+    "sha256": "1b87282c077b92cdbd1f4084cc8941a09896f3ce048861d2b6774bf8cd4c4d6a",
+    "bytes": 2515
+  },
+  "realKnownMarketplaces": {
+    "path": "/Users/leo/.codebuddy/plugins/known_marketplaces.json",
+    "exists": true,
+    "sha256": "10abf60f6cc11b7b93a3452b5e012d0b36165210bcf4dc461ed1b010e9d6b7b8",
+    "bytes": 1090
+  },
+  "throwawayRoot": null,
+  "isolated": false
+}

@@ -1,0 +1,14 @@
+{
+  "args": [
+    "plugin",
+    "marketplace",
+    "remove",
+    "omo-local"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.jmmLla20tE",
+  "ok": true,
+  "status": 0,
+  "stdout": "Removing marketplace 'omo-local'...\n✔ Marketplace 'omo-local' removed successfully\n",
+  "stderr": "",
+  "error": null
+}

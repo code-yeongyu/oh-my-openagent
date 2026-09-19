@@ -1,0 +1,13 @@
+{
+  "args": [
+    "plugin",
+    "install",
+    "omo@omo-local"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.h8nBoOwiXm",
+  "ok": true,
+  "status": 0,
+  "stdout": "Installing plugin: omo@omo-local...\n✔ Successfully installed plugin: omo@omo-local. Run /reload-plugins to apply now, or start a new session.\n",
+  "stderr": "",
+  "error": null
+}

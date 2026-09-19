@@ -33,6 +33,14 @@ This is repeated on purpose, because it is the single most ignored rule in this 
 3. **RUN THE SENPI GATE:** `tsgo --noEmit -p packages/omo-senpi/tsconfig.json` then `bun run test:senpi`. This is the hermetic UNIT gate; it does NOT prove a live session — the `senpi-qa` skill does.
 4. **CONFIRM THE REAL `~/.senpi/agent` WAS NOT TOUCHED** — record the live driver's `realSenpiUntouched` / changed-path fields and isolated agent-dir path. A whole-directory digest is supporting evidence only because live debug/cache files may change. A driver reporting `SKIP` because the `senpi` binary is absent is NOT a pass; say so in the evidence.
 
+### CODEBUDDY side (`packages/omo-codebuddy/`): ALWAYS run the `codebuddy-qa` skill
+
+1. **ALWAYS RUN THE `codebuddy-qa` SKILL** (`.agents/skills/codebuddy-qa/`) to map the EXPECTED IMPACT and the FULL CHANGE SCOPE of your edit BEFORE and AFTER. It drives the REAL CodeBuddy Code CLI (`@tencent-ai/codebuddy-code`, bin `codebuddy`/`cbc`) and the BUILT plugin bundle through `.agents/skills/codebuddy-qa/scripts/drive.mjs`.
+2. **ISOLATE EVERYTHING.** Every install runs against a throwaway `--root` / `--home`; `drive.mjs isolation` digests the real `~/.codebuddy/settings.json` and `plugins/known_marketplaces.json` before AND after, and a changed digest FAILS the run. NEVER install into the real profile.
+3. **DISTINGUISH THE LAUNCHER FROM THE CLI.** `~/.codebuddy/bin/buddycn` is the CodeBuddy IDE launcher (a VS Code fork) with NO `plugin` subcommand — `codebuddy plugin validate <dir>` through it is a no-op that exits 0. `drive.mjs probe` reports `agentCliAvailable`; a launcher-only machine gets a SKIP, never a pass.
+4. **RUN THE CODEX-STYLE GATE:** `bun test packages/omo-codebuddy` + `bun scripts/build-plugin.mjs --check` + `tsgo --noEmit -p packages/omo-codebuddy/tsconfig.json`. That is the hermetic gate; it does NOT prove a live host load — `codebuddy plugin install` + `plugin list --json` (no auth needed) does, and a live model turn needs `/login` (report it PENDING until then, never as a pass).
+5. **REMEMBER THE MARKETPLACE ROOT RULE:** CodeBuddy rejects a marketplace entry whose source escapes the marketplace root (`Plugin source path escapes marketplace root`), so the installer copies; never "fix" it by symlinking.
+
 ### EVIDENCE: record it under `.omo/evidence/` or it DID NOT HAPPEN
 
 **WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). Live Senpi QA is the one scoped exception: it goes under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by the `senpi-qa` skill's script. For EVERY change you MUST record reviewer-readable plain files:

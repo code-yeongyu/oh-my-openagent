@@ -1,0 +1,13 @@
+{
+  "args": [
+    "plugin",
+    "marketplace",
+    "list"
+  ],
+  "home": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.jmmLla20tE",
+  "ok": true,
+  "status": 0,
+  "stdout": "[\n  {\n    \"name\": \"omo-local\",\n    \"type\": \"directory\",\n    \"description\": \"Local checkout of oh-my-openagent (omo) for CodeBuddy.\"\n  }\n]\n",
+  "stderr": "",
+  "error": null
+}

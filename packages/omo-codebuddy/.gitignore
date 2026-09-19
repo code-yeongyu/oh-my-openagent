@@ -1,0 +1,7 @@
+# Generated plugin artifacts (rebuild with `bun scripts/build-plugin.mjs`).
+plugin/skills/
+plugin/agents/
+plugin/commands/
+plugin/hooks/scripts/
+plugin/.mcp.json
+plugin/runtime/

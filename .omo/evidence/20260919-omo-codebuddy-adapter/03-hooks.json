@@ -1,0 +1,51 @@
+{
+  "user-prompt-submit": {
+    "status": 0,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"<ultrawork-mode>\\nULTRAWORK MODE IS ACTIVE FOR THIS TASK.\\n\\nMANDATORY BOOTSTRAP: do all three steps, in order, before anything else.\\n\\n1. The first user-visible line this turn MUST be exactly:\\n`ULTRAWORK MODE ENABLED!`\\n\\n2. Record the objective before any other tool call: if your harness exposes a goal/todo\\n   tool, create the goal with the user's request verbatim; otherwise open your reply with a\\n   binding `# Goal` block. Never skip this step.\\n\\n3. Read the FULL ultrawork directive NOW, before any other tool call, plan, or edit.\\n   It is the `ultrawork` skill of this plugin, stored at:\\n\\n/Users/leo/Desktop/code/oaauto/oh-my-openagent-wt/codebuddy-adapter/packages/omo-codebuddy/plugin/skills/ultrawork/SKILL.md\\n\\n   Read the whole file (use Read with the path above when the skill view is not enough).\\n   If a read comes back truncated, keep reading the remaining ranges until every line is\\n   seen. Every rule in that file is binding for this entire task: no compromise, no\\n   summarizing from memory, no skipping. If the file does not exist, tell the user the omo\\n   ultrawork skill is missing and continue with steps 1 and 2 plus evidence-bound execution.\\n\\nDo not start the requested work until all three steps are complete.\\n</ultrawork-mode>\"}}\n",
+    "stdoutBytes": 1355,
+    "parsed": {
+      "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": "<ultrawork-mode>\nULTRAWORK MODE IS ACTIVE FOR THIS TASK.\n\nMANDATORY BOOTSTRAP: do all three steps, in order, before anything else.\n\n1. The first user-visible line this turn MUST be exactly:\n`ULTRAWORK MODE ENABLED!`\n\n2. Record the objective before any other tool call: if your harness exposes a goal/todo\n   tool, create the goal with the user's request verbatim; otherwise open your reply with a\n   binding `# Goal` block. Never skip this step.\n\n3. Read the FULL ultrawork directive NOW, before any other tool call, plan, or edit.\n   It is the `ultrawork` skill of this plugin, stored at:\n\n/Users/leo/Desktop/code/oaauto/oh-my-openagent-wt/codebuddy-adapter/packages/omo-codebuddy/plugin/skills/ultrawork/SKILL.md\n\n   Read the whole file (use Read with the path above when the skill view is not enough).\n   If a read comes back truncated, keep reading the remaining ranges until every line is\n   seen. Every rule in that file is binding for this entire task: no compromise, no\n   summarizing from memory, no skipping. If the file does not exist, tell the user the omo\n   ultrawork skill is missing and continue with steps 1 and 2 plus evidence-bound execution.\n\nDo not start the requested work until all three steps are complete.\n</ultrawork-mode>"
+      }
+    }
+  },
+  "session-start": {
+    "status": 0,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"<omo-workflows>\\nThe omo CodeBuddy plugin is installed. Its workflows are available as skills: ulw-plan, ulw-execute, ulw-loop, ulw-research, init-deep, review-work.\\nUse them by name when the user asks for the matching workflow (for example \\\"ulw-plan this change\\\" or \\\"init-deep this repo\\\"), or through `/omo:<workflow>`.\\nInstalling the plugin also enables automatic behaviors: ultrawork mode on an `ultrawork`/`ulw` prompt, skill pointers on workflow mentions, continuation of unfinished omo work plans when a turn ends early, and comment checking after edits.\\n</omo-workflows>\"}}\n",
+    "stdoutBytes": 663,
+    "parsed": {
+      "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": "<omo-workflows>\nThe omo CodeBuddy plugin is installed. Its workflows are available as skills: ulw-plan, ulw-execute, ulw-loop, ulw-research, init-deep, review-work.\nUse them by name when the user asks for the matching workflow (for example \"ulw-plan this change\" or \"init-deep this repo\"), or through `/omo:<workflow>`.\nInstalling the plugin also enables automatic behaviors: ultrawork mode on an `ultrawork`/`ulw` prompt, skill pointers on workflow mentions, continuation of unfinished omo work plans when a turn ends early, and comment checking after edits.\n</omo-workflows>"
+      }
+    }
+  },
+  "stop": {
+    "status": 0,
+    "stdout": "",
+    "stdoutBytes": 0,
+    "parsed": null
+  },
+  "post-tool-use": {
+    "status": 0,
+    "stdout": "",
+    "stdoutBytes": 0,
+    "parsed": null
+  },
+  "_empty": {
+    "status": 0,
+    "stdout": "",
+    "stdoutBytes": 0,
+    "parsed": null
+  },
+  "stop_unfinished_work": {
+    "status": 0,
+    "stdout": "{\"continue\":false,\"reason\":\"The ulw-execute work plan for this session is still unfinished. The turn ended before the plan was completed, so resume it now:\\n1. Read the plan at /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/omo-codebuddy-continuation-lptzxP/plan.md and reload its checklist.\\n2. Continue the remaining unchecked items in this session (`codebuddy:qa-session`), one item at a time, keeping the plan checkboxes updated as each one is proven.\\n3. Record evidence for every acceptance criterion (command, observed result, artifact path) before checking an item off.\\nDo not restart finished work and do not rewrite the plan structure.\\nIf the work is genuinely blocked on the user, stop and say exactly what is blocking and what you need.\"}\n",
+    "stdoutBytes": 755,
+    "parsed": {
+      "continue": false,
+      "reason": "The ulw-execute work plan for this session is still unfinished. The turn ended before the plan was completed, so resume it now:\n1. Read the plan at /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/omo-codebuddy-continuation-lptzxP/plan.md and reload its checklist.\n2. Continue the remaining unchecked items in this session (`codebuddy:qa-session`), one item at a time, keeping the plan checkboxes updated as each one is proven.\n3. Record evidence for every acceptance criterion (command, observed result, artifact path) before checking an item off.\nDo not restart finished work and do not rewrite the plan structure.\nIf the work is genuinely blocked on the user, stop and say exactly what is blocking and what you need."
+    }
+  }
+}

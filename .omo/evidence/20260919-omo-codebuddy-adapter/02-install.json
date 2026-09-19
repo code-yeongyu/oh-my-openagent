@@ -1,0 +1,11 @@
+{
+  "marketplace": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.FThjQB8n4j/.codebuddy/plugins/omo-local",
+  "plugin": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.FThjQB8n4j/.codebuddy/plugins/omo-local/plugins/omo",
+  "mode": "symlink",
+  "settingsPath": "/var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.FThjQB8n4j/.codebuddy/settings.json",
+  "nextSteps": [
+    "codebuddy --plugin-dir /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.FThjQB8n4j/.codebuddy/plugins/omo-local/plugins/omo",
+    "then in a session: /plugin marketplace add /var/folders/w1/32_78tdn49gdmbh74wplgtf40000gn/T/tmp.FThjQB8n4j/.codebuddy/plugins/omo-local",
+    "then: /plugin install omo@omo-local"
+  ]
+}
