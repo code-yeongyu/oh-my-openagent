@@ -271,6 +271,7 @@ export class BackgroundManager {
   private completedTaskArchive: Map<string, BackgroundTask> = new Map()
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private cancellationEvents: Map<string, Event[]> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private readonly parentWakeNotifier: ParentWakeNotifier
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
@@ -1574,6 +1575,24 @@ The fallback retry session is now created and can be inspected directly.
     this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
+  private deferCancellationEvent(task: BackgroundTask, event: Event): void {
+    const events = this.cancellationEvents.get(task.id) ?? []
+    if (!events.some((pendingEvent) => pendingEvent.type === event.type)) {
+      events.push(event)
+      this.cancellationEvents.set(task.id, events)
+    }
+  }
+
+  private replayCancellationEvents(taskID: string): void {
+    const events = this.cancellationEvents.get(taskID)
+    this.cancellationEvents.delete(taskID)
+    for (const event of events ?? []) this.handleEvent(event)
+  }
+
+  private discardCancellationEvents(taskID: string): void {
+    this.cancellationEvents.delete(taskID)
+  }
+
 
   private shouldHoldDispatchedParentWakeForTextDelta(
     eventType: string,
@@ -1672,6 +1691,10 @@ The fallback retry session is now created and can be inspected directly.
 
       const { task } = resolved
       if (task.status !== "running") return
+      if (task.cancellationRequested) {
+        this.deferCancellationEvent(task, event)
+        return
+      }
 
       const assistantError = info.error
       if (!assistantError) return
@@ -1820,6 +1843,11 @@ The fallback retry session is now created and can be inspected directly.
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
       const sessionID = resolveSessionEventID(props)
+      const resolved = sessionID ? this.resolveTaskAttemptBySession(sessionID) : undefined
+      if (resolved?.isCurrent && resolved.task.cancellationRequested) {
+        this.deferCancellationEvent(resolved.task, event)
+        return
+      }
       if (sessionID) {
         void this.enqueueNotificationForParent(sessionID, () => this.flushPendingParentWake(sessionID)).catch((error) => {
           log("[background-agent] Failed to flush pending parent wake:", { sessionID, error })
@@ -1857,6 +1885,14 @@ The fallback retry session is now created and can be inspected directly.
 
       const { task } = resolved
       if (task.status !== "running") return
+      if (task.cancellationRequested) {
+        this.deferCancellationEvent(task, event)
+        log("[background-agent] Ignoring session.error during task cancellation:", {
+          taskId: task.id,
+          sessionID,
+        })
+        return
+      }
 
       const errorObj = props?.error as { name?: string; message?: string } | undefined
       const errorName = errorObj?.name
@@ -2404,6 +2440,7 @@ The task was re-queued on a fallback model after a retryable failure.
     if (!task || (task.status !== "running" && task.status !== "pending")) {
       return false
     }
+    if (task.cancellationRequested) return false
 
     const source = options?.source ?? "cancel"
     const abortSession = options?.abortSession !== false
@@ -2429,9 +2466,21 @@ The task was re-queued on a fallback model after a retryable failure.
 
     const wasRunning = task.status === "running"
     if (wasRunning && abortSession && task.sessionId) {
+      task.cancellationRequested = true
+      log("[background-agent] Task cancellation requested:", {
+        taskId: task.id,
+        sessionID: task.sessionId,
+        source,
+      })
       const aborted = await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
-      if (!aborted) return false
+      if (!aborted) {
+        task.cancellationRequested = undefined
+        this.replayCancellationEvents(task.id)
+        return false
+      }
 
+      task.cancellationRequested = undefined
+      this.discardCancellationEvents(task.id)
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
@@ -2550,7 +2599,7 @@ The task was re-queued on a fallback model after a retryable failure.
    */
   private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
     // Guard: Check if task is still running (could have been completed by another path)
-    if (task.status !== "running") {
+    if (task.status !== "running" || task.cancellationRequested) {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
       return false
     }
@@ -2603,6 +2652,11 @@ The task was re-queued on a fallback model after a retryable failure.
         clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
 
+        log("[background-agent] Task completion cleanup abort requested:", {
+          taskId: task.id,
+          sessionID: task.sessionId,
+          source,
+        })
         // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
         await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
@@ -3215,6 +3269,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.idleDeferralTimers.clear()
 
     this.parentWakeNotifier.shutdown()
+    this.cancellationEvents.clear()
 
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
