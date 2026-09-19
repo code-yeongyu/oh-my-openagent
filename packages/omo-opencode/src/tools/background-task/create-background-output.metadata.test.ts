@@ -26,9 +26,10 @@ describe("createBackgroundOutput metadata", () => {
     expect(description).not.toContain("Returns task_id")
   })
 
-  test("describes task_id as a background task id instead of a session id", () => {
+  test("describes task_id as a background task id with session-ID fallback", () => {
     // #given
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: () => undefined,
     }
     const client: BackgroundOutputClient = {
@@ -44,8 +45,8 @@ describe("createBackgroundOutput metadata", () => {
     // #then
     expect(taskIdArg.description).toContain("background task ID")
     expect(taskIdArg.description).toContain("bg_")
-    expect(taskIdArg.description).toContain("not a session ID")
     expect(taskIdArg.description).toContain("ses_")
+    expect(taskIdArg.description).toContain("fallback")
   })
 
   test("omits sessionId metadata when task session is not yet assigned", async () => {
@@ -63,6 +64,7 @@ describe("createBackgroundOutput metadata", () => {
       status: "running",
     }
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: id => (id === task.id ? task : undefined),
     }
     const client: BackgroundOutputClient = {
@@ -113,6 +115,7 @@ describe("createBackgroundOutput metadata", () => {
       status: "completed",
     }
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: id => (id === task.id ? task : undefined),
     }
     const client: BackgroundOutputClient = {
@@ -137,8 +140,7 @@ describe("createBackgroundOutput metadata", () => {
     const output = await tool.execute({ task_id: "ses-child-task" }, context)
 
     // #then
-    expect(output).toContain("background_output expects a background task ID")
-    expect(output).toContain("bg_")
+    expect(output).toContain("No background task is registered for this session ID")
     expect(output).toContain('session_read(session_id="ses-child-task")')
   })
 })
