@@ -1,0 +1,68 @@
+{
+  "base": "c43a34195babfb8555cd9512ff4a71bbf7724cc1",
+  "realOpenCodeQaBase": "9af447adae9d0a551c777a9d0948848485e516ad",
+  "bunVersion": "1.4.2",
+  "opencodeVersion": "1.18.29",
+  "failingFirst": {
+    "passed": 202,
+    "failed": 5,
+    "expectedFailures": 5,
+    "sourceErrorLength": 513039
+  },
+  "backgroundAgentSuite": {
+    "passed": 771,
+    "failed": 0,
+    "expectations": 1976,
+    "files": 65
+  },
+  "typecheck": {
+    "passed": true,
+    "scope": "root, script, and workspace packages"
+  },
+  "build": {
+    "passed": true
+  },
+  "realOpenCodeQa": {
+    "passed": true,
+    "providerCounts": {
+      "parentToolCall": 1,
+      "parentAfterTool": 1,
+      "childError": 3,
+      "wake": 1
+    },
+    "notificationKinds": [
+      "retry",
+      "all-finished"
+    ],
+    "renderedErrorLengths": [
+      2000,
+      2000
+    ],
+    "markerOriginalLength": 513039,
+    "diagnosticPrefixPresent": true,
+    "tailSentinelPresent": false,
+    "fullErrorPresentInParentRequest": false,
+    "retryNotificationLength": 5056,
+    "combinedNotificationLength": 18738,
+    "parentRequestBodyLength": 126543,
+    "sse": {
+      "pluginAdded": 45,
+      "sessionError": 3,
+      "parseErrors": 0
+    },
+    "sandboxDatabase": {
+      "sessions": 4,
+      "messages": 12,
+      "parts": 15
+    },
+    "isolation": {
+      "realSessionCountBefore": 12,
+      "realSessionCountAfter": 12,
+      "unchanged": true
+    },
+    "processCleanup": {
+      "opencodeServeStopped": true,
+      "fakeProviderStopped": true
+    }
+  }
+}
