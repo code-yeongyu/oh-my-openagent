@@ -13,13 +13,13 @@
 | Tier | Composer | Base | With team-mode | Where |
 |------|----------|------|----------------|-------|
 | **Session** | `create-session-hooks.ts` | 24 | 24 | OpenCode session lifecycle + chat.params + chat.message |
-| **Tool Guard** | `create-tool-guard-hooks.ts` | 17 | 18 | Pre/post tool execution (+1: `team-tool-gating`) |
+| **Tool Guard** | `create-tool-guard-hooks.ts` | 18 | 19 | Pre/post tool execution (+1: `team-tool-gating`) |
 | **Transform** | `create-transform-hooks.ts` | 4 | 6 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`; `monitor-status-injector` is a further +1 gated on `monitor.enabled`, not team-mode) |
 | **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
 | **Skill** | `create-skill-hooks.ts` | 2 | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
 | **Direct event handlers** | `src/plugin/event.ts` | 0 | +4 | `team-session-events/` sub-files: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 
-Total exposed hooks: **54 base, 61 with team-mode, 62 with team-mode + monitor** (counts the 4 team-session-events handlers individually).
+Total exposed hooks: **55 base, 62 with team-mode, 63 with team-mode + monitor** (counts the 4 team-session-events handlers individually).
 
 Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](../config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema -- they activate together with `team_mode.enabled`.
 
@@ -51,7 +51,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `runtimeFallback` | event | Reactive auto-switch on API provider errors |
 | `legacyPluginToast` | chat.message | Show toast when legacy plugin name detected |
 
-### Tier 2: Tool Guard Hooks (17)
+### Tier 2: Tool Guard Hooks (18)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -72,6 +72,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `fsyncSkipWarning` | tool.execute.after | Warn when fsync is skipped for atomic writes |
 | `notepadWriteGuard` | tool.execute.before | Block `Write` to append-only notepad paths (`.omo/notepads`, `.sisyphus/notepads`) |
 | `planFormatValidator` | tool.execute.before | Validate plan/todo checkbox format on `Write`/`Edit` of boulder plans |
+| `verificationReminder` | tool.execute.after + event | Prompt user to verify alignment after file edits; triggers on `session.idle` |
 
 ### Tier 3: Transform Hooks (4 base + 1 monitor-gated)
 
