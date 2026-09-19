@@ -3,7 +3,7 @@ import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 import type { ChildEventListener } from "../types"
 import { createHostSessionHandle } from "./handle"
 import type { HostSessionChildHandle, HostSessionLiveness, HostSessionPort } from "./handle-port"
-import type { HostSessionClient, HostSessionClosed, HostSessionCommand, HostSessionParked } from "./session-client"
+import { HostSessionDetachedError, type HostSessionClient, type HostSessionClosed, type HostSessionCommand, type HostSessionParked } from "./session-client"
 import { childOpenInput } from "./session-client.test-support"
 
 /** The fixture's session identity: the same triple a record stores as `host_session`. */
@@ -30,6 +30,10 @@ export interface FakeSessionPort extends HostSessionPort {
   stateAsked(): Promise<void>
   /** Answer that read; awaiting the returned promise runs after the handle consumed it. */
   answerState(liveness: HostSessionLiveness): Promise<HostSessionLiveness>
+  /** Resolves once the handle's heartbeat has attempted `count` state reads - a tick observed, never polled for. */
+  stateRead(count: number): Promise<void>
+  /** Mirror a real `SessionClient` after its connection dropped: every state read now throws in place. */
+  failStateWithSyncThrow(): void
 }
 
 /**
@@ -46,6 +50,9 @@ export function fakeSessionPort(
   const transport = Promise.withResolvers<unknown>()
   const stateAsked = Promise.withResolvers<void>()
   const stateAnswer = Promise.withResolvers<HostSessionLiveness>()
+  const stateReadWaiters: Array<{ count: number; resolve: () => void }> = []
+  let stateReadCount = 0
+  let failStateSync = false
   let closes = 0
   let detaches = 0
   return {
@@ -65,7 +72,15 @@ export function fakeSessionPort(
       return answer(command)
     },
     getState: () => {
+      stateReadCount += 1
+      for (let index = stateReadWaiters.length - 1; index >= 0; index -= 1) {
+        const waiter = stateReadWaiters[index]
+        if (waiter === undefined || waiter.count !== stateReadCount) continue
+        stateReadWaiters.splice(index, 1)
+        waiter.resolve()
+      }
       stateAsked.resolve()
+      if (failStateSync) throw new HostSessionDetachedError("get_state")
       return stateAnswer.promise
     },
     onEvent: (listener) => {
@@ -102,6 +117,13 @@ export function fakeSessionPort(
     answerState: (liveness) => {
       stateAnswer.resolve(liveness)
       return stateAnswer.promise
+    },
+    stateRead: (count) =>
+      stateReadCount >= count
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => stateReadWaiters.push({ count, resolve })),
+    failStateWithSyncThrow: () => {
+      failStateSync = true
     },
   }
 }

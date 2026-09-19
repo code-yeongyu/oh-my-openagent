@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { ChildExitFacts } from "../types"
 import { classifySessionExit, type SessionExitClassification, type SessionExitInput } from "./exit-mapping"
-import { openHostSessionHandle } from "./handle.test-support"
+import { FAKE_SESSION, fakeSessionPort, handleOverPort, openHostSessionHandle } from "./handle.test-support"
 import type { HostSessionParked } from "./session-client"
 import { sessionClientHarness } from "./session-client.test-support"
 
@@ -289,5 +289,24 @@ describe("createHostSessionHandle over a daemon session", () => {
     expect(host.sessions().map((session) => session.sessionPath)).toEqual(["/tmp/sessions/i.jsonl"])
     expect(handle.exitOutcome()).toBeUndefined()
     expect(handle.attached).toBe(false)
+  })
+})
+
+describe("host session heartbeat resilience", () => {
+  test("#given a connection that dropped under the beat #when the heartbeat reads state #then the in-place throw is contained and the child still exits cleanly", async () => {
+    // given: a real SessionClient throws `HostSessionDetachedError` in place - it never returns a
+    // rejected promise - so a beat tick racing teardown used to escape the timer callback as an
+    // uncaughtException and killed the parent. The fixture mirrors exactly that throw.
+    const port = fakeSessionPort()
+    const handle = handleOverPort(port, 5)
+    port.failStateWithSyncThrow()
+
+    // when: two beat ticks attempt the doomed read
+    await port.stateRead(2)
+
+    // then: nothing escaped the timer callback, and the child still reaches its daemon-driven exit
+    port.emitClosed({ sessionId: FAKE_SESSION.routingId, reason: "host_shutdown" })
+    expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts("host_shutdown") })
+    await handle.dispose()
   })
 })
