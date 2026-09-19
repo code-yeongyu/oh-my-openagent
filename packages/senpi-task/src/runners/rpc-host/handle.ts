@@ -65,15 +65,23 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
 
   const heartbeat = setInterval(() => {
     if (outcome !== undefined || parked || detached) return
-    client
-      .getState()
-      .then((state) => {
-        lastSeenAt = now()
-        sessionId = state.sessionId
-      })
-      .catch((error: unknown) => {
-        log("senpi-task host session heartbeat get_state failed", { taskId, error: String(error) })
-      })
+    // `SessionClient.getState` throws in place - it does not return a rejected promise - once the
+    // connection is gone, and teardown can detach the client before `settleExit` stops this beat.
+    // A throw escaping the timer callback is an uncaughtException that takes the whole host down,
+    // so the sync throw is caught here and the rejection path is logged below.
+    try {
+      client
+        .getState()
+        .then((state) => {
+          lastSeenAt = now()
+          sessionId = state.sessionId
+        })
+        .catch((error: unknown) => {
+          log("senpi-task host session heartbeat get_state failed", { taskId, error: String(error) })
+        })
+    } catch (error) {
+      log("senpi-task host session heartbeat get_state failed", { taskId, error: String(error) })
+    }
   }, heartbeatIntervalMs)
   heartbeat.unref?.()
 
@@ -163,6 +171,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const endOnHost = async (next: "closed" | "terminated"): Promise<void> => {
     if (outcome !== undefined) return
     intent = next
+    // `client.close()` drops the connection before the classification below stops the beat; stop
+    // it up front so no tick lands on a client this teardown has already detached.
+    clearInterval(heartbeat)
     if (next === "terminated") await settleWithin(bestEffort(client.send({ type: "abort" }), "abort"), ABORT_GRACE_MS)
     await settleWithin(bestEffort(client.close(), "close_session"), closeGraceMs)
     // A teardown this client asked for always ends the child - including a session the daemon had
