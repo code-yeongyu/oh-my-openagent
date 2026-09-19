@@ -1,0 +1,53 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/agent-dir.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+131 |         write(join(legacyFlatAgentDir(home), "settings.json"), FLAT_SETTINGS)
+132 | 
+133 |         const result = adoptLegacyFlatState({ SENPI_CODING_AGENT_DIR: join(home, ".senpi", "agent") }, home)
+134 | 
+135 |         const canonical = canonicalAgentDir({}, home)
+136 |         expect(result.adopted).toBe(true)
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6717/packages/omo-native/test/agent-dir.test.ts:136:32)
+(fail) omo agent directory > #given a stale legacy engine variable exported by the shell > #when the launcher adopts the flat state > #then the carry-forward still lands in the canonical branded directory [1.70ms]
+
+packages/omo-native/test/launcher.test.ts:
+211 |           HOME: home,
+212 |           SENPI_CODING_AGENT_DIR: join(home, ".senpi", "agent"),
+213 |         })
+214 |         expect(result.status).toBe(0)
+215 |         const environment = capture(fixture).env
+216 |         expect(environment.OMO_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+                                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-launcher-wIYypW/home/.omo/agent"
+Received: "/tmp/omo-launcher-wIYypW/home/.senpi/agent"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6717/packages/omo-native/test/launcher.test.ts:216:50)
+(fail) omo launcher > #given a fake senpi package > #given a shell that still exports a legacy engine agent-dir variable > #then state resolves to the canonical branded directory instead of the legacy one [894.72ms]
+224 |           HOME: home,
+225 |           PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
+226 |         })
+227 |         expect(result.status).toBe(0)
+228 |         const environment = capture(fixture).env
+229 |         expect(environment.OMO_CODING_AGENT_DIR).toBe(join(home, ".omo", "agent"))
+                                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/omo-launcher-4n2Y8K/home/.omo/agent"
+Received: "/tmp/omo-launcher-4n2Y8K/home/.pi/agent"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6717/packages/omo-native/test/launcher.test.ts:229:50)
+(fail) omo launcher > #given a fake senpi package > #given a shell that still exports a legacy engine agent-dir variable > #then an inherited pi variable does not hijack the directory either [808.99ms]
+
+ 48 pass
+ 3 fail
+ 162 expect() calls
+Ran 51 tests across 2 files. [44.36s]
