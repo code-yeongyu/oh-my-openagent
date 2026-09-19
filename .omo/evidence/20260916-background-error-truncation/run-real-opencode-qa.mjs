@@ -104,16 +104,16 @@ async function stopProcess(child) {
   }
 }
 
-function basicAuth(password) {
-  return `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`
+function basicAuth(credential) {
+  return `Basic ${Buffer.from(`opencode:${credential}`).toString("base64")}`
 }
 
-async function postJson(url, password, body) {
+async function postJson(url, credential, body) {
   const response = await fetch(url, {
     method: "POST",
     signal: AbortSignal.timeout(60_000),
     headers: {
-      authorization: basicAuth(password),
+      authorization: basicAuth(credential),
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -133,9 +133,9 @@ function eventSessionId(properties) {
     ?? null
 }
 
-async function watchSse(url, password, signal, eventSummary) {
+async function watchSse(url, credential, signal, eventSummary) {
   const response = await fetch(url, {
-    headers: { authorization: basicAuth(password) },
+    headers: { authorization: basicAuth(credential) },
     signal,
   })
   if (!response.ok || !response.body) {
@@ -229,7 +229,7 @@ const sandboxEnv = {
 
 const fakePort = await getFreePort()
 const servePort = await getFreePort()
-const password = `qa-${Date.now()}-${Math.random().toString(16).slice(2)}`
+const serverCredential = `qa-${Date.now()}-${Math.random().toString(16).slice(2)}`
 const pluginUrl = pathToFileURL(path.join(worktree, "packages/omo-opencode/src/index.ts")).href
 const fakeModelConfig = {
   tool_call: true,
@@ -315,19 +315,19 @@ try {
 
   serveProcess = spawn(opencodeExe, ["serve", "--port", String(servePort), "--hostname", "127.0.0.1", "--print-logs", "--log-level", "INFO"], {
     cwd: sandbox.project,
-    env: { ...sandboxEnv, OPENCODE_SERVER_PASSWORD: password },
+    env: { ...sandboxEnv, OPENCODE_SERVER_PASSWORD: serverCredential },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   })
   attachSanitizedLog(serveProcess.stdout, serveLogFile)
   attachSanitizedLog(serveProcess.stderr, serveLogFile)
   const serverUrl = `http://127.0.0.1:${servePort}`
-  await waitForHttp(`${serverUrl}/global/health`, { headers: { authorization: basicAuth(password) } }, 60_000)
+  await waitForHttp(`${serverUrl}/global/health`, { headers: { authorization: basicAuth(serverCredential) } }, 60_000)
 
   sseAbort = new AbortController()
   ssePromise = watchSse(
     `${serverUrl}/event?directory=${encodeURIComponent(sandbox.project)}`,
-    password,
+    serverCredential,
     sseAbort.signal,
     eventSummary,
   ).catch((error) => {
@@ -337,7 +337,7 @@ try {
 
   const session = await postJson(
     `${serverUrl}/session?directory=${encodeURIComponent(sandbox.project)}`,
-    password,
+    serverCredential,
     { title: "background error truncation QA" },
   )
   parentSessionId = session?.id ?? session?.sessionID ?? null
@@ -345,7 +345,7 @@ try {
 
   await postJson(
     `${serverUrl}/session/${parentSessionId}/prompt_async?directory=${encodeURIComponent(sandbox.project)}`,
-    password,
+    serverCredential,
     {
       parts: [{
         type: "text",
