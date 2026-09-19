@@ -40,6 +40,7 @@ export interface SessionState {
   inFlight?: boolean
   stagnationCount: number
   consecutiveFailures: number
+  consecutiveProviderFailures?: number
   allTodosCompletedAt?: number
   recentCompactionAt?: number
   recentCompactionEpoch?: number
