@@ -6,7 +6,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": true, "resolveJsonModule": true,
     "lib": ["ESNext"],
     "types": ["bun-types"]
   },
