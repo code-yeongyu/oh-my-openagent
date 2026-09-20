@@ -271,6 +271,9 @@ export class BackgroundManager {
   private completedTaskArchive: Map<string, BackgroundTask> = new Map()
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  /** Absolute liveness backstop for a running attempt (see armTaskDeadline). */
+  private readonly taskHardDeadlineMs = 60 * 60 * 1000
+  private taskDeadlineTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private readonly parentWakeNotifier: ParentWakeNotifier
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
@@ -1309,6 +1312,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.addTask(task)
+    this.armTaskDeadline(task)
     subagentSessions.add(input.sessionId)
     this.startPolling()
     this.taskHistory.record(input.parentSessionId, { id: task.id, sessionID: input.sessionId, agent: input.agent || "task", description: input.description, status: "running", startedAt: task.startedAt })
@@ -1370,6 +1374,7 @@ The fallback retry session is now created and can be inspected directly.
     // Reset startedAt on resume to prevent immediate completion
     // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
     existingTask.startedAt = new Date()
+    this.armTaskDeadline(existingTask)
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
@@ -2970,6 +2975,35 @@ The task was re-queued on a fallback model after a retryable failure.
     return verifySessionStillExists(this.client, sessionID, this.directory)
   }
 
+  /**
+   * Absolute liveness backstop. Activity reads can fail (`session-activity` returns
+   * `unavailable` on an SDK/receiver error, which suppresses stale interruption) and the
+   * poll loop can be wedged by an awaited SDK call; in both cases a running attempt is
+   * never reported terminal and the task strands indefinitely. Arm one timer per running
+   * attempt; the callback re-checks status and the attempt token, so a stale timer can
+   * never fail a resumed attempt.
+   */
+  private armTaskDeadline(task: BackgroundTask): void {
+    const existing = this.taskDeadlineTimers.get(task.id)
+    if (existing) clearTimeout(existing)
+    const attemptID = task.currentAttemptID
+    const timer = setTimeout(() => {
+      this.taskDeadlineTimers.delete(task.id)
+      if (task.status !== "running") return
+      if (task.currentAttemptID !== attemptID) return
+      log("[background-agent] Task exceeded the hard deadline; reporting it as failed", {
+        taskId: task.id,
+        sessionID: task.sessionId,
+        deadlineMs: this.taskHardDeadlineMs,
+      })
+      void this.failCrashedTask(
+        task,
+        `Task exceeded the hard deadline of ${Math.round(this.taskHardDeadlineMs / 60000)} minutes without reaching a terminal state.`,
+      )
+    }, this.taskHardDeadlineMs)
+    this.taskDeadlineTimers.set(task.id, timer)
+  }
+
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "error", errorMessage)
@@ -2996,6 +3030,11 @@ The task was re-queued on a fallback model after a retryable failure.
     if (idleTimer) {
       clearTimeout(idleTimer)
       this.idleDeferralTimers.delete(task.id)
+    }
+    const deadlineTimer = this.taskDeadlineTimers.get(task.id)
+    if (deadlineTimer) {
+      clearTimeout(deadlineTimer)
+      this.taskDeadlineTimers.delete(task.id)
     }
 
     this.cleanupPendingByParent(task)
