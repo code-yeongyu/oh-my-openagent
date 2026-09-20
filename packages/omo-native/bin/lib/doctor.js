@@ -121,6 +121,7 @@ function engineVersionOrUnresolved(senpi) {
 // the unbundled spelling made the whole report blind to the sessions it exists to find.
 const ENGINE_MARKERS = ["senpi/dist/cli.js", "senpi/dist/bundle/cli.js"]
 const MANAGED_MODE_FLAG = "--mode"
+const TEST_REPORT_PROCESS_TABLE_ENV = "OMO_TEST_DOCTOR_PROCESS_TABLE_JSON"
 
 /**
  * Reads the live process table. `ps` is the portable answer on macOS and Linux alike, and reading
@@ -144,6 +145,28 @@ function listProcesses() {
     })
   }
   return entries
+}
+
+function reportProcessList(options) {
+  if (options.list !== undefined) return options.list
+  if (!Object.hasOwn(process.env, TEST_REPORT_PROCESS_TABLE_ENV)) return listProcesses
+  return () => {
+    try {
+      const entries = JSON.parse(process.env[TEST_REPORT_PROCESS_TABLE_ENV])
+      if (!Array.isArray(entries) || !entries.every((entry) =>
+        entry !== null
+        && typeof entry === "object"
+        && Number.isSafeInteger(entry.pid)
+        && Number.isSafeInteger(entry.ppid)
+        && typeof entry.elapsed === "string"
+        && typeof entry.tty === "string"
+        && typeof entry.command === "string"
+      )) return []
+      return entries
+    } catch {
+      return []
+    }
+  }
 }
 
 function isEngine(entry) {
@@ -291,7 +314,7 @@ export function reapStaleEngines(args, options = {}) {
 }
 
 function staleEngineReport(options) {
-  const list = options.list ?? listProcesses
+  const list = reportProcessList(options)
   return formatStaleEngineLines(classifyEngineProcesses(list()).stale)
 }
 
@@ -356,7 +379,7 @@ function transientMemoryReport(options) {
 }
 
 function retiredPayloadReport(options) {
-  const list = options.list ?? listProcesses
+  const list = reportProcessList(options)
   const now = options.now ?? Date.now
   const payloadMtimeMs = options.payloadMtimeMs ?? ((payloadDir) => {
     try {
