@@ -1,0 +1,17 @@
+WHAT WAS TESTED
+- `node -r windows-posix-mkdir-preload.cjs packages/omo-senpi/scripts/qa/drive.mjs --self-test`
+- `node -r windows-posix-mkdir-preload.cjs packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs --self-test`
+- `SENPI_BIN=<worktree senpi.exe> node -r windows-posix-mkdir-preload.cjs packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs`
+
+WHAT WAS OBSERVED
+- Both deterministic driver self-tests printed `SELF-TEST OK` and exited 0.
+- The repository driver requires POSIX `mkdir -p`; on Windows the evidence-local preload maps only that call to recursive `mkdirSync`. Product code is unchanged.
+- The full RPC driver reached the real Senpi binary but reported FAIL before task persistence because the tracked OMO extension could not load on this Windows host: `uv_os_get_passwd returned ENOMEM`.
+- That failure reproduced with both freshly generated and tracked extension bundles.
+- In every full-driver attempt, `realCredentialsUntouched` was true, the whole real agent-directory digest was stable, the sandbox agent directory was distinct, and `leakedPids` was 0.
+
+WHY IT IS ENOUGH
+The driver controls and cleanup/isolation checks are sound on this host. The host-specific extension-loader failure prevents the broad RPC lifecycle scenario from reaching this patch's code, so it is not counted as behavioral proof; `live-model-catalog-result.txt` supplies the direct real-Senpi proof instead.
+
+WHAT WAS OMITTED
+Absolute machine paths, randomized sandbox suffixes, and raw stderr beyond the one relevant error were summarized. No credentials, auth files, environment dumps, or session transcripts were retained.
