@@ -1,0 +1,17 @@
+scenario	model	http_status	agent	runtime_name	resolved_model	classification	prompt_bytes	prompt_sha256
+target-k3-256k	kimi-for-coding/k3-256k	200	sisyphus	Sisyphus - ultraworker	kimi-for-coding/k3-256k	kimi-k3	27278	98eec64195cfc105e22b6a8c1cabaee314cfb03c9774ecf3926e2bb1e6a81489
+target-k3-256k	kimi-for-coding/k3-256k	200	sisyphus-junior	Sisyphus-Junior	kimi-for-coding/k3-256k	kimi-k3	7954	5acc6aaf4ff71df809534d1258b4df848b6a9200de52bd95ad6dffab95b46abd
+target-k3-256k	kimi-for-coding/k3-256k	200	atlas	Atlas - Plan Executor	kimi-for-coding/k3-256k	kimi-k3	28600	700df5647fed339ab7e7feedee6589045a2063f459a132596eb81afdb49cc83e
+target-k3-256k	kimi-for-coding/k3-256k	200	metis	Metis - Plan Consultant	kimi-for-coding/k3-256k	base	13402	58ff8336284e59e3adbb5e17f477736a0dac699ecd82c9637b135bbea9a53218
+positive-k3	opencode-go/kimi-k3	200	sisyphus	Sisyphus - ultraworker	opencode-go/kimi-k3	kimi-k3	27278	98eec64195cfc105e22b6a8c1cabaee314cfb03c9774ecf3926e2bb1e6a81489
+positive-k3	opencode-go/kimi-k3	200	sisyphus-junior	Sisyphus-Junior	opencode-go/kimi-k3	kimi-k3	7954	5acc6aaf4ff71df809534d1258b4df848b6a9200de52bd95ad6dffab95b46abd
+positive-k3	opencode-go/kimi-k3	200	atlas	Atlas - Plan Executor	opencode-go/kimi-k3	kimi-k3	28600	700df5647fed339ab7e7feedee6589045a2063f459a132596eb81afdb49cc83e
+positive-k3	opencode-go/kimi-k3	200	metis	Metis - Plan Consultant	opencode-go/kimi-k3	base	13402	58ff8336284e59e3adbb5e17f477736a0dac699ecd82c9637b135bbea9a53218
+k2-control	opencode-go/kimi-k2.7-code	200	sisyphus	Sisyphus - ultraworker	opencode-go/kimi-k2.7-code	kimi-k2-7	26238	c97f4d8cb320b1c01d3bc1a3f9c879cacb0ebfcaeec549a400f3a371cb116ffc
+k2-control	opencode-go/kimi-k2.7-code	200	sisyphus-junior	Sisyphus-Junior	opencode-go/kimi-k2.7-code	kimi-k2-7	7285	0d3e95d75c83f21d1cad4be0bead35570c7f8c82f13e3c48324aeccdd3999416
+k2-control	opencode-go/kimi-k2.7-code	200	atlas	Atlas - Plan Executor	opencode-go/kimi-k2.7-code	kimi-k2-7	28321	3b0c8d0eab34cc6456cb9dfaf061c6980cba777889b1b39f27c5c676bef43dcb
+k2-control	opencode-go/kimi-k2.7-code	200	metis	Metis - Plan Consultant	opencode-go/kimi-k2.7-code	kimi-k2-7	9087	a3974fc9bd454955c8c3eb1cf345464a739212d7578c98394f83b10a511e0964
+default-control	anthropic/claude-sonnet-5	200	sisyphus	Sisyphus - ultraworker	anthropic/claude-sonnet-5	default	32073	e2ebe4bbfa20696936d40943eaa43f9e3e82feb9ccf96b7c7a31a7dc247312b6
+default-control	anthropic/claude-sonnet-5	200	sisyphus-junior	Sisyphus-Junior	anthropic/claude-sonnet-5	default	2573	4ebe17993471f7764c1f75d9b66eac9b95acc60718fddade09ec486ad9c27e10
+default-control	anthropic/claude-sonnet-5	200	atlas	Atlas - Plan Executor	anthropic/claude-sonnet-5	default	34037	2f8c9d683d183123ab1280b0935593669f6dacebab716b0e5a058958628f7853
+default-control	anthropic/claude-sonnet-5	200	metis	Metis - Plan Consultant	anthropic/claude-sonnet-5	base	13402	58ff8336284e59e3adbb5e17f477736a0dac699ecd82c9637b135bbea9a53218
