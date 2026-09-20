@@ -286,6 +286,7 @@ describe("preemptive-compaction", () => {
     //#then
     expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
       sessionID,
+      target: "anthropic/claude-sonnet-4-6",
       providerID: "anthropic",
       modelID: "claude-sonnet-4-6",
       error: String(summarizeError),
@@ -608,6 +609,7 @@ describe("preemptive-compaction", () => {
       resolvePendingSummarize()
       expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
         sessionID,
+        target: "anthropic/claude-sonnet-4-6",
         providerID: "anthropic",
         modelID: "claude-sonnet-4-6",
         error: expect.stringContaining("Compaction summarize timed out"),
@@ -918,5 +920,72 @@ describe("preemptive-compaction", () => {
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given a summarize that never settles
+  // #when a later tool call happens after the stall release ceiling
+  // #then the guard is released so the session can compact again
+  it("should release a stalled summarize guard after the release ceiling", async () => {
+    const restoreTimeouts = setupImmediateTimeouts()
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_stalled"
+    const pendingSummarize = new Promise<void>(() => undefined)
+
+    ctx.client.session.summarize
+      .mockImplementationOnce(() => pendingSummarize)
+      .mockResolvedValueOnce({})
+
+    try {
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              role: "assistant",
+              sessionID,
+              providerID: "anthropic",
+              modelID: "claude-sonnet-4-6",
+              finish: true,
+              tokens: { input: 800000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
+            },
+          },
+        },
+      })
+
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_stall_1" },
+        { title: "", output: "test", metadata: null },
+      )
+
+      // then - the pending summarize owns admission
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+      const originalNow = Date.now
+      try {
+        // when - still inside the ceiling, admission stays blocked
+        Date.now = () => originalNow() + 61_000
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_stall_2" },
+          { title: "", output: "test", metadata: null },
+        )
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+        // when - past the ceiling, the stalled guard is released
+        Date.now = () => originalNow() + 601_000
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_stall_3" },
+          { title: "", output: "test", metadata: null },
+        )
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+        expect(logMock).toHaveBeenCalledWith(
+          "[preemptive-compaction] releasing a stalled summarize guard",
+          expect.objectContaining({ sessionID, releaseAfterMs: 600_000 }),
+        )
+      } finally {
+        Date.now = originalNow
+      }
+    } finally {
+      restoreTimeouts()
+    }
   })
 })

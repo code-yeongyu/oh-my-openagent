@@ -9,6 +9,18 @@ export interface CachedCompactionState {
   providerID: string
   modelID: string
   tokens: TokenInfo
+  /** Agent that produced the cached message; used to resolve the compaction pin. */
+  agent?: string
+}
+
+/**
+ * One in-flight summarize per session. `attemptID` lets a superseded attempt
+ * detect that it no longer owns the session's admission guard, so its late
+ * cleanup cannot clear the guard of a newer attempt.
+ */
+export interface SummarizeAttempt {
+  startedAt: number
+  attemptID: number
 }
 
 export interface PreemptiveCompactionClient {
