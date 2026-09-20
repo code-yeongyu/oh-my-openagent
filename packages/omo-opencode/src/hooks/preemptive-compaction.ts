@@ -8,6 +8,7 @@ import { runPreemptiveCompactionIfNeeded } from "./preemptive-compaction-trigger
 import type {
   CachedCompactionState,
   PreemptiveCompactionContext,
+  SummarizeAttempt,
   TokenInfo,
 } from "./preemptive-compaction-types"
 
@@ -19,6 +20,7 @@ export function createPreemptiveCompactionHook(
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
   const lastCompactionTime = new Map<string, number>()
+  const summarizeStartedAt = new Map<string, SummarizeAttempt>()
   const tokenCache = new Map<string, CachedCompactionState>()
 
   const postCompactionMonitor = createPostCompactionDegradationMonitor({
@@ -42,6 +44,7 @@ export function createPreemptiveCompactionHook(
       compactionInProgress,
       compactedSessions,
       lastCompactionTime,
+      summarizeStartedAt,
     })
   }
 
@@ -54,6 +57,7 @@ export function createPreemptiveCompactionHook(
         compactionInProgress.delete(sessionID)
         compactedSessions.delete(sessionID)
         lastCompactionTime.delete(sessionID)
+        summarizeStartedAt.delete(sessionID)
         tokenCache.delete(sessionID)
         postCompactionMonitor.clear(sessionID)
       }
@@ -91,6 +95,7 @@ export function createPreemptiveCompactionHook(
           providerID: info.providerID,
           modelID: info.modelID ?? "",
           tokens: info.tokens,
+          agent: typeof info.agent === "string" ? info.agent : undefined,
         })
       }
       compactedSessions.delete(sessionID)
