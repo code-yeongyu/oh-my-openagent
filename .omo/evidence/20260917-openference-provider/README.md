@@ -69,14 +69,31 @@ Model IDs match the tracked `openference-models.json` catalog exactly.
 
 ## Live API verification
 
-Live chat completion WAS exercised (run 3), using a real credential already configured on the QA host:
+Live chat completions WERE exercised (runs 3 and 4), using a real credential already
+configured on the QA host. Capture note: `opencode run` writes the session banner to
+**stderr** and the completion to **stdout**; the raw captures below keep the two streams
+in separate files, unedited (the banner retains its literal ANSI reset bytes).
 
 ```bash
+# run 3: text mode
 OPENFERENCE_API_KEY=<real host key> opencode run -m "openference/GLM-5.2" "Reply with exactly one word: ok"
 ```
 
-Output (`run3-live-chat-glm-5.2.txt`): the session banner shows the model resolved as
-`openference/GLM-5.2` and the live completion returned `ok` - proving the full chain:
-credential gate -> provider injection -> catalog entry -> opencode's `@ai-sdk/openai-compatible`
-loader -> live `POST https://api.openference.com/v1/chat/completions` -> response.
+- `run3-live-chat-glm-5.2.txt` (stdout): the completion `ok`
+- `run3-banner-stderr.log` (stderr, raw): `> Sisyphus - ultraworker · GLM-5.2` - the model
+  resolved through the injected `openference` provider
+
+```bash
+# run 4: machine-readable, same prompt and model
+OPENFERENCE_API_KEY=<real host key> opencode run -m "openference/GLM-5.2" --format json "Reply with exactly one word: ok"
+```
+
+- `run4-usage-cost-glm-5.2.json`: step-finish record with
+  `tokens {input: 24178, output: 2}` and `cost: 0.033858` - which is exactly the bundled
+  catalog's per-million rates for GLM-5.2 (24,178 x $1.4/M + 2 x $4.4/M), proving the
+  shipped `cost` fields feed opencode's usage display.
+
+Together: credential gate -> provider injection -> catalog entry -> opencode's
+`@ai-sdk/openai-compatible` loader -> live `POST https://api.openference.com/v1/chat/completions`
+-> response, with token/cost accounting driven by the tracked catalog.
 
