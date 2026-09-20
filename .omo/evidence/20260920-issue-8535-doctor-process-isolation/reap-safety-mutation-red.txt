@@ -1,0 +1,40 @@
+WHAT WAS TESTED
+Temporary mutation (applied only for this test, then reverted):
+`runDoctor` routed `doctor --reap` through `reportProcessList(options)`, allowing the forged report
+fixture to replace the live process table.
+
+Command (PowerShell, repository root):
+& '.\.omo\tmp\bun-runtime\node_modules\@oven\bun-windows-x64\bin\bun.exe' --config=NUL test --test-name-pattern "forged report fixture" packages/omo-native/test/doctor.test.ts
+
+WHAT WAS OBSERVED
+Exit code: 1
+
+bun test v1.4.2 (744846f84)
+
+168 |         expect(result.status).toBe(1)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+(fail) omo doctor > #given a forged report fixture names a live non-engine process > #then reap ignores the fixture, refuses the pid, and leaves the process alive
+
+0 pass
+13 filtered out
+1 fail
+1 expect() calls
+Ran 1 test across 1 file.
+
+The test's `finally` block ran even on the failed assertion and reaped the sacrificial child if the
+mutated launcher had not already done so. The mutation was reverted immediately after this run.
+
+WHY IT IS ENOUGH
+The mutation changed only the trust boundary under test. The launcher then accepted the forged
+stale-engine record and returned success, so the assertion failed for the intended security reason.
+This demonstrates that the restored assertion detects any future routing of report fixtures into
+the destructive reap path.
+
+WHAT WAS OMITTED
+The randomized sacrificial child pid and timing were not retained. No real session or test-runner
+pid was used, and no secret-bearing output was captured.

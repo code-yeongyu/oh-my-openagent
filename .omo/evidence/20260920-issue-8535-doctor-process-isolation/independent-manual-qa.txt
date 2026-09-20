@@ -1,0 +1,28 @@
+WHAT WAS TESTED
+An independent manual driver copied packages/omo-native/bin into a fresh packaged fixture and
+invoked the real copied launcher with Node, outside bun:test:
+
+node .omo/tmp/manual-doctor-qa.mjs
+
+The driver exercised a fixed stale-engine report, an explicit empty process table, malformed JSON,
+and a forged report entry naming a live sacrificial process passed to doctor --reap.
+
+WHAT WAS OBSERVED
+Exit code: 0
+
+FIXED status=0 fixturePidReported=true
+EMPTY status=0 processWarning=false
+MALFORMED status=0 processWarning=false
+FORGED_REAP status=1 refused=true childAliveAfterAttempt=true
+CLEANUP childAlive=false
+CLEANUP fixtureExists=false
+
+WHY IT IS ENOUGH
+This drives the same packaged launcher entry users run rather than calling the report helpers
+directly. It proves controlled report input across the subprocess boundary, fail-closed report
+behavior, and the separation between report data and process-signaling authority. The sacrificial
+child survived the reap attempt and was then removed by the driver.
+
+WHAT WAS OMITTED
+Random temporary paths and the sacrificial pid were not retained. No user process, credential,
+environment dump, auth header, or token was captured.

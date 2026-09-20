@@ -1,0 +1,18 @@
+WHAT WAS TESTED
+The focused copied-launcher command recorded in green-fixed-process-table.txt included an explicit
+empty JSON array, an empty string, and malformed JSON in OMO_TEST_DOCTOR_PROCESS_TABLE_JSON.
+
+WHAT WAS OBSERVED
+- Explicit `[]`: status 0; no stale-engine warning; no retired-payload warning.
+- Empty string: status 0; no stale-engine warning; no retired-payload warning.
+- Malformed `{not-json`: status 0; no stale-engine warning; no retired-payload warning.
+- Focused total: 5 pass, 0 fail, including all three boundary cases.
+
+WHY IT IS ENOUGH
+Presence of the variable selects a controlled report source. Empty and invalid input both produce an
+empty source instead of falling through to the host process table. Both normal process-derived
+doctor reports use that source.
+
+WHAT WAS OMITTED
+No environment dump was captured; only the deliberately supplied non-secret fixture values are
+described.

@@ -1,0 +1,9 @@
+CAPTURED IMPLEMENTATION
+Commit: 69869e14974e7872d8b0a145e1ef46ec6631a4ff
+Tree: d475e0bcd780bb32d3453f289740e5bccbb89403
+Base: 91ca94f642ef9d8de8b5c9b95bdf25e9ad94b7ad
+Pre-commit code diff SHA-1: 03549c9d067af1e3784179d3023b1088ecb48472
+
+The RED/GREEN, mutation, manual CLI, local-gate, and independent review artifacts in this directory
+cover the implementation tree above. Evidence files are committed separately so the tested product
+tree hash remains explicit and stable.

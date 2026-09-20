@@ -1,0 +1,30 @@
+WHAT WAS TESTED
+Command (PowerShell, repository root):
+& '.\.omo\tmp\bun-runtime\node_modules\@oven\bun-windows-x64\bin\bun.exe' --config=NUL test --test-name-pattern "(fixed test-only process table|explicitly empty test-only process table|empty or malformed test-only process-table JSON|forged report fixture)" packages/omo-native/test/doctor.test.ts
+
+Runtime: Bun 1.4.2. The test starts the copied real launcher as a subprocess.
+
+WHAT WAS OBSERVED
+Exit code: 0
+
+bun test v1.4.2 (744846f84)
+
+(pass) omo doctor > #given a fixed test-only process table > #then diagnostics report only the supplied stale engine
+(pass) omo doctor > #given an explicitly empty test-only process table > #then diagnostics render no process-derived warning
+(pass) omo doctor > #given empty or malformed test-only process-table JSON > #then empty input fails closed without reading the host process table
+(pass) omo doctor > #given empty or malformed test-only process-table JSON > #then malformed input fails closed without reading the host process table
+(pass) omo doctor > #given a forged report fixture names a live non-engine process > #then reap ignores the fixture, refuses the pid, and leaves the process alive
+
+5 pass
+10 filtered out
+0 fail
+16 expect() calls
+Ran 5 tests across 1 file.
+
+WHY IT IS ENOUGH
+The same fixed-table test that failed before the production change now passes through the copied
+launcher. The focused run also proves the explicit empty boundary, malformed-input fail-closed
+behavior, and the report/reap authority separation.
+
+WHAT WAS OMITTED
+Per-test timings and randomized temporary paths were omitted. No secret-bearing output was emitted.

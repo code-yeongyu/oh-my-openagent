@@ -1,0 +1,38 @@
+WHAT WAS TESTED
+1. Full affected file:
+& '.\.omo\tmp\bun-runtime\node_modules\@oven\bun-windows-x64\bin\bun.exe' --config=NUL test packages/omo-native/test/doctor.test.ts
+
+2. Both doctor files:
+& '.\.omo\tmp\bun-runtime\node_modules\@oven\bun-windows-x64\bin\bun.exe' --config=NUL test packages/omo-native/test/doctor.test.ts packages/omo-native/test/doctor-stale-engines.test.ts
+
+Runtime: Bun 1.4.2. `--config=NUL` excludes unrelated root preloads because this isolated
+worktree has no installed workspace dependencies; both selected files import only `bun:test`, local
+doctor code, and Node built-ins.
+
+WHAT WAS OBSERVED
+Command 1 exit code: 0
+- 15 pass
+- 0 fail
+- 49 expect() calls
+- Ran 15 tests across 1 file.
+
+Command 2 exit code: 0
+- 33 pass
+- 0 fail
+- 100 expect() calls
+- Ran 33 tests across 2 files.
+
+The full affected file included fixed, empty, malformed, and forged-reap cases. The two-file run also
+kept all existing classification, formatting, explicit reap, invalid-pid, and real-launcher refusal
+coverage green. The sacrificial child assertion proved it was alive after refusal and dead after its
+`finally` cleanup. Test fixture roots were removed by the existing `afterEach`; no test child remained.
+
+WHY IT IS ENOUGH
+The focused RED/GREEN artifacts prove the new subprocess seam. The complete affected file proves
+every copied-launcher diagnostic uses an explicit empty table by default, removing dependence on the
+developer process table. The adjacent file proves production classification and reap behavior remain
+unchanged.
+
+WHAT WAS OMITTED
+Per-test timings and randomized temporary paths/pids were omitted. No credentials, auth headers,
+environment dump, or secret-bearing logs were captured.

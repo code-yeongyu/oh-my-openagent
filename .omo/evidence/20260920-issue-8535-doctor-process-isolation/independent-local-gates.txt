@@ -1,0 +1,37 @@
+WHAT WAS TESTED
+Focused new behavior:
+
+.omo/tmp/bun-runtime/node_modules/@oven/bun-windows-x64/bin/bun.exe --config=NUL test --test-name-pattern "(fixed test-only process table|explicitly empty test-only process table|empty or malformed test-only process-table JSON|forged report fixture)" packages/omo-native/test/doctor.test.ts
+
+Related regression suite:
+
+.omo/tmp/bun-runtime/node_modules/@oven/bun-windows-x64/bin/bun.exe --config=NUL test packages/omo-native/test/doctor.test.ts packages/omo-native/test/doctor-stale-engines.test.ts
+
+Targeted TypeScript check using TypeScript plus bun-types installed under the ignored .omo/tmp tree:
+
+node .omo/tmp/typecheck-runtime/node_modules/typescript/bin/tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution bundler --strict --allowJs --checkJs false --esModuleInterop --skipLibCheck --forceConsistentCasingInFileNames --resolveJsonModule --lib ESNext --types bun-types packages/omo-native/test/doctor.test.ts
+
+WHAT WAS OBSERVED
+- Focused behavior: 5 pass, 0 fail, 16 assertions.
+- Related suites: 33 pass, 0 fail, 100 assertions.
+- Targeted TypeScript check: exit code 0, no diagnostics.
+- git diff --check: exit code 0.
+
+A broader five-file doctor run produced 53 passes and one failure in the pre-existing
+doctor-edition registry-unavailable assertion. Its captured output shows the assertion matched
+`FAIL ... registry/npm` text from missing packaged artifacts and the absent root Senpi dependency in
+this dependency-free worktree; none of the changed process-table cases failed. The installed
+workspace CI run is the authoritative broad gate.
+
+The package tsconfig was also attempted. It could not resolve pre-existing workspace imports from
+@code-yeongyu/senpi and zod because this isolated worktree deliberately has no root workspace
+node_modules. The changed test file itself passes the equivalent strict targeted check above; the
+remote repository gate remains responsible for the full installed-workspace typecheck.
+
+WHY IT IS ENOUGH
+The focused run checks each new contract, the two-file run covers the existing classifier and reap
+rules alongside the spawned launcher, and the targeted compiler run checks the modified TypeScript
+surface without masking missing unrelated workspace dependencies.
+
+WHAT WAS OMITTED
+Per-test timings and randomized fixture paths were omitted. No secret-bearing output was captured.

@@ -1,0 +1,42 @@
+WHAT WAS TESTED
+Command (PowerShell, repository root):
+& '.\.omo\tmp\bun-runtime\node_modules\@oven\bun-windows-x64\bin\bun.exe' --config=NUL test --test-name-pattern "fixed test-only process table" packages/omo-native/test/doctor.test.ts
+
+Runtime: Bun 1.4.2. `--config=NUL` omits unrelated repository-wide test preloads because this
+isolated worktree has no installed workspace dependencies; doctor.test.ts itself imports only
+`bun:test` and Node built-ins.
+
+WHAT WAS OBSERVED
+Exit code: 1
+
+bun test v1.4.2 (744846f84)
+
+packages\omo-native\test\doctor.test.ts:
+87 |           command: "node /fixture/node_modules/@code-yeongyu/senpi/dist/cli.js --extension /fixture/plugin",
+88 |         }]),
+89 |       })
+90 |
+91 |       expect(result.status).toBe(0)
+92 |       expect(result.stdout).toContain(`WARN stale engine pid ${pid}`)
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "WARN stale engine pid 853501"
+Received: "PASS plugin manifest: plugin/package.json\nPASS extension: plugin/extensions/omo.js\nPASS lsp-daemon runtime: plugin/runtime/lsp-daemon/dist/cli.js\nPASS senpi CLI: <temporary fixture>\nPASS senpi version 2026.8.9\nINFO omo · Edition: Native · Installed: 1.2.3-test.0 (engine: senpi 2026.8.9) · Latest: 0.0.0-beta.0\nINFO Update: npm i -g omo-ai@beta\nINFO Daemon: unavailable on win32 (no unix socket to share)\nINFO no credentials found; run omo setup to review sibling stores\n"
+
+(fail) omo doctor > #given a fixed test-only process table > #then diagnostics report only the supplied stale engine
+
+0 pass
+10 filtered out
+1 fail
+2 expect() calls
+Ran 1 test across 1 file.
+
+WHY IT IS ENOUGH
+The copied real launcher completed its normal doctor path with status 0, so setup, syntax, imports,
+and fixture packaging were valid. The sole failing assertion is the missing fixture pid 853501,
+which proves the unmodified launcher ignored the explicit fixed table.
+
+WHAT WAS OMITTED
+The randomized temporary fixture directory and timing were normalized. No credentials, environment
+dump, auth header, or token was captured.

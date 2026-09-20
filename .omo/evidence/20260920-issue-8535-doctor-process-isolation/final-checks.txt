@@ -1,0 +1,29 @@
+WHAT WAS TESTED
+PowerShell commands from the repository root:
+- `Get-ChildItem -LiteralPath $env:TEMP -Directory -Filter 'omo-doctor-*'`
+- `git diff --check`
+- `git status --short`
+- `git diff --stat`
+- `git diff -- packages/omo-native/bin/lib/doctor.js packages/omo-native/test/doctor.test.ts`
+- Evidence-directory inventory by file name and size.
+
+WHAT WAS OBSERVED
+- OMO_DOCTOR_TEMP_LEFTOVERS=0
+- git diff --check exit code: 0
+- Tracked source changes are limited to:
+  - packages/omo-native/bin/lib/doctor.js
+  - packages/omo-native/test/doctor.test.ts
+- Untracked evidence is limited to:
+  - .omo/evidence/20260920-issue-8535-doctor-process-isolation/
+- packages/omo-native/test/doctor-stale-engines.test.ts is unchanged.
+- No lockfile, package manifest, CI file, documentation file, or prior PR path changed.
+- No commit was created because parent verification and the remaining PR workflow are intentionally
+  pending.
+
+WHY IT IS ENOUGH
+The clean diff check proves patch formatting. The status, stat, full scoped diff, and evidence
+inventory establish that the implementation stayed inside the assigned paths. The empty temp-fixture
+inventory is an external cleanup receipt in addition to the in-test child liveness cleanup assertion.
+
+WHAT WAS OMITTED
+No environment dump, credential, auth header, or secret-bearing log was captured.
