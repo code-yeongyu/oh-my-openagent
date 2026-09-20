@@ -105,6 +105,7 @@ export function isKimiK2CodeModel(model: string): boolean {
 
 export function isKimiK3Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
+  if (modelName === "k3-256k") return true
   if (/kimi-k3/.test(modelName)) return true
   if (/k3[-.]?p?\d*$/.test(modelName)) return true
   return false
