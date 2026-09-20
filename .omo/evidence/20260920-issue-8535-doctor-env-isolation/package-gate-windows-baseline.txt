@@ -1,0 +1,18 @@
+WHAT WAS TESTED
+The package-wide native test command was attempted with the repository test preload, then rerun without that preload to separate setup failure from test results:
+
+- `bun test packages/omo-native/test`
+- `bun --config=NUL test packages/omo-native/test`
+
+WHAT WAS OBSERVED
+- The repository-preload attempt stopped before package tests because the preload tried to invoke `bun` from `PATH`; this workstation uses an explicit Bun 1.4.0 executable.
+- The preload-free package run completed: 282 pass, 35 skip, 20 fail, 765 assertions across 36 files.
+- The changed `doctor.test.ts` cases all passed in the package run.
+- The 20 failures are outside `doctor.test.ts`: most cannot create test directories beneath the Windows home due to `EPERM`; the remaining compiled-runtime, packed-install, and staged-build failures depend on those unsupported or unavailable package-build surfaces.
+- The focused affected suite and neighboring stale-engine suite pass separately: 29 pass, 0 fail.
+
+WHY IT IS ENOUGH
+The package-wide run is retained rather than presented as green. Its failures are unrelated to the test-only environment scrubber and occur in untouched files or build surfaces. The passing focused copied-launcher and neighboring suites provide direct regression evidence for this change; the package typecheck supplies the static gate.
+
+WHAT WAS OMITTED
+Repeated stack traces containing absolute workstation paths and randomized temporary names were summarized. No environment dump, credentials, tokens, auth headers, or private configuration were retained.
