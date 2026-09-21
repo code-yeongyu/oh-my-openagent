@@ -1,0 +1,12 @@
+bun test v1.4.2 (744846f84)
+
+packages\omo-codex\src\install\codex-cache-command-shim.test.ts:
+(pass) root shim executes a quoted runtime path with spaces from environment [622.03ms]
+(pass) root shim executes a quoted runtime path with spaces from config [654.18ms]
+(pass) cached shim executes a quoted runtime path with spaces from environment [533.86ms]
+(pass) cached shim executes a quoted runtime path with spaces from config [656.52ms]
+
+ 4 pass
+ 0 fail
+ 8 expect() calls
+Ran 4 tests across 1 file. [3.97s]

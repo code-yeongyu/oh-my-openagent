@@ -1,0 +1,107 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages\omo-codex\src\install\codex-cache-command-shim.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+(node:12116) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+33 |         const child = Bun.spawn(["cmd.exe", "/d", "/c", "call", link.path, "--probe", "two words"], {
+34 |           env: { ...process.env, CODEX_HOME: codexHome, NODE_REPL_NODE_PATH: source === "environment" ? `"${runtime}"` : "", OMO_RUNTIME: "node" },
+35 |           stdout: "pipe", stderr: "pipe",
+36 |         })
+37 |         const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+38 |         expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "stderr": "",
++   "code": 255,
++   "stderr": 
++ "The syntax of the command is incorrect.
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 5
+
+      at <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-command-shim.test.ts:38:34)
+(fail) root shim executes a quoted runtime path with spaces from environment [78.00ms]
+33 |         const child = Bun.spawn(["cmd.exe", "/d", "/c", "call", link.path, "--probe", "two words"], {
+34 |           env: { ...process.env, CODEX_HOME: codexHome, NODE_REPL_NODE_PATH: source === "environment" ? `"${runtime}"` : "", OMO_RUNTIME: "node" },
+35 |           stdout: "pipe", stderr: "pipe",
+36 |         })
+37 |         const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+38 |         expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "stderr": "",
++   "code": 255,
++   "stderr": 
++ "The syntax of the command is incorrect.
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 5
+
+      at <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-command-shim.test.ts:38:34)
+(fail) root shim executes a quoted runtime path with spaces from config [125.00ms]
+33 |         const child = Bun.spawn(["cmd.exe", "/d", "/c", "call", link.path, "--probe", "two words"], {
+34 |           env: { ...process.env, CODEX_HOME: codexHome, NODE_REPL_NODE_PATH: source === "environment" ? `"${runtime}"` : "", OMO_RUNTIME: "node" },
+35 |           stdout: "pipe", stderr: "pipe",
+36 |         })
+37 |         const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+38 |         expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "stderr": "",
++   "code": 255,
++   "stderr": 
++ "The syntax of the command is incorrect.
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 5
+
+      at <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-command-shim.test.ts:38:34)
+(fail) cached shim executes a quoted runtime path with spaces from environment [110.00ms]
+33 |         const child = Bun.spawn(["cmd.exe", "/d", "/c", "call", link.path, "--probe", "two words"], {
+34 |           env: { ...process.env, CODEX_HOME: codexHome, NODE_REPL_NODE_PATH: source === "environment" ? `"${runtime}"` : "", OMO_RUNTIME: "node" },
+35 |           stdout: "pipe", stderr: "pipe",
+36 |         })
+37 |         const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+38 |         expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "stderr": "",
++   "code": 255,
++   "stderr": 
++ "The syntax of the command is incorrect.
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 5
+
+      at <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-command-shim.test.ts:38:34)
+(fail) cached shim executes a quoted runtime path with spaces from config [109.00ms]
+
+ 0 pass
+ 4 fail
+ 4 expect() calls
+Ran 4 tests across 1 file. [7.72s]

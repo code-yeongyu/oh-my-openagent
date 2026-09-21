@@ -1,0 +1,75 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages\omo-codex\src\install\codex-cache-bins.test.ts:
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the canonical runtime wrapper #then uses the new name, marker, and edition exports [31.00ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given a marker-bearing legacy omo wrapper #when writing the canonical wrapper #then deletes the legacy wrapper
+(pass) linkRootRuntimeBin runtime wrapper parity > #given an unmarked user-owned omo #when writing the canonical wrapper twice #then preserves omo byte-identical and remains idempotent
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the canonical runtime wrapper #then uses the new name and environment exports [16.00ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when writing the omo-agent-toolkit runtime wrapper #then embeds the node fallback chain
+(pass) linkRootRuntimeBin runtime wrapper parity > #given posix platform #when bun is absent everywhere #then the wrapper falls back to node before exiting 127
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then embeds the node fallback chain [16.00ms]
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 platform #when writing the omo runtime wrapper #then discovers Codex bundled Node from config before bare node
+(skip) linkRootRuntimeBin runtime wrapper parity > #given posix wrapper target was removed #when running omo #then exits with reinstall guidance
+(skip) linkRootRuntimeBin runtime wrapper parity > #given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec
+(pass) linkRootRuntimeBin runtime wrapper parity > #given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token [15.00ms]
+229 |     // given
+230 |     const fixture = await createRepoFixture()
+231 |     await mkdir(fixture.binDir, { recursive: true })
+232 |     const target = join(fixture.repoRoot, "generated-wrapper.sh")
+233 |     await writeFile(target, "#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\necho stale\n")
+234 |     await symlink(target, join(fixture.binDir, "omo"))
+                ^
+EPERM: operation not permitted, symlink 'C:\Users\kyzer\AppData\Local\Temp\omo-codex-cache-bins-zncxzt\repo\generated-wrapper.sh' -> 'C:\Users\kyzer\AppData\Local\Temp\omo-codex-cache-bins-zncxzt\bin\omo'
+    path: "C:\\Users\\kyzer\\AppData\\Local\\Temp\\omo-codex-cache-bins-zncxzt\\repo\\generated-wrapper.sh",
+    dest: "C:\\Users\\kyzer\\AppData\\Local\\Temp\\omo-codex-cache-bins-zncxzt\\bin\\omo",
+ syscall: "symlink",
+   errno: -1,
+    code: "EPERM"
+
+      at async <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-bins.test.ts:234:11)
+(fail) legacy omo reclamation across link kinds > #given bin/omo is a symlink resolving to a marker-bearing wrapper #when writing the canonical wrapper #then removes the symlink and keeps its target
+245 |     // given
+246 |     const fixture = await createRepoFixture()
+247 |     await mkdir(fixture.binDir, { recursive: true })
+248 |     const target = join(fixture.repoRoot, "my-own-script.sh")
+249 |     await writeFile(target, "#!/bin/sh\necho mine\n")
+250 |     await symlink(target, join(fixture.binDir, "omo"))
+                ^
+EPERM: operation not permitted, symlink 'C:\Users\kyzer\AppData\Local\Temp\omo-codex-cache-bins-RUKuad\repo\my-own-script.sh' -> 'C:\Users\kyzer\AppData\Local\Temp\omo-codex-cache-bins-RUKuad\bin\omo'
+    path: "C:\\Users\\kyzer\\AppData\\Local\\Temp\\omo-codex-cache-bins-RUKuad\\repo\\my-own-script.sh",
+    dest: "C:\\Users\\kyzer\\AppData\\Local\\Temp\\omo-codex-cache-bins-RUKuad\\bin\\omo",
+ syscall: "symlink",
+   errno: -1,
+    code: "EPERM"
+
+      at async <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-bins.test.ts:250:11)
+(fail) legacy omo reclamation across link kinds > #given bin/omo is a symlink to an unmarked user file #when writing the canonical wrapper #then preserves the symlink
+259 | 
+260 |   it("#given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing", async () => {
+261 |     // given
+262 |     const fixture = await createRepoFixture()
+263 |     await mkdir(fixture.binDir, { recursive: true })
+264 |     await symlink(join(fixture.repoRoot, "missing-target.sh"), join(fixture.binDir, "omo"))
+                ^
+EPERM: operation not permitted, symlink 'C:\Users\kyzer\AppData\Local\Temp\omo-codex-cache-bins-gmpKoT\repo\missing-target.sh' -> 'C:\Users\kyzer\AppData\Local\Temp\omo-codex-cache-bins-gmpKoT\bin\omo'
+    path: "C:\\Users\\kyzer\\AppData\\Local\\Temp\\omo-codex-cache-bins-gmpKoT\\repo\\missing-target.sh",
+    dest: "C:\\Users\\kyzer\\AppData\\Local\\Temp\\omo-codex-cache-bins-gmpKoT\\bin\\omo",
+ syscall: "symlink",
+   errno: -1,
+    code: "EPERM"
+
+      at async <anonymous> (C:\Users\kyzer\Documents\Codex\2026-09-21\new-chat\oh-my-openagent-pr-5923\packages\omo-codex\src\install\codex-cache-bins.test.ts:264:11)
+(fail) legacy omo reclamation across link kinds > #given bin/omo is a dangling symlink #when writing the canonical wrapper #then completes without throwing [16.00ms]
+
+packages\omo-codex\src\install\codex-cache-command-shim.test.ts:
+(pass) root shim executes a quoted runtime path with spaces from environment [922.00ms]
+(pass) root shim executes a quoted runtime path with spaces from config [984.00ms]
+(pass) cached shim executes a quoted runtime path with spaces from environment [875.00ms]
+(pass) cached shim executes a quoted runtime path with spaces from config [938.00ms]
+
+ 14 pass
+ 2 skip
+ 3 fail
+ 50 expect() calls
+Ran 19 tests across 2 files. [5.19s]

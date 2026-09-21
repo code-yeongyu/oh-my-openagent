@@ -1,0 +1,15 @@
+✔ #given the stable installer entrypoint #when inspecting imports #then it delegates to generated output (5.6766ms)
+✔ #given generated installer output #when importing install-local #then public installer API comes from the bundle (3.7133ms)
+✔ #given generated installer output #when importing direct bundle #then compatibility helper APIs are exported (40.3597ms)
+✔ #given no root model #when generated bundle updates config #then it does not introduce agents max_threads (10.6592ms)
+✔ #given an inline-commented V2 thread cap #when generated bundle updates config twice #then preserves the line and ordering byte-for-byte (10.3333ms)
+✔ #given explicit v1 model_catalog_json and stale models_cache v2 #when generated bundle updates config #then explicit catalog preserves disable and cap (6.0448ms)
+✔ #given explicit v2 model_catalog_json and stale models_cache v1 #when generated bundle updates config #then explicit catalog clears managed disable and cap (6.9352ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 238.0402
