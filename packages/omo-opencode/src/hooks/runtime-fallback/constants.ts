@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   retry_on_errors: [429, 500, 502, 503, 504],
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
+  provider_failure_cooldown_seconds: 120,
   timeout_seconds: 30,
   notify_on_fallback: true,
   restore_primary_after_cooldown: false,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
+import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isProviderFailureCoordinationError, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback error classifier", () => {
   test("detects cooling-down auto-retry status signals", () => {
@@ -348,6 +348,30 @@ describe("extractStatusCode", () => {
       cause: { statusCode: 503 },
     }
     expect(extractStatusCode(error)).toBe(400)
+  })
+})
+
+describe("isProviderFailureCoordinationError", () => {
+  test("treats a text-only 429 as a coordination error even when retryOnErrors omits 429", () => {
+    //#given
+    const error = { message: "Request failed with status code 429" }
+
+    //#when
+    const coordination = isProviderFailureCoordinationError(error, [500, 502])
+
+    //#then
+    expect(coordination).toBe(true)
+  })
+
+  test("does not treat a text-only non-429 status as a coordination error", () => {
+    //#given
+    const error = { message: "Request failed with status code 500" }
+
+    //#when
+    const coordination = isProviderFailureCoordinationError(error, [500, 502])
+
+    //#then
+    expect(coordination).toBe(false)
   })
 })
 
