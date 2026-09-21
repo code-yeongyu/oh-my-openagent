@@ -1,0 +1,1 @@
+QA processes finished. Exact task-created sandbox directories were retained after automatic command review rejected cleanup as blocked by policy. Runtime regression tests remove their own fixtures in finally blocks. Task-local toolchain/scratch directory work/ is excluded only through the local git exclude file.

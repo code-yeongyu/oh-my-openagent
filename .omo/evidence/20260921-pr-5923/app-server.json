@@ -1,0 +1,142 @@
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "01a0c440-9120-7000-a3bc-0b0dcfa21ba6",
+  "turnId": "01a0c440-91d2-7c03-b9b5-62acdcd5f39c",
+  "expectHook": [
+    "sessionStart",
+    "userPromptSubmit"
+  ],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:0:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:1:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:2:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:3:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:0:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:1:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:2:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:3:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:4:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:4:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:18:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\stop-checking-ulw-execute-continuation.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:19:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\stop-checking-ulw-loop-resume.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:18:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\stop-checking-ulw-execute-continuation.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:19:C:\\Users\\kyzer\\AppData\\Local\\Temp\\pr5923-codex-FSoqZf\\codex\\plugins\\cache\\sisyphuslabs\\omo\\5.0.0-beta.81\\hooks\\stop-checking-ulw-loop-resume.json"
+    }
+  ],
+  "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"C:\\\\Users\\\\kyzer\\\\AppData\\\\Local\\\\Temp\\\\\" (codex_home: AbsolutePathBuf(\"C:\\\\Users\\\\kyzer\\\\AppData\\\\Local\\\\Temp\\\\pr5923-codex-FSoqZf\\\\codex\"))\n{\"timestamp\":\"2026-09-21T13:56:00.873223Z\",\"level\":\"ERROR\",\"fields\":{\"message\":\"Project-local config, hooks, and exec policies are disabled in the following folders until the project is trusted, but skills still load.\\n    1. C:\\\\Users\\\\kyzer\\\\Documents\\\\Codex\\\\2026-09-21\\\\new-chat\\\\oh-my-openagent-pr-5923\\\\.codex\\n       To load project-local config, hooks, and exec policies, add c:\\\\users\\\\kyzer\\\\documents\\\\codex\\\\2026-09-21\\\\new-chat\\\\oh-my-openagent as a trusted project in C:\\\\Users\\\\kyzer\\\\AppData\\\\Local\\\\Temp\\\\pr5923-codex-FSoqZf\\\\codex\\\\config.toml.\\n\"},\"target\":\"codex_app_server\"}\n{\"timestamp\":\"2026-09-21T13:56:00.928017Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model mock-model is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-09-21T13:56:01.063078Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"failed to warm featured plugin ids cache\",\"error\":\"remote featured plugin request to https://chatgpt.com/backend-api/plugins/featured?platform=codex failed with status 401 Unauthorized: {\\\"detail\\\":\\\"Unauthorized\\\"}\"},\"target\":\"codex_core_plugins::manager\"}\n{\"timestamp\":\"2026-09-21T13:56:01.078231Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\"},\"target\":\"codex_core::shell_snapshot\"}\n{\"timestamp\":\"2026-09-21T13:56:01.107329Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model mock-model is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n"
+}
