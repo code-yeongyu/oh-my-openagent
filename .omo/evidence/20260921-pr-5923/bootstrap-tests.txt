@@ -1,0 +1,13 @@
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.81 test
+> vitest --run test/bootstrap-wrapper.test.ts test/package-smoke.test.ts
+
+
+ RUN  v5.0.1 C:/Users/kyzer/Documents/Codex/2026-09-21/new-chat/oh-my-openagent-pr-5923/packages/omo-codex/plugin/components/ulw-loop
+
+
+ Test Files  2 passed (2)
+      Tests  16 passed | 1 skipped (17)
+   Start at  21:56:19
+   Duration  527ms (tests 49%, transform 41%, import 8%, worker 1%)
+

@@ -169,7 +169,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 				].join("\n"),
 			);
 
-			const result = await runShell(`${bootstrap}\n"$ULW_LOOP_NODE" "$ULW_LOOP_CLI" ulw-loop status --json`, {
+			const result = await runShell(`${bootstrap}\nulw_loop ulw-loop status --json`, {
 				...process.env,
 				CODEX_HOME: codexHome,
 				HOME: home,

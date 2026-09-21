@@ -73,7 +73,7 @@ Codex subagent reliability:
 Do all three steps before execution. No edits, goal tools, or checkpointing before bootstrap completes.
 
 ### 1. Create goals from the brief
-Resolve the CLI before the first command. If `omo` is absent from PATH or lacks `ulw-loop`, use the stable local installer bin or cached Codex component CLI — same CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, recording the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
+Resolve the CLI before the first command. If `omo-agent-toolkit` is absent from PATH or lacks `ulw-loop`, use the stable local installer bin or cached Codex component CLI — same CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, recording the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
 ```sh
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 ULW_LOOP_NODE="$(command -v node 2>/dev/null || true)"
@@ -86,17 +86,37 @@ if [ -z "$ULW_LOOP_NODE" ]; then
 fi
 
 ULW_LOOP_CLI=
+ULW_LOOP_CLI_KIND=
 if command -v omo-agent-toolkit >/dev/null 2>&1 && omo-agent-toolkit ulw-loop help >/dev/null 2>&1; then
   ULW_LOOP_CLI=omo-agent-toolkit
-elif [ -n "$ULW_LOOP_NODE" ]; then
-  for candidate in "$HOME/.local/bin/omo-agent-toolkit" "$CODEX_HOME/bin/omo-agent-toolkit" "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
+  ulw_loop() { omo-agent-toolkit "$@"; }
+else
+  for candidate in "$HOME/.local/bin/omo-agent-toolkit" "$HOME/.local/bin/omo-agent-toolkit.cmd" "$CODEX_HOME/bin/omo-agent-toolkit" "$CODEX_HOME/bin/omo-agent-toolkit.cmd" "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
     [ -f "$candidate" ] || [ -x "$candidate" ] || continue
-    if "$ULW_LOOP_NODE" "$candidate" ulw-loop help >/dev/null 2>&1; then
-      ULW_LOOP_CLI="$candidate"
-      break
-    fi
+    case "$candidate" in
+      *.js)
+        [ -n "$ULW_LOOP_NODE" ] || continue
+        if "$ULW_LOOP_NODE" "$candidate" ulw-loop help >/dev/null 2>&1; then
+          ULW_LOOP_CLI="$candidate"
+          ULW_LOOP_CLI_KIND=node
+          break
+        fi
+        ;;
+      *)
+        if "$candidate" ulw-loop help >/dev/null 2>&1; then
+          ULW_LOOP_CLI="$candidate"
+          ULW_LOOP_CLI_KIND=exec
+          break
+        fi
+        ;;
+    esac
   done
 
+  if [ -n "$ULW_LOOP_CLI" ] && [ "$ULW_LOOP_CLI_KIND" = node ]; then
+    ulw_loop() { "$ULW_LOOP_NODE" "$ULW_LOOP_CLI" "$@"; }
+  elif [ -n "$ULW_LOOP_CLI" ] && [ "$ULW_LOOP_CLI_KIND" = exec ]; then
+    ulw_loop() { "$ULW_LOOP_CLI" "$@"; }
+  fi
 fi
 
 if [ -z "${ULW_LOOP_CLI:-}" ]; then
@@ -107,6 +127,8 @@ if [ -z "${ULW_LOOP_CLI:-}" ]; then
 fi
 ```
 If `ULW_LOOP_CLI` is empty, open the durable notepad first, record the missing CLI evidence, then surface the installer issue.
+
+The `ulw_loop` shell function dispatches to the resolved wrapper or cached JavaScript CLI. After bootstrap, use it in place of `omo-agent-toolkit` when the toolkit is absent from PATH or lacks the ULW subcommand.
 
 Run one form:
 ```sh
