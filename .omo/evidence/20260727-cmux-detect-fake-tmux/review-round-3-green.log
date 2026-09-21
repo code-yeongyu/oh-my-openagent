@@ -1,0 +1,13 @@
+GREEN sweep after the launch-kind reconciliation, on the rebased head
+Bun 1.3.13, 2026-09-02
+
+packages/tmux-core                                    115 pass  0 fail 
+packages/omo-opencode/src/shared/tmux                 89 pass  0 fail 
+packages/omo-opencode/src/tools/interactive-bash      3 pass  0 fail 
+packages/omo-opencode/src/features/tmux-subagent      168 pass  0 fail 
+packages/openclaw-core                                67 pass  0 fail 
+
+script/package-registration-audit.test.ts             6 pass  0 fail 
+
+bunx tsgo --noEmit -p packages/tmux-core/tsconfig.json     exit 0
+bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json  exit 0
