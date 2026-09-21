@@ -80,7 +80,7 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 
 ## Approval gate
 
-When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay**. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
+When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay unless pre-authorized auto-continue applies**. Pre-authorized auto-continue means the user already said auto-continue or keep going, or the invoking ulw-execute or start-work context carries approval; then treat the gate as approved and continue toward plan creation. Pre-authorization authorizes plan creation only, never implementation. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
 
 ## Delegation (OpenCode-native)
 
@@ -94,5 +94,5 @@ Roles - the ONLY subagents you may spawn (all read-only, plus `oracle` for the h
 
 ## Stop rules
 
-- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts are recorded: present the handoff explanation (Phase 4 delivery format in `references/full-workflow.md`), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. **Never begin execution yourself.**
-- Brief presented and `status: awaiting-approval` recorded: wait. Do not re-explore unless the user changes scope.
+- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts are recorded: present the handoff explanation (Phase 4 delivery format in `references/full-workflow.md`), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop; with pre-authorized auto-continue on CLEAR without `review_required`, continue toward start-work instead of stopping. **Never begin execution yourself.**
+- Brief presented and `status: awaiting-approval` recorded: wait unless pre-authorized auto-continue applies, in which case treat the gate as approved and continue. Do not re-explore unless the user changes scope.

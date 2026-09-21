@@ -103,6 +103,7 @@ Never guess the shape of the deliverable. After the brief and before `team_creat
 - Name the alternatives that actually fit THIS domain — slides for a briefing, standalone HTML for a living page, Markdown for a working note, LaTeX for a typeset or citation-heavy document, several at once when the audience differs.
 - Propose the TEMPLATE too, chosen from the domain and the user's own context: section skeleton, citation style, length target, language, and any house style they have used before. A prior document the user points at is the strongest template signal — read it and mirror its structure and tagging.
 - Ask once, compactly: proposed format + proposed template + what each option costs. Then stop and wait. Guessing here wastes the entire assembly pass.
+- Skip the ask when a default output is on record: an explicit user-set default in project memory or config, or a prior brief answer reused silently for the team; a per-run explicit choice wins; record a newly stated default in the brief.
 
 Record the answer in `brief.md`; Phase 6 opens by turning it into `design-spec.md`.
 
@@ -347,7 +348,7 @@ Nothing reaches the user until both gates pass:
 1. **Visual QA (always).** Render the produced artifact back to images — PDF pages to PNG, the HTML in a real browser — and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Fix and re-render until the pages are clean. Reading the source markup is not visual QA; inspect the pixels.
 2. **Proofread gate — `task(category: "writing", ...)`.** Hand the final text to a dedicated `writing` lane whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language (for Korean, natural Korean written by a Korean, not translationese). It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass — this gate runs BEFORE the first delivery, not after the user finds the typo.
 
-Then deliver: the artifact plus a compact chat-readable summary of what it says — the answer in a few sentences, the numbers that matter, and what to look at first. The document is the deliverable; the summary is what gets it read.
+Then deliver: the artifact plus a compact chat-readable summary of what it says — the answer in a few sentences, the numbers that matter, and what to look at first. The document is the deliverable; the summary is what gets it read. When the request carries unambiguous downstream planning or building intent, continue into ulw-plan with the research and the team journal as input; when the request is research-only, stop here.
 
 ### The closing briefing — every run ends with it
 
