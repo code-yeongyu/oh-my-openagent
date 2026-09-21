@@ -1,0 +1,156 @@
+
+> @sisyphuslabs/omo-codex-plugin@5.0.0-beta.81 build
+> node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+
+Synced OMO Codex manifests to version 5.0.0-beta.81 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled git-bash-mcp dist
+[materialize] wrote 148 frontend reference files from submodules
+(node:12328) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@5.0.0-beta.81 build
+> tsc -p tsconfig.build.json
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@5.0.0-beta.81 build
+> tsc -p tsconfig.build.json
+
+Building components/teammode
+
+> @sisyphuslabs/codex-teammode@5.0.0-beta.81 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 2 modules in 27ms
+
+  cli.js  4.18 KB  (entry point)
+
+Building components/ulw-execute-continuation
+
+> @code-yeongyu/codex-ulw-execute-continuation@5.0.0-beta.81 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 24ms
+
+  cli.js  14.52 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@5.0.0-beta.81 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 51 modules in 43ms
+
+  cli.js  156.1 KB  (entry point)
+
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@5.0.0-beta.81 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 10 modules in 29ms
+
+  cli.js  19.25 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@5.0.0-beta.81 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 5 modules in 27ms
+
+  cli.js  35.97 KB  (entry point)
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 22ms
+
+  cli.js  6.1 KB  (entry point)
+
+Bundling components/teammode/dist/cli.js
+Bundled 2 modules in 21ms
+
+  cli.js  4.22 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@5.0.0-beta.81 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 111 modules in 47ms
+
+  cli.js  0.35 MB  (entry point)
+
+Bundled 109 modules in 55ms
+
+  posthog.js  0.35 MB  (entry point)
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 24ms
+
+  cli.js  8.79 KB  (entry point)
+
+Bundling components/ulw-execute-continuation/dist/cli.js
+Bundled 5 modules in 24ms
+
+  cli.js  14.78 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.81 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.81 build
+> node scripts/build-runtime.mjs
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 10 modules in 28ms
+
+  cli.js  19.43 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 5 modules in 21ms
+
+  cli.js  36.14 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 51 modules in 38ms
+
+  cli.js  156.27 KB  (entry point)
+
+Building components/bootstrap
+
+> @sisyphuslabs/codex-bootstrap@5.0.0-beta.81 build
+> node scripts/build.mjs
+
+
+  dist\cli.js  421.9kb
+
+Done in 103ms
+Bundling components/telemetry/dist/cli.js
+Bundled 111 modules in 35ms
+
+  cli.js  0.35 MB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.81 build
+> tsc -p tsconfig.build.json && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 56 modules in 24ms
+
+  cli.js  211.16 KB  (entry point)
+
+Bundling components/bootstrap/dist/cli.js
+Bundled 197 modules in 50ms
+
+  cli.js  0.43 MB  (entry point)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 56 modules in 20ms
+
+  cli.js  212.34 KB  (entry point)
+

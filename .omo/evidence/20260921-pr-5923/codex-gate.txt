@@ -1,0 +1,109 @@
+$ bun run build:codex-install && bun run build:git-bash-mcp && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && npm --prefix packages/lsp-tools-mcp test && npm --prefix packages/omo-codex/plugin ci && npm --prefix packages/omo-codex/plugin/components/ulw-loop test && bun run --cwd packages/omo-codex/plugin build && node scripts/check-third-party-notices.mjs --ship && bun test --timeout 20000 packages/omo-opencode/src/cli/cli-installer.platform.test.ts packages/omo-codex/src/install/codex-cache.test.ts packages/omo-codex/src/install/codex-cleanup.test.ts packages/omo-codex/src/install/codex-config-agent-cleanup.test.ts packages/omo-codex/src/install/codex-config-autonomous-features.test.ts packages/omo-codex/src/install/codex-config-reasoning.test.ts packages/omo-codex/src/install/codex-config-toml.test.ts packages/omo-codex/src/install/codex-project-local-cleanup.test.ts packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts packages/omo-codex/src/install/install-codex.test.ts packages/omo-codex/src/install/install-codex-packaged.test.ts packages/omo-codex/src/install/link-cached-plugin-agents.test.ts packages/omo-codex/src/**/*.test.ts packages/utils/src/jsonc-parser.test.ts packages/utils/src/frontmatter.test.ts packages/hashline-core/src/hash-computation.test.ts packages/hashline-core/src/smoke-untested-modules.test.ts packages/rules-engine/src/index.test.ts packages/rules-engine/src/security-boundary.test.ts packages/agents-md-core/src/injector.test.ts packages/omo-codex/plugin/components/lsp/test/package-smoke.test.ts && node --test packages/omo-codex/plugin/test/*.test.mjs packages/omo-codex/scripts/install-cache-copy.test.mjs packages/omo-codex/scripts/install-cli-args.test.mjs packages/omo-codex/scripts/install-delegated-command.test.mjs packages/omo-codex/scripts/install-config-autonomous-features.test.mjs packages/omo-codex/scripts/install-config-autonomous.test.mjs packages/omo-codex/scripts/install-config-reasoning.test.mjs packages/omo-codex/scripts/install-config.test.mjs packages/omo-codex/scripts/install-hook-targets.test.mjs packages/omo-codex/scripts/install-project-local-cleanup.test.mjs packages/omo-codex/scripts/install-lazycodex-version-stamp.test.mjs packages/omo-codex/scripts/install-local-entrypoint.test.mjs packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs packages/omo-codex/scripts/install-local.test.mjs packages/omo-codex/scripts/install-marketplace-cache.test.mjs packages/omo-codex/scripts/install-mcp-context7-runtime.test.mjs packages/omo-codex/scripts/install-mcp-runtime.test.mjs packages/omo-codex/scripts/install-packaged-local.test.mjs packages/omo-codex/scripts/install-generated-bundle.test.mjs packages/omo-codex/scripts/install-agent-links.test.mjs packages/omo-codex/scripts/install-bin-links.test.mjs
+$ bun run script/build-codex-install.ts
+$ bun run --cwd packages/git-bash-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 15 modules in 15ms
+
+  cli.js  22.68 KB  (entry point)
+
+$ npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build
+
+added 56 packages, and audited 59 packages in 2s
+
+14 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 build
+> node scripts/ensure-core-links.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json --emitDeclarationOnly && bun build src/cli.ts src/mcp.ts src/tools.ts src/request-context.ts src/lsp/manager.ts --outdir dist --target node --format esm
+
+Bundled 70 modules in 25ms
+
+  cli.js               195.54 KB  (entry point)
+  mcp.js               195.1 KB   (entry point)
+  tools.js             183.17 KB  (entry point)
+  request-context.js   7.46 KB    (entry point)
+  lsp/manager.js       109.73 KB  (entry point)
+
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 56 packages, and audited 59 packages in 2s
+
+14 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 27ms
+
+  cli.js     251.96 KB  (entry point)
+  index.js   232.76 KB  (entry point)
+  client.js  230.49 KB  (entry point)
+
+(node:25376) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+> @code-yeongyu/lsp-tools-mcp@0.1.0 test
+> vitest --run
+
+
+ RUN  v5.0.1 C:/Users/kyzer/Documents/Codex/2026-09-21/new-chat/oh-my-openagent-pr-5923/packages/lsp-tools-mcp
+
+
+ Test Files  25 passed (25)
+      Tests  96 passed | 1 skipped (97)
+   Start at  21:52:08
+   Duration  3.80s (tests 52%, transform 38%, import 9%, worker 1%)
+
+  Transform  transforming modules took 3.84s · 38% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+added 75 packages, and audited 93 packages in 3s
+
+14 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @code-yeongyu/comment-checker@0.8.0 (postinstall: node postinstall.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.81 test
+> vitest --run
+
+
+ RUN  v5.0.1 C:/Users/kyzer/Documents/Codex/2026-09-21/new-chat/oh-my-openagent-pr-5923/packages/omo-codex/plugin/components/ulw-loop
+
+ ❯ test/codex-goal-snapshot.test.ts (18 tests | 1 failed) 45ms
+   ❯ readCodexGoalSnapshotInput (4)
+     × reads from sample fixture path 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/codex-goal-snapshot.test.ts > readCodexGoalSnapshotInput > reads from sample fixture path
+Error: Codex goal snapshot is neither valid JSON nor a readable path: /C:/Users/kyzer/Documents/Codex/2026-09-21/new-chat/oh-my-openagent-pr-5923/packages/omo-codex/plugin/components/ulw-loop/test/fixtures/codex-goal-snapshot.json
+ ❯ readCodexGoalSnapshotInput src/codex-goal-snapshot.ts:101:10
+
+     99|   const path = resolve(cwd, trimmed);
+    100|   if (!existsSync(path)) {
+    101|    throw new CodexGoalSnapshotError(`Codex goal snapshot is neither va…
+       |          ^
+    102|   }
+    103|   try {
+ ❯ test/codex-goal-snapshot.test.ts:109:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 65 passed (66)
+      Tests  1 failed | 671 passed | 1 skipped (673)
+   Start at  21:52:16
+   Duration  3.85s (tests 64%, transform 24%, import 11%, worker 1%)
+
+error: script "test:codex" exited with code 1
