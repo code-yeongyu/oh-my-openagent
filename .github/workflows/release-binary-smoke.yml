@@ -1,0 +1,105 @@
+name: Release binary smoke
+
+on:
+  pull_request:
+    paths:
+      - script/build-omo-binary.ts
+      - script/build-omo-binary.test.ts
+      - script/senpi-worker-compile*.ts
+      - packages/omo-native/**
+      - script/qa/dependency-audit-*.ts
+      - script/qa/dependency-audit/**
+      - script/qa/fixtures/dependency-audit/**
+      - script/release-compile-argv.fixture.ts
+      - script/receipt-gate.fixture.ts
+      - script/release-binary-smoke-workflow.test.ts
+      - script/publish-release-platform-workflow.test.ts
+      - .github/workflows/publish-platform.yml
+      - package.json
+      - bun.lock
+      - .github/workflows/release-binary-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            binary: omo-linux-x64
+          - os: macos-latest
+            target: darwin-arm64
+            binary: omo-darwin-arm64
+          - os: windows-latest
+            target: windows-x64
+            binary: omo-windows-x64.exe
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - name: Install dependencies
+        id: install
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Apply native engine patches
+        id: patch
+        run: node packages/omo-native/bin/senpi-patch.mjs
+      - name: Build release binary
+        id: build
+        env:
+          OUT_DIR: ${{ runner.temp }}/release-binary-smoke
+        run: |
+          bun run script/build-omo-binary.ts \
+            --target "${{ matrix.target }}" \
+            --omo-version 0.0.0-ci \
+            --omo-ai-version 0.0.0-ci \
+            --out-dir "$OUT_DIR"
+      - name: Test compile and worker contracts
+        id: contracts
+        run: |
+          # The sidecar parity test reads the source plugin's generated skills.
+          node packages/omo-senpi/plugin/scripts/sync-skills.mjs
+          bun test script/build-omo-binary.test.ts script/senpi-worker-compile.test.ts
+          bun test script/release-binary-smoke-workflow.test.ts script/publish-release-platform-workflow.test.ts script/qa/dependency-audit-capture.test.ts
+      - name: Capture compiled RPC and extension receipts
+        id: capture
+        env:
+          OUT_DIR: ${{ runner.temp }}/release-binary-smoke
+        run: |
+          bun script/qa/dependency-audit-capture.ts --phase post \
+            --binary "$OUT_DIR/${{ matrix.binary }}" --out "$OUT_DIR/post" \
+            --case bytes --case graph --case rpc --case extension
+          jq -e '.complete == true and .pass == true and ([.cases[].case] == ["bytes", "graph", "rpc", "extension"]) and all(.cases[]; .pass == true and .exitCode == 0)' "$OUT_DIR/post/summary.json"
+      - name: Upload JSON receipts only
+        id: receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-binary-smoke-${{ matrix.target }}
+          path: ${{ runner.temp }}/release-binary-smoke/post/*.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Write job summary
+        id: summary
+        if: always()
+        env:
+          JOB_SUMMARY_TITLE: Release binary smoke (${{ matrix.target }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the native release target with splitting and name-preserving minification.
+            - Tests relocated workers and compiled RPC/extension behavior.
+            - Uploads JSON receipts only; never publishes a binary.
+          JOB_SUMMARY_NEXT: Inspect the first failed build, contract, or receipt gate for this target.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
