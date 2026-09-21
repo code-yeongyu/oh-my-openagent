@@ -6,7 +6,22 @@ import type {
   InstallArgs,
   InstallConfig,
   InstallPlatform,
+  OpenAIPlan,
+  OpenAISubscription,
 } from "./types"
+
+export const OPENAI_SUBSCRIPTION_VALUES: readonly OpenAISubscription[] = ["no", "yes", "api", "plus", "pro"]
+
+const OPENAI_PLAN_BY_SUBSCRIPTION: Record<Exclude<OpenAISubscription, "no">, OpenAIPlan> = {
+  yes: "api",
+  api: "api",
+  plus: "plus",
+  pro: "pro",
+}
+
+export function openaiSubscriptionToPlan(subscription: OpenAISubscription): OpenAIPlan {
+  return subscription === "no" ? "none" : OPENAI_PLAN_BY_SUBSCRIPTION[subscription]
+}
 
 export const SYMBOLS = {
   check: color.green("[OK]"),
@@ -152,8 +167,8 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
   }
 
-  if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
-    errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
+  if (args.openai !== undefined && !OPENAI_SUBSCRIPTION_VALUES.includes(args.openai)) {
+    errors.push(`Invalid --openai value: ${args.openai} (expected: ${OPENAI_SUBSCRIPTION_VALUES.join(", ")})`)
   }
 
   if (args.opencodeGo !== undefined && !["no", "yes"].includes(args.opencodeGo)) {
@@ -223,12 +238,15 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
   const hasCodex = platform === "codex" || platform === "both"
   const hasSenpi = platform === "senpi"
 
+  const openaiPlan = args.openai ? openaiSubscriptionToPlan(args.openai) : "none"
+
   return {
     platform,
     hasOpenCode,
     hasClaude: hasOpenCode && args.claude !== "no",
     isMax20: args.claude === "max20",
-    hasOpenAI: hasOpenCode && args.openai === "yes",
+    hasOpenAI: hasOpenCode && openaiPlan !== "none",
+    openaiPlan,
     hasGemini: hasOpenCode && args.gemini === "yes",
     hasCopilot: hasOpenCode && args.copilot === "yes",
     hasCodex,
@@ -247,7 +265,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
 
 export function detectedToInitialValues(detected: DetectedConfig): {
   claude: ClaudeSubscription
-  openai: BooleanArg
+  openai: OpenAISubscription
   gemini: BooleanArg
   copilot: BooleanArg
   opencodeZen: BooleanArg

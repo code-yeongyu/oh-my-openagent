@@ -1,6 +1,7 @@
 import type { InstallConfig } from "./types"
 import type { ProviderAvailability } from "./model-fallback-types"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
+import { isApiOnlyOpenAiModel, isChatGptSubscriptionPlan } from "./openai-only-model-catalog"
 
 export function toProviderAvailability(config: InstallConfig): ProviderAvailability {
 	return {
@@ -19,6 +20,7 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 		minimaxCodingPlan: config.hasMinimaxCodingPlan,
 		vercelAiGateway: config.hasVercelAiGateway,
 		isMaxPlan: config.isMax20,
+		openaiPlan: config.openaiPlan,
 	}
 }
 
@@ -38,6 +40,22 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 		vercel: availability.vercelAiGateway,
 	}
 	return mapping[provider] ?? false
+}
+
+export function isModelAvailableOnProvider(
+	provider: string,
+	model: string,
+	availability: ProviderAvailability,
+): boolean {
+	if (!isProviderAvailable(provider, availability)) return false
+	if (
+		provider === "openai" &&
+		isChatGptSubscriptionPlan(availability.openaiPlan) &&
+		isApiOnlyOpenAiModel(model)
+	) {
+		return false
+	}
+	return true
 }
 
 export function hasAnyConfiguredProvider(config: InstallConfig): boolean {

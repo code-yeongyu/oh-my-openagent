@@ -5,8 +5,9 @@ import type {
   DetectedConfig,
   InstallConfig,
   InstallPlatform,
+  OpenAISubscription,
 } from "./types"
-import { detectedToInitialValues } from "./install-validators"
+import { detectedToInitialValues, openaiSubscriptionToPlan } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import { isSenpiPlatformEnabled } from "./senpi-platform-flag"
 
@@ -66,6 +67,7 @@ export async function promptInstallConfig(
       hasClaude: false,
       isMax20: false,
       hasOpenAI: false,
+      openaiPlan: "none",
       hasGemini: false,
       hasCopilot: false,
       hasCodex,
@@ -95,15 +97,18 @@ export async function promptInstallConfig(
   })
   if (!claude) return null
 
-  const openai = await selectOrCancel({
-    message: "Do you have an OpenAI/ChatGPT Plus subscription?",
+  const openai = await selectOrCancel<OpenAISubscription>({
+    message: "Which OpenAI/ChatGPT plan do you have?",
     options: [
-      { value: "no", label: "No", hint: "Oracle will use fallback models" },
-      { value: "yes", label: "Yes", hint: "GPT-5.6 Sol for Oracle (high-IQ debugging)" },
+      { value: "no", label: "None", hint: `Will use ${ULTIMATE_FALLBACK} as fallback` },
+      { value: "plus", label: "ChatGPT Plus", hint: "GPT-5.6 Sol for Oracle (subscription models only)" },
+      { value: "pro", label: "ChatGPT Pro", hint: "GPT-5.6 Sol for Oracle (subscription models only)" },
+      { value: "api", label: "OpenAI API key", hint: "Full API catalog including GPT-5.6 Terra" },
     ],
     initialValue: initial.openai,
   })
   if (!openai) return null
+  const openaiPlan = openaiSubscriptionToPlan(openai)
 
   const gemini = await selectOrCancel({
     message: "Will you integrate Google Gemini?",
@@ -210,7 +215,8 @@ export async function promptInstallConfig(
     hasOpenCode: true,
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
-    hasOpenAI: openai === "yes",
+    hasOpenAI: openaiPlan !== "none",
+    openaiPlan,
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasCodex,

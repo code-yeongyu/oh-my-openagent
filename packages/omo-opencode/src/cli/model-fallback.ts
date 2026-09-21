@@ -9,7 +9,7 @@ import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
 import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
-import { isProviderAvailable, toProviderAvailability } from "./provider-availability"
+import { isModelAvailableOnProvider, toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
 	isAnyFallbackEntryAvailable,
@@ -98,7 +98,7 @@ function collectAvailableFallbacks(
 ): FallbackModelObject[] {
   const expandedFallbacks = fallbackChain.flatMap((entry) =>
     entry.providers
-      .filter((provider: string) => isProviderAvailable(provider, availability))
+      .filter((provider: string) => isModelAvailableOnProvider(provider, entry.model, availability))
       .map((provider: string) => toFallbackModelObject(entry, provider))
   )
   return expandedFallbacks.filter((entry, index, allEntries) =>
