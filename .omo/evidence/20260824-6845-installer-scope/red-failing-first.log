@@ -1,0 +1,50 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/install.test.ts:
+248 | 
+249 |     // when running install with a distinct custom root but no explicit scope
+250 |     const exitCode = await install(scopeArgs())
+251 | 
+252 |     // then the install is rejected before any mutation
+253 |     expect(exitCode).toBe(1)
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6845/packages/omo-opencode/src/cli/install.test.ts:253:22)
+(fail) install CLI - config scope confirmation > non-TUI install without --config-scope fails and writes no registration in either root [7.52ms]
+270 |     const exitCode = await install(scopeArgs("global"))
+271 | 
+272 |     // then the plugin lands in the default global directory only
+273 |     expect(exitCode).toBe(0)
+274 |     const globalConfigPath = join(xdgDir, "opencode", "opencode.json")
+275 |     expect(existsSync(globalConfigPath)).toBe(true)
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6845/packages/omo-opencode/src/cli/install.test.ts:275:42)
+(fail) install CLI - config scope confirmation > non-TUI install with --config-scope=global registers only in the default global directory [11.50ms]
+310 |       ...scopeArgs(),
+311 |       configScope: unsafeTestValue<InstallArgs["configScope"]>("both"),
+312 |     })
+313 | 
+314 |     // then the install is rejected and nothing is written
+315 |     expect(exitCode).toBe(1)
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6845/packages/omo-opencode/src/cli/install.test.ts:315:22)
+(fail) install CLI - config scope confirmation > non-TUI install rejects an unsupported --config-scope value [14.04ms]
+
+ 4 pass
+ 3 fail
+ 20 expect() calls
+Ran 7 tests across 1 file. [1022.00ms]
