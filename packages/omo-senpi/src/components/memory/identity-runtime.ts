@@ -77,7 +77,8 @@ export function createIdentityRuntime(
 
   let builtSandbox: SandboxTransform | undefined
   const resolveAgentDir = deps.resolveAgentDir ?? (() => resolveAgentHome({ env: process.env }))
-  const lazySandbox = (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs | Promise<ReflectionSpawnArgs> => {
+  const lazySandbox = async (spawnArgs: ReflectionSpawnArgs): Promise<ReflectionSpawnArgs> => {
+    const agentDir = resolveAgentDir()
     if (builtSandbox === undefined) {
       builtSandbox = buildSandboxTransform({
         policy: reflection.sandbox as SandboxPolicy,
@@ -87,7 +88,7 @@ export function createIdentityRuntime(
         runtimeWrites: [
           identity.identityPaths.reflectionSessions,
           identity.identityPaths.reflection,
-          resolveAgentDir(),
+          agentDir,
           ...(process.env.XDG_CONFIG_HOME === undefined ? [] : [process.env.XDG_CONFIG_HOME]),
         ],
         command: spawnArgs.command,
@@ -101,7 +102,14 @@ export function createIdentityRuntime(
         })
       }
     }
-    return builtSandbox(spawnArgs)
+    const transformed = await builtSandbox(spawnArgs)
+    return {
+      ...transformed,
+      env: {
+        ...transformed.env,
+        SENPI_CODING_AGENT_DIR: agentDir,
+      },
+    }
   }
 
   const runner = new SenpiSubprocessRunner({

@@ -103,7 +103,7 @@ describe("memory identity runtime", () => {
 async function renderReflectionSandboxAgentDir(envShape: {
   readonly omo?: string
   readonly senpi?: string
-}): Promise<{ readonly fakeHome: string; readonly renderedArgs: readonly string[] }> {
+}): Promise<{ readonly fakeHome: string; readonly renderedArgs: readonly string[]; readonly childEnv: NodeJS.ProcessEnv }> {
   // given: an isolated identity root, a fake sandbox-exec/bwrap on PATH so the seatbelt profile or
   // bwrap args render, and a fake absolute inner command so the sandbox does not degrade.
   const root = await mkdtemp(join(tmpdir(), "omo-memory-agent-dir-"))
@@ -178,7 +178,7 @@ async function renderReflectionSandboxAgentDir(envShape: {
         prompt: join(paths.reflectionSessions, "prompt.md"),
       },
     })
-    return { fakeHome, renderedArgs: transformed.args }
+    return { fakeHome, renderedArgs: transformed.args, childEnv: transformed.env }
   } finally {
     for (const [key, value] of Object.entries(snapshot)) {
       if (value === undefined) delete process.env[key]
@@ -201,6 +201,17 @@ function sandboxGrantsAgentDir(renderedArgs: readonly string[], agentDirReal: st
 }
 
 describe("memory identity runtime agent-dir resolution", () => {
+  test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
+    "#given a detected branded agent home #when reflection is sandboxed #then its child uses the granted authentication directory",
+    async () => {
+      const { fakeHome, renderedArgs, childEnv } = await renderReflectionSandboxAgentDir({})
+      const agentDir = join(fakeHome, ".omo")
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(agentDir))).toBe(true)
+      expect(childEnv.SENPI_CODING_AGENT_DIR).toBe(agentDir)
+    },
+    30_000,
+  )
+
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given a rendered reflection sandbox #when OMO_CODING_AGENT_DIR is set #then the agent-dir runtimeWrites grant equals the resolved agent dir",
     async () => {
