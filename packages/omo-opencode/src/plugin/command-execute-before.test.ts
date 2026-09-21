@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from "bun:test"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 import { handleGoalMessage } from "./chat-message/loop-commands"
+import { MAX_OBJECTIVE_LENGTH, validateObjective } from "../hooks/goal/validation"
 import {
   consumeNativeGoalCommandMarker,
   createCommandExecuteBeforeHandler,
@@ -100,6 +101,53 @@ describe("createCommandExecuteBeforeHandler", () => {
     expect(resumeGoal).not.toHaveBeenCalled()
     expect(isStopped).not.toHaveBeenCalled()
     expect(clear).not.toHaveBeenCalled()
+  })
+
+  test("#given /goal arguments longer than the objective cap #when command.execute.before runs #then goal is set truncated instead of throwing", async () => {
+    // given
+    const clear = mock(() => {})
+    const isStopped = mock(() => false)
+    const setGoal = mock((_: string, objective: string) => {
+      validateObjective(objective)
+      return createMockGoal()
+    })
+    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
+      directory: process.cwd(),
+      hooks: {
+        goal: {
+          setGoal,
+          getGoal: mock(() => null),
+          pauseGoal: mock(() => null),
+          resumeGoal: mock(() => createMockGoal()),
+          clearGoal: mock(() => true),
+          markComplete: mock(() => null),
+          event: mock(async () => {}),
+        },
+        stopContinuationGuard: {
+          isStopped,
+          clear,
+        },
+      },
+    }))
+    const longArguments = "Refactor the auth module. ".repeat(200)
+
+    // when
+    await handler(
+      {
+        command: "goal",
+        sessionID: "ses-long-goal",
+        arguments: longArguments,
+      },
+      {
+        parts: [],
+      },
+    )
+
+    // then
+    expect(setGoal).toHaveBeenCalledTimes(1)
+    const captured = setGoal.mock.calls[0]?.[1] as string
+    expect(captured.length).toBe(MAX_OBJECTIVE_LENGTH)
+    expect(captured.startsWith("Refactor the auth module.")).toBe(true)
   })
 
   test("#given non-stopped session and /goal #when command.execute.before runs #then goal is set and clear is not called", async () => {
