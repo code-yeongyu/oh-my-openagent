@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// 生成 dist/v2/index.js：对主 bundle 的轻量 re-export shim。
-// 主 dist/index.js 默认导出已是 dual-host 模块（server + setup），
-// ./v2 子路径只需转发，不产生第二份完整 bundle。
+// Writes dist/v2/index.js: a thin re-export shim over the main bundle.
+// The default export of dist/index.js is already the dual-host module (server + setup),
+// so the ./v2 subpath only forwards to it instead of emitting a second full bundle.
 import { mkdirSync, writeFileSync, existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 
 const root = process.cwd()
 const outFile = join(root, "dist", "v2", "index.js")
 
-// 前置校验：主 bundle 必须存在（该节点依赖 build graph 的 index 节点）
+// Precondition: the main bundle must exist (this node depends on the build graph's "index" node).
 const mainEntry = join(root, "dist", "index.js")
 if (!existsSync(mainEntry)) {
-  console.error("[write-v2-shim] dist/index.js 不存在，请先运行主构建")
+  console.error("[write-v2-shim] dist/index.js is missing; run the main build first")
   process.exit(1)
 }
 
