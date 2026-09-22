@@ -1,3 +1,16 @@
+## A crashed reclaimer's stale sentinel cannot wedge DAG lock acquisition on Windows
+
+Clearing a stale `.reclaim` sentinel renames and unlinks files that the host's antivirus or
+search indexer can briefly hold open; on win32 that surfaces as EPERM/EBUSY sharing violations
+POSIX rename does not have. The quarantining rename threw the refusal raw, and the stall budget -
+which resets only when the canonical holder changes - charged the reclaim's own I/O until
+`withLock` timed out behind an unchanged dead holder, exactly the intermittent windows-latest
+failure of "the sentinel cannot wedge acquisition". The rename now retries transient refusals
+like the final unlink already did, clearing a stale sentinel republishes the reclaim mutex in
+place instead of handing a wasted poll back to the waiter, and a pass that cleared a sentinel
+resets the stall budget: the loop observes the sentinel's disappearance, not the clock.
+omo#8671.
+
 ## unspecified-low leads with MiMo V2.6 Pro; the Grok rung moves to 4.7
 
 `CATEGORY_FALLBACK_CHAINS["unspecified-low"]` and the builtin category config now lead with

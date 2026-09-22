@@ -552,8 +552,9 @@ function withLock<T>(
 ): T {
   assertSafeSegment(basename(path), "lock name")
   // LOCK_WAIT_TIMEOUT_MS bounds how long we sit behind ONE unchanged holder, not wall clock: a holder
-  // that changes or vanishes is the system making progress, and our own reclaim I/O on a slow host is
-  // work, not waiting. Charging either to the deadline made a free lock look like a timeout.
+  // that changes or vanishes is the system making progress, our own reclaim I/O on a slow host is
+  // work, not waiting, and clearing a crashed reclaimer's stale sentinel is a state transition of
+  // the same class. Charging any of those to the deadline made a free lock look like a timeout.
   let stalledSince = now()
   let stalledBehind: LockHolder | undefined
   let acquiredHolder: LockHolder | undefined
@@ -581,6 +582,7 @@ function withLock<T>(
         break
       }
       if (outcome.kind === "holder_changed") continue
+      if (outcome.clearedStaleMutex) stalledSince = now()
     }
     if (now() - stalledSince >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
     Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
@@ -670,12 +672,14 @@ function tryCreateLock(path: string, content: string, fsyncWrites: boolean, recr
 
 /**
  * Why a dead-holder reclaim did not hand us the lock. `reclaim_busy`: a live peer holds the reclaim
- * mutex, so we are genuinely waiting on it. `holder_changed`: the canonical lock was released or
- * taken by someone else while we worked, so the next attempt should start over immediately.
+ * mutex, so we are genuinely waiting on it; `clearedStaleMutex` marks that the pass did clear a
+ * crashed reclaimer's stale sentinel - a filesystem state transition the caller must treat as
+ * progress, not contention. `holder_changed`: the canonical lock was released or taken by someone
+ * else while we worked, so the next attempt should start over immediately.
  */
 type ReclaimOutcome =
   | { readonly kind: "acquired"; readonly holder: LockHolder }
-  | { readonly kind: "reclaim_busy" }
+  | { readonly kind: "reclaim_busy"; readonly clearedStaleMutex: boolean }
   | { readonly kind: "holder_changed" }
 
 function reclaimObservedLock(
@@ -687,8 +691,10 @@ function reclaimObservedLock(
   fsyncWrites: boolean,
 ): ReclaimOutcome {
   const reclaimPath = `${path}.reclaim`
-  const reclaimHolder = tryAcquireReclaimMutex(reclaimPath, isProcessAlive, now, fsyncWrites)
-  if (reclaimHolder === undefined) return { kind: "reclaim_busy" }
+  const reclaimMutex = tryAcquireReclaimMutex(reclaimPath, isProcessAlive, now, fsyncWrites)
+  if (reclaimMutex.holder === undefined) {
+    return { kind: "reclaim_busy", clearedStaleMutex: reclaimMutex.clearedStaleMutex }
+  }
   const content = JSON.stringify({
     hostPid: process.pid,
     runId,
@@ -713,8 +719,13 @@ function reclaimObservedLock(
   } finally {
     if (fd !== undefined) fs.closeSync(fd)
     fs.rmSync(successorPath, { force: true })
-    removeObservedLock(reclaimPath, reclaimHolder, () => true)
+    removeObservedLock(reclaimPath, reclaimMutex.holder, () => true)
   }
+}
+
+type ReclaimMutexState = {
+  readonly holder: LockHolder | undefined
+  readonly clearedStaleMutex: boolean
 }
 
 function tryAcquireReclaimMutex(
@@ -722,23 +733,32 @@ function tryAcquireReclaimMutex(
   isProcessAlive: (pid: number) => boolean,
   now: () => number,
   fsyncWrites: boolean,
-): LockHolder | undefined {
+): ReclaimMutexState {
   const content = JSON.stringify({
     hostPid: process.pid,
     token: randomUUID(),
     createdAt: new Date(now()).toISOString(),
   })
-  if (tryCreateLock(path, content, fsyncWrites)) return { pid: process.pid, content }
-  const observedHolder = readLockHolder(path)
-  if (observedHolder !== undefined &&
-    (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid))) {
-    removeObservedLock(
-      path,
-      observedHolder,
-      (movedHolder) => movedHolder === undefined || movedHolder.pid === undefined || !isProcessAlive(movedHolder.pid),
-    )
+  if (tryCreateLock(path, content, fsyncWrites)) {
+    return { holder: { pid: process.pid, content }, clearedStaleMutex: false }
   }
-  return undefined
+  const observedHolder = readLockHolder(path)
+  if (observedHolder === undefined ||
+    (observedHolder.pid !== undefined && isProcessAlive(observedHolder.pid))) {
+    return { holder: undefined, clearedStaleMutex: false }
+  }
+  const clearedStaleMutex = removeObservedLock(
+    path,
+    observedHolder,
+    (movedHolder) => movedHolder === undefined || movedHolder.pid === undefined || !isProcessAlive(movedHolder.pid),
+  )
+  if (!clearedStaleMutex) return { holder: undefined, clearedStaleMutex: false }
+  // The crashed reclaimer's sentinel is gone: that is a state transition, not contention, so retry
+  // the publication once in place instead of handing a wasted poll back to the waiter.
+  if (tryCreateLock(path, content, fsyncWrites)) {
+    return { holder: { pid: process.pid, content }, clearedStaleMutex: true }
+  }
+  return { holder: undefined, clearedStaleMutex: true }
 }
 
 function removeObservedLock(
@@ -748,12 +768,7 @@ function removeObservedLock(
 ): boolean {
   if (!sameLockHolder(observedHolder, readLockHolder(path))) return false
   const quarantinePath = `${path}.${process.pid}.${randomUUID()}.stale`
-  try {
-    fs.renameSync(path, quarantinePath)
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return false
-    throw error
-  }
+  if (!quarantineStaleLock(path, quarantinePath)) return false
   const movedHolder = readLockHolder(quarantinePath)
   if (!sameLockHolder(observedHolder, movedHolder) || !canRemove(movedHolder)) {
     restoreQuarantinedLock(path, quarantinePath)
@@ -786,6 +801,24 @@ function restoreQuarantinedLock(path: string, quarantinePath: string): void {
     if (!hasCode(error, "EEXIST")) throw error
   }
   fs.rmSync(quarantinePath, { force: true })
+}
+
+// Windows can briefly refuse the quarantining rename of a stale lock with a sharing violation
+// (EPERM/EBUSY) while antivirus or the indexer still holds the file open - the same class
+// removeWindowsContendedFile below tolerates for the final unlink, which POSIX rename does not
+// have. Retry the rename so a stale sentinel clears on a loaded runner instead of crashing the
+// reclaim, then surface a persistent refusal instead of hiding it.
+function quarantineStaleLock(path: string, quarantinePath: string): boolean {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(path, quarantinePath)
+      return true
+    } catch (error) {
+      if (hasCode(error, "ENOENT")) return false
+      if (attempt >= WINDOWS_CLEANUP_RETRIES || (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))) throw error
+      Atomics.wait(sleeper, 0, 0, WINDOWS_CLEANUP_RETRY_MS)
+    }
+  }
 }
 
 type RunArtifactIndex = {

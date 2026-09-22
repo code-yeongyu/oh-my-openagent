@@ -731,6 +731,87 @@ describe("createDagFileStore locks and retention", () => {
     expect(fs.existsSync(reclaimSentinel)).toBe(false)
   })
 
+  test("#given a crashed reclaimer left its sentinel #when Windows briefly refuses the sentinel quarantine rename #then the stale sentinel still cannot wedge or crash acquisition", () => {
+    // given - the shape behind the windows-latest flake: the runner's antivirus or search indexer
+    // briefly holds the sentinel open, so the quarantining rename is refused with EPERM (a sharing
+    // violation POSIX rename does not have) while both recorded holder pids are dead. The refusal
+    // must be retried, not crash the reclaim and not wedge acquisition until the stall budget.
+    const store = createDagFileStore(
+      { project_dir: tempProject() },
+      { isProcessAlive: () => false },
+    )
+    const canonical = store.paths.runLock(runId)
+    const reclaimSentinel = `${canonical}.reclaim`
+    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
+    fs.writeFileSync(reclaimSentinel, JSON.stringify({ hostPid: 202, token: "crashed-reclaimer" }))
+    const realRename = fs.renameSync
+    let refusals = 0
+    spyOn(fs, "renameSync").mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
+      if (from === reclaimSentinel && refusals < 2) {
+        refusals += 1
+        const error = new Error("operation not permitted")
+        Object.assign(error, { code: "EPERM" })
+        throw error
+      }
+      realRename(from, to)
+    })
+    let entered = false
+
+    // when
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(refusals).toBe(2)
+    expect(fs.existsSync(reclaimSentinel)).toBe(false)
+  })
+
+  test("#given a crashed reclaimer left its sentinel on a slow host #when clearing it spans stall budgets of lock reads #then acquisition observes the sentinel's disappearance rather than the clock", () => {
+    // given - the other half of the windows-latest flake: every read of the lock files is slowed by
+    // the runner's antivirus, so clearing the sentinel costs more than LOCK_WAIT_TIMEOUT_MS of
+    // observed I/O even though nothing waits on a live holder. A peer also wins the republished
+    // mutex once, so the clear is observed across two acquisition passes; the budget must follow
+    // that state transition instead of expiring mid-reclaim.
+    let clock = 1_000_000
+    const store = createDagFileStore(
+      { project_dir: tempProject() },
+      { isProcessAlive: () => false, now: () => clock },
+    )
+    const canonical = store.paths.runLock(runId)
+    const reclaimSentinel = `${canonical}.reclaim`
+    fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
+    fs.writeFileSync(reclaimSentinel, JSON.stringify({ hostPid: 202, token: "crashed-reclaimer" }))
+    const realRead = fs.readFileSync
+    spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
+      if (typeof path === "string" && (path === canonical || path === reclaimSentinel)) clock += 600
+      return realRead(path, options as never)
+    }) as typeof fs.readFileSync)
+    const realLink = fs.linkSync
+    let republishLost = false
+    spyOn(fs, "linkSync").mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
+      if (to === reclaimSentinel && !republishLost && !fs.existsSync(reclaimSentinel)) {
+        republishLost = true
+        const error = new Error("file already exists")
+        Object.assign(error, { code: "EEXIST" })
+        throw error
+      }
+      realLink(from, to)
+    })
+    let entered = false
+
+    // when
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(republishLost).toBe(true)
+    expect(fs.existsSync(reclaimSentinel)).toBe(false)
+  })
+
   test("#given a contender probes every reclamation transition #when a stale lock is replaced #then only the reclaimer concludes it holds the lock", () => {
     // given
     const project = tempProject()
