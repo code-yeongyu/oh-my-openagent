@@ -1,0 +1,37 @@
+bun test v1.2.18 (0d4089ea)
+
+test/compile-safe-engine.test.ts:
+(pass) compile-safe engine preparation > #given an engine whose css-tree resolves its data through createRequire > #when the engine is prepared for bun compile > #then no css-tree module reaches for a file at runtime [206.87ms]
+(pass) compile-safe engine preparation > #given an engine whose css-tree resolves its data through createRequire > #when the engine is prepared for bun compile > #then the inlined modules still expose the exact upstream data [194.84ms]
+(pass) compile-safe engine preparation > #given an engine whose css-tree resolves its data through createRequire > #when the preparation runs a second time > #then every prepared file stays byte-identical [77.09ms]
+(pass) compile-safe engine preparation > #given a css-tree whose data module matches no known shape > #when the engine is prepared > #then preparation fails loud instead of shipping a broken binary [73.45ms]
+(pass) compile-safe engine preparation > #given an engine that does not bundle css-tree > #when the engine is prepared > #then preparation is a no-op [99.30ms]
+(pass) compile-safe engine preparation > #given the patch script runs as postinstall does > #when the installed engine still resolves css-tree data dynamically > #then the script prepares css-tree along with the pi-ai floor [625.82ms]
+
+test/rpc-stream-errors.test.mjs:
+(pass) installed RPC stream serializer > #given malformed assistant stream data #when stdio serializes it #then RPC rejects it and shuts down [521.94ms]
+(pass) installed RPC stream serializer > #given malformed user stream data #when stdio serializes it #then RPC rejects it and shuts down [537.03ms]
+(pass) installed RPC stream serializer > #given a missing RPC target #when postinstall prepares the engine #then it fails with a named compatibility error [326.21ms]
+(pass) installed RPC stream serializer > #given shutdown renamed in upstream RPC code #when postinstall runs #then it rejects the missing binding [439.46ms]
+(pass) installed RPC stream serializer > #given shutdown renamed in prepared RPC code #when postinstall runs #then it rejects the missing binding [879.41ms]
+(pass) installed RPC stream serializer > #given the hoisted async function shutdown shape #when postinstall prepares the engine #then serializer failures reach shutdown [327.30ms]
+(pass) installed RPC stream serializer > #given the hoisted async function shutdown shape renamed #when postinstall runs #then it rejects the missing binding [430.64ms]
+(pass) installed RPC stream serializer > #given the createRpcShutdown const shutdown shape #when postinstall prepares the engine #then serializer failures reach shutdown [434.89ms]
+(pass) installed RPC stream serializer > #given the createRpcShutdown const shutdown shape renamed #when postinstall runs #then it rejects the missing binding [343.45ms]
+(pass) installed RPC stream serializer > #given toJsonEvent missing from RPC code #when postinstall runs #then it rejects the missing binding [464.42ms]
+(pass) installed RPC stream serializer > #given value missing from RPC code #when postinstall runs #then it rejects the missing binding [560.87ms]
+(pass) installed RPC stream serializer > #given a valid tool start #when stdio serializes it #then tool metadata is preserved [501.78ms]
+(pass) installed RPC stream serializer > #given an already prepared runtime #when postinstall runs again #then its bytes stay unchanged [725.03ms]
+
+test/senpi-patch.test.ts:
+(pass) senpi-patch claudeCodeVersion floor > #given Ghostty uses the bundled terminal-image capability detector > #when the patch script prepares the installed Senpi runtime > #then Ghostty opts into Kitty Unicode placeholders so images move with transcript rows [855.18ms]
+(pass) senpi-patch claudeCodeVersion floor > #given a bundled pi-ai claudeCodeVersion below the 2.1.251 floor > #when the patch script runs as postinstall does > #then the version is rewritten to the floor [545.58ms]
+(pass) senpi-patch claudeCodeVersion floor > #given a bundled pi-ai claudeCodeVersion already at the floor > #when the patch script runs > #then the bundled file stays byte-identical [391.91ms]
+(pass) senpi-patch claudeCodeVersion floor > #given a bundled pi-ai claudeCodeVersion above the floor > #when the patch script runs > #then the bundled file is never downgraded and stays byte-identical [276.72ms]
+(pass) senpi-patch claudeCodeVersion floor > #given the patch script already rewrote a below-floor version > #when it runs again > #then the rewritten file is left unchanged and the exit stays clean [630.73ms]
+(pass) senpi-patch claudeCodeVersion floor > #given the bundled file has no claudeCodeVersion declaration > #when the patch script runs > #then it fails with the unsupported-Senpi error naming the relative path [417.73ms]
+
+ 25 pass
+ 0 fail
+ 72 expect() calls
+Ran 25 tests across 3 files. [14.51s]
