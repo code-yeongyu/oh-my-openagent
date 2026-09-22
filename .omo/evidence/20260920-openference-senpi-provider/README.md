@@ -53,6 +53,21 @@ Raw captures:
   1.0M/384K, MiMo-V2.6-Flash/Pro and SenseNova 6.7/6.8 Flash-Lite included)
 - `run4-stderr.log` / `run5-stderr.log` — the extension's own continuation components
   observing the sessions (no provider errors)
+- Runs 4-6 executed against the machine's installed engine 2026.9.16-3.
+
+### Rebase re-validation — engine 2026.9.22-2 (runs 7-9)
+
+After rebasing onto the dev that adopts Senpi 2026.9.22-2, the same live-harness
+QA was repeated against the NEW engine pinned by the repo's lockfile (loaded from
+the workspace's own `node_modules`), with the freshly rebuilt bundle:
+
+- `run7-newengine-list-models.txt` — **19 openference models** listed through the
+  rebuilt bundle on engine 2026.9.22-2
+- `run8-newengine-env-glm-5.2.txt` — live `GLM-5.2` completion, env credential: `ok`
+- `run9-newengine-authjson-glm-5.2.txt` — live `GLM-5.2` completion with ONLY the
+  stored auth.json credential (env var unset): `ok`
+- No `models.json` was created in the QA agent dir on any run (verified after each
+  engine version's runs); the credential was removed between runs.
 
 ## Why there is no regression
 
