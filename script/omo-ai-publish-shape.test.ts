@@ -186,7 +186,10 @@ describe("omo-ai publish workflow shape", () => {
       expect(step.env?.ALREADY_PUBLISHED).toBe("${{ needs.release-metadata.outputs.already_published }}")
     }
 
-    expect(namedStep("post-publish-verify", "Wait for omo-ai registry readiness").run).toContain("npm view omo-ai@$OMO_AI_VERSION version")
+    const readinessRun = namedStep("post-publish-verify", "Wait for omo-ai registry readiness").run ?? ""
+    expect(readinessRun).toContain('npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version')
+    expect(readinessRun).toContain('npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball')
+    expect(readinessRun).toContain('curl --fail --silent --location --head --output /dev/null "$TARBALL_URL"')
     expect(namedStep("post-publish-verify", "Guard omo-ai dist-tags").run).toContain("0.0.0-beta.0")
     const liveRun = namedStep("post-publish-verify", "Verify omo-ai live install").run ?? ""
     expect(liveRun).toContain('npm i -g "omo-ai@$OMO_AI_VERSION"')

@@ -1402,23 +1402,33 @@ jobs:
           # omo-ai 5.0.0-0.beta.42 (2026-09-04) took ~5 minutes. The previous 5 x 15 s = 60 s budget
           # therefore failed the run AFTER a successful publish. Size the wait to the registry's stated
           # contract and read with --prefer-online so a cached "not found" cannot mask a landed version.
+          # Metadata can precede the tarball blob by several minutes, so readiness also requires the
+          # immutable artifact URL to answer successfully before the live install begins.
           READINESS_INTERVAL_SECONDS=15
           READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
             IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
+            TARBALL_URL=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball 2>/dev/null || true)
             BETA_READY=true
             if [ "$ALREADY_PUBLISHED" != "true" ]; then
               BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
               [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
             fi
+            TARBALL_READY=false
+            if [ -n "$TARBALL_URL" ] &&
+               curl --fail --silent --location --head --output /dev/null "$TARBALL_URL"; then
+              TARBALL_READY=true
+            fi
 
-            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
-              echo "omo-ai@$OMO_AI_VERSION is ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
+            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] &&
+               [ "$BETA_READY" = "true" ] &&
+               [ "$TARBALL_READY" = "true" ]; then
+              echo "omo-ai@$OMO_AI_VERSION metadata and tarball are ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
               break
             fi
 
             if [ "$attempt" = "$READINESS_ATTEMPTS" ]; then
-              echo "::error::omo-ai@$OMO_AI_VERSION did not become visible within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION version' before re-running anything."
+              echo "::error::omo-ai@$OMO_AI_VERSION metadata and tarball did not both become available within $((READINESS_ATTEMPTS * READINESS_INTERVAL_SECONDS)) s. The publish-main job already reported '+ omo-ai@$OMO_AI_VERSION', so this is a registry propagation timeout, not a publish failure: check 'npm view omo-ai@$OMO_AI_VERSION dist.tarball' and the returned URL before re-running anything."
               exit 1
             fi
             echo "Waiting for omo-ai@$OMO_AI_VERSION registry propagation (attempt ${attempt}/${READINESS_ATTEMPTS}, ${READINESS_INTERVAL_SECONDS}s)"
