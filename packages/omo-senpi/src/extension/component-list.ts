@@ -12,6 +12,7 @@ import { createMemoryComponent } from "../components/memory"
 import { createModelProfileComponent } from "../components/model-profile"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent } from "../components/onboarding"
+import { createOpenferenceProviderComponent } from "../components/openference-provider"
 import { createSkillPointersComponent } from "../components/skill-pointers"
 import { createOmoNativeTelemetryComponent } from "../components/telemetry"
 import { createTodoFanoutReminderComponent } from "../components/todo-fanout-reminder"
@@ -27,6 +28,9 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createConfigStartupComponent(),
     // After config-startup so configuration diagnostics print before the profile notice.
     createModelProfileComponent(),
+    // Credential-gated models.json provisioning; the engine reloads models.json on
+    // every /model open, so a load-time write needs no restart.
+    createOpenferenceProviderComponent(),
     // Skill availability is resolved before the startup UI components run, and it stays
     // outside the native-badge -> onboarding -> advisor adjacency that session-start
     // ordering pins (session-start-ordering.test.ts).

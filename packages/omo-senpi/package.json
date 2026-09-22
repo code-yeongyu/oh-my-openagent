@@ -32,6 +32,7 @@
     "test": "bun test src/**/*.test.ts"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.84.2",
     "@earendil-works/pi-tui": "0.84.2",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
