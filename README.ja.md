@@ -457,5 +457,7 @@ OpenCode が Debian/Arch だとすれば、oh-my-openagent は Ubuntu/[Omarchy](
 - [ELESTYLE](https://elestyle.jp)
   - マルチモバイル決済ゲートウェイ elepay、キャッシュレスソリューション向けモバイルアプリケーション SaaS OneQR の開発元。
 - [Deepgram](https://deepgram.com)
+- [Chazm](https://chazm.co.kr)
+  - 自動車のリースと長期レンタルの見積もりを比較するマーケットプレイス。
 
 *素晴らしいヒーロー画像を提供してくれた [@junhoyeo](https://github.com/junhoyeo) 氏に特別な感謝を。*

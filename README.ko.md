@@ -460,5 +460,7 @@ Credit: LazyCodex 이름 아이디어는 [LazyVim](https://github.com/LazyVim/La
 - [ELESTYLE](https://elestyle.jp)
   - elepay(멀티 모바일 결제 게이트웨이), OneQR(캐시리스 솔루션용 모바일 앱 SaaS) 개발사.
 - [Deepgram](https://deepgram.com)
+- [Chazm](https://chazm.co.kr)
+  - 자동차 리스와 장기렌트 견적을 비교하는 마켓플레이스.
 
 *훌륭한 hero 이미지를 만들어준 [@junhoyeo](https://github.com/junhoyeo)에게 특별히 감사드립니다.*
