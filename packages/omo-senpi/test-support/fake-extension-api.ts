@@ -152,6 +152,21 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     this.mcpServers.push({ name, config })
   }
 
+  // In-memory provider registrations (senpi ExtensionAPI registerProvider): complete
+  // pi-ai Providers land in `providers`, legacy name+config pairs in `providerConfigs`.
+  readonly providers: import("@earendil-works/pi-ai").Provider[] = []
+  readonly providerConfigs: Array<{ name: string; config: Record<string, unknown> }> = []
+
+  registerProvider(provider: import("@earendil-works/pi-ai").Provider): void
+  registerProvider(name: string, config: Record<string, unknown>): void
+  registerProvider(providerOrName: unknown, config?: Record<string, unknown>): void {
+    if (typeof providerOrName === "string") {
+      this.providerConfigs.push({ name: providerOrName, config: config ?? {} })
+      return
+    }
+    this.providers.push(providerOrName as import("@earendil-works/pi-ai").Provider)
+  }
+
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {
     const results: unknown[] = []

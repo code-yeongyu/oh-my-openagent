@@ -293,6 +293,56 @@
       "output": 131072
     }
   },
+  "MiMo-V2.6-Flash": {
+    "name": "MiMo-V2.6-Flash",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.14,
+      "output": 0.28,
+      "cache_read": 0.0028,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 131072
+    }
+  },
+  "MiMo-V2.6-Pro": {
+    "name": "MiMo-V2.6-Pro",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0.435,
+      "output": 0.87,
+      "cache_read": 0.0036,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 1048576,
+      "output": 131072
+    }
+  },
   "MiniMax M3": {
     "name": "MiniMax M3",
     "reasoning": true,
@@ -359,6 +409,56 @@
     "cost": {
       "input": 0.45,
       "output": 3.2,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 262144,
+      "output": 65536
+    }
+  },
+  "SenseNova 6.7 Flash-Lite": {
+    "name": "SenseNova 6.7 Flash-Lite",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "limit": {
+      "context": 262144,
+      "output": 65536
+    }
+  },
+  "SenseNova 6.8 Flash-Lite": {
+    "name": "SenseNova 6.8 Flash-Lite",
+    "reasoning": true,
+    "tool_call": true,
+    "attachment": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "cost": {
+      "input": 0,
+      "output": 0,
       "cache_read": 0,
       "cache_write": 0
     },

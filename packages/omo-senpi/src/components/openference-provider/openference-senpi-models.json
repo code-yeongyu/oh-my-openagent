@@ -269,6 +269,40 @@
     }
   },
   {
+    "id": "MiMo-V2.6-Flash",
+    "name": "MiMo-V2.6-Flash",
+    "reasoning": true,
+    "input": [
+      "text",
+      "image"
+    ],
+    "contextWindow": 1048576,
+    "maxTokens": 131072,
+    "cost": {
+      "input": 0.14,
+      "output": 0.28,
+      "cacheRead": 0.0028,
+      "cacheWrite": 0
+    }
+  },
+  {
+    "id": "MiMo-V2.6-Pro",
+    "name": "MiMo-V2.6-Pro",
+    "reasoning": true,
+    "input": [
+      "text",
+      "image"
+    ],
+    "contextWindow": 1048576,
+    "maxTokens": 131072,
+    "cost": {
+      "input": 0.435,
+      "output": 0.87,
+      "cacheRead": 0.0036,
+      "cacheWrite": 0
+    }
+  },
+  {
     "id": "MiniMax M3",
     "name": "MiniMax M3",
     "reasoning": true,
@@ -331,6 +365,56 @@
       "medium": "medium",
       "high": null,
       "xhigh": "xhigh",
+      "max": null
+    }
+  },
+  {
+    "id": "SenseNova 6.7 Flash-Lite",
+    "name": "SenseNova 6.7 Flash-Lite",
+    "reasoning": true,
+    "input": [
+      "text",
+      "image"
+    ],
+    "contextWindow": 262144,
+    "maxTokens": 65536,
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    },
+    "thinkingLevelMap": {
+      "minimal": null,
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": null,
+      "max": null
+    }
+  },
+  {
+    "id": "SenseNova 6.8 Flash-Lite",
+    "name": "SenseNova 6.8 Flash-Lite",
+    "reasoning": true,
+    "input": [
+      "text",
+      "image"
+    ],
+    "contextWindow": 262144,
+    "maxTokens": 65536,
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    },
+    "thinkingLevelMap": {
+      "minimal": null,
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": null,
       "max": null
     }
   }

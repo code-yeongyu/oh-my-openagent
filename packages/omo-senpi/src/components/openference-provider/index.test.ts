@@ -1,14 +1,26 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import type { AuthContext, AuthResult, Model, Provider } from "@earendil-works/pi-ai"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { OPENFERENCE_PROVIDER_COMPONENT_NAME, createOpenferenceProviderComponent } from "./index"
-import { OPENFERENCE_ENV_VAR } from "./merge"
+import type { ComponentContext, ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import extension from "../../extension"
+import catalogJson from "./openference-senpi-models.json"
+import {
+  createOpenferenceProviderComponent,
+  OPENFERENCE_BASE_URL,
+  OPENFERENCE_ENV_VAR,
+  OPENFERENCE_PROVIDER_COMPONENT_NAME,
+  OPENFERENCE_USER_AGENT,
+} from "./index"
+
+// The committed catalog is the source of truth for model count; the shape of
+// each entry is pinned by the generator suite.
+const CATALOG_COUNT = (catalogJson as unknown[]).length
 
 const tempDirs: string[] = []
 
@@ -31,6 +43,13 @@ function ctxWithLogger(): { ctx: ComponentContext; warnings: string[] } {
   return { ctx: { logger, config: { getFlag: () => undefined } }, warnings }
 }
 
+function authContext(values: Record<string, string | undefined>): AuthContext {
+  return {
+    env: async (name: string) => values[name],
+    fileExists: async () => false,
+  }
+}
+
 afterEach(() => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop()
@@ -41,7 +60,7 @@ afterEach(() => {
 describe("createOpenferenceProviderComponent", () => {
   const pi = new FakeExtensionAPI()
 
-  test("does nothing without a credential", () => {
+  test("registers nothing without a credential", () => {
     // given an agent dir with no credential
     const dir = agentDir()
 
@@ -49,131 +68,116 @@ describe("createOpenferenceProviderComponent", () => {
     const { ctx } = ctxWithLogger()
     createOpenferenceProviderComponent({ agentDir: dir, env: {} }).register(pi, ctx)
 
-    // then models.json is not created
-    expect(existsSync(join(dir, "models.json"))).toBe(false)
+    // then no provider was registered and the agent dir stayed empty
+    expect(pi.providers.length).toBe(0)
+    expect(pi.providerConfigs.length).toBe(0)
+    expect(readdirSync(dir)).toEqual([])
   })
 
-  test("creates models.json with the bundled catalog when the env credential exists", () => {
-    // given the env credential and no models.json
+  test("registers a complete provider in memory when the env credential exists", () => {
+    // given the env credential
     const dir = agentDir()
+    const before = pi.providers.length
 
     // when the component registers
     const { ctx } = ctxWithLogger()
     createOpenferenceProviderComponent({ agentDir: dir, env: { [OPENFERENCE_ENV_VAR]: "sk-test" } }).register(pi, ctx)
 
-    // then models.json carries the openference provider with the full catalog
-    const doc = JSON.parse(readFileSync(join(dir, "models.json"), "utf8")) as Record<string, unknown>
-    const providers = doc.providers as Record<string, Record<string, unknown>>
-    const provider = providers.openference
-    expect(provider.baseUrl).toBe("https://api.openference.com/v1")
-    expect(provider.api).toBe("openai-completions")
-    expect(provider.apiKey).toBe("$OPENFERENCE_API_KEY")
-    expect(provider.headers).toEqual({ "User-Agent": "pi/openference" })
-    const models = provider.models as Record<string, unknown>[]
-    expect(models.length).toBe(15)
+    // then one provider was registered with the full catalog and the required header
+    expect(pi.providers.length).toBe(before + 1)
+    const provider = pi.providers[pi.providers.length - 1] as Provider
+    expect(provider.id).toBe("openference")
+    expect(provider.baseUrl).toBe(OPENFERENCE_BASE_URL)
+    expect(provider.headers).toEqual({ "User-Agent": OPENFERENCE_USER_AGENT })
+    expect(provider.auth.apiKey?.resolve).toBeDefined()
+
+    const models = provider.getModels() as readonly Model<"openai-completions">[]
+    expect(models.length).toBe(CATALOG_COUNT)
     expect(models.some((model) => model.id === "GLM-5.2")).toBe(true)
     expect(models.some((model) => model.id === "Kimi K2.7 Code")).toBe(true)
+    const glm = models.find((model) => model.id === "GLM-5.2")
+    expect(glm?.contextWindow).toBe(262144)
+    expect(glm?.maxTokens).toBe(128000)
+    expect(glm?.cost).toEqual({ input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 })
+    expect(models.every((model) => model.baseUrl === OPENFERENCE_BASE_URL)).toBe(true)
+    expect(models.every((model) => model.provider === "openference")).toBe(true)
+
+    // and nothing was written to the agent dir
+    expect(readdirSync(dir)).toEqual([])
   })
 
-  test("merges into an existing models.json without touching other providers", () => {
-    // given a models.json with an unrelated provider
+  test("resolves request auth from the stored credential first, then the env var", async () => {
+    // given a registered provider
     const dir = agentDir()
-    const existing = { providers: { ollama: { baseUrl: "http://localhost:11434/v1", api: "openai-completions" } } }
-    writeFileSync(join(dir, "models.json"), JSON.stringify(existing, undefined, 2), "utf8")
-
-    // when the component registers
     const { ctx } = ctxWithLogger()
-    createOpenferenceProviderComponent({ agentDir: dir, env: { [OPENFERENCE_ENV_VAR]: "sk-test" } }).register(pi, ctx)
+    createOpenferenceProviderComponent({ agentDir: dir, env: {} }).register(pi, ctx)
+    const provider = pi.providers[pi.providers.length - 1] as Provider
+    const resolve = provider.auth.apiKey?.resolve
+    if (resolve === undefined) throw new Error("apiKey auth missing")
+    const signal = new AbortController().signal
 
-    // then the ollama block survives verbatim and openference is added
-    const doc = JSON.parse(readFileSync(join(dir, "models.json"), "utf8")) as Record<string, unknown>
-    const providers = doc.providers as Record<string, Record<string, unknown>>
-    expect(providers.ollama).toEqual({ baseUrl: "http://localhost:11434/v1", api: "openai-completions" })
-    expect(providers.openference).toBeDefined()
+    // when auth resolves against a stored credential, an ambient env var, and neither
+    const fromStore = (await resolve({
+      credential: { type: "api_key", key: "sk-stored" },
+      ctx: authContext({}),
+      signal,
+    })) as AuthResult
+    const fromEnv = (await resolve({
+      credential: undefined,
+      ctx: authContext({ [OPENFERENCE_ENV_VAR]: "sk-ambient" }),
+      signal,
+    })) as AuthResult
+    const fromNothing = await resolve({
+      credential: undefined,
+      ctx: authContext({}),
+      signal,
+    })
+
+    // then the stored key wins, ambient env still authenticates, and no
+    // credential resolves to undefined so the engine owns availability instead
+    // of a config entry that cannot work
+    expect(fromStore).toEqual({ auth: { apiKey: "sk-stored" }, source: "stored API key" })
+    expect(fromEnv).toEqual({ auth: { apiKey: "sk-ambient" }, source: OPENFERENCE_ENV_VAR })
+    expect(fromNothing).toBeUndefined()
   })
 
-  test("keeps a user-pinned model entry verbatim", () => {
-    // given a models.json where the user pinned GLM-5.2 under openference
+  test("skips with a warning on hosts without registerProvider", () => {
+    // given a host API whose provider registration is not available
     const dir = agentDir()
-    const existing = {
-      providers: { openference: { models: [{ id: "GLM-5.2", name: "Pinned", contextWindow: 1234, maxTokens: 56 }] } },
-    }
-    writeFileSync(join(dir, "models.json"), JSON.stringify(existing, undefined, 2), "utf8")
+    const olderHost = new FakeExtensionAPI()
+    ;(olderHost as { registerProvider?: unknown }).registerProvider = undefined
 
-    // when the component registers
-    const { ctx } = ctxWithLogger()
-    createOpenferenceProviderComponent({ agentDir: dir, env: { [OPENFERENCE_ENV_VAR]: "sk-test" } }).register(pi, ctx)
-
-    // then the pinned entry stays first and unchanged, and the rest of the catalog follows
-    const doc = JSON.parse(readFileSync(join(dir, "models.json"), "utf8")) as Record<string, unknown>
-    const models = ((doc.providers as Record<string, Record<string, unknown>>).openference.models) as Record<
-      string,
-      unknown
-    >[]
-    expect(models[0]).toEqual({ id: "GLM-5.2", name: "Pinned", contextWindow: 1234, maxTokens: 56 })
-    expect(models.length).toBe(15)
-  })
-
-  test("leaves malformed models.json untouched with a warning", () => {
-    // given a models.json that is not valid JSON
-    const dir = agentDir()
-    const malformed = "{ not json"
-    writeFileSync(join(dir, "models.json"), malformed, "utf8")
-
-    // when the component registers
+    // when the component registers with the credential present
     const { ctx, warnings } = ctxWithLogger()
-    createOpenferenceProviderComponent({ agentDir: dir, env: { [OPENFERENCE_ENV_VAR]: "sk-test" } }).register(pi, ctx)
+    createOpenferenceProviderComponent({ agentDir: dir, env: { [OPENFERENCE_ENV_VAR]: "sk-test" } }).register(
+      olderHost as SenpiExtensionAPI,
+      ctx,
+    )
 
-    // then the file content is unchanged and a warning was logged
-    expect(readFileSync(join(dir, "models.json"), "utf8")).toBe(malformed)
+    // then it skipped instead of failing
     expect(warnings.length).toBe(1)
+    expect(olderHost.providers.length).toBe(0)
   })
 
-  test("is idempotent: a second registration rewrites nothing", () => {
-    // given a first registration that wrote models.json
-    const dir = agentDir()
-    const env = { [OPENFERENCE_ENV_VAR]: "sk-test" }
-    const { ctx } = ctxWithLogger()
-    const component = createOpenferenceProviderComponent({ agentDir: dir, env })
-    component.register(pi, ctx)
-    const firstWrite = readFileSync(join(dir, "models.json"), "utf8")
-
-    // when the component registers a second time
-    component.register(pi, ctx)
-
-    // then the file is byte-identical
-    expect(readFileSync(join(dir, "models.json"), "utf8")).toBe(firstWrite)
-  })
-
-  test("writes 2-space indented JSON with a trailing newline", () => {
-    // given a fresh registration
-    const dir = agentDir()
-
-    // when the component registers
-    const { ctx } = ctxWithLogger()
-    createOpenferenceProviderComponent({ agentDir: dir, env: { [OPENFERENCE_ENV_VAR]: "sk-test" } }).register(pi, ctx)
-
-    // then the file follows the repo's JSON serialization conventions
-    const raw = readFileSync(join(dir, "models.json"), "utf8")
-    expect(raw.endsWith("}\n")).toBe(true)
-    expect(raw.split("\n")[1]).toBe('  "providers": {')
-  })
-
-  test("accepts an auth.json openference entry instead of the env var", () => {
+  test("registers from an auth.json openference entry instead of the env var", () => {
     // given auth.json with an openference login entry and no env credential
     const dir = agentDir()
     writeFileSync(
       join(dir, "auth.json"),
-      JSON.stringify({ openference: { type: "api_key", apiKey: "sk-from-login" } }),
+      JSON.stringify({ openference: { type: "api_key", key: "sk-from-login" } }),
       "utf8",
     )
+    const before = pi.providers.length
 
     // when the component registers
     const { ctx } = ctxWithLogger()
     createOpenferenceProviderComponent({ agentDir: dir, env: {} }).register(pi, ctx)
 
-    // then models.json was written
-    expect(existsSync(join(dir, "models.json"))).toBe(true)
+    // then the provider was registered and auth.json was left untouched
+    expect(pi.providers.length).toBe(before + 1)
+    expect(JSON.parse(readFileSync(join(dir, "auth.json"), "utf8"))).toEqual({
+      openference: { type: "api_key", key: "sk-from-login" },
+    })
   })
 
   test("component name drives the standard disable flag", () => {
@@ -184,5 +188,69 @@ describe("createOpenferenceProviderComponent", () => {
     // then its name follows the omo-senpi-<name>-disabled flag convention
     expect(component.name).toBe(OPENFERENCE_PROVIDER_COMPONENT_NAME)
     expect(component.name).toBe("openference-provider")
+  })
+})
+
+describe("production extension composes without filesystem effects", () => {
+  const savedEnv: Record<string, string | undefined> = {}
+  const pinnedVars = ["OPENFERENCE_API_KEY", "OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"] as const
+
+  function pinEnv(key: string, value: string | undefined): void {
+    savedEnv[key] = process.env[key]
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
+  }
+
+  afterEach(() => {
+    for (const key of pinnedVars) {
+      if (savedEnv[key] === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = savedEnv[key]
+      }
+      delete savedEnv[key]
+    }
+  })
+
+  test("composing the real extension with a credential present registers in memory and writes nothing", async () => {
+    // given a credential in the environment and a temp agent dir pinned through
+    // the same env vars the production roster reads
+    const dir = agentDir()
+    pinEnv(OPENFERENCE_ENV_VAR, "sk-test")
+    pinEnv("OMO_CODING_AGENT_DIR", dir)
+    pinEnv("SENPI_CODING_AGENT_DIR", dir)
+    pinEnv("PI_CODING_AGENT_DIR", dir)
+    const fakePi = new FakeExtensionAPI()
+
+    // when the REAL extension entry composes and registers every component
+    await extension(fakePi)
+
+    // then the openference provider registered in memory and the pinned agent
+    // dir gained no provider config: the composition path touches no user file
+    // (regression guard for the models.json writer this component used before
+    // the registerProvider redesign)
+    expect(fakePi.providers.some((provider) => provider.id === "openference")).toBe(true)
+    expect(existsSync(join(dir, "models.json"))).toBe(false)
+    expect(readdirSync(dir)).toEqual([])
+  })
+
+  test("composing the real extension without a credential registers no openference provider", async () => {
+    // given no credential in the environment
+    const dir = agentDir()
+    pinEnv(OPENFERENCE_ENV_VAR, undefined)
+    pinEnv("OMO_CODING_AGENT_DIR", dir)
+    pinEnv("SENPI_CODING_AGENT_DIR", dir)
+    pinEnv("PI_CODING_AGENT_DIR", dir)
+    const fakePi = new FakeExtensionAPI()
+
+    // when the real extension entry composes
+    await extension(fakePi)
+
+    // then no openference provider exists and the agent dir is untouched
+    expect(fakePi.providers.some((provider) => provider.id === "openference")).toBe(false)
+    expect(readdirSync(dir)).toEqual([])
   })
 })

@@ -6,9 +6,9 @@ import { join } from "node:path"
  * either the `OPENFERENCE_API_KEY` env var holds a non-empty value, or the
  * engine's `<agentDir>/auth.json` carries an `openference` login entry.
  *
- * The auth.json entry check stays shape-tolerant on purpose: the engine owns the
- * file and its entry shape (type/apiKey fields) varies by login flow, while the
- * component only needs to know the user ever authenticated with openference.
+ * auth.json is engine-owned: `/login openference` writes one of the canonical
+ * credential shapes (api_key or oauth), so the check accepts exactly those and
+ * fails closed on anything else.
  */
 export function hasOpenferenceCredential({
   agentDir,
@@ -25,8 +25,8 @@ export function hasOpenferenceCredential({
     const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
     const entry = parsed.openference
     if (entry === null || typeof entry !== "object") return false
-    const record = entry as Record<string, unknown>
-    return typeof record.type === "string" || typeof record.apiKey === "string"
+    const type = (entry as { type?: unknown }).type
+    return type === "api_key" || type === "oauth"
   } catch {
     return false
   }

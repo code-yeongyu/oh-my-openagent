@@ -57,12 +57,22 @@ describe("hasOpenferenceCredential", () => {
     expect(connected).toBe(true)
   })
 
-  test("accepts an auth.json openference entry carrying only an apiKey", () => {
-    // given auth.json with an openference entry missing the type field
-    const dir = agentDirWith({ openference: { apiKey: "sk-test" } })
+  test("accepts an oauth-shaped openference entry", () => {
+    // given auth.json with an openference oauth credential (no apiKey field)
+    const dir = agentDirWith({ openference: { type: "oauth", refresh: "r", access: "a", expires: 1 } })
 
     // when the credential gate runs
     expect(hasOpenferenceCredential({ agentDir: dir, env: {} })).toBe(true)
+  })
+
+  test("rejects credential shapes the login flow never writes", () => {
+    // given auth.json entries with unknown or missing types
+    const unknownType = agentDirWith({ openference: { type: "magic", key: "sk-test" } })
+    const noType = agentDirWith({ openference: { apiKey: "sk-test" } })
+
+    // when the credential gate runs
+    expect(hasOpenferenceCredential({ agentDir: unknownType, env: {} })).toBe(false)
+    expect(hasOpenferenceCredential({ agentDir: noType, env: {} })).toBe(false)
   })
 
   test("ignores auth.json entries for other providers", () => {

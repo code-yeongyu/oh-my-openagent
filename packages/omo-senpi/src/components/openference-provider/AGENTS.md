@@ -1,53 +1,47 @@
 # openference-provider
 
-Credential-gated registration of the [Openference](https://openference.com) provider (an
-OpenAI-compatible gateway serving curated open-source models) into the engine's
-`models.json` (Pi `docs/models.md` provider-config form), so a credentialed machine gets
-the full model catalog with correct context windows and costs without hand-writing
-config. The OpenCode edition ships the same provider via
+Credential-gated IN-MEMORY registration of the [Openference](https://openference.com)
+provider (an OpenAI-compatible gateway serving curated open-source models) through
+`pi.registerProvider(createProvider(...))` — no user-config mutation, nothing persisted:
+when the credential is gone on the next load, the provider is simply not registered.
+The OpenCode edition ships the same gateway via
 `packages/omo-opencode/src/features/openference-provider/`.
 
 ## Files
 
 | Path | Purpose |
 |------|---------|
-| `index.ts` | Component factory `createOpenferenceProviderComponent(options)`; load-time, synchronous, atomic write |
-| `auth.ts` | `hasOpenferenceCredential`: `OPENFERENCE_API_KEY` env var or an `openference` entry in `<agentDir>/auth.json` (shape-tolerant: any object entry with a `type` or `apiKey` field) |
-| `merge.ts` | Pure `mergeOpenferenceProvider(existing, catalog)` with fill-only-missing semantics + the shared constants |
-| `types.ts` | Pi model-entry shape (`OpenferenceSenpiModelEntry`, `OpenferenceSenpiCatalog`) |
+| `index.ts` | Component factory `createOpenferenceProviderComponent(options)`; builds the complete pi-ai Provider and registers it on load |
+| `auth.ts` | `hasOpenferenceCredential`: `OPENFERENCE_API_KEY` env var or an `openference` entry in `<agentDir>/auth.json` (exactly the shapes `/login` writes: `type: api_key` or `oauth`) |
+| `types.ts` | Committed-catalog entry shape (Pi models.json model-entry form) |
 | `openference-senpi-models.json` | Generated catalog; refresh with `bun run packages/omo-senpi/scripts/generate-openference-models.ts` |
-| `../../../scripts/generate-openference-models.ts` | Generator mapping the public unauthenticated `GET /v1/models` listing onto the Pi entry shape (gates: text output, `tool_calling === true`, both limits published; emits `thinkingLevelMap` from published efforts) |
+| `../../../scripts/generate-openference-models.ts` | Generator mapping the public unauthenticated `GET /v1/models` listing onto the entry shape (gates: text output, `tool_calling === true`, both limits published; emits `thinkingLevelMap` from published efforts) |
 
 ## Behavior
 
 - **Gate:** registration happens at EXTENSION LOAD (x-search pattern). Without a
-  credential the component logs on the debug channel and returns: `models.json` is never
-  created or touched. Gated by the standard `omo-senpi-openference-provider-disabled`
-  flag via the composition layer.
-- **Merge:** fill-only-missing at every level - provider fields, header values
-  (one level deep), and whole model entries identified by `id`. A user-pinned model
-  entry always wins; catalog ids the user's list lacks are appended. When nothing is
-  missing the file is left byte-identical (no write).
-- **Abort, never clobber:** unparsable `models.json`, a non-object `providers` record, a
-  non-object `openference` slot, or a non-array `models` under `openference` each log a
-  warning and leave the file untouched.
-- **Write:** temp file + rename in the agent dir (atomic), 2-space indent, trailing
-  newline. The engine reloads `models.json` on every `/model` open, so no restart is
-  needed.
-- **Provider block:** `baseUrl https://api.openference.com/v1`, `api openai-completions`,
-  `apiKey $OPENFERENCE_API_KEY` (engine env interpolation), and the
-  `User-Agent: pi/openference` header - Openference rejects requests without a `pi/`
-  User-Agent with 403 "coding agent required".
-- **Removal never happens:** a credential that disappears later leaves the block in place
-  for the user to manage (same invariant as the OpenCode side).
+  credential the component logs on the debug channel and registers nothing. Gated by
+  the standard `omo-senpi-openference-provider-disabled` flag via the composition layer.
+- **In-memory only:** the provider is registered through the engine's provider
+  registration API; `models.json` and every other user-config file are never read for
+  writing, created, or mutated. Hosts without `registerProvider` (older engines) get a
+  warn-level skip via feature detection, not a failure.
+- **Request auth is engine-owned:** `auth.apiKey.resolve` merges the stored `/login`
+  credential with the env var per field (`credential.key ?? env("OPENFERENCE_API_KEY")`),
+  so both credential paths work identically and no key value ever lands in config.
+  `/login openference` prompts for the key through the registered `login` flow
+  (useful for rotation or moving from env to stored). With no resolvable credential the
+  provider reports unauthenticated and the engine owns model availability.
+- **Required header:** the provider carries `User-Agent: pi/openference` — Openference
+  rejects requests without a `pi/` User-Agent with 403 "coding agent required".
+- **Catalog:** committed, generated from the live listing; models complete into full
+  pi-ai Model objects at registration (api/provider/baseUrl filled from the block).
+  `cacheWrite` cost stays at the zero default (Openference publishes no cache-write rate).
 
-## Conventions
+## Notes
 
-- The generated catalog is committed; the generator is a standalone Bun executable run
-  by path, mirroring `packages/omo-opencode/scripts/generate-opengateway-models.ts`.
-  Catalog model IDs contain spaces (e.g. `Kimi K2.7 Code`) - Openference ids are not
-  owner-prefixed.
-- `cacheWrite` cost stays at the zero default: Openference publishes no cache-write rate,
-  and borrowing the input rate would misreport usage.
+- Catalog model ids are not owner-prefixed and contain spaces (`Kimi K2.7 Code`,
+  `SenseNova 6.8 Flash-Lite`); quote them in CLI selections:
+  `senpi -p --provider openference --model "Kimi K2.7 Code" ...`.
 - The live listing is the source of truth for reasoning control (it may disagree with
   Openference's static docs tables); the generator follows the listing.

@@ -33,6 +33,8 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import type { ThinkingLevel, ThinkingLevelMap } from "@earendil-works/pi-ai"
+
 import type {
   OpenferenceSenpiCatalog,
   OpenferenceSenpiModelEntry,
@@ -48,7 +50,7 @@ const PER_TOKEN_TO_PER_MILLION = 1_000_000
 const COST_DECIMALS = 4
 
 /** Senpi thinking levels that map onto published provider effort words. */
-const SENPI_EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const
+const SENPI_EFFORT_LEVELS: readonly ThinkingLevel[] = ["minimal", "low", "medium", "high", "xhigh", "max"]
 
 export interface OpenferenceCatalogModel {
   readonly id: string
@@ -86,7 +88,7 @@ function perMillion(price: string | undefined): number {
   return Math.round((Number.isFinite(value) ? value : 0) * factor) / factor
 }
 
-function thinkingLevelMap(model: OpenferenceCatalogModel): { readonly [level: string]: string | null } | undefined {
+function thinkingLevelMap(model: OpenferenceCatalogModel): ThinkingLevelMap | undefined {
   const reasoning = model.reasoning
   if (reasoning?.control === "always_on") {
     // Reasoning is always emitted: there is no off switch, so the off level is
@@ -96,7 +98,7 @@ function thinkingLevelMap(model: OpenferenceCatalogModel): { readonly [level: st
   if (reasoning?.control !== "effort") return undefined
   const efforts = reasoning.supported_efforts
   if (efforts === undefined || efforts.length === 0) return undefined
-  const map: Record<string, string | null> = {}
+  const map: ThinkingLevelMap = {}
   for (const level of SENPI_EFFORT_LEVELS) {
     map[level] = efforts.includes(level) ? level : null
   }

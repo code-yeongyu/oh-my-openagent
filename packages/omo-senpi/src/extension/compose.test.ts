@@ -152,7 +152,10 @@ describe("composeOmoSenpiExtension", () => {
 
   it("#given a component using optional registerMcpServer on an old API #when composed #then skips that component and registers later components", async () => {
     // given
-    const pi: Omit<FakeExtensionAPI, "registerMcpServer"> & { registerMcpServer?: undefined } = {
+    const pi: Omit<
+      FakeExtensionAPI,
+      "registerMcpServer" | "registerProvider" | "providers" | "providerConfigs"
+    > & { registerMcpServer?: undefined; registerProvider?: undefined } = {
       handlers: [],
       tools: [],
       removedToolHints: new Map(),

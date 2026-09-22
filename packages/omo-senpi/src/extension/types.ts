@@ -56,6 +56,14 @@ export interface SenpiExtensionAPI {
   registerMessageRenderer?(customType: string, renderer: unknown): void
   appendEntry?(customType: string, data?: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /**
+   * In-memory provider registration (engine ExtensionAPI registerProvider): a complete
+   * pi-ai Provider built with `createProvider`, or the legacy name+config form. Optional
+   * because hosts older than the release that added provider registration do not expose it;
+   * the registering component must skip on older hosts (feature detection, no hard failure).
+   */
+  registerProvider?(provider: import("@earendil-works/pi-ai").Provider): void
+  registerProvider?(name: string, config: Record<string, unknown>): void
 }
 
 export interface ComponentLogger {
