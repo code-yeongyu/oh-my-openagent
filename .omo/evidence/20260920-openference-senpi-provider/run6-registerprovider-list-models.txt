@@ -4,9 +4,7 @@ alibaba-token-plan          deepseek-v4-flash                                   
 alibaba-token-plan          deepseek-v4-flash-0731                                    1M       384K     yes       no    
 alibaba-token-plan          deepseek-v4-pro                                           1M       384K     yes       no    
 alibaba-token-plan          deepseek-v4-pro-0813                                      1M       384K     yes       no    
-alibaba-token-plan          deepseek-v4.1-flash                                       1M       384K     yes       yes   
-alibaba-token-plan          glm-5                                                     202.8K   16.4K    yes       no    
-... excerpt: openference rows only (full listing is one command, see README) ...
+... excerpt: openference rows only ...
 openference                 Auto                                                      131.1K   131.1K   yes       no    
 openference                 DeepSeek-V4-Flash-0731                                    1.0M     384K     yes       yes   
 openference                 DeepSeek-V4-Pro-0813                                      1.0M     384K     yes       no    
@@ -19,6 +17,10 @@ openference                 GLM-5.3                                             
 openference                 GLM-5.3-Flash                                             1.0M     128K     yes       yes   
 openference                 Kimi K2.6                                                 262.1K   131.1K   yes       yes   
 openference                 Kimi K2.7 Code                                            262.1K   131.1K   yes       yes   
+openference                 MiMo-V2.6-Flash                                           1.0M     131.1K   yes       yes   
+openference                 MiMo-V2.6-Pro                                             1.0M     131.1K   yes       yes   
 openference                 MiniMax M3                                                1.0M     131.1K   yes       yes   
 openference                 Nemotron-3-120B                                           256K     131.1K   yes       no    
 openference                 Qwen3.8 27b                                               262.1K   65.5K    yes       yes   
+openference                 SenseNova 6.7 Flash-Lite                                  262.1K   65.5K    yes       yes   
+openference                 SenseNova 6.8 Flash-Lite                                  262.1K   65.5K    yes       yes   
