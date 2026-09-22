@@ -101,21 +101,31 @@ const ulwExecuteCodexCompletion = `When all top-level checkboxes in \`## TODOs\`
 const ulwExecuteOriginalHardRule = `- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
 - No \`--dry-run\` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
-- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
+- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, authors tests, or produces QA deliverables - a spawned worker does. Root DOES personally gate-verify every worker claim (read the diff, run the automated checks, reproduce the Manual-QA artifact) before a checkbox closes; delegating that verification is a defect.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
 - No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.
-- No unprefixed session ids in Boulder state. Sessions are always recorded as \`codex:<session_id>\`.
+- No unprefixed session ids in Boulder state. Sessions are recorded with the harness platform prefix (\`<platform>:<session_id>\`).
 - No stale-memory execution. The plan and ledger are the durable source of truth.`;
 
 const ulwExecuteCodexHardRule = `- No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
 - No \`--dry-run\` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
-- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
+- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, authors tests, or produces QA deliverables - a spawned worker does. Root DOES personally gate-verify every worker claim (read the diff, run the automated checks, reproduce the Manual-QA artifact) before a checkbox closes; delegating that verification is a defect.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
 - No implementation, review, or merge in the main checkout; every phase works in a task-owned worktree.
 - No unprefixed session ids in Boulder state. Sessions are always recorded as \`codex:<session_id>\`.
-- No stale-memory execution. The plan and ledger are the durable source of truth.
-- Codex final verification is the exception to the delegated-QA-only rule above: perform your own manual QA on the real surface and record a self-review before completion.`;
+- No stale-memory execution. The plan and ledger are the durable source of truth.`;
+
+const ulwExecuteCodexReliabilityGuidance = `### Codex tier mapping for the delegation router
+When tier worker agents are installed, map the delegation router's parenthesized difficulty to \`agent_type\`: (low) -> \`lazycodex-worker-low\`; (medium) -> \`lazycodex-worker-medium\`; (high) -> \`lazycodex-worker-high\`. Explorer/librarian research lanes keep their own roles. On spawn surfaces without \`agent_type\`, state the tier inside \`message\`. Difficulty (model power) is orthogonal to the LIGHT/HEAVY rigor tier in step 4 — judge each on its own facts.
+
+## Codex Subagent Reliability
+
+Every \`multi_agent_v1.spawn_agent\` message is a self-contained executable assignment: \`TASK: <imperative assignment>\`, then \`DELIVERABLE\`, \`SCOPE\`, and \`VERIFY\`, with role instructions inside \`message\`. Use \`fork_context: false\` unless full history is truly required; paste only the context the child needs.
+
+Plan and reviewer agents may run for a long time: spawn them in the background and keep doing independent root work. Between \`multi_agent_v1.wait_agent\` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles. A timeout only means no new mailbox update arrived; treat a running child as alive. Require \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. Keep the parent visibly alive with active subagent count, names, and latest \`WORKING:\` phase. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running — then record inconclusive (never a pass), close if safe, and respawn a smaller \`fork_context: false\` task with the missing deliverable.
+
+`;
 
 const reviewWorkCodexGate = `
 On Codex, use \`review-work\` only when the user asks for a review or demands
@@ -168,7 +178,9 @@ export function removeCodexSkillOverlays(skillName, content) {
 	if (skillName === "ulw-execute") {
 		return content
 			.replace(ulwExecuteCodexCompletion, ulwExecuteOriginalCompletion)
-			.replace(ulwExecuteCodexHardRule, ulwExecuteOriginalHardRule);
+			.replace(ulwExecuteCodexHardRule, ulwExecuteOriginalHardRule)
+			.replace(ulwExecuteCodexReliabilityGuidance, "")
+			.replace(/codex:<session_id>/g, "<platform>:<session_id>");
 	}
 	if (skillName === "review-work") {
 		return content.replace(reviewWorkCodexGatePattern, "");

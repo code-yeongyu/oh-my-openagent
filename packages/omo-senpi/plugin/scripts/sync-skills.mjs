@@ -108,7 +108,7 @@ function applyTier1Adaptation(content) {
 }
 
 function applyUlwExecuteOverlay(content) {
-  return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
+  return content.replace(/<platform>:<session_id>/g, "senpi:<session_id>")
 }
 
 function applySharedTierAdaptation(skillName, content) {

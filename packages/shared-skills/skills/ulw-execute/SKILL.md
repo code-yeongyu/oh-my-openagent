@@ -5,41 +5,19 @@ description: "Executes a written ulw-plan work plan with Boulder state, evidence
 
 ## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER
 
-**YOU DO NOT WRITE CODE. YOU DO NOT EDIT PRODUCT FILES. YOU DO NOT RUN QA YOURSELF. EVERY unit of implementation, test, QA, and review work MUST be delegated to a spawned subagent. NO EXCEPTIONS.** Your hands touch only plan selection, `.omo/` state (Boulder, ledger, plan checkboxes), decomposition, dispatch, verdicts, and evidence records. About to edit a product file or run an implementation command yourself? **STOP. SPAWN A WORKER INSTEAD.** Orchestrate at **MAXIMUM PARALLELISM**: every independent unit runs concurrently; only named dependencies serialize.
-
-## Codex Harness Tool Compatibility
-
-Translate any OpenCode-only tool name in an inherited example to its Codex equivalent:
-
-| OpenCode example | Codex tool to use |
-| --- | --- |
-| final-review `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})` |
-| worker `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as <role>. ...","fork_context":false})` — for implementation workers add `agent_type: "lazycodex-worker-<low|medium|high>"` when the spawn schema exposes `agent_type` |
-| `background_output(task_id="...")` | `multi_agent_v1.wait_agent(...)` for mailbox signals |
-| `team_*(...)` | `multi_agent_v1.spawn_agent` + `multi_agent_v1.send_input` + `multi_agent_v1.wait_agent` + `multi_agent_v1.close_agent` |
-
-When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
-
-Codex exposes ONE of two subagent tool surfaces per session; check your own tool list and route accordingly. If `multi_agent_v1.*` tools exist, use the table above as written. If instead a flat `spawn_agent` with a required `task_name` exists (`multi_agent_v2`), rewrite every `multi_agent_v1.*` example: `multi_agent_v1.spawn_agent({...,"fork_context":false})` becomes `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":...,"agent_type":...,"fork_turns":"none"})` (`"all"` only when full parent history is truly required); `send_input` becomes `send_message`; do not call `close_agent`/`resume_agent` (finished agents end on their own; `followup_task` re-tasks one, `interrupt_agent` stops one); `wait_agent` takes only `timeout_ms` and returns on any child mailbox activity. On the v2 surface `agent_type` may be absent from the spawn schema — when absent, omit it and describe the role inside `message`. If a code block below conflicts with this section, this section wins.
-
-### Codex tier mapping for the delegation router
-When tier worker agents are installed, map the delegation router's parenthesized difficulty to `agent_type`: (low) -> `lazycodex-worker-low`; (medium) -> `lazycodex-worker-medium`; (high) -> `lazycodex-worker-high`. Explorer/librarian research lanes keep their own roles. On spawn surfaces without `agent_type`, state the tier inside `message`. Difficulty (model power) is orthogonal to the LIGHT/HEAVY rigor tier in step 4 — judge each on its own facts.
-
-## Codex Subagent Reliability
-
-Every `multi_agent_v1.spawn_agent` message is a self-contained executable assignment: `TASK: <imperative assignment>`, then `DELIVERABLE`, `SCOPE`, and `VERIFY`, with role instructions inside `message`. Use `fork_context: false` unless full history is truly required; paste only the context the child needs.
-
-Plan and reviewer agents may run for a long time: spawn them in the background and keep doing independent root work. Between `multi_agent_v1.wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles. A timeout only means no new mailbox update arrived; treat a running child as alive. Require `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. Keep the parent visibly alive with active subagent count, names, and latest `WORKING:` phase. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running — then record inconclusive (never a pass), close if safe, and respawn a smaller `fork_context: false` task with the missing deliverable.
+**YOU DO NOT WRITE CODE. YOU DO NOT EDIT PRODUCT FILES. YOU DO NOT AUTHOR TESTS OR QA ARTIFACTS. EVERY unit of implementation, test-authoring, and hands-on QA work MUST be delegated to a spawned subagent. NO EXCEPTIONS on authored work.** Your hands touch plan selection, `.omo/` state (Boulder, ledger, plan checkboxes), decomposition, dispatch, verdicts, and evidence records, plus gate verification: when a worker claims done, YOU personally read the diff, run the automated checks, and reproduce the Manual-QA artifact before any checkbox closes. Verifying a worker's claim is your own duty; producing the implementation or its QA evidence is not. About to edit a product file, author a test, or craft QA output yourself? **STOP. SPAWN A WORKER INSTEAD.** Orchestrate at **MAXIMUM PARALLELISM**: every independent unit runs concurrently; only named dependencies serialize.
 
 # ulw-execute
 
-Execute a work plan until every top-level checkbox is complete. This skill pairs with the harness's ulw-execute continuation hook, which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
+Execute a work plan until every top-level checkbox is complete. This skill pairs with the harness's ulw-execute continuation hook, which re-injects the next turn while `.omo/boulder.json` says this session still has unchecked plan work.
 
 ## Usage
 
 ```text
-$ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]
+/ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]
 ```
+
+In Codex, invoke the same skill as `$ulw-execute`.
 
 - `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
 - `--worktree` (optional): reuse an existing task-owned worktree for the first phase instead of creating one; every phase runs in a task-owned worktree regardless.
@@ -76,7 +54,7 @@ When the user explicitly said `start work` / `$ulw-execute` and no selectable pl
 
 ## Phase 2: Create or update Boulder state
 
-Write `.omo/boulder.json` before implementation starts. Prefix session ids with `codex:` so the continuation hook can identify its own session.
+Write `.omo/boulder.json` before implementation starts. Record session ids with the harness platform prefix (`<platform>:<session_id>`) so the continuation hook can identify its own session.
 
 ```json
 {
@@ -87,7 +65,7 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
       "work_id": "<work-id>",
       "active_plan": ".omo/plans/<plan-name>.md",
       "plan_name": "<plan-name>",
-      "session_ids": ["codex:<session_id>"],
+      "session_ids": ["<platform>:<session_id>"],
       "status": "active",
       "worktree_path": null
     }
@@ -207,7 +185,7 @@ A worker done claim is never final: each implementation sub-task returns a `Done
 
 Rules:
 - `confirmed` is the only pass verdict. `false-positive`, `needs-fix`, and `needs-human-review` all block checkbox completion.
-- The verifier must be independent from the executor: use the harness's gate reviewer (see the harness compatibility section) or a fresh reviewer worker on a strong model, or root only when root did not implement or materially rewrite that task.
+- The verifier must be independent from the executor: use the harness's gate reviewer or a fresh reviewer worker on a strong model. Root personally gate-verifies a worker claim only when root did not implement or materially rewrite that task, and never counts its own implementation as verified.
 - A worker done claim must be independently verified before it becomes checkbox completion.
 - On any non-confirmed verdict, append the feedback to the ledger, reset the checkbox work to in-progress, and re-dispatch the executor with the exact failure.
 - The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.
@@ -235,8 +213,8 @@ When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are
 - No production change before a failing-first proof exists (unit test at a seam, otherwise the failing Manual-QA scenario), and no change to existing behavior before a baseline characterization test pins the current behavior and passes on the unchanged code.
 - No `--dry-run` as completion evidence.
 - No tests-only completion claim. A Manual-QA artifact is required.
-- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself — a spawned worker does.
+- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, authors tests, or produces QA deliverables - a spawned worker does. Root DOES personally gate-verify every worker claim (read the diff, run the automated checks, reproduce the Manual-QA artifact) before a checkbox closes; delegating that verification is a defect.
 - No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.
 - No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.
-- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.
+- No unprefixed session ids in Boulder state. Sessions are recorded with the harness platform prefix (`<platform>:<session_id>`).
 - No stale-memory execution. The plan and ledger are the durable source of truth.
