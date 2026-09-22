@@ -3,7 +3,7 @@
 import { $ } from "bun"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { resolveLatestFlag } from "./release-latest-flag"
+import { resolveReleaseFlags } from "./release-latest-flag"
 import { resolveReleaseVersion } from "./release-version.mjs"
 
 const PACKAGE_NAME = "oh-my-opencode"
@@ -385,8 +385,8 @@ async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<vo
   const releaseExists = await $`gh release view v${newVersion}`.nothrow()
   if (releaseExists.exitCode !== 0) {
     const publishedTags = await $`gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName'`.text()
-    const latestFlag = resolveLatestFlag(newVersion, publishedTags.split("\n").filter(Boolean))
-    await $`gh release create v${newVersion} ${latestFlag} --title "v${newVersion}" --notes ${releaseNotes}`
+    const releaseFlags = resolveReleaseFlags(newVersion, publishedTags.split("\n").filter(Boolean))
+    await $`gh release create v${newVersion} ${releaseFlags} --title "v${newVersion}" --notes ${releaseNotes}`
   } else {
     console.log(`Release v${newVersion} already exists`)
   }

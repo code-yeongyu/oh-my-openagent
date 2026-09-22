@@ -2,23 +2,26 @@
 
 export const RELEASE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
 
-export type LatestFlag = "--latest" | "--latest=false"
+export type ReleaseFlag = "--prerelease" | "--latest" | "--latest=false"
 
 function toReleaseVersion(tag: string): string | null {
   const version = tag.trim().replace(/^v/, "")
   return RELEASE_VERSION_PATTERN.test(version) ? version : null
 }
 
-export function resolveLatestFlag(version: string, releasedTags: readonly string[]): LatestFlag {
+export function resolveReleaseFlags(version: string, releasedTags: readonly string[]): ReleaseFlag[] {
   const target = toReleaseVersion(version)
   if (target === null) {
     throw new TypeError(`Not a release version: ${version}`)
+  }
+  if (target.includes("-")) {
+    return ["--prerelease", "--latest=false"]
   }
   const outranked = releasedTags.some((tag) => {
     const published = toReleaseVersion(tag)
     return published !== null && Bun.semver.order(published, target) > 0
   })
-  return outranked ? "--latest=false" : "--latest"
+  return [outranked ? "--latest=false" : "--latest"]
 }
 
 async function main(): Promise<void> {
@@ -28,7 +31,7 @@ async function main(): Promise<void> {
     process.exit(2)
   }
   const releasedTags = (await Bun.stdin.text()).split("\n").filter((line) => line.trim().length > 0)
-  console.log(resolveLatestFlag(version, releasedTags))
+  console.log(resolveReleaseFlags(version, releasedTags).join("\n"))
 }
 
 if (import.meta.main) {

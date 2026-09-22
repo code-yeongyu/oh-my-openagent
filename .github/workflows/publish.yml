@@ -1245,24 +1245,16 @@ jobs:
             printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
           } > /tmp/lazycodex-release-notes.md
 
-          # Same badge rule as the omo release above (#7743): never `--prerelease`, Latest decided by
-          # the highest published semver, so a later stable outranks every beta on the mirror too.
-          LATEST_FLAG="$(gh release list --repo code-yeongyu/lazycodex --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
+          # Prerelease metadata and the Latest decision come from the same semver-aware helper.
+          RELEASE_FLAGS_OUTPUT="$(gh release list --repo code-yeongyu/lazycodex --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
+          mapfile -t RELEASE_FLAGS <<< "$RELEASE_FLAGS_OUTPUT"
           gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" "$LATEST_FLAG" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
+            gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
 
       - name: Create GitHub release
-        # Always a full release, never `--prerelease`, on every channel: the npm
-        # dist-tag (beta/next) already carries the channel semantics, and every
-        # shipping version is `5.0.0-beta.N`.
-        #
-        # The Latest badge is decided by `script/release-latest-flag.ts` from the
-        # highest ALREADY PUBLISHED semver, not by creation order. `gh release
-        # create` can only send make_latest true/false, so a bare `--latest`
-        # would hand the badge to an older-line hotfix dispatched after a newer
-        # release. That badge is load-bearing: `releases/latest/download/<asset>`
-        # is the URL the compiled omo binary's self-update hint resolves against
-        # (packages/omo-native/compile-entry.ts).
+        # Semver prereleases are GitHub prereleases and never Latest. Stable
+        # releases use the highest already-published semver to prevent an
+        # older-line hotfix dispatched later from stealing the badge.
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
@@ -1273,9 +1265,10 @@ jobs:
           # must fail the step instead of silently mis-assigning the badge.
           set -euo pipefail
 
-          LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
+          RELEASE_FLAGS_OUTPUT="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
+          mapfile -t RELEASE_FLAGS <<< "$RELEASE_FLAGS_OUTPUT"
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
-            gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            gh release create "v${VERSION}" "${RELEASE_FLAGS[@]}" --title "v${VERSION}" --notes-file /tmp/changelog.md
 
       - name: Download release-binary artifacts
         if: inputs.skip_platform != true && inputs.lazycodex_only != true
