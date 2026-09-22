@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0-beta.83] - 2026-09-22
+
 ### Added
 
 **`oh-my-openagent install --platform=native` now installs OmO Native for you, so you no longer have to know the package name or the recommended runtime.** `native` is a public platform now, listed in `install --help` and in the interactive picker beside OpenCode, Codex and Both. Choosing it performs the real install - `bun add -g omo-ai@beta` when bun is on PATH, `npm i -g omo-ai@beta` when it is not, with bun named as the recommended runtime - and then points you at `omo setup`. When the global install fails, the exact command to run by hand and the reason it failed are printed instead of a raw error. The in-repo development adapter keeps today's behaviour under `--platform=native-dev`, still gated by an environment flag (`OMO_ENABLE_NATIVE_DEV_PLATFORM`, and the old `OMO_ENABLE_SENPI_PLATFORM` is still accepted). ([#8618](https://github.com/code-yeongyu/oh-my-openagent/issues/8618))
