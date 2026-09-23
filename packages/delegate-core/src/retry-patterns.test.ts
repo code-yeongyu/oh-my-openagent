@@ -17,4 +17,14 @@ describe("delegate task retry contract", () => {
     expect(availableOptions).toBeDefined()
     expect(availableOptions?.every((option) => guidance.includes(option))).toBe(true)
   })
+
+  test("#given unknown category output without error prefix #when detected #then retry guidance still applies", () => {
+    const output = 'Unknown category: "bad". Available: visual-engineering, ultrabrain'
+    const error = detectDelegateTaskError(output)
+
+    expect(error).toEqual({
+      errorType: "unknown_category",
+      originalOutput: output,
+    })
+  })
 })
