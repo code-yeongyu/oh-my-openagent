@@ -380,7 +380,7 @@ await runLauncher(["say", "hi"])
       for (const [label, args] of [
         ["install", ["install", "source"]], ["remove", ["remove", "source"]],
         ["list", ["list"]], ["config", ["config"]], ["auth", ["auth", "login"]],
-        ["app-server", ["app-server"]], ["update with flags", ["update", "--extensions"]],
+        ["update with flags", ["update", "--extensions"]],
         ["update with a source", ["update", "source"]],
       ] as const) {
         test(`#then ${label} passes through without an extension argument`, () => {
@@ -395,6 +395,24 @@ await runLauncher(["say", "hi"])
           expect((captured.env.OMO_BIN ?? "").replace(/\\/g, "/")).toMatch(/\/bin\/omo\.js$/)
         })
       }
+    })
+
+    describe("#when app-server is launched", () => {
+      test("#then it loads the packaged extension before the app-server command", () => {
+        const fixture = createFixture()
+        const result = run(fixture, ["app-server"])
+        expect(result.status).toBe(0)
+        expect(capture(fixture).argv).toEqual([
+          "--extension", join(fixture.packageRoot, "plugin"), "app-server",
+        ])
+      })
+
+      test("#then --no-extensions leaves the extension list untouched", () => {
+        const fixture = createFixture()
+        const result = run(fixture, ["app-server", "--no-extensions"])
+        expect(result.status).toBe(0)
+        expect(capture(fixture).argv).toEqual(["app-server", "--no-extensions"])
+      })
     })
 
     describe("#when bare update is requested", () => {
