@@ -38,6 +38,7 @@ afterAll(async () => {
 function outputPathsIn(root) {
   return {
     outputPath: join(root, "omo.js"),
+    standaloneParityOutputPath: join(root, "omo-standalone-parity.js"),
     taskOutputPath: join(root, "omo-task.js"),
     memberOutputPath: join(root, "omo-member.js"),
     supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
@@ -76,6 +77,16 @@ describe("checkExtensionCurrent", () => {
     expect(outputs.toolkitSdkInputs.filter(input => input.includes("node_modules/"))).toEqual([])
     const sdk = await import(outputs.toolkitSdkOutputPath)
     expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "agentToolkit", "createAgentToolkit", "toolkitContextFromEnv"].sort())
+  })
+
+  test("#given the dedicated parity extension build #when its inputs are inspected #then it contains only the standalone parity entry", async () => {
+    // given / when
+    const outputs = await sharedOutputs()
+
+    // then
+    expect(outputs.standaloneParityInputs.some(input => input.endsWith("src/extension/standalone-parity-index.ts"))).toBe(true)
+    expect(outputs.standaloneParityInputs.some(input => input.endsWith("src/extension/component-list.ts"))).toBe(false)
+    expect(await readFile(outputs.standaloneParityOutputPath, "utf8")).toMatch(/^\/\/ omo:/)
   })
 
   test("#given a missing SDK artifact #when freshness is checked #then it reports that output", async () => {

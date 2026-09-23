@@ -49,10 +49,12 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = join(packageRoot, "..", "..")
 const entryPath = join(packageRoot, "src", "extension", "bundled-index.ts")
+const standaloneParityEntryPath = join(packageRoot, "src", "extension", "standalone-parity-index.ts")
 const outputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
   ? join(pluginRoot, "extensions", "omo.js")
   : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo.js")
 const taskEntryPath = join(packageRoot, "src", "extension", "omo-task.ts")
+const standaloneParityOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-standalone-parity.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-standalone-parity.js")
 const taskOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-task.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-task.js")
 const memberEntryPath = join(repoRoot, "packages", "senpi-task", "src", "team", "member-extension", "index.ts")
 const memberOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-member.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-member.js")
@@ -93,6 +95,9 @@ export async function buildExtension(options = {}) {
     OMO_SENPI_BUNDLED: true,
   }
   const output = options.outputPath ?? outputPath
+  const standaloneParityOutput = options.standaloneParityOutputPath ?? (options.outputPath === undefined
+    ? standaloneParityOutputPath
+    : join(dirname(output), "omo-standalone-parity.js"))
   const taskOutput = options.taskOutputPath ?? (options.outputPath === undefined
     ? taskOutputPath
     : join(dirname(output), "omo-task.js"))
@@ -110,6 +115,7 @@ export async function buildExtension(options = {}) {
     : join(dirname(output), "runtime", "agent-toolkit-sdk", "sdk.js"))
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
+  const standaloneParityInputs = await buildEntry(standaloneParityEntryPath, standaloneParityOutput, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
@@ -119,7 +125,7 @@ export async function buildExtension(options = {}) {
   await Promise.all([
     stageRuntimePersonas(repoRoot, dirname(output)),
   ])
-  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, toolkitSdkInputs }
+  return { mainInputs, standaloneParityInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, toolkitSdkInputs }
 }
 
 async function buildEntry(entry, output, buildDefines, externals = externalSpecifiers) {
@@ -150,6 +156,9 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
 
 export async function checkExtensionCurrent(options = {}) {
   const output = options.outputPath ?? outputPath
+  const standaloneParityOutput = options.standaloneParityOutputPath ?? (options.outputPath === undefined
+    ? standaloneParityOutputPath
+    : join(dirname(output), "omo-standalone-parity.js"))
   const taskOutput = options.taskOutputPath ?? (options.outputPath === undefined
     ? taskOutputPath
     : join(dirname(output), "omo-task.js"))
@@ -169,6 +178,8 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
   const currentMain = await readBuiltEntry(output)
   if (currentMain === undefined) return { ok: false, reason: "missing-output", output }
+  const currentStandaloneParity = await readBuiltEntry(standaloneParityOutput)
+  if (currentStandaloneParity === undefined) return { ok: false, reason: "missing-output", output: standaloneParityOutput }
   const currentTask = await readBuiltEntry(taskOutput)
   if (currentTask === undefined) return { ok: false, reason: "missing-output", output: taskOutput }
   const currentMember = await readBuiltEntry(memberOutput)
@@ -186,6 +197,7 @@ export async function checkExtensionCurrent(options = {}) {
   // artifacts out of the tree it verifies.
   const tempRoot = await mkdtemp(join(tmpdir(), "omo-senpi-build-check-"))
   const expectedOutput = join(tempRoot, "omo.js")
+  const expectedStandaloneParityOutput = join(tempRoot, "omo-standalone-parity.js")
   const expectedTaskOutput = join(tempRoot, "omo-task.js")
   const expectedMemberOutput = join(tempRoot, "omo-member.js")
   const expectedSupervisorOutput = join(tempRoot, "memory-run-supervisor.mjs")
@@ -194,6 +206,7 @@ export async function checkExtensionCurrent(options = {}) {
   try {
     await buildExtension({
       outputPath: expectedOutput,
+      standaloneParityOutputPath: expectedStandaloneParityOutput,
       taskOutputPath: expectedTaskOutput,
       memberOutputPath: expectedMemberOutput,
       supervisorOutputPath: expectedSupervisorOutput,
@@ -205,6 +218,9 @@ export async function checkExtensionCurrent(options = {}) {
     }
     if (!artifactsMatch(currentMain, await readFile(expectedOutput, "utf8"))) {
       return { ok: false, reason: "stale-output", output }
+    }
+    if (!artifactsMatch(currentStandaloneParity, await readFile(expectedStandaloneParityOutput, "utf8"))) {
+      return { ok: false, reason: "stale-output", output: standaloneParityOutput }
     }
     if (!artifactsMatch(currentTask, await readFile(expectedTaskOutput, "utf8"))) {
       return { ok: false, reason: "stale-output", output: taskOutput }
@@ -220,7 +236,7 @@ export async function checkExtensionCurrent(options = {}) {
     }
     const stalePersona = await findStaleRuntimePersona(tempRoot, dirname(output), repoRoot)
     if (stalePersona !== undefined) return { ok: false, reason: "stale-output", output: stalePersona }
-    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput }
+    return { ok: true, output, standaloneParityOutput, taskOutput, memberOutput, advisorRuntimeOutput }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
@@ -278,6 +294,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.log(`omo-senpi extension build is current: ${result.output}`)
   } else {
     await buildExtension()
-    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}`)
+    console.log(`Built omo-senpi extensions: ${outputPath}, ${standaloneParityOutputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}`)
   }
 }

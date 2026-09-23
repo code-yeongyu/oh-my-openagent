@@ -5,6 +5,7 @@
 !/plugin/extensions/memory-run-supervisor.mjs
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
+!/plugin/extensions/omo-standalone-parity.js
 !/plugin/extensions/omo-task.js
 !/plugin/extensions/omo.js
 !/plugin/extensions/reflection-persona.md
