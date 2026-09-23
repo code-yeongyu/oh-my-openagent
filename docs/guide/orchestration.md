@@ -69,7 +69,7 @@ Every spawn provides exactly one of `category` or `subagent_type`:
 
 - `task(category="...")` routes to **the category worker**: a fresh worker session configured by the category's model and skills. This is how implementation, tests, and QA get done. A category-routed task always takes its model from `omo.json` (`categories.<name>.models`); passing `model` alongside `category` is rejected.
 - `task(subagent_type="...")` invokes a named agent directly. The builtin roster is:
-  - Curated read-only agents (in-process, cannot write files): `explore` (codebase grep: "where is X?"), `librarian` (remote repos, official docs, OSS examples), `plan-consultant` (pre-planning gap analysis), `plan-reviewer` (plan review). `plan-consultant` and `plan-reviewer` are **plan-gated**: spawnable only after you explicitly asked for the ulw-plan workflow, a `.omo/plans/*.md` file was touched this session, and `/ulw-execute` hasn't run.
+  - Curated read-only agents (in-process, cannot write files): `explore` (codebase grep: "where is X?"), `librarian` (remote repos, official docs, OSS examples), `plan-consultant` (gap analysis of the complete plan draft), `plan-reviewer` (plan review). `plan-consultant` and `plan-reviewer` are **plan-gated**: spawnable only after you explicitly asked for the ulw-plan workflow, a `.omo/plans/*.md` file was touched this session, and `/ulw-execute` hasn't run.
   - ulw-loop reviewers (they write report artifacts, so they aren't in the read-only set): `omo-native-code-reviewer` (diff, tests, risk), `omo-native-qa-executor` (runs real scenarios, records surface evidence), `omo-native-gate-reviewer` (approves unless it can cite a failed success criterion). The pre-rename `omo-senpi-*` spellings still resolve.
 
 Useful spawn options: `run_in_background: true` for parallel waves (the default posture), `load_skills` to prepend skills to the child's prompt, `name` for a stable handle, `task_summary` for the one-line footer label. Continue a child with `task_send`, peek with `task_output`, end it with `task_cancel`; `/tasks` lists what this session spawned. `plan-reviewer` is one-shot: `task_send` to it is always refused.
@@ -107,17 +107,18 @@ stateDiagram-v2
     Interview --> Brief
     Defaults --> Brief
     Brief --> Approval: user says okay
-    Approval --> GapAnalysis: plan-consultant
-    GapAnalysis --> WritePlan: .omo/plans/<slug>.md
-    WritePlan --> Review: plan-reviewer round
-    Review --> WritePlan: REJECT - fix cited issues
+    Approval --> Draft: write .omo/plans/<slug>.md (todos + TL;DR)
+    Draft --> GapAnalysis: plan-consultant reads the complete draft
+    GapAnalysis --> Folded: fold findings, re-check
+    Folded --> Review: plan-reviewer round
+    Review --> Folded: REJECT - fix cited issues
     Review --> Done: APPROVE
     Done --> [*]: handoff to /ulw-execute
 ```
 
 ### Plan Consultant gap analysis
 
-Before the plan is written, the planner spawns `plan-consultant` to catch what it missed: hidden intentions in the request, ambiguities that would derail a worker, over-engineering and scope creep, missing acceptance criteria, unaddressed edge cases. The planner has the whole picture in its head; the consultant forces that implicit knowledge onto the page.
+After the complete initial draft exists (every todo, the human summary, and a passed structural self-check), the planner hands `plan-consultant` the exact plan path to catch what it missed: hidden intentions in the request, contradictions between scope and todos, missing acceptance criteria, QA scenarios an agent cannot run, dependency mistakes, over-engineering and scope creep. Accepted findings are folded into the plan before `plan-reviewer` sees it; an owner-decision the consultant surfaces goes back to you at the approval gate.
 
 ### Plan Reviewer high-accuracy rounds
 

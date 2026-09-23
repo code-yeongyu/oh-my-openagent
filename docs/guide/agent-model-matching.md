@@ -88,7 +88,7 @@ Delegation goes through the `task` tool. Four curated read-only agents have thei
 | --- | --- | --- | --- |
 | `explore` | Fast codebase grep and pattern discovery | `kimi-for-coding-highspeed` (off) | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` -> `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` -> `deepseek/deepseek-flash (max)` -> `opencode-go\|bailian-coding-plan/qwen3.7-plus` -> `opencode-go/minimax-m2.7` -> `anthropic\|github-copilot/claude-haiku-4-5` |
 | `librarian` | Documentation and OSS code search | `kimi-for-coding-highspeed` (off) | Same chain as `explore`. |
-| `plan-consultant` | Pre-planning gap analysis for `/ulw-plan` | `claude-fable-5-1` (max) | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` -> `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)` |
+| `plan-consultant` | Gap analysis of the complete plan draft for `/ulw-plan` | `claude-fable-5-1` (max) | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` -> `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)` |
 | `plan-reviewer` | One-shot plan review against clarity, verification, and context criteria | `gpt-6-astra` (xhigh) | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` -> `github-copilot/gpt-6-astra (high)` -> `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` -> `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> two lower rungs listed in the source file -> `opencode-go/glm-5.2` |
 
 The utility rungs elided above are cheap fast models; read the source file for the exact list. They exist so the system degrades gracefully when you don't hold every subscription. If you have a paid tier connected, it's always preferred.
@@ -103,7 +103,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-For a scarce Claude Fable 5 allocation, `plan-consultant` is the default value-per-token placement: it runs before the plan is finalized and can prevent expensive downstream work. The builtin chain already heads it with Claude Fable 5.1 at `max`; pin a lower effort when the allocation is tight:
+For a scarce Claude Fable 5 allocation, `plan-consultant` is the default value-per-token placement: it runs against the complete draft before the plan is finalized and can prevent expensive downstream work. The builtin chain already heads it with Claude Fable 5.1 at `max`; pin a lower effort when the allocation is tight:
 
 ```jsonc
 {

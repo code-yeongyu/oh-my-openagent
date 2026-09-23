@@ -643,7 +643,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent               | Role                                       | Default Chain                                                          |
 | ------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
-| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) |
+| **plan-consultant** | Gap analysis of the complete plan draft for `/ulw-plan` | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) |
 | **plan-reviewer**   | High-accuracy plan review gate             | openai\|chatgpt-subscription/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → … (full chain in source) |
 | **explore**         | Fast codebase grep                         | kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off) → openai\|chatgpt-subscription/gpt-6-luna-fast (low) → deepseek/deepseek-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → opencode-go/minimax-m2.7 → anthropic\|github-copilot/claude-haiku-4-5 |
 | **librarian**       | Docs/code search                           | (same chain as `explore`)                                              |
@@ -738,7 +738,7 @@ The Light edition does not ship this agent roster; it ships separate Codex-nativ
 - **The category worker**: a fresh worker session configured by the category's model and skills; `task(category: "architect")` is the architect consult lane for architecture and debugging questions.
 - **`explore`**: fast codebase grep.
 - **`librarian`**: external docs/code search.
-- **`plan-consultant`**: pre-planning consultant; analyzes the request for hidden intent and gaps before the plan is written.
+- **`plan-consultant`**: gap-analysis consultant; audits the complete plan draft (todos, acceptance criteria, QA scenarios) for hidden intent, contradictions and missing constraints before `plan-reviewer` runs.
 - **`plan-reviewer`**: high-accuracy plan reviewer.
 
 #### Skills
