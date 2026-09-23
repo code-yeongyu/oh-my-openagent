@@ -32,6 +32,7 @@ function snapshotFor(projectDir: string, updatedAt: number): TuiRuntimeSnapshot 
       },
     ],
     loop: null,
+    lspClients: [],
   }
 }
 
@@ -127,7 +128,7 @@ describe("tui-sidebar mirror IPC", () => {
   it("#given a version mismatch #when reading #then it returns null", () => {
     // given
     const projectDir = makeTempDir("version")
-    writeRawMirror(projectDir, { ...snapshotFor(projectDir, Date.now()), version: 2 })
+    writeRawMirror(projectDir, { ...snapshotFor(projectDir, Date.now()), version: 1 })
 
     // when
     const snapshot = readMirror(projectDir)

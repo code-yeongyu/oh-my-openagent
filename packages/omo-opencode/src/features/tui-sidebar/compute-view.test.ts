@@ -10,6 +10,8 @@ import type {
   SidebarView,
 } from "./state-types"
 
+const noLsp = { kind: "none" } as const
+
 const validConfig: ConfigState = { kind: "valid" }
 const invalidConfig: ConfigState = {
   kind: "invalid",
@@ -50,13 +52,14 @@ describe("tui sidebar computeView", () => {
       agents: idleAgents,
       jobs: idleJobs,
       loop: idleLoop,
+      lsp: noLsp,
     }
 
     // when
     const view = computeView(sections)
 
     // then
-    expect(view).toEqual({ kind: "idle", roster })
+    expect(view).toEqual({ kind: "idle", roster, lsp: noLsp })
     expect("configBanner" in view).toBe(false)
   })
 
@@ -68,6 +71,7 @@ describe("tui sidebar computeView", () => {
       agents: idleAgents,
       jobs: idleJobs,
       loop: idleLoop,
+      lsp: noLsp,
     }
 
     // when
@@ -85,6 +89,7 @@ describe("tui sidebar computeView", () => {
       agents: activeAgents,
       jobs: idleJobs,
       loop: idleLoop,
+      lsp: noLsp,
     }
 
     // when
@@ -97,6 +102,7 @@ describe("tui sidebar computeView", () => {
       agents: activeAgents,
       jobs: idleJobs,
       configBanner: { kind: "none" },
+      lsp: noLsp,
     })
   })
 
@@ -108,6 +114,7 @@ describe("tui sidebar computeView", () => {
       agents: idleAgents,
       jobs: activeJobs,
       loop: idleLoop,
+      lsp: noLsp,
     }
 
     // when
@@ -120,6 +127,7 @@ describe("tui sidebar computeView", () => {
       agents: idleAgents,
       jobs: activeJobs,
       configBanner: { kind: "invalid" },
+      lsp: noLsp,
     })
   })
 
@@ -131,6 +139,7 @@ describe("tui sidebar computeView", () => {
       agents: idleAgents,
       jobs: idleJobs,
       loop: liveLoop,
+      lsp: noLsp,
     }
 
     // when
@@ -143,7 +152,26 @@ describe("tui sidebar computeView", () => {
       agents: idleAgents,
       jobs: idleJobs,
       configBanner: { kind: "none" },
+      lsp: noLsp,
     })
+  })
+
+  it("#given only LSP clients #when computing view #then it remains idle with the LSP section", () => {
+    const lsp = {
+      kind: "list" as const,
+      clients: [{ serverId: "typescript", root: "/workspace", state: "alive" as const, refCount: 1 }],
+    }
+
+    const view = computeView({
+      config: validConfig,
+      roster,
+      agents: idleAgents,
+      jobs: idleJobs,
+      loop: idleLoop,
+      lsp,
+    })
+
+    expect(view).toEqual({ kind: "idle", roster, lsp })
   })
 
   it("#given equivalent views built with different literal key order #when computing keys #then viewKey is stable", () => {
@@ -154,6 +182,7 @@ describe("tui sidebar computeView", () => {
       agents: activeAgents,
       jobs: activeJobs,
       configBanner: { kind: "invalid" },
+      lsp: noLsp,
     }
     const second: SidebarView = {
       configBanner: { kind: "invalid" },
@@ -173,6 +202,7 @@ describe("tui sidebar computeView", () => {
         kind: "live",
       },
       kind: "active",
+      lsp: noLsp,
     }
 
     // when
@@ -185,10 +215,11 @@ describe("tui sidebar computeView", () => {
 
   it("#given a changed view value #when computing keys #then viewKey changes", () => {
     // given
-    const original: SidebarView = { kind: "idle", roster }
+    const original: SidebarView = { kind: "idle", roster, lsp: noLsp }
     const changed: SidebarView = {
       kind: "idle",
       roster: { kind: "rows", rows: [{ label: "atlas", model: "openai/gpt-5.5" }] },
+      lsp: noLsp,
     }
 
     // when
@@ -197,5 +228,19 @@ describe("tui sidebar computeView", () => {
 
     // then
     expect(changedKey).not.toBe(originalKey)
+  })
+
+  it("#given changed LSP data #when computing keys #then viewKey changes", () => {
+    const first: SidebarView = {
+      kind: "idle",
+      roster,
+      lsp: { kind: "list", clients: [{ serverId: "typescript", root: "/workspace", state: "alive", refCount: 1 }] },
+    }
+    const second: SidebarView = {
+      ...first,
+      lsp: { kind: "list", clients: [{ serverId: "typescript", root: "/workspace", state: "alive", refCount: 2 }] },
+    }
+
+    expect(viewKey(second)).not.toBe(viewKey(first))
   })
 })

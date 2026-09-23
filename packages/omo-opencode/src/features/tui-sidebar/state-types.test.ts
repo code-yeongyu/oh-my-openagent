@@ -7,6 +7,7 @@ import type {
   ConfigState,
   JobBoardState,
   LoopState,
+  LspState,
   RosterState,
   SidebarView,
 } from "./state-types"
@@ -66,6 +67,17 @@ function describeLoopState(state: LoopState): string {
   }
 }
 
+function describeLspState(state: LspState): string {
+  switch (state.kind) {
+    case "none":
+      return "none"
+    case "list":
+      return state.clients.map((client) => `${client.serverId}:${client.state}`).join(",")
+    default:
+      return assertNever(state)
+  }
+}
+
 function describeConfigBanner(banner: ConfigBanner): string {
   switch (banner.kind) {
     case "none":
@@ -84,12 +96,13 @@ function describeSidebarView(view: SidebarView): string {
         describeLoopState(view.loop),
         describeAgentsState(view.agents),
         describeJobBoardState(view.jobs),
+        describeLspState(view.lsp),
         describeConfigBanner(view.configBanner),
       ].join("|")
     case "broken":
       return view.messages.join("\n")
     case "idle":
-      return describeRosterState(view.roster)
+      return `${describeRosterState(view.roster)}|${describeLspState(view.lsp)}`
     default:
       return assertNever(view)
   }
@@ -126,6 +139,7 @@ describe("tui sidebar state types", () => {
         ],
       },
       configBanner: { kind: "invalid" },
+      lsp: { kind: "none" },
     }
     const broken: SidebarView = {
       kind: "broken",
@@ -134,6 +148,7 @@ describe("tui sidebar state types", () => {
     const idle: SidebarView = {
       kind: "idle",
       roster: { kind: "rows", rows: [{ label: "sisyphus", model: "gpt-5" }] },
+      lsp: { kind: "none" },
     }
 
     // when
@@ -141,9 +156,9 @@ describe("tui sidebar state types", () => {
 
     // then
     expect(descriptions).toEqual([
-      "1/2|sisyphus:busy|Summarize:completed|invalid",
+      "1/2|sisyphus:busy|Summarize:completed|none|invalid",
       "config invalid",
-      "sisyphus:gpt-5",
+      "sisyphus:gpt-5|none",
     ])
     expect(describeConfigState({ kind: "valid" })).toBe("valid")
     expect(describeConfigState({ kind: "invalid", messages: ["bad"] })).toBe("bad")

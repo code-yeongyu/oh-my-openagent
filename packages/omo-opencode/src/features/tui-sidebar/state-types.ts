@@ -14,6 +14,17 @@ export type JobRow = {
   readonly lastTool: string | null
 }
 
+export type LspClientState = "initializing" | "alive" | "dead"
+
+export type LspClientRow = {
+  readonly serverId: string
+  readonly root: string
+  readonly state: LspClientState
+  readonly refCount: number
+}
+
+export type LspState = { readonly kind: "none" } | { readonly kind: "list"; readonly clients: readonly LspClientRow[] }
+
 export type RosterRow = {
   readonly label: string
   readonly model: string
@@ -58,10 +69,11 @@ export type SidebarView =
       readonly loop: LoopState
       readonly agents: AgentsState
       readonly jobs: JobBoardState
+      readonly lsp: LspState
       readonly configBanner: ConfigBanner
     }
   | { readonly kind: "broken"; readonly messages: readonly string[] }
-  | { readonly kind: "idle"; readonly roster: RosterState }
+  | { readonly kind: "idle"; readonly roster: RosterState; readonly lsp: LspState }
 
 export function assertNever(value: never): never {
   throw new Error(`Unexpected variant: ${JSON.stringify(value)}`)
