@@ -200,7 +200,7 @@ function readSessionEntries(root) {
       if (item.isDirectory()) walk(path)
       else if (item.isFile() && path.endsWith(".jsonl")) {
         for (const line of readFileSync(path, "utf8").split("\n").filter(Boolean)) {
-          try { entries.push(JSON.parse(line)) } catch {}
+          entries.push(JSON.parse(line))
         }
       }
     }
