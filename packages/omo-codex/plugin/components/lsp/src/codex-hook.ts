@@ -48,6 +48,7 @@ interface PostToolUseHookOutput {
 
 const DIAGNOSTIC_START_PATTERN = /(?:error|warning|information|hint)\[[^\]\r\n]+\] \(\d+\) at \d+:\d+:/g;
 const DIAGNOSTIC_CHUNK_PATTERN = /^(?:error|warning|information|hint)\[[^\]\r\n]+\] \(\d+\) at \d+:\d+:/;
+const REQUEST_CWD_REJECTION_PREFIX = "LSP file path must be inside request cwd:";
 const DEFAULT_MAX_HOOK_FEEDBACK_CHARS = 8000;
 const CONTEXT_PRESSURE_MAX_HOOK_FEEDBACK_CHARS = 1200;
 const CONTEXT_PRESSURE_MARKERS = [
@@ -110,7 +111,10 @@ export async function runLspPostToolUseHook(
 	const cache = readLspPostEditCache(sessionId);
 	const result = await collectPostEditDiagnostics({ filePaths, runDiagnostics, cache });
 	writeLspPostEditCache(sessionId, cache);
-	const blocks = result.blocks.filter(({ diagnostics }) => !isLspDaemonUnreachableDiagnostics(diagnostics));
+	const blocks = result.blocks.filter(
+		({ diagnostics }) =>
+			!isLspDaemonUnreachableDiagnostics(diagnostics) && !isRequestCwdRejectionDiagnostics(diagnostics),
+	);
 
 	if (blocks.length === 0) return "";
 
@@ -130,6 +134,10 @@ export async function runLspPostToolUseHook(
 export async function runLspPostCompactHook(input: CodexPostCompactInput): Promise<string> {
 	markLspSessionCompacted(sessionIdFrom(input));
 	return "";
+}
+
+export function isRequestCwdRejectionDiagnostics(diagnostics: string): boolean {
+	return diagnostics.trimStart().startsWith(REQUEST_CWD_REJECTION_PREFIX);
 }
 
 function formatDiagnosticBlock({ filePath, diagnostics }: DiagnosticBlock): string {

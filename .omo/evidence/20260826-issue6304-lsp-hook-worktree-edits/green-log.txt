@@ -1,0 +1,8 @@
+
+ RUN  v4.1.11 /home/viprix/projects/oom-wt-6304/packages/omo-codex/plugin/components/lsp
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  04:09:13
+   Duration  573ms (transform 258ms, setup 0ms, import 342ms, tests 9ms, environment 0ms)
