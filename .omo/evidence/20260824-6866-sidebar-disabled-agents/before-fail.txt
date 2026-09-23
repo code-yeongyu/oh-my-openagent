@@ -1,0 +1,40 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:
+103 | 
+104 |       // when
+105 |       const rows = resolveRoster(project)
+106 | 
+107 |       // then
+108 |       expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
+                                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6866/packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:108:62)
+      at withIsolatedConfig (/home/viprix/projects/oom-wt-6866/packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:40:12)
+      at <anonymous> (/home/viprix/projects/oom-wt-6866/packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:95:5)
+(fail) resolveRoster > #given disabled_agents config #when resolving roster #then it excludes disabled builtin agents [29.25ms]
+122 | 
+123 |       // when
+124 |       const rows = resolveRoster(project)
+125 | 
+126 |       // then
+127 |       expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
+                                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6866/packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:127:62)
+      at withIsolatedConfig (/home/viprix/projects/oom-wt-6866/packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:40:12)
+      at <anonymous> (/home/viprix/projects/oom-wt-6866/packages/omo-opencode/src/features/tui-sidebar/roster-resolver.test.ts:114:5)
+(fail) resolveRoster > #given legacy alias in disabled_agents #when resolving roster #then it excludes the canonical agent [25.25ms]
+
+ 3 pass
+ 2 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [1174.00ms]
