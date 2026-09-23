@@ -2885,6 +2885,396 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(promptBodies.length).toBe(1)
     expect(promptBodies.filter((body) => body.noReply === false)).toHaveLength(1)
   })
+
+  test("#given a terminal task is stuck in pendingByParent with no wake queued #when the parent session goes idle #then the lost notification is forced through the queue", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+    const promptBodies: PromptAsyncBody[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (body: PromptAsyncBody) => {
+          promptBodies.push(body)
+          return { data: {} }
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const parentSessionID = "parent-lost-wake"
+    const task = createMockTask({
+      id: "task-lost-wake",
+      parentSessionId: parentSessionID,
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(parentSessionID, new Set([task.id]))
+
+    // when — the parent goes idle while the completion notification is still owed
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: parentSessionID } })
+    await waitForCoalescedFlush(manager, parentSessionID)
+
+    // then — the reconciliation sweep forces the notification instead of leaving the parent parked
+    expect(getPendingByParent(manager).get(parentSessionID)).toBeUndefined()
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 600)
+    expect(getDispatchedParentWakes(manager).has(parentSessionID)).toBe(true)
+    expect(promptBodies.some(body => body.body?.noReply === false)).toBe(true)
+  })
+
+  test("#given a terminal task is stuck in pendingByParent #when a sibling task transitions to terminal #then the lost notification is forced without any parent session event", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+    const promptBodies: PromptAsyncBody[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (body: PromptAsyncBody) => {
+          promptBodies.push(body)
+          return { data: {} }
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const parentSessionID = "parent-sibling-transition"
+    const stuckTask = createMockTask({
+      id: "task-stuck-terminal",
+      parentSessionId: parentSessionID,
+      status: "completed",
+      completedAt: new Date(),
+    })
+    const siblingTask = createMockTask({
+      id: "task-sibling",
+      sessionId: "session-sibling",
+      parentSessionId: parentSessionID,
+      status: "running",
+    })
+    getTaskMap(manager).set(stuckTask.id, stuckTask)
+    getTaskMap(manager).set(siblingTask.id, siblingTask)
+    getPendingByParent(manager).set(parentSessionID, new Set([stuckTask.id, siblingTask.id]))
+
+    // when — the sibling completes; NO parent session event is emitted
+    const completed = await tryCompleteTaskForTest(manager, siblingTask)
+
+    // then — the terminal transition sweeps the stuck task through the queue
+    expect(completed).toBe(true)
+    expect(getPendingByParent(manager).get(parentSessionID)).toBeUndefined()
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 600)
+    expect(getDispatchedParentWakes(manager).has(parentSessionID)).toBe(true)
+    expect(promptBodies.some(body => body.body?.noReply === false)).toBe(true)
+  })
+
+  test("#given a terminal task was marked but its queued notification never executed #when reconciliation runs #then the lost notification is delivered exactly once", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+    const promptBodies: PromptAsyncBody[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (body: PromptAsyncBody) => {
+          promptBodies.push(body)
+          return { data: {} }
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const parentSessionID = "parent-marked-but-lost"
+    const task = createMockTask({
+      id: "task-marked-lost",
+      parentSessionId: parentSessionID,
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(parentSessionID, new Set([task.id]))
+    // Simulate the exact #6546 review state: markForNotification ran (the marker
+    // exists) but the serialized op was lost before notifyParentSession executed.
+    manager.markForNotification(task)
+
+    // when — reconciliation fires while the stale marker sits in notifications
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: parentSessionID } })
+    await waitForCoalescedFlush(manager, parentSessionID)
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 600)
+
+    // then — the marked-but-undelivered task is retried despite its marker
+    expect(getPendingByParent(manager).get(parentSessionID)).toBeUndefined()
+    const noReplyBodiesAfterFirstSweep = promptBodies.filter(body => body.body?.noReply === false).length
+    expect(noReplyBodiesAfterFirstSweep).toBe(1)
+
+    // and — a second sweep must not inject the wake a second time
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: parentSessionID } })
+    await waitForCoalescedFlush(manager, parentSessionID)
+    expect(promptBodies.filter(body => body.body?.noReply === false).length).toBe(noReplyBodiesAfterFirstSweep)
+  })
+
+  test("#given two sweeps enqueue the same lost task before either op executes #when both ops run #then the once-per-task guard suppresses the duplicate wake", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+    const promptBodies: PromptAsyncBody[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (body: PromptAsyncBody) => {
+          promptBodies.push(body)
+          return { data: {} }
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const parentSessionID = "parent-double-sweep"
+    const task = createMockTask({
+      id: "task-double-sweep",
+      parentSessionId: parentSessionID,
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(parentSessionID, new Set([task.id]))
+
+    // when — two reconciliations enqueue the recovery op twice synchronously,
+    // before either queued op gets a microtask to execute
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: parentSessionID } })
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: parentSessionID } })
+    await waitForCoalescedFlush(manager, parentSessionID)
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 600)
+
+    // then — delivery happened once; the duplicate op hit the guard
+    expect(getPendingByParent(manager).get(parentSessionID)).toBeUndefined()
+    expect(promptBodies.filter(body => body.body?.noReply === false)).toHaveLength(1)
+  })
+
+  test("#given a queued reply wake is lost after notifyParentSession ran #when a sibling transitions with no parent event #then the owed wake is rebuilt exactly once", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+    const promptBodies: PromptAsyncBody[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (body: PromptAsyncBody) => {
+          promptBodies.push(body)
+          return { data: {} }
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const parentSessionID = "parent-round3-lost-wake"
+    const lostTask = createMockTask({
+      id: "task-round3-alpha",
+      parentSessionId: parentSessionID,
+      status: "error",
+      error: "boom",
+      completedAt: new Date(),
+      description: "ROUND3-ALPHA-MARKER",
+    })
+    const siblingTask = createMockTask({
+      id: "task-round3-beta",
+      sessionId: "session-round3-beta",
+      parentSessionId: parentSessionID,
+      status: "running",
+      description: "ROUND3-BETA-MARKER",
+    })
+    getTaskMap(manager).set(lostTask.id, lostTask)
+    getTaskMap(manager).set(siblingTask.id, siblingTask)
+    getPendingByParent(manager).set(parentSessionID, new Set([siblingTask.id]))
+
+    // when — notifyParentSession runs for alpha (error ⇒ reply-required), its
+    // wake queues, and then the wake is lost downstream exactly like the
+    // retained-wake deletion path leaves the world (round-3 review)
+    await (cast<{ notifyParentSession(task: typeof lostTask): Promise<void> }>(manager)).notifyParentSession(lostTask)
+    manager.markForNotification(lostTask)
+    const notifier = (cast<{
+      parentWakeNotifier: {
+        getPendingParentWakes(): Map<string, unknown>
+        clearDispatchedParentWake(sessionID: string): void
+      }
+    }>(manager)).parentWakeNotifier
+    expect(notifier.getPendingParentWakes().has(parentSessionID)).toBe(true)
+    notifier.getPendingParentWakes().delete(parentSessionID)
+    notifier.clearDispatchedParentWake(parentSessionID)
+    // Isolate the signal: without this, beta's own all-complete wake would
+    // embed alpha's leftover summary and mask whether alpha's OWED wake was
+    // genuinely rebuilt.
+    ;(cast<{ completedTaskSummaries: Map<string, unknown[]> }>(manager))
+      .completedTaskSummaries.get(parentSessionID)?.splice(0)
+
+    // and — the sibling transitions to terminal with NO parent session event
+    const completed = await tryCompleteTaskForTest(manager, siblingTask)
+
+    // then — the owed ledger forces a rebuild of alpha's lost wake
+    expect(completed).toBe(true)
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 600)
+    const deliveredText = JSON.stringify(promptBodies)
+    expect(deliveredText).toContain("ROUND3-ALPHA-MARKER")
+    expect(deliveredText).toContain("ROUND3-BETA-MARKER")
+    const alphaMentions = deliveredText.split("ROUND3-ALPHA-MARKER").length - 1
+    expect(alphaMentions).toBe(1)
+  })
+
+  test("#given a successful wake dispatch is consumed #when a sibling transitions or parent goes idle #then no duplicate wake is rebuilt", async () => {
+    // given — a reply-required wake is queued, flushed, and then conclusively consumed
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+    const promptBodies: PromptAsyncBody[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (body: PromptAsyncBody) => {
+          promptBodies.push(body)
+          return { data: {} }
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const parentSessionID = "parent-round4-success-ack"
+    const consumedTask = createMockTask({
+      id: "task-round4-alpha",
+      parentSessionId: parentSessionID,
+      status: "error",
+      error: "boom",
+      completedAt: new Date(),
+      description: "ROUND4-ALPHA-MARKER",
+    })
+    const siblingTask = createMockTask({
+      id: "task-round4-beta",
+      sessionId: "session-round4-beta",
+      parentSessionId: parentSessionID,
+      status: "running",
+      description: "ROUND4-BETA-MARKER",
+    })
+    getTaskMap(manager).set(consumedTask.id, consumedTask)
+    getTaskMap(manager).set(siblingTask.id, siblingTask)
+    getPendingByParent(manager).set(parentSessionID, new Set([siblingTask.id]))
+
+    // when — notify runs for alpha, the wake is dispatched, then parent output consumes it
+    await (cast<{ notifyParentSession(task: typeof consumedTask): Promise<void> }>(manager)).notifyParentSession(consumedTask)
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 600)
+    expect(promptBodies.filter(body => body.body?.noReply === false)).toHaveLength(1)
+    const replyLedger = (cast<{ replyWakeOwedByTask: Map<string, string> }>(manager)).replyWakeOwedByTask
+    expect(replyLedger.has(consumedTask.id)).toBe(true)
+
+    // @allow simulate conclusive consumption: parent assistant turn produced output after the wake (clears dispatched + acks ledger)
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        sessionID: parentSessionID,
+        info: { role: "assistant", finish: "stop", tokens: { input: 10, output: 10 } },
+      },
+    })
+    expect(getDispatchedParentWakes(manager).has(parentSessionID)).toBe(false)
+    expect(replyLedger.has(consumedTask.id)).toBe(false)
+    // @allow clear recent-activity window set by consumption — otherwise sibling flush defers via admit-only path and races the 2s window; ledger ack already proven
+    const inspector = (cast<{
+      parentWakeNotifier: { sessionInspector: { recentParentSessionActivity: Map<string, number> } }
+    }>(manager)).parentWakeNotifier.sessionInspector
+    inspector.recentParentSessionActivity.delete(parentSessionID)
+    // @allow isolate summary so sibling wake does not embed alpha via leftover merge
+    ;(cast<{ completedTaskSummaries: Map<string, unknown[]> }>(manager))
+      .completedTaskSummaries.get(parentSessionID)?.splice(0)
+
+    // and — sibling transitions to terminal (no parent event), which would rebuild a LOST wake but must not rebuild a CONSUMED one
+    const completed = await tryCompleteTaskForTest(manager, siblingTask)
+    expect(completed).toBe(true)
+    await new Promise(resolve => setTimeout(resolve, 400))
+    await waitForCoalescedFlush(manager, parentSessionID)
+    await waitUntil(() => getDispatchedParentWakes(manager).has(parentSessionID), 800)
+    const deliveredText = JSON.stringify(promptBodies)
+    const alphaMentions = deliveredText.split("ROUND4-ALPHA-MARKER").length - 1
+    const betaMentions = deliveredText.split("ROUND4-BETA-MARKER").length - 1
+    // then — alpha was delivered exactly once (the original dispatch), sibling exactly once, no duplicate rebuild
+    expect(alphaMentions).toBe(1)
+    expect(betaMentions).toBe(1)
+    expect(replyLedger.has(consumedTask.id)).toBe(false)
+    // Also verify via parent idle reconciliation path does not resurrect the consumed wake
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: parentSessionID } })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(JSON.stringify(promptBodies).split("ROUND4-ALPHA-MARKER").length - 1).toBe(1)
+  })
+
+  test("#given a sibling errors while another completes #when the error path runs #then pendingByParent is not emptied outside the serialized notification queue", async () => {
+    // given
+    let capturedOperation: (() => Promise<void>) | undefined
+    manager.shutdown()
+    manager = createBackgroundManager()
+    const enqueueSpy = spyOn(
+      cast<{
+        enqueueNotificationForParent: (
+          sessionID: string | undefined,
+          operation: () => Promise<void>,
+        ) => Promise<void>
+      }>(manager),
+      "enqueueNotificationForParent",
+    )
+    enqueueSpy.mockImplementation(async (_sessionID, operation) => {
+      capturedOperation = operation
+      return Promise.resolve()
+    })
+    const verifySpy = spyOn(
+      cast<{ verifySessionExists: (sessionID: string) => Promise<boolean> }>(manager),
+      "verifySessionExists",
+    )
+    verifySpy.mockImplementation(async () => false)
+
+    const parentSessionID = "parent-atomic-accounting"
+    const task = createMockTask({
+      id: "task-atomic-accounting",
+      sessionId: "session-atomic-accounting",
+      parentSessionId: parentSessionID,
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(parentSessionID, new Set([task.id]))
+
+    // when — a terminal session.error fires and the notification is queued but not yet run
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: task.sessionId,
+        error: { name: "UnknownError", data: { message: "Model not found: kimi-for-coding/k2p5." } },
+      },
+    })
+    await flushBackgroundNotifications()
+
+    // then — the decrement is deferred into the serialized queue, not done eagerly
+    expect(capturedOperation).toBeDefined()
+    expect(getPendingByParent(manager).get(parentSessionID)?.has(task.id)).toBe(true)
+
+    // when — the queued notification finally runs
+    await capturedOperation?.()
+
+    // then — the accounting settles atomically
+    expect(getPendingByParent(manager).get(parentSessionID)).toBeUndefined()
+
+    enqueueSpy.mockRestore()
+    verifySpy.mockRestore()
+  })
 })
 
 describe("BackgroundManager.trackTask", () => {
@@ -6178,7 +6568,15 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       //#given
       const manager = createBackgroundManager()
       mockVerifySessionExists(manager, true)
-      const notifyParentSession = mock(async (_task: BackgroundTask) => {})
+      const notifyParentSession = mock(async (task: BackgroundTask) => {
+        const pending = getPendingByParent(manager).get(task.parentSessionId)
+        if (pending) {
+          pending.delete(task.id)
+          if (pending.size === 0) {
+            getPendingByParent(manager).delete(task.parentSessionId)
+          }
+        }
+      })
       ;(cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager)).notifyParentSession = notifyParentSession
       const concurrencyManager = getConcurrencyManager(manager)
       const concurrencyKey = `terminal/${errorName}`

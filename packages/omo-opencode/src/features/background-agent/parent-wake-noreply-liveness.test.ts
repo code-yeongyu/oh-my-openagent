@@ -378,6 +378,53 @@ describe("parent wake admitted-consumption drop (duplicate ALL-COMPLETE regressi
     }
   })
 
+  test("#given an UN-admitted reply wake and unrelated parent output #when the stale tool-call deferral fires #then the wake stays queued instead of being dropped", async () => {
+    // given: the reply-required wake is admitted as noReply (no deposit ever
+    // lands), then the parent's live turn produces unrelated output. The drop
+    // path must NOT treat that output as consumption of a deposit that never
+    // happened — the allComplete reply is still owed (#6546 round 5).
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let consumed = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () =>
+        consumed
+          ? [
+              ...BLOCKED_MESSAGES,
+              {
+                info: { role: "assistant", finish: "tool-calls", time: { created: 101_000 } },
+                parts: [
+                  { type: "text", text: "unrelated tool output while wake still owed" },
+                  { type: "tool", state: { status: "running" } },
+                ],
+              },
+            ]
+          : BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: the parent's turn produces unrelated output before any noReply
+      // admission ever landed, and the deferral ages
+      consumed = true
+      now = 110_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the un-admitted reply wake is still owed — the admit-only drop
+      // requires noReplyAdmittedAt to be set, so the wake stays queued with
+      // reply liveness retained instead of being dropped
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given admitted wake while the tool-blocked turn is still mid-flight #when the tool-call deferral goes stale #then no reply dispatch forks the turn", async () => {
     // given: reproduce ses_149e6ecb2ffe — admit-only deposit during a silent
     // long-running tool (sleep), no post-admission output yet
