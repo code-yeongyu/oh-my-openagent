@@ -1,0 +1,6 @@
+qa sessions in REAL db: 0 (expected 0)
+qa sessions in SANDBOX db: 8 (expected 8)
+ISOLATION VERIFIED
+real db path: $REAL_HOME/.local/share/opencode/opencode.db
+sandbox db path: $QA_SANDBOX/data/opencode/opencode.db
+sandbox xdg root: $QA_SANDBOX
