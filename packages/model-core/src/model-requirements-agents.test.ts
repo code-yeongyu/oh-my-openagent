@@ -24,21 +24,22 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("sisyphus keeps opus primary before Kimi K3, gpt-5.6-sol, GLM 5.2, and big-pickle fallbacks", () => {
+  test("sisyphus keeps opus primary before Kimi K3, gpt-5.6-sol, GLM 5.3, and big-pickle fallbacks", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, solFallback, fourth, last] = sisyphus.fallbackChain
+    const [primary, oldOpus, second, solFallback, fourth, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(5)
+    expect(sisyphus.fallbackChain).toHaveLength(6)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
-          providers: ["anthropic", "github-copilot", "opencode"],
+          providers: ["anthropic"],
           model: "claude-opus-5-5",
           variant: "max",
         })
+    expect(oldOpus).toEqual({ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" })
     expect(second).toEqual({
           providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "bailian-coding-plan", "moonshotai-cn", "firmware", "ollama-cloud", "aihubmix"],
           model: "kimi-k3",
@@ -49,7 +50,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
           variant: "medium",
         })
     expect(fourth?.providers[0]).toBe("zai-coding-plan")
-    expect(fourth?.model).toBe("glm-5.2")
+    expect(fourth?.model).toBe("glm-5.3")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
@@ -159,25 +160,26 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("prometheus uses Fable 5.1 xhigh, then Opus 5.5 max, before Kimi K3 max", () => {
+  test("prometheus uses Fable 5.1 xhigh, then Opus 5.5 and Opus 5 max, before Kimi K3 max", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
     // when
-    const [primary, opusFallback, kimiFallback] = prometheus.fallbackChain
+    const [primary, opusFallback, oldOpus, kimiFallback] = prometheus.fallbackChain
 
     // then
-    expect(prometheus.fallbackChain).toHaveLength(3)
+    expect(prometheus.fallbackChain).toHaveLength(4)
     expect(primary).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
           variant: "xhigh",
         })
     expect(opusFallback).toEqual({
-          providers: ["anthropic", "github-copilot", "opencode"],
+          providers: ["anthropic"],
           model: "claude-opus-5-5",
           variant: "max",
         })
+    expect(oldOpus).toEqual({ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" })
     expect(kimiFallback).toEqual({
           providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
           model: "kimi-k3",
@@ -190,20 +192,21 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
     // when
-    const [primary, opusFallback, kimiFallback] = metis.fallbackChain
+    const [primary, opusFallback, oldOpus, kimiFallback] = metis.fallbackChain
 
     // then
-    expect(metis.fallbackChain).toHaveLength(3)
+    expect(metis.fallbackChain).toHaveLength(4)
     expect(primary).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
           variant: "max",
         })
     expect(opusFallback).toEqual({
-          providers: ["anthropic", "github-copilot", "opencode"],
+          providers: ["anthropic"],
           model: "claude-opus-5-5",
           variant: "max",
         })
+    expect(oldOpus).toEqual({ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-5", variant: "max" })
     expect(kimiFallback).toEqual({
           providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
           model: "kimi-k3",
@@ -236,7 +239,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
           variant: "high",
         })
     expect(opusFallback).toEqual({
-          providers: ["anthropic", "github-copilot", "opencode"],
+          providers: ["anthropic"],
           model: "claude-opus-5-5",
           variant: "max",
         })

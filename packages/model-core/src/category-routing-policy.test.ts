@@ -18,8 +18,13 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -165,8 +170,13 @@ describe("category routing policy", () => {
     // then
     expect(highChain).toEqual([
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -187,8 +197,13 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -204,8 +219,13 @@ describe("category routing policy", () => {
         variant: "low",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "low",
       },
       {

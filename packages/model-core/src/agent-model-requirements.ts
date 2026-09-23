@@ -4,8 +4,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -17,7 +22,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.6-sol",
         variant: "medium",
       },
-      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
+      { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.3" },
       { providers: ["opencode"], model: "big-pickle" }
     ],
     requiresAnyModel: true,
@@ -48,11 +53,16 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
         variant: "max",
       },
-      { providers: ["opencode-go"], model: "glm-5.2" }
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5",
+        variant: "max",
+      },
+      { providers: ["opencode-go"], model: "glm-5.3" }
     ],
   },
   librarian: {
@@ -97,8 +107,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "xhigh",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -116,8 +131,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -133,8 +153,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "high" },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -142,7 +167,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3.1-pro",
         variant: "high",
       },
-      { providers: ["opencode-go"], model: "glm-5.2" }
+      { providers: ["opencode-go"], model: "glm-5.3" }
     ],
   },
   atlas: {

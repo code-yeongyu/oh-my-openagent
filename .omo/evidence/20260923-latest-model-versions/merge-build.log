@@ -1,0 +1,68 @@
+$ bun run build:lsp-daemon && bun run build:ast-grep-mcp && bun run build:senpi-plugin:stage
+$ npm --prefix packages/lsp-daemon ci && npm --prefix packages/lsp-daemon run build
+
+added 57 packages, and audited 60 packages in 1s
+
+14 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> @code-yeongyu/lsp-daemon@0.1.0 build
+> node scripts/build.mjs
+
+Bundled 83 modules in 18ms
+
+  cli.js     251.59 KB  (entry point)
+  index.js   232.42 KB  (entry point)
+  client.js  230.0 KB   (entry point)
+
+$ bun run --cwd packages/ast-grep-mcp build
+$ bun build src/cli.ts --outdir dist --target node --format esm
+Bundled 103 modules in 14ms
+
+  cli.js  85.14 KB  (entry point)
+
+$ bun run build:materialize-frontend && node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs && node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs && node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check && node packages/omo-senpi/plugin/scripts/build-install.mjs
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 148 frontend reference files from submodules
+Staged Senpi LSP runtime: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/runtime/lsp-daemon/dist
+Staged Senpi ast-grep MCP runtime: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/runtime/ast-grep-mcp/cli.js
+Staged x-search conditional skill: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/skills-conditional/x-search/SKILL.md
+Bundled 47 modules in 12ms
+
+  sdk.js  113.56 KB  (entry point)
+
+Bundled 1056 modules in 98ms
+
+  omo.js  1.90 MB  (entry point)
+
+Bundled 826 modules in 179ms
+
+  omo-task.js  1.38 MB  (entry point)
+
+Bundled 219 modules in 19ms
+
+  omo-member.js  0.28 MB  (entry point)
+
+Bundled 151 modules in 18ms
+
+  memory-run-supervisor.mjs  42.40 KB  (entry point)
+
+Bundled 178 modules in 15ms
+
+  omo-init-deep-advisor.js  89.33 KB  (entry point)
+
+Built omo-senpi extensions: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/extensions/omo.js, /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/extensions/omo-task.js, /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/extensions/omo-member.js, /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+Built omo-senpi daemon launch spec: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/daemon-launch-spec.json
+synced omo-senpi skills to /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/skills
+generated directive is current: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 7 modules in 6ms
+
+  install.mjs  21.00 KB  (entry point)
+
+Built omo-senpi installer: /Users/cminseo/Developer/omo-model-latest/packages/omo-senpi/plugin/scripts/install.mjs

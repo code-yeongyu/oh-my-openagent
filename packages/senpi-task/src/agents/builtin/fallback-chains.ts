@@ -42,8 +42,13 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       variant: "max",
     },
     {
-      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
+      providers: ["anthropic-subscription", "anthropic"],
       model: "claude-opus-5-5",
+      variant: "max",
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
+      model: "claude-opus-5",
       variant: "max",
     },
     {
@@ -57,8 +62,13 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
     { providers: ["chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "high" },
     {
-      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
+      providers: ["anthropic-subscription", "anthropic"],
       model: "claude-opus-5-5",
+      variant: "max",
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
+      model: "claude-opus-5",
       variant: "max",
     },
     {
@@ -66,6 +76,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       model: "gemini-3.1-pro",
       variant: "high",
     },
-    { providers: ["opencode-go"], model: "glm-5.2" }
+    { providers: ["opencode-go"], model: "glm-5.3" }
   ],
 }

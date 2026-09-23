@@ -47,6 +47,11 @@ describe("GPT-6 family routing", () => {
     const chain = table[name].fallbackChain
     expect(chain[0]?.model).toBe("claude-fable-5-1")
     expect(chain[1]).toMatchObject({ model: "claude-opus-5-5", variant: "max" })
-    expect(chain[1]?.providers).toEqual(chain[0]?.providers)
+    expect(chain[1]?.providers).toEqual(["anthropic"])
+    expect(chain[2]).toEqual({
+      providers: chain[0]?.providers,
+      model: "claude-opus-5",
+      variant: "max",
+    })
   })
 })

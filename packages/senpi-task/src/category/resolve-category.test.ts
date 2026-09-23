@@ -285,7 +285,7 @@ describe("resolveCategory", () => {
     expect(resolved.spec.variant).toBe("low")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      providers: ["anthropic-subscription", "anthropic"],
       model: "claude-opus-5-5",
       variant: "low",
     })
