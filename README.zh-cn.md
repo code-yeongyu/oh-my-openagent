@@ -7,18 +7,8 @@
 
 > **Sponsors**
 > 以下是我们的赞助商,支持着这个个人副业项目的持续开发。
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** 以与官方定价相同的价格提供 **300 TPS 的 Kimi K3 Ultrafast**。立即试用 `opengateway/moonshotai/kimi-k3-ultrafast`。 对推理原文实行无日志政策,让注重隐私的使用成为可能;同时由于不直接向提供商发起请求,还能保持匿名。 |
+> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** 赞助了 OmO。它是一个兼容 OpenAI 的网关,通过一个 API 即可使用多家模型提供商。感谢对开源的支持。 |
 > | :-----| :----- |
-
-> [!NOTE]
-> **OmO for Codex 已发布。试试 LazyCodex**
->
-> 因为太爱 Anthropic 模型而被封禁之后，我们决定站到 Codex 这一边。
-> 如果你是 OmO 粉丝，但觉得配置太麻烦，请使用 LazyCodex。OmO for Codex 已经发布:
-> ```bash
-> npx lazycodex-ai install
-> ```
-> 了解更多请访问 [lazycodex.ai](https://lazycodex.ai)。
 
 > [!NOTE]
 > **正在进行多 Harness 代理操作系统重构**

@@ -7,18 +7,8 @@
 
 > **Sponsors**
 > Ниже представлены наши спонсоры. Они помогают проекту существовать как личному сайд-проекту.
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** предлагает **Kimi K3 Ultrafast со скоростью 300 TPS** по той же цене, что и официальный прайс. Попробуйте `opengateway/moonshotai/kimi-k3-ultrafast`. Действует политика отсутствия логов исходных текстов инференса, так что ваши запросы остаются приватными, а поскольку вы не обращаетесь к провайдеру напрямую, сохраняется анонимность. |
+> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** спонсирует OmO. Это OpenAI-совместимый шлюз, который объединяет множество провайдеров моделей под одним API. Спасибо за поддержку open source. |
 > | :-----| :----- |
-
-> [!NOTE]
-> **🚀 Первый релиз для Codex: omo теперь доступен в Codex CLI**
->
-> Никаких сложных JSON-конфигураций. Просто выполните:
-> ```bash
-> npx lazycodex-ai install
-> ```
-> Ваш Codex получит локальные правила, comment checker, LSP, Git Bash для Windows, ultrawork, ulw-loop, ulw-execute-continuation, telemetry, teammode, bootstrap, lcx и другие компоненты.
-> Подробности на [lazycodex.ai](https://lazycodex.ai).
 
 > [!NOTE]
 > **Рефакторинг в сторону мульти-harness агентной ОС**

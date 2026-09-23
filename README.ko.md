@@ -7,18 +7,8 @@
 
 > **Sponsors**
 > 아래는 저희의 스폰서입니다. 개인 사이드 프로젝트를 지속하는 데 도움을 주고 있습니다.
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)**에서 **Kimi K3 Ultrafast를 300 TPS**로 이용하세요. 공식 정가와 동일한 가격입니다. `opengateway/moonshotai/kimi-k3-ultrafast`를 지금 사용해보세요. 추론 원문 노로깅 정책으로 프라이버시를 지키며 사용할 수 있고, 제공사에 직접 요청하지 않기 때문에 익명성도 지킬 수 있습니다. |
+> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)**가 OmO를 후원하고 있습니다. 여러 모델 제공사를 하나의 API로 쓸 수 있는 OpenAI 호환 게이트웨이입니다. 오픈소스를 응원해주셔서 감사합니다. |
 > | :-----| :----- |
-
-> [!NOTE]
-> **OmO for Codex 출시: LazyCodex를 써보세요**
->
-> Anthropic 모델을 너무 사랑했던 이유로 차단까지 겪었던 저희는 이제 Codex의 손을 들기로 했습니다.
-> OmO 팬이지만 설정이 번거로웠다면 LazyCodex를 사용해보세요. OmO for Codex가 출시되었습니다:
-> ```bash
-> npx lazycodex-ai install
-> ```
-> 자세한 내용은 [lazycodex.ai](https://lazycodex.ai)에서 확인하세요.
 
 > [!NOTE]
 > **멀티 하니스 에이전트 OS 리팩토링 진행 중**

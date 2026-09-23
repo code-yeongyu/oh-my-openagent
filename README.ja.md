@@ -7,18 +7,8 @@
 
 > **Sponsors**
 > 以下は私たちのスポンサーです。個人のサイドプロジェクトとして継続するための支援をいただいています。
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** では **Kimi K3 Ultrafast (300 TPS)** を公式価格と同じ料金で提供しています。`opengateway/moonshotai/kimi-k3-ultrafast` を今すぐお試しください。 推論原文ノーロギングポリシーにより、プライバシーに配慮した利用が可能です。プロバイダーに直接リクエストしないため、匿名性も保てます。 |
+> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** は OmO のスポンサーです。複数のモデルプロバイダーをひとつの API で使える OpenAI 互換ゲートウェイです。オープンソースへのご支援に感謝します。 |
 > | :-----| :----- |
-
-> [!NOTE]
-> **OmO for Codex が登場しました。LazyCodex を試してください**
->
-> Anthropic のモデルを愛しすぎてブロックまで経験した私たちは、今度は Codex に賭けることにしました。
-> OmO のファンだけれど設定が面倒だったなら、LazyCodex を使ってください。OmO for Codex はもうリリースされています:
-> ```bash
-> npx lazycodex-ai install
-> ```
-> 詳細は [lazycodex.ai](https://lazycodex.ai) をご覧ください。
 
 > [!NOTE]
 > **マルチハーネスエージェントOSへのリファクタリング進行中**
