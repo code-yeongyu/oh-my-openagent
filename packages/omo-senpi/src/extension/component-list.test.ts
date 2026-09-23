@@ -13,6 +13,14 @@ const taskComponent: OmoSenpiComponent = {
 }
 
 describe("createOmoSenpiComponents", () => {
+  test("#given the full OMO registration array #when standalone parity is inspected #then the dedicated package remains its sole activation owner", () => {
+    // given / when
+    const names = createOmoSenpiComponents(taskComponent).map(({ name }) => name)
+
+    // then
+    expect(names).not.toContain("standalone-parity")
+  })
+
   test("#given the production registration array #when x-search is looked up #then it is present exactly once", () => {
     // given
     const names = createOmoSenpiComponents(taskComponent).map(({ name }) => name)
