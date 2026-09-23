@@ -1,0 +1,7 @@
+{
+  "surface": "isolated opencode serve + prompt_async + SSE /event",
+  "session_error_seen": true,
+  "observed_error_name": "APIError",
+  "observed_error_message": "model_not_supported",
+  "isolation": "dedicated HOME and XDG data/config/cache/state roots; sandbox database only"
+}

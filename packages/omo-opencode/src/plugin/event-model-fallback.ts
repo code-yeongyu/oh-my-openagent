@@ -7,6 +7,7 @@ import {
   type ModelFallbackHook,
 } from "../hooks/model-fallback/hook";
 import { shouldRetryError } from "../shared/model-error-classifier";
+import { getSessionModel } from "../shared/session-model-state";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import {
@@ -216,10 +217,19 @@ export function createModelFallbackEventHandler(args: {
     if (!agentName) return;
 
     const parsed = extractProviderModelFromErrorMessage(params.errorMessage);
-    const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
+    const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const sessionModel = getSessionModel(params.sessionID);
+    const providerHint = (params.props?.providerID as string | undefined)
+      || parsed.providerID
+      || lastKnown?.providerID
+      || sessionModel?.providerID;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined) || parsed.modelID || SISYPHUS_MISSING_METADATA_CURRENT_MODEL_ID,
+      (params.props?.modelID as string | undefined)
+        || parsed.modelID
+        || lastKnown?.modelID
+        || sessionModel?.modelID
+        || SISYPHUS_MISSING_METADATA_CURRENT_MODEL_ID,
     );
     const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
