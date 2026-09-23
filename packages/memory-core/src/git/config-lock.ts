@@ -3,6 +3,7 @@ import { resolve } from "node:path"
 const CONFIG_LOCK_ERROR = /(could not lock config file|unable to create '[^']*config\.lock')/i
 const LOCK_CONTENTION_ERROR =
   /(could not lock config file|unable to create '[^']*\.lock'|cannot lock ref|another git process seems to be running)/i
+const WORKTREE_METADATA_RACE_ERROR = /failed to read .*worktrees.*commondir/i
 const ATTEMPTS = 5
 const BASE_DELAY_MS = 25
 const mutationQueues = new Map<string, Promise<void>>()
@@ -19,6 +20,18 @@ export function isGitConfigLockError(error: unknown): boolean {
  */
 export function isGitLockError(error: unknown): boolean {
   return LOCK_CONTENTION_ERROR.test(errorText(error))
+}
+
+/**
+ * Concurrent `git worktree add` processes enumerate `.git/worktrees/` while a
+ * sibling registration is mid-creation and can read a `commondir` that exists
+ * but is not yet written. Git aborts the whole add with this message followed by
+ * the platform's spelling of errno 0 ("Success" on Linux, "Undefined error: 0"
+ * on macOS). The failure is transient, and the aborted attempt leaves its branch
+ * ref behind without registering a worktree.
+ */
+export function isGitWorktreeMetadataRaceError(error: unknown): boolean {
+  return WORKTREE_METADATA_RACE_ERROR.test(errorText(error))
 }
 
 function errorText(error: unknown): string {

@@ -1,0 +1,2 @@
+$ tsgo --noEmit -p tsconfig.json
+typecheck exit=0
