@@ -12,6 +12,10 @@ export interface EventState {
   lastEventTimestamp: number
   /** Count of assistant messages for the main session */
   messageCount: number
+  /** Whether the terminal root assistant message contains structured output */
+  hasStructuredOutput: boolean
+  /** Structured output from the terminal root assistant message */
+  structuredOutput: unknown
   /** Current agent name from the latest assistant message */
   currentAgent: string | null
   /** Current model ID from the latest assistant message */
@@ -58,6 +62,8 @@ export function createEventState(): EventState {
     hasReceivedMeaningfulWork: false,
     lastEventTimestamp: Date.now(),
     messageCount: 0,
+    hasStructuredOutput: false,
+    structuredOutput: undefined,
     currentAgent: null,
     currentModel: null,
     currentVariant: null,
