@@ -1,7 +1,7 @@
 import type { SessionInfo, SessionMessage, SearchResult } from "./types"
 import { getSessionInfo, readSessionMessages } from "./storage"
 
-export async function formatSessionList(sessionIDs: string[]): Promise<string> {
+export async function formatSessionList(sessionIDs: string[], archivedIds?: Set<string>): Promise<string> {
   if (sessionIDs.length === 0) {
     return "No sessions found."
   }
@@ -16,7 +16,7 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
 
   const headers = ["Session ID", "Messages", "First", "Last", "Agents"]
   const rows = infos.map((info) => [
-    info.id,
+    archivedIds?.has(info.id) ? `${info.id} [archived]` : info.id,
     info.message_count.toString(),
     info.first_message?.toISOString().split("T")[0] ?? "N/A",
     info.last_message?.toISOString().split("T")[0] ?? "N/A",
@@ -114,7 +114,8 @@ export function formatSearchResults(results: SearchResult[]): string {
 
   for (const result of results) {
     const timestamp = result.timestamp ? new Date(result.timestamp).toISOString() : ""
-    lines.push(`[${result.session_id}] ${result.message_id} (${result.role}) ${timestamp}`)
+    const archivedMarker = result.archived ? " [archived]" : ""
+    lines.push(`[${result.session_id}]${archivedMarker} ${result.message_id} (${result.role}) ${timestamp}`)
     lines.push(`  ${result.excerpt}`)
     lines.push(`  Matches: ${result.match_count}\n`)
   }
