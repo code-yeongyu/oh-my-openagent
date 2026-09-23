@@ -232,15 +232,19 @@ export function createBackgroundUpdateCheckRunner(
     // sees an "Updated!" toast while the runtime keeps loading the old
     // version in an infinite restart loop.
     //
-    // For sandbox installs we instead emit the truthful "update available"
-    // toast and rely on OpenCode's own plugin reinstall path to apply the
-    // new version.
+    // #6620: Skipping everything left the sandbox stale forever, because
+    // OpenCode only reinstalls when its cached resolution is gone and
+    // `<CACHE_ROOT>/packages/bun.lock` keeps pinning the old version for tag
+    // specs like `@latest`. Invalidate the per-spec sandbox + lock entry so
+    // the next OpenCode start re-resolves the tag fresh; the toast below is
+    // then truthful ("Restart to apply").
     const moduleWorkspace = deps.getModuleHostingWorkspace()
     if (isOpenCodeManagedSandbox(moduleWorkspace, getCacheWorkspaceDir(deps), deps.getOpenCodeConfigPaths({ binary: "opencode" }).configDir)) {
-      await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+      const invalidated = deps.invalidatePackage(PACKAGE_NAME)
       deps.log(
-        `[auto-update-checker] OpenCode-managed sandbox detected (${moduleWorkspace}); skipping auto-update install. Notification only. See #4318.`,
+        `[auto-update-checker] OpenCode-managed sandbox detected (${moduleWorkspace}); invalidated stale plugin cache: ${invalidated}. Restart applies the update. See #4318/#6620.`,
       )
+      await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
       return
     }
 

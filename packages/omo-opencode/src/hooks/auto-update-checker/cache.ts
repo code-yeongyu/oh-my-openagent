@@ -23,19 +23,39 @@ function stripTrailingCommas(json: string): string {
   return json.replace(/,(\s*[}\]])/g, "$1")
 }
 
+function removePackageEntriesFromLock(lock: BunLockfile, packageNames: readonly string[]): boolean {
+  const packages = lock.packages
+  if (!packages) return false
+
+  let removed = false
+  for (const packageName of packageNames) {
+    if (packages[packageName] !== undefined) {
+      delete packages[packageName]
+      log(`[auto-update-checker] Removed from bun.lock: ${packageName}`)
+      removed = true
+    }
+
+    // #6620: bun.lock keys resolved packages by "<name>@<range>", so a tag
+    // spec like "oh-my-openagent@latest" pins its first resolution under a
+    // key the exact-name delete above never matches. Purge every spec-keyed
+    // entry too, or the next install re-resolves the stale pinned version.
+    const specifierPrefix = `${packageName}@`
+    for (const key of Object.keys(packages)) {
+      if (!key.startsWith(specifierPrefix)) continue
+      delete packages[key]
+      log(`[auto-update-checker] Removed from bun.lock: ${key}`)
+      removed = true
+    }
+  }
+
+  return removed
+}
+
 function removeFromTextBunLock(lockPath: string, packageNames: readonly string[]): boolean {
   try {
     const content = fs.readFileSync(lockPath, "utf-8")
     const lock = JSON.parse(stripTrailingCommas(content)) as BunLockfile
-    let removed = false
-
-    for (const packageName of packageNames) {
-      if (lock.packages?.[packageName]) {
-        delete lock.packages[packageName]
-        log(`[auto-update-checker] Removed from bun.lock: ${packageName}`)
-        removed = true
-      }
-    }
+    const removed = removePackageEntriesFromLock(lock, packageNames)
 
     if (removed) {
       fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2))

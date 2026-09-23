@@ -80,6 +80,117 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     expect(showUpdateAvailableToast).toHaveBeenCalledTimes(1)
   })
 
+  test("#given OpenCode-managed sandbox with stale loaded version #when auto-update fires with autoUpdate=true #then the stale per-spec sandbox cache is invalidated so the next start re-resolves the tag (#6620)", async () => {
+    // given — models issue #6620: the plugin runs from
+    //   <CACHE_ROOT>/packages/oh-my-openagent@latest/ and that sandbox holds a
+    //   stale resolved version because <CACHE_ROOT>/packages/bun.lock pins it.
+    const cacheDir = "/cache/packages"
+    const configDir = "/config"
+    const sandboxDir = "/cache/packages/oh-my-openagent@latest"
+
+    const findPluginEntry = mock(() => ({
+      entry: "oh-my-openagent@latest",
+      pinnedVersion: "latest",
+      isPinned: false,
+      configPath: "/project/opencode.json",
+    }))
+    const getCachedVersion = mock(() => "4.15.1")
+    const getLatestVersion = mock(async () => "4.19.4")
+    const extractChannel = mock(() => "stable")
+    const syncCachePackageJsonToIntent = mock(() => ({ synced: true, error: null as null | "parse_error" | "write_error" }))
+    const invalidatePackage = mock(() => true)
+    const runBunInstallWithDetails = mock(async () => ({ success: true }))
+    const getOpenCodeCacheDir = mock(() => "/cache")
+    const getOpenCodeConfigPaths = mock(() => ({ configDir }))
+    const existsSync = mock(() => false)
+    const showUpdateAvailableToast = mock(async () => {})
+    const showAutoUpdatedToast = mock(async () => {})
+    const log = mock(() => {})
+    const getModuleHostingWorkspace = mock(() => sandboxDir)
+
+    const runner = createBackgroundUpdateCheckRunner({
+      existsSync,
+      join: joinPosix as unknown as typeof import("node:path").join,
+      runBunInstallWithDetails: runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
+      log: log as unknown as typeof import("../../../shared/logger").log,
+      getOpenCodeCacheDir,
+      getOpenCodeConfigPaths,
+      invalidatePackage,
+      extractChannel,
+      findPluginEntry,
+      getCachedVersion,
+      getLatestVersion,
+      syncCachePackageJsonToIntent: syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
+      showUpdateAvailableToast,
+      showAutoUpdatedToast,
+      getModuleHostingWorkspace,
+    } as Parameters<typeof createBackgroundUpdateCheckRunner>[0])
+
+    // when
+    await runner(createCtx(), /* autoUpdate */ true, (_isUpdate, latest) => `v${latest} available. Restart to apply.`)
+
+    // then — the stale sandbox must be invalidated (removes the per-spec dir +
+    // lock pin so OpenCode reinstalls fresh on next start), while the #4318
+    // guarantees hold: no flat-path bun install, no false "Updated!" toast.
+    expect(invalidatePackage).toHaveBeenCalledWith("oh-my-openagent")
+    expect(runBunInstallWithDetails).not.toHaveBeenCalled()
+    expect(showAutoUpdatedToast).not.toHaveBeenCalled()
+    expect(showUpdateAvailableToast).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given autoUpdate disabled in an OpenCode-managed sandbox #when a newer version is available #then the cache is left untouched and only the notification toast is shown", async () => {
+    // given
+    const cacheDir = "/cache/packages"
+    const configDir = "/config"
+    const sandboxDir = "/cache/packages/oh-my-openagent@latest"
+
+    const findPluginEntry = mock(() => ({
+      entry: "oh-my-openagent@latest",
+      pinnedVersion: "latest",
+      isPinned: false,
+      configPath: "/project/opencode.json",
+    }))
+    const getCachedVersion = mock(() => "4.15.1")
+    const getLatestVersion = mock(async () => "4.19.4")
+    const extractChannel = mock(() => "stable")
+    const syncCachePackageJsonToIntent = mock(() => ({ synced: true, error: null as null | "parse_error" | "write_error" }))
+    const invalidatePackage = mock(() => true)
+    const runBunInstallWithDetails = mock(async () => ({ success: true }))
+    const getOpenCodeCacheDir = mock(() => "/cache")
+    const getOpenCodeConfigPaths = mock(() => ({ configDir }))
+    const existsSync = mock(() => false)
+    const showUpdateAvailableToast = mock(async () => {})
+    const showAutoUpdatedToast = mock(async () => {})
+    const log = mock(() => {})
+    const getModuleHostingWorkspace = mock(() => sandboxDir)
+
+    const runner = createBackgroundUpdateCheckRunner({
+      existsSync,
+      join: joinPosix as unknown as typeof import("node:path").join,
+      runBunInstallWithDetails: runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
+      log: log as unknown as typeof import("../../../shared/logger").log,
+      getOpenCodeCacheDir,
+      getOpenCodeConfigPaths,
+      invalidatePackage,
+      extractChannel,
+      findPluginEntry,
+      getCachedVersion,
+      getLatestVersion,
+      syncCachePackageJsonToIntent: syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
+      showUpdateAvailableToast,
+      showAutoUpdatedToast,
+      getModuleHostingWorkspace,
+    } as Parameters<typeof createBackgroundUpdateCheckRunner>[0])
+
+    // when
+    await runner(createCtx(), /* autoUpdate */ false, (_isUpdate, latest) => `v${latest} available. Restart to apply.`)
+
+    // then — opt-out users keep full manual control over their cache.
+    expect(invalidatePackage).not.toHaveBeenCalled()
+    expect(runBunInstallWithDetails).not.toHaveBeenCalled()
+    expect(showUpdateAvailableToast).toHaveBeenCalledTimes(1)
+  })
+
   test("#given import.meta.url resolves inside the flat cache workspace #when auto-update fires with autoUpdate=true #then existing install flow runs unchanged", async () => {
     // given
     const cacheDir = "/cache/packages"

@@ -1,0 +1,21 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/auto-update-checker/hook/background-update-check.test.ts:
+130 |     await runner(createCtx(), /* autoUpdate */ true, (_isUpdate, latest) => `v${latest} available. Restart to apply.`)
+131 |
+132 |     // then — the stale sandbox must be invalidated (removes the per-spec dir +
+133 |     // lock pin so OpenCode reinstalls fresh on next start), while the #4318
+134 |     // guarantees hold: no flat-path bun install, no false "Updated!" toast.
+135 |     expect(invalidatePackage).toHaveBeenCalledWith("oh-my-openagent")
+                                    ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+Expected: [ "oh-my-openagent" ]
+But it was not called.
+      at <anonymous> (/home/viprix/projects/oom-wt-6620/packages/omo-opencode/src/hooks/auto-update-checker/hook/background-update-check.test.ts:135:31)
+(fail) createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318) > #given OpenCode-managed sandbox with stale loaded version #when auto-update fires with autoUpdate=true #then the stale per-spec sandbox cache is invalidated so the next start re-resolves the tag (#6620) [0.61ms]
+
+ 4 pass
+ 1 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [1.53s]
