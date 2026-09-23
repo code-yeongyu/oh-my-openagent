@@ -13,6 +13,7 @@ import {
   getAgentToolRestrictions,
   hasInternalInitiatorMarker,
   isAmbiguousPostDispatchPromptFailure,
+  lowerReasoningForModel,
   log,
   messagesInDirectory,
   normalizePromptTools,
@@ -780,6 +781,11 @@ export class BackgroundManager {
     const childDirectory = input.cwd ?? parentDirectory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${childDirectory}`)
 
+    const launchVariant =
+      input.model?.reasoning !== undefined
+        ? lowerReasoningForModel(input.model.reasoning, input.model).variant
+        : input.model?.variant
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionId,
@@ -790,7 +796,7 @@ export class BackgroundManager {
               model: {
                 id: input.model.modelID,
                 providerID: input.model.providerID,
-                ...(input.model.variant ? { variant: input.model.variant } : {}),
+                ...(launchVariant ? { variant: launchVariant } : {}),
               },
             }
           : {}),
@@ -903,8 +909,6 @@ The fallback retry session is now created and can be inspected directly.
           modelID: input.model.modelID,
         }
       : undefined
-    const launchVariant = input.model?.variant
-
     if (input.model) {
       applySessionPromptParams(sessionID, input.model)
     }
@@ -1416,11 +1420,12 @@ The fallback retry session is now created and can be inspected directly.
           modelID: existingTask.model.modelID,
         }
       : undefined
-    const resumeVariant = existingTask.model?.variant
-
-    if (existingTask.model) {
-      applySessionPromptParams(existingTask.sessionId!, existingTask.model)
-    }
+    const loweredReasoning = existingTask.model
+      ? applySessionPromptParams(existingTask.sessionId!, existingTask.model)
+      : {}
+    const resumeVariant = existingTask.model?.reasoning !== undefined
+      ? loweredReasoning.variant
+      : existingTask.model?.variant
 
     dispatchInternalPrompt({
       mode: "async",

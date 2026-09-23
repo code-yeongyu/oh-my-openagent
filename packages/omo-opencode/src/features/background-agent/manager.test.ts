@@ -8290,6 +8290,62 @@ describe("BackgroundManager - tool permission spread order", () => {
     manager.shutdown()
   })
 
+  test("startTask lowers canonical reasoning for session creation and prompt payloads", async () => {
+    //#given
+    const createCalls: Array<{ body: Record<string, unknown> }> = []
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async (args: { body: Record<string, unknown> }) => {
+          createCalls.push(args)
+          return { data: { id: "session-reasoning-launch" } }
+        },
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-reasoning-launch",
+      status: "pending",
+      queuedAt: new Date(),
+      description: "test task",
+      prompt: "test prompt",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.6-sol",
+        variant: "max",
+        reasoning: "high",
+      },
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      model: task.model,
+    }
+
+    //#when
+    await (cast<{ startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> }>(manager))
+      .startTask({ task, input })
+
+    //#then
+    expect(createCalls).toHaveLength(1)
+    expect(createCalls[0].body.model).toEqual({ id: "gpt-5.6-sol", providerID: "openai", variant: "high" })
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.variant).toBe("high")
+
+    manager.shutdown()
+  })
+
   test("startTask updates tracked session agent when launch falls back to general", async () => {
     //#given
     const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
@@ -8431,6 +8487,54 @@ describe("BackgroundManager - tool permission spread order", () => {
     expect(promptCall).toBeDefined()
     expect(promptCall?.body.agent).toBe("explore")
     expect(promptCall?.body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
+
+    manager.shutdown()
+  })
+
+  test("resume lowers canonical reasoning for the prompt payload", async () => {
+    //#given
+    let promptCall: { path: { id: string }; body: Record<string, unknown> } | undefined
+    const client = {
+      session: {
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCall = args
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-reasoning-resume",
+      sessionId: "session-reasoning-resume",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "resume task",
+      prompt: "resume prompt",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.6-sol",
+        variant: "max",
+        reasoning: "high",
+      },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-reasoning-resume",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+
+    //#then
+    expect(promptCall).toBeDefined()
+    expect(promptCall?.body.variant).toBe("high")
 
     manager.shutdown()
   })
