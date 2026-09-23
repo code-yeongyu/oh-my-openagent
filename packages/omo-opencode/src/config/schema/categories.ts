@@ -30,7 +30,8 @@ export const CategoryConfigSchema = z.object({
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
-  prompt_append: z.string().optional(),
+  /** Inline text or file:// URI; an array of sources is appended in array-index order. */
+  prompt_append: z.union([z.string(), z.array(z.string())]).optional(),
   max_prompt_tokens: z.number().int().positive().optional(),
   /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini/minimax models. */
   is_unstable_agent: z.boolean().optional(),

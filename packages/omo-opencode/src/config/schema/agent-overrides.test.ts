@@ -57,4 +57,36 @@ describe("AgentOverridesSchema", () => {
 
     expect(result.success).toBe(false)
   })
+
+  test("accepts array-form prompt_append preserving entry order", () => {
+    // given
+    const input = {
+      oracle: {
+        prompt_append: ["first-append-sentinel", "second-append-sentinel"],
+      },
+    }
+
+    // when
+    const result = AgentOverridesSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.oracle?.prompt_append).toEqual([
+        "first-append-sentinel",
+        "second-append-sentinel",
+      ])
+    }
+  })
+
+  test("rejects non-string non-array prompt_append", () => {
+    // given
+    const input = { oracle: { prompt_append: 42 } }
+
+    // when
+    const result = AgentOverridesSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
 })

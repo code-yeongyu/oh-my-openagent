@@ -546,7 +546,17 @@
             }
           },
           "prompt_append": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "max_prompt_tokens": {
             "type": "integer",
@@ -2649,7 +2659,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -3201,7 +3221,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -3753,7 +3783,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -4305,7 +4345,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -4860,7 +4910,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -5412,7 +5472,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -5964,7 +6034,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -6516,7 +6596,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -7068,7 +7158,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -7620,7 +7720,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -8172,7 +8282,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -8724,7 +8844,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -9276,7 +9406,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -9828,7 +9968,17 @@
                   "type": "string"
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "tools": {
                   "type": "object",
@@ -10381,7 +10531,17 @@
                 "type": "string"
               },
               "prompt_append": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
               },
               "tools": {
                 "type": "object",
@@ -10993,7 +11153,17 @@
                 }
               },
               "prompt_append": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
               },
               "max_prompt_tokens": {
                 "type": "integer",
@@ -14578,7 +14748,17 @@
                 }
               },
               "prompt_append": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
               },
               "max_prompt_tokens": {
                 "type": "integer",
@@ -16496,7 +16676,17 @@
                 }
               },
               "prompt_append": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
               },
               "max_prompt_tokens": {
                 "type": "integer",
@@ -18420,7 +18610,17 @@
                   }
                 },
                 "prompt_append": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
                 },
                 "max_prompt_tokens": {
                   "type": "integer",
@@ -20228,7 +20428,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -20780,7 +20990,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -21332,7 +21552,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -21884,7 +22114,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -22439,7 +22679,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -22991,7 +23241,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -23543,7 +23803,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -24095,7 +24365,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -24647,7 +24927,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -25199,7 +25489,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -25751,7 +26051,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -26303,7 +26613,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -26855,7 +27175,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -27407,7 +27737,17 @@
                         "type": "string"
                       },
                       "prompt_append": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
                       },
                       "tools": {
                         "type": "object",
@@ -27960,7 +28300,17 @@
                       "type": "string"
                     },
                     "prompt_append": {
-                      "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
                     },
                     "tools": {
                       "type": "object",
@@ -28572,7 +28922,17 @@
                       }
                     },
                     "prompt_append": {
-                      "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
                     },
                     "max_prompt_tokens": {
                       "type": "integer",
@@ -32157,7 +32517,17 @@
                       }
                     },
                     "prompt_append": {
-                      "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
                     },
                     "max_prompt_tokens": {
                       "type": "integer",
@@ -34075,7 +34445,17 @@
                       }
                     },
                     "prompt_append": {
-                      "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
                     },
                     "max_prompt_tokens": {
                       "type": "integer",

@@ -62,3 +62,17 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
     return `[WARNING: Could not read file: ${promptAppend}]`
   }
 }
+
+export function resolvePromptAppendSources(
+  promptAppendSources: string | string[],
+  configDir?: string
+): string | undefined {
+  if (!Array.isArray(promptAppendSources)) {
+    return resolvePromptAppend(promptAppendSources, configDir)
+  }
+
+  const resolvedEntries = promptAppendSources.map((entry) => resolvePromptAppend(entry, configDir))
+  if (resolvedEntries.length === 0) return undefined
+
+  return resolvedEntries.join("\n\n")
+}

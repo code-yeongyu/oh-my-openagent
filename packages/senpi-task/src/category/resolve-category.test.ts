@@ -95,6 +95,30 @@ describe("resolveCategory", () => {
     expect(resolved.spec.prompt_append).toEndWith("\n\nfixture-overlay")
   })
 
+  test("#given an omo overlay with array prompt_append #when resolved #then entries are appended in declared order after the builtin base", () => {
+    // given
+    const models = registry([model("anthropic", "claude-opus-4-7")])
+
+    // when
+    const result = resolveCategory(
+      "ultrabrain",
+      {
+        categories: {
+          ultrabrain: {
+            model: "anthropic/claude-opus-4-7",
+            prompt_append: ["fixture-overlay-first", "fixture-overlay-second"],
+          },
+        },
+      },
+      models,
+    )
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.prompt_append).toBeDefined()
+    expect(resolved.spec.prompt_append).toEndWith("\n\nfixture-overlay-first\n\nfixture-overlay-second")
+  })
+
   test("#given a disabled omo category overlay #when resolved #then a disabled result explains the reason", () => {
     // given
     const models = registry([model("openai", "gpt-5.5")])

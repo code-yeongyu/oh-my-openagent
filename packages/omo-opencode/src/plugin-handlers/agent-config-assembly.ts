@@ -116,7 +116,7 @@ async function createCoreAgentConfig(
     agentConfig.prometheus = await buildPrometheusAgentConfig({
       configAgentPlan: sources.configAgent?.plan,
       pluginPrometheusOverride: pluginConfig.agents?.prometheus as
-        | (Record<string, unknown> & { prompt_append?: string })
+        | (Record<string, unknown> & { prompt_append?: string | string[] })
         | undefined,
       userCategories: pluginConfig.categories,
       currentModel,
