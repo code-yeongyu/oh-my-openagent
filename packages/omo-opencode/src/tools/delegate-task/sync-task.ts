@@ -1,8 +1,8 @@
 import { handedBackSyncSessions, subagentSessions } from "../../features/claude-code-session-state"
+import { abortWithTimeout } from "../../features/background-agent/abort-with-timeout"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { log } from "../../shared/logger"
 import { scheduleSyncSessionDeletion } from "./sync-session-cleanup"
 import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
@@ -176,9 +176,7 @@ export async function executeSyncTask(
       // session.idle), so handedBackSyncSessions is the signal the enforcer keys on;
       // the abort still cancels the child's opencode-side background jobs.
       if (typeof client?.session?.abort === "function") {
-        void client.session.abort({ path: { id: syncSessionID } }).catch((error: unknown) => {
-          log(`[task] Failed to abort completed sync session:`, error)
-        })
+        await abortWithTimeout(client, syncSessionID)
       }
       scheduleSyncSessionDeletion(client, syncSessionID)
     }
