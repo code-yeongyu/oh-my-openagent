@@ -34,6 +34,36 @@ describe("getModelCapabilities", () => {
         },
         toolCall: true,
       },
+      "claude-opus-5": {
+        id: "claude-opus-5",
+        family: "claude-opus",
+        reasoning: true,
+        temperature: true,
+        modalities: {
+          input: ["text", "image", "pdf"],
+          output: ["text"],
+        },
+        limit: {
+          context: 1_000_000,
+          output: 128_000,
+        },
+        toolCall: true,
+      },
+      "glm-5.3": {
+        id: "glm-5.3",
+        family: "glm",
+        reasoning: true,
+        temperature: true,
+        modalities: {
+          input: ["text"],
+          output: ["text"],
+        },
+        limit: {
+          context: 1_000_000,
+          output: 131_000,
+        },
+        toolCall: true,
+      },
       "gemini-3.1-pro": {
         id: "gemini-3.1-pro",
         family: "gemini",

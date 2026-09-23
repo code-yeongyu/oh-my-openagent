@@ -18,8 +18,13 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -130,7 +135,7 @@ describe("category routing policy", () => {
       },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
-        model: "qwen3.8-max-preview",
+        model: "qwen3.7-plus-preview",
         variant: "max",
       },
       {
@@ -160,8 +165,13 @@ describe("category routing policy", () => {
     // then
     expect(highChain).toEqual([
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -187,8 +197,13 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       }
     ])
@@ -199,8 +214,13 @@ describe("category routing policy", () => {
         variant: "low",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "low",
       },
       {

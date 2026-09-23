@@ -9,8 +9,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {
@@ -61,8 +66,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       }
     ],
@@ -102,7 +112,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
-        model: "qwen3.8-max-preview",
+        model: "qwen3.7-plus-preview",
         variant: "max",
       },
       { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
@@ -112,8 +122,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "unspecified-high": {
     fallbackChain: [
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
@@ -132,8 +147,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "low",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "low",
       },
       {
