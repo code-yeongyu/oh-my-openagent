@@ -111,3 +111,12 @@ The evidence proves catalog availability, chain selection, exact pinned ordering
 - Gates re-run on the final tree: `bun test packages/model-core packages/senpi-task` = 2989 pass / 1 skip / 0 fail (baseline identical); `bun test script/opus5-model-recommendation-audit.test.ts` = 1 pass.
 - `bun run test:senpi`: still running at commit time.
 - Regenerated `packages/omo-senpi/plugin/**` bundles are included: tracked release artifacts rebuilt from the changed sources (repo history: `build(omo-senpi): regenerate...`).
+
+
+## Final gate state (delivery)
+
+- `bun run test:senpi` -> 3735 pass, 0 fail, exit 0.
+- `bun test packages/model-core packages/senpi-task` -> 2993 pass, 1 skip, 0 fail (run in isolation).
+- `bun test script/opus5-model-recommendation-audit.test.ts` -> 1 pass.
+- Qwen correction: the category chain keeps the shipped `qwen3.8-max-preview` and the agent chain keeps `qwen3.7-plus`; the un-suffixed `qwen3.8-max` is not snapshot-backed, so a version bump there is a follow-up that includes regenerating the models.dev-derived capability snapshot.
+- Curated senpi chains (plan-consultant/plan-reviewer parity) and the telemetry vocabulary follow the same ids.

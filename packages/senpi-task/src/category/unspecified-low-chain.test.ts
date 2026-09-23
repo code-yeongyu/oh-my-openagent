@@ -23,7 +23,7 @@ const FULL_CHAIN_MODELS: readonly FakeModel[] = [
   { provider: "xai", id: "grok-4.7" },
   { provider: "chatgpt-subscription", id: "gpt-5.6-terra" },
   { provider: "anthropic", id: "claude-sonnet-5" },
-  { provider: "qwen-token-plan", id: "qwen3.7-plus-preview" },
+  { provider: "qwen-token-plan", id: "qwen3.8-max-preview" },
   { provider: "deepseek", id: "deepseek-v4-pro" },
   { provider: "xiaomi", id: "mimo-v2.5-pro" },
 ]

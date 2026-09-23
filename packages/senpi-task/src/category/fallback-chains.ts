@@ -122,7 +122,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     },
     {
       providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
-      model: "qwen3.7-plus-preview",
+      model: "qwen3.8-max-preview",
       variant: "max",
     },
     { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },

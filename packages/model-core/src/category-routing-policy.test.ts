@@ -135,7 +135,7 @@ describe("category routing policy", () => {
       },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
-        model: "qwen3.7-plus-preview",
+        model: "qwen3.8-max-preview",
         variant: "max",
       },
       {
