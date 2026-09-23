@@ -9294,6 +9294,9 @@
       "properties": {
         "force_enable": {
           "type": "boolean"
+        },
+        "script": {
+          "type": "string"
         }
       },
       "additionalProperties": false

@@ -1,0 +1,18 @@
+Host command (no credentials or host config are mounted):
+
+docker run --rm -i --name omo-pr2528-qa \
+  -v /Users/admin/code/.worktrees/oh-my-openagent-pr2528:/workspaces/oh-my-openagent \
+  -v /tmp/qa-pr2528.sh:/tmp-host-qa/qa-pr2528.sh:ro \
+  -v /tmp/invoke-notification.ts:/tmp-host-qa/invoke-notification.ts:ro \
+  -v /Users/admin/.cache/opencode/models.json:/tmp-host-models.json:ro \
+  -w /workspaces/oh-my-openagent \
+  omo-qa bash /tmp-host-qa/qa-pr2528.sh
+
+Isolation:
+- The container is disposable (`--rm`) and uses its own HOME and OpenCode database.
+- No provider credentials, host OpenCode configuration, or unrelated host temporary files are mounted.
+- The models.dev public catalog cache is mounted read-only to avoid an unrelated network timeout.
+- `/tmp/qa-project` is created inside the container and removed with it.
+- The host database is read only for session counts before and after the container run.
+
+The runner waits for real `session.created` and `session.idle` SSE events, invokes the current worktree production notification sender, and validates the script's JSON payload before printing the captured result.

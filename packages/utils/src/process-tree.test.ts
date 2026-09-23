@@ -14,6 +14,21 @@ function isProcessAlive(pid: number): boolean {
 }
 
 describe("runProcessWithTreeTimeout output decoding", () => {
+  it("#given stdin text #when the child reads standard input #then the text is delivered", async () => {
+    const result = await runProcessWithTreeTimeout({
+      args: ["--eval", "process.stdin.pipe(process.stdout)"],
+      command: process.execPath,
+      cwd: process.cwd(),
+      env: { PATH: process.env["PATH"] ?? "" },
+      maxBuffer: 1024,
+      stdin: "notification payload",
+      timeoutMs: 1_000,
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toBe("notification payload")
+  })
+
   it("#given a UTF-8 character split across child writes #when output is collected #then the character is preserved", async () => {
     // given
     const script = [

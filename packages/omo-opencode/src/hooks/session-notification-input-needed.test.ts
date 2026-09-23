@@ -7,6 +7,7 @@ const sender = require("./session-notification-sender")
 
 describe("session-notification input-needed events", () => {
   let notificationCalls: string[]
+  let scriptCalls: Array<Record<string, unknown> | undefined>
 
   function createMockPluginInput() {
     return {
@@ -33,14 +34,16 @@ describe("session-notification input-needed events", () => {
   beforeEach(() => {
     _resetForTesting()
     notificationCalls = []
+    scriptCalls = []
 
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
     spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
     spyOn(utils, "startBackgroundCheck").mockImplementation(() => {})
     spyOn(sender, "detectPlatform").mockReturnValue("darwin")
-    spyOn(sender, "sendSessionNotification").mockImplementation(async (_ctx: unknown, _platform: unknown, _title: unknown, message: string) => {
+    spyOn(sender, "sendSessionNotification").mockImplementation(async (_ctx: unknown, _platform: unknown, _title: unknown, message: string, script: Record<string, unknown> | undefined) => {
       notificationCalls.push(message)
+      scriptCalls.push(script)
     })
   })
 
@@ -92,6 +95,47 @@ describe("session-notification input-needed events", () => {
 
     expect(notificationCalls).toHaveLength(1)
     expect(notificationCalls[0]).toContain("Agent needs permission to continue")
+  })
+
+  test("passes custom script context for idle, permission, and question notifications", async () => {
+    const sessionID = "main-custom-script"
+    setMainSession(sessionID)
+    const hook = createSessionNotification(createMockPluginInput(), {
+      script: "~/.config/opencode/notification.sh",
+      enforceMainSessionFilter: false,
+      idleConfirmationDelay: 0,
+      skipIfIncompleteTodos: false,
+    })
+
+    await hook({ event: { type: "session.idle", properties: { sessionID } } })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await hook({ event: { type: "permission.asked", properties: { sessionID } } })
+    await hook({
+      event: {
+        type: "tool.execute.before",
+        properties: {
+          sessionID,
+          tool: "question",
+          args: { questions: [{ question: "Which branch?" }] },
+        },
+      },
+    })
+
+    expect(scriptCalls.map((call) => call?.hookType)).toEqual(["idle", "permission", "question"])
+    expect(scriptCalls.every((call) => call?.scriptPath === "~/.config/opencode/notification.sh")).toBe(true)
+  })
+
+  test("runs a custom script when desktop notifications are unsupported", async () => {
+    const sessionID = "unsupported-custom-script"
+    spyOn(sender, "detectPlatform").mockReturnValue("unsupported")
+    const hook = createSessionNotification(createMockPluginInput(), {
+      script: "/tmp/notification.sh",
+      enforceMainSessionFilter: false,
+    })
+
+    await hook({ event: { type: "permission.asked", properties: { sessionID } } })
+
+    expect(scriptCalls[0]?.hookType).toBe("permission")
   })
 
   test("lazily detects platform and starts background checks on first idle event", async () => {
