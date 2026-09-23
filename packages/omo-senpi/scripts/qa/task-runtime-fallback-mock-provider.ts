@@ -107,7 +107,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   })
 
   // Builtin chain fixture providers for the "quick" category: rung 1 (openai-codex/
-  // gpt-5.6-luna-fast) always dies on the child; rung 2 (deepseek/deepseek-v4-flash) answers
+  // gpt-6-luna-fast) always dies on the child; rung 2 (deepseek/deepseek-v4-flash) answers
   // unless the scenario exhausts the chain. Both fixtures declare reasoning so the runtime
   // accepts the rung variants ("low" / "off") in its fallback selector.
   pi.registerProvider("openai-codex", {
@@ -115,7 +115,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://omo-runtime-fallback-mock",
     apiKey: "mock",
     api: "openai-completions",
-    models: [{ ...mockModel("gpt-5.6-luna-fast", "Dead chain rung one"), reasoning: true }],
+    models: [{ ...mockModel("gpt-6-luna-fast", "Dead chain rung one"), reasoning: true }],
     streamSimple(model, context) {
       return streamMessage(childReply(model.id))
     },
@@ -142,7 +142,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
         quotio: ids.filter((id) => id.includes("quotio")),
         kimi: ids.filter((id) => id.includes("kimi")),
         mock: ids.filter((id) => id.includes("omo-fallback-mock")),
-        findQuotio: registry?.find("openai-codex", "gpt-5.6-luna-fast") !== undefined,
+        findQuotio: registry?.find("openai-codex", "gpt-6-luna-fast") !== undefined,
       }, null, 2))
     }
     dump("t0")

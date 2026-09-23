@@ -20,13 +20,13 @@
   },
 
   "categories": {
-    "quick": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
     "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
     "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" },
     "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
-    "deep-low": { "model": "openai/gpt-5.6-sol", "reasoning": "medium" },
+    "deep-low": { "model": "openai/gpt-6-sol", "reasoning": "medium" },
     "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
   },

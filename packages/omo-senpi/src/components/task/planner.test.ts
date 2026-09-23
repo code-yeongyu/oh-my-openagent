@@ -135,7 +135,7 @@ describe("createTaskChildPlanner", () => {
     const planner = createTaskChildPlanner(
       {},
       BUILTIN_AGENTS,
-      () => registry([model("openai", "gpt-5.6-luna-fast")]),
+      () => registry([model("openai", "gpt-6-luna-fast")]),
     )
 
     // when
@@ -148,12 +148,12 @@ describe("createTaskChildPlanner", () => {
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.plan.model).toBe("openai/gpt-5.6-luna-fast")
+    expect(resolved.plan.model).toBe("openai/gpt-6-luna-fast")
     expect(resolved.plan.resolved_model).toEqual({
       source: "agent",
       provider: "openai",
-      model_id: "gpt-5.6-luna-fast",
-      display: "openai/gpt-5.6-luna-fast",
+      model_id: "gpt-6-luna-fast",
+      display: "openai/gpt-6-luna-fast",
       variant: "low",
       reasoning: "low",
     })
@@ -255,7 +255,7 @@ describe("createTaskChildPlanner", () => {
       BUILTIN_AGENTS,
       () => registry([
         model("anthropic", "claude-fable-5-1"),
-        model("openai", "gpt-5.6-luna-fast"),
+        model("openai", "gpt-6-luna-fast"),
       ]),
     )
 
@@ -661,7 +661,7 @@ describe("createTaskChildPlanner parent independence", () => {
       () => registry([
         model("anthropic", "claude-fable-5-1"),
         model("anthropic", "claude-opus-5-5"),
-        model("openai", "gpt-5.6-luna-fast"),
+        model("openai", "gpt-6-luna-fast"),
       ]),
     )
     const child = {
@@ -684,7 +684,7 @@ describe("createTaskChildPlanner parent independence", () => {
     // then
     expect(fableParent.plan.model).toBe("anthropic/claude-fable-5-1")
     expect(highParent.plan.model).toBe("anthropic/claude-opus-5-5")
-    expect(childUnderFableParent.plan.model).toBe("openai/gpt-5.6-luna-fast")
+    expect(childUnderFableParent.plan.model).toBe("openai/gpt-6-luna-fast")
     expect(childUnderHighParent.plan.model).toBe(childUnderFableParent.plan.model)
     expect(childUnderFableParent.plan.category).toBeUndefined()
     expect(childUnderHighParent.plan.category).toBeUndefined()

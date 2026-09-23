@@ -24,7 +24,7 @@ type CapturedNotify = {
 
 const QUICK_CHAIN: readonly DelegateFallbackEntry[] = [
   { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
-  { providers: ["openai"], model: "gpt-5.6-luna-fast", variant: "minimal" },
+  { providers: ["openai"], model: "gpt-6-luna-fast", variant: "minimal" },
 ]
 
 function deadChainError(category: string): PlanResolutionError {

@@ -33,7 +33,7 @@ describe("TaskManager runtime fallback visibility", () => {
     const fallbackEvent = {
       type: "retry_fallback_applied",
       from: "kimi-coding/kimi-for-coding-highspeed-unlocked",
-      to: "chatgpt-subscription/gpt-5.6-luna-fast:minimal",
+      to: "chatgpt-subscription/gpt-6-luna-fast:minimal",
       chainKey: "kimi-coding/kimi-for-coding-highspeed-unlocked",
       reason: "hard-error",
     }
@@ -43,12 +43,12 @@ describe("TaskManager runtime fallback visibility", () => {
 
     // then
     expect(store.load(started.task_id)).toMatchObject({
-      model: "chatgpt-subscription/gpt-5.6-luna-fast",
+      model: "chatgpt-subscription/gpt-6-luna-fast",
       resolved_model: {
         source: "category",
         provider: "chatgpt-subscription",
-        model_id: "gpt-5.6-luna-fast",
-        display: "chatgpt-subscription/gpt-5.6-luna-fast",
+        model_id: "gpt-6-luna-fast",
+        display: "chatgpt-subscription/gpt-6-luna-fast",
         reasoning_effort: "minimal",
       },
     })
@@ -59,7 +59,7 @@ describe("TaskManager runtime fallback visibility", () => {
   test("#given a builtin category child on a chain rung #when Senpi applies a fallback to the next rung #then the record advances and the remaining chain shrinks", async () => {
     // given
     const models = [
-      { provider: "chatgpt-subscription", id: "gpt-5.6-luna-fast" },
+      { provider: "chatgpt-subscription", id: "gpt-6-luna-fast" },
       { provider: "opencode-go", id: "minimax-m3" },
     ] as const
     const registry = {
@@ -97,7 +97,7 @@ describe("TaskManager runtime fallback visibility", () => {
 
     // then: the remaining chain rung after the selected one is on the record before any retry
     expect(store.load(started.task_id)).toMatchObject({
-      model: "chatgpt-subscription/gpt-5.6-luna-fast",
+      model: "chatgpt-subscription/gpt-6-luna-fast",
       fallback_models: [
         {
           source: "category",
@@ -111,9 +111,9 @@ describe("TaskManager runtime fallback visibility", () => {
     // when
     const fallbackEvent = {
       type: "retry_fallback_applied",
-      from: "chatgpt-subscription/gpt-5.6-luna-fast",
+      from: "chatgpt-subscription/gpt-6-luna-fast",
       to: "opencode-go/minimax-m3:max",
-      chainKey: "chatgpt-subscription/gpt-5.6-luna-fast",
+      chainKey: "chatgpt-subscription/gpt-6-luna-fast",
       reason: "hard-error",
     }
     fake.emit(fallbackEvent)
@@ -132,7 +132,7 @@ describe("TaskManager runtime fallback visibility", () => {
     expect(record?.fallback_models).toEqual([])
     expect(
       record?.fallback_attempts?.map((attempt) => `${attempt.provider}/${attempt.model_id}`),
-    ).toEqual(["chatgpt-subscription/gpt-5.6-luna-fast", "opencode-go/minimax-m3"])
+    ).toEqual(["chatgpt-subscription/gpt-6-luna-fast", "opencode-go/minimax-m3"])
     fake.settle({ status: "completed", finalResponse: "done" })
     await manager.waitFor(started.task_id)
   })

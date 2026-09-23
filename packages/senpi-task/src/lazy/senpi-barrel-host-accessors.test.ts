@@ -30,7 +30,7 @@ describe("senpi host-daemon accessors", () => {
     }
 
     // then
-    // The pin (2026.9.22-4) carries senpi todos 15-17/20, so every accessor resolves. While the
+    // The pin (2026.9.23) carries senpi todos 15-17/20, so every accessor resolves. While the
     // pin predated them this test's tripwire proved each one failed closed with its symbol name
     // (see this file's history); that path is the three-line requireHostSymbol with no other branch.
     for (const [name, value] of Object.entries(resolved)) {

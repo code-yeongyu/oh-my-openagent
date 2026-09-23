@@ -21,7 +21,7 @@ function throwingProviderAccessorModel(message: string): object {
     },
     id: {
       enumerable: true,
-      value: "gpt-5.6-luna-fast",
+      value: "gpt-6-luna-fast",
     },
   })
 }
@@ -58,13 +58,13 @@ if (visualPrimary.kind !== "resolved") {
 requireCondition(visualPrimary.spec.modelId === "claude-opus-5", "visual-engineering primary model mismatch")
 requireCondition(visualPrimary.spec.variant === "max", "visual-engineering primary variant is not max")
 
-const quickPrimary = resolveCategory("quick", {}, registry([model("openai-codex", "gpt-5.6-luna-fast")]))
+const quickPrimary = resolveCategory("quick", {}, registry([model("openai-codex", "gpt-6-luna-fast")]))
 requireCondition(quickPrimary.kind === "resolved", "quick primary did not resolve")
 if (quickPrimary.kind !== "resolved") {
   throw new Error("quick primary did not resolve")
 }
 requireCondition(quickPrimary.spec.provider === "openai-codex", "quick primary provider mismatch")
-requireCondition(quickPrimary.spec.modelId === "gpt-5.6-luna-fast", "quick primary model mismatch")
+requireCondition(quickPrimary.spec.modelId === "gpt-6-luna-fast", "quick primary model mismatch")
 requireCondition(quickPrimary.modelSelection.matchedFallback === false, "quick primary should be a direct hit")
 
 const visualKimiFallback = resolveCategory("visual-engineering", {}, registry([model("kimi-coding", "k3")]))
@@ -147,13 +147,13 @@ requireCondition(
   "unavailable available models missing registry model",
 )
 
-const hardcodedFallback = resolveCategory("quick", {}, registry([model("openai", "gpt-5.6-luna-fast")]))
+const hardcodedFallback = resolveCategory("quick", {}, registry([model("openai", "gpt-6-luna-fast")]))
 requireCondition(hardcodedFallback.kind === "resolved", "hardcoded fallback scenario did not resolve")
 if (hardcodedFallback.kind !== "resolved") {
   throw new Error("hardcoded fallback scenario did not resolve")
 }
 requireCondition(hardcodedFallback.spec.provider === "openai", "hardcoded fallback provider mismatch")
-requireCondition(hardcodedFallback.spec.modelId === "gpt-5.6-luna-fast", "hardcoded fallback model mismatch")
+requireCondition(hardcodedFallback.spec.modelId === "gpt-6-luna-fast", "hardcoded fallback model mismatch")
 requireCondition(hardcodedFallback.spec.variant === "minimal", "hardcoded fallback variant is not minimal")
 requireCondition(hardcodedFallback.modelSelection.matchedFallback, "hardcoded fallback was not marked as fallback")
 
@@ -172,7 +172,7 @@ requireCondition(systemDefault.spec.modelId === "system-default", "system defaul
 
 const headerModel = {
   provider: "openai-codex",
-  id: "gpt-5.6-luna-fast",
+  id: "gpt-6-luna-fast",
   name: "header model",
   headers: { "User-Agent": "test" },
 }
@@ -214,15 +214,15 @@ requireCondition(throwingAvailable.availableModels.length === 0, "throwing avail
 requireCondition(!JSON.stringify(throwingAvailable).includes(throwingAvailableMarker), "throwing available accessor marker leaked")
 
 const secretFindResults = [
-  { provider: "openai", id: "gpt-5.6-luna-fast", password: "hidden" },
-  { provider: "openai", id: "gpt-5.6-luna-fast", accessToken: "hidden" },
-  { provider: "openai", id: "gpt-5.6-luna-fast", privateToken: "hidden" },
+  { provider: "openai", id: "gpt-6-luna-fast", password: "hidden" },
+  { provider: "openai", id: "gpt-6-luna-fast", accessToken: "hidden" },
+  { provider: "openai", id: "gpt-6-luna-fast", privateToken: "hidden" },
 ]
 const secretFind = secretFindResults.map((findResult) => resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
+    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
     find: () => findResult,
   },
 ))
@@ -240,7 +240,7 @@ const identityFind = identityFindResults.map((findResult) => resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
+    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
     find: () => findResult,
   },
 ))
@@ -249,7 +249,7 @@ for (const result of identityFind) {
   if (result.kind !== "model_unavailable") {
     throw new Error("identity find result did not return model_unavailable")
   }
-  requireCondition(result.attemptedModel === "openai/gpt-5.6-luna-fast", "identity find attempted model changed")
+  requireCondition(result.attemptedModel === "openai/gpt-6-luna-fast", "identity find attempted model changed")
   requireCondition(!JSON.stringify(result).includes("evil"), "identity find result leaked mismatched provider")
 }
 
@@ -258,7 +258,7 @@ const throwingFind = resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
+    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
     find: () => throwingProviderAccessorModel(throwingFindMarker),
   },
 )
@@ -267,21 +267,21 @@ if (throwingFind.kind !== "model_unavailable") {
   throw new Error("throwing find accessor did not return model_unavailable")
 }
 requireCondition(
-  throwingFind.availableModels.includes("openai/gpt-5.6-luna-fast"),
+  throwingFind.availableModels.includes("openai/gpt-6-luna-fast"),
   "throwing find accessor lost valid available model",
 )
 requireCondition(!JSON.stringify(throwingFind).includes(throwingFindMarker), "throwing find accessor marker leaked")
 
 const inheritedIdentityModel: object = Object.create({
   provider: "openai",
-  id: "gpt-5.6-luna-fast",
+  id: "gpt-6-luna-fast",
   privateToken: "hidden",
 })
 const inheritedIdentity = resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => [model("openai", "gpt-5.6-luna-fast")],
+    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
     find: () => inheritedIdentityModel,
   },
 )
@@ -292,8 +292,8 @@ const nonArrayAvailable = resolveCategory(
   "quick",
   {},
   {
-    getAvailable: () => ({ 0: model("openai", "gpt-5.6-luna-fast"), length: 1 }),
-    find: () => model("openai", "gpt-5.6-luna-fast"),
+    getAvailable: () => ({ 0: model("openai", "gpt-6-luna-fast"), length: 1 }),
+    find: () => model("openai", "gpt-6-luna-fast"),
   },
 )
 requireCondition(nonArrayAvailable.kind === "model_unavailable", "non-array getAvailable did not return model_unavailable")
@@ -302,7 +302,7 @@ if (nonArrayAvailable.kind !== "model_unavailable") {
 }
 requireCondition(nonArrayAvailable.availableModels.length === 0, "non-array getAvailable leaked available models")
 
-const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-5.6-luna-fast")]))
+const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-6-luna-fast")]))
 requireCondition(prototypeName.kind === "not_found", "prototype-shaped category did not return not_found")
 
 console.log(JSON.stringify({

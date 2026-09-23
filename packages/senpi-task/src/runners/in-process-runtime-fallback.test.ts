@@ -59,8 +59,8 @@ describe("InProcessRunner runtime fallback", () => {
       {
         source: "category" as const,
         provider: "chatgpt-subscription",
-        model_id: "gpt-5.6-luna-fast",
-        display: "chatgpt-subscription/gpt-5.6-luna-fast",
+        model_id: "gpt-6-luna-fast",
+        display: "chatgpt-subscription/gpt-6-luna-fast",
         reasoning_effort: "minimal",
       },
       {
@@ -86,7 +86,7 @@ describe("InProcessRunner runtime fallback", () => {
       modelFallback: true,
       chains: {
         "kimi-coding/kimi-for-coding-highspeed-unlocked": [
-          "chatgpt-subscription/gpt-5.6-luna-fast:minimal",
+          "chatgpt-subscription/gpt-6-luna-fast:minimal",
           "example-gateway/z-ai/glm-5.2-ultrafast-unlocked:none",
         ],
       },
@@ -109,8 +109,8 @@ describe("InProcessRunner runtime fallback", () => {
         {
           source: "category" as const,
           provider: "chatgpt-subscription",
-          model_id: "gpt-5.6-luna-fast",
-          display: "chatgpt-subscription/gpt-5.6-luna-fast",
+          model_id: "gpt-6-luna-fast",
+          display: "chatgpt-subscription/gpt-6-luna-fast",
           reasoning_effort: "high",
           variant: "max",
         },
@@ -124,7 +124,7 @@ describe("InProcessRunner runtime fallback", () => {
     // then
     expect(capturedRetrySettings(captured)).toMatchObject({
       chains: {
-        "kimi-coding/kimi-for-coding-highspeed-unlocked": ["chatgpt-subscription/gpt-5.6-luna-fast:high"],
+        "kimi-coding/kimi-for-coding-highspeed-unlocked": ["chatgpt-subscription/gpt-6-luna-fast:high"],
       },
     })
   })
@@ -132,7 +132,7 @@ describe("InProcessRunner runtime fallback", () => {
   test("#given a builtin category resolving to a chain rung #when the child session is created #then the remaining chain rungs land in retry fallback chains", async () => {
     // given
     const models = [
-      { provider: "chatgpt-subscription", id: "gpt-5.6-luna-fast" },
+      { provider: "chatgpt-subscription", id: "gpt-6-luna-fast" },
       { provider: "opencode-go", id: "minimax-m3" },
     ] as const
     const registry = {
@@ -160,11 +160,11 @@ describe("InProcessRunner runtime fallback", () => {
     await handle.waitForIdle()
 
     // then
-    expect(`${spec.provider}/${spec.modelId}`).toBe("chatgpt-subscription/gpt-5.6-luna-fast")
+    expect(`${spec.provider}/${spec.modelId}`).toBe("chatgpt-subscription/gpt-6-luna-fast")
     expect(capturedRetrySettings(captured)).toMatchObject({
       modelFallback: true,
       chains: {
-        "chatgpt-subscription/gpt-5.6-luna-fast": ["opencode-go/minimax-m3:max"],
+        "chatgpt-subscription/gpt-6-luna-fast": ["opencode-go/minimax-m3:max"],
       },
     })
   })

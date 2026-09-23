@@ -11,9 +11,17 @@ const bundledSnapshot = getBundledModelCapabilitiesSnapshot({
 const OPENAI_FAST_ALIASES = [
   { aliasModelID: "gpt-5.6-sol-fast", canonicalModelID: "gpt-5.6-sol" },
   { aliasModelID: "gpt-6-astra-fast", canonicalModelID: "gpt-6-astra" },
+  { aliasModelID: "gpt-6-sol-fast", canonicalModelID: "gpt-6-sol" },
+  { aliasModelID: "gpt-6-luna-fast", canonicalModelID: "gpt-6-luna" },
   { aliasModelID: "gpt-5.6-terra-fast", canonicalModelID: "gpt-5.6-terra" },
   { aliasModelID: "gpt-5.6-luna-fast", canonicalModelID: "gpt-5.6-luna" },
 ] as const
+
+function canonicalOfSuffixedAlias(modelID: string): string {
+  const withoutProvider = modelID.slice(modelID.lastIndexOf("/") + 1)
+  const withoutVariant = withoutProvider.split(":")[0] ?? withoutProvider
+  return withoutVariant.replace(/-fast$/, "")
+}
 
 describe("OpenAI GPT fast capability aliases", () => {
   test("inherits each canonical snapshot entry without changing the requested model ID", () => {
@@ -111,6 +119,8 @@ describe("OpenAI GPT fast capability aliases", () => {
     { providerID: "openai", modelID: "gpt-5.6-sol-fast:high" },
     { providerID: "vercel", modelID: "openai/gpt-5.6-sol-fast:high" },
     { providerID: "openai", modelID: "gpt-6-astra-fast:high" },
+    { providerID: "openai", modelID: "gpt-6-sol-fast:high" },
+    { providerID: "openai", modelID: "gpt-6-luna-fast:high" },
   ])("inherits canonical capabilities for suffixed fast alias $providerID/$modelID", ({ providerID, modelID }) => {
     const alias = getModelCapabilities({
       providerID,
@@ -120,7 +130,7 @@ describe("OpenAI GPT fast capability aliases", () => {
 
     expect(alias).toMatchObject({
       requestedModelID: modelID,
-      canonicalModelID: modelID.includes("gpt-6-astra") ? "gpt-6-astra" : "gpt-5.6-sol",
+      canonicalModelID: canonicalOfSuffixedAlias(modelID),
       supportsTemperature: false,
       diagnostics: {
         resolutionMode: "alias-backed",

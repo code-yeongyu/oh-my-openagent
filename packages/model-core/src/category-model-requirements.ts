@@ -39,6 +39,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-6-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
         variant: "medium",
       }
@@ -61,11 +66,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
-        model: "kimi-k3",
-        variant: "max",
-      },
-      {
         providers: ["anthropic"],
         model: "claude-opus-5-5",
         variant: "max",
@@ -74,12 +74,17 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5",
         variant: "max",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
+        variant: "max",
       }
     ],
   },
   quick: {
     fallbackChain: [
-      { providers: ["chatgpt-subscription"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
       { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "off" },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],

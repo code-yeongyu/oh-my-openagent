@@ -4,10 +4,9 @@ import { describe, expect, it } from "bun:test"
 
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
 import { KNOWN_MODELS } from "../telemetry/model-vocabulary"
-import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 
 // The id order is the order the picker renders, so it is pinned as a literal list.
-const EXPECTED_IDS = ["capable", "simple-work", "deep-work"] as const
+const EXPECTED_IDS = ["capable", "deep-work"] as const
 
 // The vendors banned from every public omo surface. Their literal spelling is assembled from
 // fragments on purpose: the acceptance gate greps this whole directory for those names, so the
@@ -22,14 +21,17 @@ function rungs(): readonly { readonly profile: string; readonly providers: reado
   )
 }
 
+function chainOf(profile: string): readonly string[] {
+  return (BUILTIN_MODEL_PROFILES[profile]?.models ?? []).map((rung) => `${rung.model} ${rung.variant ?? "default"}`)
+}
+
 describe("BUILTIN_MODEL_PROFILES", () => {
-  it("ships exactly the three intent profiles in picker order", () => {
+  it("ships exactly the two intent profiles in picker order", () => {
     expect(Object.keys(BUILTIN_MODEL_PROFILES)).toEqual([...EXPECTED_IDS])
   })
 
   it("labels each profile by intent", () => {
     expect(BUILTIN_MODEL_PROFILES["capable"]?.displayName).toBe("Capable")
-    expect(BUILTIN_MODEL_PROFILES["simple-work"]?.displayName).toBe("Simple work")
     expect(BUILTIN_MODEL_PROFILES["deep-work"]?.displayName).toBe("Deep work")
     for (const id of EXPECTED_IDS) {
       expect(BUILTIN_MODEL_PROFILES[id]?.description.length ?? 0).toBeGreaterThan(0)
@@ -67,27 +69,25 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(apiLaneRungs).toEqual([])
   })
 
-  it("copies the deep lane chains verbatim into deep-work, strongest lane first", () => {
+  it("heads every Claude rung with the anthropic-subscription lane", () => {
+    const claudeRungs = rungs().filter((rung) => rung.model.startsWith("claude-"))
+    expect(claudeRungs.length).toBeGreaterThan(0)
+    expect(claudeRungs.filter((rung) => rung.providers[0] !== "anthropic-subscription").map((rung) => `${rung.profile}: ${rung.model}`)).toEqual([])
+  })
+
+  it("orders the capable chain fable xhigh -> opus max -> kimi max -> glm max", () => {
+    expect(chainOf("capable")).toEqual([
+      "claude-fable-5-1 xhigh",
+      "claude-opus-5-5 max",
+      "kimi-k3 max",
+      "glm-5.3 max",
+    ])
+  })
+
+  it("runs deep-work as astra high then gpt-6-sol medium and nothing after it", () => {
     expect(BUILTIN_MODEL_PROFILES["deep-work"]?.models).toEqual([
-      ...CATEGORY_FALLBACK_CHAINS["deep-high"],
-      ...CATEGORY_FALLBACK_CHAINS["deep-low"],
-    ])
-  })
-
-  it("orders the capable chain fable -> opus -> kimi -> glm", () => {
-    expect(BUILTIN_MODEL_PROFILES["capable"]?.models.map((rung) => rung.model)).toEqual([
-      "claude-fable-5-1",
-      "claude-opus-5-5",
-      "kimi-k3",
-      "glm-5.3",
-    ])
-  })
-
-  it("keeps simple-work on the fast rungs", () => {
-    expect(BUILTIN_MODEL_PROFILES["simple-work"]?.models.map((rung) => rung.model)).toEqual([
-      "gpt-5.6-luna-fast",
-      "deepseek-v4-flash",
-      "claude-haiku-4-5",
+      { providers: ["chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "high" },
+      { providers: ["chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-6-sol", variant: "medium" },
     ])
   })
 })

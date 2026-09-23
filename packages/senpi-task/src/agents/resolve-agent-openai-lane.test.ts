@@ -29,8 +29,8 @@ function expectResolved(result: ReturnType<typeof resolveAgent>): Extract<typeof
 }
 
 const CURATED_GPT_CASES = [
-  { agent: "explore", modelId: "gpt-5.6-luna-fast" },
-  { agent: "librarian", modelId: "gpt-5.6-luna-fast" },
+  { agent: "explore", modelId: "gpt-6-luna-fast" },
+  { agent: "librarian", modelId: "gpt-6-luna-fast" },
   { agent: "plan-reviewer", modelId: "gpt-6-astra" },
 ] as const
 

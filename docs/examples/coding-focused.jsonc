@@ -7,10 +7,10 @@
 
   "agents": {
     // Rapid codebase navigation
-    "explore": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Fast docs lookup
-    "librarian": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "librarian": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Pre-planning consultant: minimal overhead for coding plans
     "plan-consultant": { "model": "anthropic/claude-sonnet-5" },
@@ -25,7 +25,7 @@
 
   "categories": {
     // Trivial changes: fastest possible
-    "quick": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Standard coding tasks: good quality, fast
     "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
@@ -40,7 +40,7 @@
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Deep autonomous work: the default lane, then the escalation lane
-    "deep-low": { "model": "openai/gpt-5.6-sol", "reasoning": "medium" },
+    "deep-low": { "model": "openai/gpt-6-sol", "reasoning": "medium" },
     "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Hard reasoning problems

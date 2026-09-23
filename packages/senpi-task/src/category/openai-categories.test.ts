@@ -125,19 +125,19 @@ describe("category prompt append resolvers", () => {
 })
 
 describe("GPT builtin defaults and gates", () => {
-  it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra high, deep-low Sol medium, all on the chatgpt-subscription lane", () => {
+  it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra high, deep-low GPT-6 Sol medium, all on the chatgpt-subscription lane", () => {
     expect(definition("ultrabrain").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "max" })
     expect(definition("deep-high").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "high" })
-    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-5.6-sol", variant: "medium" })
+    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-6-sol", variant: "medium" })
   })
 
   it("#given unspecified-high #then its default is the Opus 5.5 rung its chain now leads with, not Astra", () => {
     expect(definition("unspecified-high").config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "max" })
   })
 
-  it("#given the gates #then ultrabrain opens on either flagship, each deep lane only on its own model, unspecified-high is ungated", () => {
+  it("#given the gates #then ultrabrain opens on either flagship, deep-low on either Sol tier, deep-high on Astra alone, unspecified-high is ungated", () => {
     expect(definition("ultrabrain").requiresModel).toEqual(["gpt-6-astra", "gpt-5.6-sol"])
-    expect(definition("deep-low").requiresModel).toBe("gpt-5.6-sol")
+    expect(definition("deep-low").requiresModel).toEqual(["gpt-6-sol", "gpt-5.6-sol"])
     expect(definition("deep-high").requiresModel).toBe("gpt-6-astra")
     expect(definition("unspecified-high").requiresModel).toBeUndefined()
   })

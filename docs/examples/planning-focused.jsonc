@@ -7,7 +7,7 @@
 
   "agents": {
     // Exploration for the research phase
-    "explore": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Research and documentation
     "librarian": { "model": "deepseek/deepseek-v4-flash", "reasoning": "max" },
@@ -28,7 +28,7 @@
   },
 
   "categories": {
-    "quick": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
 
@@ -45,7 +45,7 @@
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Deep research and analysis: the default lane, then the escalation lane
-    "deep-low": { "model": "openai/gpt-5.6-sol", "reasoning": "medium" },
+    "deep-low": { "model": "openai/gpt-6-sol", "reasoning": "medium" },
     "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Strategic reasoning

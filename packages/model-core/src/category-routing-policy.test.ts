@@ -35,7 +35,7 @@ describe("category routing policy", () => {
     ])
   })
 
-  test("each deep lane is a single rung, so the lanes never substitute each other", () => {
+  test("deep-high is a single Astra rung and deep-low a Sol ladder, so the lanes never substitute each other", () => {
     // given
     const low = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
     const high = CATEGORY_MODEL_REQUIREMENTS["deep-high"]
@@ -49,6 +49,11 @@ describe("category routing policy", () => {
       },
     ])
     expect(low.fallbackChain).toEqual([
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-6-sol",
+        variant: "medium",
+      },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
@@ -68,7 +73,7 @@ describe("category routing policy", () => {
     expect(leadingChain).toEqual([
       {
         providers: ["chatgpt-subscription"],
-        model: "gpt-5.6-luna-fast",
+        model: "gpt-6-luna-fast",
         variant: "low",
       },
       {
@@ -192,11 +197,6 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
-        model: "kimi-k3",
-        variant: "max",
-      },
-      {
         providers: ["anthropic"],
         model: "claude-opus-5-5",
         variant: "max",
@@ -204,6 +204,11 @@ describe("category routing policy", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5",
+        variant: "max",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
         variant: "max",
       }
     ])

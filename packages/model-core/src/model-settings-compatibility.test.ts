@@ -528,6 +528,64 @@ describe("resolveCompatibleModelSettings", () => {
     })
   })
 
+  test("GPT-6 Sol keeps none reasoningEffort", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-6-sol",
+      desired: { reasoningEffort: "none" },
+    })
+
+    expect(result).toEqual({
+      variant: undefined,
+      reasoningEffort: "none",
+      changes: [],
+    })
+  })
+
+  test("GPT-6 Luna keeps none reasoningEffort", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-6-luna",
+      desired: { reasoningEffort: "none" },
+    })
+
+    expect(result).toEqual({
+      variant: undefined,
+      reasoningEffort: "none",
+      changes: [],
+    })
+  })
+
+  test("GPT-6 Sol keeps none reasoningEffort through a provider-prefixed fast id", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "openai/gpt-6-sol-fast",
+      desired: { reasoningEffort: "none" },
+    })
+
+    expect(result).toEqual({
+      variant: undefined,
+      reasoningEffort: "none",
+      changes: [],
+    })
+  })
+
+  test("GPT-6 Astra still downgrades none reasoningEffort to low through a fast id", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "gpt-6-astra-fast",
+      desired: { reasoningEffort: "none" },
+    })
+
+    expect(result).toEqual({
+      variant: undefined,
+      reasoningEffort: "low",
+      changes: [
+        { field: "reasoningEffort", from: "none", to: "low", reason: "unsupported-by-model-family" },
+      ],
+    })
+  })
+
   test("o-series keeps none reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

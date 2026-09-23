@@ -24,18 +24,22 @@ export type BuiltinModelProfile = {
 // Key order is the order a picker renders. `deep` is deliberately NOT an id: builtin delegation
 // categories already carry that name, and the two axes never compete (a profile picks the MAIN
 // session model; categories keep their own chains).
+//
+// Every Claude rung is headed by `anthropic-subscription`, senpi's Claude subscription lane, exactly
+// like the category chains (#8051): rung provider order IS the ranking, so a machine logged in there
+// that also holds an OpenCode Zen key must not land on the metered `opencode` lane.
 export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile>> = Object.freeze({
   capable: {
     displayName: "Capable",
     description: "The strongest generalist available - the default pick when you do not want to think about models.",
     models: [
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
-        variant: "max",
+        variant: "xhigh",
       },
       {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
         variant: "max",
       },
@@ -47,21 +51,12 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
       { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
     ],
   },
-  "simple-work": {
-    displayName: "Simple work",
-    description: "Fast and cheap for small, well-specified edits - provider lists copied from the explore chain.",
-    models: [
-      { providers: ["chatgpt-subscription"], model: "gpt-5.6-luna-fast", variant: "low" },
-      { providers: ["deepseek"], model: "deepseek-v4-flash" },
-      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" },
-    ],
-  },
-  // The two deep delegation lanes, strongest first; `builtin-profiles.test.ts` deep-equals this to
-  // deep-high ++ deep-low so the profile can never drift away from what the product ships. The lanes
-  // themselves never fall back onto each other, but a MAIN session model wants the ladder.
+  // A MAIN session model for hard problems: Astra first, GPT-6 Sol as the one step down. It is its
+  // own chain, not the deep-high + deep-low category chains glued together, so it stops at GPT-6 Sol
+  // instead of inheriting the deep-low GPT-5.6 Sol tail.
   "deep-work": {
     displayName: "Deep work",
-    description: "Maximum reasoning for hard problems - the models the deep delegation lanes run.",
+    description: "Maximum reasoning for hard problems - GPT-6 Astra, then GPT-6 Sol.",
     models: [
       {
         providers: ["chatgpt-subscription", "github-copilot", "opencode"],
@@ -70,7 +65,7 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
       },
       {
         providers: ["chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-sol",
+        model: "gpt-6-sol",
         variant: "medium",
       },
     ],

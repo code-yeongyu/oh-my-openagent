@@ -13,6 +13,11 @@
 //   cli-model-wins   `--model` (provenance "cli") with an active tier: the CLI model survives.
 //   tier-beats-recommended-models  senpi's own recommended-models builtin first auto-switches to
 //                    gpt-5.6-sol (first-available provenance); the tier still wins with glm-5.3.
+//   deep-work-second-rung  model_profile "deep-work" + only gpt-6-sol served: gpt-6-sol is selected.
+//   deep-work-no-old-sol-tail  model_profile "deep-work" + only gpt-5.6-sol served: the profile ends at
+//                    GPT-6 Sol, so the unavailable notice appears and the session keeps mock-1.
+//   simple-work-removed  model_profile "simple-work": the removed profile gets the unknown-profile
+//                    notice listing capable, deep-work, and the session keeps mock-1.
 // Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
 // ~/.senpi/agent credential files are digest-compared before/after and MUST stay identical.
 import { spawnSync } from "node:child_process"
@@ -106,6 +111,24 @@ const SCENARIOS = {
     cliModel: undefined,
     recommendedModels: undefined,
     expect: { model: "glm-5.3", notice: APPLIED_TYPE },
+  },
+  "deep-work-second-rung": {
+    omoConfig: { model_profile: "deep-work" },
+    mockModels: ["mock-1", "gpt-6-sol"],
+    cliModel: undefined,
+    expect: { model: "gpt-6-sol", notice: APPLIED_TYPE },
+  },
+  "deep-work-no-old-sol-tail": {
+    omoConfig: { model_profile: "deep-work" },
+    mockModels: ["mock-1", "gpt-5.6-sol"],
+    cliModel: undefined,
+    expect: { model: "mock-1", notice: UNAVAILABLE_TYPE },
+  },
+  "simple-work-removed": {
+    omoConfig: { model_profile: "simple-work" },
+    mockModels: ["mock-1", "gpt-6-luna-fast"],
+    cliModel: undefined,
+    expect: { model: "mock-1", notice: UNKNOWN_TYPE },
   },
 }
 
@@ -237,14 +260,18 @@ function runScenario(name, scenario, args, senpiBin) {
       const applied = profileNotices[0]
       checks.notice_names_model = applied?.content.includes(`selected omo-mock/${scenario.expect.model}`) === true
       checks.notice_lists_skipped =
-        applied?.content.includes("skipped: anthropic/claude-fable-5-1, anthropic/claude-opus-5") === true
+        applied?.content.includes("skipped: anthropic-subscription/claude-fable-5-1, anthropic-subscription/claude-opus-5-5") === true
       checks.notice_mentions_retry_chains = applied?.content.includes("retry chains") === true
       checks.applied_details = applied?.details?.model === `omo-mock/${scenario.expect.model}`
     }
     if (name === "unknown-profile") {
       const unknown = profileNotices[0]
       checks.notice_lists_known_profiles =
-        unknown?.content.includes('model_profile "nope" is not defined; known profiles: capable, deep-work, simple-work') === true
+        unknown?.content.includes('model_profile "nope" is not defined; known profiles: capable, deep-work') === true
+    }
+    if (name === "simple-work-removed") {
+      checks.notice_lists_remaining_profiles =
+        profileNotices[0]?.content.includes('model_profile "simple-work" is not defined; known profiles: capable, deep-work') === true
     }
     if (name === "tier-beats-recommended-models") {
       const changes = entries.filter((entry) => entry.type === "model_change").map((entry) => entry.modelId)

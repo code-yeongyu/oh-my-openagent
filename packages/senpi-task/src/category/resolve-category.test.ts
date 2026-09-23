@@ -413,7 +413,7 @@ describe("resolveCategory", () => {
 
   test("#given category params in omo overlay #when resolved #then child spec carries generation params and prompt append", () => {
     // given
-    const models = registry([model("chatgpt-subscription", "gpt-5.6-luna-fast")])
+    const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
     // when
     const result = resolveCategory(
@@ -480,9 +480,9 @@ describe("builtin category defaults", () => {
       ["visual-engineering", "anthropic/claude-fable-5-1", "max"],
       ["artistry", "anthropic/claude-fable-5-1", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6-astra", "max"],
-      ["deep-low", "chatgpt-subscription/gpt-5.6-sol", "medium"],
+      ["deep-low", "chatgpt-subscription/gpt-6-sol", "medium"],
       ["deep-high", "chatgpt-subscription/gpt-6-astra", "high"],
-      ["quick", "chatgpt-subscription/gpt-5.6-luna-fast", "low"],
+      ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
       ["unspecified-low", "xiaomi/mimo-v2.6-pro", "max"],
       ["unspecified-high", "anthropic/claude-opus-5-5", "max"],
       ["architect", "anthropic/claude-fable-5-1", "max"],
@@ -493,7 +493,7 @@ describe("builtin category defaults", () => {
     expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
       architect: ["claude-fable-5-1"],
       ultrabrain: ["gpt-6-astra", "gpt-5.6-sol"],
-      "deep-low": ["gpt-5.6-sol"],
+      "deep-low": ["gpt-6-sol", "gpt-5.6-sol"],
       "deep-high": ["gpt-6-astra"],
     })
   })

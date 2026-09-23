@@ -209,19 +209,18 @@ A model profile is a named, ordered model chain you pick by intent ("Capable", "
 
 This is not the `profiles` key. `profiles.<name>` is a config-layer overlay activated by `OMO_PROFILE` (see [Profile activation](#profile-activation)): it changes which configuration is loaded. `model_profiles` and `model_profile` are ordinary base keys inside that configuration: they change which model the main session starts on. A `profiles.<name>` layer may set `model_profile` like any other key, which is the one way the two meet.
 
-Three builtin profiles ship (`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`). Each rung lists every provider that serves the model, so a Copilot-only or gateway-only setup still resolves:
+Two builtin profiles ship (`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`). Each rung lists every provider that serves the model, so a Copilot-only or gateway-only setup still resolves:
 
 | Id | Display name | Chain |
 |----|--------------|-------|
-| `capable` | Capable | `claude-fable-5-1` (max) -> `claude-opus-5-5` (max) -> `kimi-k3` (max) -> `glm-5.3` (max) |
-| `simple-work` | Simple work | `gpt-5.6-luna-fast` (low) -> `deepseek-v4-flash` -> `claude-haiku-4-5` |
-| `deep-work` | Deep work | `gpt-6-astra` (high) -> `gpt-5.6-sol` (medium), the `deep` category chain verbatim |
+| `capable` | Capable | `claude-fable-5-1` (xhigh) -> `claude-opus-5-5` (max) -> `kimi-k3` (max) -> `glm-5.3` (max) |
+| `deep-work` | Deep work | `gpt-6-astra` (high) -> `gpt-6-sol` (medium) |
 
 What happens at session start (`packages/omo-senpi/src/components/model-profile/index.ts`, `resolve.ts`):
 
 - `model_profile` unset: nothing. Senpi's own default resolution, including its `recommended-models` builtin, runs untouched.
 - A literal `provider/model`: that exact model is looked up in the live registry and applied.
-- A profile id: the builtin table is overlaid with `model_profiles`, and the first rung the live registry can serve is applied. The notice names the pick and the skipped rungs, for example `omo-senpi: model profile "capable" selected anthropic/claude-opus-5-5 (skipped: anthropic/claude-fable-5-1); mid-session fallback follows senpi's retry chains`.
+- A profile id: the builtin table is overlaid with `model_profiles`, and the first rung the live registry can serve is applied. The notice names the pick and the skipped rungs, for example `OmO Native: model profile "capable" selected anthropic-subscription/claude-opus-5-5 (skipped: anthropic-subscription/claude-fable-5-1); mid-session fallback follows senpi's retry chains`.
 - No rung resolves: a notice lists the chain and Senpi's default model stays.
 - Unknown id: `model_profile "<name>" is not defined; known profiles: ...`.
 

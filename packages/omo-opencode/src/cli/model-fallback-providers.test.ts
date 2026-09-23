@@ -38,22 +38,36 @@ describe("generateModelConfig provider routes", () => {
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then Hephaestus uses the native Sol route
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.hephaestus?.variant).toBe("medium")
+      // then Hephaestus uses the native Sol route and keeps its predecessor as fallback
+      expect(result.agents?.hephaestus).toEqual({
+        model: "openai/gpt-6-sol",
+        variant: "medium",
+        fallback_models: [
+          {
+            model: "openai/gpt-5.6-sol",
+            variant: "medium",
+          },
+        ],
+      })
     })
 
-    test("Hephaestus uses its merged Copilot GPT-5.6 Sol medium rung", () => {
+    test("Hephaestus uses its merged Copilot GPT-6 Sol medium rung", () => {
       // given only GitHub Copilot is available
       const config = createConfig({ hasCopilot: true })
 
       // when the generated model config is resolved
       const result = generateModelConfig(config)
 
-      // then Hephaestus uses the supported Copilot effort
+      // then Hephaestus uses the supported Copilot effort and keeps its predecessor as fallback
       expect(result.agents?.hephaestus).toEqual({
-        model: "github-copilot/gpt-5.6-sol",
+        model: "github-copilot/gpt-6-sol",
         variant: "medium",
+        fallback_models: [
+          {
+            model: "github-copilot/gpt-5.6-sol",
+            variant: "medium",
+          },
+        ],
       })
     })
 
@@ -65,7 +79,7 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Hephaestus uses the OpenCode Sol route
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.6-sol")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-6-sol")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -137,7 +151,7 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Explore includes its remaining fallbacks
-      expect(result.agents?.explore?.model).toBe("openai/gpt-5.6-luna-fast")
+      expect(result.agents?.explore?.model).toBe("openai/gpt-6-luna-fast")
       expect(result.agents?.explore?.variant).toBe("low")
       expect(result.agents?.explore?.fallback_models).toBeDefined()
       expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
@@ -197,7 +211,7 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then Librarian includes its remaining fallbacks
-      expect(result.agents?.librarian?.model).toBe("openai/gpt-5.6-luna-fast")
+      expect(result.agents?.librarian?.model).toBe("openai/gpt-6-luna-fast")
       expect(result.agents?.librarian?.variant).toBe("low")
       expect(result.agents?.librarian?.fallback_models).toBeDefined()
       expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)

@@ -320,7 +320,7 @@ describe("category activation gating", () => {
   describe("#given an ungated builtin category", () => {
     test("#when the registry offers only a chain rung #then the pre-gating fallback behavior is unchanged", () => {
       // given
-      const models = registry([model("chatgpt-subscription", "gpt-5.6-luna-fast")])
+      const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)
@@ -328,13 +328,13 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.modelId).toBe("gpt-5.6-luna-fast")
+      expect(result.spec.modelId).toBe("gpt-6-luna-fast")
       expect(result.availableCategories).toContain("quick")
     })
 
     test("#when a gated category is unmet #then other categories stay listed as available", () => {
       // given
-      const models = registry([model("chatgpt-subscription", "gpt-5.6-luna-fast")])
+      const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)

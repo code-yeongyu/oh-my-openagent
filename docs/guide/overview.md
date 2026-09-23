@@ -40,8 +40,7 @@ Want more control? Run `/ulw-plan` for interview-based planning, then `/ulw-exec
 You don't have to know model names to get a good main agent. Pick a profile by intent and omo picks the model:
 
 - **Capable**: the strongest generalist you have. Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
-- **Simple work**: fast and cheap for small, well-specified edits. GPT-5.6 Luna Fast, then DeepSeek V4 Flash, then Claude Haiku 4.5.
-- **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-5.6 Sol. Same chain the `deep` category runs.
+- **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-6 Sol.
 
 Set one key in `omo.json`:
 
@@ -105,7 +104,7 @@ Recommended models, named plainly:
 - **Claude Opus 5.5** (or Claude Fable 5). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
 - **GPT 5.6 Sol**. The GPT-recommended configuration. It gets a model-aware GPT-native prompt built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
 
-Kimi K3 and GLM 5.2 / 5.3 have tuned prompt presets too, with lighter validation. Models below the recommended tier aren't supported as the main agent. The **Capable** profile walks the Claude-first slice of this list (Fable 5.1, Opus 5, Kimi K3, GLM 5.3), so it's the safe default when you'd rather not choose; pick **Deep work** for the GPT side. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
+Kimi K3 and GLM 5.2 / 5.3 have tuned prompt presets too, with lighter validation. Models below the recommended tier aren't supported as the main agent. The **Capable** profile walks the Claude-first slice of this list (Fable 5.1, Opus 5.5, Kimi K3, GLM 5.3), so it's the safe default when you'd rather not choose; pick **Deep work** for the GPT side. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
 
 ### The category worker
 
@@ -166,8 +165,8 @@ Override specific categories or curated agents in `omo.json`:
     "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
 
     // Research agents: cheap and fast is the point
-    "explore": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
-    "librarian": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" }
+    "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
+    "librarian": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" }
   },
 
   "categories": {
@@ -187,7 +186,7 @@ Override specific categories or curated agents in `omo.json`:
     "artistry": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Quick tasks: fast and cheap
-    "quick": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
+    "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Low-effort fallback: MiMo V2.6 Pro max
     "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },

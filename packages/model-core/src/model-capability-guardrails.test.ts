@@ -9,7 +9,7 @@ import {
 } from "./model-capability-guardrails"
 
 describe("model-capability-guardrails", () => {
-  test("keeps Luna Fast aligned with its bundled canonical model", () => {
+  test.each(["gpt-5.6-luna-fast", "gpt-6-luna-fast"])("keeps %s aligned with its bundled canonical model", (modelID) => {
     const issues = collectModelCapabilityGuardrailIssues({
       snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
     })
@@ -17,7 +17,7 @@ describe("model-capability-guardrails", () => {
     expect(issues).not.toContainEqual(
       expect.objectContaining({
         kind: "built-in-model-missing-from-snapshot",
-        modelID: "gpt-5.6-luna-fast",
+        modelID,
       }),
     )
   })

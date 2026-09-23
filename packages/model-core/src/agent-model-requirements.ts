@@ -31,6 +31,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-6-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
         variant: "medium",
       }
@@ -63,7 +68,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   librarian: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
       { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m3" },
@@ -76,7 +81,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   explore: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-luna-fast", variant: "low" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
       { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m3" },
@@ -100,6 +105,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
         variant: "xhigh",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5-5",
+        variant: "max",
       },
       {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],

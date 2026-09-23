@@ -46,7 +46,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("deep-low is a single sol-family medium rung", () => {
+  test("deep-low leads with gpt-6-sol medium and keeps gpt-5.6-sol medium as its fallback rung", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
 
@@ -57,6 +57,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(chain).toEqual([
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-6-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
         variant: "medium",
       }
@@ -64,7 +69,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
   })
 
   test("neither deep lane carries the other lane's model, so they never substitute each other", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-5.6-sol"])
+    expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6-sol", "gpt-5.6-sol"])
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6-astra"])
   })
 
@@ -117,7 +122,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(chain).toEqual([
       {
         providers: ["chatgpt-subscription"],
-        model: "gpt-5.6-luna-fast",
+        model: "gpt-6-luna-fast",
         variant: "low",
       },
       {
@@ -246,11 +251,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
-        model: "kimi-k3",
-        variant: "max",
-      },
-      {
         providers: ["anthropic"],
         model: "claude-opus-5-5",
         variant: "max",
@@ -258,6 +258,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5",
+        variant: "max",
+      },
+      {
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        model: "kimi-k3",
         variant: "max",
       }
     ])

@@ -175,7 +175,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then explore should use native OpenAI mini-fast (primary model)
-      expect(result.agents?.explore?.model).toBe("openai/gpt-5.6-luna-fast")
+      expect(result.agents?.explore?.model).toBe("openai/gpt-6-luna-fast")
       expect(result.agents?.explore?.variant).toBe("low")
     })
 

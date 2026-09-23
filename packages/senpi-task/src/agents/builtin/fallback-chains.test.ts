@@ -42,7 +42,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
     expect(AGENT_FALLBACK_CHAINS).toEqual({
       explore: [
         { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-        { providers: ["chatgpt-subscription"], model: "gpt-5.6-luna-fast", variant: "low" },
+        { providers: ["chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
         { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
         { providers: ["opencode-go"], model: "minimax-m3" },
@@ -53,7 +53,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       ],
       librarian: [
         { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-        { providers: ["chatgpt-subscription"], model: "gpt-5.6-luna-fast", variant: "low" },
+        { providers: ["chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
         { providers: ["deepseek"], model: "deepseek-v4-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
         { providers: ["opencode-go"], model: "minimax-m3" },
