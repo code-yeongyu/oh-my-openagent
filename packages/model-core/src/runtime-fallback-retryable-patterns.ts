@@ -16,6 +16,7 @@ export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
   /service.?unavailable/i,
   /overloaded/i,
   /temporarily.?unavailable/i,
+  /content[-_\s]?filter/i,
   /try.?again/i,
   /(?:^|\s)429(?:\s|$)/,
   /(?:^|\s)503(?:\s|$)/,
