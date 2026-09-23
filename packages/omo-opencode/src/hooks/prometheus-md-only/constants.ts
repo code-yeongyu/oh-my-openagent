@@ -53,34 +53,35 @@ ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 
 **You are writing a work plan. STOP AND VERIFY you completed ALL steps:**
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                     PROMETHEUS WORKFLOW                             │
-├──────┬──────────────────────────────────────────────────────────────┤
-│  1   │ INTERVIEW: Full consultation with user                       │
-│      │    - Gather ALL requirements                                 │
-│      │    - Clarify ambiguities                                     │
-│      │    - Record decisions to .omo/drafts/                   │
-├──────┼──────────────────────────────────────────────────────────────┤
-│  2   │ METIS CONSULTATION: Pre-generation gap analysis              │
-│      │    - task(agent="Metis - Plan Consultant", ...)     │
-│      │    - Identify missed questions, guardrails, assumptions      │
-├──────┼──────────────────────────────────────────────────────────────┤
-│  3   │ PLAN GENERATION: Write to .omo/plans/*.md               │
-│      │    <- YOU ARE HERE                                           │
-├──────┼──────────────────────────────────────────────────────────────┤
-│  4   │ MOMUS REVIEW (if high accuracy requested)                    │
-│      │    - task(agent="Momus - Plan Critic", ...)         │
-│      │    - Loop until OKAY verdict                                 │
-├──────┼──────────────────────────────────────────────────────────────┤
-│  5   │ SUMMARY: Present to user                                     │
-│      │    - Key decisions made                                      │
-│      │    - Scope IN/OUT                                            │
-│      │    - Offer: "Start Work" vs "High Accuracy Review"           │
-│      │    - Guide to /ulw-execute                                    │
-└──────┴──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                               PROMETHEUS WORKFLOW                                │
+├──────┬───────────────────────────────────────────────────────────────────────────┤
+│  1   │ INTERVIEW: Full consultation with user                                    │
+│      │    - Gather ALL requirements                                              │
+│      │    - Clarify ambiguities                                                  │
+│      │    - Record decisions to .omo/drafts/                                     │
+├──────┼───────────────────────────────────────────────────────────────────────────┤
+│  2   │ PLAN GENERATION: Write the complete draft to .omo/plans/*.md              │
+│      │    - todos + human TL;DR + structural self-check                          │
+│      │    <- YOU ARE HERE                                                        │
+├──────┼───────────────────────────────────────────────────────────────────────────┤
+│  3   │ METIS CONSULTATION: Gap analysis of the complete draft                    │
+│      │    - task(agent="Metis - Plan Consultant", ...) with the exact plan path  │
+│      │    - Fold findings, repeat the self-check                                 │
+├──────┼───────────────────────────────────────────────────────────────────────────┤
+│  4   │ MOMUS REVIEW (if high accuracy requested)                                 │
+│      │    - task(agent="Momus - Plan Critic", ...)                               │
+│      │    - Loop until OKAY verdict                                              │
+├──────┼───────────────────────────────────────────────────────────────────────────┤
+│  5   │ SUMMARY: Present to user                                                  │
+│      │    - Key decisions made                                                   │
+│      │    - Scope IN/OUT                                                         │
+│      │    - Offer: "Start Work" vs "High Accuracy Review"                        │
+│      │    - Guide to /ulw-execute                                                │
+└──────────────────────────────────────────────────────────────────────────────────┘
 
-**DID YOU COMPLETE STEPS 1-2 BEFORE WRITING THIS PLAN?**
-**AFTER WRITING, WILL YOU DO STEPS 4-5?**
+**DID YOU COMPLETE STEP 1 BEFORE WRITING THIS PLAN?**
+**AFTER WRITING, WILL YOU DO STEPS 3-5?**
 
 If you skipped steps, STOP NOW. Go back and complete them.
 
