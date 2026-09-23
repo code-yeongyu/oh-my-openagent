@@ -94,7 +94,14 @@ export function createSessionHooks(args: {
     if (externalNotifier.detected && externalNotifier.pluginName && !forceEnable) {
       log(getNotificationConflictWarning(externalNotifier.pluginName))
     } else {
-      sessionNotification = safeHook("session-notification", () => createSessionNotification(ctx))
+      const envPlaySound = process.env.OMO_NOTIFICATION_SOUND === "1" || process.env.OMO_NOTIFICATION_SOUND === "true"
+      const envSoundPath = process.env.OMO_NOTIFICATION_SOUND_PATH ?? ""
+      sessionNotification = safeHook("session-notification", () =>
+        createSessionNotification(ctx, {
+          playSound: pluginConfig.notification?.play_sound ?? envPlaySound,
+          soundPath: pluginConfig.notification?.sound_path ?? envSoundPath,
+        }),
+      )
     }
   }
 
