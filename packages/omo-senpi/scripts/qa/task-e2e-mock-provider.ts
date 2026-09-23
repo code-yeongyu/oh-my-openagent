@@ -267,6 +267,10 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
     const tools = (context.tools ?? []).map((tool) => ({ name: tool.name, description: tool.description }))
     appendFileSync(toolsDumpTarget, `${JSON.stringify(tools)}\n`)
   }
+  const messagesDumpTarget = env.MOCK_DUMP_MESSAGES
+  if (typeof messagesDumpTarget === "string" && messagesDumpTarget.length > 0 && !isChild) {
+    appendFileSync(messagesDumpTarget, `${JSON.stringify(context.messages ?? [])}\n`)
+  }
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount
   const step = steps[Math.min(index, steps.length - 1)]
