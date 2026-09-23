@@ -104,6 +104,7 @@ export async function executeHookCommand(
       shell: true,
       detached: !isWin32,
       env,
+      windowsHide: true,
     });
 
     let stdout = "";
