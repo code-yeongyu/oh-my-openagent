@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/messages-transform.test.ts:
+444 | 
+445 |       //#when
+446 |       await runHandler(makeHooks({}), messages)
+447 | 
+448 |       //#then
+449 |       expect(messages, scenario.name).toHaveLength(3)
+                                            ^
+error: opus 5
+
+Expected length: 3
+Received length: 2
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6452/packages/omo-opencode/src/plugin/messages-transform.test.ts:449:39)
+(fail) createMessagesTransformHandler > #given every Anthropic Claude release at or after its prefill-disabled family floor #when messages transform runs #then it appends a synthetic user recovery turn [0.65ms]
+
+ 22 pass
+ 1 fail
+ 67 expect() calls
+Ran 23 tests across 1 file. [582.00ms]
