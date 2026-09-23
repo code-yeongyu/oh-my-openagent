@@ -1,0 +1,121 @@
+== RED: new regression tests vs unfixed launcher (launcher.js reverted to HEAD) ==
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-native/test/launcher.test.ts:
+383 |       for (const args of [["update"], ["update", "--self"], ["update", "self"], ["update", "senpi"], ["update", "omo"]]) {
+384 |         test(`#then omo ${args.join(" ")} exits non-zero with honest refusal guidance and spawns nothing`, () => {
+385 |           const fixture = createFixture()
+386 |           const result = run(fixture, args)
+387 | 
+388 |           expect(result.status).toBe(1)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7172/packages/omo-native/test/launcher.test.ts:388:33)
+(fail) omo launcher > #given a fake senpi package > #when any self-update spelling is answered > #then omo update exits non-zero with honest refusal guidance and spawns nothing [116.76ms]
+383 |       for (const args of [["update"], ["update", "--self"], ["update", "self"], ["update", "senpi"], ["update", "omo"]]) {
+384 |         test(`#then omo ${args.join(" ")} exits non-zero with honest refusal guidance and spawns nothing`, () => {
+385 |           const fixture = createFixture()
+386 |           const result = run(fixture, args)
+387 | 
+388 |           expect(result.status).toBe(1)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7172/packages/omo-native/test/launcher.test.ts:388:33)
+(fail) omo launcher > #given a fake senpi package > #when any self-update spelling is answered > #then omo update --self exits non-zero with honest refusal guidance and spawns nothing [167.18ms]
+383 |       for (const args of [["update"], ["update", "--self"], ["update", "self"], ["update", "senpi"], ["update", "omo"]]) {
+384 |         test(`#then omo ${args.join(" ")} exits non-zero with honest refusal guidance and spawns nothing`, () => {
+385 |           const fixture = createFixture()
+386 |           const result = run(fixture, args)
+387 | 
+388 |           expect(result.status).toBe(1)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7172/packages/omo-native/test/launcher.test.ts:388:33)
+(fail) omo launcher > #given a fake senpi package > #when any self-update spelling is answered > #then omo update self exits non-zero with honest refusal guidance and spawns nothing [108.60ms]
+383 |       for (const args of [["update"], ["update", "--self"], ["update", "self"], ["update", "senpi"], ["update", "omo"]]) {
+384 |         test(`#then omo ${args.join(" ")} exits non-zero with honest refusal guidance and spawns nothing`, () => {
+385 |           const fixture = createFixture()
+386 |           const result = run(fixture, args)
+387 | 
+388 |           expect(result.status).toBe(1)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7172/packages/omo-native/test/launcher.test.ts:388:33)
+(fail) omo launcher > #given a fake senpi package > #when any self-update spelling is answered > #then omo update senpi exits non-zero with honest refusal guidance and spawns nothing [94.78ms]
+383 |       for (const args of [["update"], ["update", "--self"], ["update", "self"], ["update", "senpi"], ["update", "omo"]]) {
+384 |         test(`#then omo ${args.join(" ")} exits non-zero with honest refusal guidance and spawns nothing`, () => {
+385 |           const fixture = createFixture()
+386 |           const result = run(fixture, args)
+387 | 
+388 |           expect(result.status).toBe(1)
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7172/packages/omo-native/test/launcher.test.ts:388:33)
+(fail) omo launcher > #given a fake senpi package > #when any self-update spelling is answered > #then omo update omo exits non-zero with honest refusal guidance and spawns nothing [104.32ms]
+395 | 
+396 |       test("#then a Bun-managed install's refusal names that install's own update command", () => {
+397 |         const fixture = createFixture({ installLayout: "bun" })
+398 |         const result = run(fixture, ["update"])
+399 | 
+400 |         expect(result.status).toBe(1)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7172/packages/omo-native/test/launcher.test.ts:400:31)
+(fail) omo launcher > #given a fake senpi package > #when any self-update spelling is answered > #then a Bun-managed install's refusal names that install's own update command [101.92ms]
+
+ 0 pass
+ 37 filtered out
+ 6 fail
+ 6 expect() calls
+Ran 6 tests across 1 file. [988.00ms]
+red-exit=1
+
+== GREEN: full launcher suite after fix ==
+bun test v1.3.14 (0d9b296a)
+
+ 43 pass
+ 0 fail
+ 163 expect() calls
+Ran 43 tests across 1 file. [7.61s]
+green-exit=0
+
+== REAL BINARY DRIVE: node bin/omo.js update, isolated HOME ==
+exit=1
+stdout:
+omo does not self-update (the senpi engine is version-pinned).
+Run: npm i -g omo-ai@beta
+stderr: (empty); isolated temp HOME listing after run: . .. (untouched)
+
+== TYPECHECK ==
+bunx tsc -p packages/omo-native/tsconfig.json --noEmit -> TYPECHECK_OK
+
+== ENTRY SMOKE ==
+node packages/omo-native/bin/omo.js --version -> omo 5.0.0-0.beta.18 (engine: senpi 2026.8.23)
+
+== PRE-EXISTING ENV FAILURE (not from this change) ==
+payload.test.ts '#then every required artifact is present...' fails identically on clean checkout:
+needs bun run build:omo-native staged payload; root prepare (bun install) failed earlier at git submodule init for shared-skills upstreams (network-restricted env).
