@@ -53,6 +53,21 @@ describe("normalizeLegacyModelEntry", () => {
     ])
   })
 
+  test("#given camelCase topP #when normalized #then it becomes top_p for strict schema parsing", () => {
+    // given
+    const input = {
+      model: "openai/gpt-5",
+      topP: 0.9,
+    }
+
+    // when
+    const normalized = normalizeLegacyModelEntry(input)
+
+    // then
+    expect(normalized.top_p).toBe(0.9)
+    expect("topP" in normalized).toBe(false)
+  })
+
   test("#given existing canonical provider options #when aliases normalize #then options merge without discarding canonical values", () => {
     // given
     const input = {
