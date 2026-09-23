@@ -129,6 +129,15 @@ const AUTO_RETRY_GATE_PATTERNS = [
   "credentials for model",
 ]
 
+/**
+ * Provider-announced weekly/monthly plan-limit exhaustion (Z.AI coding plan:
+ * "Weekly/Monthly Limit Exhausted. Your limit will reset at <ts>"). The reset is
+ * scheduled far in the future, so the recovery is to cycle to the next fallback
+ * model. Checked before STOP_MESSAGE_PATTERNS because the generic "monthly limit"
+ * stop pattern would otherwise swallow it (#7161).
+ */
+const PROVIDER_PLAN_LIMIT_EXHAUSTED_PATTERN = /\b(weekly|monthly)[\s/-]*limit\s+exhausted/i
+
 function hasProviderAutoRetrySignal(message: string): boolean {
   if (!message.includes("retrying in")) {
     return false
@@ -166,6 +175,12 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // Check message patterns for unknown errors
   const msg = error.message?.toLowerCase() ?? ""
+
+  // Provider plan-limit exhaustion (weekly/monthly) must cycle fallbacks even
+  // though its wording overlaps generic STOP patterns like "monthly limit".
+  if (PROVIDER_PLAN_LIMIT_EXHAUSTED_PATTERN.test(msg)) {
+    return true
+  }
 
   // STOP patterns take precedence over retryable patterns
   if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {

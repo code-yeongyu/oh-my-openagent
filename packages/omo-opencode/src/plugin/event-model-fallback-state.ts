@@ -168,12 +168,15 @@ export function createModelFallbackContinuationController(args: {
       try {
         await pluginContext.client.session.abort({ path: { id: sessionID } });
       } catch (error) {
-        log("[event] model-fallback abort failed", {
+        // Abort throws when no active stream remains - exactly the state after a
+        // provider killed the stream (e.g. Z.AI quota exhaustion, #7161). The
+        // continuation dispatch must still proceed; the prompt-async gate owns
+        // duplicate-injection safety.
+        log("[event] model-fallback abort failed; continuing with fallback dispatch", {
           sessionID,
           source,
           error: error instanceof Error ? error : String(error),
         });
-        return;
       }
       releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
         reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],

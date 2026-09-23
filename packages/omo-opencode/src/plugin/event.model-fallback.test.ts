@@ -440,7 +440,7 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
   })
 
-  test("#given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt", async () => {
+  test("#given abort fails because no active stream remains #when fallback handles assistant error #then the continuation is still dispatched (#7161)", async () => {
     //#given
     const sessionID = "ses_model_fallback_abort_failure"
     setMainSession(sessionID)
@@ -486,10 +486,71 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    //#then
+    //#then - a failed abort means the stream already died; the fallback prompt must still go out
     expect(pendingFallbackArms).toBe(1)
     expect(abortCalls).toEqual([sessionID])
-    expect(promptAsyncCalls).toEqual([])
+    expect(promptAsyncCalls).toEqual([sessionID])
+  })
+
+  test("#given Z.AI weekly/monthly limit exhaustion kills the primary #when session.error fires and abort throws #then the user fallback chain cycles (#7161)", async () => {
+    //#given - issue #7161 setup: zai-coding-plan primary exhausted, configured fallback chain
+    const sessionID = "ses_zai_quota_exhaustion_fallback"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["opencode-go/glm-5.2", "opencode-zen-free/deepseek-v4-flash-free"],
+        },
+      },
+    }
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      pluginConfig,
+      abort: async () => {
+        throw new Error("session has no active stream to abort")
+      },
+      promptAsync: async () => ({}),
+    })
+    const chatMessageHandler = createChatFallbackMessageHandler(modelFallback)
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "zai-coding-plan",
+          modelID: "glm-5.3",
+          error: {
+            name: "AI_APICallError",
+            data: {
+              message:
+                "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-05-20 15:43:27",
+            },
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "zai-coding-plan", modelID: "glm-5.3" },
+      },
+      output,
+    )
+
+    //#then - exhaustion is retryable, dispatch survives the abort failure, and the first configured rung applies
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptAsyncCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "glm-5.2",
+    })
   })
 
   test("does not collapse fallback continuations for different providers with the same model id", async () => {
@@ -1288,6 +1349,56 @@ describe("createEventHandler - model fallback", () => {
       modelID: "kimi-k3",
     })
     expect(output.message["variant"]).toBeUndefined()
+  })
+
+  test("#given session.error omits model metadata while session model state knows the primary #when fallback arms #then it targets the actual primary instead of the first hardcoded rung (#7161)", async () => {
+    //#given
+    const sessionID = "ses_error_missing_model_session_state"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatFallbackMessageHandler(modelFallback)
+
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-8" })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          error: {
+            name: "UnknownError",
+            data: {
+              error: {
+                message: "Bad Gateway: Opus 4.8 provider temporarily unavailable",
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+      },
+      output,
+    )
+
+    //#then - the failed primary is claude-opus-4-8, so the claude-opus-5 rung is a real fallback, not a no-op skip
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-5",
+    })
+    expect(output.message["variant"]).toBe("max")
   })
 
   test("does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default)", async () => {
