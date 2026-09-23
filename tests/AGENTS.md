@@ -13,6 +13,7 @@ tests/
 ├── reasoning-vocabulary-parity.test.ts  # model-core vs omo-config-core reasoning levels + normalization agree
 ├── ulw-loop-define-goal-reference.test.ts  # ulw-loop skills (omo-senpi + omo-codex editions) ship define-goal.md beside full-workflow.md
 ├── ulw-plan-review-convergence-contract.test.ts  # bounded review-convergence contract JSON present in every edition's full-workflow.md (issue #6128)
+├── ulw-plan-consultant-dispatch-contract.test.ts  # consultant dispatch contract JSON present in every edition's full-workflow.md (issue #8509)
 └── hashline/                          # Standalone headless Hashline exercise package
     ├── package.json
     ├── bun.lock
