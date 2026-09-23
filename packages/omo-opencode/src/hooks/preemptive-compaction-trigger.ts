@@ -45,6 +45,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
   compactionInProgress: Set<string>
   compactedSessions: Set<string>
   lastCompactionTime: Map<string, number>
+  contextLimitWarnedSessions: Set<string>
 }): Promise<void> {
   const {
     ctx,
@@ -55,6 +56,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
     compactionInProgress,
     compactedSessions,
     lastCompactionTime,
+    contextLimitWarnedSessions,
   } = args
 
   if (compactedSessions.has(sessionID) || compactionInProgress.has(sessionID)) return
@@ -76,6 +78,23 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       providerID: cached.providerID,
       modelID: cached.modelID,
     })
+    if (!contextLimitWarnedSessions.has(sessionID)) {
+      contextLimitWarnedSessions.add(sessionID)
+      ctx.client.tui.showToast({
+        body: {
+          title: "Auto-compaction disabled for this session",
+          message: `Unknown context limit for ${cached.providerID}/${cached.modelID}. Preemptive auto-compaction cannot run for this session, so the context window may fill up without an automatic summary. You may need to manually /compact or switch models.`,
+          variant: "warning",
+          duration: 10000,
+        },
+      }).catch((toastError: unknown) => {
+        const toastErrorMessage = String(toastError)
+        log("[preemptive-compaction] Failed to show context-limit-unknown toast", {
+          sessionID,
+          toastError: toastErrorMessage,
+        })
+      })
+    }
     return
   }
 
