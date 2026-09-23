@@ -229,7 +229,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     return
   }
   if (earlyCommands.has(command) || command === "update") {
-    await spawnSenpi(args, false)
+    await spawnSenpi(args, command === "app-server" && !args.includes("--no-extensions"))
     return
   }
   if (isInteractiveDefault(args)) {
