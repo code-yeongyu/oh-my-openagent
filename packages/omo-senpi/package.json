@@ -60,6 +60,6 @@
   },
   "devDependencies": {
     "@code-yeongyu/senpi": "2026.9.18-4",
-    "terser": "5.50.0"
+    "terser": "5.44.0"
   }
 }

@@ -87,6 +87,7 @@ describe("omo-senpi package shape", () => {
     expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.9.18-4")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
     expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.9.18-4")
+    expect(devDependencies.terser).toBe("5.44.0")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
