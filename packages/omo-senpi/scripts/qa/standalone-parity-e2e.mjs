@@ -5,6 +5,7 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, digestDirectory } from "./drive.mjs"
+import { protectedSnapshotsUntouched, snapshotProtectedState } from "./isolation-state.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -31,7 +32,11 @@ const messagesDump = join(sandbox.root, "messages.jsonl")
 const sessions = join(sandbox.root, "sessions")
 const sourceHome = join(sandbox.root, "source-home")
 const realSenpiBefore = credentialDigest(realSenpiAgentDir)
-const realBetaBefore = digestDirectory(realBetaRoot)
+const realBetaBefore = {
+  bin: digestDirectory(join(realBetaRoot, "bin")),
+  parity: digestDirectory(join(realBetaRoot, "standalone-parity")),
+  protectedState: snapshotProtectedState(join(realBetaRoot, "home", ".omo", "agent")),
+}
 let server
 
 try {
@@ -95,7 +100,13 @@ try {
     normalPackageDiscovery: !/duplicate.*omo|duplicate.*extension/iu.test(`${discovery.stderr}\n${discovery.stdout}`),
     modelUsageNonzero: sessionEntries.some((entry) => Number(entry.message?.usage?.totalTokens ?? 0) > 0),
     realSenpiUntouched: credentialDigest(realSenpiAgentDir) === realSenpiBefore,
-    realBetaUntouched: digestDirectory(realBetaRoot) === realBetaBefore,
+    realBetaUntouched:
+      digestDirectory(join(realBetaRoot, "bin")) === realBetaBefore.bin
+      && digestDirectory(join(realBetaRoot, "standalone-parity")) === realBetaBefore.parity
+      && protectedSnapshotsUntouched(
+        realBetaBefore.protectedState,
+        snapshotProtectedState(join(realBetaRoot, "home", ".omo", "agent")),
+      ),
   }
   const failed = Object.entries(result).filter(([key, value]) => key !== "status" && key !== "isolatedAgentDir" && key !== "skillCount" && key !== "commandCount" && value !== true)
   if (failed.length > 0) throw new Error(`standalone parity assertions failed: ${failed.map(([key]) => key).join(", ")}`)
