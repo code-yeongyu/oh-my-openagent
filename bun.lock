@@ -389,6 +389,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@code-yeongyu/senpi@2026.9.13": "patches/@code-yeongyu%2Fsenpi@2026.9.13.patch",
+  },
   "overrides": {
     "@earendil-works/pi-agent-core": "0.84.2",
     "@earendil-works/pi-ai": "0.84.2",

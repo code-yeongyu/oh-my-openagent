@@ -250,5 +250,8 @@
     "ip-address": "^10.7.2",
     "@types/node": "26.6.2"
   },
-  "trustedDependencies": []
+  "trustedDependencies": [],
+  "patchedDependencies": {
+    "@code-yeongyu/senpi@2026.9.13": "patches/@code-yeongyu%2Fsenpi@2026.9.13.patch"
+  }
 }

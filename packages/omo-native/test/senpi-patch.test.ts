@@ -4,8 +4,11 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { z } from "zod"
 
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
+const REPOSITORY_ROOT = resolve(PACKAGE_ROOT, "..", "..")
+const rootManifest = z.object({ patchedDependencies: z.record(z.string(), z.string()) })
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
 const BUNDLED_ANTHROPIC_MESSAGES = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
 const ENGINE_BUNDLE = "dist/bundle"
@@ -78,6 +81,25 @@ function runPatch(root: string) {
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+// A CRLF checkout still applies, but every patched line lands with a carriage
+// return, and the postinstall transforms then reject the engine as unsupported.
+describe("version-scoped Senpi patch delivery", () => {
+  describe("#given the patched dependency that every platform installs", () => {
+    describe("#when git resolves the patch file's checkout attributes", () => {
+      test("#then its end-of-line form is pinned to lf", () => {
+        const manifest = rootManifest.parse(JSON.parse(readFileSync(join(REPOSITORY_ROOT, "package.json"), "utf8")))
+        const patches = Object.values(manifest.patchedDependencies)
+        expect(patches.length).toBeGreaterThan(0)
+        for (const patch of patches) {
+          const attributes = spawnSync("git", ["check-attr", "eol", "--", patch], { cwd: REPOSITORY_ROOT, encoding: "utf8" })
+          expect(attributes.status).toBe(0)
+          expect(attributes.stdout.trim()).toBe(`${patch}: eol: lf`)
+        }
+      })
+    })
+  })
 })
 
 describe("senpi-patch claudeCodeVersion floor", () => {

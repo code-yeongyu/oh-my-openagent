@@ -1,0 +1,335 @@
+diff --git a/dist/core/extensions/builtin/config-reload/index.js b/dist/core/extensions/builtin/config-reload/index.js
+index 57762e1..cabc95c 100644
+--- a/dist/core/extensions/builtin/config-reload/index.js
++++ b/dist/core/extensions/builtin/config-reload/index.js
+@@ -73,6 +73,7 @@ export function configReloadExtension(pi, options = {}) {
+     const eventUnsubscribes = [];
+     const pending = new Map();
+     let engine;
++    const watcherClosures = [];
+     let activeTargets = [];
+     let currentContext;
+     let started = false;
+@@ -86,9 +87,8 @@ export function configReloadExtension(pi, options = {}) {
+     // The engine goes inert the moment close() is called; its unsubscribe loop can
+     // take seconds per watcher, and session_shutdown is awaited by the reload flow.
+     const closeWatchers = () => {
+-        engine?.close().catch((error) => {
+-            logger.error("watcher_error", { path: "watcher teardown", message: errorMessage(error) });
+-        });
++        if (engine)
++            watcherClosures.push(Promise.allSettled([engine.close()]));
+         engine = undefined;
+         activeTargets = [];
+     };
+@@ -161,8 +161,9 @@ export function configReloadExtension(pi, options = {}) {
+         }
+     };
+     const processChange = async (change) => {
+-        if (reloadInFlight || !currentContext)
++        if (reloadInFlight || !currentContext || !started)
+             return;
++        const changeContext = currentContext;
+         // Suppression state (self-write consumption, routine-diff base) is per path,
+         // so it must be resolved before grouping: a path watched by several
+         // registrations would otherwise be classified once per group and reach the
+@@ -178,6 +179,8 @@ export function configReloadExtension(pi, options = {}) {
+         const rearmDirectoryWatch = change.created.some((path) => activeTargets.some((target) => target.rearmOnCreation === resolve(path)));
+         for (const [registrationId, paths] of groups) {
+             const errors = await validateChangedPaths(registrationId, paths, registrations, agentDir, currentContext.cwd);
++            if (!started || currentContext !== changeContext)
++                return;
+             if (errors.length > 0) {
+                 rejectChange(currentContext, registrationId, paths, errors, logger, pi);
+                 continue;
+@@ -205,11 +208,14 @@ export function configReloadExtension(pi, options = {}) {
+         });
+     };
+     const rebuildWatchers = (ctx) => {
++        if (!started || currentContext !== ctx) return;
+         closeWatchers();
+         clearCompactionRecheck();
+         const settingsManager = SettingsManager.create(ctx.cwd, agentDir, { projectTrusted: ctx.isProjectTrusted() });
+         const settings = resolveConfigReloadSettings(settingsManager);
+-        if (!settings.enabled || ctx.mode === "print" || ctx.mode === "json") {
++        // Nonpersistent RPC probes need a configuration snapshot, not live OS watches.
++        if (!settings.enabled || ctx.mode === "print" || ctx.mode === "json" ||
++            (ctx.mode === "rpc" && ctx.sessionManager.getSessionFile() === undefined)) {
+             pi.events.emit(CONFIG_WATCH_READY, { enabled: false });
+             return;
+         }
+@@ -347,10 +353,12 @@ export function configReloadExtension(pi, options = {}) {
+         await processReloadHandoff(event, ctx);
+     });
+     pi.on("agent_end", async (_event, ctx) => {
++        if (!started) return;
+         currentContext = ctx;
+         await flushPending();
+     });
+     pi.on("agent_settled", async (_event, ctx) => {
++        if (!started) return;
+         currentContext = ctx;
+         await flushPending();
+     });
+@@ -359,7 +367,7 @@ export function configReloadExtension(pi, options = {}) {
+             rebuildWatchers(currentContext);
+         return { trusted: "undecided" };
+     });
+-    pi.on("session_shutdown", (event) => {
++    pi.on("session_shutdown", async (event) => {
+         const closingContext = currentContext;
+         started = false;
+         currentContext = undefined;
+@@ -371,6 +379,10 @@ export function configReloadExtension(pi, options = {}) {
+         pending.clear();
+         if (event.reason !== "reload" && closingContext)
+             reloadHandoffs.delete(handoffKey(closingContext));
++        const results = (await Promise.all(watcherClosures)).flat();
++        const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
++        if (errors.length > 0)
++            throw new AggregateError(errors, "Config watcher shutdown failed");
+     });
+     function canRequestReload(ctx) {
+         return (ctx.isIdle() &&
+diff --git a/dist/core/extensions/builtin/config-reload/watch-engine.js b/dist/core/extensions/builtin/config-reload/watch-engine.js
+index 5da9d21..a86eebb 100644
+--- a/dist/core/extensions/builtin/config-reload/watch-engine.js
++++ b/dist/core/extensions/builtin/config-reload/watch-engine.js
+@@ -23,6 +23,7 @@ export class ConfigReloadWatchEngine {
+     #pending = new Map();
+     #timer;
+     #closed = false;
++    #closeCompletion;
+     constructor(options) {
+         this.#subscribe = options.subscribe;
+         this.#onRealChange = options.onRealChange;
+@@ -97,15 +98,14 @@ export class ConfigReloadWatchEngine {
+         }
+     }
+     /**
+-     * Marks the engine inert synchronously, then drains the unsubscribe loop off
+-     * the caller's stack. A single `fs.watch` unsubscribe can block for seconds on
+-     * a loaded machine, and a reload awaits this call; every dispatch path already
+-     * checks `#closed`, so the still-attached subscriptions are silent while the
+-     * returned promise settles. Await it only to observe teardown completion.
++     * Marks the engine inert synchronously and invokes every unsubscriber on this
++     * turn so in-flight worker registrations observe cancellation. Native disposer
++     * promises are awaited on the returned completion; the non-worker platform
++     * branch remains a synchronous close. Await it only to observe teardown completion.
+      */
+     close() {
+         if (this.#closed) {
+-            return Promise.resolve();
++            return this.#closeCompletion;
+         }
+         this.#closed = true;
+         if (this.#timer) {
+@@ -113,19 +113,14 @@ export class ConfigReloadWatchEngine {
+             this.#timer = undefined;
+         }
+         const unsubscribes = this.#unsubscribes.splice(0);
+-        return new Promise((settle) => {
+-            this.#clock.setTimeout(() => {
+-                for (const unsubscribe of unsubscribes) {
+-                    try {
+-                        unsubscribe();
+-                    }
+-                    catch (error) {
+-                        this.#reportError(error, "watch subscription");
+-                    }
+-                }
+-                settle();
+-            }, 0);
+-        });
++        // Cancel queued registrations synchronously; await every native disposer.
++        this.#closeCompletion = Promise.allSettled(unsubscribes.map(async (unsubscribe) => unsubscribe()))
++            .then((results) => {
++                const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
++                if (errors.length > 0)
++                    throw new AggregateError(errors, "Config watcher teardown failed");
++            });
++        return this.#closeCompletion;
+     }
+     getBaselineSnapshot() {
+         const snapshot = new Map();
+diff --git a/dist/core/extensions/builtin/config-reload/watch-event-source.js b/dist/core/extensions/builtin/config-reload/watch-event-source.js
+index f7548d6..fe31a1a 100644
+--- a/dist/core/extensions/builtin/config-reload/watch-event-source.js
++++ b/dist/core/extensions/builtin/config-reload/watch-event-source.js
+@@ -14,6 +14,7 @@ parentPort.on("message", (message) => {
+ 		return;
+ 	}
+ 	if (message.kind !== "watch") return;
++	if (Atomics.load(message.active, 0) === 0) return;
+ 	try {
+ 		const watcher = watch(
+ 			message.path,
+@@ -34,6 +35,10 @@ parentPort.on("message", (message) => {
+ 				message: error instanceof Error ? error.message : String(error),
+ 			});
+ 		});
++		if (Atomics.load(message.active, 0) === 0) {
++			watcher.close();
++			return;
++		}
+ 		watchers.set(message.id, watcher);
+ 	} catch (error) {
+ 		parentPort.postMessage({
+@@ -103,7 +108,7 @@ export function createFsWatchEventSource(onError = () => { }, options = {}) {
+                 return;
+             const replacement = ensureRecursiveWorker();
+             for (const [id, subscription] of recursiveSubscriptions) {
+-                replacement.postMessage({ kind: "watch", id, path: subscription.path, recursive: subscription.recursive });
++                replacement.postMessage({ kind: "watch", id, path: subscription.path, recursive: subscription.recursive, active: subscription.active });
+             }
+         });
+         recursiveWorker = worker;
+@@ -113,11 +118,15 @@ export function createFsWatchEventSource(onError = () => { }, options = {}) {
+         if (WORKER_OFFLOADED_WATCH_PLATFORMS.has(options.platform ?? process.platform)) {
+             const id = nextSubscriptionId++;
+             const recursive = watchOptions?.recursive ?? false;
+-            ensureRecursiveWorker().postMessage({ kind: "watch", id, path, recursive });
+-            recursiveSubscriptions.set(id, { path, listener, recursive });
++            const active = new Int32Array(new SharedArrayBuffer(4));
++            Atomics.store(active, 0, 1);
++            ensureRecursiveWorker().postMessage({ kind: "watch", id, path, recursive, active });
++            recursiveSubscriptions.set(id, { path, listener, recursive, active });
++            let closing;
+             return () => {
+                 if (!recursiveSubscriptions.delete(id))
+-                    return;
++                    return closing;
++                Atomics.store(active, 0, 0);
+                 // Resolve at unsubscribe time: the worker may have been replaced after a crash.
+                 const worker = recursiveWorker;
+                 if (!worker)
+@@ -127,7 +136,11 @@ export function createFsWatchEventSource(onError = () => { }, options = {}) {
+                     return;
+                 }
+                 recursiveWorker = undefined;
+-                void worker.terminate().catch((error) => onError(error, path));
++                closing = worker.terminate().catch((error) => {
++                    onError(error, path);
++                    throw error;
++                });
++                return closing;
+             };
+         }
+         const watcher = watchWithErrorHandler(path, listener, () => onError(new Error(`fs.watch failed for ${path}`), path), { recursive: watchOptions?.recursive ?? false });
+diff --git a/dist/modes/rpc/rpc-mode.js b/dist/modes/rpc/rpc-mode.js
+index 543bbc1..7144d9c 100644
+--- a/dist/modes/rpc/rpc-mode.js
++++ b/dist/modes/rpc/rpc-mode.js
+@@ -100,7 +100,8 @@ export async function runRpcMode(runtimeHost) {
+     // byte-identical default behavior.
+     const capabilities = parseClientCapabilities(envValue("RPC_CLIENT_CAPABILITIES"));
+     const handler = createRpcConnectionHandler(runtimeHost, sink, { capabilities });
+-    let shuttingDown = false;
++    let shutdownCompletion;
++    let shutdownExitCode = 0;
+     const signalCleanupHandlers = [];
+     const registerSignalHandlers = () => {
+         const signals = ["SIGTERM"];
+@@ -119,20 +120,23 @@ export async function runRpcMode(runtimeHost) {
+     registerSignalHandlers();
+     let detachInput = () => { };
+     async function shutdown(exitCode = 0, signal) {
+-        if (shuttingDown) {
+-            process.exit(exitCode);
++        if (shutdownExitCode === 0)
++            shutdownExitCode = exitCode;
++        if (shutdownCompletion === undefined) {
++            shutdownCompletion = (async () => {
++                for (const cleanup of signalCleanupHandlers) {
++                    cleanup();
++                }
++                await handler.dispose();
++                detachInput();
++                process.stdin.pause();
++                if (signal !== "SIGTERM") {
++                    await flushRawStdout();
++                }
++            })();
+         }
+-        shuttingDown = true;
+-        for (const cleanup of signalCleanupHandlers) {
+-            cleanup();
+-        }
+-        await handler.dispose();
+-        detachInput();
+-        process.stdin.pause();
+-        if (signal !== "SIGTERM") {
+-            await flushRawStdout();
+-        }
+-        process.exit(exitCode);
++        await shutdownCompletion;
++        process.exit(shutdownExitCode);
+     }
+     const handleInputLine = async (line) => {
+         await handler.handleInputLine(line);
+diff --git a/dist/modes/rpc/session-worker-client.js b/dist/modes/rpc/session-worker-client.js
+index 0527883..568b184 100644
+--- a/dist/modes/rpc/session-worker-client.js
++++ b/dist/modes/rpc/session-worker-client.js
+@@ -30,6 +30,16 @@ export class SessionWorkerClient {
+                 this.requests.close(new Error("session_worker_exited"));
+                 this.listeners.clear();
+                 callbacks.exit();
++                const terminal = this.pendingTerminal;
++                if (terminal) {
++                    terminal.writer.enqueue(terminal.sessionId, { type: "session_error", error: terminal.error });
++                    terminal.writer.closeSession(terminal.sessionId, {
++                        type: "response",
++                        command: "close_session",
++                        success: false,
++                        error: terminal.error,
++                    });
++                }
+                 resolve();
+             });
+         });
+@@ -202,15 +212,8 @@ export class SessionWorkerClient {
+         if (this.stopped)
+             return;
+         this.callbacks.failure(error);
+-        if (this.writer && this.sessionId) {
+-            this.writer.enqueue(this.sessionId, { type: "session_error", error });
+-            this.writer.closeSession(this.sessionId, {
+-                type: "response",
+-                command: "close_session",
+-                success: false,
+-                error,
+-            });
+-        }
++        if (this.writer && this.sessionId)
++            this.pendingTerminal = { writer: this.writer, sessionId: this.sessionId, error };
+         this.quarantine();
+     }
+ }
+diff --git a/dist/modes/rpc/worker-session-registry.js b/dist/modes/rpc/worker-session-registry.js
+index b78cfad..962d2e0 100644
+--- a/dist/modes/rpc/worker-session-registry.js
++++ b/dist/modes/rpc/worker-session-registry.js
+@@ -132,20 +132,8 @@ export class WorkerSessionRegistry {
+         if (entry.closeStarted)
+             return entry.closeCompletion;
+         entry.closeStarted = true;
+-        // Reply on a bounded deadline, but keep entry, attachments and reservations until exit.
+-        let timer;
+-        await Promise.race([
+-            entry.worker.close(this.closeGraceMs),
+-            new Promise((resolve) => {
+-                timer = setTimeout(() => {
+-                    if (entry.state !== "closed")
+-                        entry.state = "quarantined";
+-                    resolve();
+-                }, this.closeGraceMs);
+-            }),
+-        ]);
+-        if (timer)
+-            clearTimeout(timer);
++        // The worker deadline requests termination; only exit releases registry ownership.
++        await entry.worker.close(this.closeGraceMs);
+     }
+     list() {
+         return [...this.entries].map(([sessionId, entry]) => {

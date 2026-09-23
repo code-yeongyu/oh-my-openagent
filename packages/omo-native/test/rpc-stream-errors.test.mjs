@@ -73,6 +73,18 @@ function patch(root) {
   if (result.status !== 0) throw new Error(result.stderr)
 }
 
+// The whole shutdown surface runs, declarations included, so signal cleanup and the
+// shutdown state are the engine's own. Upstream and prepared sources both load.
+function shutdownFrom(source, bindings) {
+  const start = source.search(/^[ \t]*let (shuttingDown|shutdownCompletion)\b/m)
+  const end = source.search(/^[ \t]*const handleInputLine/m)
+  if (start < 0 || end < 0) throw new Error("RPC shutdown surface was not found")
+  return new Function(
+    "process", "handler", "flushRawStdout", "killTrackedDetachedChildren",
+    `${source.slice(start, end)}\nreturn shutdown;`,
+  )(bindings.process, bindings.handler, bindings.flushRawStdout, () => undefined)
+}
+
 function sinkFrom(source) {
   const sinkSource = source.match(/const sink = \{[\s\S]*?\n\s*\};/)?.[0]
   if (!sinkSource) throw new Error("upstream RPC sink was not found")
@@ -165,5 +177,47 @@ describe("installed RPC stream serializer", () => {
     const first = readFileSync(fixture.rpcPath, "utf8")
     patch(fixture.root)
     expect(readFileSync(fixture.rpcPath, "utf8")).toBe(first)
+  })
+
+  test("#given a serializer shutdown(1) and an EOF shutdown(0) #when disposal is still pending #then both join it and exit 1", async () => {
+    const fixture = engineFixture()
+    patch(fixture.root)
+    const entered = Promise.withResolvers()
+    const released = Promise.withResolvers()
+    let disposalComplete = false
+    let disposals = 0
+    const exits = []
+    const shutdown = shutdownFrom(readFileSync(fixture.rpcPath, "utf8"), {
+      process: {
+        platform: "darwin",
+        on() {},
+        off() {},
+        stdin: { pause() {} },
+        exit(code) {
+          exits.push({ code, disposalComplete })
+          throw new Error("process.exit")
+        },
+      },
+      handler: {
+        async dispose() {
+          disposals++
+          entered.resolve()
+          await released.promise
+          disposalComplete = true
+        },
+      },
+      flushRawStdout: async () => {},
+    })
+    const settled = (attempt) => attempt.then(() => "returned", (error) => error.message)
+    const first = settled(shutdown(1))
+    await entered.promise
+    const second = settled(shutdown(0))
+    released.resolve()
+    expect(await Promise.all([first, second])).toEqual(["process.exit", "process.exit"])
+    expect(disposals).toBe(1)
+    expect(exits).toEqual([
+      { code: 1, disposalComplete: true },
+      { code: 1, disposalComplete: true },
+    ])
   })
 })

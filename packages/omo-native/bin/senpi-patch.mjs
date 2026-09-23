@@ -4,6 +4,8 @@ import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import { prepareCompileSafeEngine } from "./lib/compile-safe-engine.js"
 import { prepareRpcStreamErrors } from "./lib/rpc-stream-errors.js"
+import { patchRpcCloseOrdering } from "./lib/rpc-close-ordering.js"
+import { patchWatcherShutdown } from "./lib/watcher-shutdown.js"
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(join(packageRoot, "package.json"))
@@ -73,3 +75,5 @@ if (existsSync(claudeCodeBundlePath)) {
 
 prepareCompileSafeEngine(senpiRoot)
 prepareRpcStreamErrors(senpiRoot)
+patchRpcCloseOrdering(senpiRoot)
+patchWatcherShutdown(senpiRoot)
