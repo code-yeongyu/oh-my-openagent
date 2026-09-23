@@ -1,6 +1,7 @@
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { resolveRegisteredAgentName } from "../claude-code-session-state"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import type { RuntimeStateMember } from "./types"
 
@@ -13,7 +14,7 @@ type PromptGenerationModel = {
 }
 
 export type TeamMemberPromptBody = {
-  parts: Array<{ type: "text"; text: string }>
+  parts: Array<{ type: "text"; text: string; synthetic: true; metadata: { compaction_continue: true } }>
   agent?: string
   model?: { providerID: string; modelID: string }
   variant?: string
@@ -64,6 +65,6 @@ export function buildMemberPromptBody(member: RuntimeStateMember, text: string):
     ...(model ? { model } : {}),
     ...(member.model?.variant ? { variant: member.model.variant } : {}),
     ...buildPromptGenerationParams(member.model),
-    parts: [{ type: "text", text }],
+    parts: [createInternalAgentContinuationTextPart(text)],
   }
 }
