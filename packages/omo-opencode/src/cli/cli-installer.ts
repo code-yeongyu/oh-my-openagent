@@ -25,7 +25,9 @@ import {
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { runCodexInstaller } from "./install-codex"
-import { runSenpiInstaller } from "./install-senpi"
+import { runNativeDevInstaller } from "./install-native-dev"
+import { nativeInstallFailureLines, nativeInstallSuccessLine, runNativeInstall } from "./install-native"
+import { NATIVE_EDITION_HINT_TITLE, nativeEditionHintLines, shouldShowNativeEditionHint } from "./native-edition-hint"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
@@ -166,14 +168,26 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     console.log()
   }
 
-  if (config.hasSenpi) {
-    printInfo("Installing Senpi harness adapter...")
+  if (config.hasNative) {
+    printInfo("Installing OmO Native...")
+    const outcome = await runNativeInstall()
+    if (outcome.failure) {
+      for (const line of nativeInstallFailureLines(outcome.failure)) printError(line)
+      return 1
+    }
+    for (const note of outcome.notes) printInfo(note)
+    printSuccess(nativeInstallSuccessLine())
+    console.log()
+  }
+
+  if (config.hasNativeDev) {
+    printInfo("Installing the OmO Native development adapter...")
     try {
-      const senpiResult = await runSenpiInstaller()
-      printSuccess(`Senpi adapter installed ${SYMBOLS.arrow} ${color.dim(senpiResult.settingsPath)}`)
+      const nativeDevResult = await runNativeDevInstaller()
+      printSuccess(`OmO Native development adapter installed ${SYMBOLS.arrow} ${color.dim(nativeDevResult.settingsPath)}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      printError(`Senpi install failed: ${message}`)
+      printError(`OmO Native development adapter install failed: ${message}`)
       return 1
     }
     console.log()
@@ -191,6 +205,14 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )
+
+  if (shouldShowNativeEditionHint(config)) {
+    printInfo(color.bold(NATIVE_EDITION_HINT_TITLE))
+    for (const line of nativeEditionHintLines({ command: color.cyan, link: color.underline })) {
+      console.log(`    ${line}`)
+    }
+    console.log()
+  }
 
   if (args.tui) {
     await maybePromptForGitHubStars(config.platform)

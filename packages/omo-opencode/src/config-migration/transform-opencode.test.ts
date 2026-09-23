@@ -113,7 +113,7 @@ describe("OpenCode config migration transform", () => {
           background_task: { enabled: true },
         },
         "[codex]": { telemetry: { enabled: false } },
-        "[senpi]": { agents: { oracle: { model: "senpi-model" } } },
+        "[native]": { agents: { oracle: { model: "senpi-model" } } },
       })
       expect(projectDocument.document).toEqual({
         $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",

@@ -9,6 +9,7 @@ import { describe, expect, test } from "bun:test"
  * root package). Shape only - launcher behavior is covered by launcher.test.ts.
  */
 const manifestPath = resolve(import.meta.dir, "..", "package.json")
+const sourceExtensionBundlePath = resolve(import.meta.dir, "..", "..", "omo-senpi", "plugin", "extensions", "omo.js")
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
   name: string
   bin?: Record<string, string>
@@ -52,13 +53,24 @@ describe("omo-ai published package shape", () => {
         ])
       })
 
+      // omo#8247: the checker npm package ships every platform's binary (~255 MiB unpacked); the
+      // extension downloads the pinned release for the host instead, so the dependency must stay absent
+      // AND the shipped bundle must carry the downloader that replaces it.
+      test("#then the comment-checker payload is not a runtime dependency and the bundle downloads the pinned release instead", () => {
+        expect(manifest.dependencies).not.toHaveProperty("@code-yeongyu/comment-checker")
+        const bundle = readFileSync(sourceExtensionBundlePath, "utf8")
+        expect(bundle).toContain("code-yeongyu/go-claude-code-comment-checker")
+        expect(bundle).toContain("/releases/download/v")
+        expect(bundle).toContain("comment-checker_v")
+      })
+
       test("#then the codemode parser dependency is exactly pinned", () => {
         expect(manifest.dependencies?.["@babel/parser"]).toBe("8.0.4")
       })
 
       test("#then the senpi pin is exact with no range operator", () => {
         const pin = manifest.dependencies?.["@code-yeongyu/senpi"]
-        expect(pin).toBe("2026.9.18-4")
+        expect(pin).toBe("2026.9.23-5")
         expect(pin).toMatch(/^\d/)
         expect(pin).not.toMatch(/^[\^~]/)
       })

@@ -9679,13 +9679,9 @@
       "properties": {
         "commit_footer": {
           "default": false,
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "string"
-            }
+          "type": [
+            "boolean",
+            "string"
           ]
         },
         "include_co_authored_by": {

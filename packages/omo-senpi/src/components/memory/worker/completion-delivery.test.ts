@@ -74,47 +74,20 @@ describe("deliverReflectionCompletion", () => {
     const { entries } = await deliverLive(failedRecord({ outcome }))
     expect(entries[0]?.data).not.toHaveProperty("recap")
   })
-  test("#given a failed record with reason spawn_failed and detail #when delivered live #then the notification includes both", async () => {
-    // given
-    const detail = "spawn ENOENT: senpi binary not found"
-    const record = failedRecord({ reason: "spawn_failed", detail })
+  test.each(["merged", "no_changes", "failed", "timed_out", "merge_conflict", "parent_dirty", "dirty_uncommitted"] as const)(
+    "#given a %s record #when delivered live #then it is journaled with its facts and no toast fires",
+    async (outcome) => {
+      // given
+      const detail = "spawn ENOENT: senpi binary not found"
+      const record = failedRecord({ outcome, reason: "spawn_failed", detail })
 
-    // when
-    const { delivered, entries, notifications } = await deliverLive(record)
+      // when
+      const { delivered, entries, notifications } = await deliverLive(record)
 
-    // then
-    expect(notifications).toEqual([{
-      message: "Memory reflection reflection-run-7 failed (spawn_failed): spawn ENOENT: senpi binary not found; its transcript cursor was not advanced.",
-      level: "warning",
-    }])
-    expect(delivered.reason).toBe("spawn_failed")
-    expect(delivered.detail).toBe(detail)
-    expect(entries).toEqual([{ customType: REFLECTION_COMPLETION_ENTRY_TYPE, data: delivered }])
-  })
-
-  test("#given a failed record with a long detail #when delivered live #then the notification bounds detail the same way the transcript does", async () => {
-    // given
-    const detail = `spawn ENOENT: ${"x".repeat(200)}`
-
-    // when
-    const { notifications } = await deliverLive(failedRecord({ reason: "spawn_failed", detail }))
-    const message = notifications[0]?.message ?? ""
-
-    // then
-    expect(message.startsWith("Memory reflection reflection-run-7 failed (spawn_failed): spawn ENOENT:")).toBe(true)
-    expect(message.endsWith("; its transcript cursor was not advanced.")).toBe(true)
-    expect(message).toContain("...")
-    expect(message).not.toContain("x".repeat(200))
-  })
-
-  test("#given a failed record with neither reason nor detail #when delivered live #then the generic wording is unchanged", async () => {
-    // given / when
-    const { notifications } = await deliverLive(failedRecord())
-
-    // then
-    expect(notifications).toEqual([{
-      message: "Memory reflection reflection-run-7 ended with failed; its transcript cursor was not advanced.",
-      level: "warning",
-    }])
-  })
+      // then
+      expect(notifications).toEqual([])
+      expect(delivered).toMatchObject({ outcome, reason: "spawn_failed", detail, delivery: { status: "consumed" } })
+      expect(entries).toEqual([{ customType: REFLECTION_COMPLETION_ENTRY_TYPE, data: delivered }])
+    },
+  )
 })

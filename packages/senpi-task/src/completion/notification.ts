@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { isolationDetails, isolationLine } from "../isolation/details"
 import { messageability } from "../state"
 import type { TaskRecord } from "../state"
 import { formatTargetWithModel } from "../status-line"
@@ -22,6 +23,7 @@ export type BuildDetailsOptions = {
 }
 
 export function buildCompletionDetails(record: TaskRecord, options: BuildDetailsOptions = {}): CompletionDetails {
+  const isolation = isolationDetails(record)
   const finalResponse = finalResponseForNotification(record, options.stateDir)
   const runStats = record.run_stats
   const tokens = options.tokens ?? runStats?.total_tokens
@@ -47,6 +49,7 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
     ...(record.owner?.kind === "dag"
       ? { dag: { run_id: record.owner.runId, node_id: record.owner.nodeId } }
       : {}),
+    ...(isolation === undefined ? {} : { isolation }),
   }
   return tokens === undefined ? base : { ...base, tokens }
 }
@@ -130,6 +133,7 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
     ...(detail.final_response_file === undefined
       ? []
       : [`${resultFilePrefix}${excerptForWidth(detail.final_response_file, width, resultFilePrefix, "")}`]),
+    ...(detail.isolation === undefined ? [] : [isolationLine(detail.isolation)]),
     ...(continuation.length === 0
       ? []
       : [`${nextPrefix}${excerptForWidth(continuation, width, nextPrefix, "")}`]),

@@ -24,6 +24,7 @@ import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { OwnedStartResult } from "./owner"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
+import { DAG_NODE_OUTPUT_PREVIEW_CHARS } from "./types"
 import type {
   DagNode,
   DagNodeCounts,
@@ -338,6 +339,11 @@ export function applyDagSchedulerEvent(
             now: terminalResults.now,
           })
       terminalResults?.pendingTerminalResults.delete(event.nodeId)
+      // The durable copy is written here anyway; carrying a bounded preview of it onto the node
+      // costs no extra IO and is what lets a midpoint snapshot audit the child's claim (#8674).
+      const outputText = terminalResult === undefined
+        ? replayedResult?.output
+        : terminalResult.record.final_response ?? ""
       return {
         ...record,
         nodes: record.nodes.map((node) => {
@@ -352,6 +358,12 @@ export function applyDagSchedulerEvent(
           return {
             ...transitioned,
             resultArtifact: persisted.artifact,
+            ...(outputText === undefined
+              ? {}
+              : {
+                  output: outputText.slice(0, DAG_NODE_OUTPUT_PREVIEW_CHARS),
+                  outputBytes: persisted.artifact.bytes,
+                }),
             ...(terminalResult?.record.run_stats === undefined && replayedResult?.runStats === undefined
               ? {}
               : { runStats: terminalResult?.record.run_stats ?? replayedResult?.runStats }),
@@ -409,7 +421,11 @@ function replayDagNodeResult(
   store: DagFileStore,
   runId: DagRunId,
   nodeId: DagNodeId,
-): { readonly artifact: DagNodeResultArtifact; readonly runStats?: TaskRecord["run_stats"] } | undefined {
+): {
+  readonly artifact: DagNodeResultArtifact
+  readonly output: string
+  readonly runStats?: TaskRecord["run_stats"]
+} | undefined {
   const result = readDagNodeResult({ store, runId, nodeId })
   if (result === null) return undefined
   const outputPath = store.paths.result(runId, nodeId)
@@ -417,6 +433,7 @@ function replayDagNodeResult(
   const statsPath = outputPath.replace(/\.txt$/, ".stats.json")
   const stats = readOptionalArtifact(store, statsPath)
   return {
+    output,
     artifact: {
       ...artifactRef(store, outputPath, output),
       ...(stats === undefined ? {} : { stats }),
@@ -1046,6 +1063,8 @@ function clearedTerminalOutcome(node: DagNode): DagNode {
     completedAt: _completedAt,
     runStats: _runStats,
     resultArtifact: _resultArtifact,
+    output: _output,
+    outputBytes: _outputBytes,
     ...cleared
   } = node as DagNodeWithResult
   return cleared

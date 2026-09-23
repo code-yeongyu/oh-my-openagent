@@ -253,7 +253,7 @@ Interest alone is not a trigger. Anything without one stays a queued lead in `ex
 Settle with executed code, not judgment, whenever sources disagree, a behavior is undocumented, a claim is performance- or compatibility-shaped, or the honest answer is "it should work". Spawn one verification worker per claim:
 
 ```
-task(category="deep", run_in_background=true, prompt="TASK: verify by execution: <claim>.
+task(category="deep-low", run_in_background=true, prompt="TASK: verify by execution: <claim>.
 SOURCE: <where it came from>; CONTRADICTION: <opposing source, if any>.
 Write a minimal self-contained script that tests the claim; run it (uv run --with <deps> python / bun / direct compile); capture full stdout+stderr; pin versions.
 Reply with: the exact code, the full output, environment (OS, runtime, dependency versions), and a verdict — CONFIRMED / REFUTED / PARTIAL — grounded in the output.")
@@ -333,7 +333,7 @@ Asset workers (background, parallel, each fed `design-spec.md`) — visuals are 
 
 **Verify the asset manifest before rendering.** List every asset the document references, assert each file exists and is non-empty on disk, and re-render whatever is missing. A document that renders with three broken diagrams is a document you will publish twice.
 
-Assembly worker — `task(category="deep", load_skills=["frontend", "visual-qa", "open-design", "data-scientist", "imagegen", "ulw-loop"], run_in_background=true, ...)`: before writing, read every available design and visualization skill and apply it — the report is a designed artifact, not a text dump; the worker's prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (workers, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few.
+Assembly worker — `task(category="deep-low", load_skills=["frontend", "visual-qa", "open-design", "data-scientist", "imagegen", "ulw-loop"], run_in_background=true, ...)`: before writing, read every available design and visualization skill and apply it — the report is a designed artifact, not a text dump; the worker's prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (workers, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few.
 
 ### The delivery gates — every gate must PASS, in order
 

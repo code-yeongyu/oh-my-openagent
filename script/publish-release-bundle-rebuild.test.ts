@@ -54,4 +54,21 @@ describe("test workflows", () => {
     expect(stagesBundles, "rebuilt bundles live in an ignored path and must be force-staged into the release commit").toBe(true)
     expect(rebuildPrecedesCommit, "the rebuild must land in the release commit, not after it").toBe(true)
   })
+
+  test("rebuilds the version-stamped Codex installer bundle into the release commit", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const prepareJob = sliceWorkflowSection(workflow, "  prepare-release-state:", "  dispatch-provenance-safe-publish:")
+
+    // #when
+    const rebuildsInstaller = prepareJob.includes("bun run build:codex-install")
+    const stagesInstaller = prepareJob.includes("packages/omo-codex/scripts/install-dist/install-local.mjs")
+    const rebuildPrecedesCommit =
+      prepareJob.indexOf("bun run build:codex-install") < prepareJob.indexOf('git commit -m "release: v${VERSION}"')
+
+    // #then
+    expect(rebuildsInstaller, "the installer bundle embeds packages/omo-codex/package.json, so the version bump must rebuild it or codex-install-bundle-freshness rejects the release commit").toBe(true)
+    expect(stagesInstaller, "the rebuilt installer bundle must be staged into the release commit").toBe(true)
+    expect(rebuildPrecedesCommit, "the installer rebuild must land in the release commit, not after it").toBe(true)
+  })
 })

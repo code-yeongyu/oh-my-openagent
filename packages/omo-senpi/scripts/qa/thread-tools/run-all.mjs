@@ -19,6 +19,7 @@ const scenarios = [
   ["terminal-to-ui", "terminal-to-ui.mjs"],
   ["desktop-to-cli", "desktop-to-cli.mjs"],
   ["plugin-surface", "plugin-surface.mjs"],
+  ["session-control", "session-control-qa.mjs"],
 ]
 
 const outDirIndex = process.argv.indexOf("--out-dir")

@@ -9,15 +9,20 @@ export type AppendFdCache = Map<string, number>
 
 const APPEND_FD_CAP = 16
 
+// Exported so every reader shares ONE definition of the layout: the dag node activity clock stats
+// this file to date a live child's last transcript write, and removeRecord unlinks it.
+export function taskEventLogPath(stateDir: string, taskId: string): string {
+  return join(stateDir, "logs", `${taskId}.jsonl`)
+}
+
 export function appendTaskEvent(
   stateDir: string,
   taskId: TaskId,
   event: PersistedTaskEvent,
   appendFds: AppendFdCache,
 ): string {
-  const logsDir = join(stateDir, "logs")
-  mkdirSync(logsDir, { recursive: true })
-  const path = join(logsDir, `${taskId}.jsonl`)
+  mkdirSync(join(stateDir, "logs"), { recursive: true })
+  const path = taskEventLogPath(stateDir, taskId)
   const line = `${JSON.stringify({ type: event.type, payload: redactEventPayload(event.payload) })}\n`
   writeSync(appendFdFor(path, appendFds), line)
   return path

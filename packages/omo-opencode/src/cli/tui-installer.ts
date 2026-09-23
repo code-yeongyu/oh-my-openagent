@@ -13,7 +13,9 @@ import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
 import { detectCodexInstallation, formatCodexInstallationWarning, runCodexInstaller } from "./install-codex"
-import { runSenpiInstaller } from "./install-senpi"
+import { runNativeDevInstaller } from "./install-native-dev"
+import { nativeInstallFailureLines, nativeInstallSuccessLine, runNativeInstall } from "./install-native"
+import { NATIVE_EDITION_HINT_TITLE, nativeEditionHintLines, shouldShowNativeEditionHint } from "./native-edition-hint"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
@@ -148,15 +150,28 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     }
   }
 
-  if (config.hasSenpi) {
-    spinner.start("Installing Senpi harness adapter")
+  if (config.hasNative) {
+    spinner.start("Installing OmO Native")
+    const outcome = await runNativeInstall()
+    if (outcome.failure) {
+      spinner.stop(`OmO Native install failed ${color.yellow("[!]")}`)
+      for (const line of nativeInstallFailureLines(outcome.failure)) p.log.error(line)
+      p.outro(color.red("Installation failed."))
+      return 1
+    }
+    spinner.stop(nativeInstallSuccessLine())
+    for (const note of outcome.notes) p.log.info(note)
+  }
+
+  if (config.hasNativeDev) {
+    spinner.start("Installing the OmO Native development adapter")
     try {
-      const senpiResult = await runSenpiInstaller()
-      spinner.stop(`Senpi adapter installed to ${color.cyan(senpiResult.settingsPath)}`)
+      const nativeDevResult = await runNativeDevInstaller()
+      spinner.stop(`OmO Native development adapter installed to ${color.cyan(nativeDevResult.settingsPath)}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      spinner.stop(`Senpi install failed ${color.yellow("[!]")}`)
-      p.log.error(`Senpi install failed: ${message}`)
+      spinner.stop(`OmO Native development adapter install failed ${color.yellow("[!]")}`)
+      p.log.error(`OmO Native development adapter install failed: ${message}`)
       p.outro(color.red("Installation failed."))
       return 1
     }
@@ -175,6 +190,11 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
       `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )
+
+  if (shouldShowNativeEditionHint(config)) {
+    p.log.info(color.bold(NATIVE_EDITION_HINT_TITLE))
+    p.log.message(nativeEditionHintLines({ command: color.cyan, link: color.underline }).join("\n"))
+  }
 
   const shouldStar = await p.confirm({
     message: "Star the repos on GitHub?",

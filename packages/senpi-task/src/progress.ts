@@ -12,6 +12,7 @@ export type ToolProgressDetails = {
   readonly currentTool?: string
   readonly lastAssistantLine?: string
   readonly turns: number
+  readonly failedTurns?: number
   readonly toolCalls?: number
   readonly tokens?: number
   readonly outputTokens?: number
@@ -62,7 +63,7 @@ export function createChildProgress(
         fallbackCount,
       }),
       stats,
-      verb: currentTool === undefined ? "running" : `running ${currentTool}`,
+      verb: selectLiveActivityVerb({ tool: currentTool, turns: stats.turns, failedTurns: stats.failed_turns }),
     })
 
   return {
@@ -98,6 +99,7 @@ export function createChildProgress(
         ...(currentTool === undefined ? {} : { currentTool }),
         ...(lastAssistantLine === undefined ? {} : { lastAssistantLine }),
         turns: stats.turns,
+        ...((stats.failed_turns ?? 0) > 0 ? { failedTurns: stats.failed_turns } : {}),
         toolCalls: stats.tool_calls,
         ...(lastTotalTokens === undefined ? {} : { tokens: lastTotalTokens }),
         ...(stats.output_tokens === undefined ? {} : { outputTokens: stats.output_tokens }),
@@ -110,13 +112,28 @@ export function createChildProgress(
   }
 }
 
+// The live-row verb for a child that has not settled: a tool in flight always leads ("running
+// <tool>"), and before the first successful assistant turn the row must not claim motion - it
+// reads "starting", or "retrying" once a failed assistant turn proved the child is alive. Only a
+// successful turn earns the plain "running".
+export function selectLiveActivityVerb(input: {
+  readonly tool?: string
+  readonly turns: number
+  readonly failedTurns?: number
+}): string {
+  if (input.tool !== undefined) return `running ${input.tool}`
+  if (input.turns > 0) return "running"
+  if ((input.failedTurns ?? 0) > 0) return "retrying"
+  return "starting"
+}
+
 export function readToolProgressDetails(value: unknown): ToolProgressDetails | undefined {
   if (!isRecord(value) || !isRecord(value.progress)) return undefined
   if (typeof value.progress.activity !== "string" || typeof value.progress.startedAt !== "number") return undefined
   if (typeof value.childId !== "string" || typeof value.turns !== "number") return undefined
   if (value.currentTool !== undefined && typeof value.currentTool !== "string") return undefined
   if (value.lastAssistantLine !== undefined && typeof value.lastAssistantLine !== "string") return undefined
-  const optionalNumbers = [value.toolCalls, value.tokens, value.outputTokens, value.tokensPerSecond]
+  const optionalNumbers = [value.toolCalls, value.tokens, value.outputTokens, value.tokensPerSecond, value.failedTurns]
   if (optionalNumbers.some((entry) => entry !== undefined && typeof entry !== "number")) return undefined
   return value as ToolProgressDetails
 }

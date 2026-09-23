@@ -60,6 +60,9 @@ export interface TeamServiceDeps {
   readonly omoConfig: OmoConfig
   readonly cwd: string
   readonly agentNames: ReadonlySet<string>
+  // The session's package-aware inherited list, so a team member reproduces the same providers an
+  // ordinary child gets (#8492). Absent, member launches fall back to the parent's argv entries.
+  readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
   readonly appendTaskEvent?: (taskId: string, event: PersistedTaskEvent) => void
   readonly now?: () => number
   readonly newMessageId?: () => string
@@ -145,7 +148,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         memberExtension: {
           entryPath: memberExtensionEntryPath,
-          inheritedExtensions: parseExtensionEntries(process.argv),
+          inheritedExtensions: deps.resolveInheritedExtensions ?? parseExtensionEntries(process.argv),
         },
       })
     },

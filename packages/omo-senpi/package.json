@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.0.0-beta.75",
+  "version": "5.0.0-beta.87",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -48,10 +48,10 @@
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-    "typebox": "1.3.18"
+    "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.9.18-4"
+    "@code-yeongyu/senpi": "2026.9.23-5"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -59,7 +59,7 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.9.18-4",
+    "@code-yeongyu/senpi": "2026.9.23-5",
     "terser": "5.44.0"
   }
 }

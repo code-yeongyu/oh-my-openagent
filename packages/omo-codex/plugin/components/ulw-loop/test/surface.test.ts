@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { REVIEWER_ROLES_BY_SURFACE, resolveToolkitSurface, reviewerRolesFor } from "../src/surface.ts";
+import {
+	canonicalReviewerAgentName,
+	GATE_REVIEWER_AGENT_NAMES,
+	LEGACY_REVIEWER_AGENT_ALIASES,
+	REVIEWER_ROLES_BY_SURFACE,
+	resolveToolkitSurface,
+	reviewerRolesFor,
+} from "../src/surface.ts";
 
 let markerDir: string;
 
@@ -65,10 +72,42 @@ describe("reviewerRolesFor", () => {
 			gateReview: "lazycodex-gate-reviewer",
 		});
 		expect(reviewerRolesFor("omo-senpi")).toEqual({
-			codeReview: "omo-senpi-code-reviewer",
-			manualQa: "omo-senpi-qa-executor",
-			gateReview: "omo-senpi-gate-reviewer",
+			codeReview: "omo-native-code-reviewer",
+			manualQa: "omo-native-qa-executor",
+			gateReview: "omo-native-gate-reviewer",
 		});
 		expect(Object.keys(REVIEWER_ROLES_BY_SURFACE).sort()).toEqual(["lazycodex", "omo-senpi"]);
+	});
+});
+
+describe("canonicalReviewerAgentName", () => {
+	it("#given a retired reviewer spelling #when canonicalized #then it maps to the omo-native name", () => {
+		expect(canonicalReviewerAgentName("omo-senpi-gate-reviewer")).toBe("omo-native-gate-reviewer");
+		expect(canonicalReviewerAgentName("omo-senpi-code-reviewer")).toBe("omo-native-code-reviewer");
+		expect(canonicalReviewerAgentName("omo-senpi-qa-executor")).toBe("omo-native-qa-executor");
+	});
+
+	it("#given a canonical or unrelated name #when canonicalized #then it is returned unchanged", () => {
+		expect(canonicalReviewerAgentName("omo-native-gate-reviewer")).toBe("omo-native-gate-reviewer");
+		expect(canonicalReviewerAgentName("lazycodex-gate-reviewer")).toBe("lazycodex-gate-reviewer");
+		expect(canonicalReviewerAgentName("explore")).toBe("explore");
+	});
+
+	it("#given every retired alias #when mapped #then each target is a live reviewer role", () => {
+		const liveRoles = new Set(
+			Object.values(REVIEWER_ROLES_BY_SURFACE).flatMap((roles) => [
+				roles.codeReview,
+				roles.manualQa,
+				roles.gateReview,
+			]),
+		);
+		for (const canonical of Object.values(LEGACY_REVIEWER_AGENT_ALIASES)) expect(liveRoles.has(canonical)).toBe(true);
+	});
+
+	it("#given the gate reviewer name set #when read #then it carries both the canonical and the retired spelling", () => {
+		expect(GATE_REVIEWER_AGENT_NAMES.has("omo-native-gate-reviewer")).toBe(true);
+		expect(GATE_REVIEWER_AGENT_NAMES.has("omo-senpi-gate-reviewer")).toBe(true);
+		expect(GATE_REVIEWER_AGENT_NAMES.has("lazycodex-gate-reviewer")).toBe(true);
+		expect(GATE_REVIEWER_AGENT_NAMES.has("omo-native-code-reviewer")).toBe(false);
 	});
 });

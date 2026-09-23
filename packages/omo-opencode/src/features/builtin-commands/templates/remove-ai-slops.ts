@@ -153,7 +153,7 @@ Team mode is enabled for this session. The rules below **override Phase 2-4** of
 
 Rationale for this composition:
 - **4 workers = team mode's parallel cap.** A fifth member just queues.
-- **Reviewer is NOT a team member** — review demands stronger reasoning than category routing provides (team category members are downcast to sisyphus-junior). The reviewer runs OUTSIDE the team as a \`deep\` task; see Phase 3.
+- **Reviewer is NOT a team member** — review demands stronger reasoning than category routing provides (team category members are downcast to sisyphus-junior). The reviewer runs OUTSIDE the team as a \`deep-high\` task; see Phase 3.
 - **quick × 3** absorbs the mass of per-file slop removal. **unspecified-low × 1** is the rework lane for fixes triggered by reviewer findings.
 
 **Team lifecycle** (create once, reuse until Phase 5 cleanup):
@@ -180,14 +180,14 @@ While any team task is \`pending | claimed | in_progress\`:
   - Immediately dispatch an **external reviewer** — review runs OUTSIDE the team because team-member category routing downcasts to sisyphus-junior:
     \`\`\`
     task(
-      category="deep",
+      category="deep-high",
       load_skills=[],
       run_in_background=true,
       description="slop review: <file>",
       prompt=<file path + full worker report + Safety/Behavior/Quality checklist + instruction to output "PASS" or "FAIL:<per-hunk rollback instructions>">
     )
     \`\`\`
-    If \`deep\` is unavailable in this session, fall back to \`category="unspecified-high"\`.
+    If \`deep-high\` is unavailable in this session, fall back to \`category="unspecified-high"\`.
 - On a reviewer task returning FAIL:
   - Create a rework team task: \`team_task_create(subject="rework: <file>", description=<reverse-patch hunks from reviewer + "then run $omo:remove-ai-slops on remaining non-rolled-back issues only">)\`. The \`unspecified-low\` fix member claims it.
   - Create a new reviewer task paired to the rework completion (same incremental pattern).

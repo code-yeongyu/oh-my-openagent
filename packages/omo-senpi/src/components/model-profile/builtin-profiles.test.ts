@@ -2,16 +2,11 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
+import { BUILTIN_MODEL_PROFILES, DEFAULT_MODEL_PROFILE_ID } from "./builtin-profiles"
 import { KNOWN_MODELS } from "../telemetry/model-vocabulary"
-import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 
-// The id order is the order the picker renders, so it is pinned as a literal list.
-const EXPECTED_IDS = ["capable", "simple-work", "deep-work"] as const
+const EXPECTED_IDS = ["daily-normal", "daily-heavy", "geeky-normal", "geeky-heavy"] as const
 
-// The vendors banned from every public omo surface. Their literal spelling is assembled from
-// fragments on purpose: the acceptance gate greps this whole directory for those names, so the
-// guard that keeps them OUT of the table must not put them back IN as test data.
 const BANNED_VENDOR_TOKENS: readonly string[] = [["mini", "max"].join(""), ["gem", "ini"].join("")]
 
 const PROVIDER_VOCABULARY: Readonly<Record<string, readonly string[]>> = KNOWN_MODELS
@@ -22,18 +17,31 @@ function rungs(): readonly { readonly profile: string; readonly providers: reado
   )
 }
 
+function chainOf(profile: string): readonly string[] {
+  return (BUILTIN_MODEL_PROFILES[profile]?.models ?? []).map((rung) => `${rung.model} ${rung.variant ?? "default"}`)
+}
+
 describe("BUILTIN_MODEL_PROFILES", () => {
-  it("ships exactly the three intent profiles in picker order", () => {
+  it("ships exactly the four lane profiles in picker order", () => {
     expect(Object.keys(BUILTIN_MODEL_PROFILES)).toEqual([...EXPECTED_IDS])
   })
 
-  it("labels each profile by intent", () => {
-    expect(BUILTIN_MODEL_PROFILES["capable"]?.displayName).toBe("Capable")
-    expect(BUILTIN_MODEL_PROFILES["simple-work"]?.displayName).toBe("Simple work")
-    expect(BUILTIN_MODEL_PROFILES["deep-work"]?.displayName).toBe("Deep work")
+  it("labels each profile by lane and gives every profile a distinct family/tier pair", () => {
+    expect(BUILTIN_MODEL_PROFILES["daily-normal"]?.displayName).toBe("Daily · Normal")
+    expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.displayName).toBe("Daily · Heavy")
+    expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.displayName).toBe("Geeky · Normal")
+    expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.displayName).toBe("Geeky · Heavy")
+    const pairs = Object.values(BUILTIN_MODEL_PROFILES).map((profile) => `${profile.family}:${profile.tier}`)
+    expect(pairs).toEqual(["daily:normal", "daily:heavy", "geeky:normal", "geeky:heavy"])
     for (const id of EXPECTED_IDS) {
       expect(BUILTIN_MODEL_PROFILES[id]?.description.length ?? 0).toBeGreaterThan(0)
     }
+  })
+
+  it("uses the daily-normal leaf as the unset-config default id", () => {
+    expect(Object.hasOwn(BUILTIN_MODEL_PROFILES, DEFAULT_MODEL_PROFILE_ID)).toBe(true)
+    expect(BUILTIN_MODEL_PROFILES[DEFAULT_MODEL_PROFILE_ID]?.family).toBe("daily")
+    expect(BUILTIN_MODEL_PROFILES[DEFAULT_MODEL_PROFILE_ID]?.tier).toBe("normal")
   })
 
   it("gives every rung at least one provider and a model id", () => {
@@ -60,31 +68,49 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(offenders).toEqual([])
   })
 
-  it("lists no rung on the openai API lane so openai-codex is the only OpenAI lane", () => {
-    const apiLaneRungs = rungs()
-      .filter((rung) => rung.providers.includes("openai"))
+  it("ranks the ChatGPT subscription ahead of the openai API lane on every GPT rung", () => {
+    const gptRungs = rungs().filter((rung) => rung.model.startsWith("gpt-"))
+    expect(gptRungs.length).toBeGreaterThan(0)
+    const misordered = gptRungs
+      .filter((rung) => rung.providers[0] !== "chatgpt-subscription" || rung.providers[1] !== "openai")
       .map((rung) => `${rung.profile}: ${rung.providers.join("|")}/${rung.model}`)
-    expect(apiLaneRungs).toEqual([])
+    expect(misordered).toEqual([])
   })
 
-  it("copies the deep category chain verbatim into deep-work", () => {
-    expect(BUILTIN_MODEL_PROFILES["deep-work"]?.models).toEqual(CATEGORY_FALLBACK_CHAINS["deep"])
+  it("heads every Claude rung with the anthropic-subscription lane", () => {
+    const claudeRungs = rungs().filter((rung) => rung.model.startsWith("claude-"))
+    expect(claudeRungs.length).toBeGreaterThan(0)
+    expect(claudeRungs.filter((rung) => rung.providers[0] !== "anthropic-subscription").map((rung) => `${rung.profile}: ${rung.model}`)).toEqual([])
   })
 
-  it("orders the capable chain fable -> opus -> kimi -> glm", () => {
-    expect(BUILTIN_MODEL_PROFILES["capable"]?.models.map((rung) => rung.model)).toEqual([
-      "claude-fable-5-1",
-      "claude-opus-5",
-      "kimi-k3",
-      "glm-5.3",
+  it("orders daily-normal opus medium then kimi max then glm max", () => {
+    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "kimi-k3 max", "glm-5.3 max"])
+  })
+
+  it("runs daily-heavy as fable xhigh only", () => {
+    expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.models).toEqual([
+      {
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-1",
+        variant: "xhigh",
+      },
     ])
   })
 
-  it("keeps simple-work on the fast rungs", () => {
-    expect(BUILTIN_MODEL_PROFILES["simple-work"]?.models.map((rung) => rung.model)).toEqual([
-      "gpt-5.6-luna-fast",
-      "deepseek-v4-flash",
-      "claude-haiku-4-5",
+  it("splits geeky-normal so sol-fast stays on the subscription/API lanes and plain sol also opens Copilot/OpenCode", () => {
+    expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.models).toEqual([
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-sol-fast", variant: "medium" },
+      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-sol", variant: "medium" },
+    ])
+  })
+
+  it("runs geeky-heavy as astra xhigh with the same provider ranking as deep-high", () => {
+    expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.models).toEqual([
+      {
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+        model: "gpt-6-astra",
+        variant: "xhigh",
+      },
     ])
   })
 })

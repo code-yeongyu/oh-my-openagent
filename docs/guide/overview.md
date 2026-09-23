@@ -1,6 +1,6 @@
 # What Is Oh My OpenAgent?
 
-Oh My OpenAgent is a multi-model agent orchestration harness. This guide covers OmO Native (omo-senpi), the standalone `omo` command; the OpenCode and Codex editions ship separately. It turns a single AI agent into a coordinated development team that actually ships code.
+Oh My OpenAgent is a multi-model agent orchestration harness. This guide covers OmO Native, the standalone `omo` command; the OpenCode and Codex editions ship separately. It turns a single AI agent into a coordinated development team that actually ships code.
 
 Not locked to Claude. Not locked to OpenAI. Not locked to anyone.
 
@@ -39,9 +39,8 @@ Want more control? Run `/ulw-plan` for interview-based planning, then `/ulw-exec
 
 You don't have to know model names to get a good main agent. Pick a profile by intent and omo picks the model:
 
-- **Capable**: the strongest generalist you have. Claude Fable 5.1, then Claude Opus 5, then Kimi K3, then GLM 5.3.
-- **Simple work**: fast and cheap for small, well-specified edits. GPT-5.6 Luna Fast, then DeepSeek V4 Flash, then Claude Haiku 4.5.
-- **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-5.6 Sol. Same chain the `deep` category runs.
+- **Capable**: the strongest generalist you have. Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
+- **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-6 Sol.
 
 Set one key in `omo.json`:
 
@@ -51,7 +50,7 @@ Set one key in `omo.json`:
 
 At session start omo walks the chain and applies the first model your connected providers serve, then prints a notice naming the pick and the rungs it skipped. The switch is session-scoped: nothing is written to `settings.json`. Mid-session failures follow Senpi's own retry chains, not the profile.
 
-Want one exact model instead? Put it in the same key: `"model_profile": "anthropic/claude-opus-5"`. Anything with a `/` is a pin. The precedence is simple: a `--model` flag or scoped model wins, then a pinned model, then a profile, then Senpi's own default. Leave the key unset and omo doesn't touch the session model at all. Profiles pick the main session model only; categories and curated agents keep their own chains. Full detail in the [omo.json reference](../reference/omo-json.md#model-profiles-senpi-harness).
+Want one exact model instead? Put it in the same key: `"model_profile": "anthropic/claude-opus-5-5"`. Anything with a `/` is a pin. The precedence is simple: a `--model` flag or scoped model wins, then a pinned model, then a profile, then Senpi's own default. Leave the key unset and omo doesn't touch the session model at all. Profiles pick the main session model only; categories and curated agents keep their own chains. Full detail in the [omo.json reference](../reference/omo-json.md#model-profiles-native-harness).
 
 ---
 
@@ -61,7 +60,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-1` max, then `claude-opus-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. Kimi high-speed for quick tasks. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. Kimi high-speed for quick tasks. All working together, automatically.
 
 ---
 
@@ -94,7 +93,7 @@ For a deep dive into how the pieces collaborate, see the [Orchestration System G
 
 ---
 
-## How omo-senpi delegates
+## How OmO Native delegates
 
 ### The main agent
 
@@ -102,10 +101,10 @@ The main agent is your session. It runs on your session model (a profile, a pin,
 
 Recommended models, named plainly:
 
-- **Claude Opus 5** (or Claude Fable 5). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
+- **Claude Opus 5.5** (or Claude Fable 5). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
 - **GPT 5.6 Sol**. The GPT-recommended configuration. It gets a model-aware GPT-native prompt built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
 
-Kimi K3 and GLM 5.2 / 5.3 have tuned prompt presets too, with lighter validation. Models below the recommended tier aren't supported as the main agent. The **Capable** profile walks the Claude-first slice of this list (Fable 5.1, Opus 5, Kimi K3, GLM 5.3), so it's the safe default when you'd rather not choose; pick **Deep work** for the GPT side. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
+Kimi K3 and GLM 5.2 / 5.3 have tuned prompt presets too, with lighter validation. Models below the recommended tier aren't supported as the main agent. The **Capable** profile walks the Claude-first slice of this list (Fable 5.1, Opus 5.5, Kimi K3, GLM 5.3), so it's the safe default when you'd rather not choose; pick **Deep work** for the GPT side. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
 
 ### The category worker
 
@@ -162,12 +161,12 @@ Override specific categories or curated agents in `omo.json`:
 
   "agents": {
     // Planning helpers: Claude for the gap analysis, GPT for the review
-    "plan-consultant": { "model": "anthropic/claude-opus-5", "reasoning": "high" },
+    "plan-consultant": { "model": "anthropic/claude-opus-5-5", "reasoning": "high" },
     "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
 
     // Research agents: cheap and fast is the point
-    "explore": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" },
-    "librarian": { "model": "openai/gpt-5.6-luna-fast", "reasoning": "low" }
+    "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
+    "librarian": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" }
   },
 
   "categories": {
@@ -181,22 +180,22 @@ Override specific categories or curated agents in `omo.json`:
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
 
     // Autonomous research and execution: GPT-6 Astra high, then GPT-5.6 Sol medium
-    "deep": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
 
     // Creative and design work
     "artistry": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Quick tasks: fast and cheap
-    "quick": { "model": "kimi-coding/kimi-for-coding-highspeed" },
+    "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
-    // Low-effort fallback: Grok 4.6 xhigh
-    "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
+    // Low-effort fallback: MiMo V2.6 Pro max
+    "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
 
-    // High-effort fallback: GPT-6 Astra, then Opus 5, GLM 5.3, and Kimi K3
-    "unspecified-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+    // High-effort fallback: Opus 5, then GLM 5.3 and Kimi K3
+    "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" }
+    "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "low" }
   }
 }
 ```
@@ -205,21 +204,22 @@ Override specific categories or curated agents in `omo.json`:
 
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Fable 5, Claude Opus 5, Claude Sonnet 5, Claude Haiku 4.5
+- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5, Claude Haiku 4.5
 - Kimi K3: behaves very similarly to Claude
 - GLM 5.2 / 5.3: Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), `deep` (high), and `unspecified-high` (high), with `gpt-6-astra-fast` as the Fast-mode variant
-- GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max) and `deep` (medium)
+- GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (xhigh), with `gpt-6-astra-fast` as the Fast-mode variant
+- GPT-6 Sol: `deep-low` runs it at medium, on the Fast (priority) tier `gpt-6-sol-fast` where the OpenAI lanes serve it
+- GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
 - GPT-5.6 Terra: balanced mid-tier; second rung in `unspecified-low`
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`
 
 **Other families**:
 
 - Grok 4.6: default for the `unspecified-low` category (xhigh)
-- DeepSeek V4 Flash / Pro: utility rungs in `explore`, `librarian`, `quick`, and `unspecified-low`
+- DeepSeek V4.1 Flash (`deepseek-flash`) / V4 Pro: utility rungs in `explore`, `librarian`, `quick`, and `unspecified-low`
 
 See the [Agent-Model Matching Guide](./agent-model-matching.md) for the full chains, safe vs risky overrides, and the tuned-preset list.
 

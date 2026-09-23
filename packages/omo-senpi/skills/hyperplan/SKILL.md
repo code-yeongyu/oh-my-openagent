@@ -43,7 +43,7 @@ Before starting, verify:
 
 Each member is a `kind: "category"` team member. The category selects the member's model and prompt shaping; the `prompt` field below is the **system prompt** that establishes its adversarial identity.
 
-Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep` only when that category resolves in this project; if `team_create` rejects `deep` as unresolvable, retry once without only the `researcher` member and state the degraded roster.
+Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep-low` only when that category resolves in this project; if `team_create` rejects `deep-low` as unresolvable, retry once without only the `researcher` member and state the degraded roster.
 
 ### CATEGORY CHARACTERISTICS REFERENCE
 
@@ -51,7 +51,7 @@ Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and
 |----------|----------------|--------------------------------|
 | `unspecified-low` | Mid-tier, simplicity-leaning, structure-demanding | Pragmatist Skeptic — bias toward simplicity makes it the natural enemy of over-engineering |
 | `unspecified-high` | High-effort, broad-impact, coordination-aware | Integration Tester — broad-scope thinking exposes cross-module fragility |
-| `deep` | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
+| `deep-low` | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
 | `ultrabrain` | Hard-logic, simplicity-biased, strategic advisor | Architect Strategist — deep reasoning sees structural flaws others miss |
 | `artistry` | Unconventional, pattern-breaking, lateral | Creative Challenger — pattern-breaking bias attacks orthodox thinking |
 
@@ -112,7 +112,7 @@ When you receive others' findings, default position: assume they missed somethin
 Output format: numbered findings/critiques, each <=3 sentences. Cite specific edge cases and integration points. No prose.
 ```
 
-### MEMBER 3: `researcher` (category: `deep`)
+### MEMBER 3: `researcher` (category: `deep-low`)
 
 **Role**: The Autonomous Researcher.
 **Position**: Enemy of unfounded claims. Evidence demander.
@@ -227,7 +227,7 @@ team_create({
     members: [
       { name: "skeptic",    kind: "category", category: "unspecified-low",  prompt: "<full Skeptic system prompt>" },
       { name: "validator",  kind: "category", category: "unspecified-high", prompt: "<full Validator system prompt>" },
-      { name: "researcher", kind: "category", category: "deep",             prompt: "<full Researcher system prompt>" },
+      { name: "researcher", kind: "category", category: "deep-low",         prompt: "<full Researcher system prompt>" },
       { name: "architect",  kind: "category", category: "ultrabrain",       prompt: "<full Architect system prompt>" },
       { name: "creative",   kind: "category", category: "artistry",         prompt: "<full Creative system prompt>" }
     ]
@@ -237,7 +237,7 @@ team_create({
 
 Capture the returned `team_run_id`. You pass it to every subsequent `task_send` and `team_delete` call.
 
-If `team_create` rejects `deep` as unresolvable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
+If `team_create` rejects `deep-low` as unresolvable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
 
 ### Phase 2: Round 1 — Independent analysis
 

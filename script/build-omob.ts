@@ -5,14 +5,16 @@
 // ~/.omo state with a regular omo installation; only the binary and its provisioned
 // runtime dir are namespaced by the commit pair.
 
-import { spawnSync } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, chmodSync, renameSync, cpSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { versionLines, type OmoBuildInfo } from "../packages/omo-native/build-info"
-import { RELEASE_BINARY_TARGETS } from "./build-omo-binary"
 import { installOmobLauncher, isCurrentOmobBuild } from "./omob-launcher"
+import { writeProvenanceMarker } from "./omob-provenance"
 import { pruneOmobRuntimes } from "./omob-runtime-prune"
+import { resetSenpiWorkspaceInstalls } from "./omob-senpi-workspace-reset"
+import { installSenpiTarball } from "./omob-senpi-install"
 export { installOmobLauncher, isCurrentOmobBuild } from "./omob-launcher"
 
 export interface OmobOptions {
@@ -108,6 +110,21 @@ function run(command: string, args: readonly string[], cwd: string, env: NodeJS.
 	if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? 1}`)
 }
 
+function runAsync(command: string, args: readonly string[], cwd: string): Promise<void> {
+	return new Promise((resolveRun, rejectRun) => {
+		const child = spawn(command, [...args], { cwd, stdio: "inherit" })
+		child.on("error", rejectRun)
+		child.on("close", (status, signal) => {
+			if (status === 0) {
+				resolveRun()
+				return
+			}
+			const reason = signal === null ? `exit code ${status ?? 1}` : `signal ${signal}`
+			rejectRun(new Error(`${command} ${args.join(" ")} failed with ${reason}`))
+		})
+	})
+}
+
 function runCaptured(command: string, args: readonly string[], cwd: string): string {
 	const result = spawnSync(command, [...args], { cwd, encoding: "utf8" })
 	if (result.error !== undefined) throw result.error
@@ -174,7 +191,39 @@ export function acquireCacheLock(cacheDir: string, pid: number = process.pid): C
 	return { path, release }
 }
 
-export function ensureCacheClone(url: string, directory: string, ref: string, skipFetch: boolean, checkout = true): { readonly directory: string; readonly commit: string } {
+export interface CacheCloneSpec {
+	readonly url: string
+	readonly directory: string
+	readonly ref: string
+}
+
+/**
+ * A plain `origin/<branch>` narrows the fetch to that one refspec. Anything else — a raw SHA,
+ * or a revision expression such as `origin/dev~1` — is not a refspec git can fetch, so fall
+ * back to fetching every branch and resolving locally.
+ */
+export function fetchRefArgs(ref: string): string[] {
+	const branch = ref.startsWith("origin/") ? ref.slice("origin/".length) : ""
+	const isPlainBranch = branch !== "" && !/[~^:@\\]|\.\.|^-/.test(branch)
+	return isPlainBranch ? ["--prune", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`] : ["--prune", "origin"]
+}
+
+/**
+ * The two cache clones are independent repositories, so fetching them one after the other adds
+ * a whole network round trip to every managed launch's refresh. Fetch them together.
+ */
+export async function fetchCacheClones(
+	specs: readonly CacheCloneSpec[],
+	fetchOne: (spec: CacheCloneSpec) => Promise<void> = (spec) => runAsync("git", ["fetch", ...fetchRefArgs(spec.ref)], spec.directory),
+): Promise<void> {
+	// Every fetch must finish before a failure is reported: the caller releases the cache lock and
+	// exits on the error, and an abandoned `git fetch` would keep writing to that same cache.
+	const results = await Promise.allSettled(specs.map((spec) => fetchOne(spec)))
+	const failure = results.find((result) => result.status === "rejected")
+	if (failure !== undefined && failure.status === "rejected") throw failure.reason
+}
+
+function ensureCloneExists(url: string, directory: string): void {
 	mkdirSync(dirname(directory), { recursive: true })
 	if (!existsSync(join(directory, ".git"))) {
 		// --recurse-submodules bootstraps the submodules; the post-reset sync below is the
@@ -183,14 +232,12 @@ export function ensureCacheClone(url: string, directory: string, ref: string, sk
 	}
 	const actualUrl = runCaptured("git", ["config", "--get", "remote.origin.url"], directory)
 	if (actualUrl !== url) throw new Error(`cache origin mismatch at ${directory}: expected ${url}, found ${actualUrl}`)
+}
+
+export function ensureCacheClone(url: string, directory: string, ref: string, skipFetch: boolean, checkout = true): { readonly directory: string; readonly commit: string } {
+	ensureCloneExists(url, directory)
 	if (!skipFetch) {
-		// A plain `origin/<branch>` narrows the fetch to that one refspec. Anything else —
-		// a raw SHA, or a revision expression such as `origin/dev~1` — is not a refspec git
-		// can fetch, so fall back to fetching every branch and resolving locally.
-		const branch = ref.startsWith("origin/") ? ref.slice("origin/".length) : ""
-		const isPlainBranch = branch !== "" && !/[~^:@\\]|\.\.|^-/.test(branch)
-		const fetchArgs = isPlainBranch ? ["--prune", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`] : ["--prune", "origin"]
-		run("git", ["fetch", ...fetchArgs], directory)
+		run("git", ["fetch", ...fetchRefArgs(ref)], directory)
 	}
 	if (!checkout) return { directory, commit: runCaptured("git", ["rev-parse", `${ref}^{commit}`], directory) }
 	// A cache checkout must land on the exact ref tree: drop leftovers from a previous
@@ -212,9 +259,15 @@ interface CommitInfo {
 	readonly branch: string
 }
 
+// One `git log` answers both the commit and its date; every extra git process is ~11ms
+// on the refresh path that each managed launch pays.
+export function parseCommitLog(output: string): { readonly commit: string; readonly committedAt: string } {
+	const [commit = "", committedAt = ""] = output.split("\n")
+	return { commit: commit.trim(), committedAt: committedAt.trim() }
+}
+
 function readCommitInfo(directory: string, ref: string): CommitInfo {
-	const commit = runCaptured("git", ["rev-parse", `${ref}^{commit}`], directory)
-	const committedAt = runCaptured("git", ["log", "-1", "--format=%cI", ref], directory)
+	const { commit, committedAt } = parseCommitLog(runCaptured("git", ["log", "-1", "--format=%H%n%cI", `${ref}^{commit}`], directory))
 	const rawBranch = runCaptured("git", ["rev-parse", "--abbrev-ref", ref], directory).trim()
 	const branch = (rawBranch === "HEAD" || rawBranch === "" ? ref : rawBranch).replace(/^origin\//, "")
 	return { commit, committedAt, branch }
@@ -273,12 +326,16 @@ export function resolveCachedSenpiPackage(cacheDir: string, commit: string): str
 	return readSenpiArtifactCache(cacheDir, commit)
 }
 
-function buildSenpiPackage(senpiDir: string, cacheDir: string, commit: string): string {
+async function buildSenpiPackage(senpiDir: string, cacheDir: string, commit: string): Promise<string> {
 	const cached = readSenpiArtifactCache(cacheDir, commit)
 	if (cached !== undefined) {
 		console.error(`[omob] reusing senpi artifact ${commit}`)
 		return cached
 	}
+	// The clone is reused and `git clean -ffd` keeps ignored dirs, so the previous build's publish
+	// staging would shadow the workspace links this build's bundler resolves.
+	const discarded = resetSenpiWorkspaceInstalls(senpiDir)
+	if (discarded.length > 0) console.error(`[omob] discarded senpi publish staging: ${discarded.join(", ")}`)
 	run("bun", ["install"], senpiDir)
 	materializeNestedLockDeps(senpiDir)
 	run("bun", ["run", "build:bun"], senpiDir)
@@ -288,20 +345,12 @@ function buildSenpiPackage(senpiDir: string, cacheDir: string, commit: string): 
 	const tarballName = packSoleSenpiTarball(tarballDir, () =>
 		run("bun", ["pm", "pack", "--destination", tarballDir], join(senpiDir, "packages", "coding-agent")),
 	)
-	// Isolated production install: the tarball plus its registry deps, resolved under
-	// a dedicated root so the resulting tree can be dropped into omo's node_modules.
 	const installRoot = join(cacheDir, "artifacts", "senpi", commit, "install")
-	rmSync(installRoot, { recursive: true, force: true })
-	mkdirSync(installRoot, { recursive: true })
-	writeFileSync(join(installRoot, "package.json"), `${JSON.stringify({ private: true, dependencies: { "@code-yeongyu/senpi": `file:${resolve(tarballDir, tarballName)}` } }, undefined, "\t")}\n`)
-	run("bun", ["install", "--production", "--ignore-scripts"], installRoot)
-	nestHoistedDeps(installRoot)
-	const packageRoot = join(installRoot, "node_modules", "@code-yeongyu", "senpi")
+	const packageRoot = await installSenpiTarball(resolve(tarballDir, tarballName), installRoot)
 	writeSenpiArtifactCache(cacheDir, { commit, packageRoot, tarballName })
 	return packageRoot
 }
 
-/** Moves the isolated install's hoisted deps under the senpi package, mirroring the published nested layout. */
 /**
  * senpi's publish staging (prepare-senpi-bundled-workspaces.mjs) reads npm lock
  * entries shaped "packages/<workspace>/node_modules/<pkg>" and expects those
@@ -336,31 +385,6 @@ function materializeNestedLockDeps(senpiRoot: string): void {
 	}
 }
 
-function nestHoistedDeps(installRoot: string): void {
-	const senpiNodeModules = join(installRoot, "node_modules", "@code-yeongyu", "senpi", "node_modules")
-	const topLevel = join(installRoot, "node_modules")
-	mkdirSync(senpiNodeModules, { recursive: true })
-	for (const entry of readdirSync(topLevel)) {
-		if (entry.startsWith(".") || entry === "@code-yeongyu") continue
-		// A scope directory may already exist under the package from bundling; moving the
-		// whole scope would silently drop its hoisted siblings, so merge child by child.
-		if (entry.startsWith("@")) {
-			const scopeTarget = join(senpiNodeModules, entry)
-			mkdirSync(scopeTarget, { recursive: true })
-			for (const child of readdirSync(join(topLevel, entry))) {
-				const childTarget = join(scopeTarget, child)
-				if (existsSync(childTarget)) continue
-				renameSync(join(topLevel, entry, child), childTarget)
-			}
-			continue
-		}
-		const from = join(topLevel, entry)
-		const to = join(senpiNodeModules, entry)
-		if (existsSync(to)) continue
-		renameSync(from, to)
-	}
-}
-
 function swapSenpi(omoDir: string, builtSenpiRoot: string): void {
 	const target = join(omoDir, "node_modules", "@code-yeongyu", "senpi")
 	if (existsSync(target)) rmSync(target, { recursive: true, force: true })
@@ -370,7 +394,7 @@ function swapSenpi(omoDir: string, builtSenpiRoot: string): void {
 	run("bun", [join("packages", "omo-native", "bin", "senpi-patch.mjs")], omoDir, { ...process.env, OMO_SENPI_PATCH_ROOT: target })
 }
 
-function installBinary(binaryPath: string, installDir: string, name: string): string {
+function installBinary(binaryPath: string, installDir: string, name: string, info: OmoBuildInfo): string {
 	mkdirSync(installDir, { recursive: true })
 	const destination = join(installDir, name)
 	const temporary = `${destination}.tmp-${process.pid}`
@@ -378,6 +402,9 @@ function installBinary(binaryPath: string, installDir: string, name: string): st
 	cpSync(binaryPath, temporary)
 	chmodSync(temporary, 0o755)
 	renameSync(temporary, destination)
+	// Only after the executable is published, so the marker can never describe a build that
+	// did not land; it is bound to this file's identity and re-verified on every read.
+	writeProvenanceMarker(destination, versionLines(info).join("\n"))
 	return destination
 }
 
@@ -398,11 +425,14 @@ async function runBuild(options: OmobOptions): Promise<number> {
 	const senpiUrl = options.senpiUrl ?? DEFAULT_SENPI_URL
 	const omoUrl = "https://github.com/code-yeongyu/oh-my-openagent.git"
 	console.error(`[omob] checking ${options.omoRef} + ${options.senpiRef}`)
-	const senpi = ensureCacheClone(senpiUrl, join(options.cacheDir, "senpi"), options.senpiRef, options.skipFetch, false)
-	const omo = ensureCacheClone(omoUrl, join(options.cacheDir, "omo"), options.omoRef, options.skipFetch, false)
+	const senpiSpec: CacheCloneSpec = { url: senpiUrl, directory: join(options.cacheDir, "senpi"), ref: options.senpiRef }
+	const omoSpec: CacheCloneSpec = { url: omoUrl, directory: join(options.cacheDir, "omo"), ref: options.omoRef }
+	ensureCloneExists(senpiSpec.url, senpiSpec.directory)
+	ensureCloneExists(omoSpec.url, omoSpec.directory)
+	if (!options.skipFetch) await fetchCacheClones([senpiSpec, omoSpec])
 
-	const senpiInfo = readCommitInfo(senpi.directory, options.senpiRef)
-	const omoInfo = readCommitInfo(omo.directory, options.omoRef)
+	const senpiInfo = readCommitInfo(senpiSpec.directory, options.senpiRef)
+	const omoInfo = readCommitInfo(omoSpec.directory, options.omoRef)
 	const buildInfo: OmoBuildInfo = {
 		command: options.name,
 		omo: omoInfo,
@@ -418,17 +448,25 @@ async function runBuild(options: OmobOptions): Promise<number> {
 		return 0
 	}
 	console.error(`[omob] building: omo ${omoInfo.commit} + senpi ${senpiInfo.commit}`)
-	ensureCacheClone(senpiUrl, senpi.directory, options.senpiRef, true)
-	ensureCacheClone(omoUrl, omo.directory, options.omoRef, true)
-	const builtSenpiRoot = buildSenpiPackage(senpi.directory, options.cacheDir, senpiInfo.commit)
+	ensureCacheClone(senpiUrl, senpiSpec.directory, options.senpiRef, true)
+	ensureCacheClone(omoUrl, omoSpec.directory, options.omoRef, true)
+	const builtSenpiRoot = await buildSenpiPackage(senpiSpec.directory, options.cacheDir, senpiInfo.commit)
 	// The omo prepare chain materializes gitignored plugin/skills from the shared-skills
 	// upstream submodules; a caller's OMO_SKIP_MATERIALIZE=1 would skip that and break the
 	// build, so the dev-binary install always runs the full materialization.
 	const installEnv: NodeJS.ProcessEnv = { ...process.env }
 	delete installEnv.OMO_SKIP_MATERIALIZE
-	run("bun", ["install"], omo.directory, installEnv)
-	swapSenpi(omo.directory, builtSenpiRoot)
+	// `bun install` triggers the root prepare, which otherwise builds the whole product - the
+	// OpenCode plugin bundle, the Codex Light plugin and its components, the CLI, the TUI,
+	// schemas and declarations - none of which the compiled binary embeds. build-omo-native
+	// builds the plugin payload it does embed, so the binary only needs the materialized
+	// frontend from that chain.
+	run("bun", ["install"], omoSpec.directory, { ...installEnv, OMO_BUILD_PROFILE: "omo-native" })
+	swapSenpi(omoSpec.directory, builtSenpiRoot)
 
+	// Imported here, not at module scope: the fast path returns above, and this module graph
+	// (zod plus the sidecar fixture) is parsed on every managed launch otherwise.
+	const { RELEASE_BINARY_TARGETS } = await import("./build-omo-binary")
 	const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === options.target)
 	if (target === undefined) throw new Error(`unknown target: ${options.target}`)
 	const omoAiVersion = deriveOmobAiVersion(omoInfo.commit, senpiInfo.commit)
@@ -452,7 +490,7 @@ async function runBuild(options: OmobOptions): Promise<number> {
 			"--build-info",
 			JSON.stringify(buildInfo),
 		],
-		omo.directory,
+		omoSpec.directory,
 		installEnv,
 	)
 	const binaryPath = join(outDir, target.binaryName)
@@ -460,7 +498,7 @@ async function runBuild(options: OmobOptions): Promise<number> {
 	const result = { binaryPath, size: statSync(binaryPath).size }
 
 	if (!options.skipInstall) {
-		const installed = installBinary(result.binaryPath, installDir, installedName)
+		const installed = installBinary(result.binaryPath, installDir, installedName, buildInfo)
 		if (options.launcher) console.error(`[omob] installed launcher ${installOmobLauncher(options)}`)
 		console.log(`installed ${installed} (${result.size} bytes)`)
 	}

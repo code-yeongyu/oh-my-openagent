@@ -27,6 +27,29 @@ export const OmoTaskWarningsSchema = z.object({
   unavailable_categories: z.boolean().default(true),
 }).strict()
 
+export const IsolationBackendKindSchema = z.enum([
+  "auto", "apfs", "btrfs", "zfs", "reflink", "overlayfs", "block-clone", "rcopy",
+])
+export type IsolationBackendKind = z.infer<typeof IsolationBackendKindSchema>
+
+export const OmoTaskIsolationSchema = z.object({
+  enabled: z.boolean().default(false),
+  backend: IsolationBackendKindSchema.default("auto"),
+  apply: z.boolean().default(true),
+  merge: z.enum(["patch", "branch"]).default("patch"),
+  commits: z.enum(["generic", "ai"]).default("generic"),
+}).strict()
+
+const isolationDefaults = OmoTaskIsolationSchema.parse({})
+
+export const OmoTaskIsolationLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+  backend: IsolationBackendKindSchema.optional(),
+  apply: z.boolean().optional(),
+  merge: z.enum(["patch", "branch"]).optional(),
+  commits: z.enum(["generic", "ai"]).optional(),
+}).strict()
+
 // Bounds for the dag orchestration subsystem. The whole block is optional, but once present every
 // key falls back to the engine default in senpi-task's DAG_SETTINGS_DEFAULTS.
 export const OmoTaskDagSettingsSchema = z.object({
@@ -41,6 +64,7 @@ export const OmoTaskDagSettingsSchema = z.object({
 }).strict()
 
 export const OmoTaskSettingsSchema = z.object({
+  isolation: OmoTaskIsolationSchema.default(isolationDefaults),
   // "auto" defers the choice to the shared task daemon: `process` when this platform can host
   // children as daemon sessions and the ensured daemon advertises the session capabilities, else
   // `in-process`. It is resolved ONCE per parent session, so a child's mode never depends on daemon
@@ -104,6 +128,7 @@ export const OmoTaskWarningsLayerSchema = z.object({
 }).strict()
 
 export const OmoTaskSettingsLayerSchema = z.object({
+  isolation: OmoTaskIsolationLayerSchema.optional(),
   default_execution_mode: z.enum(["auto", "in-process", "process"]).optional(),
   process_runner: z.enum(["host", "child-process"]).optional(),
   host_engine_policy: z.enum(["upgrade", "fallback"]).optional(),

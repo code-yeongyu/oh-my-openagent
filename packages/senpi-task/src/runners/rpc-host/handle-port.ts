@@ -1,5 +1,6 @@
 import type { RunnerOutcome } from "../in-process/child-handle"
 import type { ChildEventListener, RpcChildHandle, RpcTerminalAssistantMessage } from "../types"
+import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from "./session-client"
 
 /**
@@ -7,9 +8,10 @@ import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from ".
  * an interface, not the client class, so a suite can drive the handle over an in-memory session.
  */
 
-/** The heartbeat reads only liveness and the durable session id off `get_state`. */
+/** The heartbeat reads liveness and the durable session id off `get_state`; recovery reads whether a turn still runs. */
 export interface HostSessionLiveness {
   readonly sessionId: string
+  readonly isStreaming?: boolean
 }
 
 /** `HostSessionClient` satisfies this structurally. The transport error itself is never read. */
@@ -44,6 +46,8 @@ export type HostSessionHandleOptions = {
   readonly heartbeatIntervalMs: number
   readonly now: () => number
   readonly closeGraceMs: number
+  /** Transport recovery. Absent: a lost transport ends the child as crashed(transport_gone). */
+  readonly reattach?: HostSessionReattach
 }
 
 export type HostSessionChildHandle = RpcChildHandle & {

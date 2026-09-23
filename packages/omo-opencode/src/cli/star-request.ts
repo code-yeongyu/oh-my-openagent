@@ -11,7 +11,8 @@ const PLATFORM_REPOSITORIES = {
   opencode: ["code-yeongyu/oh-my-openagent"],
   codex: STAR_REPOSITORIES,
   both: STAR_REPOSITORIES,
-  senpi: STAR_REPOSITORIES,
+  native: STAR_REPOSITORIES,
+  "native-dev": STAR_REPOSITORIES,
 } as const satisfies Record<InstallPlatform, readonly string[]>
 
 const execFileAsync = promisify(execFile)

@@ -60,8 +60,7 @@ rather than borders, creating layers you feel more than see."
 | Status/info | --status-info | #2563EB | #3B82F6 | Informational |
 
 ### Rules
-- Surface hierarchy creates depth without shadows or borders where possible.
-- Accent is used ONLY for interactive elements. Never decorative.
+- Accent marks the one or two most likely actions on a screen, on the control's background rather than its glyph or label. Peer choices differ by style, never by size. Nothing decorative carries accent.
 - Never introduce a color not in this table. Extend the table first.
 
 ## 3. Typography
@@ -148,11 +147,22 @@ code; do not invent future components just to fill the section.
 | Emphasis | 400-600ms | cubic-bezier(0.16, 1, 0.3, 1) | Page transition, hero entry |
 | Scroll-driven | tied to scroll | linear | Parallax, progress, reveal |
 
+### Feedback thresholds
+
+| Event | Feedback | Timing |
+|-------|----------|--------|
+| Press, tap, drag start | State change on the element itself | Same frame; a drag image once the pointer has moved a few px |
+| Hover-revealed controls | Controls appear, then leave with the pointer | After hover intent, not on pointer entry |
+| Async action started | Placeholder or disabled control at once; spinner or skeleton only past ~1 s | An indicator never flashes for sub-second work |
+| Long wait | Determinate progress at an even pace; indeterminate only when the total is unknown | Never swap indicator shape mid-task or front-load to 90% |
+| Outcome | Failure reported next to the object; success shown by the changed state itself | Toast only for outcomes not visible in place |
+
 ### Rules
-- Only animate `transform` and `opacity`. Never animate layout properties.
-- Every interactive element has hover + active + focus states.
+- Only animate `transform`, `opacity`, and `filter`. Never animate layout properties.
+- Every interactive element has hover, active, and focus states. Selected/focused/active is encoded with ink-alpha washes and a glyph (check) — never a coloured accent border or outline. `focus-visible` rings are the only coloured edge.
+- A surface that changes size, position, or content animates from its old geometry to the new one; never unmount and remount it. Nothing reflows under the pointer while the user is typing or dragging.
 - Scroll-triggered animations use `IntersectionObserver`, not scroll listeners.
-- Reduced motion: respect `prefers-reduced-motion` — disable non-essential animation.
+- Reduced motion means reduce, not remove: under `prefers-reduced-motion`, positional, scale, and depth motion becomes a cross-fade; fades, gesture-tracked motion, and progress indicators stay.
 
 ## 7. Depth & Surface
 
@@ -174,6 +184,19 @@ If borders:
 
 If tonal-shift:
 Surfaces use progressively lighter/darker shades. No borders, no shadows.
+
+### Radius
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| --radius-sm | [e.g. 6px] | Inputs, chips, small controls |
+| --radius-md | [e.g. 12px] | Cards, panels, popovers |
+| --radius-lg | [e.g. 20px] | Sheets, modals, hero containers |
+| --radius-full | 9999px | Pills, avatars |
+
+### Rules
+- Nested corners are concentric: inner radius = outer radius minus the padding between them, never the same value at both depths.
+- Elevation reads only when scale, shadow, and highlight change together; a shadow change alone does not lift a surface.
 
 ## 8. Accessibility Constraints & Accepted Debt
 
@@ -219,7 +242,8 @@ After every component implementation, check:
 - [ ] Interactive elements have all required states from Section 5 and Section 6.
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
-- [ ] Motion follows the timing table. No arbitrary durations.
+- [ ] Motion follows the timing and feedback-threshold tables, and every animation has its reduced-motion path.
+- [ ] Radii come from the Section 7 scale; nested corners are concentric.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 - [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
 - [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.

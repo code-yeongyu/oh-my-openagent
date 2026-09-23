@@ -30,7 +30,7 @@ ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
 export const KIMI_CATEGORIES = [
   {
     name: "writing",
-    config: { model: "anthropic/claude-fable-5-1", variant: "medium" },
+    config: { model: "anthropic/claude-fable-5-1", variant: "low" },
     description: "Documentation, prose, technical writing",
     promptAppend: WRITING_CATEGORY_PROMPT_APPEND,
   },

@@ -1,8 +1,0 @@
-label=after repo=<worktree> opencode=1.18.18
-sandbox=<mktemp -d> (host XDG + HOME untouched)
-model=kimi-for-coding/kimi-for-coding resolved=kimi-for-coding/kimi-for-coding sisyphus=kimi-k2-7 metis=metis-k2-7 sisyphus_bytes=25374
-model=kimi-for-coding/kimi-for-coding-highspeed resolved=kimi-for-coding/kimi-for-coding-highspeed sisyphus=kimi-k2-7 metis=metis-k2-7 sisyphus_bytes=25374
-model=moonshotai/kimi-k2.8 resolved=moonshotai/kimi-k2.8 sisyphus=kimi-k2-7 metis=metis-k2-7 sisyphus_bytes=25374
-model=opencode-go/kimi-k2.7-code resolved=opencode-go/kimi-k2.7-code sisyphus=kimi-k2-7 metis=metis-k2-7 sisyphus_bytes=25374
-model=moonshotai/kimi-k2.6 resolved=moonshotai/kimi-k2.6 sisyphus=kimi-k2-6 metis=metis-base sisyphus_bytes=33822
-model=opencode-go/kimi-k3 resolved=opencode-go/kimi-k3 sisyphus=other metis=metis-base sisyphus_bytes=26405

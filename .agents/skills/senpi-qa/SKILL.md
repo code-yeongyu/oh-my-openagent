@@ -15,8 +15,13 @@ count as live QA here: `bun run test:senpi` is the package gate, the drivers in
 - **Evidence lives at exactly one path.** Every artifact goes under
   `.omo/evidence/omo-senpi-adapter/<slug>/`. Pick it with
   `scripts/resolve-evidence-dir.mjs` and nothing else — a hand-typed path is how
-  runs end up somewhere like `local-ignore/qa-evidence/`, which no reviewer reads
-  and the PR cannot cite.
+  runs end up somewhere like `local-ignore/qa-evidence/` or a `.qa-evidence/` at
+  the worktree root, which is outside the ignored root and gets committed by
+  accident (#8703).
+- **Evidence stays local.** `.omo/evidence/` is gitignored and the
+  tracked-evidence audit test fails the build if any evidence path is tracked.
+  Never `git add -f` an artifact; the PR body carries the summary and the
+  decisive excerpts.
 - **The real agent dir stays untouched.** The live drivers build their own
   isolated `SENPI_CODING_AGENT_DIR` and deliberately IGNORE a caller-provided
   one, so `~/.senpi/agent` is never used as the sandbox. Report the driver's
@@ -26,7 +31,8 @@ count as live QA here: `bun run test:senpi` is the package gate, the drivers in
   report `SKIP` or `FAIL` in their final JSON rather than degrading to the real
   home. A `SKIP` is not a pass — say so in the evidence README.
 - **The captured JSON is the evidence.** No file on disk means the QA did not
-  happen, which means no commit and no push.
+  happen, which means no commit and no push. The file proves the run on the
+  machine that made it; it is not something the commit carries.
 
 ## Resolve the evidence directory first
 

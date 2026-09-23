@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import type { PluginInput } from "@opencode-ai/plugin"
 import { afterAll, describe, expect, mock, test } from "bun:test"
 import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
@@ -27,10 +29,6 @@ const scheduleDeferredStartupCheckMock = (runCheck: () => void) => {
 
 let scheduledCheck: (() => void) | null = null
 
-mock.module("./checker/latest-version", () => ({
-  getLatestVersion: latestVersionMock,
-}))
-
 mock.module("./hook/deferred-startup-check", () => ({
   scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
 }))
@@ -45,6 +43,7 @@ const createPluginInput = (): PluginInput => ({
   directory: "/tmp/project",
   project: {} as PluginInput["project"],
   worktree: "/tmp/project",
+  experimental_workspace: { register: () => undefined },
   serverUrl: new URL("https://example.com"),
   $: {} as PluginInput["$"],
 } satisfies PluginInput)

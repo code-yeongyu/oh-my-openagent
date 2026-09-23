@@ -124,5 +124,28 @@ export function makeAccumulator(
 export function getString(input: Record<string, unknown>, keys: readonly string[]): string | undefined;
 export function joinPatchLines(lines: readonly string[]): string;
 export function isRecord(value: unknown): value is Record<string, unknown>;
+export const COMMENT_CHECKER_RELEASE_VERSION: string;
+export const COMMENT_CHECKER_RELEASE_REPO: string;
+export type CommentCheckerArchiveExtension = "tar.gz" | "zip";
+export interface CommentCheckerReleaseAsset {
+	readonly os: string;
+	readonly arch: string;
+	readonly ext: CommentCheckerArchiveExtension;
+	readonly assetName: string;
+	readonly url: string;
+}
+export interface CommentCheckerCacheDirInput {
+	readonly platform: string;
+	readonly env: Readonly<Record<string, string | undefined>>;
+	readonly homedir: string;
+	readonly cacheDirName: string;
+}
+export function resolveCommentCheckerReleaseAsset(
+	platform: string,
+	arch: string,
+	version?: string,
+): CommentCheckerReleaseAsset | null;
+export function commentCheckerBinaryName(platform: string): string;
+export function commentCheckerCacheDir(input: CommentCheckerCacheDirInput): string;
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null;
 export function runCommentChecker(input: RunCommentCheckerInput, options: RunCommentCheckerOptions): Promise<CheckResult>;

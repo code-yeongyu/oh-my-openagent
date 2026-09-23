@@ -34,10 +34,13 @@ describe("resolveKibitzerSidecarModel", () => {
 
     const resolution = resolveKibitzerSidecarModel({ config, registry })
 
+    // thinking rides in from the builtin quick default (gpt-5.6-luna-fast at low); the pinned model
+    // declares no reasoning of its own.
     expect(resolution).toEqual({
       kind: "resolved",
       category: "quick",
       model: "omo-mock/mock-1",
+      thinking: "low",
       fallbacks: [],
       chain: { selectedModel: "omo-mock/mock-1" },
     })

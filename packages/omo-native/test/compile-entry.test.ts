@@ -8,15 +8,16 @@ import {
   answerCompiledFastPath,
   buildSenpiArgs,
   remapSenpiEnvironment,
+  reexecProvisionedRuntime,
   runCompiledLauncher,
   shouldPrintCompiledBanner,
   updateLine,
   updateHint,
   versionLine,
 } from "../compile-entry"
-import { loadOpenAICodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
-import { openaiCodexOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js"
-import { openaiCodexProvider } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js"
+import { loadChatGptSubscriptionOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js"
+import { chatgptSubscriptionOAuth } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/auth/oauth/chatgpt-subscription.js"
+import { chatgptSubscriptionProvider } from "../../../node_modules/@code-yeongyu/senpi/node_modules/@earendil-works/pi-ai/dist/providers/chatgpt-subscription.js"
 import {
   isProvisionedExecutable,
   materializeProvisionedExecutable,
@@ -33,19 +34,63 @@ const sha = (value: string) => createHash("sha256").update(value).digest("hex")
 
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
+describe("provisioned executable handoff", () => {
+  for (const platform of ["darwin", "linux"] as const) {
+    test(`execve on ${platform} keeps argv[0] and the exact environment without a child`, async () => {
+      // given
+      const env = { PRESERVED: "compiled-fixture" }
+      const execs: unknown[][] = []
+      const spawns: unknown[][] = []
+      const propagated: unknown[] = []
+      // when
+      await reexecProvisionedRuntime("/runtime/omo", {
+        argv: ["--mode", "rpc"], env, platform,
+        execve: (...args) => { execs.push(args) },
+        run: async (...args) => { spawns.push(args); return { status: 37, signal: null } },
+        propagate: (result: unknown) => { propagated.push(result) },
+      })
+      // then
+      expect(execs).toEqual([["/runtime/omo", ["/runtime/omo", "--mode", "rpc"], env]])
+      expect(spawns).toEqual([])
+      expect(propagated).toEqual([])
+    })
+  }
+
+  for (const mode of ["win32", "absent", "throw"] as const) {
+    test(`preserves the async child result when execve is ${mode}`, async () => {
+      // given
+      const env = { PRESERVED: "fallback-fixture" }
+      const spawns: unknown[][] = []
+      const propagated: unknown[] = []
+      let execs = 0
+      // when
+      await reexecProvisionedRuntime("/runtime/omo", {
+        argv: ["--mode", "rpc"], env, platform: mode === "win32" ? "win32" : "linux",
+        execve: mode === "absent" ? null : () => { execs += 1; throw new Error("injected unavailable") },
+        run: async (...args) => { spawns.push(args); return { status: 37, signal: null } },
+        propagate: (result: unknown) => { propagated.push(result) },
+      })
+      // then
+      expect(execs).toBe(mode === "throw" ? 1 : 0)
+      expect(spawns).toEqual([["/runtime/omo", ["--mode", "rpc"], { env }]])
+      expect(propagated).toEqual([{ status: 37, signal: null }])
+    })
+  }
+})
+
 describe("compiled OMO OAuth module identity", () => {
   test("registers the loader in the same nested pi-ai graph used by the provider", async () => {
-    const loadedFlow = await loadOpenAICodexOAuth()
+    const loadedFlow = await loadChatGptSubscriptionOAuth()
 
-    expect(loadedFlow).toBe(openaiCodexOAuth)
-    expect(openaiCodexProvider().id).toBe("openai-codex")
+    expect(loadedFlow).toBe(chatgptSubscriptionOAuth)
+    expect(chatgptSubscriptionProvider().id).toBe("chatgpt-subscription")
   })
 
   test("derives OpenAI Codex request auth from a stored OAuth credential", async () => {
     const secret = "review-secret-must-not-be-printed"
     const credential = { type: "oauth" as const, access: secret, refresh: "discarded", expires: Date.now() + 60_000 }
 
-    const auth = await openaiCodexProvider().auth.oauth?.toAuth(credential)
+    const auth = await chatgptSubscriptionProvider().auth.oauth?.toAuth(credential)
 
     expect(auth).toEqual({ apiKey: secret })
   })

@@ -162,6 +162,68 @@ afterEach(() => {
 })
 
 describe("omo launcher", () => {
+  describe("POSIX execve handoff", () => {
+    test("passes argv[0], the engine arguments and environment without spawning a child", () => {
+      // given: a subprocess-local spy cannot replace the test runner itself.
+      const fixture = createFixture()
+      const probe = join(fixture.packageRoot, "probe.mjs")
+      const execCapture = join(fixture.root, "exec.json")
+      writeFile(probe, `
+import { writeFileSync } from "node:fs"
+import { runLauncher } from "./bin/lib/launcher.js"
+Object.defineProperty(process, "platform", { value: "linux" })
+process.execve = (file, argv, env) => {
+  writeFileSync(process.env.EXEC_CAPTURE, JSON.stringify({ file, argv, env }))
+}
+await runLauncher(["say", "hi", "-e", "/user/plugin"])
+`)
+      // when
+      const result = spawnSync(process.execPath, [probe], {
+        encoding: "utf8",
+        env: { ...process.env, EXEC_CAPTURE: execCapture, CAPTURE_FILE: fixture.captureFile, OMO_CODING_AGENT_DIR: join(fixture.root, "agent") },
+      })
+      // then: the fake engine writes captureFile only if the spawn path ran.
+      expect(result.status).toBe(0)
+      expect(existsSync(execCapture)).toBe(true)
+      expect(existsSync(fixture.captureFile)).toBe(false)
+      const handed = JSON.parse(readFileSync(execCapture, "utf8"))
+      expect(handed.file).toBe(process.execPath)
+      expect(handed.argv).toEqual([
+        process.execPath, join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
+        "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
+      ])
+      expect(handed.env.OMO_CODING_AGENT_DIR).toBe(join(fixture.root, "agent"))
+      expect(handed.env.SENPI_CODING_AGENT_DIR).toBe(join(fixture.root, "agent"))
+      expect(handed.env.OMO_NATIVE).toBe("1")
+      expect(handed.env.CAPTURE_FILE).toBe(fixture.captureFile)
+      expect(result.stderr).not.toContain("ExperimentalWarning")
+    })
+
+    for (const mode of ["throw", "absent", "win32"] as const) {
+      test(`preserves the child exit code and environment when execve is ${mode}`, () => {
+        // given
+        const fixture = createFixture()
+        const probe = join(fixture.packageRoot, "probe.mjs")
+        writeFile(probe, `
+import { runLauncher } from "./bin/lib/launcher.js"
+${mode === "win32" ? 'Object.defineProperty(process, "platform", { value: "win32" })' : ""}
+process.execve = ${mode === "absent" ? "undefined" : '() => { throw new Error("injected execve unavailable") }'}
+await runLauncher(["say", "hi"])
+`)
+        // when
+        const result = spawnSync(process.execPath, [probe], {
+          encoding: "utf8",
+          env: { ...process.env, CAPTURE_FILE: fixture.captureFile, FAKE_EXIT: "37", OMO_CODING_AGENT_DIR: join(fixture.root, "agent") },
+        })
+        // then
+        expect(result.status).toBe(37)
+        expect(capture(fixture).argv).toEqual(["--extension", join(fixture.packageRoot, "plugin"), "say", "hi"])
+        expect(capture(fixture).env.OMO_CODING_AGENT_DIR).toBe(join(fixture.root, "agent"))
+        expect(result.stderr).not.toContain("ExperimentalWarning")
+      })
+    }
+  })
+
   describe("#given a fake senpi package", () => {
     describe("#when the default command is launched", () => {
       test("#then the packaged extension precedes user extension arguments", () => {
@@ -263,6 +325,7 @@ describe("omo launcher", () => {
           })
           expect(result.status).toBe(0)
           expect(capture(fixture).env.SENPI_RUNTIME).toBe(runtime)
+          expect(result.stderr).not.toContain("ExperimentalWarning")
         })
       }
 

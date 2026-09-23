@@ -104,7 +104,7 @@ oh-my-openagent ships in three editions of the same product: two plugins that lo
 
 **Light Edition (omo for Codex CLI)** carries the portable components that fit Codex's plugin system: `rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `ulw-execute-continuation`, and `telemetry` at the core, plus `teammode` and supporting components (`bootstrap`, `lcx`, and more), plugin-scoped MCPs for `grep_app`, `context7`, `git_bash`, and `lsp`, and the shared `ast-grep` skill. It installs Codex agent TOMLs into `~/.codex/agents/`. There are no OpenCode `team_*` tools; Codex CLI's own spawn/collaboration surface does that work.
 
-**Senpi Edition (standalone, beta)** is the native `omo` command with the OMO extension built in. It installs from `omo-ai@beta` and loads into neither OpenCode nor Codex.
+**OmO Native (standalone, beta)** is the `omo` command with the OMO extension built in. It installs from `omo-ai@beta` and loads into neither OpenCode nor Codex.
 
 Pick the edition(s) you want.
 
@@ -115,13 +115,13 @@ Pick the edition(s) you want.
 | **Ultimate** (OpenCode) | `bunx oh-my-openagent install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
 | **Light** (Codex CLI) | `npx lazycodex-ai install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + local Codex marketplace cache + `~/.codex/config.toml` marketplace/plugin/agent blocks + optional autonomous permissions + component CLIs in `~/.local/bin` |
 | **Both** | `bunx oh-my-openagent install --platform=both` | Both of the above |
-| **Senpi edition** (beta) | `bun add -g omo-ai@beta`, then `omo` | The `omo` command: pinned senpi release with the OMO extension built in. Beta channel only; a bare `bun add -g omo-ai` fails by design. See the [install guide](docs/guide/installation.md#senpi-edition-beta-omo-via-npm-omo-ai). |
+| **OmO Native** (beta) | `bun add -g omo-ai@beta`, then `omo` | The `omo` command: pinned senpi engine with the OMO extension built in. Beta channel only; a bare `bun add -g omo-ai` fails by design. See the [install guide](docs/guide/installation.md#omo-native-beta-omo-via-omo-ai). |
 
 `lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo-agent-toolkit` CLI still defaults to `opencode` (Ultimate).
 
 ### Which edition should I pick?
 
-Already on OpenCode, or want the most-tested path? **Ultimate**. Already on Codex CLI? **Light**. Want one command without installing a host first? The **Senpi edition**, which ships a pinned Senpi engine with OMO built in; bun is the recommended runtime for it, and the `@beta` tag is required. Do not install plain `omo` from npm; that is an unrelated package by a different author.
+Already on OpenCode, or want the most-tested path? **Ultimate**. Already on Codex CLI? **Light**. Want one command without installing a host first? **OmO Native**, which ships a pinned senpi engine with OMO built in; bun is the recommended runtime for it, and the `@beta` tag is required. Do not install plain `omo` from npm; that is an unrelated package by a different author.
 
 ### For Humans
 
@@ -158,7 +158,7 @@ The guide covers: platform selection, the subscription interview, provider authe
 
 The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Runtime config is `~/.omo/omo.jsonc` plus walked project `.omo/omo.jsonc`. Legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files are imported once by the migration engine and are not read afterward.
 
-The recommended `bunx`/`npx` invocation is `oh-my-openagent install` (or the original `oh-my-opencode install`). Once installed, the short command is `omo-agent-toolkit`. The `omo` bin was removed from these packages in this major release; the name now belongs to the senpi-native edition, installed with `bun add -g omo-ai@beta` (beta channel only; bun is the recommended runtime). Do **not** use `bunx omo` or `npx omo`: `omo` on npm is a different, unrelated package by a different author, and those commands resolve to it. The senpi edition's package name is `omo-ai`. `lazycodex-ai` is a single-purpose Node/npm installer package: `npx lazycodex-ai install` routes directly to the Codex Light installer. It is not the Codex marketplace name (the marketplace repository is `code-yeongyu/lazycodex`). Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
+The recommended `bunx`/`npx` invocation is `oh-my-openagent install` (or the original `oh-my-opencode install`). Once installed, the short command is `omo-agent-toolkit`. The `omo` bin was removed from these packages in this major release; the name now belongs to OmO Native, installed with `bun add -g omo-ai@beta` (beta channel only; bun is the recommended runtime). Do **not** use `bunx omo` or `npx omo`: `omo` on npm is a different, unrelated package by a different author, and those commands resolve to it. OmO Native's package name is `omo-ai`. `lazycodex-ai` is a single-purpose Node/npm installer package: `npx lazycodex-ai install` routes directly to the Codex Light installer. It is not the Codex marketplace name (the marketplace repository is `code-yeongyu/lazycodex`). Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
 
 ### Telemetry
 
@@ -266,7 +266,7 @@ When the main agent delegates to a subagent, it doesn't pick a model. It picks a
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 
-The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` routes to GPT-6 Astra max and `deep` to GPT-6 Astra high (OpenAI / OpenAI Codex, then GitHub Copilot, then OpenCode); both fall back to GPT-5.6 Sol. You touch nothing.
+The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` routes to GPT-6 Astra max (falling back to GPT-5.6 Sol), `deep-high` to GPT-6 Astra xhigh, and `deep-low` to GPT-6 Sol Fast medium (then GPT-6 Sol where the Fast tier is not served). You touch nothing.
 
 ### Claude Code Compatibility
 

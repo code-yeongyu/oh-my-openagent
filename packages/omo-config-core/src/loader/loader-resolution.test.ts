@@ -25,11 +25,11 @@ describe("loadOmoConfig resolution", () => {
       join(fixture.homeDir, ".omo", "omo.jsonc"),
       `{
         "task": { "max_depth": 4, "default_concurrency": 2 },
-        "[senpi]": { "task": { "ttl_ms": 111000, "default_concurrency": 3 } },
+        "[native]": { "task": { "ttl_ms": 111000, "default_concurrency": 3 } },
         "profiles": {
           "opus": {
             "task": { "default_concurrency": 6, "resume_children": false },
-            "[senpi]": { "task": { "default_concurrency": 9, "state_dir": "/tmp/opus" } }
+            "[native]": { "task": { "default_concurrency": 9, "state_dir": "/tmp/opus" } }
           }
         }
       }`,
@@ -54,7 +54,7 @@ describe("loadOmoConfig resolution", () => {
       state_dir: "/tmp/opus",
     })
     expect(result.config.profiles).toBeUndefined()
-    expect(result.config["[senpi]"]).toBeUndefined()
+    expect(result.config["[native]"]).toBeUndefined()
   })
 
   test("#given user and project profile layers #when loading a resolved view #then raw layers retain user and project provenance", () => {
@@ -66,7 +66,7 @@ describe("loadOmoConfig resolution", () => {
     )
     writeJsonc(
       join(fixture.projectDir, ".omo", "omo.jsonc"),
-      `{"[senpi]":{"task":{"default_concurrency":3}},"profiles":{"opus":{"[senpi]":{"task":{"resume_children":false}}}}}`,
+      `{"[native]":{"task":{"default_concurrency":3}},"profiles":{"opus":{"[native]":{"task":{"resume_children":false}}}}}`,
     )
 
     // when
@@ -87,7 +87,7 @@ describe("loadOmoConfig resolution", () => {
     expect(result.layers.map((layer) => layer.source.scope)).toEqual(["user", "project"])
     expect(result.layers.map((layer) => layer.config)).toEqual([
       { task: { max_depth: 4 }, profiles: { opus: { task: { ttl_ms: 111_000 } } } },
-      { "[senpi]": { task: { default_concurrency: 3 } }, profiles: { opus: { "[senpi]": { task: { resume_children: false } } } } },
+      { "[native]": { task: { default_concurrency: 3 } }, profiles: { opus: { "[native]": { task: { resume_children: false } } } } },
     ])
   })
 
@@ -117,7 +117,7 @@ describe("loadOmoConfig resolution", () => {
     const fixture = makeFixture()
     writeJsonc(
       join(fixture.homeDir, ".omo", "omo.jsonc"),
-      `{"task":{"max_depth":4},"[senpi]":{"task":{"default_concurrency":3}},"profiles":{"opus":{"task":{"ttl_ms":111000}}}}`,
+      `{"task":{"max_depth":4},"[native]":{"task":{"default_concurrency":3}},"profiles":{"opus":{"task":{"ttl_ms":111000}}}}`,
     )
 
     // when

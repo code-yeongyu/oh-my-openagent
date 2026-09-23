@@ -197,11 +197,8 @@ export async function resolveBunReexec(input) {
 
 /**
  * Runs the decision. Resolves true when bun took over the process, in which case the caller must
- * return immediately: the child has already run to completion and its exit status is propagated.
- *
- * The wait is asynchronous for the same reason the engine spawn is: this is the outer half of the
- * launcher chain, and a node process blocked in `spawnSync` here dies to a SIGTERM without ever
- * telling the bun child - which owns the engine - that anything happened.
+ * return immediately. POSIX replaces the current image; unsupported or failed execve uses the
+ * asynchronous child path so signals still reach the engine and its exit status is propagated.
  *
  * Node's execArgv is deliberately dropped - node flags are not bun flags, and forwarding them
  * would fail the very launch this re-exec is meant to make work.
@@ -212,6 +209,15 @@ export async function maybeReexecUnderBun(input) {
   const run = input.spawn ?? runChild
   const propagate = input.propagate ?? propagateResult
   const argv = input.argv ?? process.argv
+  const execve = input.execve === undefined ? process.execve : input.execve
+  if ((input.platform ?? process.platform) !== "win32" && typeof execve === "function") {
+    try {
+      execve(decision.bunPath, [decision.bunPath, input.scriptPath, ...argv.slice(2)], process.env)
+      return true
+    } catch {
+      // Keep the same inherited environment and signal forwarding if replacement fails.
+    }
+  }
   const result = await run(decision.bunPath, [input.scriptPath, ...argv.slice(2)], {
     stdio: "inherit",
     windowsHide: true,

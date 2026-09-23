@@ -1,4 +1,5 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import { log } from "@oh-my-opencode/utils"
 
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
@@ -40,6 +41,8 @@ export type LifecycleContext = {
   readonly hostSessionProbe: HostSessionProbe
   readonly hostSessionClose: HostSessionCloser | undefined
   readonly hostRetry: HostSessionRetryPolicy
+  readonly isolation: IsolationRuntime | undefined
+  readonly isolationProbe: OwnerProbe | undefined
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
@@ -81,6 +84,8 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     hostSessionProbe: deps.hostSessionProbe ?? defaultHostSessionProbe(),
     hostSessionClose: deps.hostSessionClose ?? defaultHostSessionCloser,
     hostRetry: deps.hostRetry ?? DEFAULT_HOST_SESSION_RETRY_POLICY,
+    isolation: deps.isolation,
+    isolationProbe: deps.isolationProbe,
   }
 }
 

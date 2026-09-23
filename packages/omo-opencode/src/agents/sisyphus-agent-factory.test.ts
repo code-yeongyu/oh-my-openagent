@@ -50,6 +50,9 @@ describe("createSisyphusAgent", () => {
         ["anthropic/claude-opus-4-7", "claude-opus-4-7"],
         ["anthropic/claude-opus-4-8", "claude-opus-4-8"],
         ["anthropic/claude-opus-5", "claude-opus-5"],
+        // Opus 5.5 deliberately shares the Opus 5 family: the guide's patterns carry over and the
+        // variant renders the running model's own name.
+        ["anthropic/claude-opus-5-5", "claude-opus-5"],
         ["anthropic/claude-fable-5", "claude-fable-5"],
         ["xai/grok-4.6", "grok-4"],
         ["x-ai/grok-4.5", "grok-4"],
@@ -105,7 +108,7 @@ describe("createSisyphusAgent", () => {
       // given
       const opus47Agent = createSisyphusAgent("anthropic/claude-opus-4-7");
       const opus48Agent = createSisyphusAgent("anthropic/claude-opus-4-8");
-      const opus5Agent = createSisyphusAgent("anthropic/claude-opus-5");
+      const opus5Agent = createSisyphusAgent("anthropic/claude-opus-5-5");
       const fable5Agent = createSisyphusAgent("anthropic/claude-fable-5");
       const sonnetAgent = createSisyphusAgent("anthropic/claude-sonnet-4-6");
 

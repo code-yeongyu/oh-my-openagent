@@ -10,6 +10,7 @@ node_modules/
 
 # Build output
 dist/
+.vitest/
 packages/omo-codex/plugin/skills/
 
 # Platform binaries (built, not committed)
@@ -53,6 +54,10 @@ oauth-success.html
 .debugging
 local-ignore/
 .local-ignore/
+# QA evidence stays local and is summarized in the PR body, never committed (#8703).
+# .omo/evidence/ is covered by `.omo/*` above; these catch hand-typed capture roots.
+.qa-evidence/
+qa-evidence/
 .debug-journal*.md
 session-ses_*.md
 pr-*.md
@@ -64,10 +69,8 @@ plans/
 !.claude/settings.json
 .dys/
 
-# Committed omo state. Everything else under .omo/ is per-session and stays ignored; these
-# negations come last so they also win over the artifact patterns above (*.log, plans/, pr-*.md).
-!.omo/evidence/
-!.omo/evidence/**
+# Committed omo state. Everything else under .omo/ (evidence, plans, drafts, ...) is per-session
+# and stays ignored; these negations come last so they also win over the artifact patterns above.
 !.omo/fixtures/
 !.omo/fixtures/**
 !.omo/init-deep.json

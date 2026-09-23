@@ -4,6 +4,7 @@ import { delimiter, join } from "node:path"
 import { spawnNode } from "./child-process.js"
 import { runDaemonCommand } from "./daemon.js"
 import { runDoctor } from "./doctor.js"
+import { ensureEnginePrepared } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
@@ -106,12 +107,31 @@ function senpiEnvironment(senpiRoot) {
   return env
 }
 
-async function spawnSenpi(args, withExtension) {
+function preparedSenpi() {
   const senpi = resolveSenpi()
+  ensureEnginePrepared({
+    senpiRoot: senpi.packageRoot,
+    omoVersion: packageManifest().version,
+    reinstallCommand: updateTarget().command,
+  })
+  return senpi
+}
+
+async function spawnSenpi(args, withExtension) {
+  const senpi = preparedSenpi()
   const finalArgs = withExtension
     ? ["--extension", join(packageRoot, "plugin"), ...args]
     : args
-  await spawnNode(senpi.cliPath, finalArgs, { env: senpiEnvironment(senpi.packageRoot) })
+  const env = senpiEnvironment(senpi.packageRoot)
+  if (process.platform !== "win32" && typeof process.execve === "function") {
+    try {
+      process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
+      return
+    } catch {
+      // A failed replacement still uses the signal-aware child path below.
+    }
+  }
+  await spawnNode(senpi.cliPath, finalArgs, { env })
 }
 
 function isInteractiveDefault(args) {
@@ -153,7 +173,7 @@ function setupSuggestionForLaunch() {
  * an exit code, and `spawnSync` is honest about a call that is expected to be this short.
  */
 export function engineHostCall(engineArgs, options) {
-  const senpi = resolveSenpi()
+  const senpi = preparedSenpi()
   const result = spawnSync(process.execPath, [senpi.cliPath, ...engineArgs], {
     encoding: "utf8",
     env: { ...senpiEnvironment(senpi.packageRoot), ...options.env },
@@ -188,7 +208,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     // `omo daemon attach <launch args>`: the daemon is reachable, so this becomes a normal launch
     // whose environment points the engine at the shared socket instead of starting its own.
     if (typeof outcome === "object") {
-      const senpi = resolveSenpi()
+      const senpi = preparedSenpi()
       await spawnNode(senpi.cliPath, ["--extension", join(packageRoot, "plugin"), ...outcome.args], {
         env: { ...senpiEnvironment(senpi.packageRoot), ...outcome.env },
       })

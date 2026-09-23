@@ -44,7 +44,7 @@ flowchart TB
     subgraph Delegation["task tool"]
         Worker["Category worker<br/>task(category=...)"]
         Curated["Curated read-only agents<br/>explore / librarian /<br/>plan-consultant / plan-reviewer"]
-        Reviewers["ulw-loop reviewers<br/>omo-senpi-code-reviewer /<br/>omo-senpi-qa-executor /<br/>omo-senpi-gate-reviewer"]
+        Reviewers["ulw-loop reviewers<br/>omo-native-code-reviewer /<br/>omo-native-qa-executor /<br/>omo-native-gate-reviewer"]
     end
 
     Kibitzer["Kibitzer<br/>(memory recall nudges)"]
@@ -70,7 +70,7 @@ Every spawn provides exactly one of `category` or `subagent_type`:
 - `task(category="...")` routes to **the category worker**: a fresh worker session configured by the category's model and skills. This is how implementation, tests, and QA get done. A category-routed task always takes its model from `omo.json` (`categories.<name>.models`); passing `model` alongside `category` is rejected.
 - `task(subagent_type="...")` invokes a named agent directly. The builtin roster is:
   - Curated read-only agents (in-process, cannot write files): `explore` (codebase grep: "where is X?"), `librarian` (remote repos, official docs, OSS examples), `plan-consultant` (pre-planning gap analysis), `plan-reviewer` (plan review). `plan-consultant` and `plan-reviewer` are **plan-gated**: spawnable only after you explicitly asked for the ulw-plan workflow, a `.omo/plans/*.md` file was touched this session, and `/ulw-execute` hasn't run.
-  - ulw-loop reviewers (they write report artifacts, so they aren't in the read-only set): `omo-senpi-code-reviewer` (diff, tests, risk), `omo-senpi-qa-executor` (runs real scenarios, records surface evidence), `omo-senpi-gate-reviewer` (approves unless it can cite a failed success criterion).
+  - ulw-loop reviewers (they write report artifacts, so they aren't in the read-only set): `omo-native-code-reviewer` (diff, tests, risk), `omo-native-qa-executor` (runs real scenarios, records surface evidence), `omo-native-gate-reviewer` (approves unless it can cite a failed success criterion). The pre-rename `omo-senpi-*` spellings still resolve.
 
 Useful spawn options: `run_in_background: true` for parallel waves (the default posture), `load_skills` to prepend skills to the child's prompt, `name` for a stable handle, `task_summary` for the one-line footer label. Continue a child with `task_send`, peek with `task_output`, end it with `task_cancel`; `/tasks` lists what this session spawned. `plan-reviewer` is one-shot: `task_send` to it is always refused.
 
@@ -232,7 +232,7 @@ Some categories gate on a model being present in your registry (`ultrabrain` and
 
 ```typescript
 task({ category: "visual-engineering", load_skills: ["frontend"], prompt: "..." });
-task({ category: "deep", load_skills: ["playwright"], prompt: "..." });
+task({ category: "deep-low", load_skills: ["playwright"], prompt: "..." });
 ```
 
 The main agent's own skills (`ulw-plan`, `ulw-execute`, `ulw-loop`, `mass-ulw`, `hyperplan`, `ultrawork`, `ulw-research`) are invoked by name; workers get skills only through `load_skills`.
@@ -257,7 +257,7 @@ Team mode is for overlapping lanes that need to exchange discoveries mid-flight.
 {
   "agents": {
     "plan-consultant": {
-      "models": ["anthropic/claude-opus-5"]
+      "models": ["anthropic/claude-opus-5-5"]
     },
     "plan-reviewer": {
       "models": ["openai/gpt-5.6-sol"],
@@ -272,7 +272,7 @@ Team mode is for overlapping lanes that need to exchange discoveries mid-flight.
       "models": ["anthropic/claude-haiku-4-5"]
     },
     "writing": {
-      "models": ["anthropic/claude-opus-5"]
+      "models": ["anthropic/claude-opus-5-5"]
     }
   }
 }

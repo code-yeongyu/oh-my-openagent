@@ -1,2 +1,0 @@
-task category:ultrabrain (openai GPT-5.6 Sol xhigh) background pending
-PASS provider=openai model=GPT-5.6 Sol reasoning=xhigh width=72

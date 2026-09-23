@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process"
 
+// POSIX launchers prefer execve and leave no wrapper. This async fallback remains for Windows,
+// missing/failed execve, and daemon attach, whose adapter still launches a child.
 // Signals a terminal or supervisor sends to the launcher, and what the launcher does with each.
 // SIGTERM and SIGHUP reach one process, so the child has to be told. SIGINT is delivered to the
 // whole foreground process group by the tty, so the child already has it and forwarding would

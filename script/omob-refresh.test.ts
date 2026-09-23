@@ -13,6 +13,7 @@ const canonical = "https://github.com/code-yeongyu/oh-my-openagent.git"
 // Replace only the expensive package/compiler boundary. Git, cache selection,
 // update decisions, installs and the installed launcher all run the real code.
 const compiler = `
+(async () => {
 const fs = require('node:fs'), path = require('node:path'), cp = require('node:child_process');
 const args = process.argv.slice(2), cwd = process.cwd();
 if (args[0]?.endsWith(path.join('script', 'build-omob.ts'))) {
@@ -36,7 +37,9 @@ if (args.includes(path.join('script', 'build-omo-binary.ts'))) {
  if (result.error) throw result.error;
  if (result.status !== 0) process.exit(result.status ?? 1);
 } else if (args[0] === 'pm') {
- fs.writeFileSync(path.join(args[args.indexOf('--destination')+1],'senpi.tgz'),'fixture');
+ await Bun.write(path.join(args[args.indexOf('--destination')+1],'senpi.tgz'), new Bun.Archive({
+  'package/package.json': JSON.stringify({name:'@code-yeongyu/senpi',version:'0.0.0-fixture',bundleDependencies:[]}),
+ }, {compress:'gzip'}));
 } else if (args[0] === 'install') {
  fs.mkdirSync(path.join(cwd,'node_modules'),{recursive:true});
  if (path.basename(cwd)==='senpi-install') {
@@ -44,6 +47,7 @@ if (args.includes(path.join('script', 'build-omo-binary.ts'))) {
   fs.mkdirSync(pkg,{recursive:true}); fs.writeFileSync(path.join(pkg,'package.json'),'{}');
  }
 }
+})().catch((error) => { console.error(error); process.exitCode = 1; });
 `
 
 function fixture() {

@@ -184,7 +184,11 @@ export function validatePluginConfig(
 ): PluginConfigValidation {
   const chain = loadOmoOpenCodeConfigChain(directory, environment)
   const views = chain.views.map((view) => parseConfigView(view.path, view.config))
-  const chainMessages = chain.diagnostics.map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
+  // A deprecated key still loads and still applies, so it is a notice, not a validation failure:
+  // counting it here would make `valid` false and report a working config as invalid in doctor.
+  const chainMessages = chain.diagnostics
+    .filter((diagnostic) => diagnostic.kind !== "deprecated-keys")
+    .map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
   const messages = [...chainMessages, ...views.flatMap((view) => view.messages)]
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]

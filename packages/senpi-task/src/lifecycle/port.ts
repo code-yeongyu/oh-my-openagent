@@ -2,6 +2,7 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
+import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
@@ -172,6 +173,9 @@ export type LifecycleDeps = {
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  // Row 17: reclaims stale clones and salvages a crashed host's isolated deltas at session start.
+  readonly isolation?: IsolationRuntime
+  readonly isolationProbe?: OwnerProbe
   readonly reserveReattach?: ReserveReattachPort
   readonly respawn?: RespawnPort
   readonly reattach?: ReattachPort

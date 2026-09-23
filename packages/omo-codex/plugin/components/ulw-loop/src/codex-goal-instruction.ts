@@ -153,8 +153,8 @@ function senpiFinalSection(plan: UlwLoopPlan, goal: UlwLoopItem, aggregate: bool
 	return joinLines([
 		"Final story — run the single-reviewer quality gate before update_goal:",
 		"- Run manual QA yourself and write the non-empty artifact under currentAttemptDir; set manualQa.by to \"main-session\".",
-		'- Spawn exactly one gate reviewer with task(category: "deep").',
-		"- If that task fails with any model_unavailable failure, retry with category:unspecified-high, then category:unspecified-low.",
+		'- Spawn exactly one gate reviewer with task(category: "deep-high").',
+		"- If that task fails with any model_unavailable failure, retry with category:deep-low, then category:unspecified-high, then category:unspecified-low.",
 		'- Set gateReview.by to the exact category:<name> literal used for the successful task.',
 		'- Build the gate JSON with omo-agent-toolkit ulw-loop checkpoint --print-template, then fill manualQa, gateReview, iteration, and criteriaCoverage.',
 		'- Require passed manualQa, approved gateReview, passed iteration, and complete criteriaCoverage before update_goal({status: "complete"}).',

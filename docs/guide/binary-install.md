@@ -87,5 +87,5 @@ There is no in-place updater. Reinstall: download the new release's asset the sa
 
 - **Windows ARM64 is a true ARM64 binary.** This differs from the npm `oh-my-opencode-windows-arm64` package, which ships an x64 binary under emulation. The release asset runs natively on ARM64 Windows.
 - **`--inspect` / inspector mode is unsupported** in the compiled binaries; use the npm install for debugging with an inspector.
-- **Beta and stable releases both carry these assets.** The compiled binary is the omo native (senpi) edition; on stable releases it is still built from the beta-channel engine, so treat it as a beta-quality native build attached for convenience.
+- **Beta and stable releases both carry these assets.** The compiled binary is the OmO Native edition; on stable releases it is still built from the beta-channel engine, so treat it as a beta-quality native build attached for convenience.
 - **glibc floor:** the Linux glibc binaries inherit Bun's own glibc floor; older distributions should use the musl (Alpine) variants.

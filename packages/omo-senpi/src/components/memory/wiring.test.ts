@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmEfaultTolerant } from "./teardown.test-support"
@@ -460,7 +460,7 @@ const eventCtx = {
 describe("memory wiring reflection completion delivery", () => {
   describe("#given a pending completion and a bound session with a real UI callback", () => {
     describe("#when afterBind drains the identity completion directory", () => {
-      test("#then the callback receives the completion notification payload and level", async () => {
+      test("#then the completion is consumed into the transcript without a toast", async () => {
         // given
         const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-wiring-notify-")))
         roots.push(root)
@@ -513,10 +513,10 @@ describe("memory wiring reflection completion delivery", () => {
         await wiring.afterBind(pi, sessionId, identity, bindContext)
 
         // then
-        expect(notifications).toEqual([{
-          message: "Delivered 1 memory reflection completions; 1 need attention.",
-          level: "warning",
-        }])
+        expect(notifications).toEqual([])
+        expect(JSON.parse(await readFile(join(completionsDir, "run-notify.json"), "utf8"))).toMatchObject({
+          delivery: { status: "consumed", sessionId },
+        })
       })
     })
   })

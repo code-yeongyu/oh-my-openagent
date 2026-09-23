@@ -9,6 +9,8 @@ export type ModelProfileSummary = {
   readonly id: string
   readonly displayName: string
   readonly source: ModelProfileSource
+  readonly family?: "daily" | "geeky"
+  readonly tier?: "normal" | "heavy"
 }
 
 /** One rung of a profile chain, after builtin entries and user config entries are unified. */
@@ -92,13 +94,29 @@ export function mergeModelProfiles(
   const merged = new Map<string, ModelProfileDefinition>()
   for (const [id, builtin] of Object.entries(BUILTIN_MODEL_PROFILES)) {
     merged.set(id, {
-      profile: { id, displayName: builtin.displayName, source: "builtin" },
+      profile: {
+        id,
+        displayName: builtin.displayName,
+        source: "builtin",
+        family: builtin.family,
+        tier: builtin.tier,
+      },
       models: builtin.models.map(builtinRung),
     })
   }
   for (const [id, entry] of Object.entries(profiles ?? {})) {
+    const replaced = merged.get(id)?.profile
+    const family = entry.family ?? replaced?.family
+    const tier = entry.tier ?? replaced?.tier
     merged.set(id, {
-      profile: { id, displayName: entry.display_name ?? id, source: "user" },
+      profile: {
+        id,
+        // A customized builtin lane keeps its lane name unless the entry renames it.
+        displayName: entry.display_name ?? replaced?.displayName ?? id,
+        source: "user",
+        ...(family !== undefined ? { family } : {}),
+        ...(tier !== undefined ? { tier } : {}),
+      },
       models: (entry.models ?? []).map(userRung),
     })
   }
@@ -139,6 +157,29 @@ function matchRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>)
   }
 }
 
+function matchScopedUserRung(rung: ModelProfileRung, availableModels: ReadonlySet<string>): RungMatch | undefined {
+  for (const provider of rung.providers) {
+    if (!availableModels.has(`${provider}/${rung.model}`)) continue
+    return {
+      provider,
+      modelId: rung.model,
+      ...(rung.reasoning !== undefined ? { reasoning: rung.reasoning } : {}),
+    }
+  }
+  return undefined
+}
+
+function matchProfileRung(
+  rung: ModelProfileRung,
+  availableModels: ReadonlySet<string>,
+  source: ModelProfileSource,
+): RungMatch | undefined {
+  if (source === "user" && rung.providers.length > 0) {
+    return matchScopedUserRung(rung, availableModels)
+  }
+  return matchRung(rung, availableModels)
+}
+
 /**
  * Resolve the active `model_profile` against the live registry listing.
  *
@@ -173,7 +214,7 @@ export function resolveModelProfile(input: ResolveModelProfileInput): ModelProfi
   const skipped: string[] = []
   if (availableModels.size > 0) {
     for (const rung of definition.models) {
-      const match = matchRung(rung, availableModels)
+      const match = matchProfileRung(rung, availableModels, definition.profile.source)
       if (match !== undefined) {
         return { kind: "resolved", profile: definition.profile, ...match, skipped }
       }

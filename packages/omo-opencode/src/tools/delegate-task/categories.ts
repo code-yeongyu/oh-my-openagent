@@ -5,6 +5,7 @@ import { fuzzyMatchModel, isModelAvailable } from "../../shared/model-availabili
 import { normalizeModel } from "../../shared/model-normalization"
 import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { isAnyFallbackModelAvailable } from "../../shared/fallback-model-availability"
 import { log } from "../../shared/logger"
 
 export interface ResolveCategoryConfigOptions {
@@ -80,6 +81,17 @@ export function resolveCategoryConfig(
       log(`[resolveCategoryConfig] Category ${categoryName} requires ${requiredModels.join(" or ")} but not available`)
       return null
     }
+  }
+  // requiresAnyModel: the lane opens only on one of its own chain models. Without this check the executor
+  // walks the chain, finds nothing, and lands on the session's system default model.
+  if (
+    categoryReq?.requiresAnyModel &&
+    availableModels &&
+    !hasExplicitUserConfig &&
+    !isAnyFallbackModelAvailable(categoryReq.fallbackChain, availableModels)
+  ) {
+    log(`[resolveCategoryConfig] Category ${categoryName} has no available model in its fallback chain`)
+    return null
   }
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
 

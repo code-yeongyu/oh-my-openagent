@@ -92,9 +92,8 @@ Now:
 ```rust
 let distance: Quantity<Meters> = Quantity::new(100.0);
 let height: Quantity<Feet> = Quantity::new(50.0);
-let combined = distance + height; // ❌ compile error
-let combined = distance + height.to_feet().to_meters_oops(); // ❌ no such method
-let combined = distance + distance; // ✅
+let combined = distance + height;   // compile error: Quantity<Meters> + Quantity<Feet>
+let combined = distance + distance; // compiles
 ```
 
 The agent cannot accidentally mix units. Refactors that change a quantity's underlying unit are caught at compile time everywhere the type flows.
@@ -109,12 +108,13 @@ pub struct ByteOffset(pub u32);
 pub struct CharOffset(pub u32);
 
 impl ByteOffset {
-    pub fn add(self, delta: u32) -> Self { Self(self.0 + delta) }
+    pub fn checked_add(self, delta: u32) -> Option<Self> { self.0.checked_add(delta).map(Self) }
 }
 
 // Converting between them is a function on the actual text.
 pub fn byte_to_char(text: &str, byte: ByteOffset) -> Option<CharOffset> {
-    text.get(..byte.0 as usize).map(|prefix| CharOffset(prefix.chars().count() as u32))
+    let prefix = text.get(..usize::try_from(byte.0).ok()?)?;
+    u32::try_from(prefix.chars().count()).ok().map(CharOffset)
 }
 ```
 
@@ -192,6 +192,41 @@ impl ProjectRel {
 ```
 
 The agent's path-handling code now distinguishes between project-relative and home-relative paths at the type level. A function taking `ProjectRel` cannot be called with a `HomeRel`.
+
+### Validated Newtypes — Parse Once, Every Path
+
+A newtype that carries an invariant has exactly one way in: a fallible constructor over a private field. Every other entry point (`FromStr`, serde, `TryFrom`) routes through it, so no path can build an unchecked value.
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct Email(String); // private field: no `Email(raw)` from outside
+
+#[derive(Debug, thiserror::Error)]
+#[error("not an email address: {0:?}")]
+pub struct InvalidEmail(String);
+
+impl TryFrom<String> for Email {
+    type Error = InvalidEmail;
+    fn try_from(raw: String) -> Result<Self, Self::Error> {
+        match raw.split_once('@') {
+            Some((user, host)) if !user.is_empty() && host.contains('.') => Ok(Self(raw)),
+            _ => Err(InvalidEmail(raw)),
+        }
+    }
+}
+
+impl std::str::FromStr for Email {
+    type Err = InvalidEmail;
+    fn from_str(raw: &str) -> Result<Self, Self::Err> { Self::try_from(raw.to_owned()) }
+}
+
+impl From<Email> for String {
+    fn from(email: Email) -> Self { email.0 }
+}
+```
+
+`#[serde(try_from = "String")]` makes deserialization run the same check, so JSON cannot smuggle in an invalid `Email`. Never add `impl From<String> for Email`: an infallible conversion into an invariant-bearing type is a bypass.
 
 ## Type-State State Machines
 
@@ -313,6 +348,7 @@ Downstream code cannot add new `impl Renderer for Whatever` because they cannot 
 ## NonEmpty Collections
 
 ```rust
+#[derive(Debug)]
 pub struct NonEmptyVec<T> {
     head: T,
     tail: Vec<T>,
@@ -322,16 +358,16 @@ pub struct NonEmptyVec<T> {
 #[error("vector was empty")]
 pub struct Empty;
 
+#[expect(clippy::len_without_is_empty, reason = "never empty by construction")]
 impl<T> NonEmptyVec<T> {
-    pub fn try_from_vec(mut v: Vec<T>) -> Result<Self, Empty> {
-        if v.is_empty() { return Err(Empty); }
-        let tail = v.split_off(1);
-        let head = v.into_iter().next().expect("checked non-empty");
-        Ok(Self { head, tail })
+    pub fn try_from_vec(v: Vec<T>) -> Result<Self, Empty> {
+        let mut items = v.into_iter();
+        let Some(head) = items.next() else { return Err(Empty) };
+        Ok(Self { head, tail: items.collect() })
     }
 
-    pub fn first(&self) -> &T { &self.head }
-    pub fn len(&self) -> usize { self.tail.len() + 1 }
+    pub const fn first(&self) -> &T { &self.head }
+    pub fn len(&self) -> usize { self.tail.len().saturating_add(1) }
 }
 ```
 
@@ -342,6 +378,8 @@ Functions taking `NonEmptyVec<T>` cannot receive an empty vector. The `first()` 
 - For one-off internal computations where the unit lives in a single function and never crosses a boundary.
 - When the wrapper does not change behavior or invariants vs. the underlying type (e.g., a `struct Count(u32)` that is only ever used in one struct).
 - When `From`/`Into` conversions would be ergonomic but would defeat the purpose (if you find yourself wanting `impl From<UserId> for Uuid`, you do not want a newtype - you want a type alias).
+
+A domain newtype never implements `Deref` to its inner type: that re-exposes every method the wrapper exists to fence off, and method resolution silently picks the inner one. `Deref` is for pointer-like wrappers (`Box`, guards, smart handles); a newtype exposes the operations it means to allow.
 
 The cost of a newtype is one tuple struct + the impls you need. The break-even is around three uses across different functions, or any use that crosses an API boundary.
 

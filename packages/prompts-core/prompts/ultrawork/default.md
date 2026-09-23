@@ -173,9 +173,9 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 ## EXECUTION RULES
 - **TODO format**: `path: <action> for <scenario-id> — verify by <check>` encoding WHERE / WHY (which scenario it advances) / HOW / VERIFY. Exactly ONE in_progress at a time. Mark completed IMMEDIATELY — never batch.
-  - GOOD pair (test-first, ordered): `module.test: Write FAILING case invalid-email→ValidationError for S2 - verify by RED with assertion msg` → `src/module: Implement validateEmail() for S2 - verify by module.test GREEN + curl 400 body`
-  - BAD: "Implement feature" / "Fix bug" / "Add tests later" / production code before its failing test → rewrite.
-- **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) — NEVER wait sequentially. But NEVER parallelise RED and GREEN of the same scenario.
+  - GOOD pair (ordered): `test/module.test: read the validateEmail cases for S2 - verify by noting intent / coverage / pass in the notepad` → `src/module: Implement validateEmail() for S2 - verify by curl 400 body + module.test green`
+  - BAD: "Implement feature" / "Fix bug" / "Add tests later" → rewrite.
+- **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) — NEVER wait sequentially. But READ before CHANGE, never in parallel with it.
 - **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).
 - **VERIFY**: Re-read request after completion. Check every scenario PASS with both artifacts captured.
 - **DELEGATE**: Don't do everything yourself — orchestrate specialized agents for their strengths.
@@ -206,10 +206,10 @@ BEFORE writing ANY code, define realistic scenarios sized to the change — **1-
 
 Each scenario MUST specify, upfront:
 - Pass condition as a binary observable ("returns 200 + body matches schema"), not "should work".
-- The REAL surface that proves it: tmux transcript, curl status+body, browser/Playwright assertion, computer-use action log, CLI stdout, parsed config dump, DB state diff. Asserting "tests pass" alone is NOT evidence.
-- The cheapest faithful proof: a test file + test id at a code seam (written test-first — see TDD below), or the real-surface scenario itself when no seam exists. Prose, docs, prompt, and visual-only changes take review + real-surface QA — a test pinning their text is pretend-coverage, not proof.
+- The REAL surface that proves it: tmux transcript, curl status+body, browser (omowright) assertion, computer-use action log, CLI stdout, parsed config dump, DB state diff. Asserting "tests pass" alone is NOT evidence.
+- The existing tests that cover it (read first — see Test Decision below) and the real-surface scenario that proves it. Prose, docs, prompt, and visual-only changes take review + real-surface QA — a test pinning their text is pretend-coverage, not proof.
 
-**These scenarios are the CONTRACT.** Record them in your TODO/notepad. You are not done until every one PASSES with both pieces of evidence captured (RED→GREEN proof + real-surface artifact).
+**These scenarios are the CONTRACT.** Record them in your TODO/notepad. You are not done until every one PASSES with its real-surface artifact captured and the tests the repository keeps for it green.
 
 ### Durable Notepad (survives context loss)
 
@@ -235,12 +235,12 @@ Every scenario requires TWO captured artifacts — both mandatory:
 
 | Artifact | Source | Captures |
 |----------|--------|----------|
-| **RED→GREEN proof** | Test runner output before AND after the change | Test id + assertion message in both states |
-| **Real-surface artifact** | tmux / curl / browser / Playwright / computer-use / CLI / DB | What the user actually sees |
+| **Tests of record** | The existing suite for the area, read before the change and green after it | Intent / coverage / pass noted; stale expectations updated |
+| **Real-surface artifact** | tmux / curl / browser (omowright) / computer-use / CLI / DB | What the user actually sees |
 
 Supporting (necessary, not sufficient): build exit 0, full suite green, lsp_diagnostics clean on changed files, regression scenarios still PASS.
 
-The real-surface artifact is always required. A test is required only where a code seam exists. "tests pass" alone is NOT done, and a test pinning prose or visual text is NOT evidence.
+The real-surface artifact is always required. A new test only where the repository keeps tests for this behavior and a regression would otherwise pass unnoticed. "tests pass" alone is NOT done, and a test pinning prose or visual text is NOT evidence.
 
 <MANUAL_QA_MANDATE>
 ### YOU MUST EXECUTE MANUAL QA YOURSELF. THIS IS NOT OPTIONAL.
@@ -254,7 +254,7 @@ The real-surface artifact is always required. A test is required only where a co
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify the output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Changes UI rendering | Drive the REAL page from js eval: (1) `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need installed Chrome/Chromium/Edge). (2) Otherwise, or for Chrome semantics, stealth, trace, or auth, WRITE a `playwright-core` script and run it from the kernel against local Chrome (`chromium.launch({ channel: "chrome" })` / `launchPersistentContext`). Capture screenshot + action log. NEVER clear cookies, cache, or site data on the user's live profile. For login state, CLONE the profile first (`rsync -a <profile>/ <tmp-clone>/`) and use only the clone as the persistent user-data-dir; clear data only there. |
+| Changes UI rendering | Drive the REAL page from js eval with omowright (staged in the `browser` skill): the owned engine (`connectPipe` on a task-owned profile, `connectCloakProfile` for bot-scored targets) for unauthenticated pages, the attached engine (`connectBrowserSkill()` in the user's own signed-in browser) when the page needs their login. Capture screenshot + action log. NEVER clear cookies, cache, or site data on the user's live profile, and never clone it; if the attached engine is missing, run the browser skill's onboarding script and relay its one human step instead of launching a headless browser. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Changes a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
@@ -274,36 +274,29 @@ The real-surface artifact is always required. A test is required only where a co
 **CLEANUP IS PART OF QA — TRACK IT AS TODOS.** The moment a QA scenario spawns any resource, add a teardown todo for it (QA scripts, tmux assets, browser contexts, PIDs, ports, containers, temp dirs). Execute every teardown todo and capture the receipt before declaring done. A leftover process / tmux session / browser context / bound port / temp dir = NOT done.
 </MANUAL_QA_MANDATE>
 
-### TDD Workflow (MANDATORY on every production code change with a test seam)
+### Test Decision (every production code change)
 
-Test-first is not optional for code. Every code behavior change — features, fixes, refactors, perf, glue, config-with-logic — follows RED → GREEN → SURFACE. Prose, docs, and visual-only changes have no seam: skip RED→GREEN and prove them through the surface channel.
+1. **READ** the tests covering the area BEFORE touching it — they are the behavior of record. Note in the notepad: do they encode the intent, cover this path, pass? One WRONG before your change is a FINDING to report — NEVER edit a test green. A bug: reproduce it first and capture the failure. A refactor: the existing tests are green on the unchanged code first.
+2. **CHANGE**: the SMALLEST change that meets the scenario; update the tests your change makes stale. Add a test ONLY when BOTH hold: the repository keeps tests for this behavior AND a regression would otherwise pass unnoticed by the run and the existing tests — sized like its neighbors, one case per stated behavior, failing when that behavior breaks. A test that restates the change (a constant, a string, a rename, a call) is NOT evidence; the run is.
+3. **SURFACE**: Exercise the real user-facing surface named by the scenario; a reproduction now passes. Capture the artifact path into the notepad.
+4. **REGRESSION**: Re-run the FULL scenario list plus the step-1 tests. Record PASS/FAIL inline with evidence paths.
 
-1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message proving it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
-2. **GREEN**: Write the SMALLEST change that flips RED→GREEN. Re-run. Capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.
-3. **SURFACE**: Exercise the real user-facing surface named by the scenario. Capture artifact path into the notepad.
-4. **REFACTOR**: Optional, only if needed. Tests MUST stay green throughout.
-5. **REGRESSION**: Re-run the FULL scenario list. Record PASS/FAIL inline with both evidence paths.
-
-**Refactor exception**: when refactoring behavior whose regressions the change could hide, write characterization tests pinning current observable behavior FIRST, watch them go GREEN against old code, THEN refactor. They remain green throughout.
-
-**Exemption whitelist** (no new test required): pure formatting, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption MUST be justified in `## Findings` with the exact reason. Unjustified exemption is rejection.
-
-**If you typed production code without a failing test preceding it in the notepad: STOP, revert, write the test, watch it fail, then redo.**
+Prose, docs, prompt, and visual-only changes have no test seam: review + real-surface QA, NO test — a test pinning their text is pretend-coverage.
 
 ### Commit Discipline (MANDATORY)
 
-Commit frequently: one atomic commit per verified increment (RED→GREEN + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Load the `git-master` skill for the commit workflow when available. Skip committing only when the user forbade commits this session.
+Commit frequently: one atomic commit per verified increment (change + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Load the `git-master` skill for the commit workflow when available. Skip committing only when the user forbade commits this session.
 
 ### Verification Anti-Patterns (BLOCKING)
 
 | Violation | Why It Fails |
 |-----------|--------------|
 | "It should work now" | No evidence. Run it. |
-| "I added the tests" | Did they go RED first, then GREEN? Show both. |
+| "I added the tests" | Did the repository keep tests here, and would the regression have passed unnoticed without them? Otherwise the run is the proof. |
 | "Fixed the bug" | What scenario proves it? Where's the artifact? |
 | "Implementation complete" | Every scenario PASS with both artifacts captured? |
 | Skipping test execution | Tests exist to be RUN, not just written |
-| Writing code before its failing test | TDD floor violated — revert, write test, redo |
+| A test that restates the change | Cannot fail for any regression — delete it; the run is the proof |
 
 **CLAIM NOTHING WITHOUT PROOF. EXECUTE. VERIFY. SHOW EVIDENCE.**
 

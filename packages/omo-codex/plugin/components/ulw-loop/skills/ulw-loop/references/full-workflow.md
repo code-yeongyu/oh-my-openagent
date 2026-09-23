@@ -18,9 +18,9 @@ Audit each pass, fail, block, steering change, and checkpoint in `.omo/ulw-loop/
 ## Manual-QA channels
 Run each criterion's real-surface proof yourself through the channel that faithfully exercises it; capture the artifact before recording PASS.
 
-1. **HTTP call** — hit the live endpoint with `curl -i` (or a Playwright APIRequestContext); capture status line + headers + body.
+1. **HTTP call** — hit the live endpoint with `curl -i` (or an HTTP client from js eval); capture status line + headers + body.
 2. **Terminal / TUI** - prove it through the xterm.js web terminal; tmux `send-keys` is fine for a boot smoke, but NEVER `tmux capture-pane` for color/layout/CJK evidence (it degrades truecolor).
-3. **Browser use** — in Codex, prefer `browser:control-in-app-browser`. Otherwise, or for Chrome semantics, stealth, trace, or auth, WRITE a `playwright-core` script and run it from js eval against local Chrome (`channel: "chrome"`; persistent context on a CLONED profile, never the live one). Capture action log + screenshot path. Never downgrade a browser-facing criterion.
+3. **Browser use** — in Codex, prefer `browser:control-in-app-browser`. Otherwise omowright from js eval (staged in the `browser` skill): the owned engine (`connectPipe` on a task-owned profile, `connectCloakProfile` for bot-scored targets) for unauthenticated pages, the attached engine (`connectBrowserSkill()` in the user's signed-in browser) when the page needs their login — never a clone of, or a launch against, the live profile. Capture action log + screenshot path. Never downgrade a browser-facing criterion.
 4. **Computer use** — for desktop/GUI apps, drive the running app via OS automation (computer-use, AppleScript, xdotool, etc.); capture action log + screenshot.
 
 For TUI visual QA (mandatory when a PR or review must inspect the terminal screen),

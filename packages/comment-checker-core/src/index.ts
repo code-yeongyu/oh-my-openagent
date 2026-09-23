@@ -8,6 +8,14 @@ export {
   parseApplyPatchRequests,
   readApplyPatchMetadataFiles,
 } from "./apply-patch-edits"
+export {
+  COMMENT_CHECKER_RELEASE_REPO,
+  COMMENT_CHECKER_RELEASE_VERSION,
+  commentCheckerBinaryName,
+  commentCheckerCacheDir,
+  resolveCommentCheckerReleaseAsset,
+} from "./release"
+export type { CommentCheckerArchiveExtension, CommentCheckerCacheDirInput, CommentCheckerReleaseAsset } from "./release"
 export { resolveCommentCheckerBinary, runCommentChecker } from "./runner"
 export type {
   ApplyPatchAccumulator,

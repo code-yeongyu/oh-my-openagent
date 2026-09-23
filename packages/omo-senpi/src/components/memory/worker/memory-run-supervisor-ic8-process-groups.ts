@@ -19,6 +19,7 @@ const defaultRuntime: ProcessGroupRuntime = {
     return await new Promise<TaskkillResult>((resolve) => {
       const child = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
         stdio: "ignore",
+        windowsHide: true,
       })
       let resolved = false
       child.once("error", (error) => {

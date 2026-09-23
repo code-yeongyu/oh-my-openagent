@@ -34,9 +34,11 @@ function consoleArgs(message: string, details: unknown): [string] | [string, unk
   return details === undefined ? [message] : [message, details]
 }
 
+// Every level writes to stderr. A child's stdout is its deliverable - the reflection worker's
+// report is read back from it - so an info line on stdout became the "report" (#8564).
 const defaultLogger: ComponentLogger = {
   info(message, details) {
-    console.info(...consoleArgs(message, details))
+    console.error(...consoleArgs(message, details))
   },
   warn(message, details) {
     console.warn(...consoleArgs(message, details))
@@ -157,7 +159,6 @@ export function composeOmoSenpiExtension(
 
     const ctx: ComponentContext = {
       logger,
-      sharedHostEnabled: pi.sharedHostEnabled === true,
       config: {
         getFlag(name) {
           return pi.getFlag(name)

@@ -135,11 +135,11 @@ describe("OmO Native product identity", () => {
   })
 
   test("#given the senpi Claude subscription lane #when masked #then it exports as itself with the anthropic vocabulary", () => {
-    // #8051: the builtin Claude rungs head with claude-sdk-oauth, so the category-model insight must
+    // #8051: the builtin Claude rungs head with anthropic-subscription, so the category-model insight must
     // read that provider as itself instead of collapsing the most-routed Claude lane to `custom`.
-    expect(KNOWN_MODELS["claude-sdk-oauth"]).toEqual(KNOWN_MODELS.anthropic)
-    expect(maskProviderAndModel("claude-sdk-oauth", "claude-opus-5")).toEqual({
-      provider: "claude-sdk-oauth",
+    expect(KNOWN_MODELS["anthropic-subscription"]).toEqual(KNOWN_MODELS.anthropic)
+    expect(maskProviderAndModel("anthropic-subscription", "claude-opus-5")).toEqual({
+      provider: "anthropic-subscription",
       model_id: "claude-opus-5",
     })
   })
@@ -231,8 +231,8 @@ describe("OmO Native product identity", () => {
       "token_status", "tool_calls", "total_tokens", "turns",
     ].sort())
     expect(Object.keys(categoryConfig).sort()).toEqual([
-      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep",
-      "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
+      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep_high",
+      "cat_deep_low", "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
       "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
       "user_category_count",
     ].sort())

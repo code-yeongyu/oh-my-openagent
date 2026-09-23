@@ -8,8 +8,9 @@ import { asSenpiThinkingLevel } from "../senpi/thinking-level"
 import { RunnerError } from "./in-process/runner-error"
 import { HostUnavailableError, ensureTaskDaemon, type EnsureTaskDaemonInput, type EnsuredTaskDaemon } from "./rpc-host/daemon"
 import { createHostSessionHandle } from "./rpc-host/handle"
-import type { HostSessionChildHandle, HostSessionPort } from "./rpc-host/handle-port"
-import { HostSessionClient, type OpenedHostSession } from "./rpc-host/session-client"
+import type { HostSessionChildHandle, HostSessionIdentity, HostSessionPort } from "./rpc-host/handle-port"
+import type { HostSessionReattach, HostSessionReattached } from "./rpc-host/reattach"
+import { HostSessionClient, HostSessionOpenError, type OpenedHostSession } from "./rpc-host/session-client"
 import { buildChildContext, resolveChildSessionPath } from "./rpc-host/session-context"
 import type { HostSessionOpenInput } from "./rpc-host/session-transport"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
@@ -18,6 +19,12 @@ import type { RpcChildHandle, RpcEntriesResult, RpcRunnerSpec, RpcSwitchSessionR
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 const DEFAULT_CLOSE_GRACE_MS = 5_000
+/** Backoff between reattach attempts after a lost transport; the daemon needs a moment to come back. */
+const DEFAULT_REATTACH_DELAYS_MS: readonly number[] = [500, 1_000, 2_000, 4_000, 8_000]
+/** How long a start may wait for a memory-critical host to admit a new worker session. */
+const DEFAULT_ADMISSION_WAIT_MS = 10 * 60_000
+const HOST_MEMORY_PRESSURE = "host_memory_pressure"
+const DEFAULT_PRESSURE_RETRY_MS = 30_000
 
 /** ONE child's session on the daemon: the port the handle drives, plus the calls the runner makes. */
 export interface HostSessionChannel extends HostSessionPort {
@@ -49,6 +56,9 @@ export type RpcHostRunnerOptions = {
   readonly fallback?: FallbackChildRunner
   readonly onWarning?: (message: string) => void
   readonly now?: () => number
+  readonly reattachDelaysMs?: readonly number[]
+  readonly admissionWaitMs?: number
+  readonly sleep?: (ms: number) => Promise<void>
 }
 
 /** Whether a started child lives on the daemon (a session) or in its own process (the fallback). */
@@ -66,6 +76,11 @@ export function isHostSessionHandle(handle: RpcChildHandle): handle is HostSessi
  * narrower or pre-change daemon, win32, a Node runtime without bun), the child is delegated to the
  * per-child `RpcProcessRunner` and the reason is warned ONCE per runner. Every other reason fails
  * closed with `host_unavailable`: a refused client must never start a second host beside the daemon.
+ *
+ * Two refusals are recoveries, not failures (omo#8563). A host above its memory refuse watermark
+ * answers `host_memory_pressure` with a retry hint: the start WAITS for it (bounded) and asks
+ * again - the one-process rule stands, so this never reaches the fallback. A lost transport under
+ * a live child is re-ensured and the same session path reopened with backoff; the handle stays.
  */
 export class RpcHostRunner {
   private readonly options: RpcHostRunnerOptions
@@ -76,6 +91,9 @@ export class RpcHostRunner {
   private readonly now: () => number
   private readonly onWarning: (message: string) => void
   private readonly warned = new Set<string>()
+  private readonly reattachDelaysMs: readonly number[]
+  private readonly admissionWaitMs: number
+  private readonly sleep: (ms: number) => Promise<void>
 
   constructor(options: RpcHostRunnerOptions) {
     this.options = options
@@ -85,6 +103,9 @@ export class RpcHostRunner {
     this.inheritedExtensions = options.inheritedExtensions ?? []
     this.now = options.now ?? Date.now
     this.onWarning = options.onWarning ?? ((message) => log("senpi-task host runner fallback", { message }))
+    this.reattachDelaysMs = options.reattachDelaysMs ?? DEFAULT_REATTACH_DELAYS_MS
+    this.admissionWaitMs = options.admissionWaitMs ?? DEFAULT_ADMISSION_WAIT_MS
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
@@ -135,7 +156,7 @@ export class RpcHostRunner {
     // ENOENT when it is missing. A child process used to create that directory for itself; on the
     // daemon path the client names the path, so the client creates the directory.
     if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
-    const opened = await this.openSession(client, spec, sessionPath)
+    const opened = await this.openAdmitted(client, spec, sessionPath)
     const handle = createHostSessionHandle({
       client,
       session: { routingId: opened.sessionId, sessionPath, instanceId: opened.instanceId },
@@ -143,6 +164,7 @@ export class RpcHostRunner {
       heartbeatIntervalMs: this.options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
       now: this.now,
       closeGraceMs: this.options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
+      reattach: this.reattachPort(spec),
     })
     // A resumed child says nothing: an attached session is still mid-turn, and a session reopened
     // from its JSONL keeps its transcript - replaying the prompt would duplicate the work.
@@ -159,6 +181,60 @@ export class RpcHostRunner {
         target === sessionPath ? Promise.resolve({ cancelled: false }) : client.switchSession(target),
       getEntries: (since?: string) => client.getEntries(since),
     })
+  }
+
+  /**
+   * Open, waiting out `host_memory_pressure`: the host says when to ask again, the wait is bounded
+   * by `admissionWaitMs`, and the wait is warned once per runner. Every other refusal is final.
+   */
+  private async openAdmitted(
+    client: HostSessionChannel,
+    spec: RpcRunnerSpec,
+    sessionPath: string,
+  ): Promise<OpenedHostSession> {
+    const deadline = this.now() + this.admissionWaitMs
+    for (;;) {
+      try {
+        return await this.openSession(client, spec, sessionPath)
+      } catch (error) {
+        const retryAfterMs = memoryPressureRetryMs(error)
+        if (retryAfterMs === undefined || this.now() + retryAfterMs > deadline) throw error
+        if (!this.warned.has(HOST_MEMORY_PRESSURE)) {
+          this.warned.add(HOST_MEMORY_PRESSURE)
+          this.onWarning(`${HOST_MEMORY_PRESSURE} - the daemon is above its memory watermark; waiting to start task children`)
+        }
+        await this.sleep(retryAfterMs)
+      }
+    }
+  }
+
+  /**
+   * Transport recovery for one child: re-ensure the daemon (it may have died), reopen the SAME
+   * session path through a fresh client, with backoff across attempts. Undefined when exhausted.
+   */
+  private reattachPort(spec: RpcRunnerSpec): HostSessionReattach {
+    return async (lost: HostSessionIdentity): Promise<HostSessionReattached | undefined> => {
+      for (const delayMs of this.reattachDelaysMs) {
+        await this.sleep(delayMs)
+        try {
+          const daemon = await this.ensureDaemon({
+            agentDir: this.options.agentDir,
+            env: this.options.env ?? process.env,
+            policy: this.options.policy,
+          })
+          const client = this.createClient(daemon.socket)
+          const opened = await this.openAdmitted(client, spec, lost.sessionPath)
+          return {
+            client,
+            session: { routingId: opened.sessionId, sessionPath: lost.sessionPath, instanceId: opened.instanceId },
+            attached: opened.attached,
+          }
+        } catch (error) {
+          log("senpi-task host session reattach attempt failed", { taskId: spec.task_id, error: String(error) })
+        }
+      }
+      return undefined
+    }
   }
 
   private async openSession(
@@ -211,6 +287,13 @@ export class RpcHostRunner {
       })
     }
   }
+}
+
+/** The host's retry hint when it refused for memory, else undefined (any other failure). */
+function memoryPressureRetryMs(error: unknown): number | undefined {
+  const cause = RunnerError.is(error) ? error.failure.cause : error
+  if (!(cause instanceof HostSessionOpenError) || cause.code !== HOST_MEMORY_PRESSURE) return undefined
+  return cause.retryAfterMs ?? DEFAULT_PRESSURE_RETRY_MS
 }
 
 /** `provider/modelId` as the child command line spells it; anything else leaves the daemon's default. */

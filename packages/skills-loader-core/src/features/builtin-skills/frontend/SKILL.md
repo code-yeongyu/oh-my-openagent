@@ -137,6 +137,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 - **Concrete reference = contract.** When a screenshot, mockup, or annotated reference exists, match its pixels, copy, component structure, and responsive intent unless the user accepts a deviation.
 - **Never weaken UX OR flatten the surface to buy points.** No dropping animations, hiding content, simplifying interactions, or replacing rendered/lit material with flat fills and flat geometric primitives for a Lighthouse score or a deadline. Hit 100 AND keep the surface dimensional — both, or neither.
 - **No emojis as icons.** SVG icon sets only (Lucide, Heroicons, Radix, Phosphor).
+- **No coloured accent borders on rounded surfaces.** A `border-l-2 border-primary` stripe on a selected row, a primary-tinted outline on a focused card — any `border-{side}-{primary|warning|destructive|success}` or accent-width rule used to mark selected/focused/active is the most recognizable AI-slop tell in shipped UI. Encode state the way `DESIGN.md` systems do: one ink at many alphas (hover/selected/active wash ramps), a glyph (check) for selection, tonal layering for focus. Keyboard `focus-visible` rings are the only coloured edge allowed. Applies to code you write AND to pre-existing instances on any surface you touch — sweep them out.
 - **GPU-composited animation only** — `transform`, `opacity`, `filter`; never animate layout properties.
 - **Slop animation is forbidden — motion serves meaning.** Every animation or hover must map to a real interaction, state change, or affordance. A hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop — do not add it.
 - **Done is the `/visual-qa` dual-oracle gate, not your own glance.** A frontend design task is verified through `/visual-qa` (real browser at 375 / 768 / 1280px, every page, with interaction states and motion driven and inspected) until the dual-oracle completion gate passes on fresh evidence.
@@ -146,7 +147,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 | Situation | Load |
 |---|---|
 | Brand/style not among the 70 in `references/design/`, or the user says "Open Design" | `open-design` skill — the local nexu-io/open-design library (137+ design skills, 150+ design systems) |
-| Driving a browser for the Design QA phase | `visual-qa` skill: Bun.WebView / local-Chrome `playwright-core` scripts from js eval; Codex in-app browser |
+| Driving a browser for the Design QA phase | `visual-qa` skill: omowright from js eval (owned engine for renders, attached engine for signed-in pages) |
 | Pure TypeScript/logic work with zero visual surface | `programming` skill alone — this skill adds nothing there |
 
 ## Activation

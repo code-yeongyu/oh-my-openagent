@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Live driver for the OpenAI lane policy (#8300). It spawns a real senpi run per scenario in a
 // throwaway sandbox (own HOME, agent dir, XDG config, session dir) whose ONLY OpenAI models come
-// from task-openai-lane-mock-provider.ts, delegates one task(category) child, and reads the model
-// the child was actually resolved to out of the task store. What it proves: the metered `openai`
-// API-key lane is never preferred over the `openai-codex` ChatGPT subscription lane when both serve
-// the same model, and an API-key-only registry still resolves through the resolver's cross-provider
-// fallthrough instead of failing. Set OMO_OPENAI_LANE_EXPECT_BOTH to point the same driver at a
-// pre-fix tree and capture the RED (`openai/gpt-6-astra`).
+// from task-openai-lane-mock-provider.ts, delegates one task child, and reads the model the child
+// was actually resolved to (after any runtime fallback) out of the task store. What it proves: the
+// `openai` API-key lane is never preferred over the `chatgpt-subscription` lane when both serve the
+// same model (#8300), an `openai`-only registry resolves, and an explore child whose kimi head dies
+// falls back to `openai/gpt-6-luna-fast` (#8734). OMO_OPENAI_LANE_EXPECT_BOTH and
+// OMO_OPENAI_LANE_EXPECT_EXPLORE_FALLBACK point the same driver at a pre-fix tree to capture a RED.
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
@@ -21,15 +21,17 @@ const providerEntry = join(scriptDir, "task-openai-lane-mock-provider.ts")
 const finalText = "omo e2e openai lane child final text"
 const laneModelId = "gpt-6-astra"
 const realAgentDir = join(homedir(), ".senpi", "agent")
-const category = process.env.OMO_OPENAI_LANE_CATEGORY?.trim() || "deep"
+const category = process.env.OMO_OPENAI_LANE_CATEGORY?.trim() || "deep-high"
 
 // Expected child model per scenario. The mock registers exactly the lanes named by the scenario,
 // so the recorded model is the lane that won the resolution.
 function expectedModels(env = process.env) {
   return {
-    "both-lanes": env.OMO_OPENAI_LANE_EXPECT_BOTH?.trim() || `openai-codex/${laneModelId}`,
+    "both-lanes": env.OMO_OPENAI_LANE_EXPECT_BOTH?.trim() || `chatgpt-subscription/${laneModelId}`,
     "api-key-only": `openai/${laneModelId}`,
-    "codex-only": `openai-codex/${laneModelId}`,
+    "subscription-only": `chatgpt-subscription/${laneModelId}`,
+    "explore-kimi-fails-api-key-only":
+      env.OMO_OPENAI_LANE_EXPECT_EXPLORE_FALLBACK?.trim() || "openai/gpt-6-luna-fast",
   }
 }
 
@@ -89,8 +91,10 @@ function runScenario(scenario, outDir) {
     seedSandbox(sandbox)
     const omoDir = join(sandbox.cwd, ".omo")
     mkdirSync(omoDir, { recursive: true })
-    // No category overrides: the builtin chain and the resolver alone must pick the lane.
-    writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify({}, null, 2)}\n`)
+    // No category overrides: the builtin chain and the resolver alone must pick the lane. Children run
+    // in-process: a process-mode child never loads the `-e` mock provider, so it would fail to start
+    // or be served by whatever real provider the child process can reach.
+    writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify({ task: { default_execution_mode: "in-process" } }, null, 2)}\n`)
     const sessionDir = join(sandbox.root, "sessions")
     mkdirSync(sessionDir, { recursive: true })
     // HOME-based user config (~/.omo/config.jsonc) would otherwise leak the developer's real
@@ -151,6 +155,7 @@ function runScenario(scenario, outDir) {
     actual_model: actualModel ?? null,
     checks,
     task_id: artifacts.task?.task_id,
+    fallback_attempts: (artifacts.task?.fallback_attempts ?? []).map((attempt) => attempt.display),
     credential_digest_before: beforeCredentials,
     credential_digest_after: afterCredentials,
   }
@@ -173,16 +178,17 @@ function selfTest() {
   const parsed = parseJsonEvents(`${JSON.stringify({ type: "text", text: finalText })}\n`)
   if (!JSON.stringify(parsed).includes(finalText)) throw new Error("event parser did not preserve final text")
   const expected = expectedModels({})
-  if (expected["both-lanes"] !== `openai-codex/${laneModelId}`) throw new Error("both-lanes must expect the subscription lane")
+  if (expected["both-lanes"] !== `chatgpt-subscription/${laneModelId}`) throw new Error("both-lanes must expect the subscription lane")
   if (expected["api-key-only"] !== `openai/${laneModelId}`) throw new Error("api-key-only must expect the API lane")
-  if (expected["codex-only"] !== `openai-codex/${laneModelId}`) throw new Error("codex-only must expect the subscription lane")
+  if (expected["subscription-only"] !== `chatgpt-subscription/${laneModelId}`) throw new Error("subscription-only must expect the subscription lane")
+  if (expected["explore-kimi-fails-api-key-only"] !== "openai/gpt-6-luna-fast") throw new Error("explore fallback must expect the openai Luna rung")
   const overridden = expectedModels({ OMO_OPENAI_LANE_EXPECT_BOTH: `openai/${laneModelId}` })
   if (overridden["both-lanes"] !== `openai/${laneModelId}`) throw new Error("pre-fix RED expectation override ignored")
   const scenarios = selectedScenarios({})
-  if (scenarios.length !== 3) throw new Error("default run must cover all three lane scenarios")
+  if (scenarios.length !== 4) throw new Error("default run must cover all four lane scenarios")
   if (scenarios.some((scenario) => typeof scenario.expectedModel !== "string")) throw new Error("every scenario needs an expected model")
-  const narrowed = selectedScenarios({ OMO_OPENAI_LANE_SCENARIOS: "codex-only, nope" })
-  if (JSON.stringify(narrowed.map((scenario) => scenario.name)) !== JSON.stringify(["codex-only"])) {
+  const narrowed = selectedScenarios({ OMO_OPENAI_LANE_SCENARIOS: "subscription-only, nope" })
+  if (JSON.stringify(narrowed.map((scenario) => scenario.name)) !== JSON.stringify(["subscription-only"])) {
     throw new Error("scenario narrowing must keep known names only")
   }
   const env = spawnEnv({ agentDir: "/tmp/a", xdgConfigHome: "/tmp/x" }, "/tmp/s", "/tmp/h", { name: "both-lanes" })

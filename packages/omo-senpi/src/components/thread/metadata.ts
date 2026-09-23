@@ -7,7 +7,7 @@
  * shipped engine are name/label/alias/keyword 3, group 2, description and
  * searchText 1, which is why every label leads with its verb and the
  * user-worded phrases live in keywords. No keyword string repeats across the
- * six tools and no indexed field carries a negated-use sentence, because the
+ * nine tools and no indexed field carries a negated-use sentence, because the
  * engine indexes negated words positively.
  */
 
@@ -120,11 +120,65 @@ export const THREAD_TOOL_SEARCH_METADATA: readonly ThreadToolSearchEntry[] = [
 		exposure: "search",
 		allowLazyActivation: true,
 	},
+	{
+		name: "thread_rename",
+		label: "Rename session",
+		description:
+			"Changes the label a session is listed under, for when the user asks to call a session something clearer",
+		searchText:
+			"rename a session, change what a session is called, fix the name a session was started with, update the session label",
+		searchKeywords: [
+			"rename this session",
+			"call it something else",
+			"change the session name",
+			"give the session a clearer name",
+			"fix the session title",
+		],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_set_model",
+		label: "Switch session model",
+		description:
+			"Moves a session onto a different model, for when the user asks to switch that session to another model or a cheaper one",
+		searchText:
+			"switch the model a session runs on, change the session to a different model, pick a cheaper or stronger model for a session",
+		searchKeywords: [
+			"switch the model",
+			"use a different model",
+			"change to a cheaper model",
+			"a stronger model for that session",
+			"swap the session model",
+		],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
+		name: "thread_set_reasoning",
+		label: "Set session reasoning level",
+		description:
+			"Sets how much reasoning a session applies, for when the user asks to raise or lower the thinking effort of a session",
+		searchText:
+			"set the reasoning level of a session, make a session think harder, ease the thinking effort of a session, adjust reasoning depth",
+		searchKeywords: [
+			"set the reasoning level",
+			"make it think harder",
+			"less thinking please",
+			"raise the reasoning",
+			"dial down the thinking",
+		],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
 ]
 
 /**
  * Family policy carried by exactly one promptGuidelines entry at registration
- * time. Repeating it per tool would dilute every copy and burn six times the
+ * time. Repeating it per tool would dilute every copy and burn nine times the
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =

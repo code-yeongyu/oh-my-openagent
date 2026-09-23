@@ -21,7 +21,7 @@ export type StatusTargetInput = {
   readonly fallbackCount?: number
 }
 
-export type StatusLineStats = Pick<TaskRunStats, "turns" | "tool_calls"> & {
+export type StatusLineStats = Pick<TaskRunStats, "turns" | "tool_calls" | "failed_turns"> & {
   readonly runtime_ms?: number
   readonly tokens_per_second?: number
   readonly cost_usd?: number
@@ -78,16 +78,43 @@ export function formatStatusTarget(input: StatusTargetInput): string | undefined
   return fallback === undefined ? target : `${target} · ${fallback}`
 }
 
+// The stats tokens of the canonical live-row grammar, as DISCRETE tokens so each surface keeps its
+// own order around the verb: turn N (M tools) · failed K · $C · T tok/s. A run that has landed no
+// successful turn and made no tool call renders NO turn token - nothing has happened yet - while
+// failed attempts surface as their own counter instead of masquerading as turns. Spend follows
+// provider-reported cost, which a run with no successful turn never carries (run-stats omits it);
+// a successful turn reporting a genuine zero still renders $0.0000.
+export type LiveStatsTokens = {
+  readonly turn?: string
+  readonly failed?: string
+  readonly spend?: string
+  readonly throughput?: string
+}
+
+export function buildLiveStatsTokens(stats: StatusLineStats): LiveStatsTokens {
+  const spend = formatLiveSpend(stats)
+  return {
+    ...((stats.turns > 0 || stats.tool_calls > 0)
+      ? { turn: `turn ${stats.turns}${toolCountSuffix(stats.tool_calls)}` }
+      : {}),
+    ...((stats.failed_turns ?? 0) > 0 ? { failed: `failed ${stats.failed_turns}` } : {}),
+    ...(spend === undefined ? {} : { spend }),
+    ...(stats.tokens_per_second === undefined ? {} : { throughput: `${stats.tokens_per_second} tok/s` }),
+  }
+}
+
 // The canonical grammar every live/status row shares:
-//   <identity> · <target (model)> · turn N (M tools) · <verb> · $C · T tok/s
+//   <identity> · <target (model)> · turn N (M tools) [· failed K] · <verb> · $C · T tok/s
 export function composeStatusLine(input: StatusLineInput): string {
+  const statsTokens = input.stats === undefined ? undefined : buildLiveStatsTokens(input.stats)
   const tokens = [
     input.identity,
     input.target,
-    input.stats === undefined ? undefined : `turn ${input.stats.turns}${toolCountSuffix(input.stats.tool_calls)}`,
+    statsTokens?.turn,
+    statsTokens?.failed,
     input.verb,
-    input.stats === undefined ? undefined : formatLiveSpend(input.stats),
-    input.stats?.tokens_per_second === undefined ? undefined : `${input.stats.tokens_per_second} tok/s`,
+    statsTokens?.spend,
+    statsTokens?.throughput,
   ]
   return tokens.filter((token): token is string => typeof token === "string" && token.length > 0).join(" · ")
 }

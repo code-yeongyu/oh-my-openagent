@@ -50,6 +50,12 @@ export interface GitLogOptions {
   readonly paths?: readonly string[]
   readonly limit?: number
   readonly includePaths?: boolean
+  /**
+   * Fixed strings every returned commit's message must contain (all of them, `--all-match`). Lets a
+   * caller looking for one trailer combination have git filter the history instead of parsing every
+   * commit into memory first.
+   */
+  readonly grep?: readonly string[]
 }
 
 export interface GitTreeSizedEntry {

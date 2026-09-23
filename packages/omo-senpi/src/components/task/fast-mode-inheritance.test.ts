@@ -9,7 +9,7 @@ type CatalogModel = SenpiModelPort & {
   readonly serviceTier?: "auto" | "flex" | "priority"
 }
 
-const CODEX = "openai-codex"
+const CODEX = "chatgpt-subscription"
 const LUNA = "gpt-5.6-luna"
 const LUNA_FAST = `${LUNA}-fast`
 

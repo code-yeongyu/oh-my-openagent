@@ -28,11 +28,14 @@ export class HostSessionOpenError extends Error {
   override readonly name = "HostSessionOpenError"
   readonly code: string
   readonly sessionPath: string
+  /** The host's retry hint (`errorData.retry_after_ms`) when the refusal is temporary. */
+  readonly retryAfterMs: number | undefined
 
-  constructor(code: string, sessionPath: string, detail: string) {
+  constructor(code: string, sessionPath: string, detail: string, retryAfterMs?: number) {
     super(`open_session for ${sessionPath} was refused (${code}): ${detail}`)
     this.code = code
     this.sessionPath = sessionPath
+    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -103,7 +106,7 @@ export function toOpenFailure(error: unknown, sessionPath: string): unknown {
   const code = readErrorCode(error)
   if (code === undefined) return error
   if (code === "session_path_in_use") return new SessionHeldElsewhereError(sessionPath, readHold(error), error.message)
-  return new HostSessionOpenError(code, sessionPath, error.message)
+  return new HostSessionOpenError(code, sessionPath, error.message, readHold(error).retryAfterMs)
 }
 
 const ERROR_CODE = /^[a-z][a-z0-9_]*$/

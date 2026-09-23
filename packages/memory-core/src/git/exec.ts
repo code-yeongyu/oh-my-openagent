@@ -77,11 +77,15 @@ function runGitCommand(
 ): Promise<GitExecResult> {
   return new Promise((resolve, reject) => {
     const hasStdin = options.stdin !== undefined
+    // git.exe is a console-subsystem binary: without windowsHide every memory auto-commit and
+    // sync allocates a fresh console window that Windows foregrounds, stealing the user's focus
+    // (#8501). Inert on posix, load-bearing on win32 - do not drop it.
     const child = spawn(executable, [...argv], {
       cwd: options.cwd,
       env: environment,
       shell: false,
       stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe"],
+      windowsHide: true,
     })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []

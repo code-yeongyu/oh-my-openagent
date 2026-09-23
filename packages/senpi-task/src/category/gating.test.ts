@@ -21,7 +21,7 @@ function registry(models: readonly FakeModel[]) {
 
 const MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED = [
   model("google", "gemini-3.1-pro"),
-  model("anthropic", "claude-opus-5"),
+  model("anthropic", "claude-opus-5-5"),
   model("opencode-go", "glm-5.2"),
   model("kimi-coding", "k3"),
 ] as const
@@ -74,6 +74,18 @@ describe("category activation gating", () => {
       expect(result.availableCategories).toContain("architect")
     })
 
+    test("#when the registry offers gpt-5.6-sol alone #then deep-low is unavailable, because GPT-5.6 Sol is not a deep-low model", () => {
+      // given
+      const models = registry([model("openai", "gpt-5.6-sol")])
+
+      // when
+      const result = resolveCategory("deep-low", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("deep-low")
+    })
+
     test("#when the gate model is absent but omo.json configures the category #then the explicit entry bypasses the gate", () => {
       // given
       const models = registry([model("kimi-coding", "k3")])
@@ -93,7 +105,7 @@ describe("category activation gating", () => {
 
     test("#when the gate model is absent and omo.json only sets a description #then the gate is bypassed and the category stays listed", () => {
       // given
-      const models = registry([model("anthropic", "claude-opus-5")])
+      const models = registry([model("anthropic", "claude-opus-5-5")])
 
       // when
       const result = resolveCategory(
@@ -118,7 +130,7 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
+      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-astra")
       expect(result.availableCategories).not.toContain("ultrabrain")
     })
 
@@ -168,68 +180,73 @@ describe("category activation gating", () => {
     })
   })
 
-  describe("#given a builtin category gated on gpt-6-astra or gpt-5.6-sol via the deep chain", () => {
-    test("#when the registry offers only cross-family models #then deep is unavailable and never falls back", () => {
+  describe("#given the two deep lanes, each gated on its own single-rung model", () => {
+    test("#when the registry offers only cross-family models #then neither lane is available and neither falls back", () => {
       // given
       const models = registry(MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED)
 
       // when
-      const result = resolveCategory("deep", {}, models)
+      const low = resolveCategory("deep-low", {}, models)
+      const high = resolveCategory("deep-high", {}, models)
 
       // then
-      expect(result.kind).toBe("model_unavailable")
-      if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
-      expect(result.availableCategories).not.toContain("deep")
+      expect(low.kind).toBe("model_unavailable")
+      expect(high.kind).toBe("model_unavailable")
+      expect(low.availableCategories).not.toContain("deep-low")
+      expect(low.availableCategories).not.toContain("deep-high")
     })
 
-    test("#when the registry offers gpt-6-astra alone #then deep resolves on it at high", () => {
+    test("#when the registry offers gpt-6-astra alone #then deep-high resolves at xhigh and deep-low stays unavailable", () => {
       // given
       const models = registry([model("openai", "gpt-6-astra")])
 
       // when
-      const result = resolveCategory("deep", {}, models)
+      const result = resolveCategory("deep-high", {}, models)
 
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
       expect(result.spec.modelId).toBe("gpt-6-astra")
-      expect(result.spec.variant).toBe("high")
-      expect(result.availableCategories).toContain("deep")
+      expect(result.spec.variant).toBe("xhigh")
+      expect(result.availableCategories).toContain("deep-high")
+      expect(result.availableCategories).not.toContain("deep-low")
+      expect(resolveCategory("deep-low", {}, models).kind).toBe("model_unavailable")
     })
 
-    test("#when the registry offers gpt-5.6-sol alone #then deep falls back to the sol rung at medium", () => {
+    test("#when the registry offers gpt-6-sol alone #then deep-low resolves at medium and deep-high stays unavailable", () => {
       // given
-      const models = registry([model("openai", "gpt-5.6-sol")])
+      const models = registry([model("openai", "gpt-6-sol")])
 
       // when
-      const result = resolveCategory("deep", {}, models)
+      const result = resolveCategory("deep-low", {}, models)
 
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
-      expect(result.spec.modelId).toBe("gpt-5.6-sol")
+      expect(result.spec.modelId).toBe("gpt-6-sol")
       expect(result.spec.variant).toBe("medium")
-      expect(result.availableCategories).toContain("deep")
+      expect(result.availableCategories).toContain("deep-low")
+      expect(result.availableCategories).not.toContain("deep-high")
+      expect(resolveCategory("deep-high", {}, models).kind).toBe("model_unavailable")
     })
 
     test("#when the gate model is absent but omo.json configures the category #then the explicit entry bypasses the gate", () => {
       // given
-      const models = registry([model("anthropic", "claude-opus-5")])
+      const models = registry([model("anthropic", "claude-opus-5-5")])
 
       // when
       const result = resolveCategory(
-        "deep",
-        { categories: { deep: { model: "anthropic/claude-opus-5" } } },
+        "deep-low",
+        { categories: { "deep-low": { model: "anthropic/claude-opus-5-5" } } },
         models,
       )
 
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.modelId).toBe("claude-opus-5")
+      expect(result.spec.modelId).toBe("claude-opus-5-5")
     })
   })
 
@@ -315,7 +332,7 @@ describe("category activation gating", () => {
   describe("#given an ungated builtin category", () => {
     test("#when the registry offers only a chain rung #then the pre-gating fallback behavior is unchanged", () => {
       // given
-      const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
+      const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)
@@ -323,13 +340,13 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.modelId).toBe("gpt-5.6-luna-fast")
+      expect(result.spec.modelId).toBe("gpt-6-luna-fast")
       expect(result.availableCategories).toContain("quick")
     })
 
     test("#when a gated category is unmet #then other categories stay listed as available", () => {
       // given
-      const models = registry([model("openai-codex", "gpt-5.6-luna-fast")])
+      const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
       // when
       const result = resolveCategory("quick", {}, models)
@@ -337,7 +354,8 @@ describe("category activation gating", () => {
       // then
       expect(result.availableCategories).not.toContain("architect")
       expect(result.availableCategories).not.toContain("ultrabrain")
-      expect(result.availableCategories).not.toContain("deep")
+      expect(result.availableCategories).not.toContain("deep-low")
+      expect(result.availableCategories).not.toContain("deep-high")
       expect(result.availableCategories).toContain("quick")
     })
   })

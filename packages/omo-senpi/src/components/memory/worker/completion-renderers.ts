@@ -1,172 +1,80 @@
 import type { EntryRenderer } from "@code-yeongyu/senpi"
-import type { ReflectionTrigger } from "@oh-my-opencode/memory-core"
+import { buildNoticeBox, type NoticeSpec } from "@oh-my-opencode/senpi-task/notice-box"
 import { normalizeRendererText } from "@oh-my-opencode/senpi-task/renderer-text"
 
+import { rememberedTitle, shortSha } from "../memory-notice-spec"
 import {
   REFLECTION_COMPLETION_ENTRY_TYPE,
-  REFLECTION_LAUNCHED_ENTRY_TYPE,
-  REFLECTION_SUMMARY_ENTRY_TYPE,
   type ReflectionCompletionApi,
   type ReflectionCompletionRecord,
-  type ReflectionCompletionSummary,
-  type ReflectionLaunchedEntry,
 } from "./completion-contracts"
-import { childFailureCause } from "./failure-detail"
-import { reflectionRemediation } from "./remediation"
+import { joinFields } from "./entry-renderers"
 import { sanitizeReflectionReport, type ReflectionRecap } from "./reflection-recap"
-import {
-  detailExcerpt,
-  joinFields,
-  noticeComponent,
-  optionalRendererText,
-  outcomeGlyph,
-  outcomeLabel,
-  outcomeSummary,
-  outcomeThemeColor,
-  runLabel,
-} from "./entry-renderers"
 
-/** Plain-text launch line, kept for notify/log surfaces that cannot carry colour. */
-export function reflectionLaunchedText(launched: ReflectionLaunchedEntry): string {
-  return `memory reflection started run:${normalizeRendererText(launched.runId)} trigger:${normalizeRendererText(launched.trigger)} (+${launched.backlogSteps} steps)`
-}
+// Reflection is background housekeeping: the transcript shows it only when memory actually
+// changed, as the same "Remembered" notice a memory tool write draws. Launch, no-change, per-run
+// failure and collapsed-summary entries are still journaled (the data and its RPC events are
+// unchanged) but have no renderer, so they never draw. Repeated failures surface through the
+// health and park alerts instead.
 
-// In-flight work reads as `accent`, matching the running state in statusThemeColor.
-export const renderReflectionLaunchedEntry: EntryRenderer<ReflectionLaunchedEntry> = (entry, options, theme) => {
-  const launched = entry.data
-  if (launched === undefined) return undefined
-  const conversations = launched.conversationIds.length
-  const model = optionalRendererText(launched.model)
-  const thinking = optionalRendererText(launched.thinking)
-  return noticeComponent(
-    {
-      glyph: "◐",
-      title: joinFields(["Memory reflection started", runLabel(launched.runId)]),
-      tone: "accent",
-      why: `The outcome lands in this transcript when the run settles - ${triggerPhrase(launched.trigger)} after ${launched.backlogSteps} new step${launched.backlogSteps === 1 ? "" : "s"}.`,
-      extra: [
-        {
-          text: joinFields([
-            `${conversations} conversation${conversations === 1 ? "" : "s"}`,
-            `category ${normalizeRendererText(launched.category)}`,
-            model === undefined ? undefined : `model ${model}`,
-            thinking === undefined ? undefined : `thinking ${thinking}`,
-          ]),
-          tone: "dim",
-        },
-      ],
-      detail: joinFields([
-        `trigger ${normalizeRendererText(launched.trigger)}`,
-        `identity ${normalizeRendererText(launched.identity)}`,
-        `started ${normalizeRendererText(launched.startedAt)}`,
-      ]),
-    },
-    options,
-    theme,
-  )
-}
+type ReflectionCompletionEntry = ReflectionCompletionRecord & { readonly recap?: ReflectionRecap }
 
-function triggerPhrase(trigger: ReflectionTrigger): string {
-  return trigger === "manual" ? "triggered manually" : `triggered by ${normalizeRendererText(trigger)}`
-}
-
-export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletionRecord & { readonly recap?: ReflectionRecap }> = (entry, options, theme) => {
+export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletionEntry> = (entry, options, theme) => {
   const record = entry.data
-  if (!record) return undefined
-  if (record.outcome === "merged" && record.recap !== undefined) {
-    const recap = record.recap
-    const report = recap.report
-    const preview = report.status === "available" ? report.preview : `Report unavailable: ${report.reason}`
-    const body = report.status === "available"
-      ? `${report.text}${report.sourceTruncated ? "\nSource clipped to the bounded stdout prefix." : ""}`
-      : `Report unavailable: ${report.reason}`
-    return noticeComponent({
-      glyph: "●", title: "Memory updated", tone: "success",
-      why: `Reflection report: ${sanitizeReflectionReport(preview)}`,
-      extra: [{ text: joinFields([
-        recap.filesChanged === undefined ? undefined : `${recap.filesChanged} files changed`,
-        `commit ${normalizeRendererText(recap.mergedCommitSha).slice(0, 7)}`,
-      ]), tone: "dim" }],
-      detail: sanitizeReflectionReport([
-        "Reflection report", body, "Historical changed paths", ...recap.changedPaths,
-        `Source conversations: ${recap.conversationIds.join(", ")}`,
-        `Commit: ${recap.mergedCommitSha}`,
-      ].join("\n")),
-    }, options, theme)
-  }
-  const reason = optionalRendererText(record.reason)
-  const detail = optionalRendererText(childFailureCause(record.detail))
-  const model = optionalRendererText(record.model)
-  const thinking = optionalRendererText(record.thinking)
-  const budgetRemediation = record.reason === "budget_not_met"
-    ? reflectionRemediation(record.reason, record.detail)
-    : undefined
-  const payoff = joinFields([
-    record.filesChanged !== undefined && record.filesChanged > 0
-      ? `${record.filesChanged} file${record.filesChanged === 1 ? "" : "s"} changed`
-      : undefined,
-    record.mergedCommitSha === undefined ? undefined : `commit ${normalizeRendererText(record.mergedCommitSha).slice(0, 7)}`,
-    record.durationMs === undefined ? undefined : `took ${formatDuration(record.durationMs)}`,
-    reason === undefined ? undefined : `reason ${reason}`,
-    detail === undefined ? undefined : detailExcerpt(detail),
-    budgetRemediation,
-  ])
-  return noticeComponent(
-    {
-      glyph: outcomeGlyph(record.outcome),
-      title: joinFields([`Memory reflection ${outcomeLabel(record.outcome)}`, runLabel(record.runId)]),
-      tone: outcomeThemeColor(record.outcome),
-      why: outcomeSummary(record.outcome),
-      extra: payoff.length === 0 ? [] : [{ text: payoff, tone: outcomeThemeColor(record.outcome) }],
-      detail: joinFields([
-        `category ${normalizeRendererText(record.category)}`,
-        `identity ${normalizeRendererText(record.identity)}`,
-        `trigger ${normalizeRendererText(record.trigger)}`,
-        model === undefined ? undefined : `model ${model}`,
-        thinking === undefined ? undefined : `thinking ${thinking}`,
-      ]),
-    },
-    options,
-    theme,
-  )
-}
-
-export const renderReflectionSummaryEntry: EntryRenderer<ReflectionCompletionSummary> = (entry, options, theme) => {
-  const summary = entry.data
-  if (!summary) return undefined
-  const clean = summary.failedCount === 0
-  const noun = `completion${summary.count === 1 ? "" : "s"}`
-  const fingerprint = optionalRendererText(summary.dominantFingerprint)
-  return noticeComponent(
-    {
-      glyph: clean ? "●" : "⚠",
-      title: `Memory reflection · ${summary.count} older ${noun} collapsed`,
-      tone: clean ? "muted" : "warning",
-      why: clean
-        ? "Delivered while this session was away; none need attention."
-        : `Delivered while this session was away; ${summary.failedCount} need attention.`,
-      extra: clean || fingerprint === undefined ? [] : [{ text: `most common ${detailExcerpt(fingerprint)}`, tone: "warning" }],
-      detail: joinFields([
-        optionalRendererText(summary.oldestISO) === undefined ? undefined : `oldest ${normalizeRendererText(summary.oldestISO)}`,
-        optionalRendererText(summary.newestISO) === undefined ? undefined : `newest ${normalizeRendererText(summary.newestISO)}`,
-      ]),
-    },
-    options,
-    theme,
-  )
+  if (record?.outcome !== "merged") return undefined
+  return buildNoticeBox(reflectionNoticeSpec(record), options, theme)
 }
 
 export function registerReflectionCompletionRenderer(api: ReflectionCompletionApi): void {
   api.registerEntryRenderer(REFLECTION_COMPLETION_ENTRY_TYPE, renderReflectionCompletionEntry)
-  api.registerEntryRenderer(REFLECTION_LAUNCHED_ENTRY_TYPE, renderReflectionLaunchedEntry)
-  api.registerEntryRenderer(REFLECTION_SUMMARY_ENTRY_TYPE, renderReflectionSummaryEntry)
 }
 
-function formatDuration(durationMs: number): string {
-  if (!Number.isFinite(durationMs) || durationMs < 0) return "unknown"
-  if (durationMs < 1000) return `${Math.round(durationMs)}ms`
-  const seconds = durationMs / 1000
-  if (seconds < 60) return `${seconds.toFixed(1)}s`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}m${String(Math.round(seconds - minutes * 60)).padStart(2, "0")}s`
+function reflectionNoticeSpec(record: ReflectionCompletionEntry): NoticeSpec {
+  const recap = record.recap
+  const paths = (recap?.changedPaths ?? []).map((path) => normalizeRendererText(path))
+  const files = recap?.filesChanged ?? record.filesChanged ?? (paths.length > 0 ? paths.length : undefined)
+  const sha = shortSha(recap?.mergedCommitSha ?? record.mergedCommitSha ?? "")
+  const stats = joinFields([
+    files === undefined || files <= 0 ? undefined : `${files} file${files === 1 ? "" : "s"} changed`,
+    sha === undefined ? undefined : `commit ${sha}`,
+  ])
+  const sources = (recap?.conversationIds ?? record.conversationIds).map((id) => normalizeRendererText(id))
+  const detail = joinFields([...paths, sources.length === 0 ? undefined : `from ${sources.join(", ")}`])
+  const report = recap?.report
+  return {
+    title: rememberedTitle("on reflection"),
+    tone: "accent",
+    why: (report?.status === "available" ? reflectionHeadline(report.text) : undefined) ?? pathsSentence(paths),
+    extra: stats.length === 0 ? [] : [{ text: stats, tone: "dim" }],
+    ...(detail.length === 0 ? {} : { expandedLine: detail }),
+  }
+}
+
+/**
+ * The report's own summary, cut to its first sentence: the reflection persona writes a numbered
+ * "**Summary**:" item first, so that sentence is what the run learned. Markdown list, heading and
+ * emphasis markers are dropped; a report without a summary item contributes its first prose line.
+ */
+export function reflectionHeadline(text: string): string | undefined {
+  const lines = sanitizeReflectionReport(text).split("\n").map(stripMarkdown).filter((line) => line.length > 0)
+  const summaryAt = lines.findIndex((line) => /^summary\b/iu.test(line))
+  const body = summaryAt < 0
+    ? lines[0]
+    : lines[summaryAt]?.replace(/^summary\b\s*[:-]?\s*/iu, "") || lines[summaryAt + 1]
+  if (body === undefined || body.length === 0) return undefined
+  const sentence = /^(.+?[.!?])(?:\s|$)/u.exec(body)?.[1] ?? body
+  return normalizeRendererText(sentence)
+}
+
+function stripMarkdown(line: string): string {
+  return line.trim()
+    .replace(/^#+\s*/u, "")
+    .replace(/^(?:\d+[.)]|[-*+])\s+/u, "")
+    .replace(/\*\*|__|`/gu, "")
+    .trim()
+}
+
+function pathsSentence(paths: readonly string[]): string {
+  if (paths.length === 0) return "Kept what this session taught."
+  return `Updated ${paths.length} memory file${paths.length === 1 ? "" : "s"} (${paths.join(", ")}).`
 }

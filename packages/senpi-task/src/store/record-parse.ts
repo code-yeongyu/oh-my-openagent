@@ -8,6 +8,7 @@ import {
 import { parseTaskId } from "../state/id"
 import {
   parseNotification,
+  parseOptionalIsolation,
   parseOptionalHostSession,
   parseOptionalOwner,
   parseOptionalPendingSteering,
@@ -52,6 +53,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const hostPid = readOptionalNumber(value, "host_pid")
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
+  const isolation = parseOptionalIsolation(value)
   const errorMessage = readOptionalString(value, "error_message")
   const startedAt = readOptionalString(value, "started_at")
   const terminalAt = readOptionalString(value, "terminal_at")
@@ -114,6 +116,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(hostPid === undefined ? {} : { host_pid: hostPid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
+    ...(isolation === undefined ? {} : { isolation }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
     ...(killed === undefined ? {} : { killed }),
     ...(runStats === undefined ? {} : { run_stats: runStats }),

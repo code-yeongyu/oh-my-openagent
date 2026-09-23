@@ -94,10 +94,10 @@ Critical path: Task 1 -> Task 2 -> Task 6
   - [ ] <verifiable condition with the exact command or assertion>
 
   QA scenarios (MANDATORY - task incomplete without these):
-  > Name the exact tool AND its exact invocation - not "verify it works". Browser use: in Codex, prefer `browser:control-in-app-browser`; otherwise, or for Chrome semantics, stealth, trace, or auth, write and run a `playwright-core` script from js eval against local Chrome (`channel: "chrome"`; persistent context on a CLONED profile, never the live one). Computer use: OS-level GUI automation for a non-browser desktop app.
+  > Name the exact tool AND its exact invocation - not "verify it works". Browser use: in Codex, prefer `browser:control-in-app-browser`; otherwise omowright from js eval (staged in the `browser` skill) — `connectPipe`/`connectCloakProfile` for a browser you own, `connectBrowserSkill()` for the user's signed-in browser; never a clone of the live profile. Computer use: OS-level GUI automation for a non-browser desktop app.
   ```
   Scenario: <happy path>
-    Tool:     <bash | curl | tmux | browser:control-in-app-browser | playwright-core(js eval, local Chrome) | computer-use>
+    Tool:     <bash | curl | tmux | browser:control-in-app-browser | omowright(js eval; owned or attached engine) | computer-use>
     Steps:    <exact command / API call / page action with concrete inputs - URL, payload, keystrokes, selectors>
     Expected: <concrete, binary pass/fail observable>
     Evidence: <attemptDir>/task-<N>-<slug>.<ext>   (attemptDir = currentAttemptDir from `omo-agent-toolkit ulw-loop status --json`, .omo/evidence/ulw/<session>/<goalId>/a<attempt>)

@@ -13,6 +13,7 @@ import {
 const TASK_PROMPT_EXCERPT_WIDTH = 80
 
 export type TaskCallArgs = {
+  readonly isolated?: boolean
   readonly prompt?: string
   readonly task_summary?: string
   readonly category?: string
@@ -29,7 +30,7 @@ export function formatTaskMode(runInBackground: boolean | undefined): string {
 }
 
 export function taskCallLines(args: TaskCallArgs): readonly string[] {
-  return [taskCallLine(args, formatTaskMode(args.run_in_background))]
+  return [taskCallLine(args, formatTaskMode(args.run_in_background) + (args.isolated ? " isolated" : ""))]
 }
 
 export function renderTaskCallLines(
@@ -37,7 +38,7 @@ export function renderTaskCallLines(
   theme: Pick<Theme, "italic">,
   width?: number,
 ): readonly string[] {
-  const plainMode = formatTaskMode(args.run_in_background)
+  const plainMode = formatTaskMode(args.run_in_background) + (args.isolated ? " isolated" : "")
   const mode = theme.italic(plainMode)
   if (width === undefined) return [taskCallLine(args, mode)]
   return [taskCallLineForWidth(args, mode, plainMode, width)]

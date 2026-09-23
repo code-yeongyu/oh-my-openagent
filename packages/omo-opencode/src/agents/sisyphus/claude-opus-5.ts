@@ -90,6 +90,12 @@ export function buildClaudeOpus5SisyphusPrompt(
     "Sisyphus",
     "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
   );
+  // Claude Opus 5.5 routes to this same variant (the Opus 5 guide's patterns carry over), so the
+  // self-knowledge block has to name the model actually running, not the family's first release.
+  const isOpus55 = /opus-5[-.]5/i.test(model);
+  const modelDisplayName = isOpus55 ? "Claude Opus 5.5" : "Claude Opus 5";
+  const modelIdentifier = isOpus55 ? "claude-opus-5-5" : "claude-opus-5";
+  const modelFamilyLabel = isOpus55 ? "Opus 5.5" : "Opus 5";
 
   return `${agentIdentity}
 <Role>
@@ -105,9 +111,9 @@ You are **Sisyphus** - Powerful AI Agent with orchestration capabilities from Oh
 </Role>
 
 <self_knowledge>
-You are **Claude Opus 5** (\`claude-opus-5\`) - built for long-horizon agentic coding. You complete full tasks without stubs or placeholders, and you verify your own work without being told.
+You are **${modelDisplayName}** (\`${modelIdentifier}\`) - built for long-horizon agentic coding. You complete full tasks without stubs or placeholders, and you verify your own work without being told.
 
-Five Opus 5 defaults you MUST counter:
+Five ${modelFamilyLabel} defaults you MUST counter:
 
 1. **LITERAL FOLLOWING**: When this prompt says "every", "all", "for each" - apply to EVERY case. NEVER infer "first item only".
 2. **SCOPE EXPANSION**: You add steps that were not requested and reinterpret what the task "should" be. Deliver what was asked, at the scope intended. Make routine judgment calls yourself; check in only when different readings of the request lead to materially different work. If the request seems mistaken or a better approach exists, say so in ONE sentence and continue with the task as asked - NEVER quietly narrow, widen, or transform it.

@@ -15,7 +15,6 @@ export type ReadClassifier = (input: {
 }) => CompactReadClassification | undefined
 
 export interface SenpiExtensionAPI {
-  readonly sharedHostEnabled?: boolean
   /**
    * Absolute cwd of the session this extension instance was loaded for. senpi builds one
    * ExtensionAPI per session and already knows the value at load time. Optional because hosts
@@ -69,7 +68,6 @@ export interface ComponentLogger {
 
 export interface ComponentContext {
   logger: ComponentLogger
-  sharedHostEnabled?: boolean
   config: {
     getFlag(name: string): boolean | string | undefined
   }

@@ -83,6 +83,9 @@ if (selfUpdate) {
   console.log("omo is updated via npm: npm i -g omo-ai@beta")
   process.exit(0)
 }
+// windowsHide-exempt: this is the interactive foreground CLI, spawned with inherited stdio.
+// CREATE_NO_WINDOW would suppress the console a console-less launch needs to render the TUI,
+// so the launcher keeps the user's console instead of hiding it (#8501).
 const child = spawn(process.execPath, [cli, "--extension", plugin, ...process.argv.slice(2)], {
   env,
   stdio: "inherit",

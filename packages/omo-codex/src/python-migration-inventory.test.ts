@@ -36,7 +36,6 @@ const optionalGeneratedPythonFiles = [
   "packages/omo-codex/plugin/skills/programming/scripts/python/check-no-excuse-rules.py",
   "packages/omo-codex/plugin/skills/programming/scripts/python/new-project.py",
   "packages/omo-codex/plugin/skills/programming/scripts/python/new-script.py",
-  "packages/omo-codex/plugin/skills/programming/scripts/rust/check-no-excuse-rules.py",
   "packages/omo-codex/plugin/skills/programming/scripts/rust/new-project.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/__init__.py",
   "packages/omo-codex/plugin/skills/ultimate-browsing/engine/__main__.py",

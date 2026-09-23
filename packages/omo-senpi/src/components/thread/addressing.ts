@@ -166,6 +166,9 @@ function gitWorktreeRoot(dir: string): string | null {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 5000,
+      // git.exe is console-subsystem: without this each root lookup flashes a console window that
+      // Windows foregrounds, stealing the user's focus (#8501).
+      windowsHide: true,
     })
     const trimmed = output.trim()
     return trimmed.length === 0 ? null : trimmed

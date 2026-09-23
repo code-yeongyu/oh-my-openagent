@@ -352,10 +352,13 @@ describe("composeOmoSenpiExtension", () => {
     expect(retried).toBe(false)
   })
 
-  it("#given the default logger #when a component logs without details #then console receives only the message", async () => {
-    // given
+  it("#given the default logger #when a component logs info #then it goes to the stderr console, never stdout, without a trailing undefined", async () => {
+    // given: a child's stdout is its deliverable (the reflection report is read from it), so
+    // component diagnostics must never share that stream (#8564)
     const pi = new FakeExtensionAPI()
     const info = spyOn(console, "info").mockImplementation(() => {})
+    const log = spyOn(console, "log").mockImplementation(() => {})
+    const error = spyOn(console, "error").mockImplementation(() => {})
     const components: OmoSenpiComponent[] = [
       {
         name: "alpha",
@@ -367,15 +370,21 @@ describe("composeOmoSenpiExtension", () => {
     ]
 
     // when
-    let alphaCalls: unknown[][] = []
+    let alphaOnStdout: unknown[][] = []
+    let alphaOnStderr: unknown[][] = []
     try {
       await composeOmoSenpiExtension(components)(pi)
-      alphaCalls = info.mock.calls.filter((call) => String(call[0]).startsWith("alpha"))
+      const alpha = (call: unknown[]) => String(call[0]).startsWith("alpha")
+      alphaOnStdout = [...info.mock.calls, ...log.mock.calls].filter(alpha)
+      alphaOnStderr = error.mock.calls.filter(alpha)
     } finally {
       info.mockRestore()
+      log.mockRestore()
+      error.mockRestore()
     }
 
     // then
-    expect(alphaCalls).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
+    expect(alphaOnStdout).toStrictEqual([])
+    expect(alphaOnStderr).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
   })
 })

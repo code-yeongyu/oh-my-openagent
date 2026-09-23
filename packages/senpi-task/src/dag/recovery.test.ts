@@ -7,6 +7,7 @@ import { join } from "node:path"
 
 import { createTaskLifecycle } from "../lifecycle"
 import { FakeRegistry } from "../lifecycle/__fixtures__/lifecycle-fakes"
+import type { ManagedChildHandle } from "../manager/child-handle"
 import { categoryPlanner, makeHandle, settings } from "../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../manager/manager"
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
@@ -197,7 +198,13 @@ class RecoveryTaskManager implements TaskManager {
   cancelTask(): Promise<never> { throw new Error("not implemented") }
   list(): readonly [] { return [] }
   forget(): void {}
-  getResidentHandle(): undefined { return undefined }
+  // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
+  // "held" from the same map its completions come from: a task it can still complete is held here.
+  getResidentHandle(taskId: string): ManagedChildHandle | undefined {
+    const record = this.#tasks.get(taskId)?.record
+    if (record === undefined || TERMINAL_TASK_STATUSES.has(record.status)) return undefined
+    return makeHandle(taskId).handle
+  }
   subscribeChild(): () => void { return () => undefined }
   residentTaskIds(): readonly string[] { return [] }
   residencyChanged(): Promise<void> { return new Promise<void>(() => undefined) }

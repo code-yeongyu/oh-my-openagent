@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-telemetry",
-	"version": "5.0.0-beta.75",
+	"version": "5.0.0-beta.87",
 	"description": "Codex plugin component that emits omo-codex anonymous daily-active telemetry on SessionStart.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -43,11 +43,12 @@
 		"check": "tsc --noEmit && biome check . && npm run build"
 	},
 	"devDependencies": {
+		"@vitest/coverage-v8": "5.0.1",
 		"@oh-my-opencode/telemetry-core": "file:../../../../telemetry-core",
-		"@biomejs/biome": "2.5.9",
-		"@types/node": "^26.2.0",
+		"@biomejs/biome": "2.5.14",
+		"@types/node": "^26.6.2",
 		"typescript": "^7.0.2",
-		"vitest": "^4.1.11"
+		"vitest": "5.0.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"

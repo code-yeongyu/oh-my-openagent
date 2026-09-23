@@ -168,17 +168,14 @@ Before production changes, define scenarios covering:
 
 Each scenario needs a binary pass condition. "Looks good" is not a pass condition.
 
-## TDD WORKFLOW
+## TEST DECISION
 
-TDD is mandatory on production code changes with a test seam; prose, docs, and visual-only changes take review + real-surface QA instead (a test pinning their text is pretend-coverage).
+1. READ: the tests covering the area, before any edit — intent, coverage, pass. One wrong before your change is a finding, never edited green. A bug: reproduce it first.
+2. CHANGE: the smallest change; update tests it makes stale. A new test only where the repository keeps tests for this behavior AND a regression would otherwise pass unnoticed — never one that restates the change.
+3. SURFACE: exercise the real user path and capture the artifact; a reproduction now passes.
+4. REGRESSION: rerun the scenario list and the step-1 tests.
 
-1. RED: write or identify a failing test that proves the needed behavior.
-2. GREEN: make the smallest change that flips the test to passing.
-3. SURFACE: exercise the real user path and capture the artifact.
-4. REFACTOR: improve structure only while tests stay green.
-5. REGRESSION: rerun the scenario list.
-
-Exemptions: pure prompt text, formatting, comment-only edits, version bumps with no behavior delta, and rename-only moves. Justify every exemption in the final report.
+Prose, docs, and visual-only changes take review + real-surface QA, no test (a test pinning their text is pretend-coverage).
 
 ## COMMIT DISCIPLINE
 

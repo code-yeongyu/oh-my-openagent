@@ -58,6 +58,7 @@ const workflowExpectations = [
   { path: ".github/workflows/sisyphus-agent.yml", jobs: ["agent"] },
   { path: ".github/workflows/stats.yml", jobs: ["stats"] },
   { path: ".github/workflows/web-ci.yml", jobs: ["format-lint-typecheck-build"] },
+  { path: ".github/workflows/isolation-linux-fs.yml", jobs: ["linux-fs"] },
   { path: ".github/workflows/web-deploy.yml", jobs: ["deploy"] },
   { path: ".github/workflows/windows-flake-soak.yml", jobs: ["soak"] },
 ] as const satisfies readonly WorkflowExpectation[]

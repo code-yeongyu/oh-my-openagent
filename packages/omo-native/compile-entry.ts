@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
-import { spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import {
   embeddedText,
@@ -268,6 +267,31 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   return false
 }
 
+export async function reexecProvisionedRuntime(expected: string, options: {
+  argv?: string[]
+  env?: NodeJS.ProcessEnv
+  platform?: NodeJS.Platform
+  execve?: ((file: string, argv: string[], env: NodeJS.ProcessEnv) => void) | null
+  run?: typeof runChild
+  propagate?: typeof propagateResult
+} = {}): Promise<void> {
+  const argv = options.argv ?? process.argv.slice(2)
+  const env = options.env ?? process.env
+  const run = options.run ?? runChild
+  const propagate = options.propagate ?? propagateResult
+  const execve = options.execve === undefined ? process.execve : options.execve
+  if ((options.platform ?? process.platform) !== "win32" && typeof execve === "function") {
+    try {
+      execve(expected, [expected, ...argv], env)
+      return
+    } catch {
+      // A provisioned binary that cannot replace this image still uses the async fallback.
+    }
+  }
+  const result = await run(expected, argv, { env })
+  propagate(result)
+}
+
 async function main(): Promise<void> {
   const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
   if (!embedded?.length) {
@@ -297,8 +321,7 @@ async function main(): Promise<void> {
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (needsProvisioning) {
     if (shouldReexecAfterProvisioning()) {
-      const result = await runChild(expected, process.argv.slice(2), { env: process.env })
-      propagateResult(result)
+      await reexecProvisionedRuntime(expected)
       return
     }
     execDir = dirname(expected)

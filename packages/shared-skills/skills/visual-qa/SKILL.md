@@ -49,7 +49,7 @@ Before any reviewer sees an image, verify each capture yourself: the file signat
 ### Web
 
 1. Capture a REFERENCE image: the user's mock/target, generated page snapshot, Figma export, source-site capture, or known-good baseline. Save as PNG. If the user provided overview text or annotations, save them next to the image and treat them as part of the reference packet.
-2. Capture the ACTUAL rendered screenshot at the reference viewport. Use two browser tiers from js eval: (1) `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need installed Chrome/Chromium/Edge); (2) otherwise, or for Chrome semantics, stealth, trace, or authenticated profiles, WRITE a `playwright-core` script and run it from the kernel against local Chrome (`chromium.launch({ channel: "chrome" })` / `launchPersistentContext` on a CLONED profile, never the live one). In Codex, prefer `browser:control-in-app-browser` for ordinary captures. Save PNG and return its path; close the browser context. See `$SKILL_DIR/references/browser-setup.md` for fixed-viewport examples and prerequisites.
+2. Capture the ACTUAL rendered screenshot at the reference viewport with omowright from js eval (the library is staged in the `browser` skill): the owned engine (`connectPipe` on a task-owned profile, viewport pinned with `emulate`, then `page.screenshot()`) for anything unauthenticated, or the attached engine (`connectBrowserSkill()` → `session.screenshot()`) when the page needs the user's login — never a clone of, or a launch against, the user's live profile. Save PNG and return its path; close the browser or stop the session. See `$SKILL_DIR/references/browser-setup.md` for fixed-viewport examples and prerequisites.
 3. Run the diff and keep the JSON:
 
 ```

@@ -30,6 +30,9 @@ export const THREAD_ERROR_CODES = [
   "transport_closed",
   "host_unavailable",
   "internal_error",
+  "model_not_found",
+  "model_ambiguous",
+  "thinking_level_unsupported",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]

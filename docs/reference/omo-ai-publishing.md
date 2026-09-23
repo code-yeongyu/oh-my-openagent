@@ -1,6 +1,6 @@
 # omo-ai Publishing Runbook
 
-`omo-ai` is the npm package for the senpi-native edition of OMO. It ships a single bin, `omo`, which launches the exact-pinned `@code-yeongyu/senpi` release with the full OMO extension loaded. This runbook records the registry state the package was bootstrapped into, the mechanism that keeps the package beta-only, and the checks a maintainer runs around each release.
+`omo-ai` is the npm package for OmO Native. It ships a single bin, `omo`, which launches the exact-pinned `@code-yeongyu/senpi` release with the full OMO extension loaded. This runbook records the registry state the package was bootstrapped into, the mechanism that keeps the package beta-only, and the checks a maintainer runs around each release.
 
 The package publishes exclusively through GitHub Actions (`publish.yml`) with npm OIDC trusted publishing. There is no local publish path, and this document must never grow one.
 
@@ -69,7 +69,7 @@ The first real omo-ai release is not automated into any merge. The user dispatch
 ## Brand contract (what makes the product read as omo)
 
 The launcher hands the pinned engine a single `SENPI_BRAND` JSON profile before spawning it. The
-engine resolves it once and then scrubs it, so a senpi the agent itself spawns keeps the engine
+engine resolves it once and then scrubs it, so a senpi engine the agent itself spawns keeps the engine
 identity instead of impersonating the product.
 
 | field | value | effect |

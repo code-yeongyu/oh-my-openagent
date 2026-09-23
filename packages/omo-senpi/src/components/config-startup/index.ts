@@ -137,19 +137,19 @@ export function notificationMessages(
   config: SenpiOmoConfigResult,
 ): readonly StartupNotice[] {
   const messages: StartupNotice[] = []
-  if (migration.error !== undefined) messages.push({ message: `omo-senpi: configuration migration: ${migration.error}`, type: "warning" })
+  if (migration.error !== undefined) messages.push({ message: `OmO Native: configuration migration: ${migration.error}`, type: "warning" })
   else if (migration.migratedFrom.length > 0) messages.push({
-    message: `omo-senpi: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,
+    message: `OmO Native: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,
     type: "info",
   })
-  else if (migration.journalResumed) messages.push({ message: "omo-senpi: recovered an interrupted configuration migration", type: "info" })
+  else if (migration.journalResumed) messages.push({ message: "OmO Native: recovered an interrupted configuration migration", type: "info" })
   const migrationDiagnostics = migration.results.flatMap((result) => result.diagnostics)
   if (migrationDiagnostics.length > 0) messages.push({
-    message: `omo-senpi: configuration migration: ${migrationDiagnostics.join("; ")}`,
+    message: `OmO Native: configuration migration: ${migrationDiagnostics.join("; ")}`,
     type: "warning",
   })
   if (config.diagnostics.length > 0) messages.push({
-    message: `omo-senpi: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
+    message: `OmO Native: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
     type: "warning",
   })
   return messages

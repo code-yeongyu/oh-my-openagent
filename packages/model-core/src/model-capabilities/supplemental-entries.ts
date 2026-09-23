@@ -62,6 +62,54 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 128000,
 		},
 	},
+	"gpt-6-sol": {
+		id: "gpt-6-sol",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-6-sol-fast": {
+		id: "gpt-6-sol-fast",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-6-luna": {
+		id: "gpt-6-luna",
+		family: "gpt-nano",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
 	"gpt-5.6-sol": {
 		id: "gpt-5.6-sol",
 		family: "gpt",
@@ -123,6 +171,38 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		limit: {
 			context: 400000,
 			input: 272000,
+			output: 128000,
+		},
+	},
+	// DeepSeek V4.1 Flash: official API id since 2026-09-10 (models.dev deepseek/deepseek-flash); multimodal input.
+	"deepseek-flash": {
+		id: "deepseek-flash",
+		family: "deepseek-flash",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 384000,
+		},
+	},
+	"gpt-6-luna-fast": {
+		id: "gpt-6-luna-fast",
+		family: "gpt-nano",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
 			output: 128000,
 		},
 	},
@@ -218,6 +298,36 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 32768,
 		},
 	},
+	"grok-4.7": {
+		id: "grok-4.7",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-4.7": {
+		id: "xai/grok-4.7",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
 	"xai/grok-build-0.1": {
 		id: "xai/grok-build-0.1",
 		family: "grok",
@@ -246,6 +356,36 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		limit: {
 			context: 256000,
 			output: 32768,
+		},
+	},
+	"mimo-v2.6-pro": {
+		id: "mimo-v2.6-pro",
+		family: "mimo",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 131072,
+		},
+	},
+	"xiaomi/mimo-v2.6-pro": {
+		id: "xiaomi/mimo-v2.6-pro",
+		family: "mimo",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 131072,
 		},
 	},
 }

@@ -108,7 +108,7 @@ Record the answer in `brief.md`; Phase 6 opens by turning it into `design-spec.m
 
 ## Phase 1 — Stand up the team (DEFAULT composition)
 
-**When the user asked for MASS research, the team is not the collection surface.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that 8 member slots cannot produce. Read `mass-ulw`'s `references/planning.md` and run collection as chained dags at its mass scale: a 60+ node opening wave covering every angle the topic has, routed across `quick` / `unspecified-low` / `unspecified-high` / `deep` in one graph, each wave's EXPAND leads defining the next wave's nodes until convergence, and a synthesis that reduces through several parallel `architect` nodes into one `architect` reducer (`ultrabrain` substitutes when the config has no `architect` category). Everything else in this skill still binds: the format gate, the journal, the claim graph, the convergence rules, and both delivery gates. Keep a small team alongside the graph for the debate rounds of Phase 3 — attack is conversation, and dag nodes do not talk.
+**When the user asked for MASS research, the team is not the collection surface.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that 8 member slots cannot produce. Read `mass-ulw`'s `references/planning.md` and run collection as chained dags at its mass scale: a 60+ node opening wave covering every angle the topic has, routed across `quick` / `unspecified-low` / `unspecified-high` / `deep-low` in one graph, each wave's EXPAND leads defining the next wave's nodes until convergence, and a synthesis that reduces through several parallel `architect` nodes into one `architect` reducer (`ultrabrain` substitutes when the config has no `architect` category). Everything else in this skill still binds: the format gate, the journal, the claim graph, the convergence rules, and both delivery gates. Keep a small team alongside the graph for the debate rounds of Phase 3 — attack is conversation, and dag nodes do not talk.
 
 Otherwise a team is the DEFAULT for ulw-research, not an option: a lead one member surfaces almost always reshapes what another should search next, and debate needs live cooperating members, not fire-and-forget workers. Create it immediately after the brief:
 
@@ -117,8 +117,8 @@ team_create({
   inline_spec: {
     name: "ulw-research-<slug>",
     members: [
-      { name: "<axis-owner-1>", category: "deep", prompt: "<member brief for axis 1 — see below>" },
-      { name: "<axis-owner-2>", category: "deep", prompt: "<member brief for axis 2>" },
+      { name: "<axis-owner-1>", category: "deep-low", prompt: "<member brief for axis 1 — see below>" },
+      { name: "<axis-owner-2>", category: "deep-low", prompt: "<member brief for axis 2>" },
       ...
       { name: "skeptic", category: "ultrabrain", prompt: "<debate brief — see below>" },
     ],
@@ -256,7 +256,7 @@ Interest alone is not a trigger. Anything without one stays a queued lead in `ex
 Settle with executed code, not judgment, whenever sources disagree, a behavior is undocumented, a claim is performance- or compatibility-shaped, or the honest answer is "it should work". Run the verification yourself in one eval cell, or spawn one verification lane per claim:
 
 ```
-task(category: "deep", run_in_background: true, prompt: "TASK: verify by execution: <claim>.
+task(category: "deep-low", run_in_background: true, prompt: "TASK: verify by execution: <claim>.
 SOURCE: <where it came from>; CONTRADICTION: <opposing source, if any>.
 Write a minimal self-contained script that tests the claim; run it (uv run --with <deps> python / bun / direct compile); capture full stdout+stderr; pin versions.
 Reply with: the exact code, the full output, environment (OS, runtime, dependency versions), and a verdict — CONFIRMED / REFUTED / PARTIAL — grounded in the output.")
@@ -338,7 +338,7 @@ Asset lanes (background, parallel `task` spawns, each fed `design-spec.md`) — 
 
 **Verify the asset manifest before rendering.** List every asset the document references, assert each file exists and is non-empty on disk, and re-render whatever is missing. A document that renders with three broken diagrams is a document you will publish twice.
 
-Assembly lane — `task(category: "deep", load_skills: ["frontend", "visual-qa"], run_in_background: true, ...)`: the report is a designed artifact, not a text dump; its prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (members, lanes, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few.
+Assembly lane — `task(category: "deep-low", load_skills: ["frontend", "visual-qa"], run_in_background: true, ...)`: the report is a designed artifact, not a text dump; its prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (members, lanes, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few.
 
 ### The two delivery gates — both must PASS, in order
 

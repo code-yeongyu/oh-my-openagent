@@ -15,9 +15,19 @@ type Waiter = {
 }
 
 type Lease = {
+  readonly model: string
   readonly laneKey: string
   readonly taskId: string
   readonly runEpoch: number
+}
+
+export type ParkedLease = Lease
+
+type ParkedEntry = {
+  readonly lease: ParkedLease
+  readonly resumed: Promise<void>
+  readonly resolve: () => void
+  resumable: boolean
 }
 
 const DEFAULT_LIMIT = 5
@@ -29,6 +39,7 @@ export class TaskConcurrency {
   readonly #counts = new Map<string, number>()
   readonly #queues = new Map<string, Waiter[]>()
   readonly #leases = new Map<string, Lease>()
+  readonly #parked = new Map<string, Map<string, ParkedEntry>>()
   #enqueueSequence = 0
   #legacyEpoch = -1
   #granting: Waiter | undefined
@@ -62,8 +73,7 @@ export class TaskConcurrency {
 
   tryAcquire(model: string, taskId: string, runEpoch: number): boolean {
     const laneKey = this.getKey(model)
-    const leaseKey = leaseKeyOf(taskId, runEpoch)
-    if (this.#leases.has(leaseKey)) return false
+    if (this.leaseState(taskId, runEpoch) !== undefined) return false
     if (this.#queues.has(laneKey) && (this.#granting?.taskId !== taskId || this.#granting.runEpoch !== runEpoch)) return false
     if (!this.#laneHasRoom(model, laneKey) || !this.#globalHasRoom()) return false
     this.#recordLease(model, { laneKey, taskId, runEpoch })
@@ -120,19 +130,71 @@ export class TaskConcurrency {
     return true
   }
 
-  releaseLease(taskId: string, runEpoch: number): void {
-    const lease = this.#leases.get(leaseKeyOf(taskId, runEpoch))
-    if (lease === undefined) return
+  leaseState(taskId: string, runEpoch: number): "held" | "parked" | undefined {
+    const key = leaseKeyOf(taskId, runEpoch)
+    if (this.#leases.has(key)) return "held"
+    for (const lane of this.#parked.values()) if (lane.has(key)) return "parked"
+    return undefined
+  }
+
+  park(taskId: string, runEpoch: number): ParkedLease | undefined {
+    const key = leaseKeyOf(taskId, runEpoch)
+    const lease = this.#leases.get(key)
+    if (lease === undefined) return undefined
+    const { promise, resolve } = Promise.withResolvers<void>()
+    const lane = this.#parked.get(lease.laneKey) ?? new Map<string, ParkedEntry>()
+    lane.set(key, { lease, resumed: promise, resolve, resumable: false })
+    this.#parked.set(lease.laneKey, lane)
     this.#dropLease(lease)
     this.#dispatch()
+    return lease
+  }
+
+  unpark(lease: ParkedLease | undefined, signal?: AbortSignal, options: { readonly overflow?: boolean } = {}): Promise<void> {
+    if (lease === undefined) return Promise.resolve()
+    const entry = this.#parked.get(lease.laneKey)?.get(leaseKeyOf(lease.taskId, lease.runEpoch))
+    // A stale token cannot resurrect a released task or resume a later parking of the same epoch.
+    if (entry?.lease !== lease) return Promise.resolve()
+    const abort = (): void => this.releaseLease(lease.taskId, lease.runEpoch)
+    if (signal?.aborted) {
+      abort()
+      return Promise.resolve()
+    }
+    signal?.addEventListener("abort", abort, { once: true })
+    entry.resumable = true
+    if (options.overflow === true) this.#resume(entry)
+    this.#dispatch()
+    return entry.resumed.finally(() => signal?.removeEventListener("abort", abort))
+  }
+
+  releaseLease(taskId: string, runEpoch: number): void {
+    const key = leaseKeyOf(taskId, runEpoch)
+    const lease = this.#leases.get(key)
+    if (lease !== undefined) this.#dropLease(lease)
+    for (const lane of this.#parked.values()) {
+      const entry = lane.get(key)
+      if (entry !== undefined) this.#dropParked(entry)
+    }
+    this.#dispatch()
+  }
+
+  #dropParked(entry: ParkedEntry): void {
+    const lane = this.#parked.get(entry.lease.laneKey)
+    lane?.delete(leaseKeyOf(entry.lease.taskId, entry.lease.runEpoch))
+    if (lane?.size === 0) this.#parked.delete(entry.lease.laneKey)
+    entry.resolve()
+  }
+
+  #resume(entry: ParkedEntry): void {
+    this.#recordLease(entry.lease.model, entry.lease)
+    this.#dropParked(entry)
   }
 
   release(model: string): void {
     const laneKey = this.getKey(model)
     const lease = this.#leases.values().find((candidate) => candidate.laneKey === laneKey)
-    if (lease === undefined) return
-    this.#dropLease(lease)
-    this.#dispatch()
+      ?? this.#parked.get(laneKey)?.values().next().value?.lease
+    if (lease !== undefined) this.releaseLease(lease.taskId, lease.runEpoch)
   }
 
   getCount(model: string): number {
@@ -155,6 +217,16 @@ export class TaskConcurrency {
   #drainEligible(): void {
     for (;;) {
       if (!this.#globalHasRoom()) return
+      // Existing owners resume before queue heads, without putting dormant parents in the FIFO.
+      let resumable: ParkedEntry | undefined
+      for (const [laneKey, lane] of this.#parked) {
+        resumable = lane.values().find((entry) => entry.resumable && this.#laneHasRoom(entry.lease.model, laneKey))
+        if (resumable !== undefined) break
+      }
+      if (resumable !== undefined) {
+        this.#resume(resumable)
+        continue
+      }
       let selected: Waiter | undefined
       for (const [laneKey, queue] of this.#queues) {
         const head = queue[0]
@@ -181,8 +253,8 @@ export class TaskConcurrency {
     }
   }
 
-  #recordLease(model: string, lease: Lease): void {
-    this.#leases.set(leaseKeyOf(lease.taskId, lease.runEpoch), lease)
+  #recordLease(model: string, lease: Omit<Lease, "model">): void {
+    this.#leases.set(leaseKeyOf(lease.taskId, lease.runEpoch), { ...lease, model })
     if (this.getLimit(model) === Number.POSITIVE_INFINITY) return
     this.#counts.set(lease.laneKey, (this.#counts.get(lease.laneKey) ?? 0) + 1)
   }

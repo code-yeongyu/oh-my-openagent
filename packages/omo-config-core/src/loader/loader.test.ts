@@ -50,7 +50,7 @@ describe("loadOmoConfig", () => {
       `{
         "categories": {
           "quick": { "model": "far-model", "tools": { "bash": true } },
-          "deep": { "model": "deep-model" }
+          "deep-low": { "model": "deep-model" }
         },
         "agents": { "reviewer": { "temperature": 0.3 } },
         "task": { "default_concurrency": 4, "wait": { "max_ms": 90000 } }
@@ -81,7 +81,7 @@ describe("loadOmoConfig", () => {
     expect(result.config.task?.wait.max_ms).toBe(90000)
     expect(result.config.categories?.quick?.model).toBe("near-model")
     expect(result.config.categories?.quick?.tools).toEqual({ read: true, bash: true })
-    expect(result.config.categories?.deep?.model).toBe("deep-model")
+    expect(result.config.categories?.["deep-low"]?.model).toBe("deep-model")
     expect(result.config.agents?.reviewer?.model).toBe("near-agent")
     expect(result.config.agents?.reviewer?.temperature).toBe(0.3)
     expect(result.config.teams?.alpha?.members[0]?.name).toBe("one")

@@ -184,6 +184,26 @@ async function readStreak(context: MemoryIdentityContext): Promise<number> {
   }
 }
 
+/**
+ * The same estimate, computed once per commit. A commit is immutable, so a second caller at the same
+ * HEAD is owed the identical number and nothing has to be re-read to produce it; the prompt path asks
+ * on every turn and would otherwise list the tree and read every system blob each time.
+ *
+ * A failed read is NOT cached and NOT swallowed. Reporting zero for a repository whose size is merely
+ * unknown is the one answer that silences the advisory exactly when it cannot be trusted.
+ */
+export async function estimateSystemTokensCached(
+  repo: GitRepoForStatus,
+  head: string,
+  cache: Map<string, number>,
+): Promise<number> {
+  const cached = cache.get(head)
+  if (cached !== undefined) return cached
+  const estimate = await estimateSystemTokens(repo, head)
+  cache.set(head, estimate)
+  return estimate
+}
+
 export async function estimateSystemTokens(repo: GitRepoForStatus, head: string): Promise<number> {
   const paths = await repo.lsTree(head)
   const systemMarkdownPaths = paths.filter(isSystemMarkdown)

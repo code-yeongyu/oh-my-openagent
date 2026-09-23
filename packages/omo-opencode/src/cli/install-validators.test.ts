@@ -90,18 +90,18 @@ describe("argsToConfig", () => {
     expect(config.hasCodex).toBe(true)
   })
 
-  test("enables only Senpi when platform is senpi", () => {
+  test("enables only the native development adapter when platform is native-dev", () => {
     // #given
-    const args: InstallArgs = { tui: false, platform: "senpi" }
+    const args: InstallArgs = { tui: false, platform: "native-dev" }
 
     // #when
     const config = argsToConfig(args)
 
     // #then
-    expect(config.platform).toBe("senpi")
+    expect(config.platform).toBe("native-dev")
     expect(config.hasOpenCode).toBe(false)
     expect(config.hasCodex).toBe(false)
-    expect(config.hasSenpi).toBe(true)
+    expect(config.hasNativeDev).toBe(true)
   })
 
   test("keeps platform=both scoped to OpenCode and Codex", () => {
@@ -112,7 +112,7 @@ describe("argsToConfig", () => {
     const config = argsToConfig(args)
 
     // #then
-    expect(config.hasSenpi).toBe(false)
+    expect(config.hasNativeDev).toBe(false)
   })
 
   test("defaults to OpenCode when platform is omitted", () => {
@@ -233,9 +233,9 @@ describe("validateNonTuiArgs", () => {
     expect(result.errors).toEqual([])
   })
 
-  test("allows senpi-only non-TUI installs without OpenCode provider flags", () => {
+  test("allows native-dev-only non-TUI installs without OpenCode provider flags", () => {
     // #given
-    const args: InstallArgs = { tui: false, platform: "senpi" }
+    const args: InstallArgs = { tui: false, platform: "native-dev" }
 
     // #when
     const result = validateNonTuiArgs(args)

@@ -153,6 +153,12 @@ export class GitMemoryRepo {
 
   async log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
     const argv = ["log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI"]
+    // `--fixed-strings` because callers pass trailer literals, `--all-match` because every one of them
+    // must appear in the same commit. Filtering inside git means a caller after one trailer combination
+    // no longer parses the whole history into memory to find it.
+    if (options.grep !== undefined && options.grep.length > 0) {
+      argv.push("--fixed-strings", "--all-match", ...options.grep.map((pattern) => `--grep=${pattern}`))
+    }
     if (options.limit !== undefined) argv.push("-n", String(options.limit))
     if (options.range !== undefined) argv.push(options.range)
     if (options.paths !== undefined && options.paths.length > 0) argv.push("--", ...options.paths)

@@ -13,6 +13,7 @@ import {
 } from "./agent-model-registry"
 import { agentToolPolicy } from "./agent-tool-policy"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
+import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
 
 export type ResolveAgentOptions = {
@@ -69,7 +70,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   registry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
-  const name = requestedName.trim()
+  const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
     .map(([agentName]) => agentName)

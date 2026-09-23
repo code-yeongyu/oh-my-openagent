@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url"
 const postinstallPath = fileURLToPath(new URL("./postinstall.mjs", import.meta.url))
 const RENAME_NOTICE =
   "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release)."
+const NATIVE_NOTICE =
+  "oh-my-openagent: OmO Native (beta) is the same omo as one 'omo' command, with no OpenCode host: bun add -g omo-ai@beta"
 const SUBPROCESS_TEST_TIMEOUT_MS = 30_000
 const HANGING_OPENCODE_MS = 60_000
 
@@ -63,6 +65,10 @@ function countNoticeLines(output: string): number {
   return output.split("\n").filter((line) => line.trim() === RENAME_NOTICE).length
 }
 
+function countNativeNotices(output: string): number {
+  return output.split("\n").filter((line) => line.trim() === NATIVE_NOTICE).length
+}
+
 describe("postinstall rename notice", () => {
   test("announces the omo-agent-toolkit rename exactly once", () => {
     // #given
@@ -73,6 +79,7 @@ describe("postinstall rename notice", () => {
 
     // #then
     expect(countNoticeLines(run.stdout)).toBe(1)
+    expect(countNativeNotices(run.stdout)).toBe(1)
   }, SUBPROCESS_TEST_TIMEOUT_MS)
 
   test("never fails the install regardless of platform binary resolution", () => {
@@ -113,5 +120,7 @@ describe("postinstall rename notice", () => {
     // #then
     expect(countNoticeLines(firstRun.stdout)).toBe(1)
     expect(countNoticeLines(secondRun.stdout)).toBe(1)
+    expect(countNativeNotices(firstRun.stdout)).toBe(1)
+    expect(countNativeNotices(secondRun.stdout)).toBe(1)
   }, SUBPROCESS_TEST_TIMEOUT_MS)
 })

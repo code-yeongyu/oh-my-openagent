@@ -2,6 +2,11 @@ import { existsSync, appendFileSync } from "fs"
 import { join } from "path"
 import { homedir, tmpdir } from "os"
 import {
+  commentCheckerBinaryName,
+  commentCheckerCacheDir,
+  resolveCommentCheckerReleaseAsset,
+} from "@oh-my-opencode/comment-checker-core"
+import {
   cleanupArchive,
   downloadArchive,
   ensureCacheDir,
@@ -23,46 +28,25 @@ function debugLog(...args: unknown[]) {
   }
 }
 
-const REPO = "code-yeongyu/go-claude-code-comment-checker"
-// Release pin: https://github.com/code-yeongyu/go-claude-code-comment-checker/releases
-const COMMENT_CHECKER_VERSION = "0.8.0"
-
-interface PlatformInfo {
-  os: string
-  arch: string
-  ext: "tar.gz" | "zip"
-}
-
-const PLATFORM_MAP: Record<string, PlatformInfo> = {
-  "darwin-arm64": { os: "darwin", arch: "arm64", ext: "tar.gz" },
-  "darwin-x64": { os: "darwin", arch: "amd64", ext: "tar.gz" },
-  "linux-arm64": { os: "linux", arch: "arm64", ext: "tar.gz" },
-  "linux-x64": { os: "linux", arch: "amd64", ext: "tar.gz" },
-  "win32-x64": { os: "windows", arch: "amd64", ext: "zip" },
-}
-
 /**
  * Get the cache directory for oh-my-opencode binaries.
  * On Windows: Uses %LOCALAPPDATA% or %APPDATA% (Windows conventions)
  * On Unix: Follows XDG Base Directory Specification
  */
 export function getCacheDir(): string {
-  if (process.platform === "win32") {
-    const localAppData = process.env.LOCALAPPDATA || process.env.APPDATA
-    const base = localAppData || join(homedir(), "AppData", "Local")
-    return join(base, CACHE_DIR_NAME, "bin")
-  }
-
-  const xdgCache = process.env.XDG_CACHE_HOME
-  const base = xdgCache || join(homedir(), ".cache")
-  return join(base, CACHE_DIR_NAME, "bin")
+  return commentCheckerCacheDir({
+    platform: process.platform,
+    env: process.env,
+    homedir: homedir(),
+    cacheDirName: CACHE_DIR_NAME,
+  })
 }
 
 /**
  * Get the binary name based on platform.
  */
 export function getBinaryName(): string {
-  return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+  return commentCheckerBinaryName(process.platform)
 }
 
 /**
@@ -77,11 +61,10 @@ export function getCachedBinaryPath(): string | null {
  * Returns the path to the downloaded binary, or null on failure.
  */
 export async function downloadCommentChecker(): Promise<string | null> {
-  const platformKey = `${process.platform}-${process.arch}`
-  const platformInfo = PLATFORM_MAP[platformKey]
+  const asset = resolveCommentCheckerReleaseAsset(process.platform, process.arch)
   
-  if (!platformInfo) {
-    debugLog(`Unsupported platform: ${platformKey}`)
+  if (!asset) {
+    debugLog(`Unsupported platform: ${process.platform}-${process.arch}`)
     return null
   }
   
@@ -95,10 +78,7 @@ export async function downloadCommentChecker(): Promise<string | null> {
     return binaryPath
   }
   
-  const version = COMMENT_CHECKER_VERSION
-  const { os, arch, ext } = platformInfo
-  const assetName = `comment-checker_v${version}_${os}_${arch}.${ext}`
-  const downloadUrl = `https://github.com/${REPO}/releases/download/v${version}/${assetName}`
+  const { assetName, url: downloadUrl, ext } = asset
   
   debugLog(`Downloading from: ${downloadUrl}`)
   log(`[${PUBLISHED_PACKAGE_NAME}] Downloading comment-checker binary...`)

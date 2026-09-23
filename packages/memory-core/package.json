@@ -16,6 +16,9 @@
     },
     "./process-identity": {
       "import": "./src/locks/process-identity.ts"
+    },
+    "./process-start-time": {
+      "import": "./src/locks/process-start-time.ts"
     }
   },
   "scripts": {
@@ -23,6 +26,6 @@
     "test": "bun test src/"
   },
   "devDependencies": {
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   }
 }

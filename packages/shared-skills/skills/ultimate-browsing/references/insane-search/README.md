@@ -223,17 +223,11 @@ result = fetch(
 python3 -c "import curl_cffi, bs4, yaml" 2>/dev/null || pip install curl_cffi beautifulsoup4 pyyaml -q
 ```
 
-브라우저를 직접 제어할 때는 js eval에서 Bun >= 1.4의 `new Bun.WebView()`를
-사용한다(macOS 기본; Linux/Windows는 설치된 Chrome/Chromium/Edge 필요).
-그 외 또는 Chrome 동작·stealth·trace·인증이 필요하면 `playwright-core` 스크립트를
-작성해 js eval에서 로컬 Chrome(`channel: "chrome"`)으로 실행한다.
-사용자가 엔진 디렉터리에서 한 번 설치할 스크립트 의존성:
-```bash
-cd "$SKILL_DIR/engine"
-test -f package.json || cp templates/package.json package.json
-bun add playwright-core@1.62.1 playwright-extra@4.3.6 puppeteer-extra-plugin-stealth@2.11.2
-```
-Chrome은 이미 설치되어 있어야 한다. 인증 프로필은 먼저 복제하고 복제본만 사용한다.
+브라우저를 직접 제어할 때는 js eval에서 omowright를 쓴다(`browser` 스킬에 스테이징됨):
+직접 띄우는 브라우저는 `connectPipe` / 스텔스는 `connectCloakProfile`(CloakBrowser),
+사용자가 로그인해 둔 브라우저는 `connectBrowserSkill`. 이 엔진의 Playwright 템플릿은
+Tier 1 추출 폴백 전용이며 에이전트가 직접 브라우저를 다루는 경로가 아니다.
+인증이 필요한 페이지는 사용자 프로필을 복제하지 말고 attached 엔진으로 간다.
 
 ## 빠른 참조 — Phase 0 명령어
 

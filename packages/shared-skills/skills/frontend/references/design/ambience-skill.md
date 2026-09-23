@@ -113,7 +113,8 @@ react-bits optimizes for the demo page. The project optimizes for `perfection/RE
 - **Accessibility contract.** Decorative canvases and effect layers get `aria-hidden="true"`. Split or scrambled text keeps the full string readable: one `aria-label` on the wrapper, or a visually hidden copy, so screen readers never hear one glyph at a time.
 - **Tokens, not demo colors.** Every color, gradient stop, and intensity traces to a `DESIGN.md` token. The catalog's violet, pink, and cyan defaults are placeholders.
 - **Budget and load order.** WebGL and GSAP-heavy components load lazily (`React.lazy` / `next/dynamic`) after the LCP element; the hero's LCP is the headline or the poster image, never the canvas. Ship a static poster fallback behind a WebGL capability check. Record the chunk size in `DESIGN.md` accepted debt.
-- **Motion serves meaning.** The shared axiom still applies: a background is the hero's one signature moment; a text reveal marks arrival; a card effect signals affordance. Two atmospheres on one page, or a reveal on every paragraph, is slop even when each piece is well built.
+- **Comfort for large-area motion.** A moving layer that fills the viewport is read by peripheral vision as the world moving: keep the surrounding chrome still as a fixed reference frame, keep the moving layer low-contrast and translucent, concentrate motion toward the center rather than the viewport edges, and never run a slow oscillation near 0.2 Hz (one cycle every ~5 s).
+- **One atmosphere per page.** A background is the hero's one signature moment; a text reveal marks arrival; a card effect signals affordance. Two atmospheres on one page, or a reveal on every paragraph, is slop even when each piece is well built.
 
 ## 5. Dependency rules
 

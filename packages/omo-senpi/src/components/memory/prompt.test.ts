@@ -353,6 +353,66 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).toContain("A".repeat(1_000))
   }, 30_000)
 
+  test("#given a system file holding invalid UTF-8 #when the pressure line is compiled #then it counts what the model will be shown, not the stored blob size", async () => {
+    // given - the estimate stands in for what the compiled memory block costs the model, and the
+    // model is shown the DECODED text, where every invalid byte becomes one U+FFFD of three bytes.
+    // Counting git's stored blob size instead makes the advisory read low for exactly the files
+    // whose decoded form is largest.
+    const advisory = 30_000
+    const boundary = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * advisory)
+    const { repo, context } = await fixtureAtSystemTokens(boundary)
+    // 3 invalid bytes -> 9 decoded bytes, a 6-byte gap the stored size cannot see.
+    await writeFile(join(repo.dir, "system", "raw.md"), Buffer.from([0xff, 0xfe, 0x80]))
+    await repo.commitWrite(["system/raw.md"], "add raw", { agentId: IDENTITY, authorName: "Prompt Agent" })
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveCompileWarnTokens: () => advisory,
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
+
+    // then - decoded is 9 bytes over the boundary's byte budget, stored is 3, and the estimate
+    // divides by 4: 24002 decoded against 24000 stored.
+    const pressureLines = result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
+    expect(pressureLines).toHaveLength(1)
+    expect(pressureLines[0]).toContain("24002/30000")
+  }, 30_000)
+
+  test("#given the estimate's own read fails #when the pressure line is compiled #then the failure surfaces instead of passing for no pressure", async () => {
+    // given - the block compiles from the first listing; only the estimate's own read fails, so this
+    // isolates the estimator from the compile path. Answering 0 here would report "no pressure" for a
+    // repository whose size is simply unknown, which silences the advisory exactly when it cannot be
+    // trusted, and an error is not the same answer as a genuine zero.
+    const advisory = 30_000
+    const { repo, context } = await fixtureAtSystemTokens(Math.floor(MEMORY_PRESSURE_SOFT_RATIO * advisory))
+    let listings = 0
+    const failingAfterCompile = new Proxy(repo, {
+      get(target, property) {
+        if (property === "lsTree") {
+          return (...args: [string?, string?]) => {
+            listings += 1
+            if (listings > 1) return Promise.reject(new Error("tree unreadable"))
+            return target.lsTree(...args)
+          }
+        }
+        const value = Reflect.get(target, property)
+        return typeof value === "function" ? value.bind(target) : value
+      },
+    }) as typeof repo
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => failingAfterCompile,
+      resolveCompileWarnTokens: () => advisory,
+    }))
+
+    // when / then
+    await expect(dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))).rejects.toThrow("tree unreadable")
+  }, 30_000)
+
   test("#given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token", async () => {
     // given
     const { repo, context } = await fixture()
@@ -461,6 +521,29 @@ describe("createMemoryPromptHandler", () => {
     expect(repo.headCalls).toBe(2)
     expect(repo.lsTreeCalls).toBe(1)
     expect(repo.showCalls).toBe(1)
+  }, 30_000)
+
+  test("#given pressure advisory enabled and an unchanged HEAD #when the handler runs twice #then the tree is listed and the system blobs are read once, not once per prompt", async () => {
+    // given — the production configuration: resolveCompileWarnTokens is wired (wiring-static.ts:85), so the
+    // pressure estimate runs on every prompt. The compiled block is HEAD-cached; the estimate must be too,
+    // or a 2.7k-commit identity pays lsTree + one show per system file on every Enter (measured: 45 git
+    // spawns between Enter and the provider request).
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveCompileWarnTokens: () => 30_000,
+    }))
+
+    // when
+    const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
+    const afterFirst = { lsTree: repo.lsTreeCalls, show: repo.showCalls }
+    const second = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
+
+    // then — same bytes, and the second prompt added no tree listing and no blob reads
+    expect(second?.systemPrompt).toBe(first?.systemPrompt)
+    expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({ lsTree: 0, show: 0 })
   }, 30_000)
 
   test("#given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content", async () => {

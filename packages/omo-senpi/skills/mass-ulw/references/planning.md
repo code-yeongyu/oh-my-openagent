@@ -50,10 +50,11 @@ Specialty categories - chosen by the KIND of work, never by difficulty:
 | `visual-engineering` | Frontend, UI, styling, animation. |
 | `writing` | Docs, prose, technical writing. |
 | `git` | Git operations only. |
-| `deep` | Hairy debugging or cross-module reasoning that a ladder rung already failed on, or clearly cannot hold. |
+| `deep-low` | Hairy debugging or cross-module reasoning a ladder rung could not hold, settled from what the worker reads. |
+| `deep-high` | The same, when the central decision cannot be settled from evidence: a trade-off, a cross-package contract, a mechanism with no in-repo pattern, or correctness argued from invariants. |
 | `ultrabrain` | At most ONE node per graph - the single genuinely hard reasoning problem everything else depends on. |
 
-A graph whose every node is `deep` is a routing failure: it pays the most expensive worker for mechanical lanes and starves the one lane that needed the horsepower.
+A graph whose every node is `deep-low` or `deep-high` is a routing failure: it pays the most expensive worker for mechanical lanes and starves the one lane that needed the horsepower.
 
 ## Concurrency and write-scope rules
 
@@ -87,7 +88,7 @@ const probe = await sdk.wait((await sdk.start(probeDag)).run_id)
 const findings = probe.nodes["probe"].output
 if (findings.includes("critical")) {
   const fix = sdk.define({ key: `fix-${today}`, name: "Fix" })
-  fix.node({ id: "fix", category: "deep", prompt: `TASK: ... FINDINGS:\n${findings}` })
+  fix.node({ id: "fix", category: "deep-low", prompt: `TASK: ... FINDINGS:\n${findings}` })
   await sdk.start(fix)
 }
 ```
@@ -119,11 +120,11 @@ A mass research run is a HARVEST, and the graph is sized by how many angles exis
 
 **Wave 1 opens at 60+ nodes, deliberately over-collecting.** Enumerate every angle the topic has - source territory, sub-question, entity, time window, competing approach, adjacent field - and give each one its own node. Sixty nodes is a floor for a genuinely broad topic, not a target to trim toward: coverage is the deliverable, and the slot limiter serializes width into queue time, never into lost correctness. Under-collecting wave 1 is the failure this mode exists to prevent.
 
-**Route the wave across the whole ladder in one graph.** Broad source sweeps and per-item harvest batches are `quick`. Angles needing a judgment call a template cannot make are `unspecified-low`. Angles with real integration surface across several territories are `unspecified-high`. Reserve `deep` for the few genuinely hairy cross-source contradictions. One tier across sixty nodes is the routing failure named above - name the tier for every node as you define it, and honor a user's literal routing words ("quick", "deep", "all quick") exactly.
+**Route the wave across the whole ladder in one graph.** Broad source sweeps and per-item harvest batches are `quick`. Angles needing a judgment call a template cannot make are `unspecified-low`. Angles with real integration surface across several territories are `unspecified-high`. Reserve `deep-low` for the few genuinely hairy cross-source contradictions, and `deep-high` only when one of them turns on a decision evidence cannot settle. One tier across sixty nodes is the routing failure named above - name the tier for every node as you define it, and honor a user's literal routing words ("quick", "deep", "all quick") exactly - a bare "deep" means `deep-low`.
 
 **Each wave's discoveries define the next wave's nodes.** Read the settled run's node outputs in the cell, harvest every EXPAND lead they returned, deduplicate against the leads already seen, then build the next run's nodes FROM those leads - chase the tail until the leads run dry under ulw-research's convergence rules. A mass research run that stops after one wave collected breadth and no depth.
 
-**Synthesis reduces through several architects, then one reducer.** Never hand sixty raw node outputs to a single node. Fan the converged material into several parallel `architect` nodes, each owning one slice of the synthesis and reading bounded per-wave digests, then depend ONE final `architect` reducer on all of them to merge their verdicts into the deliverable. **When this session's config has no `architect` category, `ultrabrain` is its substitute** - and the graph's one-`ultrabrain`-per-run rule applies to the reducer alone, so the parallel slice nodes drop to `deep` in that configuration.
+**Synthesis reduces through several architects, then one reducer.** Never hand sixty raw node outputs to a single node. Fan the converged material into several parallel `architect` nodes, each owning one slice of the synthesis and reading bounded per-wave digests, then depend ONE final `architect` reducer on all of them to merge their verdicts into the deliverable. **When this session's config has no `architect` category, `ultrabrain` is its substitute** - and the graph's one-`ultrabrain`-per-run rule applies to the reducer alone, so the parallel slice nodes drop to `deep-low` in that configuration.
 
 ## Node prompt contract
 

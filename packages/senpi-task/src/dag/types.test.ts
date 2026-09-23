@@ -190,6 +190,7 @@ describe("dag domain types", () => {
       "task_lost",
       "task_cancelled",
       "resume_task_missing",
+      "resume_task_orphaned",
       "journal_corrupt",
     ])
     expect(DAG_NODE_TRANSITION_REASONS).toEqual([

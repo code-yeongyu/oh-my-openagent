@@ -113,9 +113,13 @@ function engineVersionOrUnresolved(senpi) {
 }
 
 // The interactive engine's own command line. A published install runs it as
-// `<runtime> .../@code-yeongyu/senpi/dist/cli.js --extension <plugin>`; every non-interactive
+// `<runtime> .../@code-yeongyu/senpi/dist/<entry> --extension <plugin>`; every non-interactive
 // spelling carries an explicit `--mode`, and those are owned by whoever started them.
-const ENGINE_MARKER = "senpi/dist/cli.js"
+//
+// Both entries have to match. The launcher prefers the engine's pre-linked bundle whenever the
+// package ships one (#8417), so a current install produces `dist/bundle/cli.js` and matching only
+// the unbundled spelling made the whole report blind to the sessions it exists to find.
+const ENGINE_MARKERS = ["senpi/dist/cli.js", "senpi/dist/bundle/cli.js"]
 const MANAGED_MODE_FLAG = "--mode"
 
 /**
@@ -143,7 +147,7 @@ function listProcesses() {
 }
 
 function isEngine(entry) {
-  return entry.command.includes(ENGINE_MARKER)
+  return ENGINE_MARKERS.some((marker) => entry.command.includes(marker))
 }
 
 function isInteractive(entry) {

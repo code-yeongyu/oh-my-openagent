@@ -14,12 +14,10 @@ import { fileURLToPath } from "node:url"
 
 import {
   binaryDigest,
-  changedRealAgentFiles,
   createRunRoot,
   injectDaemonMockProvider,
   provisionRuntime,
   REAL_AGENT_DIRS,
-  realAgentDigests,
 } from "./task-host-e2e-sandbox.mjs"
 import { globalModeRpcCount, parentArgv, sandboxProcesses } from "./task-host-e2e-process.mjs"
 import { probeChildSessionOpen, probeSessionContext } from "./task-host-e2e-engine-probe.mjs"
@@ -27,11 +25,13 @@ import { scenarioA, scenarioA1, scenarioB, scenarioI } from "./task-host-e2e-sce
 import { scenarioC, scenarioC2 } from "./task-host-e2e-team.mjs"
 import { scenarioF, scenarioG, scenarioH } from "./task-host-e2e-ops.mjs"
 import { scenarioD, scenarioE4, scenarioH2, scenarioHandoffSuite } from "./task-host-e2e-gated.mjs"
+import { scenarioJ } from "./task-host-e2e-reattach.mjs"
+import { scenarioK } from "./task-host-e2e-threads.mjs"
 import { baselineScenarios } from "./task-host-e2e-baseline.mjs"
 import { runSelfTest } from "./task-host-e2e-selftest.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
-const MOCK_ENTRY = join(scriptDir, "task-e2e-mock-provider.ts")
+const MOCK_ENTRY = join(scriptDir, "task-host-e2e-mock-provider.mjs")
 const SUMMARY_NAMES = ["task-host-e2e.json", "task-41-senpi-task-daemon-host-runner-v2.json"]
 const SCENARIOS = [
   ["A", scenarioA],
@@ -47,6 +47,8 @@ const SCENARIOS = [
   ["H", scenarioH],
   ["H2", scenarioH2],
   ["I", scenarioI],
+  ["J", scenarioJ],
+  ["K", scenarioK],
 ]
 
 function parseArgs(argv) {
@@ -84,7 +86,6 @@ async function main(options) {
     return 1
   }
   mkdirSync(out, { recursive: true })
-  const digestsBefore = realAgentDigests()
   const binaryBefore = binaryDigest(bin)
   const runRoot = createRunRoot()
   const runtime = provisionRuntime(bin, runRoot)
@@ -123,14 +124,9 @@ async function main(options) {
       facts: { binaryDigestBefore: binaryBefore, binaryDigestAfter: binaryAfter, runtimeVersionsProvisioned: provisioned },
     })
   }
-  const digestsAfter = realAgentDigests()
-  const digestStable = Object.entries(digestsBefore).every(([dir, digest]) => digestsAfter[dir].credentials === digest.credentials)
-  // What the EXIT CODE gates on is the falsifiable structural claim: no process this run started ever
-  // named a real agent dir. A digest cannot carry that weight on a machine where the operator's own
-  // omo session rewrites ~/.omo/agent/auth.json mid-run; the digest delta is reported per file instead,
-  // so a reviewer attributes every change rather than trusting one boolean.
+  // Structural isolation only: QA must not even read the operator's credentials to hash them.
   const addressed = results.flatMap((entry) => entry.receipt?.processesNamingRealAgentDir ?? [])
-  const realSenpiUntouched = addressed.length === 0 && digestStable
+  const realSenpiUntouched = addressed.length === 0
   const leaked = await sweepRunRoot(runRoot)
   rmSync(runRoot, { recursive: true, force: true })
   const summary = {
@@ -147,10 +143,8 @@ async function main(options) {
     realSenpiUntouched,
     realAgentDirNeverAddressed: addressed.length === 0,
     realAgentProcessesNamingRealDir: addressed,
-    realAgentCredentialDigestStable: digestStable,
+    realAgentFilesRead: false,
     realAgentDirs: REAL_AGENT_DIRS,
-    realAgentCredentialDigests: { before: pluck(digestsBefore), after: pluck(digestsAfter) },
-    realAgentWatchedFilesChanged: changedRealAgentFiles(digestsBefore, digestsAfter),
     globalModeRpcProcessCount: globalModeRpcCount(),
     runRootProcessesBeforeSweep: leaked.before,
     runRootProcessesAfterSweep: leaked.after,
@@ -169,7 +163,6 @@ async function main(options) {
     out,
     realSenpiUntouched,
     realAgentDirNeverAddressed: summary.realAgentDirNeverAddressed,
-    realAgentWatchedFilesChanged: summary.realAgentWatchedFilesChanged,
   }))
   return summary.result === "PASS" && leaked.after.length === 0 && addressed.length === 0 ? 0 : 1
 }
@@ -214,16 +207,12 @@ function runtimeVersions(home) {
   return existsSync(root) ? readdirSync(root) : []
 }
 
-function pluck(digests) {
-  return Object.fromEntries(Object.entries(digests).map(([dir, entry]) => [dir, entry.credentials]))
-}
-
 function optionalPath(value) {
   return value === undefined ? undefined : resolve(value)
 }
 
 function countBy(results) {
-  return results.reduce((counts, entry) => ({ ...counts, [entry.status]: (counts[entry.status] ?? 0) + 1 }), {})
+  return results.reduce((counts, entry) => ({ ...counts, [entry.status]: (counts[entry.status] ?? 0) + 1 }), { pass: 0, fail: 0, skipped: 0 })
 }
 
 async function runScenarios(run, selected) {
@@ -233,6 +222,9 @@ async function runScenarios(run, selected) {
     try {
       const produced = await scenario(run)
       results.push(...(Array.isArray(produced) ? produced : [produced]))
+      for (const result of Array.isArray(produced) ? produced : [produced]) {
+        console.log(`${result.scenario}: ${result.status.toUpperCase()} ${result.reason ?? result.title}`)
+      }
     } catch (error) {
       results.push({
         scenario: name,
@@ -247,7 +239,7 @@ async function runScenarios(run, selected) {
 
 const options = parseArgs(process.argv.slice(2))
 if (process.argv.includes("--self-test")) {
-  runSelfTest(scriptDir)
+  await runSelfTest(scriptDir)
   console.log("SELF-TEST OK")
 } else {
   process.exitCode = await main(options)

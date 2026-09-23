@@ -57,7 +57,12 @@ export function DagGraphView({
   const [drawingEdges, setDrawingEdges] = useState<ReadonlySet<string>>(EMPTY)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const prevStatesRef = useRef<ReadonlyMap<string, DagState>>(new Map())
-  const seenRef = useRef<ReadonlySet<string>>(EMPTY)
+  // Entry cascade: the run's node set is fixed for the life of this mount (the parent remounts
+  // per replay cycle), so every node enters at mount; a node leaves the map once its entry
+  // animation has ended.
+  const [entering, setEntering] = useState<ReadonlyMap<string, number>>(
+    () => new Map(layout.nodes.map((placement, index) => [placement.node.id, index] as const)),
+  )
 
   const nodeState = useMemo(
     () => new Map(run.nodes.map((node) => [node.id, node.state] as const)),
@@ -104,15 +109,6 @@ export function DagGraphView({
     centerWave(activeWave, rows)
   }, [overflowing, activeWave, layout, centerWave])
 
-  const entering = new Map<string, number>()
-  for (const placement of layout.nodes) {
-    if (!seenRef.current.has(placement.node.id)) entering.set(placement.node.id, entering.size)
-  }
-  useEffect(() => {
-    if (entering.size === 0) return
-    seenRef.current = new Set([...seenRef.current, ...entering.keys()])
-  })
-
   const clearOneShot = useCallback((nodeId: string) => {
     const drop = (previous: ReadonlySet<string>) => {
       if (!previous.has(nodeId)) return previous
@@ -122,6 +118,12 @@ export function DagGraphView({
     }
     setPopping(drop)
     setShaking(drop)
+    setEntering((previous) => {
+      if (!previous.has(nodeId)) return previous
+      const next = new Map(previous)
+      next.delete(nodeId)
+      return next
+    })
   }, [])
   const onDrawn = useCallback(() => setDrawingEdges(EMPTY), [])
 

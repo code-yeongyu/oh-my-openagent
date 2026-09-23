@@ -1,3 +1,0 @@
-exactLock=/tmp/omo-round2-manual.BMoxe6/agent/hooks-state.json.lock
-lockStillHeld=true
-isolatedAgentDir=/tmp/omo-round2-manual.BMoxe6/agent

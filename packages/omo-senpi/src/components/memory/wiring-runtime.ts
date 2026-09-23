@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import { TranscriptJournal, sanitizeToSlug, type ReservedRun } from "@oh-my-opencode/memory-core"
 
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { MemoryIdentityContext } from "./context"
 import type { DreamTriggerSession } from "./dream-trigger"
 import { FactsExtractorRunner } from "./facts-runner"
@@ -19,6 +20,7 @@ import {
   resolveParentCacheReusable as resolveParentCacheReusableFromCtx,
   resolveParentContextTokens as resolveParentContextTokensFromCtx,
   resolveParentSessionFile as resolveParentSessionFileFromCtx,
+  resolveSessionAgentDir,
 } from "./session-context-resolver"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
@@ -74,6 +76,11 @@ export function createMemoryRuntimeWiring(
 
   function resolveParentCacheReusable(): boolean {
     return resolveParentCacheReusableFromCtx(lastEventCtx.current)
+  }
+
+  /** The engine's own answer for this session; detection is the fallback for hosts without it. */
+  function resolveAgentDir(): string {
+    return resolveSessionAgentDir(lastEventCtx.current) ?? resolveAgentHome({ env: process.env })
   }
 
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
@@ -137,6 +144,7 @@ export function createMemoryRuntimeWiring(
       resolveParentContextTokens,
       resolveParentSessionFile,
       resolveParentCacheReusable,
+      resolveAgentDir,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
       ...(liveSession === undefined
         ? {}

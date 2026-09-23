@@ -214,6 +214,35 @@ describe("GitMemoryRepo", () => {
     expect(history[1]?.paths).toEqual(["system/persona.md"])
     expect(filtered.map((commit) => commit.sha)).toEqual([first.sha])
     expect(filtered[0]?.paths).toBeUndefined()
+  })
+
+  it("#given trailers on two commits #when log runs with grep #then only commits whose message carries every string come back", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\n" }] })
+    await writeFile(join(dir, "system/persona.md"), "---\ndescription: Persona\n---\nfirst\n")
+    const first = await repo.commitWrite(
+      ["system/persona.md"],
+      "persona\n\nOmo-Writer: memory-tool\nOmo-Session: session-1\nOmo-Turn: 2",
+      { agentId: "agent-one", authorName: "Memory Agent" },
+    )
+    await writeFile(join(dir, "notes.md"), "note\n")
+    const second = await repo.commitWrite(
+      ["notes.md"],
+      "remember note\n\nOmo-Writer: memory-tool\nOmo-Session: session-2\nOmo-Turn: 4",
+      { agentId: "agent-one", authorName: "Memory Agent" },
+    )
+
+    // when
+    const sessionOne = await repo.log({ grep: ["Omo-Writer: memory-tool", "Omo-Session: session-1"] })
+    const nobody = await repo.log({ grep: ["Omo-Writer: memory-tool", "Omo-Session: session-9"] })
+    const both = await repo.log({ grep: ["Omo-Writer: memory-tool"] })
+
+    // then: every string must match (all-match), fixed strings, newest first
+    expect(sessionOne.map((commit) => commit.sha)).toEqual([first.sha])
+    expect(nobody).toEqual([])
+    expect(both.map((commit) => commit.sha)).toEqual([second.sha, first.sha])
+    expect(sessionOne[0]?.paths).toBeUndefined()
   }, 30_000)
 
   it("#given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree", async () => {

@@ -125,11 +125,23 @@ This table is the edge of this catalog. Hero atmospheres, animated or shader bac
 
 These sharpen the shared axioms for interaction work; none of them replace the style skill.
 
-- **Motion serves meaning.** Every animation maps to a real interaction, state change, or affordance. A hover that changes nothing is slop — beui.dev patterns all animate *state*, never decoration.
-- **Reduced motion is part of the component, not an afterthought.** Every beui.dev component ships a reduced-motion path; match that bar. Web: `prefers-reduced-motion: reduce` disables or replaces every transform-based animation (the `loader` pattern's opacity-pulse swap is the model). React Native: respect the system reduce-motion setting.
+- **Motion serves meaning, and each meaning has its motion.** Every animation maps to a real interaction, state change, or affordance; a hover that changes nothing is slop. Pick the motion from the meaning, not from the catalog's most striking demo:
+
+  | Meaning | Motion | Not |
+  |---|---|---|
+  | Press acknowledged | Scale or wash on the element, same frame | A ripple that arrives after the action fires |
+  | Something is in progress | A moving indicator | A static one, which reads as frozen |
+  | Something is live or new | A brief highlight or subtle pulse, once | A permanent loop |
+  | Something arrived from elsewhere | Enter from the direction of its origin | A fade-in from nowhere |
+  | Something moved | It travels there | Disappear here, appear there |
+  | An unfamiliar control exists | A one-time introduction on first appearance | Continuous decoration |
+
+- **Transitions keep identity.** A surface that resizes, repositions, or swaps content animates from its old geometry to the new one (`layoutId` shared layout or a measured-height morph); the user must never suspect a replacement. When items move and others appear, move first, then add. Keep one element still as the anchor while the rest animates. Nothing reflows under the pointer while the user is typing or dragging. A panel leaves the way it came: a sheet that rose from the bottom dismisses downward, and the reverse gesture undoes the forward one.
+- **Reduced motion is part of the component, not an afterthought.** Every beui.dev component ships a reduced-motion path; match that bar, and reduce rather than remove: under `prefers-reduced-motion: reduce`, positional, scale, and depth motion becomes a cross-fade (the `loader` pattern's opacity-pulse swap is the model); fades, gesture-tracked motion, and progress indicators stay; blur never animates its start or end. Any state that motion conveys is also announced (`aria-live`, a label change). React Native: respect the system reduce-motion setting.
 - **GPU-composited properties only** — `transform`, `opacity`, `filter`. Never animate layout properties; morph layout through shared-layout (`layoutId`) or measured height primitives instead.
-- **Springs move things; easings tint things.** Spatial movement (position, scale, layout morphs) wants spring physics so it stays interruptible and retargetable. Color, opacity, and blur want short duration + easing. Do not put a fixed-duration tween on a gesture-driven surface.
-- **Interruptibility is non-negotiable.** A press, hover-out, or route change mid-animation must retarget smoothly, never queue or block input. This is the practical reason beui.dev uses springs — copy that property, not just the bounce.
+- **Springs move things; easings tint things; continuous input tracks.** Spatial movement (position, scale, layout morphs) wants spring physics so it stays interruptible and retargetable. Color, opacity, and blur want short duration + easing. Discrete input (a tap, a keypress) animates; continuous input (a drag, a wheel, a slider) follows the pointer 1:1 with no interpolation, then settles with a spring on release. Do not put a fixed-duration tween on a gesture-driven surface.
+- **Interruptibility is non-negotiable.** A press, hover-out, or route change mid-animation must retarget smoothly, never queue or block input, and never snap to the end state. This is the practical reason beui.dev uses springs — copy that property, not just the bounce.
+- **One event, one feedback.** Feedback lives on the object that changed. Do not stack a spinner over a control that already shows progress, re-animate a native control, or confirm routine success with a toast: success is assumed and shown by the changed state; failure is always reported, next to the object, with the cause. Prefer undo to a confirmation dialog; a dialog is for uncommon and irreversible loss only, its buttons name the outcome ("Delete", "Keep editing"), and neither Cancel nor the destructive action takes the default (Enter) role. Send the request when the input lands, not when the acknowledging animation ends.
 - **Motion never regresses input latency or stream rendering.** Measure with the `perfection` ruleset when in doubt; a virtualized list's measurement contract beats a pretty reveal.
 - **Library choice is a project decision, not a default.** beui.dev assumes Motion (motion.dev) + Tailwind. If the project already has a motion stack, adapt the mechanism to it. If it has none: CSS transitions/WAAPI cover micro-interactions; adding a library is justified by shared-layout or spring-physics needs and gets recorded (with bundle cost) in `DESIGN.md`. Check `package.json` before importing anything.
 
@@ -143,4 +155,4 @@ These sharpen the shared axioms for interaction work; none of them replace the s
 
 ## 6. Verification
 
-Interaction work is verified through `/visual-qa` with motion actually driven and inspected — hover, press, open/close, swipe, and theme transitions exercised on the rendered surface, plus a reduced-motion pass (emulate `prefers-reduced-motion: reduce`) proving the fallback exists. Timing-sensitive changes record a short screen capture, not just stills.
+Interaction work is verified through `/visual-qa` with motion actually driven and inspected — hover, press, open/close, swipe, and theme transitions exercised on the rendered surface, an interruption pass (retarget mid-animation, dismiss mid-open) proving nothing snaps or blocks, and a reduced-motion pass (emulate `prefers-reduced-motion: reduce`) proving the fallback exists. Timing-sensitive changes record a short screen capture, not just stills.

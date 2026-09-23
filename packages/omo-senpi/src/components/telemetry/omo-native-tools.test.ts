@@ -139,15 +139,15 @@ describe("OmO Native tool telemetry", () => {
     const { pi, events } = fixture()
 
     await pi.dispatch("tool_result", result("omo/task", {
-      category: "deep",
+      category: "deep-low",
       run_in_background: true,
       tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }],
     }), context())
 
     expect(eventProperties(events, "delegation_started")).toEqual([
-      { $session_id: "hashed:session-a", kind: "category", name: "deep", background: true, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "category", name: "deep", background: true, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "category", name: "deep", background: true, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
+      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
     ])
   })
 

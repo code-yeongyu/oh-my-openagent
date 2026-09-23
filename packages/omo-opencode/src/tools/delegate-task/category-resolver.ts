@@ -2,6 +2,7 @@ import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { canonicalCategoryName } from "@oh-my-opencode/omo-config-core"
 import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
@@ -70,8 +71,13 @@ export async function resolveCategoryExecution(
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
-  const categoryName = args.category!
+  // A retired builtin name resolves to its replacement so third-party skills and AGENTS.md text
+  // spawning the old category keep working; a user category of that name still wins over the alias.
   const enabledCategories = mergeCategories(userCategories)
+  const requestedCategoryName = args.category!
+  const categoryName = enabledCategories[requestedCategoryName] !== undefined
+    ? requestedCategoryName
+    : canonicalCategoryName(requestedCategoryName)
   const categoryExists = enabledCategories[categoryName] !== undefined
 
   if (!categoryExists) {
@@ -106,6 +112,17 @@ export async function resolveCategoryExecution(
 To use this category:
 1. Connect a provider with this model: ${requiredModel}
 2. Or configure an alternative model in your .omo/omo.jsonc for this category
+
+Available categories: ${allCategoryNames}`)
+    }
+
+    if (categoryExists && requirement?.requiresAnyModel && userCategories?.[categoryName] === undefined) {
+      const chainModels = [...new Set(requirement.fallbackChain.map((entry) => entry.model))].join(", ")
+      return categoryResolutionError(`Category "${categoryName}" has no available model: none of its fallback-chain models (${chainModels}) is available.
+
+To use this category:
+1. Connect a provider that serves one of: ${chainModels}
+2. Or configure a model for this category in your .omo/omo.jsonc
 
 Available categories: ${allCategoryNames}`)
     }

@@ -42,11 +42,11 @@ Create one Team Mode run with these 5 members:
 
 | Member | Kind | Category | Role |
 |--------|------|----------|------|
-| `surface-hunter` | category | `deep` | Map entry points, trust boundaries, and reachable attack surfaces. |
+| `surface-hunter` | category | `deep-low` | Map entry points, trust boundaries, and reachable attack surfaces. |
 | `auth-data-hunter` | category | `ultrabrain` | Hunt auth, authorization, data isolation, injection, and secret handling flaws. |
 | `runtime-supply-hunter` | category | `unspecified-high` | Hunt filesystem, subprocess, archive, dependency, hook, MCP, and config risks. |
 | `poc-engineer-a` | category | `unspecified-high` | Build minimal PoCs for the strongest candidate findings. |
-| `poc-engineer-b` | category | `deep` | Independently reproduce, falsify, or downgrade candidate findings. |
+| `poc-engineer-b` | category | `deep-high` | Independently reproduce, falsify, or downgrade candidate findings. |
 
 Call `team_create` with an inline spec:
 
@@ -59,7 +59,7 @@ team_create({
       {
         name: "surface-hunter",
         kind: "category",
-        category: "deep",
+        category: "deep-low",
         prompt: "You map attack surface. Enumerate entry points, trust boundaries, attacker-controlled inputs, data sinks, privilege transitions, and sensitive assets. Return evidence with file paths and exact functions. Do not assign severity unless you can name an attack path."
       },
       {
@@ -83,7 +83,7 @@ team_create({
       {
         name: "poc-engineer-b",
         kind: "category",
-        category: "deep",
+        category: "deep-high",
         prompt: "You independently reproduce candidate findings and try to falsify them. Downgrade anything without a working path. If a PoC is unsafe to run, design a safe static or dry-run proof and explain the limit."
       }
     ]

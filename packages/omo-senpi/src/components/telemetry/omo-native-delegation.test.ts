@@ -47,7 +47,7 @@ function record(overrides: Partial<TaskRecord> = {}): TaskRecord {
     notify_on_terminal: false,
     notification: { run_epoch: 0, notified_epoch: -1 },
     task_seq: 7,
-    category: "deep",
+    category: "deep-low",
     background_mode: "foreground",
     spawn_spec: { version: 1, cwd: "/repo", prompt: "work" },
     run_stats: { runtime_ms: 5, turns: 1, tool_calls: 1, duration_status: "monotonic", token_status: "complete", cost_status: "unavailable" },

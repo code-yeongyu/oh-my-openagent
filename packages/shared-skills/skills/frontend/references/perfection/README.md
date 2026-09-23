@@ -67,6 +67,7 @@ During the audit loop, after Lighthouse scores pass, run a Design System Complia
 - **Spacing**: every margin/padding/gap value must be a multiple of the base unit (4px) and ideally use a declared token.
 - **Components**: any component used 2+ times must be documented in `DESIGN.md` Section 5. If it isn't, add it.
 - **Depth**: if `DESIGN.md` says "borders-only", there must be zero `box-shadow` declarations. If "tonal-shift", zero borders for surface separation.
+- **State borders**: grep for `border(-[trbl])?-(primary|warning|destructive|success)` and accent-width rules (`border-l-2`, `border-l-4`…) used to mark selected/focused/active. Each hit is a violation — state belongs to ink-alpha washes and glyphs. Keyboard `focus-visible` rings are exempt.
 
 A page that scores Lighthouse 100 but uses 14 undeclared hex codes and 8 magic spacing values is **NOT DONE**. The design system is the architecture — Lighthouse measures the performance of that architecture.
 

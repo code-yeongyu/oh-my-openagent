@@ -8,13 +8,17 @@
     "./config-migration": {
       "types": "./src/config-migration/index.ts",
       "import": "./src/config-migration/index.ts"
+    },
+    "./binary-downloader": {
+      "types": "./src/shared/binary-downloader.ts",
+      "import": "./src/shared/binary-downloader.ts"
     }
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@clack/prompts": "^1.7.0",
+    "@clack/prompts": "^1.8.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
@@ -35,12 +39,12 @@
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "@opencode-ai/plugin": "1.18.22",
-    "@opencode-ai/sdk": "1.18.22",
+    "@opencode-ai/plugin": "1.18.31",
+    "@opencode-ai/sdk": "1.18.31",
     "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.7",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   }
 }

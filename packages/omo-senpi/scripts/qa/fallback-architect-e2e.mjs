@@ -18,6 +18,8 @@ const DIRECTIVE_TYPE = "omo-fallback-architect:directive";
 const NOTICE_TYPE = "omo-fallback-architect:notice";
 const REMINDER_TAG = "<omo-fallback-architect-reminder>";
 const PRIMARY = "omo-mock/claude-fable-5";
+// A primary outside the fable family: the nudge follows the refusal, not a model id (omo#8513).
+const ALT_PRIMARY = "omo-mock/claude-opus-5";
 const FALLBACK = "omo-mock/mock-weak";
 
 const SCENARIOS = [
@@ -26,6 +28,13 @@ const SCENARIOS = [
 	{ name: "C-transient-fallback", primaryOutcome: "transient", categories: "declared", expectDirective: false },
 	{ name: "D-architect-disabled", primaryOutcome: "refusal", categories: "disabled", expectDirective: false },
 	{ name: "E-builtin-default", primaryOutcome: "refusal", categories: "builtin", expectDirective: true },
+	{
+		name: "F-non-fable-refusal",
+		primaryOutcome: "refusal",
+		categories: "declared",
+		expectDirective: true,
+		primary: ALT_PRIMARY,
+	},
 ];
 
 function seedScenario(scenario) {
@@ -44,7 +53,7 @@ function seedScenario(scenario) {
 		maxRetries: 1,
 		baseDelayMs: 1,
 		modelFallback: true,
-		fallbackChains: { [PRIMARY]: [FALLBACK] },
+		fallbackChains: { [scenario.primary ?? PRIMARY]: [FALLBACK] },
 	};
 	writeFileSync(join(sandbox.agentDir, "settings.json"), `${JSON.stringify(settings, null, 2)}\n`);
 
@@ -63,7 +72,8 @@ function seedScenario(scenario) {
 		`${JSON.stringify({ primaryOutcome: scenario.primaryOutcome }, null, 2)}\n`,
 	);
 
-	return { sandbox, sessionDir, home };
+	const primary = scenario.primary ?? PRIMARY;
+	return { sandbox, sessionDir, home, primary, modelId: primary.slice(primary.indexOf("/") + 1) };
 }
 
 function driveSenpi(senpiBin, scenario) {
@@ -76,7 +86,7 @@ function driveSenpi(senpiBin, scenario) {
 			"--provider",
 			"omo-mock",
 			"--model",
-			"claude-fable-5",
+			scenario.modelId,
 			"--session-dir",
 			scenario.sessionDir,
 			"design a caching layer for the fixture service",
@@ -191,7 +201,7 @@ function runScenario(senpiBin, scenario) {
 		const noticeOk = scenario.expectDirective
 			? notices.length === 1 &&
 				noticePayload?.display === true &&
-				noticePayload?.details?.from === PRIMARY &&
+				noticePayload?.details?.from === seeded.primary &&
 				noticePayload?.details?.to === FALLBACK &&
 				String(noticePayload?.content ?? "").includes('task(category: "architect")')
 			: notices.length === 0;
@@ -200,7 +210,7 @@ function runScenario(senpiBin, scenario) {
 		// Criterion 1 is "exactly ONE directive", so the count is the observable, never a boolean.
 		const expectedCount = scenario.expectDirective ? 1 : 0;
 		const contentOk = scenario.expectDirective
-			? content.includes(PRIMARY) &&
+			? content.includes(seeded.primary) &&
 				content.includes(FALLBACK) &&
 				content.includes('task(category: "architect")') &&
 				content.includes("Decompose the current problem into independent parts") &&
@@ -273,7 +283,7 @@ function runSelfTest() {
 	if (collectDirectives([{ type: "user", content: "hello" }]).length !== 0) throw new Error("self-test: false positive");
 	const duplicated = [...entries, entries[0]];
 	if (collectDirectives(duplicated).length !== 2) throw new Error("self-test: duplicate directives must be counted, not collapsed");
-	if (SCENARIOS.filter((s) => s.expectDirective).length !== 3) throw new Error("self-test: expected three positive scenarios");
+	if (SCENARIOS.filter((s) => s.expectDirective).length !== 4) throw new Error("self-test: expected four positive scenarios");
 	const noticeEntry = {
 		type: "custom_message",
 		customType: NOTICE_TYPE,

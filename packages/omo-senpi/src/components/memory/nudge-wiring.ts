@@ -132,7 +132,12 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
       if (state === undefined) return undefined
       const settings = options.resolveSettings(identity)
       if (!settings.enabled) return undefined
-      const history = await repo.head() === null ? [] : await repo.log()
+      // Ask git for the commits that carry both trailers instead of reading the whole history and
+      // filtering here: a long-lived identity has thousands of commits and this runs on every prompt.
+      // The predicate below still decides, so a prefix collision in the grep cannot widen the answer.
+      const history = await repo.head() === null
+        ? []
+        : await repo.log({ grep: [`Omo-Writer: memory-tool`, `Omo-Session: ${sessionId}`] })
       const lastSave = history.find((commit) =>
         commit.trailers["Omo-Writer"] === "memory-tool"
         && commit.trailers["Omo-Session"] === sessionId

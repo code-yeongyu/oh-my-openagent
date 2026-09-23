@@ -2,7 +2,7 @@
 
 **Role:** Adapter - distribution package for the senpi-based omo native edition.
 
-Publishes npm package `omo-ai` (bin `omo`) on the BETA channel only. The launcher in `bin/` spawns the
+Publishes npm package `omo-ai` (bin `omo`) on the BETA channel only. The launcher in `bin/` runs the
 exact-pinned `@code-yeongyu/senpi` CLI with `--extension <pkgRoot>/plugin`, where `plugin/` is the staged
 omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, never committed).
 
@@ -23,18 +23,19 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     bun-global install trusts the bun that installed it, every other install (npm, project-local,
     bunx) probes the discovered bun once per node boot and hands over when it is >= `BUN_MIN_VERSION`
     (1.4.0); `OMO_RUNTIME=node` always stays on node, `OMO_RUNTIME=bun` always re-execs (no floor).
-    Both spawn layers are ASYNC on purpose: `spawnSync` blocks the event loop, so a signaled launcher
-    dies before any handler runs and orphans the engine. `runChild` forwards `SIGTERM`/`SIGHUP` to the
-    child, waits out a bounded grace window (`OMO_SIGNAL_GRACE_MS`, default 10s) and re-raises the
-    signal on itself if the child ignores it; `SIGINT` is never forwarded (the tty already delivers it
-    to the whole foreground process group) but is still waited out. Never reintroduce `spawnSync` here.
+    POSIX handoffs use `execve` with argv[0], preserving the PID, args and environment without a
+    resident wrapper. Windows, missing execve and thrown execve retain async `runChild`; daemon
+    attach also stays spawn-based. The fallback forwards `SIGTERM`/`SIGHUP`, waits up to
+    `OMO_SIGNAL_GRACE_MS` (default 10s), then re-raises an ignored signal. It waits for `SIGINT`
+    without forwarding it twice. Never use `spawnSync` for these long-lived handoffs.
   - `bun-bin-shim.js` — `ensureBunBinShim`: keeps the user-facing bun-global bin an sh shim that
     execs bun directly (POSIX only, self-healing across `bun add -g` updates, fail-open)
   - `doctor.js` — diagnostics plus stale-orphan detection: `classifyEngineProcesses` splits live
     engines into stale (interactive, PPID 1), attached and managed (`--mode`), and
     `reapStaleEngines` terminates ONLY explicitly named pids that are still stale at request time.
     Pattern-killing is forbidden.
-  - `rpc-stream-errors.js` - postinstall preparation of the installed engine's stdio RPC serializer. A malformed streamed event produces a failed `prompt` response with `errorCode: invalid_stream_event` and shuts down with exit 1. The same preparation runs after an omob engine swap; repeated preparation is idempotent, and a missing RPC target, missing required binding (including `shutdown`), or unsupported serializer shape fails installation rather than silently missing the guard. Binding checks also run on already-prepared code.
+  - `engine-prepare.js` / `claude-code-floor.js` - the installed-engine preparation (Claude Code UA floor, compile-safe css-tree data, RPC stream guard). postinstall (`bin/senpi-patch.mjs`) runs it and stamps the engine tree with `.omo-engine-prepared` (the omo-ai package version); the launcher runs `ensureEnginePrepared` before every engine start so an install whose scripts never ran (`ignore-scripts=true`, Bun's blocked postinstalls) is prepared on first launch (#8713). A failure warns with the reinstall command and never blocks the launch.
+  - `rpc-stream-errors.js` - postinstall/launch preparation of the installed engine's stdio RPC serializer. A malformed streamed event produces a failed `prompt` response with `errorCode: invalid_stream_event` and shuts down with exit 1. The same preparation runs after an omob engine swap; repeated preparation is idempotent, and a missing RPC target, missing required binding (including `shutdown`), or unsupported serializer shape fails installation rather than silently missing the guard. Binding checks also run on already-prepared code.
   - `package-paths.js`, `provider-map.json`, `legacy-bun-global-migration.js`
 - **agent state lives in ONE canonical directory: `~/.omo/agent`.** `bin/lib/agent-dir.js` owns that answer (`canonicalAgentDir`), and the launcher, `omo doctor`, `omo setup` and the locally installed launcher (`packages/omo-senpi/src/install/local-launcher.ts`) all resolve it from there - never by composing their own default. An explicit `OMO_CODING_AGENT_DIR` (or legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins, and `adoptLegacyFlatState` carries state left in the pre-unification flat `~/.omo` layout forward once, so unifying the location never reads as another reset.
 - `bin/omo-agent-toolkit.js` - internal delegate to the staged toolkit runtime, NOT an npm bin

@@ -10,7 +10,9 @@ import { atomicWriteJson, isNonEmptyFile, readAdmissionBreaker, readCount, readC
 import { spawnRoleDenial } from "./spawn-role-guard.js";
 import { isStateLockTimeout, type StateLockOptions, withStateLockSync } from "./state-lock.js";
 import {
+	canonicalReviewerAgentName,
 	GATE_REVIEWER_AGENT_NAMES,
+	LEGACY_REVIEWER_AGENT_ALIASES,
 	REVIEWER_ROLES_BY_SURFACE,
 	resolveToolkitSurface,
 	reviewerRolesFor,
@@ -28,11 +30,13 @@ const SPAWN_TOOL_TOKENS = new Set([
 ]);
 export const DEFAULT_FANOUT_LIMIT = 24;
 const DEFAULT_REVIEW_SPAWN_LIMIT = 3;
-const GATE_MESSAGE_PATTERN = /lazycodex-gate-reviewer|omo-senpi-gate-reviewer|final gate review/i;
+const GATE_MESSAGE_PATTERN =
+	/lazycodex-gate-reviewer|omo-native-gate-reviewer|omo-senpi-gate-reviewer|final gate review/i;
 const REVIEW_AGENT_TYPES = [
 	...Object.values(REVIEWER_ROLES_BY_SURFACE).map((roles) => roles.gateReview),
 	...Object.values(REVIEWER_ROLES_BY_SURFACE).map((roles) => roles.codeReview),
 	...Object.values(REVIEWER_ROLES_BY_SURFACE).map((roles) => roles.manualQa),
+	...Object.keys(LEGACY_REVIEWER_AGENT_ALIASES),
 ] as const;
 const REVIEW_AGENT_TYPE_SET = new Set<string>(REVIEW_AGENT_TYPES);
 
@@ -238,13 +242,14 @@ function reviewAgentType(toolInput: unknown): string | null {
 }
 
 function activeSurfaceReviewerAlias(reviewer: string): string {
+	const canonical = canonicalReviewerAgentName(reviewer);
 	const activeRoles = reviewerRolesFor(resolveToolkitSurface());
 	for (const roles of Object.values(REVIEWER_ROLES_BY_SURFACE)) {
-		if (reviewer === roles.codeReview) return activeRoles.codeReview;
-		if (reviewer === roles.manualQa) return activeRoles.manualQa;
-		if (reviewer === roles.gateReview) return activeRoles.gateReview;
+		if (canonical === roles.codeReview) return activeRoles.codeReview;
+		if (canonical === roles.manualQa) return activeRoles.manualQa;
+		if (canonical === roles.gateReview) return activeRoles.gateReview;
 	}
-	return reviewer;
+	return canonical;
 }
 
 function deny(reason: string): string {

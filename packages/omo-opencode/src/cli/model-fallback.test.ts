@@ -57,7 +57,7 @@ describe("generateModelConfig", () => {
         variant: "high",
         fallback_models: [
           {
-            model: "github-copilot/claude-opus-5",
+            model: "github-copilot/claude-opus-5.5",
             variant: "max",
           },
           {
@@ -69,9 +69,9 @@ describe("generateModelConfig", () => {
       // Astra max/high rungs land first; Copilot clamps the max tier to high like the Sol rungs.
       expect(result.categories?.ultrabrain?.model).toBe("github-copilot/gpt-6-astra")
       expect(result.categories?.ultrabrain?.variant).toBe("high")
-      expect(result.categories?.deep?.model).toBe("github-copilot/gpt-6-astra")
-      expect(result.categories?.deep?.variant).toBe("high")
-      expect(result.categories?.["unspecified-low"]?.model).toBe("github-copilot/grok-4.6")
+      expect(result.categories?.["deep-high"]?.model).toBe("github-copilot/gpt-6-astra")
+      expect(result.categories?.["deep-high"]?.variant).toBe("high")
+      expect(result.categories?.["unspecified-low"]?.model).toBe("github-copilot/grok-4.7")
       expect(result.categories?.["unspecified-low"]?.variant).toBe("high")
     })
     test("omits librarian when only ZAI is available", () => {
@@ -175,7 +175,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then explore should use native OpenAI mini-fast (primary model)
-      expect(result.agents?.explore?.model).toBe("openai/gpt-5.6-luna-fast")
+      expect(result.agents?.explore?.model).toBe("openai/gpt-6-luna-fast")
       expect(result.agents?.explore?.variant).toBe("low")
     })
 
@@ -211,7 +211,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5-5")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -228,7 +228,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5-5")
     })
 
     test("Sisyphus resolves to gpt-5.6-sol medium when only OpenAI is available", () => {

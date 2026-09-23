@@ -1,6 +1,7 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { resolveModelProfile, type ModelProfileResolution } from "./resolve"
+import { DEFAULT_MODEL_PROFILE_ID } from "./builtin-profiles"
+import { resolveModelProfile, type ModelProfileResolution, type ModelProfileSummary } from "./resolve"
 
 /**
  * Applies the active `model_profile` to the MAIN session model at session start.
@@ -90,6 +91,13 @@ function isFreshSessionWithoutExplicitModel(payload: unknown): boolean {
   return provenance !== "cli" && provenance !== "scoped"
 }
 
+// Lanes have no TUI surface yet: the terminal shows neither the lane nor its reasoning, so an
+// interactive TUI session keeps the model the user started with. The desktop (rpc) and headless
+// runs still apply the profile.
+function isTuiSession(eventCtx: unknown): boolean {
+  return isRecord(eventCtx) && eventCtx["mode"] === "tui"
+}
+
 function extractCwd(pi: SenpiExtensionAPI, eventCtx: unknown): string {
   if (pi.cwd !== undefined) return pi.cwd
   if (isRecord(eventCtx) && typeof eventCtx["cwd"] === "string") return eventCtx["cwd"]
@@ -107,19 +115,24 @@ function availableSelectors(registry: SessionRegistry): string[] {
   return selectors
 }
 
+function profileLabel(profile: ModelProfileSummary): string {
+  return profile.displayName !== profile.id ? `"${profile.id}" (${profile.displayName})` : `"${profile.id}"`
+}
+
 function noticeContent(resolution: ModelProfileResolution): string {
   switch (resolution.kind) {
     case "resolved": {
       const model = `${resolution.provider}/${resolution.modelId}`
+      const reasoning = resolution.reasoning !== undefined ? ` ${resolution.reasoning}` : ""
       const skipped = resolution.skipped.length > 0 ? ` (skipped: ${resolution.skipped.join(", ")})` : ""
-      return `omo-senpi: model profile "${resolution.profile.id}" selected ${model}${skipped}; ${MID_SESSION_NOTE}`
+      return `OmO Native: model profile ${profileLabel(resolution.profile)} selected ${model}${reasoning}${skipped}; ${MID_SESSION_NOTE}`
     }
     case "unavailable":
-      return `omo-senpi: model profile "${resolution.profile.id}" has no available model (chain: ${resolution.chain.join(", ")}); keeping senpi's default model`
+      return `OmO Native: model profile ${profileLabel(resolution.profile)} has no available model; none of the chain is in this session's model registry (${resolution.chain.join(", ")}); keeping senpi's default model`
     case "empty":
-      return `omo-senpi: model profile "${resolution.profile.id}" defines no models; keeping senpi's default model`
+      return `OmO Native: model profile ${profileLabel(resolution.profile)} defines no models; keeping senpi's default model`
     case "unknown":
-      return `omo-senpi: ${resolution.message}`
+      return `OmO Native: ${resolution.message}`
   }
 }
 
@@ -132,14 +145,15 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
       // instance, which is the conservative reading of "never clobber twice".
       const appliedSessions = new Set<string>()
       pi.on("session_start", async (payload, eventCtx) => {
-        if (!isFreshSessionWithoutExplicitModel(payload)) return
+        if (isTuiSession(eventCtx) || !isFreshSessionWithoutExplicitModel(payload)) return
         const sessionId = extractSessionId(eventCtx) ?? ""
         if (appliedSessions.has(sessionId)) return
         appliedSessions.add(sessionId)
 
         const config = loadConfig({ cwd: extractCwd(pi, eventCtx) }).config
-        const active = config.model_profile
-        if (active === undefined || active.trim().length === 0) return
+        const configured = config.model_profile
+        const active =
+          configured !== undefined && configured.trim().length > 0 ? configured : DEFAULT_MODEL_PROFILE_ID
 
         const registry = extractRegistry(eventCtx)
         if (registry === undefined) {
@@ -168,7 +182,7 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
 
         const model = registry.find(resolution.provider, resolution.modelId)
         if (model === undefined) {
-          const message = `omo-senpi: model profile "${resolution.profile.id}" resolved ${resolution.provider}/${resolution.modelId} but the registry no longer lists it`
+          const message = `OmO Native: model profile "${resolution.profile.id}" resolved ${resolution.provider}/${resolution.modelId} but the registry no longer lists it`
           pi.sendMessage({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE, content: message, display: true })
           ctx.logger.warn(message)
           return
@@ -181,7 +195,12 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
           customType: MODEL_PROFILE_APPLIED_TYPE,
           content,
           display: true,
-          details: { profile: resolution.profile.id, model: selectedModel, skipped: [...resolution.skipped] },
+          details: {
+            profile: resolution.profile.id,
+            model: selectedModel,
+            skipped: [...resolution.skipped],
+            ...(resolution.reasoning !== undefined ? { reasoning: resolution.reasoning } : {}),
+          },
         })
         ctx.logger.info(content, { profile: resolution.profile.id, model: selectedModel })
       })

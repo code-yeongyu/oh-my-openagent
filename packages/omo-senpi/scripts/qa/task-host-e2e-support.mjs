@@ -3,6 +3,7 @@
 // that turn a child's session JSONL and the task store into scenario facts.
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
+import { failedChildEvidence } from "./task-host-e2e-audit.mjs"
 
 export const CHILD_PROMPT = "do the host child work and report"
 const FAILURE_TOKENS = ["too_many_sessions", "host_unavailable"]
@@ -30,11 +31,53 @@ export function spawnScript(count, childSteps, prefix = "c") {
   return { parentSteps, childSteps }
 }
 
+// Print-mode turn settlement can cancel work before the observer sees it. Keep the test's
+// parent turn open until the driver has captured its fact and explicitly kills that parent.
+export function holdParent(script) {
+  script.parentSteps.splice(-1, 0, {
+    type: "tool_call", name: "eval", arguments: {
+      language: "js", summary: "keep the QA parent active until observation completes", timeout: 1_200,
+      code: `var fs = await import("node:fs"); await new Promise((resolve, reject) => {
+        var finish = () => { if (!fs.existsSync(".omo/parent-release")) return;
+          clearTimeout(timer); watcher.close(); resolve(); };
+        var watcher = fs.watch(".omo", finish);
+        var timer = setTimeout(() => { watcher.close(); reject(new Error("parent release missing")); }, 1200000);
+        finish();
+      });`,
+    },
+  })
+  return script
+}
+
 /**
  * A child that stays mid-turn: the last scripted step repeats forever, so every provider call issues
  * another short bash sleep and the child's transcript keeps growing while it is never terminal.
  */
-export const CHILD_BUSY = [{ type: "tool_call", name: "bash", arguments: { command: "sleep 2" } }]
+// A busy child must (1) keep working across the parent's exit, so B can see its transcript grow
+// after the parent is gone, and (2) FINISH, so its session is retained on the host and A's
+// session count can reach 32 while concurrency stays at the configured 16. A step that never
+// terminates holds its slot forever and starves the other children out of ever opening.
+//
+// The tool has to be one the child can COMPLETE on this engine: `bash` is eval-only here (a
+// direct call is refused instantly, and since the mock repeats its last step, the child spun at
+// 100% of the host loop and starved every other open), and `eval` aborts at startup in a
+// mock-provider child. `read` completes; the mock's delayMs supplies the time `sleep 2` used to.
+export const CHILD_BUSY = [
+	...Array.from({ length: 2 }, () => ({
+		type: "tool_call",
+		name: "read",
+		// NOT mock-script.json: it carries the prompts, so every tool result would echo the child's
+		// own prompt and B would read its own fixture as a prompt replay.
+		arguments: { path: ".omo/omo.json" },
+		// Long enough that a child is still mid-turn when B kills the parent. It does NOT guarantee
+		// that all 32 of A's children open inside any particular observe budget: on a loaded machine
+		// they keep opening for minutes, which is why A observes with its own larger budget and
+		// `TASK_HOST_E2E_OBSERVE_MS` exists.
+		delayMs: 1_000,
+	})),
+	{ type: "text", text: "host child mock work complete" },
+]
+
 export const CHILD_DONE = [{ type: "text", text: "host child mock work complete" }]
 
 export const TERMINAL_STATUSES = new Set(["completed", "error", "lost", "cancelled"])
@@ -47,15 +90,30 @@ export function childrenSettled(records, count) {
   return records.length >= count && records.every((record) => TERMINAL_STATUSES.has(record.status))
 }
 
+// The engine keeps a child's sessions under children/<id>/sessions/<id>/; the flat
+// sessions/<id>/ layout is older. Reading only the flat one counted 0 transcripts against a
+// child that had written thousands of lines, and every transcript assertion was blind to it.
 export function childSessionFiles(sandbox, taskId) {
-  const dir = join(sandbox.stateDir, "sessions", taskId)
-  if (!existsSync(dir)) return []
-  return readdirSync(dir).filter((file) => file.endsWith(".jsonl")).map((file) => join(dir, file))
+  const dirs = [
+    join(sandbox.stateDir, "children", taskId, "sessions", taskId),
+    join(sandbox.stateDir, "sessions", taskId),
+  ]
+  return dirs.flatMap((dir) =>
+    existsSync(dir) ? readdirSync(dir).filter((file) => file.endsWith(".jsonl")).map((file) => join(dir, file)) : [])
 }
 
 export function jsonlLines(path) {
   if (!existsSync(path)) return []
   return readFileSync(path, "utf8").split("\n").filter((line) => line.trim().length > 0)
+}
+
+export function toolDetails(stdout, name) {
+  return stdout.split("\n").flatMap((line) => {
+    let event
+    try { event = JSON.parse(line) } catch { return [] }
+    return event.type === "tool_execution_end" && event.toolName === name && !event.isError
+      ? [event.result?.details].filter(Boolean) : []
+  })
 }
 
 export function transcriptSizes(sandbox, records) {
@@ -80,14 +138,15 @@ export function recordFailureTokens(records) {
  */
 export function childStartDiagnosis(sandbox, records) {
   const failed = records.filter((record) => record.status === "error")
-  const sessionsDir = join(sandbox.stateDir, "sessions")
+  const sessionsDir = [join(sandbox.stateDir, "children"), join(sandbox.stateDir, "sessions")].find((dir) => existsSync(dir))
   return {
     total: records.length,
     running: records.filter((record) => record.status === "running").length,
     completed: records.filter((record) => record.status === "completed").length,
     errored: failed.length,
     errorMessages: [...new Set(failed.map((record) => record.error_message))].slice(0, 3),
-    childSessionsDirExists: existsSync(sessionsDir),
+    failedRecords: failedChildEvidence(sandbox, records),
+    childSessionsDirExists: sessionsDir !== undefined,
     executionModes: [...new Set(records.map((record) => record.execution_mode))],
   }
 }

@@ -16,13 +16,13 @@ describe("Senpi category routing policy", () => {
     // then
     expect(routing).toEqual({
       visualEngineering: { model: "anthropic/claude-fable-5-1", variant: "max" },
-      quick: { model: "kimi-coding/kimi-for-coding-highspeed" },
-      unspecifiedHigh: { model: "openai-codex/gpt-6-astra", variant: "high" },
-      unspecifiedLow: { model: "xai/grok-4.6", variant: "xhigh" },
+      quick: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
+      unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
+      unspecifiedLow: { model: "xiaomi/mimo-v2.6-pro", variant: "max" },
     })
   })
 
-  test("unspecified-low fallback chain is grok-4.6 xhigh first and excludes luna", () => {
+  test("unspecified-low fallback chain is mimo-v2.6-pro max first and excludes luna", () => {
     // given / when
     const chain = CATEGORY_FALLBACK_CHAINS["unspecified-low"]
 
@@ -30,17 +30,22 @@ describe("Senpi category routing policy", () => {
     expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
     expect(chain).toEqual([
       {
-        providers: ["xai", "github-copilot", "opencode"],
-        model: "grok-4.6",
+        providers: ["xiaomi", "opencode-go"],
+        model: "mimo-v2.6-pro",
+        variant: "max",
+      },
+      {
+        providers: ["xai", "github-copilot", "opencode-go"],
+        model: "grok-4.7",
         variant: "xhigh",
       },
       {
-        providers: ["openai-codex", "github-copilot", "opencode"],
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
         model: "gpt-5.6-terra",
         variant: "high",
       },
       {
-        providers: ["claude-sdk-oauth", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5",
         variant: "low",
       },

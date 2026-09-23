@@ -3,6 +3,7 @@
 import type { CSSProperties, JSX, ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 
+import { usePrefersReducedMotion } from "@/components/landing/dag/use-dag-playback"
 import { cn } from "@/lib/utils"
 
 function registerLitProgress(): boolean {
@@ -46,18 +47,18 @@ const clamp01 = (value: number): number => Math.min(1, Math.max(0, value))
  */
 export function LitProgress({ children, className, lines = false }: LitProgressProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
-  const [mode, setMode] = useState<"pending" | "scroll" | "observer">("pending")
+  const [driven, setMode] = useState<"pending" | "scroll" | "observer">("pending")
+  const reducedMotion = usePrefersReducedMotion()
+  // Reduced motion never drives the sweep: the block reports observer mode without sampling.
+  const mode = reducedMotion ? "observer" : driven
 
   useEffect(() => {
+    if (reducedMotion) return
     const element = ref.current
     const body = element?.querySelector<HTMLElement>(".lit-text")
     const follow = element?.querySelector<HTMLElement>(".lit-follow") ?? null
     if (!element || !body) return
     const lineElements = lines ? [...element.querySelectorAll<HTMLElement>(".lit-line")] : []
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setMode("observer")
-      return
-    }
     const useTimeline = registerLitProgress() && supportsScrollTimeline()
 
     const vh = (style: CSSStyleDeclaration, property: string, viewport: number): number =>
@@ -106,7 +107,7 @@ export function LitProgress({ children, className, lines = false }: LitProgressP
       intersecting = entries.some((entry) => entry.isIntersecting)
       syncSampling()
     })
-    const useObserver = () => {
+    const startObserving = () => {
       element.classList.remove("lit-scroll")
       setMode("observer")
       observing = true
@@ -139,11 +140,11 @@ export function LitProgress({ children, className, lines = false }: LitProgressP
         ) {
           setMode("scroll")
         } else {
-          useObserver()
+          startObserving()
         }
       })
     } else {
-      useObserver()
+      startObserving()
     }
     return () => {
       cancelAnimationFrame(frame)
@@ -156,7 +157,7 @@ export function LitProgress({ children, className, lines = false }: LitProgressP
       element.style.removeProperty("--lit-f")
       for (const line of lineElements) line.style.removeProperty("--lit-p")
     }
-  }, [lines])
+  }, [lines, reducedMotion])
 
   return (
     <div
@@ -216,35 +217,51 @@ export function LitWords({ text, parts, className, lines = false }: LitWordsProp
   const wordCount = resolvedParts.reduce((count, part) => count + countWords(part.text), 0)
   const style: CSSProperties & { "--lit-count": number } = { "--lit-count": wordCount }
 
-  let index = 0
-  const renderWords = (partText: string, keyPrefix: string): ReactNode[] =>
-    partText.split(/(\s+)/).map((word, i) => {
-      if (!word.trim()) return word
+  /** Words numbered from `firstIndex`, whitespace tokens passed through untouched. */
+  const renderWords = (partText: string, keyPrefix: string, firstIndex: number): ReactNode[] => {
+    const nodes: ReactNode[] = []
+    let index = firstIndex
+    for (const [i, word] of partText.split(/(\s+)/).entries()) {
+      if (!word.trim()) {
+        nodes.push(word)
+        continue
+      }
       const wordStyle: CSSProperties & { "--i": number } = { "--i": index }
       index += 1
-      return (
+      nodes.push(
         <span key={`${keyPrefix}-${i}`} className="lit-word" style={wordStyle}>
           {word}
-        </span>
+        </span>,
       )
-    })
+    }
+    return nodes
+  }
 
-  const renderParts = (run: readonly LitPart[], keyPrefix: string): ReactNode[] =>
-    run.map((part, partIndex) =>
-      part.href ? (
-        <a
-          key={`${keyPrefix}-${partIndex}`}
-          href={part.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="lit-link focus-visible:outline-accent-32 focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
-          {renderWords(part.text, `${keyPrefix}-${partIndex}`)}
-        </a>
-      ) : (
-        renderWords(part.text, `${keyPrefix}-${partIndex}`)
-      ),
-    )
+  /** Word indices run continuously across the parts of one run (a paragraph or a line). */
+  const renderParts = (run: readonly LitPart[], keyPrefix: string): ReactNode[] => {
+    const nodes: ReactNode[] = []
+    let offset = 0
+    for (const [partIndex, part] of run.entries()) {
+      const words = renderWords(part.text, `${keyPrefix}-${partIndex}`, offset)
+      offset += countWords(part.text)
+      nodes.push(
+        part.href ? (
+          <a
+            key={`${keyPrefix}-${partIndex}`}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lit-link focus-visible:outline-accent-32 focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            {words}
+          </a>
+        ) : (
+          words
+        ),
+      )
+    }
+    return nodes
+  }
 
   if (!lines) {
     return (
@@ -257,7 +274,6 @@ export function LitWords({ text, parts, className, lines = false }: LitWordsProp
   return (
     <p className={cn("lit-text", className)} style={style}>
       {splitLines(resolvedParts).map((line, lineIndex) => {
-        index = 0
         const lineStyle: CSSProperties & { "--lit-count": number } = {
           "--lit-count": line.reduce((count, part) => count + countWords(part.text), 0),
         }

@@ -33,15 +33,15 @@ This is repeated on purpose, because it is the single most ignored rule in this 
 3. **RUN THE SENPI GATE:** `tsgo --noEmit -p packages/omo-senpi/tsconfig.json` then `bun run test:senpi`. This is the hermetic UNIT gate; it does NOT prove a live session — the `senpi-qa` skill does.
 4. **CONFIRM THE REAL `~/.senpi/agent` WAS NOT TOUCHED** — record the live driver's `realSenpiUntouched` / changed-path fields and isolated agent-dir path. A whole-directory digest is supporting evidence only because live debug/cache files may change. A driver reporting `SKIP` because the `senpi` binary is absent is NOT a pass; say so in the evidence.
 
-### EVIDENCE: record it under `.omo/evidence/` or it DID NOT HAPPEN
+### EVIDENCE: write it under `.omo/evidence/` (local, NEVER committed) or it DID NOT HAPPEN
 
-**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). Live Senpi QA is the one scoped exception: it goes under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by the `senpi-qa` skill's script. For EVERY change you MUST record reviewer-readable plain files:
+**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (one subfolder per change, keep it ORGANIZED). Live Senpi QA is the one scoped exception: it goes under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by the `senpi-qa` skill's script. **THE EVIDENCE FILES STAY LOCAL.** `.omo/evidence/` is gitignored and `script/tracked-evidence-paths-audit.test.ts` fails the build the moment any evidence path is tracked (#8703): never `git add -f` an evidence file, and never invent another capture root inside the worktree (`.qa-evidence/`, `qa-evidence/`, a RED/GREEN `.txt` next to the sources). What reaches the reviewer is the **QA & Evidence section of the PR body**: the four items below, the decisive sanitized excerpt of each capture (the RED failure line, the GREEN pass count, the driver's final JSON, the isolation proof), and one `sha256sum <artifact>` line per local evidence file so the summary is checkable against the file that produced it. For EVERY change you MUST record reviewer-readable plain files locally and summarize them there:
 - **WHAT WAS TESTED:** the command or manual action, the surface driven, and the behavior it was meant to prove.
 - **WHAT WAS OBSERVED:** the before/after or new behavior, isolation proof such as unchanged session counts, and the artifact path for the exact captured output.
 - **WHY IT IS ENOUGH:** how the evidence covers the intended behavior and remaining regression risk.
 - **WHAT WAS OMITTED:** redact or summarize raw secret-bearing logs, env dumps, tokens, auth headers, and private credentials instead of copying them.
 
-**NO EVIDENCE FILE == NO QA == NO COMMIT == NO PUSH.** ALWAYS. EVERY TIME. NO EXCEPTIONS.
+**NO EVIDENCE FILE == NO QA == NO COMMIT == NO PUSH.** ALWAYS. EVERY TIME. NO EXCEPTIONS. **AND AN EVIDENCE FILE INSIDE THE COMMIT == A REJECTED PR.**
 
 ## MANDATORY CHANGE-EXECUTION PROTOCOL. EVERY USER-ORDERED PATCH FOLLOWS THIS. NO EXCEPTIONS.
 
@@ -52,14 +52,14 @@ This is repeated on purpose, because it is the single most ignored rule in this 
 3. **ADD TODOS IN ULTRA-DETAIL.** Mirror EVERY atomic step of the plan into the todo list: one todo per edit-plus-verification unit. Vague todos like "implement feature" are FORBIDDEN.
 4. **MAKE A NEW WORKTREE.** ALL implementation happens in a fresh, task-owned git worktree. NEVER edit the main checkout in place, NEVER hand-commit to `dev`.
 5. **MAKE A PR AND WORK UNTIL IT GETS MERGED.** Open a reviewer-readable PR and STAY ON IT until it is MERGED: fix CI, answer review, re-run QA, resolve conflicts via `smart-rebase`. AN UNMERGED PR IS UNFINISHED WORK.
-6. **SET A GOAL AND RUN THE ULW LOOP.** Register the goal with binding success criteria and drive the work through the `ulw-loop`: evidence-bound, failing-first, real-surface QA. "IT SHOULD WORK" IS NOT EVIDENCE.
+6. **SET A GOAL AND RUN THE ULW LOOP.** Register the goal with binding success criteria and drive the work through the `ulw-loop`: evidence-bound, reproduce-first, real-surface QA. "IT SHOULD WORK" IS NOT EVIDENCE.
 7. **MANAGE THE TODO LIST OBSESSIVELY.** Mark a step in progress the instant it begins, done the instant it finishes, append new steps the moment they surface. THE TODO LIST NEVER LAGS REALITY. EVER.
 
 ## DEFAULT WORKFLOW — how to take on any task
 
 Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now hotfix, deliver every change through the **`work-with-pr`** skill: it works in an isolated git worktree, implements with evidence-bound manual QA, opens a reviewer-readable English PR (what changed, why, observed behavior, QA/evidence, residual risk), runs the verification loop, and merges. Do NOT hand-commit normal work straight to `dev`.
 
-- **QA is the evidence gate, scoped to what you touched.** A change under `packages/omo-opencode/` MUST run the **`opencode-qa`** skill; a change under `packages/omo-codex/` (lazycodex) MUST run the **`codex-qa`** skill; a change under `packages/omo-senpi/` or `packages/senpi-task/` MUST run the **`senpi-qa`** skill (see the QA section above for each). Run the matching skill, and treat its captured output (written under `.omo/evidence/`) as the QA evidence `work-with-pr` requires. A change touching more than one runs each.
+- **QA is the evidence gate, scoped to what you touched.** A change under `packages/omo-opencode/` MUST run the **`opencode-qa`** skill; a change under `packages/omo-codex/` (lazycodex) MUST run the **`codex-qa`** skill; a change under `packages/omo-senpi/` or `packages/senpi-task/` MUST run the **`senpi-qa`** skill (see the QA section above for each). Run the matching skill, and treat its captured output (written under the gitignored `.omo/evidence/`, summarized in the PR body, never committed) as the QA evidence `work-with-pr` requires. A change touching more than one runs each.
 - **Conflicts → `smart-rebase`.** If the worktree branch conflicts with its base, resolve it with the **`smart-rebase`** skill, then re-run the scoped QA. Never hand-resolve by force-pushing shared history.
 - **Merge → merge commit, ALWAYS.** Land the PR with a merge commit per **PR MERGE POLICY** below. NEVER squash-merge or rebase-merge, even if a generic workflow, skill, or GitHub default suggests it.
 

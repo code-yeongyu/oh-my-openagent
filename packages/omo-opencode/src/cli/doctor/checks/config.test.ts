@@ -68,7 +68,7 @@ describe("config check", () => {
 
         //#then the profile overlay is active and the unified user layer is reported
         expect(result.status).toBe("warn")
-        expect(result.issues.some((issue) => issue.title === "Invalid category override: deep")).toBe(true)
+        expect(result.issues.some((issue) => issue.title === "Invalid category override: deep-low")).toBe(true)
         expect(normalizePathForAssertion(result.details?.[0] ?? "")).toContain(
           normalizePathForAssertion(userConfigPath),
         )

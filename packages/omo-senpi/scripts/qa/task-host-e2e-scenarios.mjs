@@ -2,6 +2,11 @@
 // carries two parents' worth of children as sessions, B proves those sessions outlive their parent and
 // are re-attached without replaying a prompt, I proves the default-mode rule both ways.
 import { join } from "node:path"
+import { singleParentPass } from "./task-host-e2e-gates.mjs"
+import { STATE_DEADLINE_MS } from "./task-host-e2e-events.mjs"
+import { terminalChildSnapshots } from "./task-host-e2e-stranded.mjs"
+import { recordMockEvent } from "./task-host-e2e-audit.mjs"
+export { scenarioB } from "./task-host-e2e-resume.mjs"
 
 import { createScenarioSandbox, writeMockScript, writeOmoConfig } from "./task-host-e2e-sandbox.mjs"
 import {
@@ -33,6 +38,7 @@ import {
   childrenSettled,
   failureTokens,
   hostConfig,
+  holdParent,
   jsonlLines,
   recordFailureTokens,
   spawnScript,
@@ -40,7 +46,7 @@ import {
 } from "./task-host-e2e-support.mjs"
 
 export async function scenarioA(run) {
-  const sandbox = createScenarioSandbox(run, "sA", { omoConfig: hostConfig(), script: spawnScript(16, CHILD_BUSY) })
+  const sandbox = createScenarioSandbox(run, "sA", { omoConfig: hostConfig(), script: holdParent(spawnScript(16, CHILD_BUSY)) })
   const startedAt = Date.now()
   const parents = [0, 1].map(() => spawnParent(sandbox, run.mockEntry, "fan out sixteen daemon children", { capture: true }))
   const parentExits = []
@@ -50,7 +56,9 @@ export async function scenarioA(run) {
   const watched = await observeDaemon(sandbox, (probe) => {
     if (probe.json?.sessions?.worker >= 32) return true
     return childrenSettled(readTaskRecords(sandbox), 32)
-  }, { timeoutMs: 180_000, intervalMs: 1_000 })
+  // Allow a loaded host to open the full cohort; return as soon as the 32nd session lands.
+  // The parents remain attached until observation, so graceful shutdown cannot cancel admission.
+  }, { timeoutMs: 420_000, intervalMs: 1_000 })
   const observed = watched.matched ?? watched.lastProbe ?? daemonStatus(sandbox, { includeWorkers: true })
   const records = readTaskRecords(sandbox)
   const perChild = perChildRpcProcesses(sandbox)
@@ -64,10 +72,9 @@ export async function scenarioA(run) {
     instanceId: observed.json?.instanceId ?? null,
     perChildRpcProcessCount: perChild.length,
     failureTokens: tokens,
-    // Two parents ensure the SAME daemon concurrently and then exit while their children keep running,
-    // so the question "was this one host for the whole scenario?" has to be answered from a timeline,
-    // not from a single status call. Every identity change is an entry; the parents' exits are stamped
-    // on the same clock, and their stderr host lines say which side started, reused or handed off.
+    terminalChildFailures: terminalChildSnapshots(sandbox).length,
+    // Two parents concurrently ensure the same daemon. Record its identity throughout admission,
+    // rather than trusting one final status call; parent exits and host diagnostics share that clock.
     daemonIdentityTimeline: watched.timeline,
     daemonIdentitiesSeen: [...new Set(watched.timeline.map((entry) => entry.instanceId).filter(Boolean))].length,
     parentExits,
@@ -88,7 +95,8 @@ export async function scenarioA(run) {
   }
   const pass =
     facts.sessionsTotal >= 32 && facts.sessionsWorker >= 32 && tokens.length === 0 && perChild.length === 0 &&
-    facts.daemonIdentitiesSeen === 1
+    facts.daemonIdentitiesSeen === 1 && facts.terminalChildFailures === 0
+  facts.driverTeardown = recordMockEvent(sandbox.cwd, { type: "driver_teardown", parentPids: parents.map((parent) => parent.child.pid) })
   for (const parent of parents) {
     try {
       process.kill(-parent.child.pid, "SIGKILL")
@@ -101,7 +109,7 @@ export async function scenarioA(run) {
     scenario: "A",
     title: "one daemon, two parents x 16 process children",
     status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `sessions.total=${facts.sessionsTotal} sessions.worker=${facts.sessionsWorker} perChildRpc=${perChild.length} tokens=${tokens.join(",")} daemonIdentities=${facts.daemonIdentitiesSeen}` }),
+    reason: `sessions.total=${facts.sessionsTotal} sessions.worker=${facts.sessionsWorker} perChildRpc=${perChild.length} tokens=${tokens.length} daemonIdentities=${facts.daemonIdentitiesSeen} terminalFailures=${facts.terminalChildFailures}`,
     facts,
     receipt,
   }
@@ -114,7 +122,7 @@ export async function scenarioA(run) {
  * stable identity here blames the race, an unstable one exonerates it.
  */
 export async function scenarioA1(run) {
-  const sandbox = createScenarioSandbox(run, "sA1", { omoConfig: hostConfig(), script: spawnScript(16, CHILD_BUSY, "s") })
+  const sandbox = createScenarioSandbox(run, "sA1", { omoConfig: hostConfig(), script: holdParent(spawnScript(16, CHILD_BUSY, "s")) })
   const startedAt = Date.now()
   const parent = spawnParent(sandbox, run.mockEntry, "fan out sixteen daemon children from one parent", { capture: true })
   const parentExits = []
@@ -122,7 +130,7 @@ export async function scenarioA1(run) {
   const watched = await observeDaemon(sandbox, (probe) => {
     if (probe.json?.sessions?.worker >= 16) return true
     return childrenSettled(readTaskRecords(sandbox), 16)
-  }, { timeoutMs: 180_000, intervalMs: 1_000 })
+  }, { timeoutMs: STATE_DEADLINE_MS, intervalMs: 1_000 })
   const observed = watched.matched ?? watched.lastProbe ?? daemonStatus(sandbox, { includeWorkers: true })
   const records = readTaskRecords(sandbox)
   const identities = [...new Set(watched.timeline.map((entry) => entry.instanceId).filter(Boolean))]
@@ -134,9 +142,12 @@ export async function scenarioA1(run) {
     parentExits,
     parentStderrHostLines: hostLines(parent.chunks.stderr),
     perChildRpcProcessCount: perChildRpcProcesses(sandbox).length,
+    failedChildren: records.filter((record) => ["error", "lost", "cancelled"].includes(record.status)).length,
+    terminalChildFailures: terminalChildSnapshots(sandbox).length,
     childStart: childStartDiagnosis(sandbox, records),
   }
-  const pass = facts.sessionsWorker >= 16 && identities.length === 1 && facts.perChildRpcProcessCount === 0
+  const pass = singleParentPass(facts)
+  facts.driverTeardown = recordMockEvent(sandbox.cwd, { type: "driver_teardown", parentPids: [parent.child.pid] })
   try {
     process.kill(-parent.child.pid, "SIGKILL")
   } catch {
@@ -147,58 +158,7 @@ export async function scenarioA1(run) {
     scenario: "A1",
     title: "single-parent control: 16 children, one daemon identity",
     status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `sessions.worker=${facts.sessionsWorker} daemonIdentities=${identities.length} perChildRpc=${facts.perChildRpcProcessCount}` }),
-    facts,
-    receipt,
-  }
-}
-
-export async function scenarioB(run) {
-  const sandbox = createScenarioSandbox(run, "sB", { omoConfig: hostConfig(), script: spawnScript(4, CHILD_BUSY) })
-  const parent = spawnParent(sandbox, run.mockEntry, "detach with four children mid turn", { capture: true })
-  const started = await waitFor(() => {
-    const records = readTaskRecords(sandbox)
-    const running = records.filter((record) => record.status === "running").length
-    return running >= 4 || childrenSettled(records, 4) ? records : undefined
-  }, { timeoutMs: 120_000, intervalMs: 500 })
-  const records = started ?? readTaskRecords(sandbox)
-  const before = transcriptSizes(sandbox, records)
-  try {
-    process.kill(-parent.child.pid, "SIGKILL")
-  } catch {
-    // already exited
-  }
-  await parent.closed
-  const grew = await waitFor(() => {
-    const after = transcriptSizes(sandbox, records)
-    return Object.keys(before).every((id) => (after[id] ?? 0) > (before[id] ?? 0)) ? after : undefined
-  }, { timeoutMs: 60_000, intervalMs: 1_000 })
-  const after = grew ?? transcriptSizes(sandbox, records)
-  writeMockScript(sandbox, { parentSteps: [{ type: "text", text: "resume complete" }], childSteps: CHILD_BUSY })
-  const resumed = runBin(sandbox, run.parentArgs(sandbox, "resume the detached children"), { timeoutMs: 180_000 })
-  const replays = Object.fromEntries(records.map((record) => [
-    record.task_id,
-    childSessionFiles(sandbox, record.task_id)
-      .flatMap((file) => jsonlLines(file))
-      .filter((line) => line.includes(CHILD_PROMPT)).length,
-  ]))
-  const facts = {
-    childrenStarted: records.filter((record) => record.status === "running").length,
-    transcriptLinesBefore: before,
-    transcriptLinesAfter: after,
-    grewAfterParentExit: grew !== undefined,
-    resumeExit: resumed.status,
-    promptOccurrencesPerChild: replays,
-    noPromptReplay: Object.values(replays).every((count) => count === 1),
-    childStart: childStartDiagnosis(sandbox, records),
-  }
-  const pass = facts.childrenStarted >= 4 && facts.grewAfterParentExit && resumed.status === 0 && facts.noPromptReplay
-  const receipt = await cleanupScenario(sandbox, { hostPids: [daemonStatus(sandbox).json?.pid].filter(Boolean) })
-  return {
-    scenario: "B",
-    title: "detach/attach: parent quits with 4 children mid-turn",
-    status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `started=${facts.childrenStarted} grew=${facts.grewAfterParentExit} resumeExit=${resumed.status} noReplay=${facts.noPromptReplay}` }),
+    reason: `sessions.worker=${facts.sessionsWorker} daemonIdentities=${identities.length} perChildRpc=${facts.perChildRpcProcessCount} failedChildren=${facts.failedChildren} terminalFailures=${facts.terminalChildFailures}`,
     facts,
     receipt,
   }

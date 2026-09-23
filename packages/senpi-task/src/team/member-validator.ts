@@ -1,6 +1,7 @@
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import { CURATED_READONLY_AGENT_NAMES, ULW_REVIEWER_AGENT_NAMES } from "../agents/builtin"
+import { canonicalAgentName } from "../agents/builtin/legacy-agent-names"
 import { SenpiTeamSpecError } from "./errors"
 
 /**
@@ -39,8 +40,9 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
     }
 
     const subagentType = member.subagent_type.trim()
+    const canonicalSubagentType = canonicalAgentName(subagentType)
 
-    if (CURATED_READONLY_AGENT_NAMES.has(subagentType)) {
+    if (CURATED_READONLY_AGENT_NAMES.has(canonicalSubagentType)) {
       throw new SenpiTeamSpecError(
         `curated read-only agent "${subagentType}" cannot be a team member; delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
@@ -48,7 +50,7 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
       )
     }
 
-    if (ULW_REVIEWER_AGENT_NAMES.has(subagentType)) {
+    if (ULW_REVIEWER_AGENT_NAMES.has(canonicalSubagentType)) {
       throw new SenpiTeamSpecError(
         `ulw reviewer agent "${subagentType}" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
@@ -56,7 +58,7 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
       )
     }
 
-    if (!ports.isKnownAgent(subagentType)) {
+    if (!ports.isKnownAgent(canonicalSubagentType)) {
       const available = ports.agentNames !== undefined && ports.agentNames.length > 0
         ? ` Available agents: ${[...ports.agentNames].sort().join(", ")}.`
         : ""

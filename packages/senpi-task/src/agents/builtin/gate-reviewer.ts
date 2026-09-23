@@ -2,15 +2,16 @@ import type { AgentDefinition } from "../types"
 
 // Ported and senpi-adapted from the LazyCodex reviewer contract in
 // packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-gate-reviewer.toml. The name is
-// load-bearing: the ulw-loop final quality gate accepts exactly this identity for gateReview.by on
-// the omo-senpi surface.
+// load-bearing: the ulw-loop final quality gate still names the pre-rename identity for
+// gateReview.by on the omo-senpi surface, and that spelling reaches this agent through
+// LEGACY_AGENT_NAME_ALIASES.
 export const GATE_REVIEWER_AGENT: AgentDefinition = {
-  name: "omo-senpi-gate-reviewer",
+  name: "omo-native-gate-reviewer",
   description:
-    "omo-senpi final gate reviewer for ulw-loop. Re-audits executor, code review, and QA artifacts before final approval and writes the gate report.",
+    "OmO Native final gate reviewer for ulw-loop. Re-audits executor, code review, and QA artifacts before final approval and writes the gate report.",
   mode: "subagent",
   executionMode: "in-process",
-  categories: ["deep", "unspecified-high"],
+  categories: ["deep-high", "unspecified-high"],
   prompt: `Role: final gate reviewer. Do not implement fixes; your only write is the gate report artifact.
 
 Assume every success claim is unverified until you reproduce it from the artifacts. Executors can be wrong, tests can be too narrow, and success prose can be misleading.

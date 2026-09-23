@@ -73,16 +73,21 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
 
   const heartbeat = setInterval(() => {
     if (client.exited || child.stdin?.writableEnded || child.stdin?.destroyed) return
-    client
-      .send({ type: "get_state" })
-      .then((response) => {
-        lastSeenAt = now()
-        sessionId = readSessionId(response) ?? sessionId
-      })
-      .catch((error: unknown) => {
-        if (client.exited || isHarmlessRpcShutdownError(error)) return
-        log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
-      })
+    try {
+      client
+        .send({ type: "get_state" })
+        .then((response) => {
+          lastSeenAt = now()
+          sessionId = readSessionId(response) ?? sessionId
+        })
+        .catch((error: unknown) => {
+          if (client.exited || isHarmlessRpcShutdownError(error)) return
+          log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+        })
+    } catch (error) {
+      if (client.exited || isHarmlessRpcShutdownError(error)) return
+      log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+    }
   }, heartbeatIntervalMs)
   heartbeat.unref?.()
 
@@ -179,10 +184,13 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     lastSeen: () => lastSeenAt,
     exitOutcome: () => outcome,
     waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
-    dispose: () => {
+    dispose: async () => {
       clearInterval(heartbeat)
-      client.detach()
-      return Promise.resolve()
+      try {
+        await client.detach()
+      } catch (error) {
+        log("senpi-task rpc detach failed", { taskId, error: String(error) })
+      }
     },
     terminate: (terminateOptions?: TerminateOptions) => terminateRpcChild(child, terminateOptions),
     startInitialPrompt: (text) => runPrompt(text),

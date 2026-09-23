@@ -84,6 +84,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     const child = spawn(process.execPath, [supervisorPath, runDir], {
       detached: true,
       stdio: "ignore",
+      windowsHide: true,
       env: {
         ...process.env,
         OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",

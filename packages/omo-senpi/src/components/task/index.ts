@@ -280,6 +280,7 @@ function createTeamToolContext(
 ): TeamToolContext {
   const serviceDeps = {
     manager: engine.manager,
+    resolveInheritedExtensions: engine.resolveInheritedExtensions,
     destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,

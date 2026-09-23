@@ -2,6 +2,7 @@
 // G the `omo daemon` CLI contract plus a real pty attach, H a pre-wave-2 host on the sandbox socket.
 import { spawn, spawnSync } from "node:child_process"
 import { join } from "node:path"
+export { scenarioF } from "./task-host-e2e-storm.mjs"
 
 import { createScenarioSandbox, sandboxEnv } from "./task-host-e2e-sandbox.mjs"
 import { generationHostPid, zombieChildCount } from "./task-host-e2e-daemon-state.mjs"
@@ -26,62 +27,6 @@ import {
   jsonlLines,
   spawnScript,
 } from "./task-host-e2e-support.mjs"
-
-const BASH_STORM = [{ type: "tool_call", name: "bash", arguments: { command: "true" } }]
-
-export async function scenarioF(run) {
-  // 200 `true` calls spread over 8 children: the last scripted step repeats, so each child keeps
-  // spawning short-lived processes until the cells are terminated.
-  const sandbox = createScenarioSandbox(run, "sF", {
-    omoConfig: hostConfig({ task: { host_idle_exit_ms: 20_000 } }),
-    script: spawnScript(8, BASH_STORM, "z"),
-  })
-  const parent = spawnParent(sandbox, run.mockEntry, "run the bash storm across eight children")
-  const running = await waitFor(() => {
-    const records = readTaskRecords(sandbox)
-    const alive = records.filter((record) => record.status === "running").length
-    return alive >= 8 || childrenSettled(records, 8) ? records : undefined
-  }, { timeoutMs: 120_000, intervalMs: 500 })
-  const hostPid = generationHostPid(sandbox.agentDir)
-  const records = running ?? readTaskRecords(sandbox)
-  // Wait for the storm ITSELF, never for a clock: 200 `true` calls across the children, counted in
-  // their transcripts, is the condition the zombie budget is measured against.
-  const bashCalls = () =>
-    records.reduce((total, record) =>
-      total + childSessionFiles(sandbox, record.task_id)
-        .reduce((lines, file) => lines + jsonlLines(file).filter((line) => line.includes('"bash"')).length, 0), 0)
-  const stormed = await waitFor(() => (bashCalls() >= 200 ? bashCalls() : undefined), { timeoutMs: 120_000, intervalMs: 1_000 })
-  try {
-    process.kill(-parent.child.pid, "SIGKILL")
-  } catch {
-    // already gone
-  }
-  const settled = await waitFor(() => (hostPid !== undefined && zombieChildCount(hostPid) === 0 ? true : undefined), {
-    timeoutMs: 30_000,
-    intervalMs: 1_000,
-  })
-  const zombies = hostPid === undefined ? undefined : zombieChildCount(hostPid)
-  const status = daemonStatus(sandbox, { includeWorkers: true })
-  const facts = {
-    hostPid: hostPid ?? null,
-    childrenStarted: records.filter((record) => record.status === "running").length,
-    bashCallRecords: stormed ?? bashCalls(),
-    zombieChildCount: zombies ?? null,
-    zombiesSettledWithin15s: settled === true,
-    daemonReportedZombies: status.json?.zombies ?? null,
-    childStart: childStartDiagnosis(sandbox, records),
-  }
-  const pass = hostPid !== undefined && facts.childrenStarted >= 8 && facts.bashCallRecords >= 200 && zombies === 0 && status.json?.zombies === 0
-  const receipt = await cleanupScenario(sandbox, { hostPids: [hostPid, status.json?.pid].filter(Boolean) })
-  return {
-    scenario: "F",
-    title: "zombies (E1): 200 bash true across 8 children",
-    status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `hostPid=${facts.hostPid} children=${facts.childrenStarted} bashCalls=${facts.bashCallRecords} zombies=${facts.zombieChildCount} daemonZombies=${facts.daemonReportedZombies}` }),
-    facts,
-    receipt,
-  }
-}
 
 function tmuxAttach(sandbox, run, session) {
   const command = [sandbox.bin, "daemon", "attach", "-e", run.mockEntry, "--provider", "omo-mock", "--model", "mock-1"]

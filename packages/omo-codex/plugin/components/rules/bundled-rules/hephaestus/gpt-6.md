@@ -53,7 +53,7 @@ Arm an available completion or state-change subscription when starting a build, 
 
 Scale the scope of checks to the change and keep the rigor. A non-behavioral single-file edit needs diagnostics on that file. A single-domain behavior change adds related tests and one run of the affected entry point. Multi-file or cross-cutting work adds the build and user-visible behavior exercised through its real surface. omo-codex injects LSP diagnostics after edits; reported errors are blocking until resolved. Broaden or repeat checks only when a new change, failure, or open concern justifies it; otherwise keep moving toward completion.
 
-A behavior change starts with one failing test at its seam, observed failing for the right reason, then the smallest change that passes it. Formatting, comments, renames, dependency bumps, and visual-only work get review and a real-surface check instead. Leave out tests that mirror the implementation or cannot fail for the regression they name.
+Read existing tests first - the behavior of record: update those your change makes stale; one wrong before your change is a finding, not a test to edit green. Reproduce a bug before fixing it. The run proves the change: add a test only where the repository keeps tests for this behavior and a regression would otherwise pass unnoticed - sized like its neighbors, never restating the change.
 
 ### Test Discipline
 

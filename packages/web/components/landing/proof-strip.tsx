@@ -59,44 +59,42 @@ function useEntered(): { ref: (node: HTMLElement | null) => void; entered: boole
  * once, keeping the suffix. Reduced motion or an unparsable value renders the target.
  */
 function useCountUp(target: string, start: boolean): string {
-  const [display, setDisplay] = useState(target)
+  // In-flight frame for one target; anything else (idle, finished, another target) shows the target.
+  const [frame, setFrame] = useState<{ readonly target: string; readonly value: string } | null>(
+    null,
+  )
   const finished = useRef(false)
 
   useEffect(() => {
-    if (finished.current) {
-      setDisplay(target)
-      return
-    }
-    if (!start) return
+    if (finished.current || !start) return
     const match = /^(\d+(?:\.(\d+))?)(.*)$/.exec(target)
     const numeric = match?.[1]
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
     if (!numeric || reduced) {
       finished.current = true
-      setDisplay(target)
       return
     }
     const end = Number.parseFloat(numeric)
     const decimals = match[2]?.length ?? 0
     const suffix = match[3] ?? ""
-    let frame = 0
+    let handle = 0
     const startedAt = performance.now()
     const step = (now: number): void => {
       const progress = Math.min(1, (now - startedAt) / COUNT_MS)
       const eased = 1 - (1 - progress) ** 4
-      setDisplay(`${(end * eased).toFixed(decimals)}${suffix}`)
       if (progress < 1) {
-        frame = requestAnimationFrame(step)
+        setFrame({ target, value: `${(end * eased).toFixed(decimals)}${suffix}` })
+        handle = requestAnimationFrame(step)
       } else {
         finished.current = true
-        setDisplay(target)
+        setFrame(null)
       }
     }
-    frame = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(frame)
+    handle = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(handle)
   }, [target, start])
 
-  return display
+  return frame?.target === target ? frame.value : target
 }
 
 interface ProofCellProps {

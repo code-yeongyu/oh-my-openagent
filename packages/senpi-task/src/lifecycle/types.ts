@@ -25,6 +25,9 @@ export type ReconcileDeferredReason =
   | "host_draining"
   // The daemon hosting this child did not answer; the record stays parked until it does.
   | "host_unreachable"
+  // The child ran in a copy-on-write clone that is already settled and reclaimed; respawning it
+  // would resume against a directory that no longer exists, so it is refused at every boundary.
+  | "isolated_not_revivable"
 
 export type ReconcileOutcome = {
   readonly task_id: string

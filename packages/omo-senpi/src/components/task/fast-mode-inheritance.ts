@@ -14,7 +14,7 @@ type ModelReference = {
 
 // A catalog priority-tier alias of the base model: same provider, `<base>-fast` id, declares
 // `serviceTier: "priority"` and points its upstream id back at the base. This is the exact shape
-// senpi's catalog generator emits for openai and openai-codex; a model that merely ends in `-fast`
+// senpi's catalog generator emits for openai and chatgpt-subscription; a model that merely ends in `-fast`
 // (a different Cursor composer SKU, a user-defined entry with its own upstream id) is NOT an alias
 // and must not replace the planned model.
 type FastVariant = ModelReference & {

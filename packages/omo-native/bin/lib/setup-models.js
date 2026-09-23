@@ -16,7 +16,7 @@ export function formatModelReport(inventory) {
         "custom-endpoint": { model: "<custom-baseUrl-provider>/<model-id>" },
       },
     }, null, 2),
-    "For custom endpoints, define the provider baseUrl in senpi models.json, then use that provider id above.",
+    "For custom endpoints, define the provider baseUrl in the engine's models.json, then use that provider id above.",
   )
   return `${lines.join("\n")}\n`
 }

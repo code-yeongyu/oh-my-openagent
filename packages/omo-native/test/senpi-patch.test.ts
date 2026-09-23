@@ -8,7 +8,9 @@ import { fileURLToPath } from "node:url"
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const PATCH_SCRIPT = join(PACKAGE_ROOT, "bin", "senpi-patch.mjs")
 const BUNDLED_ANTHROPIC_MESSAGES = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
-const FLOOR = "2.1.251"
+const ENGINE_BUNDLE = "dist/bundle"
+// Claude Opus 5.5 rejects OAuth requests advertising Claude Code below 2.1.280 (claude_code_version_too_old).
+const FLOOR = "2.1.280"
 
 const roots: string[] = []
 
@@ -47,6 +49,26 @@ function createFixture(claudeCodeVersion: string): Fixture {
   return { root, anthropicMessages }
 }
 
+function bundledChunkSources(claudeCodeVersion: string): Record<string, string> {
+  return {
+    "chunks/anthropic-messages-TEST.js": `function cacheControl(){return{type:"ephemeral"}}var claudeCodeVersion="${claudeCodeVersion}",claudeCodeTools=["Read","Write"];export{claudeCodeTools};\n`,
+    "chunks/session-worker.js": `init_prompt_cache_ttl();claudeCodeVersion="${claudeCodeVersion}",claudeCodeTools=["Read","Write"]}});\n`,
+    "cli.js": 'import("./chunks/session-worker.js");\n',
+  }
+}
+
+function writeEngineBundle(root: string, files: Record<string, string>): void {
+  for (const [relative, source] of Object.entries(files)) {
+    const path = join(root, ENGINE_BUNDLE, relative)
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, source)
+  }
+}
+
+function readEngineBundle(root: string, files: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.keys(files).map((relative) => [relative, readFileSync(join(root, ENGINE_BUNDLE, relative), "utf8")]))
+}
+
 function runPatch(root: string) {
   return spawnSync("node", [PATCH_SCRIPT], {
     encoding: "utf8",
@@ -59,7 +81,7 @@ afterEach(() => {
 })
 
 describe("senpi-patch claudeCodeVersion floor", () => {
-  describe("#given a bundled pi-ai claudeCodeVersion below the 2.1.251 floor", () => {
+  describe(`#given a bundled pi-ai claudeCodeVersion below the ${FLOOR} floor`, () => {
     describe("#when the patch script runs as postinstall does", () => {
       test("#then the version is rewritten to the floor", () => {
         const fixture = createFixture("2.1.75")
@@ -116,6 +138,46 @@ describe("senpi-patch claudeCodeVersion floor", () => {
         const result = runPatch(fixture.root)
         expect(result.status).not.toBe(0)
         expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${BUNDLED_ANTHROPIC_MESSAGES}`)
+      })
+    })
+  })
+})
+
+// The launcher runs the engine's pre-linked dist/bundle/cli.js whenever it exists, and that bundle
+// inlines its own claudeCodeVersion, so the pi-ai floor alone never reaches the running engine.
+describe("senpi-patch claudeCodeVersion floor in the engine bundle", () => {
+  describe("#given bundled chunks advertising 2.1.251 as senpi 2026.9.22-4 ships them", () => {
+    describe("#when the patch script runs as postinstall does", () => {
+      test("#then every bundled declaration is raised to the floor and nothing else changes", () => {
+        const fixture = createFixture(FLOOR)
+        writeEngineBundle(fixture.root, bundledChunkSources("2.1.251"))
+        const result = runPatch(fixture.root)
+        expect(result.status).toBe(0)
+        expect(readEngineBundle(fixture.root, bundledChunkSources(FLOOR))).toEqual(bundledChunkSources(FLOOR))
+      })
+    })
+  })
+
+  describe("#given bundled chunks already above the floor", () => {
+    describe("#when the patch script runs", () => {
+      test("#then the bundle is never downgraded and stays byte-identical", () => {
+        const fixture = createFixture(FLOOR)
+        writeEngineBundle(fixture.root, bundledChunkSources("2.1.300"))
+        const result = runPatch(fixture.root)
+        expect(result.status).toBe(0)
+        expect(readEngineBundle(fixture.root, bundledChunkSources("2.1.300"))).toEqual(bundledChunkSources("2.1.300"))
+      })
+    })
+  })
+
+  describe("#given an engine bundle without any claudeCodeVersion declaration", () => {
+    describe("#when the patch script runs", () => {
+      test("#then it fails with the unsupported-Senpi error naming the bundle", () => {
+        const fixture = createFixture(FLOOR)
+        writeEngineBundle(fixture.root, { "cli.js": "export {}\n" })
+        const result = runPatch(fixture.root)
+        expect(result.status).not.toBe(0)
+        expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${ENGINE_BUNDLE}`)
       })
     })
   })

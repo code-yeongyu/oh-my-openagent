@@ -2,12 +2,13 @@ import type { AgentDefinition } from "../types"
 
 // Ported and senpi-adapted from the LazyCodex reviewer contract in
 // packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-code-reviewer.toml. The name is
-// load-bearing: the ulw-loop final quality gate (quality-gate.ts REVIEWER_ROLES_BY_SURFACE) accepts
-// exactly this identity for codeReview.by on the omo-senpi surface.
+// load-bearing: the ulw-loop final quality gate (quality-gate.ts REVIEWER_ROLES_BY_SURFACE) still
+// names the pre-rename identity for codeReview.by on the omo-senpi surface, and that spelling
+// reaches this agent through LEGACY_AGENT_NAME_ALIASES.
 export const CODE_REVIEWER_AGENT: AgentDefinition = {
-  name: "omo-senpi-code-reviewer",
+  name: "omo-native-code-reviewer",
   description:
-    "omo-senpi code-quality reviewer for ulw-loop final gates. Audits diffs, tests, and risk, then writes an artifact-backed review report.",
+    "OmO Native code-quality reviewer for ulw-loop final gates. Audits diffs, tests, and risk, then writes an artifact-backed review report.",
   mode: "subagent",
   executionMode: "in-process",
   categories: ["unspecified-high"],

@@ -10,7 +10,7 @@ describe("reflectionRemediation", () => {
       // when
       const hint = reflectionRemediation(
         "category_unavailable",
-        'Reflection category "quick" could not resolve a usable model (cause: model_unavailable); missing providers: kimi-coding, openai-codex',
+        'Reflection category "quick" could not resolve a usable model (cause: model_unavailable); missing providers: kimi-coding, chatgpt-subscription',
       )
 
       // then
@@ -99,7 +99,7 @@ describe("reflectionRemediation", () => {
 
     test("#when a candidate had no credentials #then the login hint fires instead of SENPI_BIN", () => {
       // given: the auth_missing arm of the same exhaustion format, which the spawn_failed branch shadowed
-      const hint = reflectionRemediation("spawn_failed", `auth_missing:openai-codex,kimi-coding; ${attempted}`)
+      const hint = reflectionRemediation("spawn_failed", `auth_missing:chatgpt-subscription,kimi-coding; ${attempted}`)
 
       // then
       expect(hint).toContain("/login")

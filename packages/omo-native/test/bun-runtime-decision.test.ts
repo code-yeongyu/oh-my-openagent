@@ -200,6 +200,56 @@ describe("bun runtime re-exec decision", () => {
     const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
     const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
 
+    test("replaces the POSIX launcher with exact argv[0] and environment", async () => {
+      // given
+      const env = { OMO_RUNTIME: "bun", PRESERVED: "fixture-value" }
+      const execs: unknown[][] = []
+      const spawns: unknown[][] = []
+      const propagated: unknown[] = []
+      // when
+      const consumed = await maybeReexecUnderBun({
+        scriptPath: treeScript, argv: ["node", treeScript, "say", "hi"],
+        env, versions: {}, homedir: () => POSIX_HOME, platform: "linux",
+        exists: existsOnly(bunPath), realpath: identityRealpath,
+        execve: (...args: unknown[]) => { execs.push(args) },
+        spawn: (...args: unknown[]) => { spawns.push(args); return { status: 37, signal: null } },
+        propagate: (result: unknown) => { propagated.push(result) },
+      })
+      // then
+      expect(consumed).toBe(true)
+      expect(execs.map(([file, argv]) => [file, argv])).toEqual([[bunPath, [bunPath, treeScript, "say", "hi"]]])
+      // input.env controls runtime discovery; the existing runChild path inherits process.env.
+      expect(execs[0]?.[2] === process.env).toBe(true)
+      expect(spawns).toEqual([])
+      expect(propagated).toEqual([])
+    })
+
+    for (const mode of ["throw", "absent", "win32"] as const) {
+      test(`keeps async fallback arguments, environment and exit status for ${mode}`, async () => {
+        // given
+        const env = { OMO_RUNTIME: "bun", PRESERVED: "fallback-value", BUN_INSTALL: POSIX_HOME }
+        const calls: unknown[][] = []
+        const propagated: unknown[] = []
+        let execs = 0
+        // when
+        const consumed = await maybeReexecUnderBun({
+          scriptPath: treeScript, argv: ["node", treeScript, "say", "hi"],
+          env, versions: {}, homedir: () => POSIX_HOME, platform: mode === "win32" ? "win32" : "linux",
+          exists: () => true, realpath: identityRealpath,
+          execve: mode === "absent" ? null : () => { execs += 1; throw new Error("injected unavailable") },
+          spawn: (...args: unknown[]) => { calls.push(args); return { status: 37, signal: null } },
+          propagate: (result: unknown) => { propagated.push(result) },
+        })
+        // then
+        expect(consumed).toBe(true)
+        expect(execs).toBe(mode === "throw" ? 1 : 0)
+        expect(calls).toHaveLength(1)
+        expect(calls[0]?.[1]).toEqual([treeScript, "say", "hi"])
+        expect(calls[0]?.[2]).toEqual({ stdio: "inherit", windowsHide: true })
+        expect(propagated).toEqual([{ status: 37, signal: null }])
+      })
+    }
+
     test("#then the script and its arguments are handed to bun with inherited stdio", async () => {
       // given
       const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
@@ -212,6 +262,7 @@ describe("bun runtime re-exec decision", () => {
         versions: {},
         homedir: () => POSIX_HOME,
         platform: "linux",
+        execve: null,
         exists: existsOnly(bunPath),
         realpath: identityRealpath,
         spawn: (command: string, args: string[], options: Record<string, unknown>) => {

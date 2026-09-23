@@ -12,7 +12,7 @@
 
 ## QA & Evidence
 
-<!-- For each command or manual QA action: what was tested, what you observed, where the saved artifact/log lives, and why that evidence is sufficient. Link sanitized artifacts under .omo/evidence/ when applicable. Do not paste raw secret-bearing logs, env dumps, tokens, auth headers, or private credentials. -->
+<!-- For each command or manual QA action: what was tested, what you observed, where the saved artifact/log lives, and why that evidence is sufficient. Evidence files stay local (.omo/evidence/ is gitignored and never committed), so paste the decisive sanitized excerpt of each capture here (RED failure line, GREEN pass count, driver final JSON, isolation proof) plus one `sha256sum <artifact>` line per evidence file. Do not paste raw secret-bearing logs, env dumps, tokens, auth headers, or private credentials. -->
 
 - **What was tested:** <!-- command or surface driven -->
   **Observed result:** <!-- actual result -->

@@ -6,6 +6,8 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { makeHandle } from "../manager/__fixtures__/manager-fakes"
+import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { compileDag, type DagDefinition } from "./graph"
@@ -169,7 +171,13 @@ class LongRunningTaskManager implements TaskManager {
   cancelTask(): Promise<never> { throw new Error("not implemented") }
   list(): readonly [] { return [] }
   forget(): void {}
-  getResidentHandle(): undefined { return undefined }
+  // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
+  // "held" from the same map its completions come from: a task it can still complete is held here.
+  getResidentHandle(taskId: string): ManagedChildHandle | undefined {
+    const record = this.#tasks.get(taskId)?.record
+    if (record === undefined || (record.status !== "pending" && record.status !== "running")) return undefined
+    return makeHandle(taskId).handle
+  }
   subscribeChild(): () => void { return () => undefined }
   residentTaskIds(): readonly string[] { return [] }
   residencyChanged(): Promise<void> { return new Promise<void>(() => undefined) }

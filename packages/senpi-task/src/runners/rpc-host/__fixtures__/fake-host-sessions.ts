@@ -53,6 +53,7 @@ interface LiveSession {
   readonly autoTitle: unknown
   readonly attachments: Set<Socket>
   parked: boolean
+  streaming: boolean
 }
 
 export class FakeSessionTable {
@@ -195,7 +196,17 @@ export class FakeSessionTable {
       autoTitle: payload.auto_title,
       attachments: new Set<Socket>(),
       parked: false,
+      streaming: false,
     }
+  }
+
+  setStreaming(routingId: string, streaming: boolean): void {
+    const session = this.#byRouting(routingId)
+    if (session !== undefined) session.streaming = streaming
+  }
+
+  isStreaming(routingId: string): boolean {
+    return this.#byRouting(routingId)?.streaming === true
   }
 
   #mintRouting(): string {

@@ -4,6 +4,8 @@
 // on the socket with the engine client this repo pins. Both are DIAGNOSTICS: a binary whose engine
 // cannot be imported here reports `unavailable` rather than failing a scenario on a harness dependency.
 
+import { createConnection } from "node:net"
+
 async function withClient(socketPath, use) {
   let client
   try {
@@ -19,9 +21,34 @@ async function withClient(socketPath, use) {
 }
 
 export async function probeSessionContext(socketPath) {
-  return await withClient(socketPath, async (client) => {
-    const rows = await client.listSessions({ include_workers: true })
-    return { probe: "ok", rows: Array.isArray(rows) ? rows : (rows?.sessions ?? []) }
+  // Older SDK listSessions() drops options. Send the worker-inclusive request on the wire so
+  // this read-only census is independent of whatever engine happens to be installed beside QA.
+  return await new Promise((resolve) => {
+    const socket = createConnection(socketPath)
+    let buffer = ""
+    const timer = setTimeout(() => finish({ probe: "unavailable: census deadline" }), 60_000)
+    const finish = (result) => {
+      clearTimeout(timer)
+      socket.destroy()
+      resolve(result)
+    }
+    socket.setEncoding("utf8")
+    socket.on("error", (error) => finish({ probe: `unavailable: ${error.message}` }))
+    socket.on("connect", () => socket.write(`${JSON.stringify({ id: "qa-census", type: "list_sessions", include_workers: true })}\n`))
+    socket.on("data", (chunk) => {
+      buffer += chunk
+      let newline
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline)
+        buffer = buffer.slice(newline + 1)
+        let row
+        try { row = JSON.parse(line) } catch { continue }
+        if (row.id !== "qa-census") continue
+        if (row.success !== true) return finish({ probe: `unavailable: ${row.error ?? "census rejected"}` })
+        const data = row.data
+        return finish({ probe: "ok", rows: Array.isArray(data) ? data : (data?.sessions ?? []) })
+      }
+    })
   })
 }
 

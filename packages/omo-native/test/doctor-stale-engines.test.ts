@@ -49,6 +49,22 @@ describe("omo doctor stale engine detection", () => {
         expect(result.managed.map((process) => process.pid)).toEqual([4242, 4243])
       })
 
+      test("#then an engine booted from the bundled entry classifies exactly like the unbundled one", () => {
+        // The launcher prefers the engine's pre-linked bundle when it exists (#8417), so a current
+        // install never produces the unbundled spelling. Classifying only that spelling makes the
+        // whole report blind to the sessions it is supposed to find.
+        const bundled = `${ENGINE.slice(0, -"cli.js".length)}bundle/cli.js`
+        const orphan = entry({ pid: 75190, command: `bun ${bundled} --extension ${PLUGIN}` })
+        const attached = entry({ pid: 12820, ppid: 12806, tty: "ttys002", command: `bun ${bundled} --extension ${PLUGIN}` })
+        const rpc = entry({ pid: 4250, command: `bun ${bundled} --mode rpc` })
+
+        const result = classifyEngineProcesses([orphan, attached, rpc])
+
+        expect(result.stale.map((process) => process.pid)).toEqual([75190])
+        expect(result.attached.map((process) => process.pid)).toEqual([12820])
+        expect(result.managed.map((process) => process.pid)).toEqual([4250])
+      })
+
       test("#then the launcher's own descendants are never reported as stale", () => {
         // A doctor run inside a live session sees its own engine; reporting it would tell the user
         // to reap the session they are typing into.

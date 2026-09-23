@@ -13,11 +13,17 @@ import {
   createRpcManagedRunner,
   mapOmoConfigAgents,
   parseExtensionEntries,
+  selectPackageExtensionPaths,
   type AgentDefinition,
   type KernelToolBindingRegistry,
   type ManagedRunner,
+  type RpcChildHandle,
+  type RpcRunnerSpec,
 } from "@oh-my-opencode/senpi-task"
 
+import { log } from "@oh-my-opencode/utils"
+
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { MEMORY_TOOL_NAME } from "../memory/tools"
 import type { TaskRuntimeContext } from "./runtime-context"
@@ -42,6 +48,10 @@ export interface RunnerBuildContext {
   readonly platform?: NodeJS.Platform
   readonly agentDir?: string
   readonly env?: Readonly<Record<string, string | undefined>>
+  readonly listInstalledPackageRoots?: () => readonly string[]
+  // The session's shared package-aware inherited list. Injected so every child-launch producer -
+  // initial spawn, revival, team members, workpool workers - resolves the SAME list.
+  readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
   // Where a daemon fallback reason goes. Defaults to the module logger; the engine passes the
   // session's deduped notice list so the same reason reaches `task_output` exactly once.
   readonly onHostWarning?: (message: string) => void
@@ -86,8 +96,97 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
   return createInProcessManagedRunner(inProcess, context)
 }
 
+// Package discovery reads settings and stats every installed package root. On a stuck mount that
+// can block rather than throw, and it sits directly in front of every child spawn, so it is bounded
+// and the child falls back to argv-only instead of never starting.
+const PACKAGE_DISCOVERY_TIMEOUT_MS = 5_000
+
+async function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+      }),
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
+/**
+ * The ONE answer to "which extensions should a child of this session inherit".
+ *
+ * Every producer of a child launch list - the initial spawn, revival, team members, workpool
+ * workers - resolves through this, because a list assembled from argv alone is exactly the #8492
+ * defect.
+ *
+ * Both inputs are read fresh on every call, never memoized: a package installed mid-session and an
+ * extension registered after the last capture must both reach the next child. That freshness is a
+ * pinned contract (`package-extensions.test.ts` asserts a changed root set between two spawns is
+ * picked up), so the cost of the lookup is bounded by a timeout instead of by a cache.
+ */
+export function createInheritedExtensionsResolver(build: RunnerBuildContext): () => Promise<readonly string[]> {
+  const argvEntries = parseExtensionEntries(process.argv)
+
+  const discoverRoots = async (): Promise<readonly string[]> => {
+    if (build.listInstalledPackageRoots !== undefined) return build.listInstalledPackageRoots()
+    const { DefaultPackageManager, SettingsManager } = await loadSenpiBarrel()
+    const cwd = build.runtime.cwd()
+    const agentDir = build.agentDir ?? resolveAgentHome({ env: build.env ?? process.env })
+    return new DefaultPackageManager({
+      cwd,
+      agentDir,
+      settingsManager: SettingsManager.create(cwd, agentDir),
+    }).listConfiguredPackages().flatMap(({ installedPath }) => installedPath === undefined ? [] : [installedPath])
+  }
+
+  return async () => {
+    const loadedExtensionPaths = build.runtime.loadedExtensionPaths()
+    if (loadedExtensionPaths.length === 0) return argvEntries
+    let installedPackageRoots: readonly string[] = []
+    try {
+      installedPackageRoots = await withTimeout(discoverRoots(), PACKAGE_DISCOVERY_TIMEOUT_MS, "package discovery")
+    } catch (error) { // no-excuse-ok: catch - discovery is best-effort and must never block a spawn.
+      log("omo-senpi package extension discovery failed; task children inherit argv extensions only", {
+        error: String(error),
+      })
+      installedPackageRoots = []
+    }
+    return [
+      ...argvEntries,
+      ...selectPackageExtensionPaths(argvEntries, loadedExtensionPaths, installedPackageRoots),
+    ]
+  }
+}
+
 function buildProcessRunner(build: RunnerBuildContext): ManagedRunner {
-  return createRpcManagedRunner(buildProcessChildRunner(build))
+  const runner = buildProcessChildRunner(build)
+  const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
+  return createRpcManagedRunner({
+    async start(spec) {
+      if (spec.extensions !== undefined) return runner.start(spec)
+      return runner.start({ ...spec, extensions: await resolveInheritedExtensions() })
+    },
+  })
+}
+
+/**
+ * The respawn seam. `TaskManagerImpl` otherwise defaults to a bare `new RpcProcessRunner()`, which
+ * carries no inherited extensions at all, so a revived child lost every package provider its first
+ * launch had and failed admission against the model recorded in its own record.
+ */
+export function buildRespawnRunner(
+  build: RunnerBuildContext,
+): { start(spec: RpcRunnerSpec): Promise<RpcChildHandle> } {
+  const runner = buildProcessChildRunner(build)
+  const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
+  return {
+    start: async (spec) => runner.start(
+      spec.extensions === undefined ? { ...spec, extensions: await resolveInheritedExtensions() } : spec,
+    ),
+  }
 }
 
 /**

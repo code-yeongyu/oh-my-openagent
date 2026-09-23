@@ -46,7 +46,7 @@ export function SocialImage({ count }: { readonly count: number | null }) {
         }}
       >
         <div style={{ display: "flex", fontWeight: 400 }}>Your tool for real work.</div>
-        <div style={{ display: "flex", fontWeight: 700 }}>But it's an agent.</div>
+        <div style={{ display: "flex", fontWeight: 700 }}>But it&apos;s an agent.</div>
       </div>
       <div
         style={{

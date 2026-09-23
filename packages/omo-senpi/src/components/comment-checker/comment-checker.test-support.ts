@@ -103,6 +103,7 @@ export function isToolResultPatch(value: unknown): value is ToolResultPatch {
 
 export async function registerWithFakeRunner(options: {
   resolveBinary?: () => string | null
+  downloadBinary?: () => Promise<string | null>
   result?: CheckResult
   logger?: ComponentLogger
 } = {}): Promise<{
@@ -115,6 +116,7 @@ export async function registerWithFakeRunner(options: {
   const logger: ComponentLogger = options.logger ?? createRecordingLogger()
   const component = createCommentCheckerComponent({
     resolveBinary: options.resolveBinary ?? (() => "/tmp/fake-comment-checker"),
+    downloadBinary: options.downloadBinary ?? (async () => null),
     runCommentChecker: async (input: RunCommentCheckerInput) => {
       calls.push(input)
       return options.result ?? { hasComments: false, message: "" }

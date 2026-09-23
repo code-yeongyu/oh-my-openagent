@@ -14,7 +14,7 @@ export type OmoOpenCodeConfigView = {
 }
 
 export type OmoOpenCodeConfigChain = {
-  readonly diagnostics: readonly { readonly message: string; readonly path: string }[]
+  readonly diagnostics: readonly { readonly kind?: string; readonly message: string; readonly path: string }[]
   readonly protectedUserView: Record<string, unknown>
   readonly views: readonly OmoOpenCodeConfigView[]
 }

@@ -32,6 +32,11 @@ export type OutcomeTrackerPorts = {
   // record is then guaranteed non-terminal, so the waiters must be settled from this record instead.
   readonly settleWaiters: (taskId: string, terminal?: TaskRecord) => void
   readonly tryRuntimeFallback: (input: ErrorOutcomeInput) => Promise<boolean>
+  // Merges (or retains) an isolated child's clone. Awaited BEFORE the terminal record is written, so
+  // every result builder - the foreground waiter, the completion notification, task_output - reads
+  // one record that already carries merge_result. A late merge would publish "done" before the
+  // parent checkout actually holds the work.
+  readonly settleIsolation?: (taskId: string, merge: boolean) => Promise<void>
 }
 
 export type OutcomeTracker = {
@@ -69,6 +74,19 @@ function ownedRecord(
     fresh.notification.run_epoch !== epoch
   ) return null
   return fresh
+}
+
+// Returns a promise ONLY for an isolated child. A non-isolated child must reach persistTerminal in
+// the same microtask it always did: an unconditional await here delays every terminal by a tick and
+// breaks callers that read the record straight after the outcome promise settles.
+// A failing merge must never strand the run either: the settle records its own failure on the
+// record, so anything escaping it is logged and the terminal still lands.
+function settleIsolationFor(ports: OutcomeTrackerPorts, owned: TaskRecord, merge: boolean): Promise<void> | undefined {
+  const settle = ports.settleIsolation
+  if (settle === undefined || owned.isolation === undefined) return undefined
+  return settle(owned.task_id, merge).catch((error: unknown) => {
+    log("senpi-task isolation settle failed", { taskId: owned.task_id, error: String(error) })
+  })
 }
 
 function errnoField(error: unknown, key: "code" | "syscall" | "path"): string | undefined {
@@ -114,6 +132,10 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     if (owned === null) return
 
     ports.releaseSlot(input.taskId, input.model, input.epoch)
+    // Awaiting even an undefined result would cost a microtask, which is exactly the delay this
+    // branch exists to avoid for a non-isolated child.
+    const settlingError = settleIsolationFor(ports, owned, false)
+    if (settlingError !== undefined) await settlingError
     persistTerminal(input.taskId, owned, input.timestamp, {
       type: "fail",
       timestamp: input.timestamp,
@@ -126,7 +148,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   function trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
     handle
       .waitForOutcome()
-      .then((outcome) => {
+      .then(async (outcome) => {
         const owned = ownedRecord(ports, taskId, handle, epoch)
         if (owned === null) return
         const timestamp = nowIso(ports.now)
@@ -150,6 +172,8 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         }
 
         ports.releaseSlot(taskId, model, epoch)
+        const settling = settleIsolationFor(ports, owned, outcome.status === "completed" && outcome.finalResponse.length > 0)
+        if (settling !== undefined) await settling
         const runStatsField = runStats === undefined ? {} : { run_stats: runStats }
         if (outcome.status === "completed" && outcome.finalResponse.length > 0) {
           persistTerminal(taskId, owned, timestamp, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })

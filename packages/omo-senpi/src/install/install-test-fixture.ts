@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 
 const REQUIRED_SKILL_NAMES = [
   "ast-grep",
+  "browser",
   "coding-agent-sessions",
   "debugging",
   "frontend",

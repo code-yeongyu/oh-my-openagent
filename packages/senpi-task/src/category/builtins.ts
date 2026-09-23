@@ -38,9 +38,10 @@ function hasRequiresModel(
   return definition.requiresModel !== undefined
 }
 
-// A gate lists every model id that opens the category; one present id is enough. ultrabrain and deep
-// gate on gpt-6-astra OR gpt-5.6-sol so a registry carrying either GPT flagship keeps them, while a
-// registry with neither never falls through to a cross-family model.
+// A gate lists every model id that opens the category; one present id is enough. ultrabrain gates on
+// gpt-6-astra OR gpt-5.6-sol so a registry carrying either GPT flagship keeps it, deep-low on either
+// GPT-6 Sol tier and deep-high on gpt-6-astra alone, and a registry with none of a lane's ids never
+// falls through to a cross-family model.
 export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
   BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [
     definition.name,

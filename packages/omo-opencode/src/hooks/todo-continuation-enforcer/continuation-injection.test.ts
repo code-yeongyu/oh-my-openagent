@@ -367,7 +367,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_injection_non_retryable",
       resolvedInfo: {
         agent: "Sisyphus - ultraworker",
-        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+        model: { providerID: "anthropic", modelID: "claude-opus-5-5" },
       },
       sessionStateStore: { getExistingState: () => state } as never,
     })

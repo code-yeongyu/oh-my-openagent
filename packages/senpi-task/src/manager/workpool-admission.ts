@@ -111,13 +111,16 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
             if (!acquired.lease.isOwner()) throw new WorkpoolError("admission_refused", "Residency admission lease was displaced.")
             // Grants are resolved AFRESH for every new worker: an existing worker never rebinds.
             const kernelTools = await resolveWorkerKernelTools(pool, ports.kernelToolBindings, options.resolveChildToolNames?.())
+            const processLaunch = pool.worker_spec.start.execution_mode === "process"
+              ? await workpoolProcessLaunch(options.store.stateDir, taskId, options.resolveInheritedExtensions)
+              : undefined
             if (!input.bind(taskId, epoch)) return
             context = prepareWorkpoolLaunch({ options, workerSpec: pool.worker_spec, taskId, hostPid: ports.hostPid,
               taskSeq: ports.nextSequence(pool.parent_session_id),
               spec: { ...pool.worker_spec.start,
                 memberScopedTools: ports.workerTools(taskId),
                 ...(kernelTools === undefined ? {} : { kernelTools }),
-                ...(pool.worker_spec.start.execution_mode === "process" ? workpoolProcessLaunch(options.store.stateDir, taskId) : {}),
+                ...(processLaunch === undefined ? {} : processLaunch),
               },
             })
           } finally { acquired.lease.release() }

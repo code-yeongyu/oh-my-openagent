@@ -6,8 +6,10 @@ import { isCliEntry } from "./entry-guard.mjs";
 
 const pluginScriptsDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(pluginScriptsDir, "..", "..", "..", "..");
-const sharedSkillsScripts = join(repoRoot, "packages", "shared-skills", "scripts");
+const sharedSkillsRoot = join(repoRoot, "packages", "shared-skills");
+const sharedSkillsScripts = join(sharedSkillsRoot, "scripts");
 const materializeScript = join(sharedSkillsScripts, "materialize-frontend-refs.mjs");
+const stageOmowrightScript = join(sharedSkillsRoot, "stage-omowright-runtime.mjs");
 
 const upstreamPaths = [
 	"packages/shared-skills/upstreams/open-design",
@@ -34,7 +36,11 @@ function initSubmodules({ strict }) {
 export async function materializeSharedUpstreams({ strict }) {
 	initSubmodules({ strict });
 	const { materializeFrontendRefs } = await import(pathToFileURL(materializeScript).href);
-	return materializeFrontendRefs({ strict });
+	const result = await materializeFrontendRefs({ strict });
+	const { stageOmowrightRuntime } = await import(pathToFileURL(stageOmowrightScript).href);
+	const omowright = await stageOmowrightRuntime();
+	process.stdout.write(`[materialize] staged omowright ${omowright.version} into the browser skill\n`);
+	return result;
 }
 
 if (isCliEntry(import.meta.url)) {

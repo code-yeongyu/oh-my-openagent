@@ -492,6 +492,10 @@ jobs:
           # The version bump restamps OMO_SENPI_PACKAGE_VERSION inside the committed Senpi
           # bundles; rebuild them so the release commit passes bundle-freshness CI.
           node packages/omo-senpi/plugin/scripts/build-extension.mjs
+          # The committed Codex installer bundle embeds packages/omo-codex/package.json, and its
+          # freshness marker digests that file; rebuild it too or codex-install-bundle-freshness
+          # rejects the release commit as stale (v5.0.0-beta.83 release-state PR).
+          bun run build:codex-install
 
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -500,6 +504,7 @@ jobs:
           # plugin/runtime; it must be committed with the extensions or the freshness check
           # rejects the release commit as stale-output (#8329).
           git add -f packages/omo-senpi/plugin/extensions packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js
+          git add packages/omo-codex/scripts/install-dist/install-local.mjs
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"

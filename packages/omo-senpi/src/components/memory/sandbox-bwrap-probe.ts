@@ -74,7 +74,7 @@ async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
     }
     let child: ChildProcess
     try {
-      child = spawn(executable, [...SMOKE_ARGS], { stdio: ["ignore", "ignore", "pipe"] })
+      child = spawn(executable, [...SMOKE_ARGS], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true })
     } catch (error) {
       finish({ exitCode: null, timedOut: false, errorMessage: error instanceof Error ? error.message : String(error), stderr: "" })
       return

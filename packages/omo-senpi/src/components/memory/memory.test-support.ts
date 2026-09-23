@@ -92,12 +92,15 @@ export function sessionContext(options: {
   readonly entries?: readonly SessionEntryFixture[]
   readonly notifications?: Array<{ message: string; level: string }>
   readonly sessionId?: string
+  /** The session's own working directory, as senpi's ExtensionContext reports it. */
+  readonly cwd?: string
 } = {}): {
   readonly sessionManager: {
     getEntries(): readonly SessionEntryFixture[]
     getSessionId(): string
   }
   readonly ui: { notify(message: string, level: string): void }
+  readonly cwd?: string
 } {
   const notifications = options.notifications ?? []
   return {
@@ -106,5 +109,6 @@ export function sessionContext(options: {
       getSessionId: () => options.sessionId ?? "session-1",
     },
     ui: { notify: (message, level) => notifications.push({ message, level }) },
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
   }
 }

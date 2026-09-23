@@ -1,10 +1,11 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
+import type { IsolationDetails } from "../../isolation/details"
 
 import type { TaskManager } from "../../manager"
 import type { ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus } from "../../state"
 import type { CallerSessionResolver } from "../control"
 
-export type OutputManager = Pick<TaskManager, "get" | "list">
+export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">
 
 export type TranscriptEntry =
   | { readonly kind: "assistant"; readonly text: string }
@@ -33,6 +34,7 @@ export type SuspendedDetails = {
 
 export type TaskSnapshot = {
   readonly task_id: string
+  readonly lease?: "held" | "parked"
   readonly name?: string
   readonly description?: string
   readonly task_summary?: string
@@ -52,6 +54,7 @@ export type TaskSnapshot = {
   readonly final_response?: string
   readonly error_message?: string
   readonly run_stats?: TaskRunStats
+  readonly isolation?: IsolationDetails
   readonly lost?: LostBreadcrumbs
 }
 

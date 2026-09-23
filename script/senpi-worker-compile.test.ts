@@ -42,13 +42,13 @@ console.log("two-workers-ready");`)
     mkdirSync(relocated)
     const moved = join(relocated, process.platform === "win32" ? "omo.exe" : "omo")
     renameSync(binary, moved)
-    rmSync(buildRoot, { recursive: true })
+    rmSync(buildRoot, { recursive: true, maxRetries: 10, retryDelay: 100 })
     const result = spawnSync(moved, [], { cwd: relocated, encoding: "utf8", timeout: 10_000 })
     // then
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout.trim()).toBe("two-workers-ready")
   } finally {
-    rmSync(scratch, { recursive: true, force: true })
+    rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 }, 45_000)
 

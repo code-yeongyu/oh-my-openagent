@@ -63,10 +63,14 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     case "prompt":
       if (routingId !== undefined && typeof payload.message === "string") {
         ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
+        ports.table.setStreaming(routingId, true)
       }
       return ok({})
     case "get_state":
-      return ok({ sessionId: `durable-${payload.sessionId}` })
+      return ok({
+        sessionId: `durable-${payload.sessionId}`,
+        isStreaming: routingId !== undefined && ports.table.isStreaming(routingId),
+      })
     case "get_entries":
       return ok({ entries: [], leafId: null })
     case "switch_session":

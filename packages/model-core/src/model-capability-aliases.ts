@@ -46,7 +46,8 @@ const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
     description: "Normalizes OpenCode's OpenAI GPT fast service-tier IDs to canonical snapshot IDs.",
     providerIDs: ["openai"],
     allowedSubproviderHosts: ["vercel"],
-    match: (normalizedModelID) => /^(?:gpt-5\.6-(?:sol|terra|luna)|gpt-6-astra)-fast$/.test(normalizedModelID),
+    match: (normalizedModelID) =>
+      /^(?:gpt-5\.6-(?:sol|terra|luna)|gpt-6-(?:astra|sol|luna))-fast$/.test(normalizedModelID),
     canonicalize: (normalizedModelID) => normalizedModelID.slice(0, -"-fast".length),
   },
   {

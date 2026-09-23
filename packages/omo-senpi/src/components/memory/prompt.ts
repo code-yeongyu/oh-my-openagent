@@ -7,7 +7,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
-import { estimateSystemTokens, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
+import { estimateSystemTokensCached, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 
 export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v3"
 export const MEMORY_NOTICE_CUSTOM_TYPE = "omo-memory:notice"
@@ -48,6 +48,10 @@ export function createMemoryPromptHandler(
 ): (payload: unknown, eventCtx?: unknown) => Promise<BeforeAgentStartEventResult | undefined> {
   const cache = options.cache ?? new MemoryBlockCache()
   const createRepo = options.createRepo ?? defaultCreateRepo
+  // The pressure estimate is a pure function of the commit, like the compiled block above it. Without
+  // this memo every prompt listed the tree and read every system blob again (one git process each):
+  // 45 git spawns between Enter and the provider request in a 2.7k-commit identity.
+  const pressureEstimates = new Map<string, number>()
   return async (payload, eventCtx) => {
     const systemPrompt = readSystemPrompt(payload)
     if (systemPrompt === undefined) return undefined
@@ -66,6 +70,7 @@ export function createMemoryPromptHandler(
       block,
       repo,
       options.resolveCompileWarnTokens?.(context.identity),
+      pressureEstimates,
     )
     const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice)
     const nextPrompt = replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock))
@@ -85,11 +90,12 @@ async function addMemoryPressureMetadata(
   block: string,
   repo: GitMemoryRepo,
   compileWarnTokens: number | undefined,
+  estimates: Map<string, number>,
 ): Promise<string> {
   if (compileWarnTokens === undefined) return block
   const head = await repo.head()
   if (head === null) return block
-  const estimate = await estimateSystemTokens(repo, head)
+  const estimate = await estimateSystemTokensCached(repo, head, estimates)
   const softThreshold = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * compileWarnTokens)
   if (estimate < softThreshold) return block
   const percentage = Math.floor((estimate / compileWarnTokens) * 100)

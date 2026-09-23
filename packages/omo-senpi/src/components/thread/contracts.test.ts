@@ -21,6 +21,9 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_send: { thread: "019233a1-7c2e-7bbb", message: "Continue the payments migration.", delivery: "auto" },
   thread_interrupt: { thread: "019233a1-7c2e-7bbb", turn_id: "turn-7" },
   thread_handoff: { thread: "payments", match: "fuzzy", message: "Pick this up where it stopped.", delivery: "follow_up" },
+  thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
+  thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
+  thread_set_reasoning: { thread: "019233a1-7c2e-7bbb", level: "high" },
 }
 
 const NEGATED_USE = /do not use|don't use|never use/i
@@ -40,7 +43,7 @@ function collectDescriptions(node: unknown, into: string[] = []): string[] {
 }
 
 describe("thread tool param schemas", () => {
-  test("#given the six thread tools #when the family is inspected #then every verb token is unique behind the shared thread_ prefix (R1)", () => {
+  test("#given the nine thread tools #when the family is inspected #then every verb token is unique behind the shared thread_ prefix (R1)", () => {
     expect(Object.keys(threadToolParamSchemas)).toEqual([
       "thread_create",
       "thread_list",
@@ -48,6 +51,9 @@ describe("thread tool param schemas", () => {
       "thread_send",
       "thread_interrupt",
       "thread_handoff",
+      "thread_rename",
+      "thread_set_model",
+      "thread_set_reasoning",
     ])
 
     const verbs = Object.keys(threadToolParamSchemas).map((name) => name.replace(/^thread_/, ""))
@@ -76,6 +82,86 @@ describe("thread tool param schemas", () => {
   test("#given the delivery mode field #when inspected #then it is a three-state enum, not a boolean (R6)", () => {
     const literals = ThreadDeliveryMode.anyOf.map((member) => member.const)
     expect(literals).toEqual(["auto", "steer", "follow_up"])
+  })
+})
+
+describe("thread_rename params", () => {
+  test("#given a thread and a new label #when parsed #then the payload validates", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, {
+      thread: "019233a1-7c2e-7bbb",
+      name: "payments-lane-2",
+    })
+    expect(outcome.kind).toBe("ok")
+  })
+
+  test("#given a rename payload missing name #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { thread: "019233a1-7c2e-7bbb" })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+})
+
+describe("thread_set_model params", () => {
+  test("#given a thread and a bare model id #when parsed #then the payload validates", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_model, {
+      thread: "019233a1-7c2e-7bbb",
+      model: "gpt",
+    })
+    expect(outcome.kind).toBe("ok")
+  })
+
+  test("#given a model fragment plus a provider #when parsed #then the payload validates", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_model, {
+      thread: "019233a1-7c2e-7bbb",
+      model: "x",
+      provider: "openai",
+    })
+    expect(outcome.kind).toBe("ok")
+  })
+
+  test("#given a set_model payload missing model #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_model, { thread: "019233a1-7c2e-7bbb" })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+})
+
+describe("thread_set_reasoning params", () => {
+  test("#given a thread and a thinking level #when parsed #then the payload validates", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_reasoning, {
+      thread: "019233a1-7c2e-7bbb",
+      level: "high",
+    })
+    expect(outcome.kind).toBe("ok")
+  })
+
+  test("#given a level scoped to the current turn #when parsed #then the payload validates", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_reasoning, {
+      thread: "019233a1-7c2e-7bbb",
+      level: "low",
+      scope: "turn",
+    })
+    expect(outcome.kind).toBe("ok")
+  })
+
+  test("#given an off-catalog level #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_reasoning, {
+      thread: "019233a1-7c2e-7bbb",
+      level: "ultra",
+    })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  test("#given an off-catalog scope #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_set_reasoning, {
+      thread: "019233a1-7c2e-7bbb",
+      level: "low",
+      scope: "forever",
+    })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  test("#given the level field #when inspected #then it is exactly the seven wire thinking levels", () => {
+    const literals = threadToolParamSchemas.thread_set_reasoning.properties.level.anyOf.map((member) => member.const)
+    expect(literals).toEqual(["off", "minimal", "low", "medium", "high", "xhigh", "max"])
   })
 })
 
@@ -139,6 +225,9 @@ describe("thread error taxonomy", () => {
       "transport_closed",
       "host_unavailable",
       "internal_error",
+      "model_not_found",
+      "model_ambiguous",
+      "thinking_level_unsupported",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

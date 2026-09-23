@@ -25,7 +25,7 @@ import {
   writeFileSync,
 } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 export const DELETED_CHILD_ENV = [
   "SENPI_PACKAGE_DIR",
@@ -36,6 +36,12 @@ export const DELETED_CHILD_ENV = [
   "PI_SESSION_FILE",
   "OMO_RPC_SOCKET_PATH",
   "SENPI_RPC_HOST_WATCH_FD",
+  "SENPI_CODING_AGENT_HOST_DIR",
+  "SENPI_CODING_AGENT_RUNTIME_DIR",
+  "OMO_CODING_AGENT_HOST_DIR",
+  "OMO_CODING_AGENT_RUNTIME_DIR",
+  "PI_CODING_AGENT_HOST_DIR",
+  "PI_CODING_AGENT_RUNTIME_DIR",
 ]
 
 export const AGENT_DIR_ENV_NAMES = ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"]
@@ -129,6 +135,8 @@ export function injectDaemonMockProvider(pluginRoot, mockEntry, name = "omo-qa-m
   // per-child processes inherit the parent's `-e` mock provider instead.
   if (!existsSync(specPath)) return { specPath, extensions: [], launchSpecPresent: false }
   copyFileSync(mockEntry, join(pluginRoot, name))
+  copyFileSync(join(dirname(mockEntry), "task-e2e-mock-provider.ts"), join(pluginRoot, "task-e2e-mock-provider.ts"))
+  copyFileSync(join(dirname(mockEntry), "task-host-e2e-audit.mjs"), join(pluginRoot, "task-host-e2e-audit.mjs"))
   const spec = JSON.parse(readFileSync(specPath, "utf8"))
   const entry = `./${name}`
   if (!spec.core.extensions.includes(entry)) spec.core.extensions.push(entry)
@@ -142,6 +150,9 @@ function baseEnv({ home, agentDir, xdgConfigHome, extra = {} }) {
   for (const name of DELETED_CHILD_ENV) delete env[name]
   env.HOME = home
   env.XDG_CONFIG_HOME = xdgConfigHome
+  env.XDG_DATA_HOME = join(home, "data")
+  env.XDG_CACHE_HOME = join(home, "cache")
+  env.XDG_STATE_HOME = join(home, "state")
   for (const name of AGENT_DIR_ENV_NAMES) env[name] = agentDir
   env.OMO_SENPI_QA = "1"
   env.CI = "1"

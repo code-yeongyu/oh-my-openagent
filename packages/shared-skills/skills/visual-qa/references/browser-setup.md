@@ -1,75 +1,75 @@
 # Browser setup (Web capture)
 
-Use the js-eval kernel for both tiers. In Codex, prefer
-`browser:control-in-app-browser` for ordinary captures.
+Capture with omowright from the js-eval kernel. The library is staged inside the `browser` skill;
+load it once per session:
 
-## Tier 1: Bun.WebView
+```js
+const { loadOmowright } = await import("<browser-skill-root>/scripts/omowright.mjs")
+const { omowright } = await loadOmowright()
+```
 
-On a Bun >= 1.4 kernel, `new Bun.WebView()` is the macOS default (system
-WebKit, no browser download). Linux/Windows require `backend: "chrome"`
-and installed Chrome/Chromium/Edge. WebView is headless; WebKit has no CDP,
-and `type()` emits no keyboard events. Use tier 2 when these differences matter.
+## Owned engine (default for QA)
+
+A browser your code launches, with a task-owned profile, pinned viewport and no user state.
+`connectPipe` opens no listening port and reaps the process on `close()`.
 
 ```js
 // js-eval cell; url and pngPath belong to this QA run.
-const view = new Bun.WebView({ width: 1280, height: 720 })
+const { mkdtempSync, rmSync } = await import("node:fs")
+const profile = mkdtempSync(`${(await import("node:os")).tmpdir()}/visual-qa-`)
+const browser = await omowright.connectPipe({
+  browserPath: chromeBinary,                      // installed Chrome, Chromium, CloakBrowser or chrome-headless-shell
+  browserArgs: ["--headless", "--no-first-run", `--user-data-dir=${profile}`],
+  storageRoot: profile,
+})
 try {
-  await view.navigate(url)
-  await Bun.write(pngPath, await view.screenshot())
-  console.log(pngPath)
-} finally {
-  view[Symbol.dispose]()
-}
-```
-
-## Tier 2: playwright-core with local Chrome
-
-For other kernels, real-Chrome semantics, stealth, traces, or authenticated
-profiles, WRITE a script beside the project's installed `playwright-core`
-dependency and execute it from js eval. The user installs `playwright-core`
-once with `bun add playwright-core` if needed; Chrome must already exist.
-No managed browser download is needed.
-
-```js
-// capture.mjs
-import { chromium } from "playwright-core"
-const [url, pngPath] = process.argv.slice(2)
-const browser = await chromium.launch({ channel: "chrome", headless: true })
-try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 })
-  await page.goto(url, { waitUntil: "load", timeout: 30000 })
-  await page.screenshot({ path: pngPath })
+  const page = await browser.newTab("about:blank")
+  await omowright.emulate(page, { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false, hasTouch: false })
+  await page.goto(url, { waitUntil: "load" })
+  await Bun.write(pngPath, await page.screenshot())
   console.log(pngPath)
 } finally {
   await browser.close()
+  rmSync(profile, { recursive: true, force: true })
 }
 ```
 
-Run from the js-eval kernel (also works on a Node kernel):
+Chrome must already be installed; report an absent executable rather than downloading a managed
+browser. For bot-scored or WAF targets use `connectCloakProfile({ profileDir })` (CloakBrowser
+with a pinned fingerprint seed) — the `browser` skill's `references/owned-engine/README.md`
+covers it.
+
+## Attached engine (authenticated pages)
+
+When the capture needs the user's login, drive the browser they are signed into instead of
+cloning its profile:
 
 ```js
-const { promisify } = await import("node:util")
-const { execFile } = await import("node:child_process")
-const result = await promisify(execFile)("node", [scriptPath, url, pngPath], { timeout: 45000 })
-console.log(result.stdout)
+const session = await omowright.connectBrowserSkill({ name: "visual-qa capture", focused: false })
+try {
+  await session.navigate(url, { waitUntil: "load" })
+  await session.resize(1280, 720)
+  const shot = await session.screenshot()            // { buffer, width, height }
+  await Bun.write(pngPath, shot.buffer)
+} finally {
+  await session.stop()
+}
 ```
 
-For auth, CLONE the user-data directory to a private task-owned directory
-and use `chromium.launchPersistentContext(clonePath, { channel: "chrome" })`.
-NEVER launch against or clear cookies/cache/site data from the live profile.
-Close the context and remove only the clone after QA. For script-based stealth,
-read the ultimate-browsing skill's `references/chrome-stealth.md`.
+NEVER launch anything against, or clear cookies/cache/site data from, the user's live profile;
+the attached engine is the only sanctioned way to a signed-in page. If no extension is connected,
+run the `browser` skill's `scripts/browser-install.mjs`, relay its one human step, and wait — do
+not fall back to the owned engine for an authenticated criterion.
 
 ## Capture a screenshot at a fixed viewport
 
-Match CSS viewport AND PNG dimensions: WebKit follows native display scale
-(a 1280x720 viewport can yield 2560x1440 pixels). Use matching reference
-captures or Chrome's `deviceScaleFactor`, not resizing to force a pass.
-Wait for the specific page state, not a sleep, then compare:
+Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned) or
+`resize` (attached) instead of resizing the PNG to force a pass. Wait for the specific page state
+(a locator, a `waitForURL`, a `createNetworkSnoop(page).waitFor(...)`), not a sleep, then compare:
 
 ```sh
 node "$SKILL_DIR/scripts/visual-qa.mjs" image-diff reference.png actual.png
 ```
 
-Inspect `dimensionsMatch` and `diffRatio`, then inspect the image. Close every
-WebView/browser context and the fixture server, even on a failed capture.
+Inspect `dimensionsMatch` and `diffRatio`, then inspect the image. Close every browser and session
+and the fixture server, even on a failed capture; remove the owned profile in the same `finally`.

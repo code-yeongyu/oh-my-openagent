@@ -53,7 +53,7 @@ One unified file configures every omo harness: the OpenCode plugin, Senpi (task,
 Within the merged document each harness resolves its own view VSCode-style, later layers winning:
 
 1. Shared base keys
-2. The `[harness]` block: `[opencode]`, `[senpi]`, or `[codex]`
+2. The `[harness]` block: `[opencode]`, `[native]`, or `[codex]` (`[senpi]` is the accepted legacy spelling of `[native]`)
 3. `profiles.<name>`
 4. `profiles.<name>.[harness]`
 
@@ -76,14 +76,14 @@ A top-level `models` record maps a short name to the canonical shape `{ model, r
 
 #### Model Profiles
 
-Two more shared base keys, read by the Senpi harness, pick the main session model by intent instead of by model id. They live at the top level, inside `[senpi]`, or inside a `profiles.<name>` layer, like any other base key.
+Two more shared base keys, read by the Senpi harness, pick the main session model by lane instead of by model id. They live at the top level, inside `[native]`, or inside a `profiles.<name>` layer, like any other base key.
 
 | Key | Type | Description |
 | --- | --- | --- |
-| `model_profiles` | record<string, `{ display_name?, models? }`> | Named ordered model chains. A name matching a builtin (`capable`, `simple-work`, `deep-work`) replaces it wholesale; any other name adds one. Entries use the same string or object shape as a category chain and may reference `models.<catalog>` entries. |
-| `model_profile` | string | Which chain starts the session: a profile id such as `capable`, or a literal `provider/model` that pins one exact model. Unset means Senpi's own default resolution runs. |
+| `model_profiles` | record<string, `{ display_name?, family?, tier?, models? }`> | Named ordered model chains. A name matching a builtin (`daily-normal`, `daily-heavy`, `geeky-normal`, `geeky-heavy`) replaces it wholesale; any other name adds one. Entries use the same string or object shape as a category chain and may reference `models.<catalog>` entries. |
+| `model_profile` | string | Which chain starts the session: a lane id such as `daily-normal`, or a literal `provider/model` that pins one exact model. Unset applies Daily · Normal on a fresh session. |
 
-Don't confuse these with `profiles.<name>` above: that key swaps configuration layers via `OMO_PROFILE`, while `model_profile` chooses a model within the loaded configuration. Builtin chains, session-start behavior, and override rules are in the [omo.json reference](./omo-json.md#model-profiles-senpi-harness).
+Don't confuse these with `profiles.<name>` above: that key swaps configuration layers via `OMO_PROFILE`, while `model_profile` chooses a model within the loaded configuration. Builtin chains, session-start behavior, and override rules are in the [omo.json reference](./omo-json.md#model-profiles-native-harness).
 
 #### Security Invariants
 
@@ -106,7 +106,7 @@ Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to li
 The first time a current harness starts (and again on install or via the CLI), a lock-and-journal migration engine imports the legacy files into the unified file:
 
 - Sources: `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` in the OpenCode user config directory, in each of its `profiles/<name>/` directories, and in walked project `.opencode/` directories, plus `~/.omo/config.jsonc`.
-- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
+- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[native]`.
 - OpenCode legacy files import only model/provider controls (`disabled_providers`, `model_fallback`, `models`, and `omo_agent` renamed to `sisyphus_agent`); agent and category registries, agent disable lists, hooks, and unrelated plugin settings are not imported.
 - Conflict policy: no-clobber. A value already present in the target wins, and every skipped legacy value is reported as a diagnostic instead of overwriting. Prior legacy migration history is preserved under the target's `legacy_migrations` key.
 - Markers: each applied migration records its id in the target's `_migrations` array, so re-runs are no-ops. `2026-07-opencode-config-unification` covers the `oh-my-*` files; `2026-07-codex-config-jsonc` covers `~/.omo/config.jsonc`; `2026-08-reasoning-unification` rewrites persisted model and reasoning fields. Codex startup runs only the second group; OpenCode plugin startup, Senpi startup, install, and the CLI run both groups, so whichever side runs first applies each group exactly once.
@@ -129,26 +129,26 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       "explore": { "model": "github-copilot/grok-code-fast-1" },
 
       // Plan-gated reviewers: keep the builtin prompt, pin the model
-      "plan-consultant": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
+      "plan-consultant": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
       "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "high" },
     },
 
     "categories": {
       // quick - Kimi high-speed by default
-      "quick": { "model": "kimi-for-coding/kimi-for-coding-highspeed" },
+      "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
       // unspecified-low - moderate tasks
-      "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
+      "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
 
       // unspecified-high - complex work
-      "unspecified-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+      "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
       // writing - docs/prose
-      "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" },
+      "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "low" },
 
       // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3 max
       "visual-engineering": {
-        "model": "anthropic/claude-opus-5",
+        "model": "anthropic/claude-opus-5-5",
         "reasoning": "max",
       },
 
@@ -169,7 +169,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
         "zai-coding-plan": 10,
       },
       "modelConcurrency": {
-        "anthropic/claude-opus-5": 2,
+        "anthropic/claude-opus-5-5": 2,
         "opencode/gpt-5-nano": 20,
       },
     },
@@ -282,7 +282,7 @@ Control what tools an agent can use:
 {
   "agents": {
     "plan-consultant": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         // Simple string fallback
         "openai/gpt-5.6-sol",
@@ -342,12 +342,13 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | -------------------- | ------------------------------- | ---------------------------------------------- |
 | `visual-engineering` | `anthropic/claude-fable-5-1` (max) | Visual design, UI/UX, frontend, styling, animation, design systems |
 | `ultrabrain`         | `openai/gpt-6-astra` (max)      | Deep logical reasoning, complex architecture. Falls back to `gpt-5.6-sol` (max). |
-| `deep`               | `openai/gpt-6-astra` (high)     | 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research. Falls back to `gpt-5.6-sol` (medium). |
+| `deep-low`           | `openai/gpt-6-sol-fast` (medium) | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research whose decisions the child can settle from evidence. Falls back to `gpt-6-sol` (medium) where the Fast tier is not served (GitHub Copilot, OpenCode Zen); unavailable without a GPT-6 Sol tier. |
+| `deep-high`          | `openai/gpt-6-astra` (xhigh)    | Escalation deep lane for a goal whose central decision cannot be settled from evidence. Single rung, no model fallback. |
 | `artistry`           | `anthropic/claude-fable-5-1` (max) | Creative/unconventional approaches             |
-| `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks, typo fixes, single-file changes |
-| `unspecified-low`    | `xai/grok-4.6` (xhigh)          | General tasks, low effort                      |
-| `unspecified-high`   | `openai/gpt-6-astra` (high) | General tasks, high effort                     |
-| `writing`            | `anthropic/claude-fable-5-1` (medium)  | Documentation, prose, technical writing        |
+| `quick`              | `openai/gpt-6-luna-fast` (low) | Trivial tasks, typo fixes, single-file changes |
+| `unspecified-low`    | `xiaomi/mimo-v2.6-pro` (max)     | General tasks, low effort                      |
+| `unspecified-high`   | `anthropic/claude-opus-5-5` (medium) | General tasks, high effort                     |
+| `writing`            | `anthropic/claude-fable-5-1` (low)     | Documentation, prose, technical writing. Unavailable when none of its Claude models (`claude-fable-5-1`, `claude-opus-5-5`, `claude-opus-4-6`) is connected; it never falls back to another family, and the installer leaves it out. |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -391,7 +392,7 @@ Runtime priority:
 
 The same resolved chain drives spawn-time selection and runtime retry fallback, so a recovered task stays on the same category chain.
 
-In the Senpi harness, the main session model has its own ordering, separate from the delegated-child chain above: a `--model` flag or scoped model, then `model_profile` as a literal `provider/model` pin, then `model_profile` as a profile id (first rung the live registry serves), then Senpi's default resolution. `categories.*` and `agents.*` overrides are never consulted for the main session, and `model_profile` is never consulted for a delegated child. See [Model Profiles](#model-profiles).
+In the Senpi harness, `model_profile` applies to OmO Desktop and headless sessions; the interactive TUI keeps the model it started with. An explicit `--model`, scoped model or resumed session is preserved. A fresh session otherwise uses `model_profile` as a literal pin or a named chain; unset config selects Daily · Normal. If no candidate is available, a notice explains the unavailable profile and the current model stays. `categories.*` and `agents.*` overrides do not select the main session model, and `model_profile` does not select delegated children. See [Model Profiles](#model-profiles).
 
 In the OpenCode plugin, every merged category appears in `availableCategories`; hiding categories with a dead fallback chain is not implemented here. That dead-chain filtering, the `model_unavailable` spawn failure, and the `task.warnings.unavailable_categories` flag belong to the Senpi/core `task` system, documented in the [omo.json reference](./omo-json.md).
 
@@ -419,14 +420,14 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 #### Agent Provider Chains
 
-The main agent has no chain of its own: it runs on your session model (Claude Opus 5 or GPT 5.6 Sol recommended). The four curated agents resolve through these chains (`packages/senpi-task/src/agents/builtin/fallback-chains.ts`):
+The main agent has no chain of its own: it runs on your session model (Claude Opus 5.5 or GPT 5.6 Sol recommended). The four curated agents resolve through these chains (`packages/senpi-task/src/agents/builtin/fallback-chains.ts`):
 
 | Agent | Default Model | Provider Priority |
 | --- | --- | --- |
-| **explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
-| **plan-reviewer** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
+| **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **plan-reviewer** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 
 #### Category Provider Chains
 
@@ -434,14 +435,15 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 
 | Category | Provider Chain Primary | Provider Priority |
 | --- | --- | --- |
-| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
-| **Ultrabrain** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|openai-codex\|opencode/gpt-6-astra (max)` → `openai\|openai-codex/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|openai-codex\|opencode/gpt-5.6-sol (max)` |
-| **Deep** | `gpt-6-astra` | `openai\|openai-codex\|github-copilot\|opencode/gpt-6-astra (high)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
-| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (xhigh)` |
-| **Quick** | `kimi-for-coding-highspeed` | `kimi-for-coding/kimi-for-coding-highspeed` → `openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` |
-| **Unspecified Low** | `grok-4.6` | `xai\|github-copilot\|opencode/grok-4.6 (xhigh)` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
-| **Unspecified High** | `gpt-6-astra` | `openai\|openai-codex\|github-copilot\|opencode/gpt-6-astra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5 (xhigh)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
-| **Writing** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (medium)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Ultrabrain** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (max)` → `openai\|chatgpt-subscription/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (max)` |
+| **Deep Low** | `gpt-6-sol-fast` | `openai\|chatgpt-subscription/gpt-6-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-sol (medium)` |
+| **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (xhigh)` |
+| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
+| **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` |
+| **Unspecified Low** | `mimo-v2.6-pro` | `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Writing** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
 
@@ -459,7 +461,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
     "defaultConcurrency": 5,
     "staleTimeoutMs": 2700000,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
-    "modelConcurrency": { "anthropic/claude-opus-5": 2 }
+    "modelConcurrency": { "anthropic/claude-opus-5-5": 2 }
   }
 }
 ```
@@ -773,7 +775,7 @@ Configure git commit behavior:
 
 `commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Commits keep your own git author and committer, and omo never adds a `Co-authored-by` trailer; `include_co_authored_by` is a deprecated no-op kept so existing configs still validate.
 
-This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-senpi-harness).
+This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-native-harness).
 
 `git_env_prefix` (default `"GIT_MASTER=1"`) is prepended to git commands; set it to `""` to disable.
 
@@ -893,7 +895,7 @@ Define `fallback_models` per agent or category:
 {
   "agents": {
     "plan-consultant": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -912,7 +914,7 @@ Define `fallback_models` per agent or category:
 {
   "agents": {
     "plan-consultant": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -991,7 +993,7 @@ If the primary model already establishes the provider, fallback entries can omit
     "reviewer": {
       "model": "openai/gpt-5.6-sol",
       "fallback_models": [
-        "gpt-5.6-luna-fast",
+        "gpt-6-luna-fast",
         {
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
@@ -1003,7 +1005,7 @@ If the primary model already establishes the provider, fallback entries can omit
 }
 ```
 
-In this example OmO treats `gpt-5.6-luna-fast` and `gpt-5.6-sol` as OpenAI fallback entries because the current/default provider is already `openai`.
+In this example OmO treats `gpt-6-luna-fast` and `gpt-5.6-sol` as OpenAI fallback entries because the current/default provider is already `openai`.
 
 **3. Mixed cross-provider chain**
 
@@ -1013,7 +1015,7 @@ Mix string entries and object entries when only some fallback models need specia
 {
   "agents": {
     "plan-consultant": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -1037,7 +1039,7 @@ Mix string entries and object entries when only some fallback models need specia
 ```json
 {
   "categories": {
-    "deep": {
+    "deep-low": {
       "model": "openai/gpt-5.6-sol",
       "fallback_models": [
         {
@@ -1046,7 +1048,7 @@ Mix string entries and object entries when only some fallback models need specia
           "maxTokens": 12000
         },
         {
-          "model": "anthropic/claude-opus-5",
+          "model": "anthropic/claude-opus-5-5",
           "reasoning": "max",
           "temperature": 0.2
         },
@@ -1268,11 +1270,11 @@ Use Antigravity for cheaper or quota-balanced work. Use direct Anthropic for lon
 
     // Direct Anthropic, only for eligible long-context accounts/models.
     "plan-consultant": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "reasoning": "max"
     },
     "plan-reviewer": {
-      "model": "anthropic/claude-opus-5"
+      "model": "anthropic/claude-opus-5-5"
     }
   }
 }

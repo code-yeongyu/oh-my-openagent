@@ -18,6 +18,16 @@ export type ChildSession = {
   dispose(): void
 }
 
+/**
+ * A closed, PARENT-AUTHORED classification of why a runner refused. Unlike `message`, no member is
+ * ever derived from child output, so it is the one part of a failure that is safe to surface and
+ * persist verbatim - and `manager.ts` still treats it only as a lookup key, never as text to echo.
+ */
+export type RunnerFailureReason =
+  | "model_not_in_child_profile"
+  | "catalog_probe_timed_out"
+  | "catalog_probe_failed"
+
 export type RunnerFailure = {
   // The snake_case kinds map 1:1 onto the manager's respawn disposition codes (todo 12): a resume
   // rebuild failure is TYPED and retryable, never a silently weakened tool set or transcript.
@@ -33,6 +43,7 @@ export type RunnerFailure = {
     // (`runners/rpc-host/daemon.ts`): the client fails closed instead of starting a second host.
     | "host_unavailable"
   readonly message: string
+  readonly reason?: RunnerFailureReason
   readonly cause?: unknown
   /**
    * Structured exit facts for the internal event log, when the child actually reached a process exit.

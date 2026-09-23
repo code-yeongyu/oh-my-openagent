@@ -1,3 +1,4 @@
+import { isolationDetails, type IsolationDetails } from "../../isolation/details"
 import type { ExecutionMode, StartResult } from "../../manager"
 import type { ToolProgressDetails } from "../../progress"
 import type { TaskRecord } from "../../state"
@@ -27,7 +28,11 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
   }
 }
 
-export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails & TaskHandleDetails {
+export function recordDetails(
+  record: TaskRecord,
+  mode: TaskToolMode,
+): Omit<TaskToolDetails, "isolation"> & TaskHandleDetails & { readonly isolation?: IsolationDetails } {
+  const isolation = isolationDetails(record)
   return {
     ...recordSummary(record),
     run_epoch: record.notification.run_epoch,
@@ -36,6 +41,7 @@ export function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolD
     resolved_model: record.resolved_model,
     fallback_attempts: record.fallback_attempts,
     run_in_background: false,
+    ...(isolation === undefined ? {} : { isolation }),
   }
 }
 
@@ -59,6 +65,7 @@ export function startedDetails(
     resolved_model: started.resolved_model,
     run_in_background: params.run_in_background === true,
     queue_position: started.queue_position,
+    ...(started.isolation === undefined ? {} : { isolation: started.isolation }),
     ...(skills === undefined ? {} : { skills }),
   }
 }

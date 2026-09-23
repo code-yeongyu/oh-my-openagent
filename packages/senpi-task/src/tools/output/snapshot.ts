@@ -1,3 +1,4 @@
+import { isolationDetails } from "../../isolation/details"
 import type { TaskRecord } from "../../state"
 import { childSessionDir } from "./transcript"
 import type { LostBreadcrumbs, SuspendedDetails, TaskSnapshot } from "./types"
@@ -20,6 +21,7 @@ const SUSPENDED_RESIDENCIES: ReadonlySet<TaskRecord["residency_state"]> = new Se
 // it attaches read-only breadcrumbs (pid + the child's session dir) so the caller can investigate
 // without task_output ever reviving or touching child state.
 export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: number): TaskSnapshot {
+  const isolation = isolationDetails(record)
   return {
     task_id: record.task_id,
     status: record.status,
@@ -41,6 +43,7 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     ...(record.final_response !== undefined ? { final_response: record.final_response } : {}),
     ...(record.error_message !== undefined ? { error_message: record.error_message } : {}),
     ...(record.run_stats !== undefined ? { run_stats: record.run_stats } : {}),
+    ...(isolation === undefined ? {} : { isolation }),
     ...(record.status === "lost" ? { lost: lostBreadcrumbs(record, stateDir) } : {}),
   }
 }

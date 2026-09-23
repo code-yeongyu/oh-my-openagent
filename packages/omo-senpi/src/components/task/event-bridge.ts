@@ -116,14 +116,24 @@ export function wireEventBridge(
     const parentSessionId = engine.runtime.sessionId()
     const reason = shutdownEvent.reason
     engine.lifecycle.dispose?.()
-    if (parentSessionId === undefined || typeof reason !== "string") {
+    if (typeof reason !== "string") {
       ctx.logger.warn(
-        "omo-senpi task session_shutdown skipped: no captured session id or malformed reason",
+        "omo-senpi task session_shutdown skipped: malformed reason",
         { parentSessionId, reason },
       )
       return
     }
-    await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason })
+    // The context can lose its session id during teardown. Only this engine's live handles
+    // establish fallback ownership; scanning every record would suspend sibling host sessions.
+    const parentSessionIds = parentSessionId === undefined
+      ? new Set(engine.manager.residentTaskIds().flatMap((taskId) => {
+        const record = engine.manager.get(taskId)
+        return record === undefined ? [] : [record.parent_session_id]
+      }))
+      : new Set([parentSessionId])
+    for (const sessionId of parentSessionIds) {
+      await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
+    }
   })
 
   pi.on("model_select", (_payload, eventCtx) => {

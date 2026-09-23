@@ -31,7 +31,8 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#then
     expect([
-      "github-copilot/claude-opus-5",
+      "github-copilot/claude-opus-5-5",
+      "github-copilot/claude-opus-5.5",
     ]).toContain((result.agents as Record<string, { model: string }>).sisyphus.model)
   })
 
@@ -89,7 +90,7 @@ describe("generateOmoConfig - model fallback system", () => {
     //#then
     expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("anthropic/claude-haiku-4-5")
     expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-5-5")
   })
 
   test("uses native OpenAI models when only ChatGPT available", () => {
@@ -162,21 +163,19 @@ describe("generateOmoConfig - model fallback system", () => {
     }>
 
     //#then
-    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5")
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-5-5")
     expect(agents.sisyphus.fallback_models).toEqual([
       {
         model: "openai/gpt-5.6-sol",
         variant: "medium",
       },
     ])
-    expect(categories.deep.model).toBe("openai/gpt-6-astra")
-    expect(categories.deep.variant).toBe("high")
-    expect(categories.deep.fallback_models).toEqual([
-      {
-        model: "openai/gpt-5.6-sol",
-        variant: "medium",
-      },
-    ])
+    expect(categories["deep-high"].model).toBe("openai/gpt-6-astra")
+    expect(categories["deep-high"].variant).toBe("xhigh")
+    expect(categories["deep-high"].fallback_models ?? []).toEqual([])
+    expect(categories["deep-low"].model).toBe("openai/gpt-6-sol-fast")
+    expect(categories["deep-low"].variant).toBe("medium")
+    expect(categories["deep-low"].fallback_models ?? []).toEqual([{ model: "openai/gpt-6-sol", variant: "medium" }])
   })
 
   test("uses haiku for explore when Claude max20", () => {

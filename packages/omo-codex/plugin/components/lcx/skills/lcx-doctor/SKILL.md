@@ -58,7 +58,7 @@ sync_latest_source() {
   git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
 }
 sync_latest_source code-yeongyu/lazycodex "$LAZYCODEX_SOURCE_ROOT/lazycodex-source"
-sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/openai-codex-source"
+sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source"
 ```
 
 2. Inventory the installed surface. Resolve `CODEX_HOME` (default `~/.codex`), then collect:
@@ -102,7 +102,7 @@ sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/openai-codex-source"
 | Plugin payload wiring | PASS/WARN/FAIL | [evidence] |
 | Bin links / aliases | PASS/WARN/FAIL | [evidence] |
 | Runtime probe | PASS/WARN/FAIL | [evidence] |
-| Drift vs latest source | PASS/WARN/FAIL | [evidence, citing `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` or `$LAZYCODEX_SOURCE_ROOT/openai-codex-source` paths] |
+| Drift vs latest source | PASS/WARN/FAIL | [evidence, citing `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` or `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source` paths] |
 
 ### Remediations
 1. [Most important fix first: exact command or config edit, and what it resolves. When Astra readiness is WARN: upgrade Codex to 0.153.1 or newer and relaunch it once so `models_cache.json` picks up `gpt-6-astra`.]
@@ -124,7 +124,7 @@ Do not:
 
 - mutate config, installs, or repositories during diagnosis
 - report a verdict without captured evidence
-- compare against remembered source layout instead of `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/openai-codex-source`
+- compare against remembered source layout instead of `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source`
 - require retired payload paths that the current `.codex-plugin/plugin.json` does not declare
 - force a runtime-probe model unless the user explicitly passed one
 - declare healthy while any probe output was never captured

@@ -6,14 +6,20 @@ import { join } from "node:path"
 
 import { AGENT_DIR_ENV_NAMES, DELETED_CHILD_ENV, credentialDigest, sandboxEnv } from "./task-host-e2e-sandbox.mjs"
 import { lastJsonLine, perChildRpcProcesses, sandboxProcesses } from "./task-host-e2e-process.mjs"
-import { CHILD_BUSY, childStartDiagnosis, failureTokens, hostConfig, jsonlLines, spawnScript } from "./task-host-e2e-support.mjs"
+import { CHILD_BUSY, childSessionFiles, childStartDiagnosis, failureTokens, hostConfig, jsonlLines, spawnScript } from "./task-host-e2e-support.mjs"
 import { scenarioD, scenarioE4, scenarioH2, scenarioHandoffSuite } from "./task-host-e2e-gated.mjs"
+import { singleParentPass, resumePass, teamPass, reopenPass, stormPass } from "./task-host-e2e-gates.mjs"
+import { observeState } from "./task-host-e2e-events.mjs"
+import { completedStormCalls } from "./task-host-e2e-storm.mjs"
+import { terminalChildSnapshots } from "./task-host-e2e-stranded.mjs"
+import { checkMockSessionIsolation } from "./task-host-e2e-mock-selftest.mjs"
+import { checkResumeReadbacks } from "./task-host-e2e-resume-selftest.mjs"
 
 function assert(condition, message) {
   if (!condition) throw new Error(`self-test: ${message}`)
 }
 
-export function runSelfTest(scriptDir) {
+export async function runSelfTest(scriptDir) {
   const root = mkdtempSync("/tmp/dh41st.")
   try {
     checkSandboxEnv(root)
@@ -21,10 +27,91 @@ export function runSelfTest(scriptDir) {
     checkFixtures()
     checkReaders(root)
     checkGates()
+    checkProductGates()
+    checkTerminalStoreMismatch(root)
+    await checkStateEvents(root)
+    checkStormReceipts()
+    await checkMockSessionIsolation(root)
+    await checkResumeReadbacks(root)
     checkDriverSource(scriptDir)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+}
+
+function checkTerminalStoreMismatch(root) {
+  const sandbox = { stateDir: join(root, "stranded") }
+  mkdirSync(join(sandbox.stateDir, "tasks"), { recursive: true })
+  const sessionPath = join(sandbox.stateDir, "child.jsonl")
+  writeFileSync(sessionPath, JSON.stringify({
+    type: "message", timestamp: "2026-09-20T00:00:00Z",
+    message: { role: "assistant", stopReason: "aborted", content: [] },
+  }) + "\n")
+  writeFileSync(join(sandbox.stateDir, "tasks", "st_aborted.json"), JSON.stringify({
+    task_id: "st_aborted", status: "running", host_session: { session_path: sessionPath },
+  }))
+  const captured = terminalChildSnapshots(sandbox)
+  assert(captured.length === 1 && captured[0].taskId === "st_aborted" &&
+    captured[0].storeStatus === "running" && captured[0].storeStableDuringRead,
+    "a terminal aborted turn must remain visible even when its store says running")
+}
+
+async function checkStateEvents(root) {
+  const path = join(root, "ready")
+  const value = await observeState(root, () => {
+    try { return readFileSync(path, "utf8") === "ready" ? "observed" : undefined } catch { return undefined }
+  }, { trigger: () => writeFileSync(path, "ready"), timeoutMs: 1_000 })
+  assert(value === "observed", "state subscription must see a synchronous trigger without sleeping")
+  assert(await observeState(root, () => undefined, { timeoutMs: 0 }) === undefined,
+    "missing state must time out, never count as readiness")
+}
+
+function checkStormReceipts() {
+  const row = (role, isError, text) => JSON.stringify({
+    message: { role, toolName: "eval", isError, content: [{ type: "text", text }] },
+  })
+  const success = row("toolResult", false, "STORM_OK:3")
+  assert(completedStormCalls([success, success]) === 1, "duplicate receipts cannot inflate the spawn budget")
+  assert(completedStormCalls([row("assistant", false, "STORM_OK:4"), row("toolResult", true, "STORM_OK:4")]) === 0,
+    "a prompt or failed eval is not a successful process spawn")
+}
+
+function checkProductGates() {
+  const cases = [
+    [singleParentPass, {
+      sessionsWorker: 16, daemonIdentitiesSeen: 1, perChildRpcProcessCount: 0, failedChildren: 0, terminalChildFailures: 0,
+    }, [{ sessionsWorker: 15 }, { daemonIdentitiesSeen: 2 }, { perChildRpcProcessCount: 1 },
+      { failedChildren: 1 }, { terminalChildFailures: 1 }]],
+    [resumePass, {
+      childrenStarted: 4, reattachedChildren: 4, grewAfterParentExit: true, resumeExit: null,
+      resumeAcknowledged: true, sameParentSession: true, noPromptReplay: true, childrenCompleted: 4,
+    }, [{ childrenStarted: 0 }, { reattachedChildren: 0 }, { grewAfterParentExit: false }, { resumeAcknowledged: false },
+      { sameParentSession: false }, { noPromptReplay: false }, { childrenCompleted: 3 }]],
+    [teamPass, {
+      memberRecords: 1, mailDelivered: true, memberSessionContexts: [{ role: "member" }],
+      memberContextMatches: true, failedMembers: 0, perChildRpcProcessCount: 0,
+    }, [{ memberRecords: 0 }, { mailDelivered: false }, { memberSessionContexts: [] },
+      { memberContextMatches: false }, { failedMembers: 1 }, { perChildRpcProcessCount: 1 }]],
+    [reopenPass, {
+      childCompleted: "completed", parkObserved: true, reopenExit: null, reviveAccepted: true,
+      transcriptLinesBeforeReopen: 10, transcriptLinesAfterReopen: 16,
+      reopenedCompleted: true, reopenMessageDelivered: true, sameChildSession: true,
+    }, [{ childCompleted: "error" }, { parkObserved: false }, { reviveAccepted: false }, { transcriptLinesAfterReopen: 10 },
+      { reopenedCompleted: false }, { reopenMessageDelivered: false }, { sameChildSession: false }]],
+    [stormPass, {
+      hostPid: 123, childrenStarted: 0, bashCallRecords: 240,
+      stormParticipants: 8, zombieChildCount: 0, daemonReportedZombies: 0, daemonAlive: true,
+    }, [{ stormParticipants: 0 }, { bashCallRecords: 199 }, { zombieChildCount: 1 },
+      { daemonReportedZombies: 1 }, { daemonAlive: false }, { hostPid: null }]],
+  ]
+  const failures = []
+  for (const [gate, healthy, mutations] of cases) {
+    if (!gate(healthy)) failures.push(`${gate.name}: rejects a healthy completed workload on a loaded host`)
+    for (const mutation of mutations) {
+      if (gate({ ...healthy, ...mutation })) failures.push(`${gate.name}: accepted broken product fact ${JSON.stringify(mutation)}`)
+    }
+  }
+  assert(failures.length === 0, failures.join("\n"))
 }
 
 function checkSandboxEnv(root) {
@@ -73,7 +160,16 @@ function checkFixtures() {
   const script = spawnScript(16, CHILD_BUSY)
   assert(script.parentSteps.filter((step) => step.name === "task").length === 16, "a 16-child parent script must issue 16 task calls")
   assert(script.parentSteps.at(-1).type === "text", "a parent script must end with a text step so the turn closes")
-  assert(script.childSteps[0].name === "bash", "a mid-turn child keeps working through a repeating tool step")
+  // The busy step must call a tool the child can COMPLETE on this engine and take TIME doing it.
+  // `bash` is eval-only (a direct call is refused instantly; the mock repeats its last step; the
+  // child spun at 100% of the host loop and starved every other open) and `eval` aborts at
+  // startup in a mock child. `read` completes; the mock's delayMs supplies the time.
+  assert(script.childSteps[0].name === "read", "a mid-turn child keeps working through a repeating tool step")
+  assert(script.childSteps[0].delayMs >= 1_000, "the busy step must hold the child for real, through a delayed model call")
+  // ...and it must END: the mock repeats its LAST step, so a busy script whose last step is a
+  // tool call never frees its concurrency slot, and the sessions the host should accumulate
+  // never open.
+  assert(script.childSteps.at(-1).type === "text", "a busy child script must end with a text step so the child finishes")
   assert(failureTokens("error too_many_sessions here").join() === "too_many_sessions", "failure tokens must be detected")
   assert(failureTokens("all good").length === 0, "failure tokens must not false-positive")
 }
@@ -81,12 +177,22 @@ function checkFixtures() {
 function checkReaders(root) {
   assert(lastJsonLine('banner\n{"a":1}\n{"reachable":true,"pid":7}\n')?.pid === 7, "the last JSON line must win over a banner")
   assert(lastJsonLine("no json at all") === undefined, "a JSON-free stream must read as undefined")
-  const sandbox = { stateDir: join(root, "state") }
+  const sandbox = { cwd: root, stateDir: join(root, "state") }
   mkdirSync(join(sandbox.stateDir, "sessions", "st_a"), { recursive: true })
   writeFileSync(join(sandbox.stateDir, "sessions", "st_a", "t.jsonl"), '{"type":"x"}\n{"type":"y"}\n')
   assert(jsonlLines(join(sandbox.stateDir, "sessions", "st_a", "t.jsonl")).length === 2, "jsonl reader must count records")
-  const diagnosis = childStartDiagnosis(sandbox, [{ task_id: "st_a", status: "error", error_message: "Task runner failed to start.", execution_mode: "process" }])
+  const failedRecord = { task_id: "st_a", status: "error", error_message: "Task runner failed to start.", execution_mode: "process" }
+  mkdirSync(join(sandbox.stateDir, "tasks"), { recursive: true })
+  writeFileSync(join(sandbox.stateDir, "tasks", "st_a.json"), JSON.stringify(failedRecord))
+  const diagnosis = childStartDiagnosis(sandbox, [failedRecord])
   assert(diagnosis.errored === 1 && diagnosis.childSessionsDirExists === true, "the child-start probe must localize a start failure")
+  // The engine's real layout nests a child's sessions under children/<id>/sessions/<id>/; the
+  // reader must find those, or every transcript assertion runs blind against a working child.
+  const nested = { stateDir: join(root, "state-nested") }
+  mkdirSync(join(nested.stateDir, "children", "st_b", "sessions", "st_b"), { recursive: true })
+  writeFileSync(join(nested.stateDir, "children", "st_b", "sessions", "st_b", "t.jsonl"), '{"type":"x"}\n')
+  assert(childSessionFiles(nested, "st_b").length === 1, "child session files must be found under children/<id>/sessions/<id>/")
+  assert(childStartDiagnosis(nested, []).childSessionsDirExists === true, "the child-start probe must see the nested layout")
   const probeDir = join(root, "creds")
   mkdirSync(probeDir, { recursive: true })
   writeFileSync(join(probeDir, "auth.json"), "AAA")

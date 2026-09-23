@@ -16,6 +16,9 @@ export function run(root: string, args: readonly string[]): string {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
     timeout: 5000,
+    // git.exe is console-subsystem: without this each advisor probe flashes a console window
+    // that Windows foregrounds, stealing the user's focus (#8501).
+    windowsHide: true,
   })
 }
 

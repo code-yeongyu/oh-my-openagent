@@ -8,7 +8,7 @@ import type {
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
-import { isSenpiPlatformEnabled } from "./senpi-platform-flag"
+import { isNativeDevPlatformEnabled } from "./native-dev-platform-flag"
 
 async function selectOrCancel<TValue extends Readonly<string | boolean | number>>(params: {
   message: string
@@ -36,9 +36,14 @@ export async function promptInstallPlatform(
     { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
     { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
     { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
+    { value: "native", label: "OmO Native", hint: "Install the standalone omo command (no host required)" },
   ]
-  if (isSenpiPlatformEnabled()) {
-    options.push({ value: "senpi", label: "Senpi", hint: "Install Senpi harness adapter only" })
+  if (isNativeDevPlatformEnabled()) {
+    options.push({
+      value: "native-dev",
+      label: "OmO Native (development adapter)",
+      hint: "Register this checkout into a local engine install",
+    })
   }
 
   return selectOrCancel<InstallPlatform>({
@@ -55,7 +60,8 @@ export async function promptInstallConfig(
 ): Promise<InstallConfig | null> {
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
-  const hasSenpi = platform === "senpi"
+  const hasNative = platform === "native"
+  const hasNativeDev = platform === "native-dev"
   const codexAutonomous = await resolveCodexAutonomous(hasCodex, codexAutonomousOverride)
   if (codexAutonomous === null) return null
 
@@ -69,7 +75,8 @@ export async function promptInstallConfig(
       hasGemini: false,
       hasCopilot: false,
       hasCodex,
-      hasSenpi,
+      hasNative,
+      hasNativeDev,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
@@ -214,7 +221,8 @@ export async function promptInstallConfig(
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasCodex,
-    hasSenpi,
+    hasNative,
+    hasNativeDev,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",

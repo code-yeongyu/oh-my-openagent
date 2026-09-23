@@ -8,6 +8,7 @@ import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task
 export interface LiveTaskContext {
   readonly cwd?: string
   readonly modelRegistry?: ChildModelRegistry
+  readonly loadedExtensionPaths?: readonly string[]
   readonly model?: unknown
   readonly serviceTier?: unknown
   // senpi >= the effectiveServiceTier context field: the tier requests carry right now, fast mode
@@ -54,6 +55,7 @@ function asParentServiceTier(value: unknown): ParentServiceTier | undefined {
 export class TaskRuntimeContext {
   #cwd: string
   #modelRegistry: ChildModelRegistry | undefined
+  #loadedExtensionPaths: readonly string[] = []
   #parentServiceTier: ParentServiceTier | undefined
   #idle = true
   #transition: ParentTransition
@@ -69,6 +71,7 @@ export class TaskRuntimeContext {
   captureFrom(ctx: LiveTaskContext): void {
     if (typeof ctx.cwd === "string" && ctx.cwd.length > 0) this.#cwd = ctx.cwd
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
+    if (ctx.loadedExtensionPaths !== undefined) this.#loadedExtensionPaths = ctx.loadedExtensionPaths
     if ("effectiveServiceTier" in ctx || "serviceTier" in ctx) {
       this.#parentServiceTier = asParentServiceTier(ctx.effectiveServiceTier) ?? asParentServiceTier(ctx.serviceTier)
     }
@@ -95,6 +98,10 @@ export class TaskRuntimeContext {
 
   modelRegistry(): ChildModelRegistry | undefined {
     return this.#modelRegistry
+  }
+
+  loadedExtensionPaths(): readonly string[] {
+    return this.#loadedExtensionPaths
   }
 
   // The parent session's effective request tier at the last captured event; a delegated child

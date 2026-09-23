@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Live fixture for the OpenAI lane policy (#8300), driven by task-openai-lane-e2e.mjs. senpi's
-// `openai` provider is the metered API-key lane and `openai-codex` is the ChatGPT subscription lane;
+// Live fixture for the OpenAI lane policy (#8300, #8734), driven by task-openai-lane-e2e.mjs. senpi's
+// `openai` provider is the API-key lane and `chatgpt-subscription` is the ChatGPT subscription lane;
 // both serve the same model ids. What this proves end to end: a delegated task(category) child is
-// never routed to the API lane when the subscription lane serves the same model, while a registry
-// that ONLY holds the API key still resolves through the resolver's cross-provider fallthrough.
+// never routed to the API lane when the subscription lane serves the same model, a registry that ONLY
+// holds `openai` still resolves, and an explore child whose kimi head dies falls back to the
+// `openai` Luna rung instead of skipping every GPT rung.
 // The parent's first turn spawns one child; the scenario's lane providers are the only models that
 // can serve it, so the recorded child model names the lane that won.
 declare const process: {
@@ -52,6 +53,7 @@ interface AssistantMessage {
     readonly cost: number
   }
   readonly stopReason: StopReason
+  readonly errorMessage?: string
   readonly timestamp: number
 }
 
@@ -78,16 +80,25 @@ const CHILD_IDENTITY = "running as an omo senpi-task child"
 const FINAL_TEXT = "omo e2e openai lane child final text"
 const PARENT_PROVIDER = "omo-openai-lane-mock"
 const LANE_MODEL_ID = "gpt-6-astra"
+const QUOTA_ERROR = `403: {"message":"You've reached your usage limit for this billing cycle.","type":"access_terminated_error"}`
 // Scenarios: "both-lanes" (API lane and subscription lane both serve the model - the subscription
-// lane must win), "api-key-only" (cross-provider fallthrough must keep the API lane reachable),
-// "codex-only" (subscription lane alone still resolves).
+// lane must win), "api-key-only" (only `openai` serves it), "subscription-only" (only
+// chatgpt-subscription serves it), "explore-kimi-fails-api-key-only" (an explore child: the kimi head
+// dies with a quota error, `openai` serves gpt-6-luna-fast, `anthropic` serves claude-haiku-4-5 - the
+// runtime fallback must pick the Luna rung, which it skipped while the rung listed only the subscription).
 const LANE_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
-  "both-lanes": ["openai", "openai-codex"],
+  "both-lanes": ["openai", "chatgpt-subscription"],
   "api-key-only": ["openai"],
-  "codex-only": ["openai-codex"],
+  "subscription-only": ["chatgpt-subscription"],
 }
+const EXPLORE_FALLBACK_SCENARIO = "explore-kimi-fails-api-key-only"
+const EXPLORE_FALLBACK_FIXTURES: readonly { readonly provider: string; readonly modelId: string; readonly dies: boolean }[] = [
+  { provider: "kimi-coding", modelId: "kimi-for-coding-highspeed", dies: true },
+  { provider: "openai", modelId: "gpt-6-luna-fast", dies: false },
+  { provider: "anthropic", modelId: "claude-haiku-4-5", dies: false },
+]
 const SCENARIO = process.env.OMO_OPENAI_LANE_SCENARIO ?? "both-lanes"
-const CATEGORY = process.env.OMO_OPENAI_LANE_CATEGORY ?? "deep"
+const CATEGORY = process.env.OMO_OPENAI_LANE_CATEGORY ?? "deep-high"
 let parentCalls = 0
 
 export default function registerOpenAiLaneMockProvider(pi: ExtensionAPI): void {
@@ -108,7 +119,7 @@ export default function registerOpenAiLaneMockProvider(pi: ExtensionAPI): void {
             id: "openai-lane-task-call",
             name: "task",
             arguments: {
-              category: CATEGORY,
+              ...(SCENARIO === EXPLORE_FALLBACK_SCENARIO ? { subagent_type: "explore" } : { category: CATEGORY }),
               prompt: "answer with your final text and stop",
               run_in_background: false,
               name: "lane-child",
@@ -117,6 +128,24 @@ export default function registerOpenAiLaneMockProvider(pi: ExtensionAPI): void {
         : assistant(PARENT_PROVIDER, model.id, "stop", [{ type: "text", text: "parent observed the lane child" }]))
     },
   })
+
+  if (SCENARIO === EXPLORE_FALLBACK_SCENARIO) {
+    for (const fixture of EXPLORE_FALLBACK_FIXTURES) {
+      pi.registerProvider(fixture.provider, {
+        name: `omo openai lane ${fixture.provider} fixture`,
+        baseUrl: "file://omo-openai-lane-mock",
+        apiKey: "mock",
+        api: "openai-completions",
+        models: [{ ...laneModel(fixture.modelId, `Explore rung (${fixture.provider})`), reasoning: true }],
+        streamSimple(model) {
+          return streamMessage(fixture.dies
+            ? assistant(fixture.provider, model.id, "error", [], QUOTA_ERROR)
+            : finalReply(fixture.provider, model.id))
+        },
+      })
+    }
+    return
+  }
 
   // The lane fixtures serve the SAME model id, so only provider ranking can decide between them.
   // reasoning: true is required for the runtime to accept the chain rung's variant (max/high).
@@ -166,6 +195,7 @@ function assistant(
   model: string,
   stopReason: StopReason,
   content: AssistantMessage["content"],
+  errorMessage?: string,
 ): AssistantMessage {
   return {
     role: "assistant",
@@ -175,6 +205,7 @@ function assistant(
     model,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason,
+    ...(errorMessage === undefined ? {} : { errorMessage }),
     timestamp: Date.now(),
   }
 }

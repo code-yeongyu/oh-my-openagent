@@ -11,6 +11,10 @@ export {
   TOKEN_COVERAGE_STATUSES,
 } from "./types"
 export type {
+  IsolationBackendKind,
+  IsolationMergeResult,
+  IsolationRecord,
+  TaskIsolationSpec,
   BackgroundMode,
   CostReportStatus,
   DurationSourceStatus,

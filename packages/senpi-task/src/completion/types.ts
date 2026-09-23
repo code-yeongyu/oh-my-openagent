@@ -1,3 +1,4 @@
+import type { IsolationDetails } from "../isolation/details"
 import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
@@ -32,6 +33,8 @@ export type CompletionDetails = {
   readonly final_response: string
   readonly final_response_file?: string
   readonly continuation_hint: string
+  // Present once an isolated child settled: what happened to its clone and where the artifacts are.
+  readonly isolation?: IsolationDetails
   // Present only when the completed task was a DAG node child, so the parent can address the exact
   // node it must re-verify or correct.
   readonly dag?: {

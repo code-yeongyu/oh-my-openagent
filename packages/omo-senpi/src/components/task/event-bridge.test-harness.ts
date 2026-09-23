@@ -20,6 +20,8 @@ import type { TaskStatusUi } from "./status-ui"
 type HarnessOptions = {
   readonly outcomes?: ReconcileResult["outcomes"]
   readonly records?: Readonly<Record<string, TaskRecord>>
+  // Task ids this engine currently holds live handles for (`manager.residentTaskIds()`).
+  readonly resident?: readonly string[]
   readonly liveRunStats?: Readonly<Record<string, TaskRunStats>>
   readonly cleanupDeleted?: readonly string[]
   readonly resumptionChannelCount?: number
@@ -89,6 +91,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     } satisfies Partial<TaskLifecycle> as unknown as TaskLifecycle,
     manager: {
       get: (taskId: string) => records[taskId],
+      residentTaskIds: () => [...(options.resident ?? [])],
       list: (scope: { scope: "all" } | { scope: "parent-session"; session_id: string }) =>
         Object.values(records)
           .filter((record) => scope.scope === "all" || record.parent_session_id === scope.session_id)

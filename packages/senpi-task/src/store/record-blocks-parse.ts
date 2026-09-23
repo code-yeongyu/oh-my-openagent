@@ -14,11 +14,75 @@ import type { DagTaskOwner } from "../dag/owner"
 import {
   isRecord,
   readNumber,
+  readOptionalBoolean,
   readOptionalNumber,
   readOptionalString,
   readOptionalStringArray,
   readString,
 } from "./scalar-read"
+import { IsolationBackendKindSchema } from "@oh-my-opencode/omo-config-core"
+import type { IsolationMergeResult, IsolationRecord, TaskIsolationSpec } from "../state"
+
+function parseIsolationSpec(value: unknown): TaskIsolationSpec {
+  if (!isRecord(value)) throw new Error("isolation is not an object")
+  const mode = readString(value, "mode")
+  if (mode !== "patch" && mode !== "branch") throw new Error("isolation.mode must be patch or branch")
+  const apply = readOptionalBoolean(value, "apply")
+  if (apply === undefined) throw new Error("isolation.apply is required")
+  const fellBack = readOptionalBoolean(value, "fell_back")
+  return {
+    backend: IsolationBackendKindSchema.parse(value["backend"]),
+    ...(fellBack === undefined ? {} : { fell_back: fellBack }),
+    merged_dir: readString(value, "merged_dir"),
+    base_dir: readString(value, "base_dir"),
+    mode,
+    apply,
+  }
+}
+
+export function parseOptionalIsolation(record: Record<string, unknown>): IsolationRecord | undefined {
+  const value = record["isolation"]
+  if (value === undefined) return undefined
+  const spec = parseIsolationSpec(value)
+  if (!isRecord(value)) throw new Error("isolation is not an object")
+  const mergeResult = value["merge_result"]
+  if (mergeResult === undefined) return spec
+  if (!isRecord(mergeResult)) throw new Error("isolation.merge_result is not an object")
+  const kind = readString(mergeResult, "kind")
+  if (kind !== "applied" && kind !== "already-applied" && kind !== "not-applied" &&
+      kind !== "branch-merged" && kind !== "branch-merge-failed" && kind !== "no-changes" && kind !== "retained") {
+    throw new Error("isolation.merge_result.kind is invalid")
+  }
+  const changesApplied = readOptionalBoolean(mergeResult, "changesApplied")
+  if (changesApplied === undefined) throw new Error("isolation.merge_result.changesApplied is required")
+  const duration = readOptionalNumber(mergeResult, "duration_ms")
+  const patchPath = readOptionalString(mergeResult, "patchPath")
+  const error = readOptionalString(mergeResult, "error")
+  const reason = readOptionalString(mergeResult, "reason")
+  const summaryPath = readOptionalString(mergeResult, "summaryPath")
+  const filesChanged = readOptionalNumber(mergeResult, "filesChanged")
+  const nestedPatchPaths = readOptionalStringArray(mergeResult, "nestedPatchPaths")
+  const branchName = readOptionalString(mergeResult, "branchName")
+  const partial = readOptionalBoolean(mergeResult, "partial")
+  const conflict = readOptionalString(mergeResult, "conflict")
+  const manualCommand = readOptionalString(mergeResult, "manualCommand")
+  const parsed: IsolationMergeResult = {
+    kind,
+    changesApplied,
+    ...(duration === undefined ? {} : { duration_ms: duration }),
+    ...(patchPath === undefined ? {} : { patchPath }),
+    ...(error === undefined ? {} : { error }),
+    ...(reason === undefined ? {} : { reason }),
+    ...(summaryPath === undefined ? {} : { summaryPath }),
+    ...(filesChanged === undefined ? {} : { filesChanged }),
+    ...(nestedPatchPaths === undefined ? {} : { nestedPatchPaths }),
+    ...(branchName === undefined ? {} : { branchName }),
+    ...(partial === undefined ? {} : { partial }),
+    ...(conflict === undefined ? {} : { conflict }),
+    ...(manualCommand === undefined ? {} : { manualCommand }),
+  }
+  return { ...spec, merge_result: parsed }
+}
 
 // Parsers for the nested blocks of a persisted task record: ownership, spawn spec, prelaunch
 // steering queue, resolved-model chain, notification epochs, host session identity, and runner kind.
@@ -104,8 +168,12 @@ export function parseOptionalSpawnSpec(record: Record<string, unknown>): TaskSpa
     const prompt = readString(value, "prompt")
     const instructions = readOptionalString(value, "instructions")
     const memberScopedToolNames = readOptionalStringArray(value, "member_scoped_tool_names")
+    const isolation: TaskIsolationSpec | undefined = value["isolation"] === undefined
+      ? undefined
+      : parseIsolationSpec(value["isolation"])
     return {
       version: 1,
+      ...(isolation === undefined ? {} : { isolation }),
       cwd,
       prompt,
       ...(instructions === undefined ? {} : { instructions }),

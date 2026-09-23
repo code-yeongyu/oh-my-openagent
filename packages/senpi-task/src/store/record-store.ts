@@ -11,7 +11,7 @@ import { join } from "node:path"
 
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
-import { appendTaskEvent, closeAppendFd, type AppendFdCache } from "./event-log"
+import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
 import { writeRecord } from "./record-write"
@@ -154,7 +154,7 @@ function removeRecord(
   // (2) completion spill file
   rmSync(join(stateDir, "completion-results", `${taskId}.txt`), { force: true })
   // (3) task event log
-  const logPath = join(stateDir, "logs", `${taskId}.jsonl`)
+  const logPath = taskEventLogPath(stateDir, String(taskId))
   rmSync(logPath, { force: true })
   closeAppendFd(logPath, appendFds)
   // (4) record LAST

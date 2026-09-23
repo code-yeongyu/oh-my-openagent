@@ -10,6 +10,7 @@ import {
   type SessionEntryLike,
 } from "./binding"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
+import { adoptSessionIdentity } from "./identity-adoption"
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
 import { primeMemoryPersonaAssets } from "./persona-prime"
@@ -51,6 +52,8 @@ type SessionSurface = {
   readonly id: string
   readonly ui?: SessionUi
   readonly hasUI?: boolean
+  /** The session's own working directory, reported by the host per event. */
+  readonly cwd?: string
 }
 type SessionState = {
   readonly enabled: boolean
@@ -70,7 +73,6 @@ export { memoryModuleSupervisor } from "./supervisor"
 
 export function createMemoryComponent(options: MemoryComponentOptions = {}): OmoSenpiComponent {
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
-  const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   const now = options.now ?? Date.now
   const env = options.env ?? process.env
   const sweepTransientRuns = options.sweepTransientRuns ?? sweepTransientMemoryRuns
@@ -79,6 +81,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
   return {
     name: "memory",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      const resolveCwd = options.resolveCwd ?? (() => extensionCwd(pi))
       const cwd = resolveCwd()
       const bootConfig = resolveMemoryConfig(loadConfig({ cwd }))
       if (!isEnabled(bootConfig, ctx, env)) return
@@ -127,33 +130,48 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         sessions.set(surface.id, state)
         if (!state.enabled) return
 
-        const identity = resolveMemoryIdentity(sessionConfig.agent, cwd, env)
+        // The identity belongs to the SESSION's workspace, not to whatever directory the host
+        // process happens to sit in: one shared host serves sessions from many workspaces (#8556).
+        const sessionCwd = surface.cwd ?? cwd
+        const memoryRoot = resolveMemoryRoot(env, sessionCwd)
+        const resolved = resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
         const previous = findLatestMemoryBinding(surface.entries)
-        const binding = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: now() })
-        // A rebind has no session_start behind it, so the recorded entry is the only evidence of what
-        // this session was: it must agree on the memory repository too, not only on the identity.
-        const conflict = previous !== undefined
-          && (previous.identity !== identity.id || (options.verifyRepository && previous.repoPathHash !== binding.repoPathHash))
-        if (conflict) {
+        const adoption = adoptSessionIdentity({
+          recorded: previous,
+          resolved,
+          memoryRoot,
+          configAgentValue: sessionConfig.agent,
+          verifyRepository: options.verifyRepository,
+        })
+        if (adoption.kind === "conflict") {
           if (!state.conflictNotified) {
             state.conflictNotified = true
             surface.ui?.notify(
-              `memory identity conflict: session is bound to ${previous.identity}, but config resolved ${identity.id}; restart with the original identity or fork a new session`,
+              `memory identity conflict: session is bound to ${previous?.identity}, but config resolved ${resolved.id}; restart with the original identity or fork a new session`,
               "error",
             )
             ctx.logger.warn("omo-senpi memory binding failed closed", {
               sessionId: surface.id,
-              bound: previous.identity,
-              resolved: identity.id,
+              bound: previous?.identity,
+              resolved: resolved.id,
             })
           }
           return
         }
+        const identity = adoption.identity
+        if (adoption.kind === "rebound") {
+          ctx.logger.info("omo-senpi memory identity rebound to the session binding", {
+            sessionId: surface.id,
+            bound: identity.id,
+            resolved: resolved.id,
+          })
+        }
+        const binding = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: now() })
 
         const run = resolveIdentityRunPaths({
           identity: identity.id,
           identityPaths: identity.paths,
-          memoryRoot: resolveMemoryRoot(env, cwd),
+          memoryRoot,
           oneShot: isOneShotSurface({ hasUI: surface.hasUI, env, pi }),
         })
         state.run = run
@@ -277,7 +295,12 @@ function readSessionSurface(value: unknown): SessionSurface {
     id: typeof id === "string" && id.length > 0 ? id : "unknown-session",
     ...(ui === undefined ? {} : { ui }),
     ...(typeof value.hasUI === "boolean" ? { hasUI: value.hasUI } : {}),
+    ...(typeof value.cwd === "string" && value.cwd.length > 0 ? { cwd: value.cwd } : {}),
   }
+}
+
+function extensionCwd(pi: SenpiExtensionAPI): string {
+  return typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : process.cwd()
 }
 
 function isSessionUi(value: unknown): value is SessionUi {

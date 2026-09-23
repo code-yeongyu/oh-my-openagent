@@ -54,6 +54,7 @@ export function liveProgressSnapshot(details: ToolProgressDetails) {
     ...(details.currentTool === undefined ? {} : { current_tool: details.currentTool }),
     ...(details.lastAssistantLine === undefined ? {} : { last_assistant_line: details.lastAssistantLine }),
     turns: details.turns,
+    ...((details.failedTurns ?? 0) > 0 ? { failed_turns: details.failedTurns } : {}),
     ...(details.toolCalls === undefined ? {} : { tool_calls: details.toolCalls }),
     ...(details.tokens === undefined ? {} : { total_tokens: details.tokens }),
     ...(details.outputTokens === undefined ? {} : { output_tokens: details.outputTokens }),

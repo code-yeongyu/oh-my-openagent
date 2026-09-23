@@ -74,7 +74,7 @@ export function createFormatterStep(options: FormatterStepOptions = {}) {
 
 function languageForPath(path: string): string { const ext = extname(path); return ext === ".ts" || ext === ".tsx" ? "typescript" : ext === ".py" ? "python" : ext.slice(1) }
 function isGitIgnored(filePath: string, cwd: string): boolean {
-  try { execFileSync("git", ["check-ignore", "-q", "--", relative(cwd, filePath)], { cwd, stdio: "ignore" }); return true } catch { return false }
+  try { execFileSync("git", ["check-ignore", "-q", "--", relative(cwd, filePath)], { cwd, stdio: "ignore", windowsHide: true }); return true } catch { return false }
 }
 
 async function formatOne(filePath: string, formatter: Formatter, cwd: string, timeoutMs: number, daemonFormat: FormatterStepOptions["daemonFormat"], resolveBinary?: FormatterStepOptions["resolveBinary"]): Promise<{ status: "formatted" | "unchanged" | "missing"; added: number; removed: number }> {
@@ -94,7 +94,7 @@ async function formatOne(filePath: string, formatter: Formatter, cwd: string, ti
   const prepared = createSpawnCommand([binary, ...formatter.args, filePath])
   let child: ReturnType<typeof spawn>
   try {
-    child = spawn(prepared.command, prepared.args, { cwd, stdio: "ignore", shell: prepared.shell })
+    child = spawn(prepared.command, prepared.args, { cwd, stdio: "ignore", shell: prepared.shell, windowsHide: true })
   } catch {
     return { status: "missing", added: 0, removed: 0 }
   }

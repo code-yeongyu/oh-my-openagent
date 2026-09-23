@@ -51,6 +51,7 @@ export async function reviveDetachedTerminal(
 ): Promise<DetachedRevivalResult> {
   const observed = context.store.load(taskId)
   if (observed === null || !isColdRevivalCandidate(observed)) return { ok: false, reason: "task is not a continuable parked child" }
+  if (observed.isolation !== undefined) return refused("isolated_not_revivable")
   if (observed.host_pid !== undefined && observed.host_pid !== context.hostPid) return refused("foreign_owner")
   const sessionPath = newestSessionPath(context, taskId)
   if (sessionPath === undefined) return { ok: false, reason: "task transcript is unavailable" }

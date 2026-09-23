@@ -64,8 +64,9 @@ describe("resolveReflectionModel", () => {
     // when
     const result = resolveReflectionModel("quick", config, staleRegistry)
 
-    // then
-    expect(result).toEqual({ kind: "resolved", category: "quick", model: "omo-mock/mock-1", fallbacks: [] })
+    // then: thinking comes from the builtin quick default (gpt-5.6-luna-fast at low), which a user
+    // model pin inherits when it declares no reasoning of its own.
+    expect(result).toEqual({ kind: "resolved", category: "quick", model: "omo-mock/mock-1", thinking: "low", fallbacks: [] })
   })
 
   test("#given a pinned model that find() cannot locate #when resolved #then it still fails closed", () => {
@@ -284,14 +285,14 @@ describe("resolveReflectionModel", () => {
 
       // when
       const result = resolveReflectionModel("quick", { categories: {} }, emptyRegistry, {
-        sessionModel: { provider: "anthropic", id: "claude-opus-5", thinking: "low" },
+        sessionModel: { provider: "anthropic", id: "claude-opus-5-5", thinking: "low" },
       })
 
       // then
       expect(result).toEqual({
         kind: "resolved",
         category: "quick",
-        model: "anthropic/claude-opus-5",
+        model: "anthropic/claude-opus-5-5",
         thinking: "low",
         source: "session_inherit",
         fallbacks: [],
@@ -301,13 +302,13 @@ describe("resolveReflectionModel", () => {
     test("#when even the registry object is missing #then the session model still resolves", () => {
       // when
       const result = resolveReflectionModel("quick", { categories: {} }, undefined, {
-        sessionModel: { provider: "anthropic", id: "claude-opus-5" },
+        sessionModel: { provider: "anthropic", id: "claude-opus-5-5" },
       })
 
       // then
       expect(result.kind).toBe("resolved")
       if (result.kind === "resolved") {
-        expect(result.model).toBe("anthropic/claude-opus-5")
+        expect(result.model).toBe("anthropic/claude-opus-5-5")
         expect(result.source).toBe("session_inherit")
       }
     })
@@ -379,6 +380,7 @@ describe("resolveReflectionModel", () => {
       kind: "resolved",
       category: "quick",
       model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+      thinking: "low",
       fallbacks: [],
     })
     expect(lookups).not.toContainEqual({ provider: "apitopia", modelId: "z-ai" })

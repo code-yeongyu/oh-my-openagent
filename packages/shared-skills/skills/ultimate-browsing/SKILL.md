@@ -7,7 +7,7 @@ description: "Renders, drives, and screenshots web pages: JS-rendered sources, c
 
 Web access for everything a plain fetch cannot finish: a page that renders in JS, a click or a form, a screenshot, a login that must persist across pages, or a host that blocks generic fetchers (WAF / 403 / Cloudflare). Start at the cheapest tier that can do the job and climb only when it cannot:
 
-**Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — a real browser**: 2a Bun.WebView, 2b a local-Chrome `playwright-core` script from js eval for Chrome semantics, stealth, trace, or auth.
+**Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — a real browser** through omowright from js eval: 2a the owned engine (a browser your code launches, CloakBrowser for stealth), 2b the attached engine (the user's own signed-in browser).
 
 ## PHASE 0 — ROUTE FIRST (MANDATORY)
 
@@ -23,11 +23,11 @@ User request
   +- podcast transcript / stock forum ----------------- TIER 1.5 agent-reach
   +- Twitter feed / LinkedIn profile / GitHub via CLI - TIER 1.5 agent-reach
   |
-  +- Tier 1/1.5 returned empty or partial ------------- TIER 2  2a kernel browser -> 2b stealth
-  +- click / fill form / scroll / interact ------------ TIER 2  2a kernel browser -> 2b stealth
-  +- screenshot / render / play video ----------------- TIER 2  2a kernel browser -> 2b stealth
-  +- login session across pages / inject cookies ------ TIER 2  2b Chrome stealth (profile + cookies)
-  +- test web app / QA / dogfood ---------------------- TIER 2  2a kernel browser -> 2b stealth
+  +- Tier 1/1.5 returned empty or partial ------------- TIER 2  2a owned engine -> 2b attached engine
+  +- click / fill form / scroll / interact ------------ TIER 2  2a owned engine -> 2b attached engine
+  +- screenshot / render / play video ----------------- TIER 2  2a owned engine -> 2b attached engine
+  +- login session across pages / the user's account --- TIER 2  2b attached engine (their browser)
+  +- test web app / QA / dogfood ---------------------- TIER 2  2a owned engine -> 2b attached engine
   |
   +- simple search query ------------------------------ NOT this skill (use web-search)
 ```
@@ -84,28 +84,35 @@ Routing table, per-platform auth (set `TWITTER_*` env vars, `gh auth login`, a t
 
 **When**: real interaction is needed (clicks, forms, screenshots, video, persistent login), or Tier 1/1.5 failed.
 
-### Tier 2a — kernel browser (default)
-
-Use `new Bun.WebView()` from the js-eval kernel on Bun >= 1.4: macOS defaults to system WebKit; Linux/Windows need installed Chrome/Chromium/Edge. WebView is headless, WebKit has no CDP, and `type()` emits no keyboard events. For other kernels or when those differences matter, use 2b.
+Both tiers are omowright, staged inside the `browser` skill and loaded from js eval:
 
 ```js
-const view = new Bun.WebView({ width: 1280, height: 800 })
+const { loadOmowright } = await import("<browser-skill-root>/scripts/omowright.mjs")
+const { omowright } = await loadOmowright()
+```
+
+### Tier 2a — owned engine (default)
+
+A browser your code launches with a task-owned profile. `connectPipe` opens no listening port; `connectCloakProfile` launches CloakBrowser with a pinned fingerprint seed and is the path for WAF, Cloudflare and bot-scored pages.
+
+```js
+const browser = await omowright.connectPipe({ browserPath, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
 try {
-  await view.navigate(url)
-  const title = await view.evaluate("document.title")
-  await Bun.write(pngPath, await view.screenshot())
+  const page = await browser.newTab(url)
+  const tree = omowright.compactSnapshot(await page.snapshot())   // the read; refs come from it
+  const snoop = omowright.createNetworkSnoop(page)                  // read the API JSON instead of the DOM when there is one
+  await page.locator("e3").click()
+  await Bun.write(pngPath, await page.screenshot())
 } finally {
-  view[Symbol.dispose]()
+  await browser.close()                                            // then rm -rf the profile
 }
 ```
 
-Use 2b for real-Chrome semantics, stealth, trace, authenticated profiles, or a page the kernel browser cannot reach.
+The rest of the surface (CUA coordinates, captcha solving, routes, traces, frames, human handoff) is in the `browser` skill's `references/owned-engine/`. A stealth binary is not proof of access: inspect the rendered result and report challenges that remain.
 
-### Tier 2b — Chrome stealth (blocked or logged-in pages)
+### Tier 2b — attached engine (logged-in pages)
 
-WRITE a `playwright-core` script and run it from js eval against installed local Chrome: `chromium.launch({ channel: "chrome" })`, or `launchPersistentContext` on a task-owned profile. For authenticated state, CLONE the user's profile first (`rsync -a <profile>/ <tmp-clone>/`); NEVER launch against or clear cookies/cache/site data from the live profile. Codex: prefer `browser:control-in-app-browser` for ordinary page control.
-
-Keep the engine's Playwright templates for script-based extraction. Stealth is optional: the user installs `playwright-extra` + `puppeteer-extra-plugin-stealth` once in the engine directory and the script wraps the `playwright-core` browser type. Setup, persistent-context arguments, screenshots, and cleanup are in [references/chrome-stealth.md](references/chrome-stealth.md). A stealth flag is not proof of access: inspect the rendered result and report challenges that remain.
+When the page needs the user's account, drive the browser they are already signed into instead of cloning their profile: `connectBrowserSkill()` → `session.navigate` → `bskSnapshot(session)` / `session.observe()` → `session.click` → `session.stop()`. NEVER launch against or clear cookies/cache/site data from the user's live profile, and never fall back to the owned engine for an authenticated criterion: if no extension is connected, run the `browser` skill's onboarding script and relay its one human step. The full loop is the `browser` skill.
 
 ### Cookie login (cross-platform)
 
@@ -119,7 +126,7 @@ python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --outpu
 python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
 ```
 
-Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Full detail in [references/chrome-stealth.md](references/chrome-stealth.md).
+Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Limits in [references/chrome-stealth.md](references/chrome-stealth.md).
 
 ## Reference docs
 
@@ -127,7 +134,7 @@ Cookie export files are written with owner-only `0600` permissions. Do not place
 |------|-------------|
 | [references/insane-search/README.md](references/insane-search/README.md) | Tier-1 engine harness (R1-R7, Phase 0 API index, no-site-name rule) + its `*.md` deep-dives |
 | [references/agent-reach/README.md](references/agent-reach/README.md) | Tier-1.5 routing table, platform auth, per-category `*.md` |
-| [references/chrome-stealth.md](references/chrome-stealth.md) | Tier-2 playwright-core scripts, optional stealth setup, cloned profiles, cookie login |
+| [references/chrome-stealth.md](references/chrome-stealth.md) | Tier-2 stealth through omowright + CloakBrowser, cookie login limits |
 
 ## Environment variables
 

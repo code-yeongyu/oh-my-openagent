@@ -15,8 +15,9 @@
 #      uv run new-project.py myproject --path ./workspace
 # ──────────────────
 #
-# Creates a new Rust project with strict lints, deny.toml, rustfmt.toml,
-# rust-toolchain.toml, and .cargo/config.toml pre-configured.
+# Creates a new Rust project with strict lints, deny.toml, rustfmt.toml, and
+# rust-toolchain.toml pre-configured. The generated project passes its own
+# fmt + clippy gate before any code is written.
 
 from __future__ import annotations
 
@@ -50,6 +51,7 @@ non_ascii_idents = "deny"
 trivial_numeric_casts = "warn"
 unused_lifetimes = "warn"
 single_use_lifetimes = "warn"
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(loom)"] }
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }
@@ -66,32 +68,22 @@ unimplemented = "deny"
 dbg_macro = "deny"
 print_stdout = "warn"
 print_stderr = "warn"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+let_underscore_must_use = "deny"
+indexing_slicing = "deny"
+mem_forget = "deny"
+clone_on_ref_ptr = "warn"
 module_name_repetitions = { level = "allow" }
 must_use_candidate = { level = "allow" }
-missing_errors_doc = { level = "allow" }
-missing_panics_doc = { level = "allow" }
-"""
-
-CARGO_CONFIG_TOML = """\
-[build]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-[target.aarch64-apple-darwin]
-rustflags = []
 """
 
 DENY_TOML = """\
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
 yanked = "deny"
 
 [licenses]
-unlicensed = "deny"
+private = { ignore = true }  # publish = false crates carry no license field
 allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
 
 [bans]
@@ -101,6 +93,16 @@ wildcards = "deny"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+"""
+
+MAIN_RS = """\
+//! Command-line entry point.
+
+use std::io::Write as _;
+
+fn main() -> std::io::Result<()> {
+    writeln!(std::io::stdout().lock(), "Hello, world!")
+}
 """
 
 RUSTFMT_TOML = """\
@@ -148,17 +150,18 @@ def main(
     (project_dir / "rust-toolchain.toml").write_text(RUST_TOOLCHAIN_TOML)
     console.print("  [dim]wrote[/] rust-toolchain.toml")
 
-    # ── Append [lints] to Cargo.toml ─────────────────────────────────
+    # ── Declare the MSRV and append [lints] to Cargo.toml ────────────
     cargo_toml = project_dir / "Cargo.toml"
-    with cargo_toml.open("a") as f:
-        f.write(CARGO_TOML_LINTS)
+    manifest = cargo_toml.read_text()
+    if 'edition = "2024"\n' not in manifest:
+        console.print("[bold red]Error:[/] cargo did not create an edition 2024 package; install Rust >= 1.85")
+        sys.exit(1)
+    manifest = manifest.replace(
+        'edition = "2024"\n', 'edition = "2024"\nrust-version = "1.85"\npublish = false\n', 1
+    )
+    cargo_toml.write_text(manifest + CARGO_TOML_LINTS)
+    (project_dir / "src" / "main.rs").write_text(MAIN_RS)
     console.print("  [dim]appended[/] [lints] to Cargo.toml")
-
-    # ── .cargo/config.toml ───────────────────────────────────────────
-    cargo_config_dir = project_dir / ".cargo"
-    cargo_config_dir.mkdir(parents=True, exist_ok=True)
-    (cargo_config_dir / "config.toml").write_text(CARGO_CONFIG_TOML)
-    console.print("  [dim]wrote[/] .cargo/config.toml")
 
     # ── deny.toml ────────────────────────────────────────────────────
     (project_dir / "deny.toml").write_text(DENY_TOML)

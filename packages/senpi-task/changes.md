@@ -1,3 +1,215 @@
+## deep-low drops its GPT-5.6 Sol rung and gate
+
+`category/fallback-chains.ts` removes the trailing `gpt-5.6-sol` medium rung from `deep-low`, leaving
+`chatgpt-subscription/gpt-6-sol-fast` medium -> `gpt-6-sol` medium. `category/openai-categories.ts`
+narrows `DEEP_LOW_GATE_MODELS` to `gpt-6-sol-fast`, `gpt-6-sol`, so the task tool's category listing
+reads `(requires gpt-6-sol-fast or gpt-6-sol)` and a GPT-5.6-Sol-only registry leaves `deep-low`
+unavailable. `ultrabrain` keeps its GPT-5.6 Sol max fallback. omo#8718.
+
+## deep-high runs GPT-6 Astra at xhigh; deep-low leads with GPT-6 Sol Fast medium
+
+`category/fallback-chains.ts` mirrors the model-core table: `deep-high`'s single Astra rung moves
+from `high` to `xhigh`, and `deep-low` gains a `chatgpt-subscription/gpt-6-sol-fast` medium head
+rung ahead of the existing `gpt-6-sol` and `gpt-5.6-sol` medium rungs. The Fast (priority) tier is
+published only on the ChatGPT subscription lane, so Copilot and OpenCode Zen keep resolving the
+lane through plain `gpt-6-sol`. `category/openai-categories.ts` routes the `deep-low` default
+through `chatgpt-subscription/gpt-6-sol-fast` and adds it to `DEEP_LOW_GATE_MODELS`, and the
+`deep-high` default runs at `xhigh`. `ultrabrain` (Astra max) and `unspecified-high` (Opus 5.5 max
+first) are unchanged. omo#8714.
+
+## deep-low leads with GPT-6 Sol; every Luna rung is GPT-6 Luna Fast; Fable chains step down to Opus 5.5
+
+`category/fallback-chains.ts` mirrors the model-core table: `deep-low` gains a `gpt-6-sol` medium
+rung ahead of the existing `gpt-5.6-sol` medium rung (deep-high stays Astra-only), `quick`'s first
+rung and the `explore` / `librarian` OpenAI rung in `agents/builtin/fallback-chains.ts` become
+`gpt-6-luna-fast` low, and `artistry` moves `claude-opus-5-5` max ahead of `kimi-k3`.
+`category/openai-categories.ts` routes the `deep-low` default through `chatgpt-subscription/gpt-6-sol`
+and gates the lane on either Sol tier (`DEEP_LOW_GATE_MODELS`), and `quick`'s default through
+`gpt-6-luna-fast`. `architect` is untouched: it is hard-gated on Fable 5.1 and never falls back.
+The manual QA scripts under `scripts/` follow the new quick rung. omo#8701.
+
+## A crashed reclaimer's stale sentinel cannot wedge DAG lock acquisition on Windows
+
+Clearing a stale `.reclaim` sentinel renames and unlinks files that the host's antivirus or
+search indexer can briefly hold open; on win32 that surfaces as EPERM/EBUSY sharing violations
+POSIX rename does not have. The quarantining rename threw the refusal raw, and the stall budget -
+which resets only when the canonical holder changes - charged the reclaim's own I/O until
+`withLock` timed out behind an unchanged dead holder, exactly the intermittent windows-latest
+failure of "the sentinel cannot wedge acquisition". The rename now retries transient refusals
+like the final unlink already did, clearing a stale sentinel republishes the reclaim mutex in
+place instead of handing a wasted poll back to the waiter, and a pass that cleared a sentinel
+resets the stall budget: the loop observes the sentinel's disappearance, not the clock.
+omo#8671.
+
+## unspecified-low leads with MiMo V2.6 Pro; the Grok rung moves to 4.7
+
+`CATEGORY_FALLBACK_CHAINS["unspecified-low"]` and the builtin category config now lead with
+`xiaomi|mimo-v2.6-pro (max)`. The Grok rung is `grok-4.7 (xhigh)` on `xai|github-copilot|opencode-go`:
+`opencode` does not serve 4.7 (models.dev, measured), `opencode-go` does. The `mimo-v2.5-pro` rung
+stays last. Chain order is proven by resolving against a registry that serves every rung at once,
+so the winner demonstrates order rather than availability. omo#8652.
+
+## The persisted run stats keep their failure count
+
+`store/run-stats-parse.ts` parses the persisted `run_stats` block field by field, and it had no
+branch for `failed_turns` - so the counter survived only in memory. Every read back from disk
+(`task_output` on a terminal child, the completion notification's details, a reconciled record)
+silently dropped it, leaving a record that claims zero turns and offers no evidence that any
+attempt was ever made. The parser now reads it with the same absent-tolerant, type-strict rule as
+the other optional stats: a record written before the field shipped still loads, and a present
+value of the wrong shape rejects the record instead of being discarded. omo#8627.
+
+## A live row reads "starting" until a real turn lands
+
+`status-line.ts` emitted `turn N` whenever stats existed, so the row the user complained about
+read `turn 4 · $0.0000 · running` while six provider attempts had failed and nothing had run. The
+stats tokens now come from ONE shared `buildLiveStatsTokens`: a run with no successful turn and no
+tool call renders no turn token at all, failed attempts render as their own `failed N` counter,
+and spend still follows reported cost - which a failed-only run never carries, while a successful
+zero-cost turn keeps rendering `$0.0000`. `progress.ts` selects the verb the same way:
+`running <tool>` while a tool executes, `starting` before anything has landed, `retrying` once a
+failure proved the child is alive, and plain `running` only after a successful turn.
+`ToolProgressDetails` carries `failedTurns` (round-tripped through `readToolProgressDetails`,
+which still accepts records omitting it, and emitted as `failed_turns` by the RPC codec) so DAG
+and RPC consumers read the same facts. omo#8627.
+
+## A failed assistant turn is no longer a turn
+
+`run-stats.ts` counted every assistant `message_end` as a turn and folded in whatever usage it
+claimed, so a provider error produced a run with `turns: 6` and `cost_status: "reported"` even
+though nothing executed - the measured payload was an all-zero usage block with a zeroed cost
+breakdown. A turn is now a SUCCESSFUL assistant turn only: `stopReason` neither `error` nor
+`aborted`, the same predicate the transcript log and the runner outcome mapping already apply.
+A failed turn contributes nothing to tokens, cost, usage coverage or generation time; it only
+increments a new `failed_turns` counter on `TaskRunStats` (emitted when greater than zero) and
+re-anchors the generation window, so a failure's wall time never inflates the next successful
+turn's `generation_ms`. A run with no successful turn reports `token_status`/`cost_status`
+`unavailable` and omits `cost_usd`, while a successful turn reporting a genuine zero cost still
+yields `cost_status: "reported"` with `cost_usd: 0`. omo#8627.
+
+## The fake host rebinds a fresh pipe when it restarts
+
+`fake-host-transport.ts` derives the win32 named pipe from the logical socket path plus a random
+secret and publishes the secret at `<path>.secret` for connecting clients. The fake host's
+`restart()` closed the server and rebound the SAME pipe name, but Windows keeps a pipe name
+reserved while any handle is open - including a reconnecting client still holding the old pipe -
+so the rebind raced the dying handles and failed with `EADDRINUSE`. The transport now exposes a
+`rotate()` that mints a fresh secret (and with it a fresh pipe name) and republishes it where
+clients read it, and `restart()` rebinds through it; a restarted generation answering the same
+logical path as a new pipe instance is exactly the story the recovery suites pin. POSIX keeps
+rebinding the same socket path, as before. omo#8604 (same dev full-matrix shard).
+
+## Isolated children run in a copy-on-write clone and merge back when they settle
+
+`isolation/` wraps `@oh-my-opencode/isolation-core` as an injectable port (`runtime.ts`
+`createIsolationRuntime`, seven backends, `~/.omo/wt` sweep roots). `prepare.ts` resolves the repo
+root, captures the baseline and clones BEFORE the record is committed to a launch, so a repository
+that cannot be cloned refuses the spawn `isolation_unavailable` instead of quietly running the child
+against the real checkout. `settle.ts` runs before the terminal record is written - every result
+surface therefore reports one merge outcome - and only a completed child merges: anything else keeps
+the delta as a patch plus a summary under `<stateDir>/isolation/<taskId>/`, and a `not-applied` or
+`branch-merge-failed` replay renames the clone aside as `<base>.retained-<ts>` with a
+`git apply --3way` manual command rather than deleting the user's only copy of that work.
+`salvage.ts` reclaims a crashed host's clones at session start by salvaging the delta before the
+sweep. An isolated record is never revived: `reviveClaimed`, `revive-detached` and the legacy
+respawn path all answer `isolated_not_revivable`.
+
+The manager takes the port as `TaskManagerOptions.isolation` and the lifecycle as `isolation` +
+`isolationProbe` (defaulting to `processOwnerProbe`); `manager/isolation-wiring.ts` owns the binding
+map, the post-spawn owner re-stamp and the settle. `createIsolationRuntime` is exported from the
+package barrel so the omo-senpi adapter can build ONE runtime per engine and hand the same object to
+both seams - an adapter that supplies neither refuses every isolated spawn, which is what
+`packages/omo-senpi/scripts/qa/isolation-e2e.mjs` pins against the real senpi binary. omo#8574.
+
+## A foreground wait parks the parent's lane lease
+
+`manager/concurrency.ts` keeps parked leases in `#parked`, a per-lane map of `(taskId, runEpoch)`
+entries held outside `#counts` and outside the FIFO. `park()` drops the lease and dispatches, so a
+child is admitted while its parent waits; `unpark(token, signal, { overflow })` resumes that exact
+entry and is a no-op for a stale token, so a released task cannot be resurrected and an earlier
+token cannot resume a later parking of the same epoch. The drain prefers a resumable parked owner
+over the queue head, which is what re-admits the parent ahead of everything that queued while it
+waited; `overflow: true` (promotion to background) re-counts the parent immediately, bounded to one
+overflow per parked lease, and an abort while parked releases instead of resuming. `tryAcquire`
+refuses an epoch whose `leaseState()` is anything but `undefined` and `releaseLease` drops the held
+lease AND any parked entry for that key, so a parked epoch is neither re-acquired nor double-released.
+
+`tools/task/execute-single.ts` and `tools/task/execute-batch.ts` park the live caller - resolved
+through `manager.findTaskByChildSession(sessionId)` plus live ownership rather than a new context
+field - and unpark in `finally`. `tools/output` reports `lease: "held" | "parked"` on the snapshot
+(`OutputManager` now also picks `concurrency`). Residency and TTL policy are untouched. Pinned by
+`manager/concurrency.test.ts` and `tools/task/lease-parking.test.ts`, the latter driving the real
+in-process runner through two- and three-level spawn trees at cap 1. omo#8575.
+
+## Host-session children reattach after a lost transport and wait out host memory pressure
+
+`runners/rpc-host/handle.ts` takes an optional `reattach` port (`runners/rpc-host/reattach.ts`). A
+`transportGone` under a live child (intent running, not parked/detached/exited) no longer ends it:
+`runners/rpc-host/handle-reattach.ts` `recoverLostTransport` calls the port, adopts the new
+`HostSessionPort` + identity it returns, and re-prompts a continuation only when a turn was in
+flight AND the reopened session is not streaming (`get_state.isStreaming`) - a cut connection to a
+host that kept the session needs no prompt; a host that reopened the session from JSONL does.
+Commands issued during recovery wait on the reattach promise and retry once on the new port;
+`HostSessionLiveness` carries `isStreaming`; `hostSession` is a getter over the live identity.
+`runners/rpc-host.ts` supplies the port: `reattachDelaysMs` backoff (500 ms .. 8 s) over
+`ensureDaemon` -> `openAdmitted(sameSessionPath)`. `openAdmitted` waits out senpi#1905's
+`host_memory_pressure` refusal (`HostSessionOpenError.retryAfterMs`, bounded by `admissionWaitMs`,
+warned once) and never reaches the fallback runner. `session-wire.ts` `HostSessionOpenError`
+carries `retryAfterMs`. Fixture: `fake-host` gained `cutConnections()` and per-session
+`streaming` state. Pinned by `runners/rpc-host/handle-reattach.test.ts` and
+`runners/rpc-host-recovery.test.ts`. omo#8563.
+
+## Detached host sessions cannot crash heartbeat or teardown
+
+The host-session heartbeat catches an in-place `HostSessionDetachedError` as well as a rejected
+state read, using the existing diagnostic. Teardown stops the heartbeat before abort or close can
+drop the connection. Its best-effort wrapper invokes each operation inside the error boundary,
+so a synchronous abort failure is logged and still proceeds to close and settle the child.
+This incorporates ayden94's heartbeat fix from #8495 for #8494 and covers the host teardown
+failure reported in senpi#1840. Subprocess regressions count both uncaught exceptions and
+unhandled rejections; a withheld-close test pins heartbeat cancellation before detachment.
+
+## RPC child heartbeat and disposal contain connection failures
+
+The child-process heartbeat also catches synchronous `send(get_state)` failures while keeping
+the existing exited-client and harmless-pipe-error policy. Disposal awaits `detach()` and logs
+either a thrown error or a rejected promise instead of leaving a nested rejection unobserved.
+These are the remaining two call sites from senpi#1840. The current protocol client returns
+rejections from `send` and detaches synchronously; subclass probes exercise both failure forms
+at the handle boundary with a real child process.
+
+## Package-provided extensions reach RPC children
+
+Process and host child runners can now select extension paths that the parent actually loaded from
+configured packages, while preserving the parent's argv extensions as the base list. Package paths
+are filtered to installed package roots, exclude synthetic and already-covered paths, and retain
+load order, so children can resolve providers shipped by packages without forwarding unrelated
+agent or project extensions.
+
+## A refused model names its cause, and the category chain is walked
+
+Two halves of #8492 that forwarding package extensions does not reach.
+
+`publicStartFailureMessage` collapses every runner failure to one sentence on purpose: `RunnerFailure.message`
+is stderr-derived child output and `store/redaction.ts` redacts by key name only, so free text carrying a
+credential would be persisted verbatim. `model_unavailable` fell through that collapse to the generic
+sentence, which is why an admission refusal reached the caller as `Task runner failed to start.` The cause
+now rides an optional `RunnerFailureReason` - a closed union the parent authors, never the child - and the
+manager maps it through a fixed table. `knownFailureReason` makes that lookup total, so an off-enum value
+degrades to the classification sentence instead of being echoed; the same guarded value is recorded as
+`failure_reason` beside `failure_kind`. `createRpcModelAdmission` tags its three refusals accordingly.
+
+`#launch` now loops. On `model_unavailable` it advances to the next `fallback_models` entry and retries;
+every other kind fails immediately, because a depth refusal or a failed session create would reproduce on
+every remaining entry. Nothing has executed yet at that point - the child does not exist - so advancing
+repeats no work, unlike the post-outcome runtime fallback that must guard on `tool_calls === 0`.
+
+The epoch advances on every hop, and that is load-bearing. `#releaseSlot` is guarded per (task, epoch) and
+remembers the highest epoch it released, so retrying under the same epoch makes the eventual completion's
+release a silent no-op and leaks the lane's lease for the life of the process. Record bookkeeping mirrors
+the runtime fallback, and `#launch` reports the epoch and resolved model it ended on so `start()` cannot
+return the pre-fallback pair.
+
 ## The launch profile no longer depends on how the spec's path is spelled
 
 The compiled entry reaches `daemon-launch-spec.json` through the install prefix; the in-process

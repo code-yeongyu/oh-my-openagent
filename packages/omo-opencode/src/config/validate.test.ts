@@ -122,7 +122,7 @@ describe("validatePluginConfig", () => {
       const result = validatePluginConfig(fixture.project)
 
       expect(result.config.agents?.sisyphus).toMatchObject({ model: "project/model", prompt: "user prompt", temperature: 0.7 })
-      expect(result.config.categories?.deep).toMatchObject({ model: "user/deep", temperature: 0.2, prompt_append: "project appendix" })
+      expect(result.config.categories?.["deep-low"]).toMatchObject({ model: "user/deep", temperature: 0.2, prompt_append: "project appendix" })
       expect(result.config.claude_code).toMatchObject({ mcp: true, commands: true })
       expect(result.config.disabled_agents).toEqual(["user-agent", "project-agent"])
       expect(result.config.tui?.sidebar.enabled).toBe(false)

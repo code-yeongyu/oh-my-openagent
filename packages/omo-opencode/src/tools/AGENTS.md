@@ -49,7 +49,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `team_status` | Full team run status (members, tasks, mailbox) |
 | `team_list` | List declared + active teams |
 
-## DELEGATION CATEGORIES (built-in 8)
+## DELEGATION CATEGORIES (built-in 9)
 
 `task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains live in [`packages/model-core/src/category-model-requirements.ts`](../../../model-core/src/category-model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
@@ -57,12 +57,13 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 |----------|---------------|-------------|--------|
 | `visual-engineering` | anthropic/claude-fable-5-1 (variant: max) | google-categories.ts | Visual design, UI/UX, frontend |
 | `ultrabrain` | openai/gpt-6-astra (variant: max) | openai-categories.ts | Hard logic / heavy reasoning; GPT-6 Astra-specific prompt append |
-| `deep` | openai/gpt-6-astra (variant: high) | openai-categories.ts | 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and autonomous multi-step problem-solving; gated on gpt-6-astra OR gpt-5.6-sol |
+| `deep-low` | openai/gpt-6-sol-fast (variant: medium) | openai-categories.ts | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and autonomous multi-step work whose decisions the child can settle from evidence; gpt-6-sol medium fallback rung, gated on either GPT-6 Sol tier |
+| `deep-high` | openai/gpt-6-astra (variant: high) | openai-categories.ts | Escalation deep lane: the goal's central decision cannot be settled from evidence (trade-off, cross-boundary contract, no in-repo pattern, correctness argued from invariants); single rung, gated on gpt-6-astra |
 | `artistry` | anthropic/claude-fable-5-1 (variant: max) | google-categories.ts | Creative / unconventional approaches |
-| `quick` | kimi-for-coding/kimi-for-coding-highspeed | openai-categories.ts | Trivial single-file changes |
-| `unspecified-low` | xai/grok-4.6 (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
-| `unspecified-high` | openai/gpt-6-astra (variant: high) | openai-categories.ts | High effort fallback; GPT-6 Astra-specific prompt append |
-| `writing` | anthropic/claude-fable-5-1 (variant: medium) | kimi-categories.ts | Documentation, prose |
+| `quick` | openai/gpt-6-luna-fast (variant: low) | openai-categories.ts | Trivial single-file changes |
+| `unspecified-low` | xiaomi/mimo-v2.6-pro (variant: max) | openai-categories.ts | Moderate effort fallback |
+| `unspecified-high` | anthropic/claude-opus-5-5 (variant: medium) | openai-categories.ts | High effort fallback; keeps the GPT-6 Astra-specific prompt append for a user override onto a GPT-6 model |
+| `writing` | anthropic/claude-fable-5-1 (variant: low) | kimi-categories.ts | Documentation, prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 

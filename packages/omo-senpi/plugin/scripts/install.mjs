@@ -100,6 +100,9 @@ if (selfUpdate) {
   console.log("omo is updated via npm: npm i -g omo-ai@beta")
   process.exit(0)
 }
+// windowsHide-exempt: this is the interactive foreground CLI, spawned with inherited stdio.
+// CREATE_NO_WINDOW would suppress the console a console-less launch needs to render the TUI,
+// so the launcher keeps the user's console instead of hiding it (#8501).
 const child = spawn(process.execPath, [cli, "--extension", plugin, ...process.argv.slice(2)], {
   env,
   stdio: "inherit",
@@ -285,6 +288,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "memory-run-supervisor.mjs"),
   ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
   join4("skills", "ast-grep", "SKILL.md"),
+  join4("skills", "browser", "SKILL.md"),
   join4("skills", "coding-agent-sessions", "SKILL.md"),
   join4("skills", "debugging", "SKILL.md"),
   join4("skills", "frontend", "SKILL.md"),

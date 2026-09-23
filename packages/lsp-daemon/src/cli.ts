@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { argv, stderr } from "node:process";
 
+import { DaemonStartupDeferredError } from "./ownership.js";
 import { runMcpStdioProxy } from "./proxy.js";
 import { runDaemon } from "./run-daemon.js";
 
@@ -21,6 +22,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-	stderr.write(`${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
+	if (error instanceof DaemonStartupDeferredError) {
+		stderr.write(`[lsp-daemon] startup deferred: ${error.reason}\n`);
+	} else {
+		stderr.write(`${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
+	}
 	process.exitCode = 1;
 });

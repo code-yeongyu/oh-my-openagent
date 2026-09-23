@@ -30,6 +30,7 @@ import {
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { resolveDagForkSource } from "./dag-fork-source"
+import { scheduleDagRetentionSweep, type DagRetentionSweepOptions } from "./dag-retention-sweep"
 import { createDagRpcBridge, type DagBridgeTimers } from "./dag-rpc-bridge"
 import { registerDagRpcHandlers } from "./dag-rpc-handlers"
 import { createDagStatusUi, type DagStatusUiTimers } from "./dag-status-ui"
@@ -85,6 +86,8 @@ export interface DagRuntimeDeps {
   readonly statusUiTimers?: DagStatusUiTimers
   /** Liveness probe + timers for the paused-run lease watch; production uses signal-0 and unref'd timers. */
   readonly leaseWatch?: DagLeaseWatchOptions
+  /** Scheduler for the retention sweep; production defers it off the session-start path. */
+  readonly retentionSweep?: DagRetentionSweepOptions
 }
 
 type RecoveryScope = {
@@ -101,6 +104,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       ...(dagSettings === undefined ? {} : { dag: dagSettings }),
     },
   })
+  scheduleDagRetentionSweep(baseStore, deps)
   const runListeners = new Map<DagRunId, Set<(event: DagRunEvent) => void>>()
   const deliveredSeq = new Map<DagRunId, number>()
   const schedulers = new Map<DagRunId, { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }>()

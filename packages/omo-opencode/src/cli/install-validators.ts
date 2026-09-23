@@ -36,8 +36,11 @@ export function formatConfigSummary(config: InstallConfig): string {
   if (config.hasCodex) {
     lines.push(`  ${SYMBOLS.info} Codex autonomous mode: ${config.codexAutonomous ? "enabled" : "disabled"}`)
   }
-  if (config.hasSenpi) {
-    lines.push(`  ${SYMBOLS.info} Senpi adapter: enabled`)
+  if (config.hasNative) {
+    lines.push(`  ${SYMBOLS.info} OmO Native: installing from omo-ai@beta`)
+  }
+  if (config.hasNativeDev) {
+    lines.push(`  ${SYMBOLS.info} OmO Native development adapter: enabled`)
   }
 
   if (!config.hasOpenCode) return lines.join("\n")
@@ -221,7 +224,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
   const platform = resolvePlatform(args)
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
-  const hasSenpi = platform === "senpi"
+  const hasNative = platform === "native"
+  const hasNativeDev = platform === "native-dev"
 
   return {
     platform,
@@ -232,7 +236,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasGemini: hasOpenCode && args.gemini === "yes",
     hasCopilot: hasOpenCode && args.copilot === "yes",
     hasCodex,
-    hasSenpi,
+    hasNative,
+    hasNativeDev,
     hasOpencodeZen: hasOpenCode && args.opencodeZen === "yes",
     hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",

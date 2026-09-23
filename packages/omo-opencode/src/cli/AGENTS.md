@@ -23,7 +23,7 @@ Commander.js CLI with 12 commands (`sparkshell` removed 2026-07). Entry: `index.
 | `cleanup` (alias `uninstall`) | Remove Codex Light state | Clean managed Codex cache/marketplace + repair project-local legacy Codex artifacts |
 | `ulw-loop` | Codex ulw-loop CLI | Run the Codex LazyCodex ulw-loop CLI |
 
-`install` accepts `--platform=opencode|codex|both` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `npx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`. A `senpi` choice appears (hidden from help) only when `SENPI_PLATFORM_ENV_FLAG=1` is set from a source checkout; it routes through `install-senpi/` (re-export of `@oh-my-opencode/omo-senpi/install`). `install-ast-grep-sg.ts` provisions the `sg` binary at install time.
+`install` accepts `--platform=opencode|codex|both|native` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `npx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`. `native` is public: it routes through `install-native/`, which runs the real OmO Native install (`bun add -g omo-ai@beta`, npm fallback with bun stated as recommended) through an injected spawn and then points at `omo setup`. A `native-dev` choice appears (hidden from help) only when `OMO_ENABLE_NATIVE_DEV_PLATFORM=1` (legacy `OMO_ENABLE_SENPI_PLATFORM=1` still accepted) is set from a source checkout; it routes through `install-native-dev/`, which wraps the in-repo engine adapter installer. `install-ast-grep-sg.ts` provisions the `sg` binary at install time.
 
 ## STRUCTURE
 

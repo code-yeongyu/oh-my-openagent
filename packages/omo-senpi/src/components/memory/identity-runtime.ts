@@ -10,7 +10,7 @@ import {
 import type { SenpiModelRegistryPort, SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
-import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { MemoryIdentityContext } from "./context"
 import { createReflectionRunIdFactory } from "./reflection-run-id"
@@ -75,11 +75,12 @@ export function createIdentityRuntime(
     createRunId: createReflectionRunIdFactory({ identityPaths: identity.identityPaths }),
   })
 
-  let builtSandbox: SandboxTransform | undefined
+  let sandboxState: { readonly transform: SandboxTransform; readonly agentDir: string } | undefined
   const resolveAgentDir = deps.resolveAgentDir ?? (() => resolveAgentHome({ env: process.env }))
-  const lazySandbox = (spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs | Promise<ReflectionSpawnArgs> => {
-    if (builtSandbox === undefined) {
-      builtSandbox = buildSandboxTransform({
+  const lazySandbox = async (spawnArgs: ReflectionSpawnArgs): Promise<ReflectionSpawnArgs> => {
+    if (sandboxState === undefined) {
+      const agentDir = resolveAgentDir()
+      const transform = buildSandboxTransform({
         policy: reflection.sandbox as SandboxPolicy,
         worktreeDir: identity.identityPaths.worktrees,
         gitCommonDir: identity.identityPaths.repo,
@@ -87,21 +88,25 @@ export function createIdentityRuntime(
         runtimeWrites: [
           identity.identityPaths.reflectionSessions,
           identity.identityPaths.reflection,
-          resolveAgentDir(),
+          agentDir,
           ...(process.env.XDG_CONFIG_HOME === undefined ? [] : [process.env.XDG_CONFIG_HOME]),
         ],
         command: spawnArgs.command,
         env: spawnArgs.env,
       })
-      if (builtSandbox.warning !== undefined) {
+      if (transform.warning !== undefined) {
         deps.logger?.warn("memory reflection sandbox degraded", {
           identity: identity.identity,
           runId: spawnArgs.runId,
-          warning: builtSandbox.warning,
+          warning: transform.warning,
         })
       }
+      // The grant and the pin below come from ONE resolution, so the directory the child locks
+      // its credentials in can never drift away from the directory the sandbox granted.
+      sandboxState = { transform, agentDir }
     }
-    return builtSandbox(spawnArgs)
+    const transformed = await sandboxState.transform(spawnArgs)
+    return { ...transformed, env: { ...transformed.env, ...pinnedAgentDirEnv(sandboxState.agentDir) } }
   }
 
   const runner = new SenpiSubprocessRunner({
@@ -143,6 +148,17 @@ export function createIdentityRuntime(
     },
   }
   return runtime
+}
+
+/**
+ * Pins the granted agent dir under every name the engine reads.
+ *
+ * The child's cwd is the reflection worktree, so without a pin it re-resolves its own agent dir
+ * - and an inherited value under the brand prefix would beat a legacy-only pin, because the
+ * engine takes the first DEFINED name across `<brand>`, `SENPI`, `PI`.
+ */
+function pinnedAgentDirEnv(agentDir: string): NodeJS.ProcessEnv {
+  return Object.fromEntries(AGENT_DIR_ENV_NAMES.map((name) => [name, agentDir]))
 }
 
 function describe(error: unknown): string {

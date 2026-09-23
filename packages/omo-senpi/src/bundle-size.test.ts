@@ -63,7 +63,17 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // packages/*/package.json` is empty). The wave grew the minified bundle 1,175,406 -> 1,181,607
 // (linux/amd64, node 24 + bun 1.4.2), and the previous ceiling had only 4,594 bytes of slack left
 // before it. 1,220,000 keeps ~3.2% headroom rather than the failing value.
-const BUDGET_BYTES = 1_220_000
+// Raised 1,220,000 -> 1,300,000 for the within-minor dependency refresh: this is the first raise caused
+// by third-party growth rather than first-party code, so it is recorded as such. No dependency was ADDED
+// - bundle-purity stays green and the inlined set is unchanged - but the refresh moves versions the
+// extension already inlines, and zod dominates: 4.4.3 -> 4.6.5 alone grows 4,558,122 -> 6,140,311 bytes
+// unpacked, with js-yaml 5.0.0 -> 5.4.2 (+158,792) and posthog-node 5.51.1 -> 5.52.4 (+17,303) behind it.
+// Measured in a node:24-bookworm container on bun 1.4.2 by building the SAME source tree twice, once with
+// dev's manifests and once with this branch's: dev rebuilds byte-identically to the committed 1,202,188
+// and this branch rebuilds to 1,260,200 (+58,012, +4.8%), so the growth is attributable to the versions
+// and not to the build host. 1,300,000 keeps ~3.2% headroom rather than the failing value. Trimming it
+// back needs a lazy-load or split of the inlined validator, which is a refactor and not a version bump.
+const BUDGET_BYTES = 1_300_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

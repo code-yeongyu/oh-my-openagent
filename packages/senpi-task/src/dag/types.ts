@@ -100,6 +100,7 @@ export const DAG_NODE_ERROR_CODES = [
   "task_lost",
   "task_cancelled",
   "resume_task_missing",
+  "resume_task_orphaned",
   "journal_corrupt",
 ] as const
 
@@ -156,7 +157,26 @@ export type DagNode = {
   readonly createdAt: string
   readonly startedAt?: string
   readonly completedAt?: string
+  // Terminal node's final child text, bounded to DAG_NODE_OUTPUT_PREVIEW_CHARS. `outputBytes` is
+  // always the FULL persisted size, so a shorter `output` means the preview was truncated and a
+  // completed node reading `outputBytes: 0` is durable evidence the child returned nothing. Without
+  // this the only surface carrying node output was the blocking wait, which the detached midpoint
+  // peek never reaches (#8674).
+  readonly output?: string
+  readonly outputBytes?: number
+  // When the backing child last wrote a transcript event. Present only while the node is running,
+  // because it describes a LIVE child: a node running with no recent activity is either
+  // finished-but-unreaped or genuinely stalled, and `running` alone cannot tell those apart (#8674).
+  readonly lastActivityAt?: string
 }
+
+// Per-node output budget in the checkpoint. A node's final message is normally far shorter; the cap
+// only stops one pathological child from dominating every checkpoint rewrite for the whole run.
+export const DAG_NODE_OUTPUT_PREVIEW_CHARS = 2000
+
+// How long a running node's child may write nothing before a status surface calls the silence out.
+// It is a reporting threshold, never an execution one: nothing is cancelled or failed by it.
+export const DAG_NODE_QUIET_AFTER_MS = 600_000
 
 export type DagEdge = {
   readonly from: DagNodeId

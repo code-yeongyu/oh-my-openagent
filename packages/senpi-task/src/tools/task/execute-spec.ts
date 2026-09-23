@@ -28,8 +28,15 @@ export function buildStartSpec(
   const skills = loadSkills(params.load_skills ?? [], cwd)
   const skillSummary = taskSkillSummary(params.load_skills ?? [], skills)
   const executionMode = resolvedTaskExecutionMode(target, deps)
+  const isolation = deps.omoConfig.task?.isolation
+  const isolated = params.isolated ?? isolation?.enabled ?? false
   return {
     prompt: skills.prepend + params.prompt,
+    ...(isolated ? {
+      isolated,
+      apply: params.apply ?? isolation?.apply ?? true,
+      merge: params.merge ?? isolation?.merge ?? "patch",
+    } : params.isolated === undefined ? {} : { isolated }),
     ...(skillSummary === undefined ? {} : { skills: skillSummary }),
     ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
     parent_session_id: parentSessionId,
@@ -102,6 +109,9 @@ function resolvedTaskExecutionMode(
 export function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: boolean | undefined): SingleSpawnParams {
   return {
     prompt: item.prompt,
+    ...(item.isolated === undefined ? {} : { isolated: item.isolated }),
+    ...(item.apply === undefined ? {} : { apply: item.apply }),
+    ...(item.merge === undefined ? {} : { merge: item.merge }),
     ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
     ...(item.task_summary !== undefined && { task_summary: item.task_summary }),
     ...(item.description !== undefined && { description: item.description }),

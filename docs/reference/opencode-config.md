@@ -47,7 +47,7 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
       // Main orchestrator: Claude Opus or Kimi K3 work best
       "sisyphus": {
         "model": "kimi-for-coding/kimi-k3",
-        "ultrawork": { "model": "anthropic/claude-opus-5", "reasoning": "max" },
+        "ultrawork": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
       },
 
       // Research agents: cheap fast models are fine
@@ -89,7 +89,7 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         // Simple string fallback
         "openai/gpt-5.6-sol",
@@ -139,7 +139,7 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -156,7 +156,7 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -201,7 +201,7 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
     "atlas": {
       "model": "openai/gpt-5.6-sol",
       "fallback_models": [
-        "gpt-5.6-luna-fast",
+        "gpt-6-luna-fast",
         {
           "model": "gpt-5.6-sol",
           "reasoning": "medium",
@@ -219,7 +219,7 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 {
   "agents": {
     "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "fallback_models": [
         "openai/gpt-5.6-sol",
         {
@@ -272,11 +272,11 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 
     // Direct Anthropic, only for eligible long-context accounts/models.
     "sisyphus": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "reasoning": "max"
     },
     "oracle": {
-      "model": "anthropic/claude-opus-5"
+      "model": "anthropic/claude-opus-5-5"
     }
   }
 }
@@ -309,8 +309,8 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
     }
   },
   "categories": {
-    "deep": {
-      "prompt_append": "file:///path/to/deep-category-append.md"
+    "deep-low": {
+      "prompt_append": "file:///path/to/deep-low-category-append.md"
     }
   }
 }
@@ -320,17 +320,17 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 
 | Agent | Default Model | Provider Priority |
 | --- | --- | --- |
-| **Sisyphus** | `claude-opus-5` | `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan/glm-5.2` → `opencode/big-pickle`
-| **Hephaestus** | `gpt-5.6-sol` | `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)`
-| **Oracle** | `gpt-5.6-sol` | `openai\|openai-codex\|opencode/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `opencode-go/glm-5.2`
-| **Librarian** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **Explore** | `gpt-5.6-luna-fast` | `openai\|openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5` → `openai\|openai-codex/gpt-5.4-nano`
-| **Multimodal Looker** | `gpt-5.6-sol` | `openai\|openai-codex\|opencode/gpt-5.6-sol (low)` → `opencode-go/kimi-k3` → `zai-coding-plan/glm-4.6v` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5-nano`
+| **Sisyphus** | `claude-opus-5-5` | `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan/glm-5.2` → `opencode/big-pickle`
+| **Hephaestus** | `gpt-6-sol` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)`
+| **Oracle** | `gpt-5.6-sol` | `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go/glm-5.2`
+| **Librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **Explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7` → `anthropic\|github-copilot/claude-haiku-4-5`
+| **Multimodal Looker** | `gpt-5.6-sol` | `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (low)` → `opencode-go/kimi-k3` → `zai-coding-plan/glm-4.6v` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5-nano`
 | **Prometheus** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
-| **Metis** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
-| **Momus** | `gpt-6-astra` | `openai\|openai-codex/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|openai-codex\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
-| **Atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7`
-| **Sisyphus Junior** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|openai-codex\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`
+| **Metis** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **Momus** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
+| **Atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7`
+| **Sisyphus Junior** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`
 
 ### Invoking Agents
 

@@ -237,5 +237,15 @@ export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolR
   }
   if (input.items.length > MAX_TASK_BATCH_ITEMS) return oversizedBatchResult()
   const starts = await startAll(input)
-  return input.runInBackground ? backgroundResult(starts) : syncResult(input, starts)
+  if (input.runInBackground) return backgroundResult(starts)
+  const parent = input.manager.findTaskByChildSession?.(input.ctx.sessionManager.getSessionId())
+  const parked = parent === undefined ? undefined : input.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
+  let promoted = false
+  try {
+    const result = await syncResult(input, starts)
+    promoted = result.details.run_in_background === true
+    return result
+  } finally {
+    await input.manager.concurrency?.unpark(parked, input.signal, { overflow: promoted })
+  }
 }

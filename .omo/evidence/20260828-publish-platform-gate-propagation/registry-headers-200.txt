@@ -1,3 +1,0 @@
-HTTP/2 200 
-cf-cache-status: DYNAMIC
-cache-control: max-age=300

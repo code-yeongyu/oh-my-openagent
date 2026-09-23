@@ -10,6 +10,9 @@ import {
 	acquireCacheLock,
 	deriveOmobAiVersion,
 	ensureCacheClone,
+	fetchCacheClones,
+	fetchRefArgs,
+	parseCommitLog,
 	hostTargetFor,
 	packSoleSenpiTarball,
 	parseOmobArgs,
@@ -298,4 +301,67 @@ describe("ensureCacheClone submodule ordering", () => {
 			rmSync(rootDir, { recursive: true, force: true })
 		}
 	}, 120_000)
+})
+
+describe("fetchCacheClones", () => {
+	const specs = [
+		{ url: "https://example.invalid/senpi.git", directory: "/cache/senpi", ref: "origin/main" },
+		{ url: "https://example.invalid/omo.git", directory: "/cache/omo", ref: "origin/dev" },
+	] as const
+
+	test("#given two independent clones #when the refresh fetches them #then neither waits for the other to finish", async () => {
+		const events: string[] = []
+		await fetchCacheClones(specs, async (spec) => {
+			events.push(`start:${spec.directory}`)
+			await Promise.resolve()
+			await Promise.resolve()
+			events.push(`end:${spec.directory}`)
+		})
+		expect(events).toHaveLength(4)
+		// Serialized fetches produce start,end,start,end; the launch path pays one network
+		// round trip per repository, so the second start must precede the first end.
+		expect(events.indexOf("start:/cache/omo")).toBeLessThan(events.indexOf("end:/cache/senpi"))
+	})
+
+	test("#given one failing fetch #when both run #then the failure is reported", async () => {
+		const attempted: string[] = []
+		const failing = fetchCacheClones(specs, async (spec) => {
+			attempted.push(spec.directory)
+			if (spec.directory === "/cache/omo") throw new Error("fetch refused")
+		})
+		await expect(failing).rejects.toThrow("fetch refused")
+		expect(attempted).toHaveLength(2)
+	})
+
+	test("#given one fetch fails while its sibling is still running #when the refresh reports the failure #then no fetch is left running against the cache", async () => {
+		const settled: string[] = []
+		let releaseSlow: (() => void) | undefined
+		const slow = new Promise<void>((resolve) => { releaseSlow = resolve })
+		const failing = fetchCacheClones(specs, async (spec) => {
+			if (spec.directory === "/cache/omo") throw new Error("fetch refused")
+			await slow
+			settled.push(spec.directory)
+		})
+		let reported = false
+		void failing.catch(() => undefined).then(() => { reported = true })
+		for (let tick = 0; tick < 12; tick++) await Promise.resolve()
+		// Reporting the failure while the sibling git process is still writing would let this
+		// process release the cache lock with a fetch still running against that cache.
+		expect(reported, "the refresh must not report failure while a sibling fetch is still running").toBe(false)
+		releaseSlow?.()
+		await expect(failing).rejects.toThrow("fetch refused")
+		expect(settled).toEqual(["/cache/senpi"])
+	})
+
+	test("#given one git log line pair #when commit info is parsed #then the commit and its date come from a single git call", () => {
+		expect(parseCommitLog("abc123\n2026-09-20T01:44:58+09:00\n")).toEqual({ commit: "abc123", committedAt: "2026-09-20T01:44:58+09:00" })
+		expect(parseCommitLog("")).toEqual({ commit: "", committedAt: "" })
+	})
+
+	test("#given a plain branch ref #when fetch args are built #then only that branch is fetched, and anything else falls back to the whole remote", () => {
+		expect(fetchRefArgs("origin/dev")).toEqual(["--prune", "origin", "+refs/heads/dev:refs/remotes/origin/dev"])
+		expect(fetchRefArgs("origin/main")).toEqual(["--prune", "origin", "+refs/heads/main:refs/remotes/origin/main"])
+		expect(fetchRefArgs("origin/dev~1")).toEqual(["--prune", "origin"])
+		expect(fetchRefArgs("a".repeat(40))).toEqual(["--prune", "origin"])
+	})
 })

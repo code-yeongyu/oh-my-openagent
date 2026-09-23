@@ -1,8 +1,9 @@
-import type { HarnessId, OmoHarnessId } from "../schema"
+import { canonicalHarnessName, harnessBlockKey, OMO_CONFIG_LEGACY_HARNESS_ALIASES } from "../schema"
+import type { HarnessId, OmoHarnessId, OmoLegacyHarnessId } from "../schema"
 import type { OmoConfigRawLayer } from "./types"
 
 export type CollectDisabledSkillsOptions = {
-  readonly harness?: OmoHarnessId | HarnessId
+  readonly harness?: OmoHarnessId | OmoLegacyHarnessId | HarnessId
   readonly layers: readonly OmoConfigRawLayer[]
   readonly profile?: string
 }
@@ -18,8 +19,19 @@ function namesAt(record: Record<string, unknown> | undefined): readonly string[]
   return value.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "")
 }
 
+// Both spellings of a renamed harness are read. The denylist is a union, so there is no precedence
+// to decide, and a raw layer handed in by a caller that did not canonicalize it still contributes.
+function harnessBlockKeys(harness: string): readonly string[] {
+  const canonical = canonicalHarnessName(harness)
+  const legacy = Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES)
+    .filter(([, target]) => target === canonical)
+    .map(([name]) => harnessBlockKey(name))
+  return [harnessBlockKey(canonical), ...legacy]
+}
+
 function scopesOf(config: Record<string, unknown>, harness: string | undefined): readonly (Record<string, unknown> | undefined)[] {
-  return [config, harness === undefined ? undefined : toRecord(config[`[${harness}]`])]
+  if (harness === undefined) return [config]
+  return [config, ...harnessBlockKeys(harness).map((key) => toRecord(config[key]))]
 }
 
 /**

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Script-only dependencies for local Chrome templates driven from js eval; Chrome must already be installed.",
   "dependencies": {
-    "playwright-core": "^1.62.1",
+    "playwright-core": "^1.63.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
   }

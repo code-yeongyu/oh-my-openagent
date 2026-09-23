@@ -209,7 +209,7 @@ export function buildParallelDelegationSection(
 ): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   const hasDelegationCategory = categories.some(
-    (category) => category.name === "deep" || category.name === "unspecified-high",
+    (category) => category.name === "deep-low" || category.name === "deep-high" || category.name === "unspecified-high",
   )
 
   if (!isNonClaude || !hasDelegationCategory) {
@@ -223,7 +223,7 @@ export function buildParallelDelegationSection(
 **MANDATORY - for ANY implementation task:**
 
 1. **ALWAYS decompose** the task into independent work units. No exceptions. Even if the task "feels small", decompose it.
-2. **ALWAYS delegate** EACH unit to a \`deep\` or \`unspecified-high\` agent in parallel (\`run_in_background=true\`).
+2. **ALWAYS delegate** EACH unit to a \`deep-low\` or \`unspecified-high\` agent in parallel (\`run_in_background=true\`); reserve \`deep-high\` for a unit whose central decision cannot be settled from evidence.
 3. **NEVER work sequentially.** If 4 independent units exist, spawn 4 agents simultaneously. Not 1 at a time. Not 2 then 2.
 4. **NEVER implement directly** when delegation is possible. You write prompts, not code.
 

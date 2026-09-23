@@ -1,7 +1,16 @@
 import { parse, printParseErrorCode } from "jsonc-parser/lib/esm/main.js"
 import type * as z from "zod"
 
-import { OmoConfigLayerSchema, OmoConfigSchema, resolveOmoTaskSettings, type OmoConfig } from "../schema"
+import {
+  canonicalizeLegacyCategoryNames,
+  canonicalizeLegacyHarnessBlocks,
+  OmoConfigLayerSchema,
+  OmoConfigSchema,
+  resolveOmoTaskSettings,
+  type LegacyCategoryRename,
+  type LegacyHarnessRename,
+  type OmoConfig,
+} from "../schema"
 import { isUnsafeObjectKey, mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
 import { resolveOmoConfigView, resolveOmoProfileName } from "./resolution"
@@ -46,6 +55,7 @@ const DEFAULT_RAW_CONFIG: Record<string, unknown> = {
 function stripResolutionControlKeys(config: OmoConfig): OmoConfig {
   const {
     "[codex]": _codex,
+    "[native]": _native,
     "[opencode]": _opencode,
     "[senpi]": _senpi,
     profiles: _profiles,
@@ -229,6 +239,34 @@ function readConfigSource(
   }
 }
 
+function legacyCategoryDiagnostic(path: string, renames: readonly LegacyCategoryRename[]): OmoConfigDiagnostic {
+  const detail = renames
+    .map((rename) => rename.dropped
+      ? `${rename.path} ignored because ${rename.canonical} is also configured`
+      : `${rename.path} renamed to ${rename.canonical}`)
+    .join(", ")
+  return {
+    kind: "deprecated-keys",
+    message: `Deprecated category name in ${path}: ${detail}. Rename it; the alias is removed in a future release.`,
+    path,
+    issuePaths: renames.map((rename) => rename.path),
+  }
+}
+
+function legacyHarnessDiagnostic(path: string, renames: readonly LegacyHarnessRename[]): OmoConfigDiagnostic {
+  const detail = renames
+    .map((rename) => rename.dropped
+      ? `${rename.path} ignored because ${rename.canonical} is also configured`
+      : `${rename.path} renamed to ${rename.canonical}`)
+    .join(", ")
+  return {
+    kind: "deprecated-keys",
+    message: `Deprecated harness block in ${path}: ${detail}. Rename it; the alias is removed in a future release.`,
+    path,
+    issuePaths: renames.map((rename) => rename.path),
+  }
+}
+
 export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfigResult {
   const fileSystem = options.fileSystem ?? DEFAULT_READ_FILE_SYSTEM
   const cwd = options.cwd ?? process.cwd()
@@ -247,8 +285,19 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     sources.push(loaded.source)
     if (loaded.diagnostic !== undefined) diagnostics.push(loaded.diagnostic)
     if (loaded.value !== undefined) {
-      layers.push({ config: loaded.value, source: loaded.source })
-      merged = mergeOmoConfigRecords(merged, loaded.value)
+      // A retired category key or harness block still resolves, so a config the startup migration
+      // could not rewrite (locked run, read-only project file) keeps applying its override instead
+      // of being ignored.
+      const canonicalized = canonicalizeLegacyCategoryNames(loaded.value)
+      if (canonicalized.renames.length > 0) {
+        diagnostics.push(legacyCategoryDiagnostic(candidate.path, canonicalized.renames))
+      }
+      const harnessCanonicalized = canonicalizeLegacyHarnessBlocks(canonicalized.document)
+      if (harnessCanonicalized.renames.length > 0) {
+        diagnostics.push(legacyHarnessDiagnostic(candidate.path, harnessCanonicalized.renames))
+      }
+      layers.push({ config: harnessCanonicalized.document, source: loaded.source })
+      merged = mergeOmoConfigRecords(merged, harnessCanonicalized.document)
     }
   }
 

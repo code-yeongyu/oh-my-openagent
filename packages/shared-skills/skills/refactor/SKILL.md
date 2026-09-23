@@ -684,7 +684,7 @@ Record the chosen path in the TodoWrite list.
 
 Rationale for this composition:
 - **4 workers = team mode's parallel cap.** 5+ just queues.
-- **No verifier team member.** Verification needs \`deep\` reasoning (or \`unspecified-high\` fallback). In-team category routing downcasts to the category worker, which is weaker than required — the verifier runs OUTSIDE the team as a \`task(category="deep")\`.
+- **No verifier team member.** Verification needs \`deep-high\` reasoning (or \`unspecified-high\` fallback). In-team category routing downcasts to the category worker, which is weaker than required — the verifier runs OUTSIDE the team as a \`task(category="deep-high")\`.
 - **quick × 2** for mechanical edits, **unspecified-low × 2** for reasoning edits — mirrors the plan's split.
 
 **Team lifecycle** (one team, reused until Phase 6 cleanup):
@@ -716,7 +716,7 @@ While any team task is \`pending | claimed | in_progress\`:
 - On a worker completion report, immediately dispatch an **external verifier** — verification runs OUTSIDE the team because team-member category routing downcasts to the category worker:
   \`\`\`
   task(
-    category="deep",
+    category="deep-high",
     load_skills=[],
     run_in_background=true,
     description="verify step <N>",

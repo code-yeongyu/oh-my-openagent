@@ -23,7 +23,7 @@ type TelemetrySettingKey = keyof OmoTelemetrySettings
 type TelemetrySettingPath = `telemetry.${TelemetrySettingKey}`
 
 export const TELEMETRY_HARNESS_SUPPORT: Record<TelemetrySettingPath, readonly OmoHarnessId[]> = {
-  "telemetry.enabled": ["senpi"],
+  "telemetry.enabled": ["native"],
 } as const
 
 export function isOmoTelemetryEnabled(config: OmoTelemetryConfigView): boolean {

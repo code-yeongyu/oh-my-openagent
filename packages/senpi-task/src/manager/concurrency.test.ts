@@ -2,6 +2,110 @@ import { describe, expect, test } from "bun:test"
 
 import { TaskConcurrency } from "./concurrency"
 
+describe("lease parking", () => {
+  const model = "anthropic/claude"
+  function holder() {
+    const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
+    expect(concurrency.tryAcquire(model, "parent", 0)).toBe(true)
+    return concurrency
+  }
+
+  test("park frees lane and global room without losing identity; double park is refused", async () => {
+    const concurrency = holder()
+    const parked = concurrency.park("parent", 0)
+    expect(parked).toBeDefined()
+    expect(concurrency.park("parent", 0)).toBeUndefined()
+    expect(concurrency.tryAcquire(model, "parent", 0)).toBe(false)
+    expect(concurrency.hasFreeSlot(model)).toBe(true)
+    expect(concurrency.hasFreeSlot("other/model")).toBe(true)
+    await concurrency.unpark(parked)
+    await concurrency.unpark(parked)
+    expect(concurrency.getCount(model)).toBe(1)
+  })
+
+  test("#given a released and re-parked epoch #when the earlier token unparks #then the later parking is untouched", async () => {
+    const concurrency = holder()
+    const stale = concurrency.park("parent", 0)
+    expect(stale).toBeDefined()
+    // The parent is released while parked, then the SAME epoch acquires and parks again: the token
+    // the first parking handed out must not resume - or release - the second one.
+    concurrency.releaseLease("parent", 0)
+    expect(concurrency.tryAcquire(model, "parent", 0)).toBe(true)
+    const current = concurrency.park("parent", 0)
+    expect(current).toBeDefined()
+    expect(current).not.toBe(stale)
+
+    await concurrency.unpark(stale)
+
+    expect(concurrency.leaseState("parent", 0)).toBe("parked")
+    expect(concurrency.getCount(model)).toBe(0)
+    await concurrency.unpark(current)
+    expect(concurrency.leaseState("parent", 0)).toBe("held")
+    expect(concurrency.getCount(model)).toBe(1)
+  })
+
+  test("parking grants a queued child and a resumable parent precedes W2-after-unpark", async () => {
+    const concurrency = holder()
+    const order: string[] = []
+    concurrency.enqueue(model, "child", 0, () => order.push("child"))
+    const parked = concurrency.park("parent", 0)
+    expect(order).toEqual(["child"])
+    const resumed = concurrency.unpark(parked).then(() => order.push("parent"))
+    concurrency.enqueue(model, "W2", 0, () => order.push("W2"))
+    concurrency.releaseLease("child", 0)
+    // Synchronous accounting is the assertion: a broken drain grants W2 instead of the parent.
+    expect(order).toEqual(["child"])
+    await resumed
+    expect(order).toEqual(["child", "parent"])
+    concurrency.releaseLease("parent", 0)
+    expect(order).toEqual(["child", "parent", "W2"])
+  })
+
+  test("a waiter enqueued during parking is admitted", () => {
+    const concurrency = holder()
+    concurrency.park("parent", 0)
+    let granted = false
+    concurrency.enqueue(model, "W", 0, () => { granted = true })
+    concurrency.drain()
+    expect(granted).toBe(true)
+  })
+
+  test("release while parked drops the identity and later unpark resolves without a lease", async () => {
+    const concurrency = holder()
+    const parked = concurrency.park("parent", 0)
+    concurrency.releaseLease("parent", 0)
+    await concurrency.unpark(parked)
+    expect(concurrency.leaseState("parent", 0)).toBeUndefined()
+    expect(concurrency.hasFreeSlot(model)).toBe(true)
+  })
+
+  test("abort while waiting to resume drops the parked entry", async () => {
+    const concurrency = holder()
+    const parked = concurrency.park("parent", 0)
+    concurrency.tryAcquire(model, "child", 0)
+    const controller = new AbortController()
+    const resumed = concurrency.unpark(parked, controller.signal)
+    controller.abort()
+    await resumed
+    expect(concurrency.leaseState("parent", 0)).toBeUndefined()
+    concurrency.releaseLease("child", 0)
+    expect(concurrency.hasFreeSlot(model)).toBe(true)
+  })
+
+  test("promotion overflow resumes once while the child holds the only slot", async () => {
+    const concurrency = holder()
+    const parked = concurrency.park("parent", 0)
+    concurrency.tryAcquire(model, "child", 0)
+    await concurrency.unpark(parked, undefined, { overflow: true })
+    await concurrency.unpark(parked, undefined, { overflow: true })
+    expect(concurrency.getCount(model)).toBe(2)
+    concurrency.releaseLease("child", 0)
+    expect(concurrency.getCount(model)).toBe(1)
+    concurrency.releaseLease("parent", 0)
+    expect(concurrency.hasFreeSlot(model)).toBe(true)
+  })
+})
+
 describe("TaskConcurrency", () => {
   test("#given default settings #when nothing acquired #then a fresh model has a free slot", () => {
     // given

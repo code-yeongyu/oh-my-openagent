@@ -48,28 +48,28 @@ describe("install platform resolution", () => {
     expect(args.platform).toBe("both")
   })
 
-  test("rejects --platform=senpi while the senpi platform flag is disabled", () => {
+  test("rejects --platform=native-dev while the native-dev platform flag is disabled", () => {
     // given
     const invocationName = "omo"
-    delete process.env.OMO_ENABLE_SENPI_PLATFORM
+    delete process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM
 
     // when / then
-    expect(() => resolveInstallArgs({ tui: true, platform: "senpi" }, invocationName)).toThrow(/OMO_ENABLE_SENPI_PLATFORM/)
+    expect(() => resolveInstallArgs({ tui: true, platform: "native-dev" }, invocationName)).toThrow(/OMO_ENABLE_NATIVE_DEV_PLATFORM/)
   })
 
-  test("resolves explicit --platform=senpi when the senpi platform flag is enabled", () => {
+  test("resolves explicit --platform=native-dev when the native-dev platform flag is enabled", () => {
     // given
     const invocationName = "omo"
-    process.env.OMO_ENABLE_SENPI_PLATFORM = "1"
+    process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM = "1"
 
     try {
       // when
-      const args = resolveInstallArgs({ tui: true, platform: "senpi" }, invocationName)
+      const args = resolveInstallArgs({ tui: true, platform: "native-dev" }, invocationName)
 
       // then
-      expect(args.platform).toBe("senpi")
+      expect(args.platform).toBe("native-dev")
     } finally {
-      delete process.env.OMO_ENABLE_SENPI_PLATFORM
+      delete process.env.OMO_ENABLE_NATIVE_DEV_PLATFORM
     }
   })
 

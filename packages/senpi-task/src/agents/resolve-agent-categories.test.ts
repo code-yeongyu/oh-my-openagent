@@ -57,15 +57,15 @@ describe("resolveAgent category stage", () => {
   test("#given categories deep then unspecified-high #when both resolve #then the deep model wins and the later category extends the runtime chain", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-high"])
-    const models = registry([model("openai", "gpt-5.6-sol"), model("anthropic", "claude-opus-5")])
+    const models = registry([model("openai", "gpt-6-sol"), model("anthropic", "claude-opus-5-5")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.6-sol")
+    expect(result.model).toBe("openai/gpt-6-sol")
     expect(result.resolved_model?.reasoning).toBe("medium")
-    expect(result.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5")
+    expect(result.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5-5")
     for (const record of result.fallback_models ?? []) {
       expect(record.source).toBe("agent")
     }
@@ -75,40 +75,40 @@ describe("resolveAgent category stage", () => {
   test("#given categories deep then unspecified-high #when the deep gate model is absent #then the second category supplies the model", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-high"])
-    const models = registry([model("anthropic", "claude-opus-5")])
+    const models = registry([model("anthropic", "claude-opus-5-5")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.model).toBe("anthropic/claude-opus-5")
-    expect(result.resolved_model?.reasoning).toBe("xhigh")
+    expect(result.model).toBe("anthropic/claude-opus-5-5")
+    expect(result.resolved_model?.reasoning).toBe("medium")
   })
 
   test("#given categories deep then unspecified-low #when only the low chain head is available #then it resolves at that chain head", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-low"])
-    const models = registry([model("xai", "grok-4.6")])
+    const models = registry([model("xiaomi", "mimo-v2.6-pro")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.model).toBe("xai/grok-4.6")
-    expect(result.resolved_model?.reasoning).toBe("xhigh")
+    expect(result.model).toBe("xiaomi/mimo-v2.6-pro")
+    expect(result.resolved_model?.reasoning).toBe("max")
   })
 
-  test("#given a single unspecified-high category #when only its claude-opus-5 rung is available #then the agent runs on it", () => {
+  test("#given a single unspecified-high category #when only its claude-opus-5-5 rung is available #then the agent runs on it", () => {
     // given
     const agents = categorizedAgent(["unspecified-high"])
-    const models = registry([model("anthropic", "claude-opus-5")])
+    const models = registry([model("anthropic", "claude-opus-5-5")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.model).toBe("anthropic/claude-opus-5")
-    expect(result.resolved_model?.reasoning).toBe("xhigh")
+    expect(result.model).toBe("anthropic/claude-opus-5-5")
+    expect(result.resolved_model?.reasoning).toBe("medium")
   })
 
   test("#given an omo.json deep category model override #when the agent resolves #then the user model reaches the agent", () => {
@@ -127,7 +127,7 @@ describe("resolveAgent category stage", () => {
   test("#given a category that carries a prompt append and tools #when the agent resolves through it #then the agent keeps its own prompt and allowlist", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-high"])
-    const models = registry([model("openai", "gpt-5.6-sol")])
+    const models = registry([model("openai", "gpt-6-sol")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
@@ -146,7 +146,7 @@ describe("resolveAgent category stage", () => {
     const result = expectUnavailable(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
+    expect(result.attemptedModel).toBe("anthropic/claude-opus-5-5")
   })
 
   test("#given a definition model alongside categories #when both are available #then the direct model wins", () => {
@@ -163,13 +163,13 @@ describe("resolveAgent category stage", () => {
 
   test("#given no registry #when a categorized agent resolves #then the first category builtin model is the attempted model", () => {
     // given
-    const agents = categorizedAgent(["deep"])
+    const agents = categorizedAgent(["deep-high"])
 
     // when
     const result = expectUnavailable(resolveAgent("categorized", agents, undefined))
 
     // then
-    expect(result.attemptedModel).toBe("openai-codex/gpt-6-astra")
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-astra")
   })
 
   test("#given the ulw reviewer builtins #when reading their definitions #then each declares its ordered model-policy categories", () => {
@@ -182,14 +182,14 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(declared).toEqual({
-      "omo-senpi-code-reviewer": ["unspecified-high"],
-      "omo-senpi-qa-executor": ["deep", "unspecified-low"],
-      "omo-senpi-gate-reviewer": ["deep", "unspecified-high"],
+      "omo-native-code-reviewer": ["unspecified-high"],
+      "omo-native-qa-executor": ["deep-low", "unspecified-low"],
+      "omo-native-gate-reviewer": ["deep-high", "unspecified-high"],
     })
   })
 
   test("#given a category whose head model is unavailable #when a later rung wins #then requested_model is the selected model, not the head", () => {
-    // given: unspecified-high's head is openai-codex/gpt-6-astra; only its glm-5.3 rung exists here.
+    // given: unspecified-high's head is anthropic/claude-opus-5-5; only its glm-5.3 rung exists here.
     const definition: AgentDefinition = { name: "probe", categories: ["unspecified-high"] }
     const glmOnlyRegistry = registry([model("zai-coding-plan", "glm-5.3")])
 
@@ -211,7 +211,7 @@ describe("resolveAgent category stage", () => {
     // given: getAvailable() returns a non-array (unparseable), but find() works. The direct-model
     // path documents this degradation, so a categorized agent must not lose it.
     const definition: AgentDefinition = { name: "probe", categories: ["unspecified-high"] }
-    const available = [model("openai-codex", "gpt-6-astra")]
+    const available = [model("anthropic", "claude-opus-5-5")]
     const malformedRegistry = {
       getAvailable: (): unknown => ({ notAnArray: true }),
       find: (provider: string, modelId: string) =>
@@ -224,7 +224,7 @@ describe("resolveAgent category stage", () => {
     // then
     expect(resolution.kind).toBe("resolved")
     if (resolution.kind !== "resolved") return
-    expect(resolution.model).toBe("openai-codex/gpt-6-astra")
+    expect(resolution.model).toBe("anthropic/claude-opus-5-5")
   })
 
   test("#given a user category model override that is unavailable #when resolution fails #then the attempted model names the user model, not the builtin", () => {

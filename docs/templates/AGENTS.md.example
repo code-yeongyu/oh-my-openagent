@@ -47,5 +47,5 @@ or changing files.
 ## Project Scratch Space
 
 Use `./.omo/session-work/` for temporary clones, downloaded references, logs, and
-agent scratch files. Keep generated evidence under `./.omo/evidence/` when the
-project wants durable QA records.
+agent scratch files. Keep generated evidence under `./.omo/evidence/` (gitignored)
+and summarize it in the PR rather than committing it.

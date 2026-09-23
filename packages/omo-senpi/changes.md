@@ -1,3 +1,278 @@
+## model profiles: the interactive TUI no longer applies `model_profile`
+
+`components/model-profile/index.ts`: `session_start` returns before any resolution when the event
+context reports `mode === "tui"` (`isTuiSession`), for a set or an unset `model_profile` alike. The
+TUI shows neither the lane nor its reasoning, so the unset Daily · Normal default replaced the
+model a user had chosen in `settings.json` (for example Fable xhigh) with Opus medium and gave them
+no way to see or change the lane. OmO Desktop (`rpc`) and headless (`json`/`print`) sessions keep
+the previous behavior. Test: `index.test.ts` "#given a TUI session ..." covers unset, a lane id and
+a literal pin; removing the guard fails it (1 fail / 55 pass), restoring it passes 56/0.
+
+## comment-checker: a native install obtains the checker without the npm payload, and Bun 1.3.x's ResolveMessage no longer escapes
+
+`components/comment-checker/resolver.ts`: `resolvePackageApiBinary` treats the value Bun 1.3.x throws
+for a missing module - a `ResolveMessage` carrying `MODULE_NOT_FOUND` that is not an `Error` instance
+(Bun 1.4.0 made it one) - as "package absent" through `utils.ts` `isMissingModuleValue`; unrelated
+thrown values still propagate. Before this, a native install without `@code-yeongyu/comment-checker`
+running on a 1.3.x bun surfaced `Extension error (.../omo.js): ResolveMessage: Cannot find module
+'@code-yeongyu/comment-checker'` after every successful `write`/`edit`/`apply_patch`. The resolver
+gains a fourth step after env, package API and PATH: the shared binary cache
+(`defaultCommentCheckerCacheDir`, `COMMENT_CHECKER_CACHE_DIR_NAME = "oh-my-opencode"`, pinned equal to
+the OpenCode edition's `CACHE_DIR_NAME` so one download serves both editions). `downloader.ts` (new)
+`downloadSenpiCommentCheckerBinary` fetches the release the shared descriptor in
+`@oh-my-opencode/comment-checker-core` pins (v0.8.0, per-platform asset) through
+`@oh-my-opencode/omo-opencode/binary-downloader` (a new narrow package export of the shared
+primitives: `downloadArchive`, `extractTarGz`, `extractZipArchive`, `ensureExecutable`, archive-entry
+validation), logs through the component logger, and returns null on an unsupported platform or a
+failed download. `component.ts`: `ensureBinaryPath` is async - sync resolution, then one download per
+session memoized in a single in-flight promise, then the existing one-time "binary unavailable"
+warning and session-inert state; `CommentCheckerComponentOptions.downloadBinary` injects it for tests.
+The native manifest keeps NOT declaring `@code-yeongyu/comment-checker` (267,670,796 bytes unpacked,
+every platform's binary), matching the OpenCode edition after #8256. The main bundle grows
+1,270,564 -> 1,284,797 bytes under the unchanged 1,300,000 budget. Tests: `comment-checker.missing-package.test.ts`
+(real module resolution, PATH fallback, Bun's non-Error value, once-only disable, unrelated values
+propagate; the first four adapted from #8248 by gunggme), `comment-checker.downloader.test.ts` (local
+HTTP server, cache hit, 503, unsupported platform, cache-dir equality with the OpenCode edition),
+resolver cache step, component download-once and in-flight coalescing. omo#8247.
+
+## Memory changes read as one "Remembered" notice; reflection lifecycle rows are gone
+
+`worker/completion-renderers.ts` registers a renderer for `senpi-memory.reflection-completion`
+only, and it draws only `merged` records. `reflection-launched`, `reflection-summary` and every
+non-merged completion (no changes, failed, timed out, merge conflict, parent dirty, dirty worktree)
+are still appended (the data and their RPC `entry_appended` events are unchanged) but have no
+renderer, so neither new rows nor rows persisted in older sessions draw. `completion-delivery.ts`
+no longer calls `ui.notify` for a delivered completion or a drain, which also removes the warning
+rows the Desktop derived from those toasts; health and park alerts keep their notices.
+`memory-notice-spec.ts` (new) is the one vocabulary: a memory tool write is
+`● Remembered · Nth entry today` (`● Let go · …` / `Cleared X. One less thing to carry.` for delete, `Moved a to b.` for rename), a
+merged reflection is `● Remembered · on reflection` with the first sentence of the report's
+Summary item and `N files changed · commit abc1234`, the soul notice is
+`● Remembered · about myself`, all in the accent tone. A refusal renders a dim
+`○ Not remembered` / `○ Couldn't let go` with a plain sentence and the raw engine text only
+expanded; the pending call line is `◌ Remembering · <path>` and disappears when the notice lands.
+The model-facing tool text is unchanged, and with `memory.write_notice.enabled: false` the row
+keeps the plain call line and message. `memory-write-render.ts` keeps only the Box framing.
+omo#8733.
+
+## Model profiles: Daily/Geeky × Normal/Heavy lanes, no capable/deep-work alias
+
+`model-profile/builtin-profiles.ts`: the builtin table is `daily-normal`, `daily-heavy`,
+`geeky-normal`, `geeky-heavy`, each with `family`/`tier`/`displayName`/`description`.
+`daily-normal` is opus 5.5 medium -> kimi-k3 max -> glm-5.3 max; `daily-heavy` is fable 5.1
+xhigh; `geeky-normal` is chatgpt-subscription gpt-6-sol-fast medium then Copilot/OpenCode
+gpt-6-sol medium; `geeky-heavy` is gpt-6-astra xhigh. `capable` / `deep-work` are removed with
+no alias map. Unset `model_profile` applies `daily-normal` on a fresh session (session-only).
+Notices include displayName + reasoning; unavailable copy names the session registry rather
+than inferring disconnected auth. omo#8735.
+
+## Model profiles: Capable then Deep work, Simple work removed, subscription lane first
+
+`model-profile/builtin-profiles.ts`: the builtin table is `capable` then `deep-work`, and
+`simple-work` is removed. `capable` leads with `claude-fable-5-1` at `xhigh` (was `max`).
+`deep-work` is its own chain, `gpt-6-astra` high -> `gpt-6-sol` medium, and no longer mirrors
+deep-high ++ deep-low, so it stops at GPT-6 Sol instead of inheriting the `gpt-5.6-sol` tail.
+Every Claude rung is headed by `anthropic-subscription`, like the category chains (#8051): before
+this a subscription machine holding an OpenCode Zen key resolved `capable` to the metered
+`opencode/claude-fable-5-1`. A config still naming `model_profile: "simple-work"` now gets the
+existing unknown-profile notice (known profiles: capable, deep-work) and keeps senpi's default
+model; a user `model_profiles.simple-work` entry keeps working as a user profile. omo#8704.
+
+## Model profiles and telemetry vocabulary follow the GPT-6 routing
+
+`model-profile/builtin-profiles.ts`: `simple-work` leads with `gpt-6-luna-fast` low and
+`deep-work` carries the new `gpt-6-sol` medium rung between Astra and `gpt-5.6-sol`, keeping the
+profile equal to deep-high ++ deep-low. `telemetry/model-vocabulary.ts`: `gpt-6-luna` and
+`gpt-6-luna-fast` join the OpenAI lanes (and `gpt-6-luna` the OpenCode Zen lane) so the new
+rungs export under their own names instead of `custom`; `docs/reference/senpi-telemetry.md` is
+regenerated from `script/telemetry-schema-block.mjs`. The QA mock providers under `scripts/qa/`
+serve `gpt-6-luna-fast` as the quick chain's first rung. omo#8701.
+
+## The live background row no longer claims "running" before a real turn lands
+
+`status-row-format.ts` kept a second copy of the status-line grammar in `liveStatsTokens` and
+defaulted the activity string to `"running"`, so a freshly spawned child with zero stats - or one
+whose provider attempts had all failed - read `turn 0 · running` (or worse, `turn 4 · $0.0000 ·
+running`, failures counted as turns by the old run stats). The row now draws its stats tokens from
+the shared `buildLiveStatsTokens` builder and derives the fallback verb through
+`selectLiveActivityVerb`: `starting` before anything lands, `retrying` once failures prove the
+child is alive, `running` only after a successful turn, and `running <tool>` unchanged while a
+tool executes. A child with no stats at all keeps the legacy `running` fallback: it is alive,
+its turn facts are just unknown to the renderer. `task-rpc-codec.ts` carries `failed_turns`
+through the live-progress snapshot so RPC and DAG consumers read the same facts as the TUI.
+The QA stats renderer (`scripts/qa/task-stats-renderer.mjs`) was repaired alongside: it now warms
+the lazy pi-tui boundary before rendering (it crashed at HEAD since the lazy boundary landed),
+renders every scenario when invoked bare instead of demanding an argument, pins the current
+completed-row grammars (the foreground row lost its `tps` token and the team notice moved to
+space-separated fields since the script was written), and adds a `failed` scenario pinning the
+failed-only row. omo#8627.
+
+## The reflection child uses the agent directory its parent engine resolved
+
+The reflection sandbox granted an agent directory the adapter re-derived through `resolveAgentHome`:
+an environment override, then `~/.omo/agent` behind its `settings.json` sentinel, then the flat
+`~/.omo`, then `~/.senpi/agent`. The engine answers that question differently - the brand's
+environment prefix before the legacy ones, then the nearest parent project config directory walked
+up from the session's cwd, then its own home default - so the two could name different directories.
+The child then locked its credentials outside the grant and the run died with
+`EPERM ... auth.json.lock` followed by `No API key found`, while the parent stayed authenticated
+(omo#8595).
+
+`session-context-resolver.ts` now reads the engine's own answer off the event context
+(`ExtensionContext.agentDir`, accepted only when absolute and non-blank) and `wiring-runtime.ts`
+hands it to the identity runtime; detection remains the fallback for a host that reports none.
+`identity-runtime.ts` resolves that directory once, grants it, and pins it into the reflection
+child's environment under `OMO_CODING_AGENT_DIR`, `SENPI_CODING_AGENT_DIR` and
+`PI_CODING_AGENT_DIR`. The pin matters twice: the child's cwd is the reflection worktree, so without
+it the child walks its own way to a directory nobody granted, and an inherited value under the brand
+prefix would beat a legacy-only pin because the engine takes the first DEFINED name across
+`<brand>`, `SENPI`, `PI`. Grant and pin come from one resolution, so they cannot drift apart.
+
+## The default component logger writes every level to stderr
+
+`extension/compose.ts` `defaultLogger.info` used `console.info` (stdout). A child process's stdout
+is its deliverable - the reflection worker's report is read back from `child-stdout.log` and its
+first three non-empty lines become the "Memory updated" preview - so component info lines
+(`ulw-execute-continuation skipped`, `ulw-loop continuation skipped`) were shown as the report.
+`info` now writes through `console.error` like `warn` and `error`; the argument shape is unchanged
+(no trailing `undefined`). Pinned by `extension/compose.test.ts`. omo#8564.
+
+## Memory identity comes from the session's workspace, and a reattach rebinds instead of failing closed
+
+`createMemoryComponent` resolved every session's identity from `process.cwd()`, read once at registration and reused for every bind. One shared host serves sessions from many workspaces, so a generation ensured by a process sitting in some other directory handed that directory's identity to every session it picked up: seven sessions reported `memory identity conflict: session is bound to <workspace>-<hash>, but config resolved server-<hash>` inside one second and lost their memory tools, with no workspace change behind it (#8556).
+
+The bind now resolves the identity from the session's own cwd. senpi builds one `ExtensionRunner` per `AgentSession` and exposes that session's directory as `ExtensionContext.cwd`, so `readSessionSurface` reads it off the event; the extension's load cwd (`pi.cwd`) and then `process.cwd()` remain as fallbacks for a host that reports neither. Registration-time work (the config read, the transient sweep, the wiring's own cwd getter) keeps using the host cwd, which is what it has always meant.
+
+`identity-adoption.ts` decides what a bind does when the session already carries a binding entry. The record wins, because it is the only evidence of what the session was; a divergence goes to the log at `info` and never to the user. Two cases the record cannot answer keep the fail-closed error: an explicitly configured `memory.agent` that names a different identity, and a record whose memory repository cannot be reproduced under the current memory root. The `session_start` path for a user-initiated identity change is therefore unchanged, and so is the repository check on the `before_agent_start` rebind from #8017.
+
+## The `deep` delegation category splits into `deep-low` and `deep-high`
+
+`deep` opened its description with a bold MANDATORY list of domains (3D, computer and browser use,
+CAPTCHA, multimodal, backend, logic, algorithms). The list routes by domain, which almost every
+coding task matches, so the category's head rung `gpt-6-astra` high served nearly all delegated work
+and the `gpt-5.6-sol` medium rung under it was reachable only by provider absence.
+
+The replacement routes by capability on two axes the caller can rate from the brief: how much context
+the child must hold, and how hard its decisions are. Decision difficulty is the gate. `deep-low`
+(`openai-codex/gpt-5.6-sol` medium) is the default lane; `deep-high` (`openai-codex/gpt-6-astra`
+high) takes a goal whose central decision cannot be settled from evidence. `CATEGORY_FALLBACK_CHAINS`
+gives each lane ONE rung and `requiresModel` gates each on its own model id, so the lanes never
+substitute each other and a registry missing one lane drops it from `availableCategories` instead of
+serving the other model under its name. The provider list inside a rung is unchanged, so a single
+provider outage still fails over across `openai-codex` -> `github-copilot` -> `opencode`.
+
+The domain list now lives only on the caller-facing `deep-low` description. The child appends lost it
+(a child never picks its category) and gained the escalation contract: a `deep-low` child returns
+`ESCALATE: deep-high` as the first line, with what it read and the decision it could not settle,
+instead of guessing. `openai-categories.ts` therefore ships four deep appends (GPT and generic per
+lane) resolved by `resolveDeepLowCategoryPromptAppend` / `resolveDeepHighCategoryPromptAppend`; the
+GPT-5.5-specific deep append is gone, since both lanes ship GPT rungs only and the GPT-5.6 doctrine
+(outcome, success criteria, escalation, stop rule) covers Sol and Astra alike.
+
+`omo-senpi-gate-reviewer` routes `["deep-high", "unspecified-high"]`, `omo-senpi-qa-executor`
+`["deep-low", "unspecified-low"]`. The telemetry `category_config` schema swaps `cat_deep` for
+`cat_deep_low` / `cat_deep_high`; `delegation_completed.category` derives from
+`BUILTIN_CATEGORY_DEFAULTS` and needed no edit. The `deep-work` model profile now deep-equals
+`deep-high ++ deep-low` instead of the single old chain.
+
+## `categories.deep` migrates once, and does nothing to configs that never used it
+
+`omo-config-core` gains `canonicalizeLegacyCategoryNames`, which rewrites a retired category key
+(`categories.deep`) and a retired category VALUE (`teams.*.members[].category`,
+`memory.reflection.category`) through the base block, `[senpi]`/`[opencode]`/`[codex]`, and every
+`profiles.*` and its harness sub-block. The loader runs it per layer before merge and reports a
+`deprecated-keys` diagnostic, which `config-startup` already surfaces as a startup warning. That is
+what keeps an override working when the file rewrite cannot run (locked batch, read-only project
+file). When both `deep` and `deep-low` exist the canonical entry wins and the drop is reported.
+
+The file rewrite is the new `2026-09-category-deep-split` plan in `config-migration`. Because the
+reasoning-unification plan taught us that a `replace-target` plan writes a backup and a `_migrations`
+marker even when the transform is a no-op, `MigrationPlan` gains `shouldRun`, a content gate that
+`batch.ts` evaluates against the parsed target before the journal, the backup and the write. The new
+plan passes `hasLegacyCategoryNames`, so a config that never named `deep` is left byte-identical with
+no marker - asserted in `migration/should-run.test.ts` by `operations` carrying no write or rename.
+
+The name also resolves at runtime: `validateTaskTarget` canonicalizes the spawn boundary (so the task
+record, telemetry and renderers all carry the name that ran), and both edition resolvers accept the
+retired name, so `task(category: "deep")` in a third-party skill or an AGENTS.md keeps working.
+
+## Daemon-host QA gates observe product transitions, not parent timing
+
+The single-parent control keeps its sixteen-session and single-daemon requirements but waits for
+readiness with the loaded-host allowance. Detach/attach uses two release barriers and resumes the
+original parent session; its gate checks child completion, a persisted resume response and no prompt
+replay rather than requiring the resident parent process to exit within an observation window.
+The second barrier keeps children mid-turn until reattachment, and the resumed parent waits for their
+terminal records before ending its own turn.
+
+Team QA follows the member's stored identity, matches its daemon context and checks delivery of the
+specific mailbox message. Parking QA explicitly authorizes its new sender, checks the revival epoch
+and waits for the same child transcript to contain both the message and its completed response.
+Its acceptance evidence is the persisted `revived` tool result, not the sender process's exit timing.
+The zombie scenario runs a finite workload and counts successful, distinct bash receipts from all
+eight children, not how many remain running after the storm ends. Missing work, a dead daemon,
+zombies, wrong identities and replay still fail their gates.
+
+Self-tests cover healthy terminal states and fault controls. State waits subscribe before triggering
+work. QA no longer reads real agent credentials for digest comparisons; child environments remain
+isolated and each scenario records process and sandbox cleanup.
+
+Fan-out fixtures keep the parent turn active until the cohort is observed. A/A1 still reject a
+terminal aborted/error child transcript even if its store incorrectly appears active and the worker
+count is sufficient. A separate diagnostic captures paired store/transcript snapshots and a bounded
+convergence observation for the graceful-shutdown suspension behavior tracked in #8517; this harness
+change does not change that product behavior.
+
+The daemon lane now owns its mock provider. Its step cursor comes from each conversation's tool-call
+receipts and the current script, so eight in-process children cannot consume one another's steps.
+The shared `task-e2e-mock-provider.ts` is unchanged. An interleaved eight-child regression requires
+all 200 steps and verifies that a replacement script starts at its first step.
+
+Failed-task evidence retains the exact record, the last assistant entry, correlated provider abort
+signals, `agent_end` abort fields, session shutdown events and the driver's teardown boundary.
+An observed `toolUse` stop reason alone is not labeled an intrinsic engine failure.
+
+## The fallback-architect nudge arms on any refusal-driven fallback
+
+`detection.ts` no longer exports `isFableFiveModel`. The exact-id equality it provided was the arming gate
+in `index.ts`, so only a session whose refusing model was literally `claude-fable-5` ever received the
+directive, and `claude-fable-5-1` - the id the shipped architect category itself resolves to - missed it.
+The `model_select` handler now arms on the refusal signal alone: `source === "fallback"`, a previous model
+in the payload, and the refusal predicate on the preceding assistant message, behind the unchanged
+architect-category gate and the unchanged `omo-senpi-fallback-architect-disabled` flag. A second refusal on
+the fallback model therefore arms a fresh directive naming the new pair, which is what the reminder must
+say once the session has moved twice.
+
+Two consequences ride along. The active episode used to clear when the newly selected model was fable 5; it
+now clears when the session returns to the selector that was refused, or on `source === "fallback-revert"`.
+And `directive.ts` gained `isFableFiveSelector`, a copy-only predicate: the consultant is Fable 5 whoever
+refused, but "the same model that just refused" holds only for a fable-family refusal, so that clause is
+conditional now and the mirrored tip line no longer names Fable 5 as the refuser.
+
+## Console-subsystem spawns are hidden on win32, and a gate keeps them that way
+
+`memory-core`'s git exec and its process-start identity probe, plus the adapter's formatter, thread
+worktree-root lookup, init-deep git plumbing and memory sandbox probe, now pass `windowsHide: true`.
+memory-core carried none at all, so every memory auto-commit spawned a visible `git.exe` console and
+every PowerShell start-time fallback spawned a visible `powershell.exe` console, both of which
+Windows foregrounds. On a Node runtime that PowerShell fallback is the steady-state path, because
+the kernel32 reader it falls back from is reached through `bun:ffi`.
+
+The audit meant to catch this matched `spawn(` and `spawnSync(` over three hand-listed files under
+`memory/worker`, so it could see neither the `exec*` family nor any file outside that list. Two
+gates replace it: `packages/memory-core/src/windows-console-hide.test.ts` and the root gate
+`packages/omo-senpi/src/windows-console-hide.test.ts`. Each resolves the child_process entry points
+a file actually imports, aliases included, and walks its whole source tree. A foreground process
+that must keep the user's console opts out with a `windowsHide-exempt:` comment at the call site,
+which is how `install/local-launcher.ts` stays exempt without reopening the hole.
+
+## Package-provided extensions reach process task children
+
+The process task runner now carries the parent's loaded package extension paths into a child when
+they are not already covered by argv extensions. It discovers configured package roots without
+changing the existing argv extension base, so package-provided providers remain available to the
+child while agent-directory and project extensions stay out of the child profile.
+
 ## `task-host-e2e.mjs`: live QA for daemon-hosted task children
 
 `scripts/qa/task-host-e2e.mjs` drives a REAL compiled omo binary against a throwaway sandbox and asks
@@ -18,12 +293,47 @@ driver - reports `skipped` with the exact command that would run it, never a pas
 what the current mainline omob does instead, and `--self-test` proves the harness itself without a
 binary.
 
+The busy-child fixture is load-bearing and easy to get wrong, so `--self-test` pins its contract.
+Its step must call a tool the child can COMPLETE on this engine - `bash` is eval-only (a direct
+call is refused instantly) and `eval` aborts at startup in a mock-provider child, so it is `read`
+- against a file that does NOT carry the prompts, because a tool result echoing the child's own
+prompt reads as a prompt replay. It must take TIME, which `step.delayMs` supplies rather than any
+tool's own latency. And it must END with a text step: the mock provider repeats its LAST step, so
+a script that ends on a tool call never frees its concurrency slot and the sessions the host
+should accumulate never open. A child's transcripts live under `children/<id>/sessions/<id>/`;
+the flat `sessions/<id>/` layout is older and is read only as a fallback.
+
 ## daemon-launch-spec.json ships in every payload
 
 The task daemon's launch spec was generated at build time but reached only the source tree: the
 native payload copies root-level files from an allowlist, the npm plugin publishes from `files`, and
 neither listed it, so every installed `omo daemon run` exited 5 with "launch spec missing". It is on
 both lists now and on `REQUIRED_PLUGIN_ARTIFACTS`, so a payload without it fails the build.
+
+## 2026-09-19 - The daemon-host QA fixture matches the engine it drives again
+
+### What changed
+
+The busy-child fixture and the transcript readers, after four live matrix runs against a compiled
+binary found four independent drifts (the contract is now stated at the top of this file and
+pinned by `--self-test`): `CHILD_BUSY` called `bash` directly; it read the prompt-bearing
+`mock-script.json`; it never terminated; and `childSessionFiles` / `childStartDiagnosis` read only
+the flat session layout. `task-e2e-mock-provider.ts` gained `step.delayMs` (abort-aware).
+
+### Why
+
+`bash` is eval-only on this engine and the mock repeats its last step, so the child spun at 100%
+of the host's single loop: every sibling `open_session` failed `host_unavailable`, the socket
+stopped answering (`get_protocol_info` unanswered for 5 s while `daemon status` reported
+`reachable:false` for a live host), and the run stalled for 13 minutes. With the flat-layout
+reader, transcripts that had thousands of lines counted as 0, so every transcript assertion in A,
+B and C was blind. The driver could not reach its own assertions.
+
+### Impact
+
+QA-only; nothing here ships to users. On the same binary the fixed harness shows one daemon
+identity, no per-child `--mode rpc` process, zero zombies, 32 children admitted with zero errors,
+and children still working - transcripts growing - after their parent is SIGKILLed.
 
 ## 2026-09-17 — Process children go to the shared daemon, and the plugin gates itself per session
 
@@ -770,3 +1080,68 @@ value, so they all follow the session.
 
 Keep the fallback until the minimum supported Senpi guarantees `cwd`, and keep resolving the cwd
 ONCE at register: re-reading it later would let a session's store move mid-flight.
+
+## Thread tools register unconditionally and gain rename, model, and reasoning control
+
+The `thread` component used to register its tools only when a launch flag said the shared
+multi-session host had been enabled. That flag recorded launch opt-in, not host presence. A session
+hosted by a supervisor that never opted in (the desktop rpc child is the common case) got zero
+`thread_*` tools, even though the socket it needed was right there. The gate is gone: `component.ts`
+registers all nine tools every time, and `src/extension/component-list.ts` lists the component right
+after `task`. Host absence is now a per-call failure, `{ kind: "error", error: { code:
+"host_unavailable", ... } }`, returned as data when the socket path doesn't exist. Nothing throws,
+and the tool surface no longer changes shape based on how the process was started.
+
+Three tools join the family. `thread_rename` sets a peer's display label through
+`set_session_name`; the id stays the address, and a label already used by another visible thread is
+`name_conflict`. `thread_set_model` resolves `provider/id`, an exact id, or a case-insensitive
+fragment against the target's own model catalog (`model_not_found` with the available list,
+`model_ambiguous` with candidates) and applies the single match through `set_model`.
+`thread_set_reasoning` applies one of `off|minimal|low|medium|high|xhigh|max` through
+`set_thinking_level`, with `scope: "turn"` leaving the model's remembered level alone; a level the
+active model rejects comes back as `thinking_level_unsupported` with the supported list and the
+thread untouched. All three require a live owner and go through the same receipt admission as
+`thread_send`.
+
+Every tool now reads the caller's id per call from the execution context's
+`sessionManager.getSessionId()`. Two addresses reach the caller's own thread: the literal `"self"`
+and the caller's explicit durable id. Fuzzy resolution in `thread_handoff` excludes the caller's
+entry before scoring, so a near-miss on your own name can't hand work back to yourself. Keep the
+`host_unavailable` mapping in the tool wrapper rather than reintroducing a registration gate; the
+tools must exist whenever the extension does.
+
+The socket client under all of this (`live-surface.ts` `request()`) also stopped taking the first
+JSONL line as the response. A multi-session host writes other lines on the same connection before
+the reply: the `open_session` admission notice `{ type: "queued", for_request: <id> }`, which the
+engine deliberately tags with the request id under `for_request` rather than the response id, and
+connection-wide broadcasts such as `agent_start` and `session_opened`. Any of those used to fail
+the pending call with "thread RPC request failed" before the real reply arrived. The client now
+settles only on the frame whose `id` matches the request it sent and skips everything else; a
+connection that closes first is a named error. Correlate by id, never by position.
+
+Two more things had to be true before a created thread was usable at all. `open_session` answers
+with the ROUTING id and a state carrying neither the durable id nor a name, while the address book
+keys every entry by the DURABLE id - so `thread_create` returned an id that resolved to `not_found`
+on the very next call, and its `name` parameter was silently dropped because the wire has no name
+field on open. And `open_session.retain_on_disconnect` defaults to false: this client is one-shot,
+so the connection that opens a session drops at once and the host moved the new session straight to
+`closing`, answering `session_closing` from then on. `openSession` now applies the name through
+`set_session_name`, sends `retain_on_disconnect: true`, and merges the entry the host reports in
+`list_sessions` before returning. When QA'ing this surface, run the host from the engine this repo
+pins: `retain_on_disconnect` landed in senpi 2026.9.20, and an older host ignores it in silence.
+## 2026-09-23 — Four-profile provider coverage follows task routing
+
+Geeky profiles keep the #8737 provider ranking: ChatGPT subscription first,
+then `openai`, then other providers serving the non-fast Sol or Astra rung.
+An explicit provider in a user profile remains scoped; it does not silently
+switch to a different provider when unavailable. Real-runtime QA observes the
+engine thinking state and the provider stream input, not only the notice.
+
+## 2026-09-23 — A customized builtin model profile keeps its lane name
+
+A user `model_profiles.<id>` entry for a builtin lane that sets no
+`display_name` now keeps the builtin's name (`Daily · Normal`) instead of
+showing the raw id. The session notice reads `model profile "daily-normal"
+(Daily · Normal) selected …` for a customized lane too. An explicit
+`display_name` still wins. The e2e gains the exact chain the desktop Settings
+editor saves and checks the notice names the lane.

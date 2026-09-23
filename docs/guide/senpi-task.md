@@ -1,6 +1,6 @@
 # Senpi Task Delegation
 
-The Senpi edition of omo (installed through `packages/omo-senpi`) ships a `task` component that lets the agent you are talking to spawn child agents, keep working while they run, steer them, and coordinate a named team. This guide covers the day-to-day surface. The engine internals live in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md); the config file is documented in [`docs/reference/omo-json.md`](../reference/omo-json.md).
+OmO Native (installed through `packages/omo-senpi`) ships a `task` component that lets the agent you are talking to spawn child agents, keep working while they run, steer them, and coordinate a named team. This guide covers the day-to-day surface. The engine internals live in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md); the config file is documented in [`docs/reference/omo-json.md`](../reference/omo-json.md).
 
 The component is on by default. Disable it with the `--no-omo-task` flag; it also self-skips if the Senpi runtime is missing the ExtensionAPI capabilities it needs (`packages/omo-senpi/src/components/task/index.ts`).
 
@@ -98,6 +98,40 @@ Named teams come from the project `teams` block in `omo.json` or `<project>/.omo
 There is no `team_wait` tool. When the next step depends on a reply, send with `task_send`, end the turn, and let the steered team-message notification resume the conversation when the reply arrives. Durable reservation and processed-message state prevent an inbox message from being lost during delivery or restart reconciliation.
 
 ## Configuration
+
+### Checkout isolation
+
+The task tool accepts `isolated`, `apply`, and `merge` on a single request or
+each batch item. Items inherit omitted values from the top-level request;
+explicit `false` wins. `apply` and `merge` are invalid unless isolation is on,
+either through `isolated: true` or the setting below. There is no free-form
+`cwd` parameter.
+
+An isolated child runs in a copy-on-write clone of the checkout instead of the
+checkout itself. When it **completes**, its changes are merged back and the
+clone is removed. Any other ending - cancelled, interrupted, failed - merges
+nothing and keeps the delta as a patch plus a summary under
+`<state dir>/isolation/<task id>/`; a merge that cannot apply cleanly leaves
+the workspace beside its original as `<clone>.retained-<timestamp>`. The
+outcome rides every result surface as `isolation`, and the completion
+notification renders it as `isolation: <kind> via <backend>`.
+
+A repository that cannot be cloned refuses the spawn with
+`isolation_unavailable` rather than quietly running the child against the real
+checkout, and an isolated child is never revived: once settled its clone is
+gone, so `task_send` and startup recovery both answer
+`isolated_not_revivable`. If the host dies mid-run, the next session salvages
+the clone's delta as artifacts - never an automatic merge - and then reclaims
+clones whose owning process is provably gone. DAG nodes and workpool workers
+inherit `task.isolation.enabled`; they have no per-node switch of their own.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `task.isolation.enabled` | `false` | Opt children into checkout isolation when `isolated` is omitted. |
+| `task.isolation.backend` | `auto` | Select `auto`, `apfs`, `btrfs`, `zfs`, `reflink`, `overlayfs`, `block-clone`, or `rcopy`. |
+| `task.isolation.apply` | `true` | Merge completed child changes back; `false` keeps patch/branch artifacts only. |
+| `task.isolation.merge` | `patch` | Choose patch application or branch integration (`branch`). |
+| `task.isolation.commits` | `generic` | Reserved for the commit-message style of a `branch` merge (`ai`). Accepted and validated; no backend consumes it yet, so both values behave as `generic`. |
 
 All defaults live in `omo.json` under `task` and `teams`. A minimal project config:
 

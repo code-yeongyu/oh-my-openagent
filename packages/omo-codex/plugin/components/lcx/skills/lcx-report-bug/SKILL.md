@@ -78,14 +78,14 @@ sync_latest_source() {
   git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
 }
 sync_latest_source code-yeongyu/lazycodex "$LAZYCODEX_SOURCE_ROOT/lazycodex-source"
-sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/openai-codex-source"
+sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source"
 ```
 4. Follow the debugging skill far enough to gather runtime evidence:
    - form at least three plausible hypotheses
    - run the smallest reproduction that exercises the real surface
    - confirm the root cause by observing the failing state
    - identify the minimal fix path or maintainer action
-5. Compare runtime evidence with both `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/openai-codex-source` before choosing the target repo. Cite exact files, commands, logs, or source paths that support the routing decision.
+5. Compare runtime evidence with both `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source` before choosing the target repo. Cite exact files, commands, logs, or source paths that support the routing decision.
 6. Choose the target repo:
    - Use `code-yeongyu/lazycodex` when the bug is in LazyCodex integration, distribution, bundled plugin code, skills, hooks, MCP wiring, installer behavior, aliases, marketplace sync, docs, or any behavior that disappears in clean upstream Codex.
    - Use `openai/codex` when the bug reproduces in clean upstream Codex without LazyCodex, or the failing behavior comes from Codex CLI core, plugin API contracts, sandboxing, approvals, config loading, or built-in tool behavior.
@@ -142,7 +142,7 @@ Write the issue body in English and keep it direct:
 - Target repository:
 - Why this belongs there:
 - LazyCodex evidence (runtime + `$LAZYCODEX_SOURCE_ROOT/lazycodex-source`):
-- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/openai-codex-source`:
+- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source`:
 
 ## Reproduction
 1. [Exact command or UI action]
@@ -186,7 +186,7 @@ Use this only when a PR is the right artifact, which is only ever for `openai/co
 - Target repository:
 - Why this belongs there:
 - LazyCodex evidence (runtime + `$LAZYCODEX_SOURCE_ROOT/lazycodex-source`):
-- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/openai-codex-source`:
+- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source`:
 
 ## Root Cause
 [Confirmed cause. Cite runtime evidence and source paths.]
@@ -263,6 +263,6 @@ Do not file:
 - a vague issue without reproduction steps
 - an issue that claims a root cause not supported by runtime evidence
 - a duplicate when commenting on an existing issue is enough
-- an issue without checking the latest `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/openai-codex-source` checkouts
+- an issue without checking the latest `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source` checkouts
 - a LazyCodex issue when the bug is proven to reproduce in clean upstream Codex
 - a fix PR without a concrete branch, implemented fix, and verification result
