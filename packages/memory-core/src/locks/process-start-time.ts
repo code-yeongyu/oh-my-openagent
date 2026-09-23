@@ -64,7 +64,7 @@ export async function readDarwinProcessStartSeconds(pid: number): Promise<number
 
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
-type ProcessHandle = import("bun:ffi").Pointer | bigint
+type ProcessHandle = import("bun:ffi").Pointer
 
 type Kernel32ProcessTimes = {
   readonly OpenProcess: (access: number, inheritHandle: number, pid: number) => ProcessHandle | null
@@ -106,7 +106,7 @@ export async function readWin32ProcessCreationFiletime(pid: number): Promise<big
   const kernel32 = await kernel32Lookup
   if (kernel32 === null) return null
   const handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
-  if (handle === null || handle === 0 || handle === 0n) return null
+  if (handle === null || handle === 0) return null
   try {
     const creation = new BigUint64Array(1)
     const ok = kernel32.GetProcessTimes(handle, creation, new BigUint64Array(1), new BigUint64Array(1), new BigUint64Array(1))
