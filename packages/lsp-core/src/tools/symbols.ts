@@ -11,6 +11,13 @@ function isDocumentSymbol(symbol: DocumentSymbol | SymbolInfo): symbol is Docume
 	return "range" in symbol;
 }
 
+export function normalizeSymbolLimit(limit: number | undefined): number {
+	if (limit === undefined || limit < 1) {
+		return DEFAULT_MAX_SYMBOLS;
+	}
+	return Math.min(Math.floor(limit), DEFAULT_MAX_SYMBOLS);
+}
+
 export async function executeLspSymbols(
 	params: Record<string, unknown>,
 	signal?: AbortSignal,
@@ -18,7 +25,7 @@ export async function executeLspSymbols(
 	const filePath = requireString(params, "filePath");
 	const rawScope = optionalString(params, "scope") ?? "document";
 	const scope = rawScope === "workspace" ? "workspace" : "document";
-	const limit = Math.min(optionalNumber(params, "limit") ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS);
+	const limit = normalizeSymbolLimit(optionalNumber(params, "limit"));
 
 	try {
 		if (scope === "workspace") {
