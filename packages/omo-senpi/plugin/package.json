@@ -25,6 +25,7 @@
     "extensions",
     "skills",
     "skills-conditional",
+    "themes",
     "runtime",
     "scripts/install.mjs",
     "CHANGELOG.md",

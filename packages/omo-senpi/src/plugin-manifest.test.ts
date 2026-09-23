@@ -98,6 +98,7 @@ describe("OMO Senpi plugin manifest", () => {
       "extensions",
       "skills",
       "skills-conditional",
+      "themes",
       "runtime",
       "scripts/install.mjs",
       "CHANGELOG.md",

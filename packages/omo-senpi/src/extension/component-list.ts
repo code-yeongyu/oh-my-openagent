@@ -16,6 +16,7 @@ import { createSkillPointersComponent } from "../components/skill-pointers"
 import { createOmoNativeTelemetryComponent } from "../components/telemetry"
 import { createTodoFanoutReminderComponent } from "../components/todo-fanout-reminder"
 import { createThreadComponent } from "../components/thread"
+import { createTuiThemesComponent } from "../components/tui-themes"
 import { createUltraworkComponent } from "../components/ultrawork"
 import { createUlwExecuteContinuationComponent } from "../components/ulw-execute-continuation"
 import { createUlwLoopComponent } from "../components/ulw-loop"
@@ -31,6 +32,9 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     // outside the native-badge -> onboarding -> advisor adjacency that session-start
     // ordering pins (session-start-ordering.test.ts).
     createBundledSkillsComponent(),
+    // Themes ride next to the other `resources_discover` contributor, and ahead of the
+    // native-badge -> onboarding -> advisor adjacency that session-start ordering pins.
+    createTuiThemesComponent(),
     createNativeBadgeComponent(),
     createOnboardingComponent(),
     createInitDeepAdvisorComponent(),
