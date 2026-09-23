@@ -35,7 +35,6 @@ export default async function registerStandaloneParityExtension(pi: unknown): Pr
   }
   await standaloneParityComponents[0].register(pi, {
     logger,
-    sharedHostEnabled: pi.sharedHostEnabled === true,
     config: { getFlag: (name) => pi.getFlag(name) },
   })
 }
