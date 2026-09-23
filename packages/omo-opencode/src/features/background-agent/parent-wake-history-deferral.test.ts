@@ -208,4 +208,242 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
+
+  test("#given zombie running tool block held under the stale-hold ceiling #when checking parent wake history #then wake stays held", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "assistant",
+                finish: "tool-calls",
+                time: { created: 80_000 },
+              },
+              parts: [
+                {
+                  type: "tool",
+                  tool: "bash",
+                  callID: "call_zombie",
+                  state: { status: "running" },
+                },
+              ],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-zombie-tool-under-ceiling": { type: "idle" } } }),
+        promptAsync: async () => {
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+        staleToolBlockMaxHoldMs: 10_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-zombie-tool-under-ceiling",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-zombie-tool-under-ceiling")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 94_000
+
+    try {
+      // when
+      const decision = await notifier["shouldDeferParentWakeForSessionHistory"](
+        "parent-zombie-tool-under-ceiling",
+        pendingWake,
+      )
+
+      // then
+      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: true })
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given zombie running tool block held past the stale-hold ceiling #when checking parent wake history #then wake is force-delivered", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "assistant",
+                finish: "tool-calls",
+                time: { created: 80_000 },
+              },
+              parts: [
+                {
+                  type: "tool",
+                  tool: "bash",
+                  callID: "call_zombie_ceiling",
+                  state: { status: "running" },
+                },
+              ],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-zombie-tool-past-ceiling": { type: "idle" } } }),
+        promptAsync: async () => {
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+        staleToolBlockMaxHoldMs: 10_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-zombie-tool-past-ceiling",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-zombie-tool-past-ceiling")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 90_000
+
+    try {
+      // when
+      const decision = await notifier["shouldDeferParentWakeForSessionHistory"](
+        "parent-zombie-tool-past-ceiling",
+        pendingWake,
+      )
+
+      // then
+      expect(decision).toEqual({ defer: false, skipPromptGateToolStateCheck: true })
+
+      // The pre-dispatch confirmation re-runs the same check; it must reach the
+      // same decision instead of re-arming the deferral.
+      const confirmedDecision = await notifier["shouldDeferParentWakeForSessionHistory"](
+        "parent-zombie-tool-past-ceiling",
+        pendingWake,
+      )
+      expect(confirmedDecision).toEqual({ defer: false, skipPromptGateToolStateCheck: true })
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given no stale-hold ceiling configured #when checking a long-held wake against a zombie tool block #then historical unbounded hold is preserved", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "assistant",
+                finish: "tool-calls",
+                time: { created: 80_000 },
+              },
+              parts: [
+                {
+                  type: "tool",
+                  tool: "bash",
+                  callID: "call_zombie_no_ceiling",
+                  state: { status: "running" },
+                },
+              ],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-zombie-tool-no-ceiling": { type: "idle" } } }),
+        promptAsync: async () => {
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-zombie-tool-no-ceiling",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-zombie-tool-no-ceiling")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 90_000
+
+    try {
+      // when
+      const decision = await notifier["shouldDeferParentWakeForSessionHistory"](
+        "parent-zombie-tool-no-ceiling",
+        pendingWake,
+      )
+
+      // then
+      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: true })
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
 })
