@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto"
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
-import { relative, resolve } from "node:path"
+import { join, relative, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
 import { minify } from "terser"
@@ -68,7 +69,7 @@ function getNodeMinifier() {
     && !nodeMinifier.child.stdin.destroyed
   ) return nodeMinifier
   nodeMinifier = undefined
-  const child = spawn("node", [BUILD_ARTIFACT_PATH, "--minify-server"], {
+  const child = spawn(resolveNodeExecutable(), [BUILD_ARTIFACT_PATH, "--minify-server"], {
     stdio: ["pipe", "pipe", "inherit"],
     windowsHide: true,
   })
@@ -93,6 +94,15 @@ function getNodeMinifier() {
     pending.clear()
   })
   return minifier
+}
+
+export function resolveNodeExecutable(pathValue = process.env.PATH ?? "", platform = process.platform) {
+  const executable = platform === "win32" ? "node.exe" : "node"
+  const pathDelimiter = platform === "win32" ? ";" : ":"
+  const candidates = pathValue.split(pathDelimiter).filter(Boolean).map((directory) => join(directory, executable))
+  return candidates.find((candidate) => !candidate.replaceAll("\\", "/").includes("/mise/shims/") && existsSync(candidate))
+    ?? candidates.find((candidate) => existsSync(candidate))
+    ?? executable
 }
 
 export function closeNodeMinifier(minifier = nodeMinifier) {

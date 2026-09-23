@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "bun:test"
 
-import { artifactsMatch, closeNodeMinifier, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
+import { artifactsMatch, closeNodeMinifier, minifyBundle, normalizeBuiltinImports, resolveNodeExecutable } from "./build-artifact.mjs"
 
 test("#given Node and Bun builtin catalogs #when imports are normalized #then Bun namespaces stay unchanged and both outputs match", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-builtin-normalize-"))
@@ -60,6 +60,24 @@ test("#given the Node minifier starts closing #when another bundle is queued #th
     await rm(root, { recursive: true, force: true })
   }
 }, 30_000)
+
+test("#given mise and direct Node binaries #when the minifier executable resolves #then it bypasses the mise shim", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-node-resolve-"))
+  const miseBin = join(root, "mise", "shims")
+  const directBin = join(root, "node-bin")
+  const executable = process.platform === "win32" ? "node.exe" : "node"
+  try {
+    await Promise.all([mkdir(miseBin, { recursive: true }), mkdir(directBin, { recursive: true })])
+    await Promise.all([
+      writeFile(join(miseBin, executable), "shim"),
+      writeFile(join(directBin, executable), "node"),
+    ])
+
+    expect(resolveNodeExecutable([miseBin, directBin].join(process.platform === "win32" ? ";" : ":"))).toBe(join(directBin, executable))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 function artifact(sourceDigest, body) {
   return `// omo:${sourceDigest}:${digest(body)}\n${body}`
