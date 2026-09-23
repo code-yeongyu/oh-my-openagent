@@ -107,8 +107,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "xhigh",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode"],
+        providers: ["anthropic"],
         model: "claude-opus-5-5",
+        variant: "max",
+      },
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-opus-5",
         variant: "max",
       },
       {

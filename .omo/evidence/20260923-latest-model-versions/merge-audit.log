@@ -1,0 +1,9 @@
+bun test v1.4.2 (744846f84)
+
+script/opus5-model-recommendation-audit.test.ts:
+(pass) Opus 5 model recommendation migration > does not publish legacy Opus 4.8 recommendations [10.88ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1191.00ms]

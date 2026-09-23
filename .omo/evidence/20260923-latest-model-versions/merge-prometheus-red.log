@@ -1,0 +1,62 @@
+bun test v1.4.2 (744846f84)
+
+packages/model-core/src/gpt-6-family-routing.test.ts:
+(pass) GPT-6 family routing > deep-low leads with gpt-6-sol medium and keeps gpt-5.6-sol medium as the fallback rung [0.69ms]
+(pass) GPT-6 family routing > deep-high still carries only Astra, so neither deep lane borrows the other's model [0.17ms]
+(pass) GPT-6 family routing > quick leads with gpt-6-luna-fast low [0.12ms]
+(pass) GPT-6 family routing > explore carries gpt-6-luna-fast low as its OpenAI rung [0.14ms]
+(pass) GPT-6 family routing > librarian carries gpt-6-luna-fast low as its OpenAI rung [0.11ms]
+(pass) GPT-6 family routing > no builtin chain names a GPT-5.6 Luna tier any more [0.17ms]
+(pass) GPT-6 family routing > artistry follows its Fable 5.1 lead with claude-opus-5-5 max [0.14ms]
+45 |     ["prometheus", AGENT_MODEL_REQUIREMENTS],
+46 |   ] as const)("%s follows its Fable 5.1 lead with claude-opus-5-5 max", (name, table) => {
+47 |     const chain = table[name].fallbackChain
+48 |     expect(chain[0]?.model).toBe("claude-fable-5-1")
+49 |     expect(chain[1]).toMatchObject({ model: "claude-opus-5-5", variant: "max" })
+50 |     expect(chain[1]?.providers).toEqual(["anthropic"])
+                                     ^
+error: expect(received).toEqual(expected)
+
+  [
+    "anthropic",
++   "github-copilot",
++   "opencode",
+  ]
+
+- Expected  - 0
++ Received  + 2
+
+      at <anonymous> (/Users/cminseo/Developer/omo-model-latest/packages/model-core/src/gpt-6-family-routing.test.ts:50:33)
+(fail) GPT-6 family routing > prometheus follows its Fable 5.1 lead with claude-opus-5-5 max [1.04ms]
+
+packages/model-core/src/model-requirements-agents.test.ts:
+(pass) AGENT_MODEL_REQUIREMENTS > oracle has gpt-5.6-sol xhigh as primary [3.97ms]
+(pass) AGENT_MODEL_REQUIREMENTS > sisyphus keeps opus primary before Kimi K3, gpt-5.6-sol, GLM 5.3, and big-pickle fallbacks [0.21ms]
+(pass) AGENT_MODEL_REQUIREMENTS > librarian keeps no-thinking Kimi HighSpeed primary, then fast OpenAI, before qwen, minimax, haiku, and nano fallbacks [0.17ms]
+(pass) AGENT_MODEL_REQUIREMENTS > explore keeps no-thinking Kimi HighSpeed primary, then fast OpenAI, before qwen, minimax, haiku, and nano fallbacks [0.18ms]
+(pass) AGENT_MODEL_REQUIREMENTS > multimodal-looker keeps vision-capable fallback order [0.14ms]
+166 |
+167 |     // when
+168 |     const [primary, opusFallback, oldOpus, kimiFallback] = prometheus.fallbackChain
+169 |
+170 |     // then
+171 |     expect(prometheus.fallbackChain).toHaveLength(4)
+                                           ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 4
+Received length: 3
+
+      at <anonymous> (/Users/cminseo/Developer/omo-model-latest/packages/model-core/src/model-requirements-agents.test.ts:171:38)
+(fail) AGENT_MODEL_REQUIREMENTS > prometheus uses Fable 5.1 xhigh, then Opus 5.5 and Opus 5 max, before Kimi K3 max [0.24ms]
+(pass) AGENT_MODEL_REQUIREMENTS > metis uses Fable 5.1 max, then Opus 5 max, then Kimi K3 max [0.12ms]
+(pass) AGENT_MODEL_REQUIREMENTS > momus leads with native gpt-6-astra xhigh before the Copilot and opencode Astra rungs [0.17ms]
+(pass) AGENT_MODEL_REQUIREMENTS > atlas keeps sonnet, kimi, gpt-5.6-sol, and minimax fallback order [0.14ms]
+(pass) AGENT_MODEL_REQUIREMENTS > sisyphus-junior keeps sonnet, Kimi, minimax, and big-pickle fallbacks [0.14ms]
+(pass) AGENT_MODEL_REQUIREMENTS > hephaestus supports openai, chatgpt-subscription, github-copilot, and opencode providers [0.11ms]
+(pass) AGENT_MODEL_REQUIREMENTS > hephaestus leads with one merged gpt-6-sol medium rung over its gpt-5.6-sol predecessor [0.10ms]
+
+ 18 pass
+ 2 fail
+ 103 expect() calls
+Ran 20 tests across 2 files. [1234.00ms]

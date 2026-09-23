@@ -2,7 +2,36 @@
 
 Date: 2026-09-23 · Branch: `fix/latest-model-versions` · Worktree: `/Users/cminseo/Developer/omo-model-latest` (base `origin/dev` @ `33d9e8a4`)
 
-## Why
+## Merge update plan (2026-09-23)
+
+The current user request supersedes the original implementation plan below.
+Merge fetched `origin/dev` (`9d5e485fbc310f10afe1fc56d0f2ce4b6ddb23be`)
+into the existing task branch without rebasing or force-pushing.
+
+- Resolve `packages/model-core/src/category-model-requirements.ts` and
+  `packages/senpi-task/src/category/fallback-chains.ts` with upstream's
+  artistry order: Fable, narrowed Opus 5.5, retained Opus 5, Kimi.
+  Preserve every upstream GPT-6 rung and the PR's GLM 5.3 bumps.
+- Resolve `category-routing-policy.test.ts`,
+  `model-requirements-categories.test.ts`, and Senpi's
+  `category/fallback-chains.test.ts` by pinning the complete merged chains.
+- Rebuild the conflicting `plugin/extensions/omo.js` and `omo-task.js`
+  through `bun run build:senpi-plugin`; retain generated companion changes
+  produced by that same build, never hand-edit bundles.
+- Verify automatic merges, run all three user-named gates, and run isolated
+  real Senpi smoke QA. Record results and semantic decisions in `report.md`.
+- Commit the verified merge, push `submission fix/latest-model-versions`
+  normally, and report PR #8699 state. Do not merge the PR upstream.
+
+The first merged package gate exposed an additional upstream assertion:
+`gpt-6-family-routing.test.ts` equated Opus 5.5 providers with Fable's.
+Update that pinned expectation to Anthropic-only plus exact Opus 5 fallback
+coverage. Apply this same policy to the newly added Prometheus rung in
+`agent-model-requirements.ts` and its `model-requirements-agents.test.ts`
+expectations. Prove the change first with the focused red test run, then
+rerun all required gates. Record all decisions in the merge report.
+
+## Original implementation rationale (historical)
 
 OmO's shipped agent/category fallback chains lag the current catalogs and still name the pre-rename provider id `openai-codex`. A rung that names a retired model id, or a provider the runtime no longer exposes, silently stops matching — the chain degrades without any error.
 

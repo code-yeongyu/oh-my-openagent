@@ -1,0 +1,11 @@
+PASS core+senpi deep-low: chatgpt-subscription/gpt-6-sol
+PASS core+senpi deep-low: chatgpt-subscription/gpt-5.6-sol
+PASS core+senpi deep-high: chatgpt-subscription/gpt-6-astra
+PASS core+senpi quick: chatgpt-subscription/gpt-6-luna-fast
+PASS core+senpi artistry: anthropic/claude-opus-5-5
+PASS core+senpi artistry: github-copilot/claude-opus-5
+PASS core+senpi artistry: opencode-go/kimi-k3
+PASS core+senpi unspecified-high: opencode-go/glm-5.3
+PASS prometheus: anthropic/claude-opus-5-5
+PASS prometheus: github-copilot/claude-opus-5
+PASS empty registry: model_unavailable
