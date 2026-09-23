@@ -1,0 +1,50 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/cli/doctor/checks/model-resolution-cache.test.ts:
+46 | 
+47 |     // when
+48 |     const result = loadAvailableModelsFromCache()
+49 | 
+50 |     // then: doctor must find the refreshed cache instead of reporting it missing
+51 |     expect(result.cacheExists).toBe(true)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6484/packages/omo-opencode/src/cli/doctor/checks/model-resolution-cache.test.ts:51:32)
+(fail) loadAvailableModelsFromCache > reads providers from the omo provider-models.json cache written by refresh [1.01ms]
+74 |     // when
+75 |     const result = loadAvailableModelsFromCache()
+76 | 
+77 |     // then: the refreshed omo cache wins
+78 |     expect(result.cacheExists).toBe(true)
+79 |     expect(result.providers).toContain("openai")
+                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "openai"
+Received: [ "legacy" ]
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6484/packages/omo-opencode/src/cli/doctor/checks/model-resolution-cache.test.ts:79:30)
+(fail) loadAvailableModelsFromCache > prefers the omo provider-models.json cache over the legacy models.json [10.66ms]
+ 95 | 
+ 96 |     // then
+ 97 |     expect(result.cacheExists).toBe(true)
+ 98 |     expect(result.providers).toContain("openai")
+ 99 |     expect(result.modelCount).toBe(1)
+100 |     expect(result.cachePath).toBe(join(tempDir, "cache", "opencode", "models.json"))
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/doctor-cache-test-1787704663032/cache/opencode/models.json"
+Received: undefined
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6484/packages/omo-opencode/src/cli/doctor/checks/model-resolution-cache.test.ts:100:30)
+(fail) loadAvailableModelsFromCache > falls back to legacy models.json when the omo provider-models.json is malformed [2.10ms]
+
+ 7 pass
+ 3 fail
+ 24 expect() calls
+Ran 10 tests across 1 file. [1438.00ms]

@@ -1,0 +1,12 @@
+=== GATE RUN A ===
+--- focused bun test ---
+ 174 pass
+ 0 fail
+ 469 expect() calls
+Ran 174 tests across 27 files. [3.05s]
+--- tsgo --noEmit -p packages/omo-opencode/tsconfig.json ---
+TSGO_EXIT:0
+--- git diff --check ---
+DIFF_CHECK_CLEAN
+--- hygiene grep (diff-scoped) ---
+NO_NEW_HITS
