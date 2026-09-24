@@ -10,7 +10,7 @@ import {
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
 
 function isInactiveBoulderStatus(status: BoulderState["status"]): boolean {
-  return status === "paused" || status === "abandoned"
+  return status === "paused" || status === "abandoned" || status === "completed"
 }
 
 export async function resolveActiveBoulderSession(input: {
