@@ -1,3 +1,15 @@
+## 2026-09-24 - omo doctor reports the OpenCode-edition migration leftovers (#8831)
+
+`omo doctor` said nothing about the machine it had just been migrated from: an `omo` earlier on PATH than omo-ai's, the legacy `oh-my-openagent` / `oh-my-opencode` package still installed globally (the one whose `npm uninstall -g` can take omo-ai's `omo` with it, #8793), and the OpenCode plugin still registered in the OpenCode config. `packages/omo-native/bin/lib/doctor-migration.js` is new and adds three report-only checks, printed right after the `INFO Update:` line; `doctor.js` only imports and calls it.
+
+- PATH: every absolute PATH dir except a project `node_modules/.bin` is scanned for `omo` (plus `.cmd`/`.ps1`/`.exe` on Windows). Each entry's owner is the nearest `package.json` above its resolved symlink or above the package path its launcher shim names; a Codex Light wrapper (`# OMO_GENERATED_RUNTIME_WRAPPER`) is `lazycodex@<cached version>`. Every entry before omo-ai's own, or every entry when omo-ai is not on PATH, gets a `WARN another omo precedes omo-ai on PATH: <file> (<owner>)`. The fix is `bunx oh-my-openagent@beta install --platform=native` when the installer repairs that owner (oh-my-openagent / oh-my-opencode / lazycodex); otherwise it is "remove that file, or move <omo-ai bin dir> ahead of <dir> on PATH". The owner rules mirror `packages/omo-opencode/src/cli/install-native/legacy-omo-bin.ts`, which omo-native cannot import.
+- Legacy package: `oh-my-openagent` / `oh-my-opencode` under an npm global prefix (`npm_config_prefix`, `~/.npmrc` `prefix=`, and the prefix implied by every PATH bin dir) or under the bun global tree (`$BUN_INSTALL/install/global/node_modules`, default `~/.bun`). The warning names the package dir. For npm the remove command is `npm uninstall -g <pkg>`, followed by the doctor's own update command if `omo` disappears; for bun it is `bun remove -g <pkg>`.
+- OpenCode registration: every server config file `bin/lib/setup-opencode-assets.js` `opencodeConfigSources` names (the global dir's `config.json` / `opencode.json` / `opencode.jsonc`, `$OPENCODE_CONFIG`, then `~/.opencode` and `$OPENCODE_CONFIG_DIR`, layered the way OpenCode reads them), plus `tui.json` / `tui.jsonc` in each of those dirs, is parsed with `bin/lib/jsonc.js`. Any `plugin` entry naming a legacy package (`<pkg>`, `<pkg>@...`, `<pkg>/tui...`, string or `[name, options]` tuple) yields one `INFO OpenCode still loads the <pkg> plugin (<files>)` line. An unparsable file is skipped because OpenCode reports its own config errors.
+
+Nothing is deleted or rewritten. `runDoctor` options gain `env` / `homeDir` / `platform`, following the existing `env` injection, so `test/doctor-migration.test.ts` runs every check against fixture trees and never reads the real PATH or home.
+
+||||||| 07452eda9
+
 ## 2026-09-24 - omo update runs the detected package-manager command (#8830)
 
 ### What changed
@@ -11,7 +23,6 @@
 ### Why an extension could not handle it
 
 Self-update is answered in the launcher before the engine is spawned, so the product package (not the pinned engine) is what moves.
-
 ## 2026-09-24 - omo setup imports every OpenCode key an omo provider can serve, and names the real sign-in command (#8799)
 
 ### What changed

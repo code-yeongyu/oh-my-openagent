@@ -5,6 +5,7 @@ import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
 import { daemonReportLines } from "./daemon.js"
+import { migrationReport } from "./doctor-migration.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
 
 const NPM_DIST_TAGS_URL = "https://registry.npmjs.org/-/package/omo-ai/dist-tags"
@@ -427,6 +428,7 @@ export function runDoctor(inventory, args = [], options = {}) {
   const latest = latestFromDistTags(readDistTags(options), version)
   lines.push(`INFO omo · Edition: Native · Installed: ${version} (engine: senpi ${engineVersionOrUnresolved(senpi)}) · Latest: ${latest}`)
   lines.push(`INFO Update: ${updateTarget().command}`)
+  lines.push(...migrationReport(options, updateTarget().command))
   lines.push(...warningsForSettings())
   lines.push(...staleEngineReport(options))
   lines.push(...retiredPayloadReport(options))
