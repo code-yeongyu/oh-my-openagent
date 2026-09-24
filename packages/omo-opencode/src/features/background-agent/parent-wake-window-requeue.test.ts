@@ -132,6 +132,32 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
     }
   })
 
+  test("#given a no-reply parent wake is accepted #when the recovery window elapses without assistant output #then it is not dispatched again", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-window-noreply-expected-silence"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, false)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+
+      // when
+      await waitForTimer()
+
+      // then
+      expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(false)
+      expect(promptAsyncCalls).toHaveLength(1)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given a requeued parent wake still produces no assistant output #when the retry window elapses #then the wake is not retried forever", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
