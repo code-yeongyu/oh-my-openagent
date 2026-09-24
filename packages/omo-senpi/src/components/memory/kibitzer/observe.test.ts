@@ -325,7 +325,7 @@ describe("kibitzer category configuration notice", () => {
 
   test("#given repeated category refusals #when observed #then exactly one bounded unavailable notice is appended per session, no gate notice, and every refusal is recorded non-diagnostic", async () => {
     const f = await fixture()
-    const bounded = { category: "quick", cause: "beyond_category", missingProviders: providers.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT) }
+    const bounded = { category: "quick", cause: "beyond_category" as const, missingProviders: providers.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT) }
 
     for (const wake of [1, 2, 3, 4]) f.observe.onWake(refusal(wake), f.context)
     f.observe.onWake(refusal(1, "other-main-session"), f.context)
