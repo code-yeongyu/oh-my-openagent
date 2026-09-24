@@ -124,6 +124,12 @@ export interface DelegateTaskToolOptions {
     dirs(): string[] | Promise<string[]>
   }
   getLoadedSkills?: () => Promise<LoadedSkill[]>
+  /**
+   * Disables the dispatch-side Prometheus planning-context injection (#6291).
+   * Wire from `disabled_hooks` containing "prometheus-md-only" so dispatch
+   * respects the same kill switch as the hook.
+   */
+  planningWarningInjectionDisabled?: boolean
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
