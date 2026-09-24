@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.19.5] - 2026-09-24
+
 ### Changed
 
 **Geeky · Normal runs GPT-5.6 Sol at medium.** ([#8807](https://github.com/code-yeongyu/oh-my-openagent/issues/8807)) The `geeky-normal` model profile now applies GPT-5.6 Sol (medium) from your ChatGPT subscription, the OpenAI API, Copilot or OpenCode, in that order, instead of GPT-6 Sol Fast then GPT-6 Sol. It no longer falls back to a GPT-6 model: when none of those providers serves GPT-5.6 Sol, the session keeps its model and prints the unavailable notice. Geeky · Heavy, the Daily lanes and the Recommended default are unchanged.
