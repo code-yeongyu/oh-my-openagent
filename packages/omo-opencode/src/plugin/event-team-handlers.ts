@@ -1,6 +1,7 @@
 import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-wake-hint";
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
+import { createTeamMemberPaneRefresher } from "../hooks/team-session-events/team-member-pane-refresher";
 import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
 import { buildTeamIdleWakeHintClient } from "./build-team-idle-wake-hint-client";
 import type { OhMyOpenCodeConfig } from "../config";
@@ -22,6 +23,9 @@ export function createEventTeamHandlers(args: {
   const teamMemberStatusHandler = teamModeConfig
     ? createTeamMemberStatusHandler(teamModeConfig)
     : undefined;
+  const teamMemberPaneRefresher = teamModeConfig?.tmux_visualization
+    ? createTeamMemberPaneRefresher(teamModeConfig)
+    : undefined;
   const teamIdleWakeHint = teamModeConfig
     ? createTeamIdleWakeHint({
         directory: args.pluginContext.directory,
@@ -33,6 +37,7 @@ export function createEventTeamHandlers(args: {
     teamIdleWakeHint,
     teamLeadOrphanHandler,
     teamMemberErrorHandler,
+    teamMemberPaneRefresher,
     teamMemberStatusHandler,
   };
 }

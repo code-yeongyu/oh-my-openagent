@@ -1,0 +1,83 @@
+WHAT WAS TESTED
+===============
+
+Issue: #4035 - team-mode tmux panes stay stuck on the first message while member
+sessions keep running.
+
+Root cause (code): the team tmux layout is fire-and-forget.
+- packages/team-core/src/team-layout-tmux/layout.ts:126 (`createTeamLayoutInCallerWindow`)
+  types `opencode attach <url> --session <sid> --dir <dir>` into each member pane via a
+  single `send-keys ... Enter` at layout creation time.
+- After that one send-keys, no code path in the repo ever touches the pane again:
+  no liveness check, no refresh, no re-attach. The visible pane output depends entirely
+  on the spawned `opencode attach` process keeping its own event subscription healthy
+  for the whole team run. If that client-side subscription dies or stalls (attach exit,
+  SSE drop, TUI stall, upstream version differences), the pane freezes at whatever was
+  last rendered while the member session itself continues unaffected. This matches the
+  maintainer triage on the issue ("one-time opencode attach ... no live-tail refresh
+  mechanism").
+
+Fix: propagate updates per agent turn, OMO-side.
+- New packages/team-core/src/team-layout-tmux/refresh-member-pane.ts:
+  reads pane state with one `tmux display-message -p -t <pane>
+  '#{@omo_attach_server_url}\t#{@omo_attach_session_id}\t#{pane_dead}\t#{pane_current_command}'`,
+  then decides: revive (pane dead, attach exited back to a shell, or empty command ->
+  re-send the attach command built from the persisted per-pane options) or redraw
+  (alive -> `send-keys C-l`). All failures are log-only; never break the event pipeline.
+- New adapter hook packages/omo-opencode/src/hooks/team-session-events/
+  team-member-pane-refresher.ts: on `message.updated` / `message.part.updated` for a
+  registered team MEMBER session (cheap in-memory team-session-registry gate first),
+  loads runtime state, resolves the member's `tmuxPaneId`, debounces 2s per session,
+  and calls refreshMemberPane. Wired in src/plugin/event-team-handlers.ts (only when
+  team_mode.enabled + tmux_visualization) and dispatched from src/plugin/event.ts.
+
+WHAT WAS OBSERVED
+=================
+
+1. Failing-first regression tests (red before implementation, green after):
+   - bun test packages/team-core/src/team-layout-tmux/refresh-member-pane.test.ts
+   - bun test packages/omo-opencode/src/hooks/team-session-events/team-member-pane-refresher.test.ts
+   Final scoped run: 16 pass / 0 fail across both files.
+2. Full scoped suites after wiring:
+   - bun test packages/team-core/src/team-layout-tmux/ packages/omo-opencode/src/hooks/team-session-events/ packages/omo-opencode/src/plugin/event-team-handlers.test.ts
+     => 96 pass, 1 skip, 0 fail
+   - bun test packages/omo-opencode/src/plugin/event.test.ts => 26 pass, 0 fail
+3. Typecheck (tsgo is authoritative in worktrees):
+   - bunx tsgo --noEmit -p packages/team-core/tsconfig.json => clean
+   - cd packages/omo-opencode && bun run typecheck (tsgo --noEmit -p tsconfig.json) => clean
+4. Live-surface probe against real opencode 1.18.22 (isolated XDG sandbox under
+   /tmp/opencode/4035-qa, script in evidence dir probe-attach-streaming.sh, raw log
+   probe-run.log): started `opencode serve` on 127.0.0.1:4599, created sessions via the
+   REST API, attached a real `opencode attach` TUI under a pty, then posted second
+   messages via the API and captured the pane stream. Result: the attach TUI applied
+   live message updates in BOTH the directory-match case (--dir == session directory)
+   and the mismatch case (--dir pointing at a different directory). This rules out the
+   "TUI filters events by --dir" theory on this build and confirms the robust lever is
+   OMO-side pane driving (revive/redraw), which works regardless of upstream attach
+   behavior.
+
+WHY IT IS ENOUGH
+================
+
+- The unit suites pin the exact contract demanded by the issue: given a member pane,
+  when update events arrive for the member session (per agent turn), the plugin issues
+  pane-targeted tmux commands (revive re-attach or redraw), including debounce,
+  non-member/lead/no-pane short-circuits, and log-only failure isolation.
+- The event seam is the same one already used by the four existing team-session-event
+  handlers; dispatch is null-safe when team mode is off (verified by event.test.ts).
+- The live probe documents actual attach streaming behavior on the current opencode
+  build, so reviewers can see why the fix does not depend on upstream event delivery.
+
+WHAT WAS OMITTED
+================
+
+- No end-to-end tmux reproduction of a full team run: this environment has no tmux
+  binary and cannot install one (no root). The repo's own live tmux smoke
+  (packages/team-core/src/team-layout-tmux/live-tmux-smoke.test.ts) is opt-in via
+  OMO_LIVE_TMUX=1 for the same reason. Pane command construction/quoting is covered by
+  unit tests instead.
+- No real LLM traffic in the probe: prompts were posted without provider credentials;
+  user messages persist and emit message.updated events regardless, which is the event
+  class the refresher consumes.
+- Sandbox paths under /tmp/opencode/4035-qa* were used with isolated XDG dirs; no real
+  ~/.local/share/opencode or ~/.omo state was read or written. No secrets in artifacts.
