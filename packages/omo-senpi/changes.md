@@ -8,6 +8,10 @@
 
 Tests: `sidecar-model.test.ts` (both category refusals name the chain's providers, only they classify as configuration), `sidecar.test.ts` (a category refusal is a non-diagnostic outcome that still backs off and heals; a transient refusal stays diagnostic), `observe.test.ts` (one bounded notice per session, no gate, streak neither fed nor reset), `notice.test.ts`, `tools/session-read.test.ts`, `memory/index.test.ts`. omo#8837, design source omo#8800.
 
+## memory: the system prompt keeps its memory block for the whole session (#8470)
+
+The memory block is compiled once per session at the memory HEAD of its first turn and persisted as an `omo-memory:projection-pin` entry; later memory commits reach the model as a `<memory_notice>` line instead of rewriting the system prompt, so they no longer invalidate the prompt cache. Compaction, `/recompile`, and a vanished pinned commit repin; new and forked sessions pin fresh.
+
 ## 2026-09-24 - onboarding lane 2 stops hand-moving global OpenCode MCP servers into project files
 
 `skills/onboarding/SKILL.md` lane 2 (migration help) now tells the guide that global OpenCode MCP servers and global OpenCode skills are `omo setup`'s job: it imports them into `~/.omo/agent/mcp.json` and `~/.omo/agent/skills/`, consent-gated, converted, and without overwriting an existing name, previewable with `omo setup --dry-run` and applied with `omo setup --yes` once the user accepts, because the guide's shell is not a terminal and plain `omo setup` stops at its consent prompt without importing. The migration-plan sentence splits "which MCP servers move to the project `.mcp.json`" into what setup carries over globally and what is genuinely project-only.

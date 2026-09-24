@@ -89,6 +89,26 @@ describe("MemoryBlockCache", () => {
     expect(cache.size).toBe(1)
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
+  it("#given a pinned revision #when HEAD moves #then the pinned compile keeps the pinned bytes and HEAD compile sees the new commit", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    const cache = new MemoryBlockCache()
+    const options = { agentId: "cache-agent" }
+    const pinned = await repo.head()
+    const atPin = await cache.compile(repo, "template", options, pinned)
+
+    // when
+    await writeFile(join(dir, "system/persona.md"), "---\ndescription: Persona\n---\nsecond\n")
+    await repo.commitWrite(["system/persona.md"], "change persona", { agentId: "cache-agent", authorName: "Cache Agent" })
+    const stillPinned = await cache.compile(repo, "template", options, pinned)
+    const atHead = await cache.compile(repo, "template", options)
+
+    // then
+    expect(stillPinned).toBe(atPin)
+    expect(stillPinned).toContain("first")
+    expect(atHead).toContain("second")
+  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+
   it("#given two identities at the same HEAD #when compiled through one cache #then identity-stable projections remain isolated", async () => {
     // given
     const { repo } = await createRepo()

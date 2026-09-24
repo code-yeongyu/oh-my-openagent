@@ -7,6 +7,14 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
+import {
+  createProjectionPins,
+  renderProjectedChangesLine,
+  type ProjectionPinRecord,
+  type ProjectionPins,
+  type ProjectionRepinReason,
+  type ProjectionTurn,
+} from "./projection-pin"
 import { estimateSystemTokensCached, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 
 export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v3"
@@ -19,12 +27,17 @@ export interface MemoryPromptSession {
   readonly id: string
   /** Messages the branch's latest compaction pushed out of the live context; 0 while nothing compacted. */
   readonly compactedMessageCount: number
+  readonly branch: readonly unknown[]
 }
 
 export interface MemoryPromptInjectionOptions {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
   readonly createRepo?: (context: MemoryIdentityContext) => GitMemoryRepo
   readonly cache?: MemoryBlockCache
+  readonly pins?: ProjectionPins
+  /** Persists a pin as a session entry so a resumed or restarted session reproduces the same bytes. */
+  readonly recordPin?: (record: ProjectionPinRecord) => void
+  readonly onRepin?: (sessionId: string, reason: Exclude<ProjectionRepinReason, "first-turn">) => void
   readonly resolveCompileWarnTokens?: (identity: string) => number
   readonly resolveNudgeTurns?: (
     repo: GitMemoryRepo,
@@ -47,6 +60,8 @@ export function createMemoryPromptHandler(
   options: MemoryPromptInjectionOptions,
 ): (payload: unknown, eventCtx?: unknown) => Promise<BeforeAgentStartEventResult | undefined> {
   const cache = options.cache ?? new MemoryBlockCache()
+  const pins = options.pins ?? createProjectionPins()
+  const recordPin = options.recordPin ?? (() => undefined)
   const createRepo = options.createRepo ?? defaultCreateRepo
   // The pressure estimate is a pure function of the commit, like the compiled block above it. Without
   // this memo every prompt listed the tree and read every system blob again (one git process each):
@@ -63,16 +78,25 @@ export function createMemoryPromptHandler(
     const repo = createRepo(context)
     const nudgeTurns = await options.resolveNudgeTurns?.(repo, session.id, context.identity)
     const soulNotice = await options.resolveSoulNotice?.(repo, session.id, context.identity)
+    const turn = await pins.advance({
+      repo,
+      sessionId: session.id,
+      branch: session.branch,
+      head: await repo.head(),
+      record: recordPin,
+    })
+    if (turn.repinned !== undefined && turn.repinned !== "first-turn") options.onRepin?.(session.id, turn.repinned)
     const block = await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, {
       agentId: context.identity,
-    })
+    }, turn.revision)
     const pressureBlock = await addMemoryPressureMetadata(
       block,
       repo,
+      turn.revision,
       options.resolveCompileWarnTokens?.(context.identity),
       pressureEstimates,
     )
-    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice)
+    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice, turn)
     const nextPrompt = replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock))
     if (notice === undefined) return { systemPrompt: nextPrompt }
     return {
@@ -89,13 +113,12 @@ export function createMemoryPromptHandler(
 async function addMemoryPressureMetadata(
   block: string,
   repo: GitMemoryRepo,
+  revision: string | null,
   compileWarnTokens: number | undefined,
   estimates: Map<string, number>,
 ): Promise<string> {
-  if (compileWarnTokens === undefined) return block
-  const head = await repo.head()
-  if (head === null) return block
-  const estimate = await estimateSystemTokensCached(repo, head, estimates)
+  if (compileWarnTokens === undefined || revision === null) return block
+  const estimate = await estimateSystemTokensCached(repo, revision, estimates)
   const softThreshold = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * compileWarnTokens)
   if (estimate < softThreshold) return block
   const percentage = Math.floor((estimate / compileWarnTokens) * 100)
@@ -113,6 +136,7 @@ function renderMemoryNotice(
   compactedMessageCount: number,
   nudgeTurns: number | undefined,
   soulNotice: { readonly sha: string } | undefined,
+  turn: ProjectionTurn,
 ): string | undefined {
   const lines = [
     ...(compactedMessageCount === 0
@@ -124,6 +148,7 @@ function renderMemoryNotice(
     ...(soulNotice === undefined
       ? []
       : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
+    ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision)]),
   ]
   if (lines.length === 0) return undefined
   return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")
@@ -149,7 +174,7 @@ function readPromptSession(eventCtx: unknown): MemoryPromptSession | undefined {
   const id = Reflect.apply(getSessionId, manager, [])
   const branch = Reflect.apply(getBranch, manager, [])
   if (typeof id !== "string" || id.length === 0 || !Array.isArray(branch)) return undefined
-  return { id, compactedMessageCount: countCompactedMessages(branch) }
+  return { id, compactedMessageCount: countCompactedMessages(branch), branch }
 }
 
 /**

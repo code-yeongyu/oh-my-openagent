@@ -1,18 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { describe, expect, test } from "bun:test"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import {
-  GitMemoryRepo,
-  buildIdentityPaths,
-  consumeSoulNoticeDelta,
-} from "@oh-my-opencode/memory-core"
+import { consumeSoulNoticeDelta } from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { createMemoryBinding } from "./binding"
-import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import {
   MEMORY_NUDGE_METADATA_TOKEN,
   MEMORY_PRESSURE_METADATA_TOKEN,
@@ -20,126 +13,21 @@ import {
   MEMORY_SOUL_METADATA_TOKEN,
   createMemoryPromptHandler,
 } from "./prompt"
+import {
+  IDENTITY,
+  fixture,
+  fixtureAtSystemTokens,
+  messageEntry,
+  customEntry,
+  compactionEntry,
+  liveBranch,
+  compactedBranch,
+  eventContext,
+  beforeAgentStart,
+  dispatchEvent,
+  boundHandler,
+} from "./prompt.test-support"
 import { MEMORY_PRESSURE_SOFT_RATIO } from "./status"
-import { realpathSync } from "node:fs"
-import { rmEfaultTolerant } from "./teardown.test-support"
-
-const IDENTITY = "prompt-agent"
-
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
-})
-
-class CountingRepo extends GitMemoryRepo {
-  headCalls = 0
-  lsTreeCalls = 0
-  showCalls = 0
-
-  override async head(): Promise<string | null> {
-    this.headCalls += 1
-    return super.head()
-  }
-
-  override async lsTree(revision?: string, path?: string): Promise<string[]> {
-    this.lsTreeCalls += 1
-    return super.lsTree(revision, path)
-  }
-
-  override async show(revision: string, path: string): Promise<string> {
-    this.showCalls += 1
-    return super.show(revision, path)
-  }
-
-  resetCounts(): void {
-    this.headCalls = 0
-    this.lsTreeCalls = 0
-    this.showCalls = 0
-  }
-}
-
-async function fixture(personaBody = "first"): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
-  const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-prompt-")))
-  tempDirs.push(dir)
-  const repo = new CountingRepo({ dir: join(dir, "repo"), agentId: IDENTITY })
-  await repo.init({
-    seedFiles: [{ relativePath: "system/persona.md", content: `---\ndescription: Persona\n---\n${personaBody}\n` }],
-  })
-  repo.resetCounts()
-  const context = createMemoryIdentityContext({
-    identity: IDENTITY,
-    identityPaths: buildIdentityPaths(join(dir, "memory"), IDENTITY),
-    binding: createMemoryBinding({ identity: IDENTITY, repoPath: repo.dir, boundAt: 0 }),
-  })
-  return { repo, context }
-}
-
-async function fixtureAtSystemTokens(tokens: number): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
-  const header = "---\ndescription: Persona\n---\n"
-  return fixture("A".repeat(tokens * 4 - Buffer.byteLength(header, "utf8") - 1))
-}
-
-function messageEntry(id: string): Record<string, unknown> {
-  return { type: "message", id, message: { role: "user", content: [{ type: "text", text: `entry ${id}` }] } }
-}
-
-function customEntry(id: string): Record<string, unknown> {
-  return { type: "custom", id, customType: "omo-test:entry" }
-}
-
-function compactionEntry(id: string, firstKeptEntryId: string): Record<string, unknown> {
-  return {
-    type: "compaction",
-    id,
-    parentId: null,
-    timestamp: "2026-09-16T00:00:00.000Z",
-    summary: "summary",
-    firstKeptEntryId,
-    tokensBefore: 4_000,
-  }
-}
-
-/** A branch that never compacted: every one of its messages is still in the live context. */
-function liveBranch(messageCount: number): readonly unknown[] {
-  return Array.from({ length: messageCount }, (_, index) => messageEntry(`m${index + 1}`))
-}
-
-/** A branch whose latest compaction pushed exactly `compactedCount` messages out of the live context. */
-function compactedBranch(compactedCount: number): readonly unknown[] {
-  return [
-    ...Array.from({ length: compactedCount }, (_, index) => messageEntry(`old-${index + 1}`)),
-    compactionEntry("c1", "kept-1"),
-    messageEntry("kept-1"),
-    messageEntry("kept-2"),
-  ]
-}
-
-function eventContext(sessionId: string, branch: readonly unknown[]): unknown {
-  return {
-    sessionManager: {
-      getSessionId: () => sessionId,
-      getBranch: () => branch,
-    },
-  }
-}
-
-function beforeAgentStart(systemPrompt: string): unknown {
-  return { type: "before_agent_start", prompt: "hello", systemPrompt }
-}
-
-async function dispatchEvent(
-  pi: FakeExtensionAPI,
-  payload: unknown,
-  ctx: unknown,
-): Promise<BeforeAgentStartEventResult | undefined> {
-  const results = await pi.dispatch("before_agent_start", payload, ctx)
-  return results[0] as BeforeAgentStartEventResult | undefined
-}
-
-function boundHandler(repo: CountingRepo, context: MemoryIdentityContext) {
-  return createMemoryPromptHandler({ resolveContext: () => context, createRepo: () => repo })
-}
 
 describe("MEMORY_PROMPT_TEMPLATE", () => {
   test("#given the compiled-block cache key #when the template id is read #then it is the v3 stable template", () => {
@@ -544,28 +432,6 @@ describe("createMemoryPromptHandler", () => {
     // then — same bytes, and the second prompt added no tree listing and no blob reads
     expect(second?.systemPrompt).toBe(first?.systemPrompt)
     expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({ lsTree: 0, show: 0 })
-  }, 30_000)
-
-  test("#given a commit between runs #when the next dispatch happens #then the new content appears while the prior result keeps the old content", async () => {
-    // given
-    const { repo, context } = await fixture()
-    const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", boundHandler(repo, context))
-    const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
-    expect(repo.headCalls).toBe(1)
-
-    // when
-    await writeFile(join(repo.dir, "system/persona.md"), "---\ndescription: Persona\n---\nsecond\n")
-    await repo.commitWrite(["system/persona.md"], "update persona", { agentId: IDENTITY, authorName: "Prompt Agent" })
-    const headCallsAfterCommit = repo.headCalls
-    const second = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
-
-    // then
-    expect(first?.systemPrompt).toContain("first")
-    expect(first?.systemPrompt).not.toContain("second")
-    expect(second?.systemPrompt).toContain("second")
-    expect(repo.headCalls - headCallsAfterCommit).toBe(1)
-    expect(repo.lsTreeCalls).toBe(2)
   }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {

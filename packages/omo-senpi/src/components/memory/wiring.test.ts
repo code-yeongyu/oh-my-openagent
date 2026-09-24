@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
@@ -125,7 +126,7 @@ describe("memory pressure dream wiring", () => {
 })
 
 describe("memory pressure compile wiring", () => {
-  test("#given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next real compile refresh adds pressure metadata without truncating memory", async () => {
+  test("#given a bound fixture repo below pressure #when a committed write crosses the threshold #then the next session's compile adds pressure metadata without truncating memory", async () => {
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-pressure-wiring-")))
     roots.push(root)
     const identity = "pressure-agent"
@@ -142,17 +143,16 @@ describe("memory pressure compile wiring", () => {
     })
     const pi = new MemoryFakeExtensionAPI()
     createMemoryWiring({
-      sessions: new Map([["session-pressure", { context }]]),
+      sessions: new Map([["session-pressure", { context }], ["session-pressure-next", { context }]]),
       loadConfig: () => loadedMemoryConfig(memorySettings({ compile_warn_tokens: 100 })),
       cwd: () => root,
       env: {},
     }).registerStatic(pi, componentContext())
-    const eventCtx = sessionContext("session-pressure")
 
     const [below] = await pi.dispatch(
       "before_agent_start",
       { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
-      eventCtx,
+      sessionContext("session-pressure"),
     )
     await writeFile(
       join(repo.dir, "system/persona.md"),
@@ -162,10 +162,11 @@ describe("memory pressure compile wiring", () => {
       agentId: identity,
       authorName: "Pressure Agent",
     })
+    // A running session keeps its pinned projection (#8470); the next session compiles the new commit.
     const [pressured] = await pi.dispatch(
       "before_agent_start",
       { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
-      eventCtx,
+      sessionContext("session-pressure-next"),
     )
 
     const belowPrompt = (below as { systemPrompt?: string } | undefined)?.systemPrompt ?? ""
@@ -225,8 +226,9 @@ describe("memory recall wiring", () => {
     expect(recall).toBeUndefined()
     // This branch never compacted and nothing else is volatile, so the projection carries no notice message.
     expect(notice).toBeUndefined()
-    // The kibitzer prompt trigger may append its gate observability entry; nothing else may land.
-    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate")).toEqual([])
+    // The kibitzer prompt trigger may append its gate observability entry and the projection records its
+    // session pin; nothing else may land.
+    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate" && entry.customType !== PROJECTION_PIN_ENTRY_TYPE)).toEqual([])
     expect(projection?.systemPrompt).toContain("persona")
   }, 30_000)
 })

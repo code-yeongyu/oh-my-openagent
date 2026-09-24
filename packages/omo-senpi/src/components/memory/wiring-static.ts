@@ -33,6 +33,7 @@ import { registerMemoryWriteListener } from "./wiring-memory-write"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
+import { createProjectionPins, PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
 
 export function registerMemoryStatic(input: {
   readonly pi: SenpiExtensionAPI
@@ -79,9 +80,14 @@ export function registerMemoryStatic(input: {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
   }
+  const projectionPins = createProjectionPins()
+  const entryApi = hasMemoryCapabilities(pi) ? pi : undefined
   const promptHandler = createPromptHandler({
     resolveContext,
     cache: promptCache,
+    pins: projectionPins,
+    ...(entryApi === undefined ? {} : { recordPin: (record) => entryApi.appendEntry(PROJECTION_PIN_ENTRY_TYPE, record) }),
+    onRepin: (sessionId, reason) => options.logger?.info("omo-senpi memory projection repinned", { sessionId, reason }),
     resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
     resolveSoulNotice: async (repo, sessionId, identity) => {
@@ -175,7 +181,10 @@ export function registerMemoryStatic(input: {
     contextForSession: (sessionId) => asCommandIdentity(resolveContext(sessionId)),
     resolveIdentity: () => (activeSession.current === undefined ? undefined : asCommandIdentity(resolveContext(activeSession.current))),
     loadSettings: loadCommandSettings,
-    bustPromptCache: () => promptCache.clear(),
+    bustPromptCache: () => {
+      promptCache.clear()
+      projectionPins.requestRefresh()
+    },
     reflectionSink: {
       request: async (request) => {
         if (activeSession.current === undefined) throw new Error("no bound memory session")
