@@ -9,6 +9,7 @@ import type {
   TelemetryDiagnosticInput,
   TelemetryEnv,
   TelemetryOsProvider,
+  TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
@@ -67,6 +68,7 @@ export type PostHogActivityReason = "run_started" | "plugin_loaded"
 
 export type PostHogClient = {
   readonly trackActive: (distinctId: string, reason: PostHogActivityReason) => void
+  readonly flush: () => Promise<void>
   readonly shutdown: () => Promise<void>
 }
 
@@ -74,12 +76,17 @@ type CreatePostHogOptions = {
   readonly configEnabled?: boolean
 }
 
+// Plugin load queues one event and flushes it explicitly. With the core default flushAt of 1,
+// capture() starts a background flush whose failure posthog-node prints via console.error into the TUI.
+const PLUGIN_TRANSPORT_OPTIONS = { flushAt: 20 }
+
 type RecordPluginTelemetryInput = {
   readonly configEnabled?: boolean
 }
 
 const NO_OP_POSTHOG: PostHogClient = {
   trackActive: () => undefined,
+  flush: async () => undefined,
   shutdown: async () => undefined,
 }
 
@@ -123,6 +130,18 @@ function logTelemetryDiagnostic(input: TelemetryDiagnosticInput): void {
   })
 }
 
+function createProductConfig(source: PostHogSource): TelemetryProductConfig {
+  const product = createOpencodeTelemetryProductConfig()
+  if (source !== "plugin") {
+    return product
+  }
+
+  return {
+    ...product,
+    transportOptions: { ...product.transportOptions, ...PLUGIN_TRANSPORT_OPTIONS },
+  }
+}
+
 function createPostHogClient(source: PostHogSource, options: CreatePostHogOptions = {}): PostHogClient {
   const env = process.env
   if (shouldDisablePostHog(env, options.configEnabled)) {
@@ -133,7 +152,7 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
     diagnostics: logTelemetryDiagnostic,
     env: createCoreCompatibleTelemetryEnv(env),
     osProvider: resolveOsProvider(),
-    product: createOpencodeTelemetryProductConfig(),
+    product: createProductConfig(source),
     source,
     transportFactory: resolveTransportFactory(),
   })
@@ -154,6 +173,17 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
         distinctId,
         reason,
       })
+    },
+    flush: async () => {
+      try {
+        await client.flush()
+      } catch (error) {
+        log("[posthog] telemetry flush failed", {
+          error: String(error),
+          errorKind: error instanceof Error ? "error" : "non_error",
+          source,
+        })
+      }
     },
     shutdown: async () => {
       await client.shutdown()
@@ -177,5 +207,5 @@ export function recordPluginTelemetry(input: RecordPluginTelemetryInput): void {
   const posthog = createPluginPostHog({ configEnabled: input.configEnabled })
   const distinctId = getPostHogDistinctId()
   posthog.trackActive(distinctId, "plugin_loaded")
-  void posthog.shutdown()
+  void posthog.flush()
 }
