@@ -81,13 +81,17 @@ function isDagOwnedChild(spec: RpcRunnerSpec): boolean {
   return typeof owner === "object" && owner !== null && "kind" in owner && owner.kind === "dag"
 }
 
+function resolveEffectiveExtensions(spec: RpcRunnerSpec): readonly string[] {
+  // The OMO launcher prepends its own extension before user/provider entries. DAG-owned tasks drop
+  // that first entry so neither the admission probe nor the detached child can boot another task
+  // engine, while provider extensions and every non-DAG extension list remain unchanged.
+  const extensions = spec.extensions ?? []
+  return isDagOwnedChild(spec) ? extensions.slice(1) : extensions
+}
+
 export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   const args: string[] = ["--no-extensions", "--no-ask-user"]
-  // The OMO launcher prepends its own extension before user/provider entries. DAG-owned tasks drop
-  // that first entry so the detached child cannot boot a task engine, while provider extensions
-  // and every non-DAG child's extension list remain unchanged.
-  const extensions = isDagOwnedChild(spec) ? (spec.extensions ?? []).slice(1) : spec.extensions ?? []
-  for (const entry of extensions) {
+  for (const entry of resolveEffectiveExtensions(spec)) {
     if (entry.length > 0) args.push("--extension", entry)
   }
   if (spec.model !== undefined && spec.model.length > 0) {
@@ -102,7 +106,7 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
 
 export function buildModelCatalogArgs(spec: RpcRunnerSpec): readonly string[] {
   const args: string[] = ["--no-extensions"]
-  for (const entry of spec.extensions ?? []) {
+  for (const entry of resolveEffectiveExtensions(spec)) {
     if (entry.length > 0) args.push("--extension", entry)
   }
   args.push("--no-skills", "--no-prompt-templates", "--no-context-files", "--list-models")
