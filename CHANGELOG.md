@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0-beta.90] - 2026-09-24
+
 ### Changed
 
 **Moving from the OpenCode edition to OmO Native now carries your setup over in one run.** ([#8815](https://github.com/code-yeongyu/oh-my-openagent/issues/8815), [#8816](https://github.com/code-yeongyu/oh-my-openagent/issues/8816), [#8817](https://github.com/code-yeongyu/oh-my-openagent/issues/8817), [#8799](https://github.com/code-yeongyu/oh-my-openagent/pull/8799), [#8803](https://github.com/code-yeongyu/oh-my-openagent/pull/8803)) `omo setup` reads what your OpenCode install already knows and brings it across after one confirmation: API keys for every provider omo can serve (an OpenCode `zai-coding-plan` key lands on `zai`), custom OpenAI- or Anthropic-compatible providers from `opencode.jsonc` with their models and keys, MCP servers, global skills, your default model, and the model you gave each category or agent. It prints a single summary first. OAuth logins it cannot copy are listed with the `/login <provider>` command that restores them, and anything it will not bring over says why: an MCP server that runs command substitution, a skill folder with no `SKILL.md`, OpenCode's `small_model`, the `build` and `plan` primary agents, or an agent name omo does not have. Running it again changes nothing that is already there.
