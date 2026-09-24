@@ -1,5 +1,5 @@
 {
-  "_comment": "Derived from @code-yeongyu/senpi 2026.9.24 builtinProviders(). builtinProviderIds and oauthProviderIds are the engine registry verbatim; providers maps a source harness id onto the omo provider that serves the same endpoint; oauthLogins maps a source OAuth id onto the omo provider to run /login for. Re-derive all four whenever the senpi pin changes.",
+  "_comment": "Derived from @code-yeongyu/senpi 2026.9.24-2 builtinProviders(). builtinProviderIds and oauthProviderIds are the engine registry verbatim; providers maps a source harness id onto the omo provider that serves the same endpoint; oauthLogins maps a source OAuth id onto the omo provider to run /login for. Re-derive all four whenever the senpi pin changes.",
   "builtinProviderIds": [
     "alibaba-token-plan",
     "amazon-bedrock",
