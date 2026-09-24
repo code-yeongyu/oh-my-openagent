@@ -12,23 +12,29 @@ export function packageManifest() {
   return readJson(join(packageRoot, "package.json"))
 }
 
-function quotePosix(value) {
-  return `'${value.replaceAll("'", "'\\''")}'`
-}
+const BUN_GLOBAL_PACKAGE_SUFFIX = "/install/global/node_modules/omo-ai"
 
 export function updateTarget(root = packageRoot, platform = process.platform) {
   const updateCwd = dirname(join(root, "package.json"))
   const normalizedRoot = updateCwd.replaceAll("\\", "/")
-  if (normalizedRoot.endsWith("/install/global/node_modules/omo-ai")) {
-    const quotedCwd = platform === "win32"
-      ? `"${normalizedRoot}"`
-      : quotePosix(updateCwd)
+  if (normalizedRoot.endsWith(BUN_GLOBAL_PACKAGE_SUFFIX)) {
+    // `--cwd` into this package dir does not retarget `bun add -g`; bun still installs into
+    // `$BUN_INSTALL/install/global` (or `~/.bun` when that env is unset). The prefix is the
+    // ancestor of `/install/global/`, and the spawn overlays it so this install is the one that
+    // moves. `platform` stays on the signature because callers pass the host they are describing.
+    const bunInstall = normalizedRoot.slice(0, -BUN_GLOBAL_PACKAGE_SUFFIX.length)
     return {
       manager: "bun",
-      command: `bun add --cwd ${quotedCwd} -g omo-ai@beta`,
+      command: "bun add -g omo-ai@beta",
+      argv: ["bun", "add", "-g", "omo-ai@beta"],
+      env: { BUN_INSTALL: bunInstall },
     }
   }
-  return { manager: "npm", command: "npm i -g omo-ai@beta" }
+  return {
+    manager: "npm",
+    command: "npm i -g omo-ai@beta",
+    argv: ["npm", "i", "-g", "omo-ai@beta"],
+  }
 }
 
 export function resolveSenpi(options = {}) {

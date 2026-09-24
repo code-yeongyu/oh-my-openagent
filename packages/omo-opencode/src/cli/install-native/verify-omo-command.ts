@@ -9,11 +9,15 @@ export interface OmoVersionProbeResult {
 
 export type OmoVersionProbe = (command: string, args: readonly string[]) => Promise<OmoVersionProbeResult>
 
-export interface OmoCommandVerification {
-  readonly ok: boolean
-  readonly notes: readonly string[]
-  readonly warnings: readonly string[]
-}
+export type OmoCommandVerification =
+  | {
+      readonly ok: true
+      /** The omo-ai `omo` that was verified. */
+      readonly binPath: string
+      readonly notes: readonly string[]
+      readonly warnings: readonly string[]
+    }
+  | { readonly ok: false; readonly notes: readonly string[]; readonly warnings: readonly string[] }
 
 export function pathOrderFix(directory: string, isWindows: boolean): string {
   return isWindows ? `set PATH=${directory};%PATH%` : `export PATH="${directory}:$PATH"`
@@ -59,7 +63,7 @@ export async function verifyOmoCommand(options: {
     }
   }
 
-  return { ok: true, notes: [`omo --version reports ${printed}`], warnings: [] }
+  return { ok: true, binPath: native.binPath, notes: [`omo --version reports ${printed}`], warnings: [] }
 }
 
 function shadowWarning(resolved: OmoBinEntry, native: OmoBinEntry, isWindows: boolean): string {

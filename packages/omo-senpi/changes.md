@@ -8,10 +8,17 @@
 
 Tests: `sidecar-model.test.ts` (both category refusals name the chain's providers, only they classify as configuration), `sidecar.test.ts` (a category refusal is a non-diagnostic outcome that still backs off and heals; a transient refusal stays diagnostic), `observe.test.ts` (one bounded notice per session, no gate, streak neither fed nor reset), `notice.test.ts`, `tools/session-read.test.ts`, `memory/index.test.ts`. omo#8837, design source omo#8800.
 
+## extension: component info logs are silent unless OMO_DEBUG is set
+
+`src/extension/compose.ts` `defaultLogger.info` no longer writes to stderr unless `OMO_DEBUG` is set. `warn`/`error` unchanged; stdout still unused (#8564). Call sites such as ulw-loop skip and model-profile selection stay as `logger.info`; the model-profile user sentence already goes through `pi.sendMessage`. `compose.test.ts` covers silent-by-default, printed-with-switch, warn-always, nothing on stdout. omo#8819.
+
+||||||| cb5ea3272
+
+||||||| e1693d8b4
+
 ## memory: the system prompt keeps its memory block for the whole session (#8470)
 
 The memory block is compiled once per session at the memory HEAD of its first turn and persisted as an `omo-memory:projection-pin` entry; later memory commits reach the model as a `<memory_notice>` line instead of rewriting the system prompt, so they no longer invalidate the prompt cache. Compaction, `/recompile`, and a vanished pinned commit repin; new and forked sessions pin fresh.
-
 ## 2026-09-24 - onboarding lane 2 stops hand-moving global OpenCode MCP servers into project files
 
 `skills/onboarding/SKILL.md` lane 2 (migration help) now tells the guide that global OpenCode MCP servers and global OpenCode skills are `omo setup`'s job: it imports them into `~/.omo/agent/mcp.json` and `~/.omo/agent/skills/`, consent-gated, converted, and without overwriting an existing name, previewable with `omo setup --dry-run` and applied with `omo setup --yes` once the user accepts, because the guide's shell is not a terminal and plain `omo setup` stops at its consent prompt without importing. The migration-plan sentence splits "which MCP servers move to the project `.mcp.json`" into what setup carries over globally and what is genuinely project-only.
@@ -19,7 +26,6 @@ The memory block is compiled once per session at the memory HEAD of its first tu
 Written because the old wording produced the bug it was meant to prevent: the lane moved a GLOBAL server into the PROJECT `.mcp.json`, and the next session outside that project saw nothing. Implementation detail lives in `packages/omo-native/changes.md`.
 
 ||||||| da3ba4f48
-
 ## skills: the hyperplan restart hint names the brand command
 
 `skills/hyperplan/SKILL.md` told the user to "Restart senpi without `--no-omo-task`". On OmO

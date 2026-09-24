@@ -26,6 +26,13 @@ export {
   nativeInstallSuccessLine,
   runNativeInstall,
 } from "./run-native-install"
+export {
+  NATIVE_SETUP_OFFER_QUESTION,
+  nativeSetupFollowUpLine,
+  nativeSetupStartLine,
+  offerNativeSetup,
+} from "./offer-native-setup"
+export type { NativeSetupOfferDependencies, NativeSetupOfferResult, NativeSetupRun } from "./offer-native-setup"
 export type {
   NativeInstallDependencies,
   NativeInstallFailure,

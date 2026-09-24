@@ -352,39 +352,81 @@ describe("composeOmoSenpiExtension", () => {
     expect(retried).toBe(false)
   })
 
-  it("#given the default logger #when a component logs info #then it goes to the stderr console, never stdout, without a trailing undefined", async () => {
-    // given: a child's stdout is its deliverable (the reflection report is read from it), so
-    // component diagnostics must never share that stream (#8564)
-    const pi = new FakeExtensionAPI()
-    const info = spyOn(console, "info").mockImplementation(() => {})
-    const log = spyOn(console, "log").mockImplementation(() => {})
-    const error = spyOn(console, "error").mockImplementation(() => {})
-    const components: OmoSenpiComponent[] = [
+  it("#given the default logger and no OMO_DEBUG #when a component logs info #then nothing is printed on stderr or stdout", async () => {
+    // given: print/json mode must not dump component diagnostics (#8819); a child's stdout is its
+    // deliverable, so diagnostics must never share that stream (#8564)
+    const captured = await captureDefaultLoggerOutput(undefined, (ctx) => {
+      ctx.logger.info("alpha ready")
+      ctx.logger.info("alpha detail", { count: 1 })
+    })
+
+    // then
+    expect(captured.stdout).toStrictEqual([])
+    expect(captured.stderr).toStrictEqual([])
+    expect(captured.warn).toStrictEqual([])
+  })
+
+  it("#given the default logger and OMO_DEBUG=1 #when a component logs info #then it goes to stderr, never stdout, without a trailing undefined", async () => {
+    // given
+    const captured = await captureDefaultLoggerOutput("1", (ctx) => {
+      ctx.logger.info("alpha ready")
+      ctx.logger.info("alpha detail", { count: 1 })
+    })
+
+    // then
+    expect(captured.stdout).toStrictEqual([])
+    expect(captured.warn).toStrictEqual([])
+    expect(captured.stderr).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
+  })
+
+  it("#given the default logger and no OMO_DEBUG #when a component logs warn #then it still goes to stderr, never stdout", async () => {
+    // given
+    const captured = await captureDefaultLoggerOutput(undefined, (ctx) => {
+      ctx.logger.warn("alpha warn")
+      ctx.logger.warn("alpha warn-detail", { count: 1 })
+    })
+
+    // then
+    expect(captured.stdout).toStrictEqual([])
+    expect(captured.stderr).toStrictEqual([])
+    expect(captured.warn).toStrictEqual([["alpha warn"], ["alpha warn-detail", { count: 1 }]])
+  })
+})
+
+async function captureDefaultLoggerOutput(
+  debug: string | undefined,
+  log: (ctx: { logger: ComponentLogger }) => void,
+): Promise<{ stdout: unknown[][]; stderr: unknown[][]; warn: unknown[][] }> {
+  const previous = process.env.OMO_DEBUG
+  if (debug === undefined) delete process.env.OMO_DEBUG
+  else process.env.OMO_DEBUG = debug
+
+  const pi = new FakeExtensionAPI()
+  const info = spyOn(console, "info").mockImplementation(() => {})
+  const logFn = spyOn(console, "log").mockImplementation(() => {})
+  const error = spyOn(console, "error").mockImplementation(() => {})
+  const warn = spyOn(console, "warn").mockImplementation(() => {})
+  try {
+    await composeOmoSenpiExtension([
       {
         name: "alpha",
         register(_api, ctx) {
-          ctx.logger.info("alpha ready")
-          ctx.logger.info("alpha detail", { count: 1 })
+          log(ctx)
         },
       },
-    ]
-
-    // when
-    let alphaOnStdout: unknown[][] = []
-    let alphaOnStderr: unknown[][] = []
-    try {
-      await composeOmoSenpiExtension(components)(pi)
-      const alpha = (call: unknown[]) => String(call[0]).startsWith("alpha")
-      alphaOnStdout = [...info.mock.calls, ...log.mock.calls].filter(alpha)
-      alphaOnStderr = error.mock.calls.filter(alpha)
-    } finally {
-      info.mockRestore()
-      log.mockRestore()
-      error.mockRestore()
+    ])(pi)
+    const alpha = (call: unknown[]) => String(call[0]).startsWith("alpha")
+    return {
+      stdout: [...info.mock.calls, ...logFn.mock.calls].filter(alpha),
+      stderr: error.mock.calls.filter(alpha),
+      warn: warn.mock.calls.filter(alpha),
     }
-
-    // then
-    expect(alphaOnStdout).toStrictEqual([])
-    expect(alphaOnStderr).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
-  })
-})
+  } finally {
+    info.mockRestore()
+    logFn.mockRestore()
+    error.mockRestore()
+    warn.mockRestore()
+    if (previous === undefined) delete process.env.OMO_DEBUG
+    else process.env.OMO_DEBUG = previous
+  }
+}

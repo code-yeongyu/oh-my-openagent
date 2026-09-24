@@ -14,7 +14,13 @@ import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version
 import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
 import { detectCodexInstallation, formatCodexInstallationWarning, runCodexInstaller } from "./install-codex"
 import { runNativeDevInstaller } from "./install-native-dev"
-import { nativeInstallFailureLines, nativeInstallSuccessLine, runNativeInstall } from "./install-native"
+import {
+  nativeInstallFailureLines,
+  nativeInstallSuccessLine,
+  nativeSetupFollowUpLine,
+  offerNativeSetup,
+  runNativeInstall,
+} from "./install-native"
 import { NATIVE_EDITION_HINT_TITLE, nativeEditionHintLines, shouldShowNativeEditionHint } from "./native-edition-hint"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
@@ -183,6 +189,15 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     spinner.stop(nativeInstallSuccessLine(outcome.verified))
     for (const note of outcome.notes) p.log.info(note)
     for (const warning of outcome.warnings) p.log.warn(warning)
+    const setup = await offerNativeSetup(outcome, {
+      confirm: async (message) => {
+        const answer = await p.confirm({ message, initialValue: true })
+        return !p.isCancel(answer) && answer
+      },
+      onStart: (line) => p.log.step(line),
+    })
+    const followUp = nativeSetupFollowUpLine(setup)
+    if (followUp !== null) p.log.warn(followUp)
   }
 
   if (config.hasNativeDev) {

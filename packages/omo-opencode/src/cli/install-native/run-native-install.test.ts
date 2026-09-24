@@ -163,6 +163,7 @@ describe("runNativeInstall legacy omo bin", () => {
     expect(outcome.notes.join("\n")).toContain("oh-my-openagent@4.19.4")
     expect(outcome.ok).toBe(true)
     expect(outcome.verified).toBe(true)
+    expect(outcome.omoBinPath).toBe(native.binPath)
     expect(outcome.warnings).toEqual([])
   })
 
@@ -225,6 +226,7 @@ describe("runNativeInstall legacy omo bin", () => {
     expect(existsSync(foreign.binPath)).toBe(true)
     expect(outcome.ok).toBe(true)
     expect(outcome.verified).toBe(false)
+    expect(outcome.omoBinPath).toBeUndefined()
     expect(outcome.warnings.join("\n")).toContain(`export PATH="${nativeRoot}/bin:$PATH"`)
   })
 })

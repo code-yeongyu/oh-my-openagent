@@ -1,3 +1,17 @@
+## 2026-09-24 - omo update runs the detected package-manager command (#8830)
+
+### What changed
+
+`bin/lib/package-paths.js` `updateTarget()` keeps `manager` and `command` and adds `argv` plus, for a bun-global layout, `env.BUN_INSTALL`. The printed bun command is `bun add -g omo-ai@beta`; the `--cwd <package dir>` form is dropped because bun ignores `--cwd` for `-g` and still installs into the ambient `BUN_INSTALL` / `~/.bun`. `bin/lib/self-update.js` is new: it prints the command, returns on `--dry-run`/`--print`, otherwise spawns through `runChild` (injectable `run` for tests), streams stdio, and reports before/after versions or a non-zero retry line. `bin/lib/launcher.js` `isSelfUpdate` calls it. Tests in `test/self-update.test.ts` and `test/launcher.test.ts`.
+
+### Why
+
+`omo update` did not update. The copy-paste command was also wrong for bun-global installs that were not the ambient prefix.
+
+### Why an extension could not handle it
+
+Self-update is answered in the launcher before the engine is spawned, so the product package (not the pinned engine) is what moves.
+
 ## 2026-09-24 - omo setup imports every OpenCode key an omo provider can serve, and names the real sign-in command (#8799)
 
 ### What changed

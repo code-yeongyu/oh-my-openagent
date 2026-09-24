@@ -41,6 +41,8 @@ export interface NativeInstallOutcome {
   readonly ok: boolean
   /** The `omo` that PATH resolves after the install is the one omo-ai owns. */
   readonly verified: boolean
+  /** The verified omo-ai binary; set only when `verified`, so onboarding never runs a bare `omo` lookup. */
+  readonly omoBinPath?: string
   readonly plan: NativeInstallPlan
   readonly notes: readonly string[]
   readonly warnings: readonly string[]
@@ -100,7 +102,9 @@ export async function runNativeInstall(
   const verification = await verifyOmoCommand({ environment, probeVersion: dependencies.probeVersion })
   notes.push(...verification.notes)
   warnings.push(...verification.warnings)
-  return { ok: true, verified: verification.ok, plan, notes, warnings }
+  return verification.ok
+    ? { ok: true, verified: true, omoBinPath: verification.binPath, plan, notes, warnings }
+    : { ok: true, verified: false, plan, notes, warnings }
 }
 
 const NPM_LEGACY_OMO_PACKAGES: readonly string[] = ["oh-my-openagent", "oh-my-opencode"]
