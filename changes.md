@@ -38,6 +38,12 @@ Verification: `bun test packages/omo-opencode/src/cli packages/omo-opencode/src/
 
 `docs/guide/installation.md` rewrites the import stage of the `omo setup` section. It now says that a credential whose provider id differs between harnesses is still imported when the endpoint matches (opencode's `zai-coding-plan` key lands on the `zai` provider), and that a skipped credential comes with the command that fixes it: start `omo` and run `/login <provider>` for an OAuth login, or define the provider and its baseUrl in the engine's `models.json` and then `/login` it for an API key nothing serves. The old text pointed at `omo auth`, which only prints or checks credentials that already exist and cannot sign anyone in. Implementation detail lives in `packages/omo-native/changes.md`.
 
+## 2026-09-24 - installation guide: `omo setup` also carries over opencode MCP servers and skills
+
+`docs/guide/installation.md` extends the import stage of the `omo setup` section: alongside credentials, the same stage converts the MCP servers declared in `~/.config/opencode/opencode.json[c]` into the engine's schema and merges them into the global `~/.omo/agent/mcp.json`, and copies global OpenCode skills into `~/.omo/agent/skills/`, with its own preview and confirmation. The text names why both are global rather than per-project, which opencode config files and directories are read (the global dir's `config.json`, `opencode.json` and `opencode.jsonc` merged, with `OPENCODE_CONFIG`, `~/.opencode/` and `OPENCODE_CONFIG_DIR` layered on top), that an existing name - or a skill name omo bundles - is kept and reported, that `mcp.json` is backed up before it is rewritten, and that a server using shell command substitution or a `{file:...}` placeholder, or a skill without a description, is refused with a notice. Implementation detail lives in `packages/omo-native/changes.md`.
+
+||||||| da3ba4f48
+
 ||||||| 530692bc0
 
 ## 2026-09-24 - skills instruct the brand command for --list-tips, --onboard, and hyperplan restart (#8794)
@@ -724,6 +730,7 @@ shell lookup for bare `tsc` and `bun` commands on Windows. The release builder
 therefore reaches the version-stamping step instead of letting the shell split
 the runtime path at `C:\Program`. The command-policy regression tests cover
 absolute Windows paths, bare package commands, and POSIX execution.
+
 ## 2026-08-27 — Record post-beta.23 merged follow-ups
 
 The root product changelog now records the pull requests merged after the
@@ -976,6 +983,7 @@ from the machine.
 **A future refactor or sync must not break:** attribution must never derive from hostname,
 hardware, or accounts; keep both capture paths (session client + facade) attributed or events
 disagree about their own schema.
+
 ## 2026-08-20 — Demand parent-side verification of DAG completions
 
 A DAG node's completion summary was delivered to the orchestrating parent as if
@@ -1172,6 +1180,7 @@ budget a test grants a subprocess or timed promise; `test/test-timeout-budget.te
 reads both the configured value and the real budgets out of the test sources and
 fails if that ordering is ever reintroduced. Keep the bound proportionate: it
 exists to survive a cold Windows process spawn, not to hide a genuine hang.
+
 ## 2026-09-06 — Keep lead polling alive through runtime access windows
 
 Lead polling now suppresses repeated `EPERM` and `EACCES` runtime-directory errors, reports the first unavailable transition and the subsequent recovery, and leaves mailbox state untouched while the runtime directory cannot be enumerated. Mailbox reads and missing-directory handling remain unchanged.

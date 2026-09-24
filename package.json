@@ -183,7 +183,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.9.24",
+    "@code-yeongyu/senpi": "2026.9.24-2",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",

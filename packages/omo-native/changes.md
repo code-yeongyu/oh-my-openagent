@@ -20,6 +20,32 @@ The provider map and the setup import flow are this package's own surface; the e
 
 `bin/lib/provider-map.json` (every senpi pin bump re-derives it), `bin/lib/setup-import.js` print helpers.
 
+## 2026-09-24 - omo setup carries over OpenCode MCP servers and global skills, not just credentials
+
+### What changed
+
+`bin/lib/setup-opencode-assets.js` (new) reads the OpenCode user-scope config the way opencode 1.18 loads it: `config.json`, `opencode.json` and `opencode.jsonc` in `$XDG_CONFIG_HOME/opencode` (else `~/.config/opencode`) deep-merged in that order, then `$OPENCODE_CONFIG`, then `opencode.json[c]` in `~/.opencode` and `$OPENCODE_CONFIG_DIR` (a layer on top of the global dir, not a replacement for it), plus the skill trees (`skills/`, then `skill/`) of each of those directories, and converts what it finds to the shapes the engine reads. `type: "local"` becomes `type: "stdio"` with the head of `command[]` as `command` and the tail as `args`, `environment` becomes `env`, `cwd` carries over, `type: "remote"` becomes `type: "http"`, `oauth: false` becomes `auth: false`, and an `oauth` client becomes the engine's `oauth` (`clientId`, `callbackPort`, space-separated `scope` as `scopes`; a `clientSecret` or `redirectUri` has no engine field and is reported). OpenCode's `{env:NAME}` placeholders become the engine's `${NAME}`; a server left with a `{file:...}` or non-identifier `{env:...}` placeholder is refused with a notice, as is one the engine's interpolation rejects (`$(` anywhere, or a value starting with `!`). A skill dir without a `SKILL.md`, or whose frontmatter has no `description` (the engine drops those), is reported and skipped. `bin/lib/jsonc.js` (new) is the string-aware comment and trailing-comma stripper the `.jsonc` path needs - a `,}` inside a string is data - and it drops a UTF-8 byte order mark; strict JSON is tried first so the common file pays nothing.
+
+`bin/lib/setup-assets-import.js` (new) owns the asset stage end to end: classify against what the target already has, print the preview, ask, write. MCP servers merge into the engine's GLOBAL `<agentDir>/mcp.json` under `mcpServers`, preserving every other key in that document, with a timestamped `.bak-` copy and an atomic 0600 write; skills are copied into the GLOBAL `<agentDir>/skills/<name>/`. An existing server name or skill directory is never overwritten - it is reported as `mcp-skipped-existing` / `skills-skipped-existing` - and a skill named like one in the plugin's `plugin/skills` is reported as `skills-skipped-bundled`, because the engine loads the user root first and the first skill of a name wins, so the copy would replace the bundled skill. An existing `mcp.json` that does not parse, or whose `mcpServers` is not an object, is left untouched.
+
+`bin/lib/setup-import.js` splits the credential stage into `importCredentials` and calls the new asset stage after it, passing its own consent prompt so both stages ask the same way. `--dry-run` previews assets and writes nothing; `--yes` accepts both stages.
+
+`test/setup-opencode-assets.test.ts` and `test/setup-assets-import.test.ts` are new: the first pins the conversions, the jsonc edge cases and the refusal rule, the second drives the real launcher end to end for import, no-overwrite, bundled-name skills, a malformed target, dry-run and idempotency, and loads the written `mcp.json` through the pinned engine's own `loadMcpConfig` so any field the engine rejects fails the test.
+
+### Why
+
+An OpenCode user's MCP servers and skills are most of their setup, and `omo setup` imported none of it. The onboarding skill's migration lane filled the gap by hand and filled it wrong: it wrote a GLOBAL OpenCode MCP server into the PROJECT `.mcp.json`, so a fresh session in any other directory could not see it. The engine reads global servers from `<agentDir>/mcp.json` (always trusted) and global skills from `<agentDir>/skills`, which is where a global server and a global skill belong.
+
+A server whose config contains shell command substitution is deliberately dropped with a notice rather than copied: the engine's MCP interpolation rejects `$(` and throws for the whole file, so copying one such value would take every other server down with it.
+
+### Why an extension could not handle it
+
+Reading another harness's config directory and writing the engine's own global config before the engine starts is the launcher's job; an extension only runs once the engine is already up.
+
+### Expected merge conflict zones
+
+`bin/lib/setup-import.js` `runSetup` tail.
+
 Follow-up: the sign-in guidance is printed once, with the plan. `printCounts` used to repeat it, so a `--yes` run showed the same `/login` lines twice (pinned by two `setup-import.test.ts` cases, both RED at `Received: 2` before the change).
 
 Review follow-ups: an imported opencode key is written with `$` and `!` escaped (`$$`, `$!`). The engine resolves every stored `api_key` as a config value - a leading `!` runs a shell command, `$NAME` / `${NAME}` interpolate the environment - while opencode keeps the key verbatim, so a key holding either character was rewritten or executed at read time; `setup-import.test.ts` now resolves the stored value through the engine's own `resolveConfigValue` and expects the source bytes back. The OAuth guidance reads the engine's auth store and says a login is already done when an OAuth entry exists under the target provider, so a re-run no longer repeats `/login` for it. `provider-map-registry.test.ts` reads `ANTHROPIC_SUBSCRIPTION_PROVIDER_ID` from the engine instead of hand-typing it.

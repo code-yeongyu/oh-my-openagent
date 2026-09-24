@@ -10,6 +10,7 @@ import { readRow, readRows } from "./sqlite-rows.js"
 import { printModelReport } from "./setup-models.js"
 import { printSetupReport } from "./setup-report.js"
 import { formatCredentialGuidance } from "./setup-guidance.js"
+import { importOpencodeAssets } from "./setup-assets-import.js"
 
 export const API_KEY_TYPE_ACCEPTLIST = new Set(["api_key"])
 const SQLITE_STORES = [
@@ -196,13 +197,13 @@ function writeTarget(path, current, additions) {
   }
 }
 
-async function consent(result, target, options) {
+async function ask(question, options) {
   if (options.yes) return true
   if (options.stdin?.isTTY !== true || options.stdout?.isTTY !== true) {
-    process.stdout.write("Non-interactive setup did not import credentials. Re-run with `omo setup --yes`.\n")
+    process.stdout.write("Non-interactive setup did not import. Re-run with `omo setup --yes`.\n")
     return false
   }
-  process.stdout.write(`Import API credentials for ${result.additions.map((item) => item.provider).join(", ")} into ${target}? [y/N] `)
+  process.stdout.write(question)
   const readline = createInterface({ input: options.stdin, output: options.stdout })
   try {
     return (await readline.question("")).trim().toLowerCase() === "y"
@@ -211,15 +212,12 @@ async function consent(result, target, options) {
   }
 }
 
-export async function runSetup(args = process.argv.slice(2), options = {}) {
-  const home = options.home ?? homedir()
-  const env = options.env ?? process.env
-  const agentDir = canonicalAgentDir(env, home)
-  const target = join(agentDir, "auth.json")
-  const runtime = { stdin: process.stdin, stdout: process.stdout, ...options, home, env }
-  const inventory = await detectHarnesses(runtime)
-  printSetupReport(inventory)
-  printModelReport(inventory)
+function consent(result, target, options) {
+  const providers = result.additions.map((item) => item.provider).join(", ")
+  return ask(`Import API credentials for ${providers} into ${target}? [y/N] `, options)
+}
+
+async function importCredentials(runtime, target, args) {
   const providerMap = readProviderMap()
   const plan = await buildPlan(runtime, providerMap)
   for (const notice of plan.notices) process.stdout.write(`${notice}\n`)
@@ -242,4 +240,25 @@ export async function runSetup(args = process.argv.slice(2), options = {}) {
   }
   writeTarget(target, current, result.additions)
   printCounts(result)
+}
+
+export async function runSetup(args = process.argv.slice(2), options = {}) {
+  const home = options.home ?? homedir()
+  const env = options.env ?? process.env
+  const agentDir = canonicalAgentDir(env, home)
+  const runtime = { stdin: process.stdin, stdout: process.stdout, ...options, home, env }
+  const inventory = await detectHarnesses(runtime)
+  printSetupReport(inventory)
+  printModelReport(inventory)
+  await importCredentials(runtime, join(agentDir, "auth.json"), args)
+  await importOpencodeAssets({
+    runtime,
+    agentDir,
+    args,
+    confirm: async (question) => {
+      const accepted = await ask(question, { ...runtime, yes: args.includes("--yes") })
+      if (!accepted && runtime.stdin.isTTY === true) process.stdout.write("Import cancelled\n")
+      return accepted
+    },
+  })
 }

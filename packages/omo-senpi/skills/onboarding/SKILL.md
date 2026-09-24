@@ -99,9 +99,20 @@ machine. Check at least:
   `~/.config/opencode/oh-my-opencode.jsonc`, project `.mcp.json`, and existing `AGENTS.md` files.
 - Anything else the user names.
 
+Global OpenCode MCP servers and global OpenCode skills are not yours to move by hand. `omo setup`
+imports them: MCP servers from `~/.config/opencode/opencode.json[c]` into the engine's global
+`~/.omo/agent/mcp.json`, and skills from `~/.config/opencode/skills/` into `~/.omo/agent/skills/`,
+converted to the shapes omo reads, consent-gated, and never overwriting a name that already exists.
+Run `omo setup --dry-run` to show the user exactly what would land. Once they accept, run
+`omo setup --yes`: your shell is not a terminal, so plain `omo setup` stops at its consent prompt
+and imports nothing.
+Copying a global server into a project `.mcp.json` yourself is a bug: it disappears the moment the
+user opens any other directory.
+
 Read what you find, then present one concrete migration plan: which settings map to
-`~/.omo/omo.json[c]`, which MCP servers move to the project `.mcp.json`, which `CLAUDE.md` content
-becomes project `AGENTS.md` content, and which personal facts belong in memory instead of files.
+`~/.omo/omo.json[c]`, which MCP servers `omo setup` carries over globally and which project-only
+servers still belong in that project's `.mcp.json`, which `CLAUDE.md` content becomes project
+`AGENTS.md` content, and which personal facts belong in memory instead of files.
 Show the plan and WAIT for the user to accept it. Apply nothing before they say yes. If they accept
 part of it, apply that part only. Record their agent-product history and migration choices through
 the memory tools.
