@@ -87,9 +87,30 @@ describe("codex-config autonomous features", () => {
     }
   })
 
-  test("#given existing child_agents_md setting #when updating config #then preserves it without stamping unsupported values", async () => {
+  test("#given existing child_agents_md=true setting #when updating config #then removes the unsupported feature", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-child-agents-preserve-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ["[features]", "child_agents_md = true", ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      autonomousPermissions: true,
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toContain("child_agents_md")
+  })
+
+  test("#given existing child_agents_md=false setting #when updating config #then removes the unsupported feature", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-child-agents-false-"))
     const configPath = join(root, "config.toml")
     await writeFile(configPath, ["[features]", "child_agents_md = false", ""].join("\n"))
 
@@ -105,8 +126,7 @@ describe("codex-config autonomous features", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain("child_agents_md = false")
-    expect(content).not.toContain("child_agents_md = true")
+    expect(content).not.toContain("child_agents_md")
   })
 
   test("#given config without child_agents_md #when updating config #then does not add unsupported feature key", async () => {

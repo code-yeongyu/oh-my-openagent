@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ed5913a0451b102580823bb453ab16a6b0fe5490e3c3cc96f21285ce1b271763:fef32404e9543827207e1db51df847e2c997e70ee31a7440d6a8cfb13c3450d0
+// omo-codex-install:28fda9d99da6217018db4e44f7ff0f218233b069668cbb2edb1ff6e352b74ab3:c1222131b78dabbca819fabe5f279b21c5a3bc5bcc0ff9ecf8d7522c01d879c9
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -20505,6 +20505,12 @@ ${featureName} = true
   }
   return replaceOrInsertSetting(config, section, featureName, "true");
 }
+function removeFeature(config, featureName) {
+  const section = findTomlSection(config, "features");
+  if (section !== null)
+    return removeSetting(config, section, featureName);
+  return removeRootSetting(config, `features.${featureName}`);
+}
 
 // packages/omo-codex/src/install/codex-config-marketplaces.ts
 var SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
@@ -21097,6 +21103,7 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugins");
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
+  config = removeFeature(config, "child_agents_md");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, applyReasoningOverride(await readCodexModelCatalog(input.repoRoot), input.reasoning));
   config = ensureCodexMultiAgentV2Config(config, {
