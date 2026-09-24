@@ -17,6 +17,7 @@ async function importFreshModelFallbackHookModule() {
 const {
   clearPendingModelFallback,
   createModelFallbackHook,
+  getFallbackState,
   getSessionFallbackChain,
   setSessionFallbackChain,
   setPendingModelFallback,
@@ -425,6 +426,133 @@ describe("model fallback hook", () => {
     })
 
     clearPendingModelFallback(modelFallback, sessionID)
+  })
+
+  test("prepends user-configured primary as chain head when absent from requirements", () => {
+    //#given
+    const sessionID = "ses_model_fallback_user_primary_prepend"
+    const hook = createModelFallbackHook({
+      resolveUserConfiguredPrimary: (agentName) =>
+        agentName === "Sisyphus - Ultraworker"
+          ? { providers: ["openai"], model: "gpt-5.4", variant: "medium" }
+          : undefined,
+    })
+    clearPendingModelFallback(hook, sessionID)
+
+    //#when
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-8-thinking",
+    )
+
+    //#then
+    expect(set).toBe(true)
+    const state = getFallbackState(hook, sessionID)
+    expect(state?.fallbackChain[0]).toEqual({
+      providers: ["openai"],
+      model: "gpt-5.4",
+      variant: "medium",
+    })
+    clearPendingModelFallback(hook, sessionID)
+  })
+
+  test("does not duplicate a user primary already present in the requirements chain", () => {
+    //#given
+    const sessionID = "ses_model_fallback_user_primary_dedup"
+    const hook = createModelFallbackHook({
+      resolveUserConfiguredPrimary: (agentName) =>
+        agentName === "Sisyphus - Ultraworker"
+          ? { providers: ["anthropic"], model: "claude-opus-5", variant: "max" }
+          : undefined,
+    })
+    clearPendingModelFallback(hook, sessionID)
+
+    //#when
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-8-thinking",
+    )
+
+    //#then
+    expect(set).toBe(true)
+    const state = getFallbackState(hook, sessionID)
+    const chain = state?.fallbackChain ?? []
+    const matches = chain.filter(
+      (entry) => entry.providers.includes("anthropic") && entry.model === "claude-opus-5",
+    )
+    expect(matches.length).toBe(1)
+    // providers 列表与 packages/model-core/src/agent-model-requirements.ts:7 的 sisyphus 链头保持一致
+    expect(chain[0]).toEqual({
+      providers: ["anthropic", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "max",
+    })
+    clearPendingModelFallback(hook, sessionID)
+  })
+
+  test("session fallback chain wins over user primary prepend", () => {
+    //#given
+    const sessionID = "ses_model_fallback_session_chain_wins"
+    const hook = createModelFallbackHook({
+      resolveUserConfiguredPrimary: (agentName) =>
+        agentName === "Sisyphus - Ultraworker"
+          ? { providers: ["openai"], model: "gpt-5.6-sol", variant: "medium" }
+          : undefined,
+    })
+    setSessionFallbackChain(hook, sessionID, [
+      { providers: ["google"], model: "gemini-3.1-pro-preview" },
+    ])
+    clearPendingModelFallback(hook, sessionID)
+
+    //#when
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-8-thinking",
+    )
+
+    //#then
+    expect(set).toBe(true)
+    const state = getFallbackState(hook, sessionID)
+    expect(state?.fallbackChain).toEqual([
+      { providers: ["google"], model: "gemini-3.1-pro-preview" },
+    ])
+    clearPendingModelFallback(hook, sessionID)
+  })
+
+  test("keeps old behavior byte-identical when no user primary is configured", () => {
+    //#given
+    const sessionID = "ses_model_fallback_no_user_primary"
+    const hook = createModelFallbackHook({ resolveUserConfiguredPrimary: () => undefined })
+    clearPendingModelFallback(hook, sessionID)
+
+    //#when
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-8-thinking",
+    )
+
+    //#then
+    expect(set).toBe(true)
+    const state = getFallbackState(hook, sessionID)
+    // providers 列表与 packages/model-core/src/agent-model-requirements.ts:7 的 sisyphus 链头保持一致
+    expect(state?.fallbackChain[0]).toEqual({
+      providers: ["anthropic", "github-copilot", "opencode"],
+      model: "claude-opus-5",
+      variant: "max",
+    })
+    clearPendingModelFallback(hook, sessionID)
   })
 })
 
