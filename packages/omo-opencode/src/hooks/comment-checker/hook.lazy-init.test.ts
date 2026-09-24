@@ -1,33 +1,34 @@
-import { describe, expect, it, mock, afterAll } from "bun:test"
+import { describe, expect, it, mock, beforeEach, afterEach } from "bun:test"
+import { createCommentCheckerHooks } from "./hook"
+import { stopPendingCallCleanup } from "./pending-calls"
+import { _resetCommentCheckerInitializationForTesting } from "./initialization-gate"
 
 const startPendingCallCleanup = mock(() => {})
 const initializeCommentCheckerCli = mock(() => {})
 
-mock.module("./cli-runner", () => ({
+const cliRunner = {
   initializeCommentCheckerCli,
   getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
   isCliPathUsable: () => true,
   processWithCli: async () => {},
   processApplyPatchEditsWithCli: async () => {},
-}))
-
-mock.module("./pending-calls", () => ({
-  registerPendingCall: () => {},
-  startPendingCallCleanup,
-  stopPendingCallCleanup: () => {},
-  takePendingCall: () => undefined,
-}))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { createCommentCheckerHooks } = await import("./hook")
+}
 
 describe("comment-checker lazy initialization", () => {
+  beforeEach(() => {
+    startPendingCallCleanup.mockClear()
+    initializeCommentCheckerCli.mockClear()
+    _resetCommentCheckerInitializationForTesting()
+  })
+
+  afterEach(() => {
+    stopPendingCallCleanup()
+    _resetCommentCheckerInitializationForTesting()
+  })
+
   it("initializes CLI and cleanup on first tool hook call only", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, cliRunner, { startPendingCallCleanup })
     const beforeHook = hooks["tool.execute.before"]
     const input = { tool: "write", sessionID: "ses_test", callID: "call_test" }
     const output = { args: { filePath: "src/a.ts" } }
