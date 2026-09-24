@@ -9,19 +9,21 @@
 
 import { loadKibitzerPersona, PERSONA_ASSET_FILENAMES } from "@oh-my-opencode/memory-core"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
-import type {
-  ChildHandle,
-  ChildModelRegistry,
-  ChildSpec,
-  CreateChildSession,
-  InProcessRunnerLike,
-  SenpiModelPort,
-  SenpiModelRegistryPort,
+import {
+  resolveCategory,
+  type ChildHandle,
+  type ChildModelRegistry,
+  type ChildSpec,
+  type CreateChildSession,
+  type InProcessRunnerLike,
+  type SenpiModelPort,
+  type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
 
 import { childModelChainSpec, type ChildModelChainSpec } from "../memory-child-model-chain"
 import { resolveReflectionModel, type ReflectionModelCandidate, type ReflectionThinkingLevel } from "../worker/resolve-model"
 import type { KibitzerSidecarChildInput } from "./sidecar"
+import type { KibitzerWakeConfiguration } from "./sidecar-outcome"
 import { KIBITZER_SIDECAR_TOOL_NAMES } from "./sidecar-prompt"
 import { loadKibitzerTaskRuntime, type KibitzerTaskRuntime } from "./task-runtime"
 import type { AnyKibitzerSidecarTool } from "./tools/result"
@@ -39,7 +41,13 @@ export type KibitzerSidecarModelResolution =
     readonly fallbacks: readonly ReflectionModelCandidate[]
     readonly chain: ChildModelChainSpec
   }
-  | { readonly kind: "unavailable"; readonly category: string; readonly cause: KibitzerSidecarModelUnavailableCause }
+  | {
+    readonly kind: "unavailable"
+    readonly category: string
+    readonly cause: KibitzerSidecarModelUnavailableCause
+    /** The category chain's providers that are not connected, when the resolver names them. */
+    readonly missingProviders?: readonly string[]
+  }
 
 export interface KibitzerSidecarModelInput {
   /** `memory.recall.category`; defaults to {@link KIBITZER_SIDECAR_DEFAULT_CATEGORY}. */
@@ -53,9 +61,21 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
   const category = input.category ?? KIBITZER_SIDECAR_DEFAULT_CATEGORY
   if (input.registry === undefined) return { kind: "unavailable", category, cause: "registry_snapshot_unavailable" }
   const resolution = resolveReflectionModel(category, input.config, input.registry)
-  if (resolution.kind === "category_unavailable") return { kind: "unavailable", category, cause: "category_unavailable" }
-  // Category-sourced resolutions carry no `source`; registry_fallback / session_inherit do.
-  if (resolution.source !== undefined) return { kind: "unavailable", category, cause: "beyond_category" }
+  if (resolution.kind === "category_unavailable") {
+    return { kind: "unavailable", category, cause: "category_unavailable", ...withProviders(resolution.missingProviders) }
+  }
+  // Category-sourced resolutions carry no `source`; registry_fallback / session_inherit do. Such an
+  // answer hides why the category itself came up empty, so the chain is asked again for the
+  // unconnected providers the notice names.
+  if (resolution.source !== undefined) {
+    const chain = resolveCategory(category, input.config, input.registry)
+    return {
+      kind: "unavailable",
+      category,
+      cause: "beyond_category",
+      ...withProviders(chain.kind === "model_unavailable" ? chain.missing_providers : undefined),
+    }
+  }
   return {
     kind: "resolved",
     category: resolution.category,
@@ -64,6 +84,10 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
     fallbacks: resolution.fallbacks,
     chain: childModelChainSpec({ model: resolution.model, fallbacks: resolution.fallbacks }),
   }
+}
+
+function withProviders(providers: readonly string[] | undefined): { readonly missingProviders?: readonly string[] } {
+  return providers === undefined || providers.length === 0 ? {} : { missingProviders: providers }
 }
 
 export interface KibitzerSidecarSpecInput {
@@ -119,12 +143,28 @@ export type KibitzerSidecarStartCode =
 /** A child that could not be started, named by the stage that refused; the sidecar backs off on it. */
 export class KibitzerSidecarStartError extends Error {
   readonly code: KibitzerSidecarStartCode
+  /** Set on a category refusal: the category and its unconnected chain providers. */
+  readonly configuration?: KibitzerWakeConfiguration
 
-  constructor(code: KibitzerSidecarStartCode, message: string, options?: { readonly cause?: unknown }) {
+  constructor(
+    code: KibitzerSidecarStartCode,
+    message: string,
+    options?: { readonly cause?: unknown; readonly configuration?: KibitzerWakeConfiguration },
+  ) {
     super(message, options)
     this.name = "KibitzerSidecarStartError"
     this.code = code
+    if (options?.configuration !== undefined) this.configuration = options.configuration
   }
+}
+
+/**
+ * The configuration state behind a start refusal, or undefined for a transient one. Only the two
+ * category refusals carry one (the starter attaches it): no connected provider serves the pinned
+ * chain, which retrying cannot change until the user connects one or pins another model.
+ */
+export function kibitzerConfigurationFailure(error: unknown): KibitzerWakeConfiguration | undefined {
+  return error instanceof KibitzerSidecarStartError ? error.configuration : undefined
 }
 
 export interface KibitzerSidecarChildStarterOptions {
@@ -161,7 +201,10 @@ export function createKibitzerSidecarChildStarter(
       registry,
     })
     if (resolution.kind === "unavailable") {
-      throw new KibitzerSidecarStartError(resolution.cause, `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`)
+      const { cause, category, missingProviders } = resolution
+      throw new KibitzerSidecarStartError(cause, `Kibitzer sidecar model unavailable: ${category} (${cause})`, {
+        ...(cause === "registry_snapshot_unavailable" ? {} : { configuration: { category, cause, ...withProviders(missingProviders) } }),
+      })
     }
     let systemPrompt: string
     try {

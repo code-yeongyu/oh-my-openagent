@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "../../prompt"
 import { RECALL_CUSTOM_TYPE } from "../../recall-session-read"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "../notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE } from "../notice"
 import { createSessionBranchSnapshot, HIDDEN_SESSION_CUSTOM_TYPES, sessionEntriesSince } from "./session-read"
 import { customEntry, customMessage, harness, jsonOf, memoryRepo, message, sessionContext, tempRoot } from "./test-support"
 
@@ -50,6 +50,7 @@ describe("sessionEntriesSince", () => {
     ]
     expect(HIDDEN_SESSION_CUSTOM_TYPES.has(NUDGED_ENTRY_TYPE)).toBe(true)
     expect(HIDDEN_SESSION_CUSTOM_TYPES.has(GATE_ENTRY_TYPE)).toBe(true)
+    expect(HIDDEN_SESSION_CUSTOM_TYPES.has(UNAVAILABLE_ENTRY_TYPE)).toBe(true)
     expect(HIDDEN_SESSION_CUSTOM_TYPES.has(RECALL_CUSTOM_TYPE)).toBe(true)
 
     const page = sessionEntriesSince(entries, -1, caps)

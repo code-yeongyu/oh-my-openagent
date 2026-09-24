@@ -5,7 +5,13 @@ import { joinFields, noticeComponent, normalizeRendererText } from "../worker/en
 
 export const NUDGED_ENTRY_TYPE = "omo-kibitzer:nudged"
 export const GATE_ENTRY_TYPE = "omo-kibitzer:gate"
+/** Once per session: the pinned recall category serves no model, so judging is off (a warning, never a failure). */
+export const UNAVAILABLE_ENTRY_TYPE = "omo-kibitzer:unavailable"
 export const GATE_REASON_MAX_CHARS = 160
+/** Bounds of the unavailable record, shared by the producer (`observe-record.ts`) and the renderer. */
+export const UNAVAILABLE_CATEGORY_MAX_CHARS = 128
+export const UNAVAILABLE_PROVIDER_MAX_CHARS = 64
+export const UNAVAILABLE_PROVIDER_MAX_COUNT = 16
 
 export interface KibitzerNudgedRecord {
   readonly version: 1
@@ -27,7 +33,15 @@ export interface KibitzerGateRecord {
   readonly wake?: number
 }
 
-// Both renderers are fail-closed: a record that does not match the producer contract draws
+export interface KibitzerUnavailableRecord {
+  readonly version: 1
+  readonly category: string
+  readonly cause: "category_unavailable" | "beyond_category"
+  /** The category chain's unconnected providers; absent when the resolver named none. */
+  readonly missingProviders?: readonly string[]
+}
+
+// Every renderer here is fail-closed: a record that does not match the producer contract draws
 // nothing rather than a half-formed notice. The session file is user-writable and older or
 // foreign producers may append entries under these types, so shape is re-validated here even
 // though the producer already validated it.
@@ -74,6 +88,46 @@ function normalizeNudge(value: unknown): { readonly path: string; readonly hint:
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+export const renderKibitzerUnavailableEntry: EntryRenderer<unknown> = (entry, options, theme) => {
+  const record = entry.data
+  if (!isRecord(record) || record.version !== 1) return undefined
+  if (record.cause !== "category_unavailable" && record.cause !== "beyond_category") return undefined
+  const category = boundedText(record.category, UNAVAILABLE_CATEGORY_MAX_CHARS)
+  const providers = validProviders(record.missingProviders)
+  if (category === undefined || providers === undefined) return undefined
+  const pin = `pin categories.${category}.model in omo.json, or set memory.recall.category to a category with a connected model`
+  return noticeComponent({
+    glyph: "⚠",
+    title: joinFields(["Kibitzer unavailable", category]),
+    tone: "warning",
+    why: providers.length > 0
+      ? `No connected provider serves the "${category}" category chain, so Kibitzer is not judging recalled memory.`
+      : `The "${category}" category resolves to no model Kibitzer may use, so Kibitzer is not judging recalled memory.`,
+    extra: providers.length > 0
+      ? [{ text: `fix: /login <provider> for one of ${providers.join(", ")}` }, { text: `or ${pin}` }]
+      : [{ text: `fix: ${pin}` }],
+    detail: "Kibitzer never falls back to a model outside its category. Judging resumes by itself once a provider of the chain is connected.",
+  }, options, theme)
+}
+
+function boundedText(value: unknown, max: number): string | undefined {
+  if (typeof value !== "string") return undefined
+  const normalized = normalizeRendererText(value)
+  return normalized.length === 0 || normalized.length > max ? undefined : normalized
+}
+
+function validProviders(value: unknown): readonly string[] | undefined {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.length > UNAVAILABLE_PROVIDER_MAX_COUNT) return undefined
+  const providers: string[] = []
+  for (const provider of value) {
+    const normalized = boundedText(provider, UNAVAILABLE_PROVIDER_MAX_CHARS)
+    if (normalized === undefined) return undefined
+    providers.push(normalized)
+  }
+  return providers
 }
 
 function validGateReason(value: unknown): string | undefined {

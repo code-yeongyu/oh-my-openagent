@@ -5,7 +5,8 @@
 
 import { redactKibitzerEventText } from "./events"
 import { normalizeGateReason } from "./judge-outcome"
-import type { KibitzerWakeOutcome, KibitzerWakeStatus, KibitzerWakeUsage } from "./sidecar-outcome"
+import { UNAVAILABLE_CATEGORY_MAX_CHARS, UNAVAILABLE_PROVIDER_MAX_CHARS, UNAVAILABLE_PROVIDER_MAX_COUNT } from "./notice"
+import type { KibitzerWakeConfiguration, KibitzerWakeOutcome, KibitzerWakeStatus, KibitzerWakeUsage } from "./sidecar-outcome"
 
 /** Hard bound of one serialized `wakes.ndjson` line, newline included. */
 export const KIBITZER_WAKE_RECORD_MAX_CHARS = 4096
@@ -24,6 +25,8 @@ export interface KibitzerWakeRecord {
   readonly cause?: string
   /** Masked, frame-free, at most `GATE_REASON_MAX_CHARS`. */
   readonly reason?: string
+  /** A category refusal's configuration state, masked and bounded by {@link boundedKibitzerConfiguration}. */
+  readonly configuration?: KibitzerWakeConfiguration
   readonly model?: string
   readonly candidateCount: number
   /** Paths of the nudges the parent re-validated and handed to delivery. */
@@ -61,6 +64,7 @@ export function kibitzerWakeRecord(outcome: KibitzerWakeOutcome, at: number): Ki
     status: outcome.status,
     ...(outcome.cause === undefined ? {} : { cause: outcome.cause }),
     ...(reason === undefined ? {} : { reason }),
+    ...(outcome.configuration === undefined ? {} : { configuration: boundedKibitzerConfiguration(outcome.configuration) }),
     ...(outcome.model === undefined ? {} : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
     candidateCount: outcome.candidateCount,
     nudged: outcome.nudges.map((nudge) => capped(nudge.path, WAKE_PATH_MAX_CHARS)),
@@ -80,4 +84,20 @@ export function kibitzerWakeRecord(outcome: KibitzerWakeOutcome, at: number): Ki
 
 export function capped(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max)
+}
+
+/**
+ * A configuration state as it may be stored (wake line and unavailable notice alike): category and
+ * provider names come from user config, so they are masked and held to the renderer's bounds.
+ */
+export function boundedKibitzerConfiguration(configuration: KibitzerWakeConfiguration): KibitzerWakeConfiguration {
+  const providers = configuration.missingProviders
+    ?.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT)
+    .map((provider) => capped(redactKibitzerEventText(provider), UNAVAILABLE_PROVIDER_MAX_CHARS))
+    .filter((provider) => provider.length > 0)
+  return {
+    category: capped(redactKibitzerEventText(configuration.category), UNAVAILABLE_CATEGORY_MAX_CHARS),
+    cause: configuration.cause,
+    ...(providers === undefined ? {} : { missingProviders: providers }),
+  }
 }

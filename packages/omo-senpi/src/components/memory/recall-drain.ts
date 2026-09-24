@@ -10,7 +10,15 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerNudgedRecord } from "./kibitzer/notice"
+import {
+  GATE_ENTRY_TYPE,
+  NUDGED_ENTRY_TYPE,
+  UNAVAILABLE_ENTRY_TYPE,
+  renderKibitzerGateEntry,
+  renderKibitzerNudgedEntry,
+  renderKibitzerUnavailableEntry,
+  type KibitzerNudgedRecord,
+} from "./kibitzer/notice"
 import { renderRecallEntry } from "./recall-notice"
 import { RECALL_CUSTOM_TYPE, readSession } from "./recall-session-read"
 
@@ -107,6 +115,7 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
       pi.registerEntryRenderer(RECALL_CUSTOM_TYPE, renderRecallEntry)
       pi.registerEntryRenderer(NUDGED_ENTRY_TYPE, renderKibitzerNudgedEntry)
       pi.registerEntryRenderer(GATE_ENTRY_TYPE, renderKibitzerGateEntry)
+      pi.registerEntryRenderer(UNAVAILABLE_ENTRY_TYPE, renderKibitzerUnavailableEntry)
       // Read aliases keep stored sessions renderable; new entries use Kibitzer only.
       pi.registerEntryRenderer("omo-memorian:recall", renderRecallEntry)
       pi.registerEntryRenderer("omo-memorian:nudged", renderKibitzerNudgedEntry)

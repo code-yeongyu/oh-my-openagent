@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
-import type { ChildHandle, ChildModelRegistry, ChildSpec, SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import { resolveCategory, type ChildHandle, type ChildModelRegistry, type ChildSpec, type SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import {
   buildKibitzerSidecarSpec,
   createKibitzerSidecarChildStarter,
   KIBITZER_SIDECAR_DEFAULT_CATEGORY,
   KibitzerSidecarStartError,
+  kibitzerConfigurationFailure,
   resolveKibitzerSidecarModel,
 } from "./sidecar-model"
 import { KIBITZER_SIDECAR_TOOL_NAMES } from "./sidecar-prompt"
@@ -20,6 +21,18 @@ const registry = {
   find: (provider: string, modelId: string) => (provider === model.provider && modelId === model.id ? model : undefined),
 }
 const config: OmoConfig = { categories: { quick: { model: "omo-mock/mock-1" } } }
+const deadRegistry = { getAvailable: () => [], find: () => undefined }
+/** Only a provider outside the quick chain is connected: the reported kimi-coding-only user. */
+const beyondRegistry = {
+  getAvailable: () => [{ provider: "kimi-coding", id: "k3", contextWindow: 200_000, cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 } }],
+  find: () => undefined,
+}
+/** The builtin quick chain's unconnected providers, straight from the category resolver. */
+function chainMissingProviders(registry: typeof deadRegistry | typeof beyondRegistry): readonly string[] {
+  const chain = resolveCategory("quick", { categories: {} }, registry)
+  if (chain.kind !== "model_unavailable" || chain.missing_providers === undefined) throw new Error("the quick chain is not dead")
+  return chain.missing_providers
+}
 
 function nudgeTool() {
   const budget = createWakeToolBudget(8)
@@ -49,15 +62,21 @@ describe("resolveKibitzerSidecarModel", () => {
   test("#given no registry snapshot or a dead category #when resolved #then the sidecar refuses instead of drifting to another model", () => {
     expect(resolveKibitzerSidecarModel({ config, registry: undefined }))
       .toEqual({ kind: "unavailable", category: "quick", cause: "registry_snapshot_unavailable" })
-    expect(resolveKibitzerSidecarModel({ config: { categories: {} }, registry: { getAvailable: () => [], find: () => undefined } }))
-      .toEqual({ kind: "unavailable", category: "quick", cause: "category_unavailable" })
+    expect(resolveKibitzerSidecarModel({ config: { categories: {} }, registry: deadRegistry }))
+      .toEqual({ kind: "unavailable", category: "quick", cause: "category_unavailable", missingProviders: chainMissingProviders(deadRegistry) })
     // A registry that still offers SOME usable model must not be adopted beyond the pinned category.
-    const beyond = {
-      getAvailable: () => [{ provider: "omo-mock", id: "frontier-1", contextWindow: 200_000, cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 } }],
-      find: () => undefined,
-    }
-    expect(resolveKibitzerSidecarModel({ config: { categories: {} }, registry: beyond }))
-      .toEqual({ kind: "unavailable", category: "quick", cause: "beyond_category" })
+    expect(resolveKibitzerSidecarModel({ config: { categories: {} }, registry: beyondRegistry }))
+      .toMatchObject({ kind: "unavailable", category: "quick", cause: "beyond_category" })
+  })
+
+  test("#given only a provider outside the chain is connected #when resolved #then the beyond-category refusal still names the chain's unconnected providers", () => {
+    const missing = chainMissingProviders(beyondRegistry)
+    expect(missing.length).toBeGreaterThan(0)
+    expect(missing).not.toContain("kimi-coding")
+
+    const resolution = resolveKibitzerSidecarModel({ config: { categories: {} }, registry: beyondRegistry })
+
+    expect(resolution).toEqual({ kind: "unavailable", category: "quick", cause: "beyond_category", missingProviders: missing })
   })
 })
 
@@ -145,5 +164,28 @@ describe("createKibitzerSidecarChildStarter", () => {
     expect((categoryError as KibitzerSidecarStartError).code).toBe("registry_snapshot_unavailable")
 
     expect(starts).toBe(0)
+  })
+
+  test("#given each start refusal #when classified #then only the two category refusals are a configuration state, carrying the category and its unconnected providers", async () => {
+    const runner = () => ({ start: async (): Promise<ChildHandle> => { throw new Error("spawn failed") } })
+    const input = { sessionId: "parent-1", generation: 1, prompt: "<kibitzer-seed/>", tools: [nudgeTool()], maxItems: 2 }
+    const refusal = (options: Partial<Parameters<typeof createKibitzerSidecarChildStarter>[0]>) =>
+      createKibitzerSidecarChildStarter({ ...base, createRunner: runner, ...options })(input).catch((error: unknown) => error)
+
+    const dead = await refusal({ loadConfig: () => ({}), modelRegistry: () => deadRegistry as unknown as ChildModelRegistry })
+    const beyond = await refusal({ loadConfig: () => ({}), modelRegistry: () => beyondRegistry as unknown as ChildModelRegistry })
+    const transient = [
+      await refusal({ modelRegistry: () => undefined }),
+      await refusal({ loadPersona: () => { throw new Error("ENOENT") } }),
+      await refusal({}),
+      new KibitzerSidecarStartError("runtime_unavailable", "no in-process runner available"),
+      new Error("not a start error"),
+    ]
+
+    expect(kibitzerConfigurationFailure(dead)).toEqual({ category: "quick", cause: "category_unavailable", missingProviders: chainMissingProviders(deadRegistry) })
+    expect(kibitzerConfigurationFailure(beyond)).toEqual({ category: "quick", cause: "beyond_category", missingProviders: chainMissingProviders(beyondRegistry) })
+    expect(transient.map((error) => error instanceof KibitzerSidecarStartError ? error.code : "plain"))
+      .toEqual(["registry_snapshot_unavailable", "persona_unavailable", "session_create_failed", "runtime_unavailable", "plain"])
+    for (const error of transient) expect(kibitzerConfigurationFailure(error)).toBeUndefined()
   })
 })

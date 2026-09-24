@@ -7,6 +7,7 @@ import { OmoMemoryRecallSchema } from "@oh-my-opencode/omo-config-core"
 import { resolveKibitzerSidecarSettings } from "./settings"
 import { KIBITZER_RESEED_FRACTION, KIBITZER_SIDECAR_MAX_TOKENS, KIBITZER_WAKE_DEADLINE_MS, KIBITZER_WAKE_TOOL_BUDGET } from "./sidecar"
 import { KIBITZER_WAKE_MAX_TOTAL_MS } from "./sidecar-contract"
+import { KibitzerSidecarStartError } from "./sidecar-model"
 import { candidate, fakeChild, fakeWakeSlot, sidecarHarness, withinMs, type FakeChild, type SidecarHarness } from "./sidecar.test-support"
 
 const K8S = "reference/kubernetes-rollouts.md"
@@ -410,7 +411,7 @@ describe("KibitzerSidecar lifecycle", () => {
     const result = await harness.offer([candidate(K8S)])
 
     expect(result).toEqual({ action: "buffered", reason: "backoff" })
-    expect(harness.outcomes.map((outcome) => [outcome.status, outcome.cause])).toEqual([["failed", "start_failed"]])
+    expect(harness.outcomes.map((outcome) => [outcome.status, outcome.cause, outcome.diagnostic, outcome.configuration])).toEqual([["failed", "start_failed", true, undefined]])
     expect(harness.sidecar.state()).toBe("backoff")
     expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([1_000])
     // The lease taken for the wake that never started is handed back before the backoff begins.
@@ -429,6 +430,30 @@ describe("KibitzerSidecar lifecycle", () => {
     expect(cursorsOf(retry.input.prompt)).toEqual([1, 2])
     expect(candidatePathsOf(retry.input.prompt)).toEqual([K8S])
     expect(harness.sidecar.events.size()).toBe(0)
+  })
+
+  test("#given the recall category's chain has no connected provider #when offered #then the refusal is reported as a non-diagnostic configuration state, still backs off, and a provider connected meanwhile heals the next wake", async () => {
+    const configuration = { category: "quick", cause: "category_unavailable" as const, missingProviders: ["openai", "xai"] }
+    let connected = false
+    const harness = sidecarHarness({
+      startChild: async (input) => {
+        if (!connected) throw new KibitzerSidecarStartError("category_unavailable", "Kibitzer sidecar model unavailable: quick (category_unavailable)", { configuration })
+        return fakeChild(input).handle
+      },
+    })
+    harness.prompt(1, "how do we handle kubernetes rollouts")
+
+    const result = await harness.offer([candidate(K8S)])
+
+    expect(result).toEqual({ action: "buffered", reason: "backoff" })
+    expect(harness.outcomes).toHaveLength(1)
+    expect(harness.outcomes[0]).toMatchObject({ status: "failed", cause: "start_failed", diagnostic: false, configuration })
+    expect(harness.timers.pending().map((timer) => timer.ms)).toEqual([1_000])
+    expect(harness.slot.held()).toBe(0)
+
+    connected = true
+    harness.timers.fire()
+    expect(await harness.offer([candidate(K8S)])).toEqual({ action: "seeded", wake: 2 })
   })
 })
 

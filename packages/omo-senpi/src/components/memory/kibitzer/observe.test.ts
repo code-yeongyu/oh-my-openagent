@@ -9,7 +9,7 @@ import type { RunnerOutcome } from "@oh-my-opencode/senpi-task"
 
 import { createMemoryBinding } from "../binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "../context"
-import { GATE_ENTRY_TYPE, GATE_REASON_MAX_CHARS, type KibitzerGateRecord } from "./notice"
+import { GATE_ENTRY_TYPE, GATE_REASON_MAX_CHARS, UNAVAILABLE_ENTRY_TYPE, UNAVAILABLE_PROVIDER_MAX_COUNT, type KibitzerGateRecord } from "./notice"
 import {
   KIBITZER_PERSISTENT_FAILURE_THRESHOLD,
   KIBITZER_SIDECAR_RETENTION_MS,
@@ -306,6 +306,60 @@ describe("kibitzer diagnostic streak notice", () => {
     expect((await f.wakes(SESSION_ID)).length).toBe(12)
     expect((await f.wakes("other-main-session")).length).toBe(2)
     expect(f.warnings).toEqual([])
+  })
+})
+
+describe("kibitzer category configuration notice", () => {
+  const providers = Array.from({ length: UNAVAILABLE_PROVIDER_MAX_COUNT + 4 }, (_, index) => `provider-${index}`)
+  const configuration = { category: "quick", cause: "beyond_category" as const, missingProviders: providers }
+  const refusal = (wake: number, sessionId = SESSION_ID): KibitzerWakeOutcome => outcome({
+    wake,
+    sessionId,
+    status: "failed",
+    cause: "start_failed",
+    reason: "Kibitzer sidecar model unavailable: quick (beyond_category)",
+    diagnostic: false,
+    configuration,
+  })
+  const unavailable = (f: Fixture) => f.entries.filter((entry) => entry.customType === UNAVAILABLE_ENTRY_TYPE)
+
+  test("#given repeated category refusals #when observed #then exactly one bounded unavailable notice is appended per session, no gate notice, and every refusal is recorded non-diagnostic", async () => {
+    const f = await fixture()
+    const bounded = { category: "quick", cause: "beyond_category", missingProviders: providers.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT) }
+
+    for (const wake of [1, 2, 3, 4]) f.observe.onWake(refusal(wake), f.context)
+    f.observe.onWake(refusal(1, "other-main-session"), f.context)
+    await f.idle()
+
+    expect(f.gates()).toEqual([])
+    expect(unavailable(f)).toEqual([
+      { customType: UNAVAILABLE_ENTRY_TYPE, data: { version: 1, ...bounded } },
+      { customType: UNAVAILABLE_ENTRY_TYPE, data: { version: 1, ...bounded } },
+    ])
+    const recorded = await f.wakes(SESSION_ID)
+    expect(recorded.map((record) => [record.wake, record.status, record.diagnostic])).toEqual([1, 2, 3, 4].map((wake) => [wake, "failed", false]))
+    expect(recorded[0]?.configuration).toEqual(bounded)
+
+    // Shutdown forgets the guard: the same session id starting over is told again.
+    await f.observe.onSessionShutdown(SESSION_ID, f.context)
+    f.observe.onWake(refusal(1), f.context)
+    expect(unavailable(f)).toHaveLength(3)
+    await f.idle()
+    expect(f.warnings).toEqual([])
+  })
+
+  test("#given category refusals between diagnostic failures #when observed #then they neither count toward nor reset the streak", async () => {
+    const f = await fixture()
+
+    f.observe.onWake(outcome({ wake: 1, status: "failed" }), f.context)
+    f.observe.onWake(refusal(2), f.context)
+    f.observe.onWake(outcome({ wake: 3, status: "failed" }), f.context)
+    f.observe.onWake(refusal(4), f.context)
+    expect(f.gates()).toEqual([])
+    f.observe.onWake(outcome({ wake: 5, status: "failed" }), f.context)
+
+    expect(f.gates().map((gate) => [gate.consecutiveFailures, gate.wake])).toEqual([[3, 5]])
+    await f.idle()
   })
 })
 

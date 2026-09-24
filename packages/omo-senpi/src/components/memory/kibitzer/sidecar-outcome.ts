@@ -2,7 +2,9 @@
 // every steer the turn absorbed. The sidecar aborts a turn itself for three reasons (the tool
 // budget, the wake deadline, session shutdown), and none of them is a child failure: only a turn
 // the engine settled as an error, or a child that could not be started, counts toward the
-// diagnostic streak that eventually raises the `omo-kibitzer:gate` notice.
+// diagnostic streak that eventually raises the `omo-kibitzer:gate` notice. A start refused because
+// the pinned recall category has no model the sidecar may use is not a failure either: it is a
+// configuration state (`configuration` on the end), reported once per session by `observe.ts`.
 
 import type { RecallNudge } from "@oh-my-opencode/memory-core"
 import type { RunnerOutcome } from "@oh-my-opencode/senpi-task"
@@ -14,6 +16,13 @@ export type KibitzerWakeAbort = "tool_budget" | "deadline" | "shutdown"
 
 export type KibitzerWakeFailureCause = "child_failed" | "child_failed_upstream" | "start_failed"
 
+/** Why the pinned recall category serves no model, and which chain providers a connection would revive. */
+export interface KibitzerWakeConfiguration {
+  readonly category: string
+  readonly cause: "category_unavailable" | "beyond_category"
+  readonly missingProviders?: readonly string[]
+}
+
 export type KibitzerWakeEnd =
   /** The engine settled the turn on its own; `nudges` on the outcome says whether it spoke. */
   | { readonly status: "completed" }
@@ -22,7 +31,13 @@ export type KibitzerWakeEnd =
   /** The sidecar aborted at the wake deadline. Accepted nudges are kept. */
   | { readonly status: "deadline" }
   /** The child turn failed or the child could not be started; the sidecar backs off. */
-  | { readonly status: "failed"; readonly cause: KibitzerWakeFailureCause; readonly reason?: string }
+  | {
+    readonly status: "failed"
+    readonly cause: KibitzerWakeFailureCause
+    readonly reason?: string
+    /** Present when the start refusal is a configuration state; such an end is never diagnostic. */
+    readonly configuration?: KibitzerWakeConfiguration
+  }
   /** The main session shut down under the turn. Nothing is delivered. */
   | { readonly status: "cancelled"; readonly cause: "shutdown" }
 
@@ -46,6 +61,8 @@ export interface KibitzerWakeOutcome {
   readonly status: KibitzerWakeStatus
   readonly cause?: KibitzerWakeFailureCause | "shutdown"
   readonly reason?: string
+  /** The configuration state a start refusal resolved to (see {@link KibitzerWakeConfiguration}). */
+  readonly configuration?: KibitzerWakeConfiguration
   readonly model?: string
   /** Nudges the parent re-validated and handed to delivery. */
   readonly nudges: readonly RecallNudge[]
@@ -64,7 +81,7 @@ export interface KibitzerWakeOutcome {
   readonly contextTokens?: number
   /** Tokens the wake's assistant messages reported; absent when the provider reported none. */
   readonly usage?: KibitzerWakeUsage
-  /** True only for `failed`: budget, deadline and shutdown never feed the failure streak. */
+  /** True only for `failed` without `configuration`: budget, deadline, shutdown and configuration states never feed the failure streak. */
   readonly diagnostic: boolean
 }
 
@@ -97,12 +114,20 @@ export function classifyWakeEnd(outcome: RunnerOutcome, abort: KibitzerWakeAbort
   }
 }
 
-/** A child that never started: the same shape as a failed turn so the streak and backoff treat both alike. */
-export function startFailureEnd(error: unknown): Extract<KibitzerWakeEnd, { readonly status: "failed" }> {
+/**
+ * A child that never started: the same shape as a failed turn so backoff treats both alike. A
+ * `configuration` marks the refusal as a configuration state, which the streak never counts.
+ */
+export function startFailureEnd(error: unknown, configuration?: KibitzerWakeConfiguration): Extract<KibitzerWakeEnd, { readonly status: "failed" }> {
   const reason = normalizeGateReason(error instanceof Error ? error.message : String(error))
-  return { status: "failed", cause: "start_failed", ...(reason === undefined ? {} : { reason }) }
+  return {
+    status: "failed",
+    cause: "start_failed",
+    ...(reason === undefined ? {} : { reason }),
+    ...(configuration === undefined ? {} : { configuration }),
+  }
 }
 
 export function isDiagnosticWakeEnd(end: KibitzerWakeEnd): boolean {
-  return end.status === "failed"
+  return end.status === "failed" && end.configuration === undefined
 }

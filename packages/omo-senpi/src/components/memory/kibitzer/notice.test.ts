@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test"
 import type { CustomEntry } from "@code-yeongyu/senpi"
 
 import { Theme } from "../../../senpi-test-runtime"
-import { renderKibitzerGateEntry, renderKibitzerNudgedEntry, type KibitzerGateRecord } from "./notice"
+import {
+  renderKibitzerGateEntry,
+  renderKibitzerNudgedEntry,
+  renderKibitzerUnavailableEntry,
+  UNAVAILABLE_PROVIDER_MAX_COUNT,
+  type KibitzerGateRecord,
+  type KibitzerUnavailableRecord,
+} from "./notice"
 
 const TEST_FG_COLORS = {
   accent: "#000000", bashMode: "#000000", border: "#000000", borderAccent: "#000000", borderMuted: "#000000",
@@ -139,5 +146,36 @@ describe("kibitzer nudged recollection", () => {
     expect(renderKibitzerNudgedEntry(entry(record), { expanded: true }, theme)?.render(120).join("\n")).toContain(
       "it is a hint, not current state",
     )
+  })
+})
+
+describe("kibitzer unavailable notice", () => {
+  const render = (data: unknown) => renderKibitzerUnavailableEntry(entry(data), { expanded: false }, theme)?.render(120).join("\n")
+
+  test("#given a dead-chain record naming the unconnected providers #when rendered #then a warning names the category, the providers, the /login command and both config keys", () => {
+    const record: KibitzerUnavailableRecord = { version: 1, category: "quick", cause: "beyond_category", missingProviders: ["openai", "xai"] }
+    const rendered = render(record) ?? ""
+    expect(rendered).toContain("⚠")
+    expect(rendered).not.toContain("✗")
+    for (const token of ["quick", "openai, xai", "/login", "categories.quick.model", "memory.recall.category"]) expect(rendered).toContain(token)
+  })
+
+  test("#given a record with no known providers #when rendered #then only the config-pin fix is offered", () => {
+    const rendered = render({ version: 1, category: "quick", cause: "category_unavailable" }) ?? ""
+    expect(rendered).toContain("categories.quick.model")
+    expect(rendered).not.toContain("/login")
+  })
+
+  test("#given a malformed or foreign stored record #when rendered #then nothing is drawn", () => {
+    for (const data of [
+      undefined,
+      "quick",
+      { version: 2, category: "quick", cause: "category_unavailable" },
+      { version: 1, category: "", cause: "category_unavailable" },
+      { version: 1, category: "quick", cause: "start_failed" },
+      { version: 1, category: "quick", cause: "category_unavailable", missingProviders: "openai" },
+      { version: 1, category: "quick", cause: "category_unavailable", missingProviders: [7] },
+      { version: 1, category: "quick", cause: "category_unavailable", missingProviders: Array.from({ length: UNAVAILABLE_PROVIDER_MAX_COUNT + 1 }, () => "p") },
+    ]) expect(render(data)).toBeUndefined()
   })
 })

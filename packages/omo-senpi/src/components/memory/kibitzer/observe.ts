@@ -10,7 +10,10 @@
 // The `omo-kibitzer:gate` notice moves here from the one-shot gate wiring with its policy intact:
 // an isolated failure is silent (the ndjson line is its only trace); the third consecutive
 // diagnostic failure of one main session appends exactly one actionable notice; a normal
-// completion or the session's shutdown resets the streak.
+// completion or the session's shutdown resets the streak. A wake carrying a `configuration` (the
+// pinned recall category serves no model) is outside the streak - neither counted nor a reset -
+// and the first one of a session appends ONE `omo-kibitzer:unavailable` warning instead; that
+// guard is forgotten at session shutdown.
 //
 // Retention: a sidecar directory idle for seven days is removed - never while a session owns it.
 // Ownership is an ordinary memory-core lock (`locks/recall-sidecar.<encoded-session>.lock`) held
@@ -31,11 +34,11 @@ import { appendFile, mkdir } from "@oh-my-opencode/memory-core/fs"
 import type { ComponentLogger } from "../../../extension/types"
 import type { MemoryIdentityContext } from "../context"
 import { redactKibitzerEventText } from "./events"
-import { GATE_ENTRY_TYPE, type KibitzerGateRecord } from "./notice"
+import { GATE_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE, type KibitzerGateRecord, type KibitzerUnavailableRecord } from "./notice"
 import { OWNER_LOCK_PURPOSE, encodeKibitzerSessionId, kibitzerSidecarSessionDir, kibitzerWakesFile, ownerLockPathFor } from "./observe-paths"
 import { KIBITZER_SIDECAR_RETENTION_MS, pruneKibitzerSidecars } from "./observe-prune"
-import { WAKE_MODEL_MAX_CHARS, capped, kibitzerWakeRecord, redactKibitzerWakeReason } from "./observe-record"
-import type { KibitzerWakeOutcome } from "./sidecar-outcome"
+import { WAKE_MODEL_MAX_CHARS, boundedKibitzerConfiguration, capped, kibitzerWakeRecord, redactKibitzerWakeReason } from "./observe-record"
+import type { KibitzerWakeConfiguration, KibitzerWakeOutcome } from "./sidecar-outcome"
 
 export {
   KIBITZER_WAKES_FILENAME,
@@ -55,7 +58,7 @@ export const KIBITZER_PERSISTENT_FAILURE_THRESHOLD = 3
 const OWNER_LOCK_WAIT_MS = 2_000
 
 export interface KibitzerObservabilityOptions {
-  /** The main session's entry sink; the gate notice is the only entry this module appends. */
+  /** The main session's entry sink; the gate and unavailable notices are the only entries this module appends. */
   readonly appendEntry: (customType: string, data?: unknown) => void
   readonly now?: () => number
   readonly retentionMs?: number
@@ -93,6 +96,8 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
   const retentionMs = options.retentionMs ?? KIBITZER_SIDECAR_RETENTION_MS
   const owned = new Map<string, Ownership>()
   const streaks = new Map<string, Streak>()
+  /** Sessions already shown the unavailable notice; forgotten at shutdown. */
+  const unavailableNotified = new Set<string>()
   /** Per-session write chains: one file, one writer, lines in wake order. */
   const writers = new Map<string, Promise<void>>()
   const sweeping = new Map<string, Promise<void>>()
@@ -166,7 +171,21 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
     void next.finally(() => {
       if (writers.get(outcome.sessionId) === next) writers.delete(outcome.sessionId)
     })
-    observeStreak(outcome)
+    if (outcome.configuration === undefined) observeStreak(outcome)
+    else noticeUnavailable(outcome.sessionId, outcome.configuration)
+  }
+
+  // ---- the configuration notice --------------------------------------------------------------------
+
+  function noticeUnavailable(sessionId: string, configuration: KibitzerWakeConfiguration): void {
+    if (unavailableNotified.has(sessionId)) return
+    unavailableNotified.add(sessionId)
+    const record: KibitzerUnavailableRecord = { version: 1, ...boundedKibitzerConfiguration(configuration) }
+    try {
+      options.appendEntry(UNAVAILABLE_ENTRY_TYPE, record)
+    } catch (error) {
+      warn("omo-senpi kibitzer unavailable notice append failed", { sessionId, error: describe(error) })
+    }
   }
 
   // ---- the diagnostic streak -----------------------------------------------------------------------
@@ -224,6 +243,7 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
     onWake,
     async onSessionShutdown(sessionId, context): Promise<void> {
       streaks.delete(sessionId)
+      unavailableNotified.delete(sessionId)
       await (writers.get(sessionId) ?? Promise.resolve())
       await disown(sessionId)
       sweep(context)
