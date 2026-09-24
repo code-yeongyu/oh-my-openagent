@@ -449,5 +449,7 @@ Ultrawork Planner (`/ulw-plan`) **会像一个真实的主管那样去采访你*
 - [ELESTYLE](https://elestyle.jp)
   - 开发了 elepay（全渠道移动支付网关）、OneQR（专为无现金社会打造的移动 SaaS 生态系统）。
 - [Deepgram](https://deepgram.com)
+- [Chazm](https://chazm.co.kr)
+  - 汽车融资租赁与长期租赁的报价比较平台。
 
 *特别感谢 [@junhoyeo](https://github.com/junhoyeo) 为我们设计的令人惊艳的首图（Hero Image）。*

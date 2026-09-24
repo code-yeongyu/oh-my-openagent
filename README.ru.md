@@ -446,5 +446,7 @@ Ultrawork Planner (`/ulw-plan`) **интервьюирует вас как на�
 - [ELESTYLE](https://elestyle.jp)
   - Создатели elepay (мультимобильный платёжный шлюз) и OneQR (мобильное SaaS-приложение для безналичных расчётов).
 - [Deepgram](https://deepgram.com)
+- [Chazm](https://chazm.co.kr)
+  - Маркетплейс для сравнения предложений по лизингу и долгосрочной аренде автомобилей.
 
 *Особая благодарность [@junhoyeo](https://github.com/junhoyeo) за это потрясающее hero-изображение.*
