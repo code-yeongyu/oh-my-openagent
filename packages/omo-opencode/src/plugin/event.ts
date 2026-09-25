@@ -5,6 +5,7 @@ import type { Managers } from "../create-managers";
 import type { PluginContext } from "./types";
 
 import { getMainSessionID, subagentSessions, syncSubagentSessions } from "../features/claude-code-session-state";
+import { createStaleAgentRegistryRecovery } from "../features/agent-registry-recovery";
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../shared/event-session-id";
 import { log } from "../shared/logger";
@@ -50,6 +51,7 @@ export function createEventHandler(args: {
   const recentAnyIdles = new Map<string, number>();
   const dedupWindowMs = 500;
   const teamHandlers = createEventTeamHandlers({ pluginConfig, pluginContext, managers });
+  const staleRegistryRecovery = createStaleAgentRegistryRecovery({ client: ctx.client });
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
     if (syncSubagentSessions.has(sessionID)) return true;
@@ -177,6 +179,11 @@ export function createEventHandler(args: {
         type: "session.idle",
         sessionId: resolveSessionEventID(props) ?? "",
       }));
+      void staleRegistryRecovery.maybeRecover().catch((err) => {
+        log("[event] agent-registry-recovery error", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
 
     if (event.type === "message.updated") {
