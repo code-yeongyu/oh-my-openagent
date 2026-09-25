@@ -1,0 +1,91 @@
+PR 6340 real OpenCode QA for the new 4-series fast alias path
+
+What was tested:
+- The 4-series `-fast` arm added to `hasGA1MContext` in packages/model-core/src/context-limit-resolver.ts,
+  driven end to end through a real isolated OpenCode server with the representative identity
+  anthropic/claude-opus-4-8-fast.
+- The behavior under test is the preemptive-compaction decision: 200000 input tokens must NOT trigger
+  automatic compaction, and 790000 input tokens must trigger it.
+
+Harness:
+- OpenCode: 0.0.0-codeg/v1.18.14-adjacency-leading-v5-202608061754 (/global/health reported healthy: true)
+- Plugin: file:///Volumes/DATA/tmp/omo-opus5-1m-101314/packages/omo-opencode/src/index.ts (confirmed in /config)
+- OpenCode model identity: anthropic/claude-opus-4-8-fast
+- Provider: isolated local @ai-sdk/openai-compatible fake provider on 127.0.0.1, loopback only
+- OMO config: experimental.preemptive_compaction = true
+- Isolated XDG data/config/cache/state plus isolated HOME under a temporary sandbox root
+- Session: ses_02969761affeprpY8nOmmyXXhl
+
+Why this run isolates the classification change:
+- The provider block declares no `anthropic-beta` header, so the plugin's anthropicContext1MEnabled stayed false.
+- The model entry declares no `limit.context`, so modelContextLimitsCache had no entry for this identity.
+- ANTHROPIC_1M_CONTEXT and VERTEX_ANTHROPIC_1M_CONTEXT were unset in the server environment.
+- With all three 1M signals absent, the only path from resolveActualContextLimit to the GA 1M limit is
+  hasGA1MContext("claude-opus-4-8-fast") matching the new 4-series `-fast` arm. Without that arm the limit
+  would be 200000, the 200000-token turn would sit at ratio 1.0 against the 0.78 threshold, and compaction
+  would have fired on the below-threshold turn.
+
+Exact drive:
+1. Started the branch plugin in an isolated real OpenCode server (opencode serve, loopback, password protected).
+2. Opened the SSE stream at /event for the isolated project directory.
+3. POSTed a real session, then POSTed /session/<id>/prompt_async for anthropic/claude-opus-4-8-fast.
+4. The local provider returned 200000 input tokens, then 790000 input tokens, through real message and
+   real bash-tool events.
+5. SSE showed no compaction part after the 200000-token turn; after the 790000-token turn it emitted an
+   `auto: true` compaction part and later `session.compacted`.
+
+Provider receipts (request bodies intentionally omitted; credentials never captured):
+2026-08-06T10:20:25.261Z request=1 summary=false tools=33 user=execute the three harmless bash tool calls returned by the isolated provider, then stop. path=/v1/chat/completions bytes=99738
+2026-08-06T10:20:25.570Z request=2 summary=false tools=33 user=[internal] Continue from the previous assistant state. path=/v1/chat/completions bytes=100106
+2026-08-06T10:20:25.691Z request=3 summary=false tools=33 user=[internal] Continue from the previous assistant state. path=/v1/chat/completions bytes=100391
+2026-08-06T10:21:26.837Z request=4 summary=true tools=none user=Create a new anchored summary from the conversation history. Output exactly the Markdown structure shown inside <template> and keep the sec path=/v1/chat/completions bytes=6354
+2026-08-06T10:21:27.858Z request=5 summary=false tools=33 user=Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed. path=/v1/chat/completions bytes=100011
+
+The first summarize request is request=4. It follows the 790000-token turn. No summarize request exists
+between the 200000-token turn and the 790000-token turn.
+
+Selected exact SSE records, in observed order:
+data: {"id":"evt_fd696a811001eP8rxPQHootGCq","type":"message.part.updated","properties":{"sessionID":"ses_02969761affeprpY8nOmmyXXhl","part":{"type":"tool","tool":"bash","callID":"call_1","state":{"status":"completed","input":{"command":"printf BELOW_THRESHOLD_TOOL","description":"BELOW_THRESHOLD_TOOL"},"output":"BELOW_THRESHOLD_TOOL","metadata":{"output":"BELOW_THRESHOLD_TOOL","exit":0,"truncated":false},"title":"printf BELOW_THRESHOLD_TOOL","time":{"start":1786011625467,"end":1786011625488}},"id":"prt_fd696a74e001EudeKwbxyZc52t","sessionID":"ses_02969761affeprpY8nOmmyXXhl","messageID":"msg_fd6968f61001YJSZa3mTNlN04C"},"time":1786011625489}}
+data: {"id":"evt_fd696a81d001M1Mjt86G87yKEP","type":"message.updated","properties":{"sessionID":"ses_02969761affeprpY8nOmmyXXhl","info":{"id":"msg_fd6968f61001YJSZa3mTNlN04C","parentID":"msg_fd6968ba4001zixZ2MiU8jRuce","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/Volumes/DATA/tmp/pr6340-4series-qa/sandbox/project","root":"/"},"cost":2.00025,"tokens":{"total":200005,"input":200000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"claude-opus-4-8-fast","providerID":"anthropic","time":{"created":1786011619169,"completed":1786011625508},"sessionID":"ses_02969761affeprpY8nOmmyXXhl","finish":"tool-calls"}}}
+data: {"id":"evt_fd696a8a5001riZqhMQLN6qNuR","type":"message.part.updated","properties":{"sessionID":"ses_02969761affeprpY8nOmmyXXhl","part":{"type":"tool","tool":"bash","callID":"call_2","state":{"status":"completed","input":{"command":"printf ABOVE_THRESHOLD_TOOL","description":"ABOVE_THRESHOLD_TOOL"},"output":"ABOVE_THRESHOLD_TOOL","metadata":{"output":"ABOVE_THRESHOLD_TOOL","exit":0,"truncated":false},"title":"printf ABOVE_THRESHOLD_TOOL","time":{"start":1786011625629,"end":1786011625637}},"id":"prt_fd696a866001FSSxwr5EQCcnaj","sessionID":"ses_02969761affeprpY8nOmmyXXhl","messageID":"msg_fd696a829001qfV5osJCxtFftd"},"time":1786011625637}}
+data: {"id":"evt_fd696a8aa001lIF0FiFli0vbaO","type":"message.updated","properties":{"sessionID":"ses_02969761affeprpY8nOmmyXXhl","info":{"id":"msg_fd696a829001qfV5osJCxtFftd","parentID":"msg_fd6968ba4001zixZ2MiU8jRuce","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/Volumes/DATA/tmp/pr6340-4series-qa/sandbox/project","root":"/"},"cost":7.90025,"tokens":{"total":790005,"input":790000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"claude-opus-4-8-fast","providerID":"anthropic","time":{"created":1786011625513,"completed":1786011625647},"sessionID":"ses_02969761affeprpY8nOmmyXXhl","finish":"tool-calls"}}}
+data: {"id":"evt_fd696a916001bROWhEPrH1fib1","type":"message.part.updated","properties":{"sessionID":"ses_02969761affeprpY8nOmmyXXhl","part":{"id":"prt_fd696a91600111HmRA4uIbadBr","messageID":"msg_fd696a913001dhTwBlUCZSYhJ1","sessionID":"ses_02969761affeprpY8nOmmyXXhl","type":"compaction","auto":true},"time":1786011625750}}
+data: {"id":"evt_fd6979b25001rbHRra9G2O8NWs","type":"session.compacted","properties":{"sessionID":"ses_02969761affeprpY8nOmmyXXhl"}}
+
+SSE event-type census for the captured stream:
+session.compacted=1, session.created=1, session.idle=1, message.updated=25, message.part.updated=33
+
+Isolation receipt (host OpenCode database, read-only count):
+real_before=4821
+real_after=4821
+
+Observed residual behavior (pre-existing, unchanged by this PR):
+- The compaction part was emitted immediately after the above-threshold turn reached the real tool path.
+- The summarize request stayed queued behind the in-flight tool turn. The plugin's 60000 ms wrapper logged
+  "Compaction summarize timed out after 60000ms" at 2026-08-06T10:21:25.741Z, about one second before
+  OpenCode completed the queued summary and SSE emitted session.compacted.
+- This is the same queue/timeout interaction already recorded for the earlier runs in this evidence folder.
+  It is outside the model-classification edit and does not change the threshold proof.
+
+Focused tests and package typecheck re-run against this same code (same session, after the real drive):
+$ bun test packages/model-core/src/context-limit-resolver.test.ts packages/omo-opencode/src/hooks/preemptive-compaction.test.ts packages/omo-opencode/src/hooks/preemptive-compaction.aws-bedrock.test.ts
+bun test v1.3.14 (0d9b296a)
+ 45 pass
+ 0 fail
+ 74 expect() calls
+Ran 45 tests across 3 files.
+exit_code=0
+
+$ bun run typecheck:packages
+exit_code=0
+
+Note on artifact format: focused-tests.txt in this folder was captured with an older bun that printed one
+line per test. bun 1.3.14 prints only the aggregate counts, so the counts above are recorded here instead
+of rewriting that artifact with a different format.
+
+What was omitted:
+No external provider request or credential was needed. The isolated provider ran on loopback with a
+placeholder key that is not recorded here. No environment dumps, auth headers, tokens, or private
+configuration were captured. The sandbox root was removed after capture.
+
+QA_RESULT=PASS_WITH_RESIDUAL_TIMEOUT_NOTE

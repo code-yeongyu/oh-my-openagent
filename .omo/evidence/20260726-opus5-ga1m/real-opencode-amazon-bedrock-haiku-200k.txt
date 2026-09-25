@@ -1,0 +1,39 @@
+PR 6340 final real OpenCode Amazon Bedrock cached-200K override QA
+
+Harness:
+- OpenCode: 0.0.0-codeg/v1.18.5-adjacency-leading-v4-202607260248
+- Plugin: file:///Volumes/DATA/tmp/omo-opus5-1m-101314/packages/omo-opencode/src/index.ts
+- OpenCode model identity: amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
+- Catalogued context limit: 200000
+- Provider transport: isolated local @ai-sdk/openai-compatible fake provider
+- XDG config/data/state/cache: /tmp/pr6340-haiku-real-qa/*
+- Session: ses_06328f097ffecOs41DtHkfxsiN
+
+Enabled 1M signals:
+- Native Anthropic beta state: the effective real OpenCode config included provider.anthropic.options.headers["anthropic-beta"] = "context-1m-2025-08-07", which makes modelCacheState.anthropicContext1MEnabled true in applyProviderConfig.
+- ANTHROPIC_1M_CONTEXT=true in the real OpenCode server process.
+- VERTEX_ANTHROPIC_1M_CONTEXT=true in the real OpenCode server process.
+
+Exact drive:
+1. Started this branch plugin in a real OpenCode server under isolated XDG directories with all three 1M signals above enabled.
+2. POSTed a real message using providerID=amazon-bedrock and modelID=us.anthropic.claude-haiku-4-5-20251001-v1:0.
+3. The isolated provider returned 160000 input tokens and a harmless bash tool call.
+4. The real OpenCode tool path executed the call, then SSE emitted an automatic compaction part and session.compacted.
+
+Provider receipts (request bodies intentionally omitted):
+2026-07-26T05:12:55.183Z request=1 summary=false tools=319 bytes=439416
+2026-07-26T05:12:56.155Z request=2 summary=false tools=319 bytes=439723
+2026-07-26T05:13:57.474Z request=3 summary=true tools=0 bytes=5600
+2026-07-26T05:13:57.786Z request=4 summary=false tools=319 bytes=439611
+
+Selected exact SSE records:
+{"id":"evt_f9cd7300a0017YC1yagb0bl9NH","type":"message.part.updated","properties":{"sessionID":"ses_06328f097ffecOs41DtHkfxsiN","part":{"type":"tool","tool":"bash","callID":"call_1","state":{"status":"completed","input":{"command":"printf HAIKU_160K_TOOL","description":"HAIKU_160K_TOOL"},"output":"HAIKU_160K_TOOL","metadata":{"output":"HAIKU_160K_TOOL","exit":0,"truncated":false},"title":"printf HAIKU_160K_TOOL","time":{"start":1785042775710,"end":1785042776074}},"id":"prt_f9cd72cdd001IWUPWbQFyQmDyi","sessionID":"ses_06328f097ffecOs41DtHkfxsiN","messageID":"msg_f9cd715a2001NYyTR7F1Xv1ktl"},"time":1785042776074}}
+{"id":"evt_f9cd73014001V2057p6aVCi5ln","type":"message.updated","properties":{"sessionID":"ses_06328f097ffecOs41DtHkfxsiN","info":{"id":"msg_f9cd715a2001NYyTR7F1Xv1ktl","parentID":"msg_f9cd71033001CLAxbhJpWYQUYu","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/tmp/pr6340-haiku-real-qa/project","root":"/"},"cost":0.160025,"tokens":{"total":160005,"input":160000,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"us.anthropic.claude-haiku-4-5-20251001-v1:0","providerID":"amazon-bedrock","time":{"created":1785042769314,"completed":1785042776092},"sessionID":"ses_06328f097ffecOs41DtHkfxsiN","finish":"tool-calls"}}}
+{"id":"evt_f9cd7333a0013QmX9A5wzosXQu","type":"message.part.updated","properties":{"sessionID":"ses_06328f097ffecOs41DtHkfxsiN","part":{"id":"prt_f9cd73339001444J4z5VYnrCLv","messageID":"msg_f9cd73336001f5u16PcTLpAb4a","sessionID":"ses_06328f097ffecOs41DtHkfxsiN","type":"compaction","auto":true},"time":1785042776889}}
+{"id":"evt_f9cd820ca001FfBQ4xp1kM4ozk","type":"session.compacted","properties":{"sessionID":"ses_06328f097ffecOs41DtHkfxsiN"}}
+
+Isolation receipt:
+real_before=4329
+real_after=4329
+
+QA_RESULT=PASS

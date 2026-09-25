@@ -169,4 +169,171 @@ describe("resolveActualContextLimit", () => {
       anthropicContext1MEnabled: false,
     })).toBe(1_000_000)
   })
+  it("returns GA 1M for 4-series fast aliases", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of [
+      "claude-opus-4-6-fast",
+      "claude-opus-4-7-fast",
+      "claude-opus-4-8-fast",
+      "claude-sonnet-4-6-fast",
+      "claude-sonnet-4-7-fast",
+      "claude-sonnet-4-8-fast",
+    ]) {
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
+  it("returns GA 1M for claude-opus-5", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for supported Opus 5 aliases", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of ["claude-opus-5-0", "claude-opus-5.0", "claude-opus-5[1m]"]) {
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
+  it("returns GA 1M for catalogued Opus 5 suffixes", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of ["claude-opus-5-fast", "claude-opus-5@default"]) {
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
+  it("uses a cached context limit for supported Opus 5 aliases", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>([
+      ["anthropic/claude-opus-5-0", 900_000],
+      ["anthropic/claude-opus-5-fast", 910_000],
+      ["anthropic/claude-opus-5@default", 920_000],
+    ])
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5-0", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(900_000)
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5-fast", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(910_000)
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5@default", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(920_000)
+  })
+
+  it("returns GA 1M for AWS Bedrock Opus 5 model IDs", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    for (const modelID of ["anthropic.claude-opus-5", "us.anthropic.claude-opus-5"]) {
+      expect(resolveActualContextLimit("aws-bedrock-anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(1_000_000)
+    }
+  })
+
+  it("returns GA 1M for the OpenCode Amazon Bedrock provider ID", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("amazon-bedrock", "us.anthropic.claude-opus-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("keeps non-Claude Amazon Bedrock models on their cached limit", () => {
+    process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
+    process.env[VERTEX_CONTEXT_ENV_KEY] = "true"
+    const modelID = "openai.gpt-5.6-sol"
+    const modelContextLimitsCache = new Map<string, number>([
+      [`amazon-bedrock/${modelID}`, 272_000],
+    ])
+
+    expect(resolveActualContextLimit("amazon-bedrock", modelID, {
+      anthropicContext1MEnabled: true,
+      modelContextLimitsCache,
+    })).toBe(272_000)
+  })
+
+  it("keeps Amazon Bedrock Claude models on their cached limit when Anthropic 1M flags are enabled", () => {
+    process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
+    process.env[VERTEX_CONTEXT_ENV_KEY] = "true"
+    const modelID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    const modelContextLimitsCache = new Map<string, number>([
+      [`amazon-bedrock/${modelID}`, 200_000],
+    ])
+
+    expect(resolveActualContextLimit("amazon-bedrock", modelID, {
+      anthropicContext1MEnabled: true,
+      modelContextLimitsCache,
+    })).toBe(200_000)
+  })
+
+  it("uses a cached context limit for a regional AWS Bedrock Opus 5 model ID", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelID = "us.anthropic.claude-opus-5"
+    const modelContextLimitsCache = new Map<string, number>([
+      [`aws-bedrock-anthropic/${modelID}`, 930_000],
+    ])
+
+    expect(resolveActualContextLimit("aws-bedrock-anthropic", modelID, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })).toBe(930_000)
+  })
+
+  it("applies the -high variant suffix to 5-series models", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-5-high", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-sonnet-5-high", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-fable-5-high", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("keeps 200K models on the default limit", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-haiku-4-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(200_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-4-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(200_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-opus-4-1", {
+      anthropicContext1MEnabled: false,
+    })).toBe(200_000)
+  })
 })
