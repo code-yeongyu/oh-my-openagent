@@ -1,0 +1,11 @@
+real_db_before=2979
+{
+  "plugin": [
+    "file:///home/rate/oh-my-openagent-pr-wt/fix-session-receiver/dist/index.js"
+  ],
+  "plugin_loaded": true,
+  "agent_count": 0
+}
+opencode_exit=0
+real_db_after=2979
+real_db_unchanged=yes
