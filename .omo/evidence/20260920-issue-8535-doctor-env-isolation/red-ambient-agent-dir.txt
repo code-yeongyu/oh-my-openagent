@@ -1,0 +1,18 @@
+WHAT WAS TESTED
+The unmodified `doctor.test.ts` was run through Bun 1.4.0 with a controlled ambient `OMO_CODING_AGENT_DIR` pointing at a valid decoy directory. The selected cases wrote their expected settings into fixture-owned directories and invoked the copied real launcher.
+
+Command shape:
+`OMO_CODING_AGENT_DIR=<decoy> bun --config=NUL test --test-name-pattern "(settings contain the legacy package entry|settings JSON is malformed|SENPI_CODING_AGENT_DIR points)" packages/omo-native/test/doctor.test.ts`
+
+WHAT WAS OBSERVED
+- 0 pass, 4 fail, 6 filtered out, 8 assertions.
+- Both legacy-entry shapes omitted the expected duplicate-package warning.
+- The malformed fixture omitted the expected parse warning.
+- The explicit alternate `SENPI_CODING_AGENT_DIR` fixture was ignored.
+- Every copied-launcher process exited normally and read the valid decoy directory instead of the fixture, exactly matching the issue owner's corrected causal chain.
+
+WHY IT IS ENOUGH
+The run changes only one controlled parent variable. Because `OMO_CODING_AGENT_DIR` outranks `SENPI_CODING_AGENT_DIR`, all four failures prove that inherited agent-dir state shadows the test fixture. Extra process-table lines are irrelevant because every failed assertion searches with `toContain`.
+
+WHAT WAS OMITTED
+Random temporary names, absolute local paths, and complete launcher output were summarized. No real settings, credentials, environment dump, process table, auth header, or private data were retained.
