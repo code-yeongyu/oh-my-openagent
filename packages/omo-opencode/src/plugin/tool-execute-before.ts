@@ -7,6 +7,7 @@ import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
 
 import type { CreatedHooks } from "../create-hooks"
+import type { QuestionToolRef } from "../features/question-visibility-watchdog"
 import type { BackgroundManager } from "../features/background-agent"
 
 const BACKGROUND_WAIT_BLOCK_MESSAGE = [
@@ -42,11 +43,12 @@ export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
   backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
+  questionVisibilityWatchdog?: { onQuestionExecuted: (ref: QuestionToolRef) => void }
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks, backgroundManager } = args
+  const { ctx, hooks, backgroundManager, questionVisibilityWatchdog } = args
 
   return async (input, output): Promise<void> => {
     // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
@@ -115,6 +117,9 @@ export function createToolExecuteBeforeHandler(args: {
       || normalizedToolName === "askuserquestion"
     ) {
       const sessionID = input.sessionID || getMainSessionID()
+      if (sessionID) {
+        questionVisibilityWatchdog?.onQuestionExecuted({ sessionID, callID: input.callID })
+      }
       await hooks.sessionNotification?.({
         event: {
           type: "tool.execute.before",

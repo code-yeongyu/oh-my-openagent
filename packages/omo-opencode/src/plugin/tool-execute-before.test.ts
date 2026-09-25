@@ -173,6 +173,66 @@ describe("createToolExecuteBeforeHandler", () => {
     expect(output.args.todos).toBe(preservedTodos)
   })
 
+  test("schedules the question visibility watchdog for question tools", async () => {
+    //#given
+    const watched: Array<{ sessionID: string; callID?: string }> = []
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: {},
+      questionVisibilityWatchdog: {
+        onQuestionExecuted: (ref) => {
+          watched.push(ref)
+        },
+      },
+    })
+
+    //#when
+    await handler(
+      { tool: "question", sessionID: "ses_q_watch", callID: "call_wd" },
+      { args: { questions: [] } as Record<string, unknown> },
+    )
+
+    //#then
+    expect(watched).toEqual([{ sessionID: "ses_q_watch", callID: "call_wd" }])
+  })
+
+  test("does not schedule the watchdog for non-question tools", async () => {
+    //#given
+    let called = false
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: {},
+      questionVisibilityWatchdog: {
+        onQuestionExecuted: () => {
+          called = true
+        },
+      },
+    })
+
+    //#when
+    await handler(
+      { tool: "bash", sessionID: "ses_bash", callID: "call_bash" },
+      { args: { command: "pwd" } as Record<string, unknown> },
+    )
+
+    //#then
+    expect(called).toBe(false)
+  })
+
   describe("task tool subagent_type normalization", () => {
     const emptyHooks = {}
 
