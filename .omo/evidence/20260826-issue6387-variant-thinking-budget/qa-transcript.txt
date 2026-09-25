@@ -1,0 +1,16 @@
+PASS applyOverrides low -> 8192
+PASS applyOverrides medium -> 16000
+PASS applyOverrides max -> 60000
+PASS applyOverrides no variant -> legacy 32000
+PASS junior low -> 8192
+PASS junior max -> 60000
+PASS junior GPT has reasoningEffort, no thinking
+PASS junior GLM has neither
+PASS adaptive-path Claude emits {}
+PASS explicit override thinking wins
+PASS junior explicit thinking wins
+PASS chat.params keeps scaled thinking block
+PASS resolver undefined -> 32000
+PASS resolver off -> 32000
+PASS resolver MAX case-insensitive
+QA RESULT: ALL PASS
