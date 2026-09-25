@@ -498,4 +498,15 @@ describe("getModelCapabilities", () => {
     expect(capabilities.supportsThinking).toBe(true)
     expect(capabilities.diagnostics.supportsThinking.source).toBe("runtime")
   })
+
+  test.each(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"])(
+    "uses the authoritative 1M context for %s despite stale generated metadata",
+    (modelID) => {
+      const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
+      const entry = bundledSnapshot.models[modelID]
+
+      expect(entry?.limit?.input).toBe(922_000)
+      expect(entry?.limit?.context).toBe(1_050_000)
+    },
+  )
 })
