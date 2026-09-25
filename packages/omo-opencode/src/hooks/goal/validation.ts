@@ -14,10 +14,10 @@ export function validateObjective(objective: string): string {
     throw new InvalidObjectiveError("Objective cannot be empty")
   }
 
+  // Truncate instead of throwing so a validation error in a continuation
+  // helper can never abort the session (#8409).
   if (trimmed.length > MAX_OBJECTIVE_LENGTH) {
-    throw new InvalidObjectiveError(
-      `Objective exceeds maximum length of ${MAX_OBJECTIVE_LENGTH} characters`,
-    )
+    return trimmed.slice(0, MAX_OBJECTIVE_LENGTH)
   }
 
   return trimmed
