@@ -63,7 +63,7 @@ describe("runtime fallback of a daemon-session child", () => {
     const handed = runner.handles.get(task.task_id)
     if (handed === undefined) throw new Error("expected the first rung's handle")
     const unsubscribed = handed.waitForUnsubscription()
-    handed.settle({ status: "error", failure: { kind: "child-turn-failed", message: "403: subscription required" } })
+    handed.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
     await unsubscribed
 
     const between = store.load(task.task_id)
