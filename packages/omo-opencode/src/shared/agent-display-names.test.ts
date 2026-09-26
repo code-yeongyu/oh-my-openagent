@@ -139,6 +139,31 @@ describe("getAgentDisplayName", () => {
     expect(getAgentDisplayName("hephaestus", { hephaestus: { displayName: "헤파이스토스" } })).toBe("헤파이스토스")
     expect(getAgentDisplayName("atlas", { atlas: { displayName: "アトラス" } })).toBe("アトラス")
   })
+
+  it("normalizes decomposed-form (NFD) display-name overrides to NFC (#4170)", () => {
+    // given a Hangul name in decomposed form (jamo characters that the OpenCode
+    // TUI renders as mojibake when not normalized)
+    const decomposed = "헤파이스토스".normalize("NFD")
+    const composed = "헤파이스토스".normalize("NFC")
+    expect(decomposed).not.toBe(composed) // sanity: forms differ
+
+    // when getAgentDisplayName resolves the override
+    const result = getAgentDisplayName("hephaestus", { hephaestus: { displayName: decomposed } })
+
+    // then output is canonical NFC, so downstream TUI/HTTP sinks see consistent bytes
+    expect(result).toBe(composed)
+  })
+
+  it("strips zero-width characters from display-name overrides (#4170)", () => {
+    // given a display name with embedded ZWSP/word-joiner (legacy sort-bias chars)
+    const polluted = "Sisyphus​ - ⁠主脑"
+
+    // when getAgentDisplayName resolves the override
+    const result = getAgentDisplayName("sisyphus", { sisyphus: { displayName: polluted } })
+
+    // then invisible characters are stripped (they caused column-truncation regressions)
+    expect(result).toBe("Sisyphus - 主脑")
+  })
 })
 
 describe("getAgentConfigKey", () => {

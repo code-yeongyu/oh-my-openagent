@@ -26,7 +26,12 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "council-member": "council-member",
 }
 
-const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+// Strip invisible characters that cause TUI mojibake / column-truncation when
+// they leak into agent names. The expanded set covers the historical regression
+// sources documented in `src/shared/agent-sort-shim.ts` and issue #4170:
+//   U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 WORD JOINER,
+//   U+FEFF BOM/ZWNBSP, U+00AD SOFT HYPHEN
+const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g
 const VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX = /^\d+\|/
 const AGENT_WRAPPER_CHARS_REGEX = /^[\\/"']+|[\\/"']+$/g
 
@@ -36,6 +41,19 @@ export function stripInvisibleAgentCharacters(agentName: string): string {
 
 export function stripAgentListSortPrefix(agentName: string): string {
   return stripInvisibleAgentCharacters(agentName).replace(VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX, "").replace(AGENT_WRAPPER_CHARS_REGEX, "")
+}
+
+/**
+ * Normalize a display name for consumption by TUI/HTTP/JSON sinks.
+ *
+ * Decomposed Unicode (NFD) or stray zero-width characters in the display
+ * name surface as mojibake in the OpenCode TUI when the name round-trips
+ * through `x-opencode-agent-name`-style sinks (#4170). Normalizing here
+ * guarantees every consumer of `getAgentDisplayName` / `getAgentListDisplayName`
+ * receives canonical NFC bytes without invisible padding.
+ */
+function canonicalizeDisplayName(displayName: string): string {
+  return stripInvisibleAgentCharacters(displayName).normalize("NFC")
 }
 
 /**
@@ -55,21 +73,21 @@ export function getAgentDisplayName(
   if (overrides) {
     const override = overrides[configKey]
       ?? Object.entries(overrides).find(([k]) => k.toLowerCase() === configKey.toLowerCase())?.[1]
-    if (override?.displayName) return override.displayName
+    if (override?.displayName) return canonicalizeDisplayName(override.displayName)
   }
 
   // Try exact match first
   const exactMatch = AGENT_DISPLAY_NAMES[configKey]
-  if (exactMatch !== undefined) return exactMatch
+  if (exactMatch !== undefined) return canonicalizeDisplayName(exactMatch)
 
   // Fall back to case-insensitive search
   const lowerKey = configKey.toLowerCase()
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
-    if (k.toLowerCase() === lowerKey) return v
+    if (k.toLowerCase() === lowerKey) return canonicalizeDisplayName(v)
   }
 
   // Unknown agent: return original key
-  return configKey
+  return canonicalizeDisplayName(configKey)
 }
 
 /**
@@ -142,10 +160,10 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
 
   const configKey = resolveKnownAgentConfigKey(trimmed)
   if (configKey !== undefined) {
-    return AGENT_DISPLAY_NAMES[configKey] ?? trimmed
+    return canonicalizeDisplayName(AGENT_DISPLAY_NAMES[configKey] ?? trimmed)
   }
 
-  return trimmed
+  return canonicalizeDisplayName(trimmed)
 }
 
 export function normalizeAgentForPromptKey(agentName: string | undefined): string | undefined {
