@@ -97,6 +97,17 @@ export function readSettingValue(
   return { present: true, value: node }
 }
 
+export function readCurrentSettingValue(
+  currentValues: Readonly<Record<string, unknown>>,
+  definition: SettingDefinition,
+): { readonly present: boolean; readonly value: unknown } {
+  const id = settingId(definition)
+  if (!Object.prototype.hasOwnProperty.call(currentValues, id)) {
+    return { present: false, value: undefined }
+  }
+  return { present: true, value: currentValues[id] }
+}
+
 export function formatSettingValue(value: unknown): string {
   if (value === undefined) return DEFAULT_LABEL
   if (typeof value === "boolean") return value ? "true" : "false"

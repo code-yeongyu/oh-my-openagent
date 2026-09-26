@@ -45,6 +45,7 @@ import {
   SETTINGS_DEFINITIONS,
   nextBooleanValue,
   nextEnumValue,
+  readCurrentSettingValue,
   readSettingValue,
   settingBaseValue,
   settingId,
@@ -216,15 +217,12 @@ export async function registerSettingsTui<Node>(
   }
 
   const refreshCards = (): void => {
-    if (!state.open || state.nodeRefs === null) return
+    if (!state.open) return
     rebuildCards()
-    const refs = state.nodeRefs.cards
-    for (let index = 0; index < refs.length; index += 1) {
-      const card = state.visible[index]
-      const ref = refs[index]
-      if (card === undefined || ref === undefined) continue
-      restyleCard(solid, ref, card, index === state.focus.current(), theme())
-    }
+    mountDialog(buildNodeList)
+    state.open = true
+    activateMode()
+    requestRender()
   }
 
   const moveFocusBy = (delta: number): void => {
@@ -248,7 +246,7 @@ export async function registerSettingsTui<Node>(
   const readCurrent = (
     definition: SettingDefinition,
   ): { readonly present: boolean; readonly value: unknown } =>
-    readSettingValue(state.currentValues, definition.path)
+    readCurrentSettingValue(state.currentValues, definition)
 
   const queueEdit = (
     definition: SettingDefinition,
@@ -299,12 +297,12 @@ export async function registerSettingsTui<Node>(
               variant: "warning",
               message: `"${value}" is not a number; ${definition.path.join(".")} stays unchanged.`,
             })
+            refreshCards()
           } else {
             queueEdit(definition, parsed)
           }
-          openDialog()
         },
-        onCancel: () => openDialog(),
+        onCancel: () => refreshCards(),
       }),
     )
     requestRender()
