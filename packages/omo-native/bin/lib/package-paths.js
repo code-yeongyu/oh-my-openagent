@@ -19,6 +19,11 @@ export function releaseChannel(version = packageManifest().version) {
   return typeof version === "string" && version.includes("-") ? "beta" : "latest"
 }
 
+/** The startup banner line: a prerelease names its beta channel, a stable release does not. */
+export function releaseBanner(version = packageManifest().version) {
+  return releaseChannel(version) === "beta" ? `omo (omo-ai beta ${version})` : `omo (omo-ai ${version})`
+}
+
 /** The package spec that installs this build's channel: `omo-ai@beta` or the bare `omo-ai`. */
 export function channelPackageSpec(version = packageManifest().version) {
   return releaseChannel(version) === "beta" ? "omo-ai@beta" : "omo-ai"

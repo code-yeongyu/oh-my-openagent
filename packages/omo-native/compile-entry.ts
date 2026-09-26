@@ -17,7 +17,7 @@ import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { buildLabel, parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
-import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
+import { nearestNodeBin, readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { daemonReportLines, runDaemonCommand } from "./bin/lib/daemon.js"
 import { runDoctor } from "./bin/lib/doctor.js"
 import { detectHarnesses, needsSetupSuggestion } from "./bin/lib/setup-detect.js"
@@ -201,7 +201,7 @@ export function answerCompiledFastPath(
  */
 export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersion" | "buildInfo">): string[] {
   const info = parseBuildInfo(manifest.buildInfo)
-  return info === undefined ? [`omo (omo-ai beta ${manifest.omoAiVersion})`] : versionLines(info)
+  return info === undefined ? [releaseBanner(manifest.omoAiVersion)] : versionLines(info)
 }
 
 export function shouldPrintCompiledBanner(args: string[], stderrIsTTY: boolean): boolean {
