@@ -330,7 +330,8 @@ async function main(): Promise<void> {
   // executable delegates to the engine in-process as required by the native startup contract.
   if (await runCompiledLauncher(process.argv.slice(2), execDir, manifest.enginePin, execDir)) return
   if (shouldPrintCompiledBanner(process.argv.slice(2), process.stderr.isTTY === true)) {
-    for (const line of compiledBannerLines(manifest)) console.error(line)
+    // Not console.error: Bun renders that red, and the banner is not an error (#8442).
+    for (const line of compiledBannerLines(manifest)) process.stderr.write(`${line}\n`)
   }
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
