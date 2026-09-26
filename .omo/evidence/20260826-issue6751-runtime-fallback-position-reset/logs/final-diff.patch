@@ -1,0 +1,386 @@
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+index 48ff3b1e6..d6228cb33 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.test.ts
+@@ -170,6 +170,137 @@ describe("createChatMessageHandler runtime fallback model override", () => {
+     })
+   })
+ 
++  test("#given our own marker-carrying fallback retry dispatch after a state wipe #when chat.message fires with the prepared fallback model #then the state is not reset as a manual model change (issue #6751)", async () => {
++    // given - a mid-cycle wipe cleared pendingFallbackModel; OMO's own retry
++    // dispatch (marked parts, model = prepared fallback) must not be misread
++    // as a manual model change, which would corrupt originalModel and enable
++    // a backward hop to the just-failed primary.
++    const deps = createDeps()
++    const sessionID = "session-6751-marker-dispatch"
++    const state = createFallbackState("zai/primary")
++    state.currentModel = "go/fallback-a"
++    state.fallbackIndex = 1
++    state.attemptCount = 1
++    state.failedModels.set("zai/primary", Date.now())
++    deps.sessionStates.set(sessionID, state)
++    const handler = createChatMessageHandler(deps)
++    const output: {
++      message: { model?: { providerID: string; modelID: string } }
++      parts?: Array<{ type: string; text?: string }>
++    } = {
++      message: {},
++      parts: [
++        { type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
++      ],
++    }
++
++    // when - requestedModel (go/fallback-a) matches currentModel here only by
++    // coincidence of the wipe shape; the marker alone must suppress resets.
++    await handler(
++      {
++        sessionID,
++        model: {
++          providerID: "go",
++          modelID: "fallback-a",
++        },
++      },
++      output,
++    )
++
++    // then
++    expect(deps.sessionStates.get(sessionID)).toBe(state)
++    expect(state.originalModel).toBe("zai/primary")
++    expect(state.currentModel).toBe("go/fallback-a")
++    expect(state.fallbackIndex).toBe(1)
++    expect(state.attemptCount).toBe(1)
++    expect(state.failedModels.get("zai/primary")).toBeDefined()
++  })
++
++  test("#given our own marker-carrying dispatch whose model mismatches the wiped currentModel #when chat.message fires #then position bookkeeping survives untouched (issue #6751)", async () => {
++    // given - worst-case interleaving from the issue log: the retry dispatch
++    // lands against a state whose currentModel is still the primary and whose
++    // pendingFallbackModel was lost. The manual-change branch must not fire.
++    const deps = createDeps()
++    const sessionID = "session-6751-marker-mismatch"
++    const state = createFallbackState("zai/primary")
++    state.currentModel = "zai/primary"
++    state.fallbackIndex = 1
++    state.attemptCount = 1
++    state.pendingFallbackModel = undefined
++    state.failedModels.set("zai/primary", Date.now())
++    deps.sessionStates.set(sessionID, state)
++    const handler = createChatMessageHandler(deps)
++    const output: {
++      message: { model?: { providerID: string; modelID: string } }
++      parts?: Array<{ type: string; text?: string }>
++    } = {
++      message: {},
++      parts: [
++        { type: "text", text: "retry payload\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
++      ],
++    }
++
++    // when
++    await handler(
++      {
++        sessionID,
++        model: {
++          providerID: "go",
++          modelID: "fallback-a",
++        },
++      },
++      output,
++    )
++
++    // then - same object, same position fields, originalModel not corrupted
++    expect(deps.sessionStates.get(sessionID)).toBe(state)
++    expect(state.originalModel).toBe("zai/primary")
++    expect(state.fallbackIndex).toBe(1)
++    expect(state.attemptCount).toBe(1)
++    expect(state.failedModels.get("zai/primary")).toBeDefined()
++  })
++
++  test("#given a marker-carrying dispatch matching pendingFallbackModel #when chat.message fires #then pending is consumed and no reset happens", async () => {
++    // given - happy path that must keep working: the dispatcher set
++    // pendingFallbackModel before sending; chat.message consumes it quietly.
++    const deps = createDeps()
++    const sessionID = "session-6751-marker-consume"
++    const state = createFallbackState("zai/primary")
++    state.currentModel = "go/fallback-a"
++    state.fallbackIndex = 1
++    state.pendingFallbackModel = "go/fallback-a"
++    deps.sessionStates.set(sessionID, state)
++    deps.sessionStatusRetryKeys.set(sessionID, new Set(["unknown:1:rate limit"]))
++    const handler = createChatMessageHandler(deps)
++    const output: {
++      message: { model?: { providerID: string; modelID: string } }
++      parts?: Array<{ type: string; text?: string }>
++    } = {
++      message: {},
++      parts: [
++        { type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
++      ],
++    }
++
++    // when
++    await handler(
++      {
++        sessionID,
++        model: {
++          providerID: "go",
++          modelID: "fallback-a",
++        },
++      },
++      output,
++    )
++
++    // then
++    expect(deps.sessionStates.get(sessionID)).toBe(state)
++    expect(state.pendingFallbackModel).toBe(undefined)
++    expect(state.originalModel).toBe("zai/primary")
++    expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
++  })
++
+   test("#given an explicit-variant fallback and a base primary #when cooldown restoration runs #then the fallback-only variant is removed", async () => {
+     // given
+     const deps = createDeps()
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts
+index a21b77027..2603f7532 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/chat-message-handler.ts
+@@ -7,6 +7,7 @@ import { createFallbackState, isModelInCooldown, stringifyRuntimeModelWithVarian
+ import { buildRetryModelPayload } from "./retry-model-payload"
+ import { resolveRuntimeModelSettings } from "./runtime-model-settings"
+ import { getSessionAgent } from "../../features/claude-code-session-state"
++import { isRuntimeFallbackRetryTextParts } from "../../shared/runtime-fallback-retry-marker"
+ 
+ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+ 
+@@ -87,6 +88,22 @@ export function createChatMessageHandler(deps: HookDeps) {
+       return
+     }
+ 
++    // Our own retry dispatches carry the runtime-fallback marker in their
++    // parts. If state was replaced mid-cycle (losing pendingFallbackModel),
++    // this dispatch would otherwise be misread as a manual model change and
++    // reset originalModel to the fallback model, enabling a backward hop to
++    // the just-failed primary (issue #6751). Never reset on marked dispatches.
++    if (isRuntimeFallbackRetryTextParts(output.parts)) {
++      if (requestedModel && requestedModel !== state.currentModel) {
++        log(`[${HOOK_NAME}] Ignoring model mismatch on marked fallback retry dispatch`, {
++          sessionID,
++          currentModel: state.currentModel,
++          requestedModel,
++        })
++      }
++      return
++    }
++
+     if (requestedModel && requestedModel !== state.currentModel) {
+       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
+         sessionID,
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts b/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts
+index 36bcb7dbe..ad53d68a6 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts
+@@ -257,6 +257,170 @@ describe("createEventHandler", () => {
+     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
+   })
+ 
++  it("#given a mid-cycle fallback state and our own abort in flight #when session.stop echoes back #then the fallback position is preserved (issue #6751)", async () => {
++    // given - a fallback hop was just prepared (primary failed, dispatch to
++    // fallback model in flight) and our machinery aborted the session, so
++    // internallyAbortedSessions carries the flag. opencode echoes session.stop
++    // back at us; that echo must not wipe fallbackIndex/failedModels.
++    const sessionID = "session-6751-stop-echo"
++    const deps = createDeps()
++    const abortCalls: string[] = []
++    const clearCalls: string[] = []
++    const state = createFallbackState("zai/primary")
++    state.currentModel = "go/fallback-a"
++    state.fallbackIndex = 1
++    state.attemptCount = 1
++    state.pendingFallbackModel = "go/fallback-a"
++    state.failedModels.set("zai/primary", Date.now())
++    deps.sessionStates.set(sessionID, state)
++    deps.internallyAbortedSessions.add(sessionID)
++    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
++
++    // when
++    await handler({ event: { type: "session.stop", properties: { sessionID } } })
++
++    // then - position bookkeeping intact so the cycle can advance forward
++    const preserved = deps.sessionStates.get(sessionID)
++    expect(preserved).toBe(state)
++    expect(preserved?.fallbackIndex).toBe(1)
++    expect(preserved?.currentModel).toBe("go/fallback-a")
++    expect(preserved?.originalModel).toBe("zai/primary")
++    expect(preserved?.attemptCount).toBe(1)
++    expect(preserved?.pendingFallbackModel).toBe("go/fallback-a")
++    expect(preserved?.failedModels.get("zai/primary")).toBeDefined()
++  })
++
++  it("#given a mid-cycle fallback state and our own abort in flight #when session.stop and session.idle echo back #then the fallback position survives both echoes (issue #6751)", async () => {
++    // given - a fallback hop was just prepared and our machinery aborted the
++    // session. opencode echoes stop then idle ("Cleared fallback retry state
++    // for cancelled session on idle" in the issue log); neither echo may wipe
++    // fallbackIndex/failedModels/pendingFallbackModel mid-cycle.
++    const sessionID = "session-6751-idle-echo"
++    const deps = createDeps()
++    const abortCalls: string[] = []
++    const clearCalls: string[] = []
++    const state = createFallbackState("zai/primary")
++    state.currentModel = "go/fallback-a"
++    state.fallbackIndex = 1
++    state.attemptCount = 1
++    state.pendingFallbackModel = "go/fallback-a"
++    state.failedModels.set("zai/primary", Date.now())
++    deps.sessionStates.set(sessionID, state)
++    deps.sessionAwaitingFallbackResult.add(sessionID)
++    deps.internallyAbortedSessions.add(sessionID)
++    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
++
++    // when
++    await handler({ event: { type: "session.stop", properties: { sessionID } } })
++    await handler({ event: { type: "session.idle", properties: { sessionID } } })
++
++    // then
++    const preserved = deps.sessionStates.get(sessionID)
++    expect(preserved).toBe(state)
++    expect(preserved?.fallbackIndex).toBe(1)
++    expect(preserved?.currentModel).toBe("go/fallback-a")
++    expect(preserved?.pendingFallbackModel).toBe("go/fallback-a")
++    expect(preserved?.failedModels.get("zai/primary")).toBeDefined()
++    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
++  })
++
++  it("#given an internal-abort echo wiped into a reset #when the next failure arrives #then the chain still advances forward past already-failed models (issue #6751)", async () => {
++    // given - issue shape: primary is chain[0], primary and first fallback both
++    // fail. The abort echoes between hops must not rewind the position.
++    const sessionID = "ses_6751_forward-only"
++    const deps = createDeps()
++    deps.pluginConfig = {
++      agents: {
++        sisyphus: {
++          model: "zai/primary",
++          fallback_models: ["zai/primary", "go/fallback-a", "zen/fallback-b"],
++        },
++      },
++    }
++    const abortCalls: string[] = []
++    const clearCalls: string[] = []
++    const dispatchedModels: string[] = []
++    const helpers: AutoRetryHelpers = {
++      ...createHelpers(deps, abortCalls, clearCalls),
++      autoRetryWithFallback: async (_sessionID, newModel) => {
++        dispatchedModels.push(newModel)
++        return { accepted: true, status: "dispatched" }
++      },
++      resolveAgentForSessionFromContext: async () => "sisyphus",
++    }
++    const handler = createEventHandler(deps, helpers)
++
++    // when - primary fails -> hop to index 1; our abort echoes stop+idle;
++    // then the first fallback fails too.
++    await handler({
++      event: {
++        type: "session.created",
++        properties: { info: { id: sessionID, agent: "sisyphus", model: "zai/primary" } },
++      },
++    })
++    await handler({
++      event: {
++        type: "session.error",
++        properties: { sessionID, error: { name: "ProviderError", message: "service unavailable", statusCode: 503 } },
++      },
++    })
++    deps.internallyAbortedSessions.add(sessionID)
++    await handler({ event: { type: "session.stop", properties: { sessionID } } })
++    await handler({ event: { type: "session.idle", properties: { sessionID } } })
++    await handler({
++      event: {
++        type: "session.error",
++        properties: { sessionID, error: { name: "MessageAbortedError", message: "aborted" } },
++      },
++    })
++    await handler({
++      event: {
++        type: "session.error",
++        properties: { sessionID, error: { name: "ProviderError", message: "monthly usage limit reached", statusCode: 503 } },
++      },
++    })
++
++    // then - second hop must be zen/fallback-b (index 2), never a repeat of
++    // zai/primary or go/fallback-a
++    expect(dispatchedModels).toEqual(["go/fallback-a", "zen/fallback-b"])
++    const finalState = deps.sessionStates.get(sessionID)
++    expect(finalState?.fallbackIndex).toBe(2)
++    expect(finalState?.currentModel).toBe("zen/fallback-b")
++    expect(finalState?.originalModel).toBe("zai/primary")
++    expect(finalState?.failedModels.has("zai/primary")).toBe(true)
++    expect(finalState?.failedModels.has("go/fallback-a")).toBe(true)
++  })
++
++  it("#given a genuine user stop with no internal abort in flight #when session.stop fires #then the fallback position is fully reset as a new-cycle boundary", async () => {
++    // given - regression guard for #6751 fix: explicit user action keeps its
++    // existing full-reset semantics. No internallyAbortedSessions entry here.
++    const sessionID = "session-6751-genuine-stop"
++    const deps = createDeps()
++    const abortCalls: string[] = []
++    const clearCalls: string[] = []
++    const state = createFallbackState("zai/primary")
++    state.currentModel = "go/fallback-a"
++    state.fallbackIndex = 1
++    state.attemptCount = 2
++    state.pendingFallbackModel = "go/fallback-a"
++    state.failedModels.set("zai/primary", Date.now())
++    deps.sessionStates.set(sessionID, state)
++    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
++
++    // when
++    await handler({ event: { type: "session.stop", properties: { sessionID } } })
++
++    // then
++    const reset = deps.sessionStates.get(sessionID)
++    expect(reset).not.toBe(state)
++    expect(reset?.originalModel).toBe("zai/primary")
++    expect(reset?.currentModel).toBe("zai/primary")
++    expect(reset?.fallbackIndex).toBe(-1)
++    expect(reset?.attemptCount).toBe(0)
++    expect(reset?.failedModels.size).toBe(0)
++    expect(reset?.pendingFallbackModel).toBe(undefined)
++  })
++
+   it("#given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315)", async () => {
+     // given - since opencode 1.15.x, session.created info.model is an object
+     // { id, providerID, variant } rather than a string. Storing it verbatim
+diff --git a/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts b/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
+index 08eedbe9b..369931603 100644
+--- a/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
++++ b/packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts
+@@ -138,6 +138,15 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+     const sessionID = resolveSessionEventID(props)
+     if (!sessionID) return
+ 
++    // An abort we issued ourselves (fallback retry-signal override, quota
++    // fallback, fallback timeout) echoes back as session.stop. Wiping the
++    // fallback position here rewinds the cycle to the just-failed primary
++    // mid-hop (issue #6751); only genuine user stops may reset.
++    if (deps.internallyAbortedSessions.has(sessionID)) {
++      log(`[${HOOK_NAME}] Ignoring session.stop echo of internal fallback abort`, { sessionID })
++      return
++    }
++
+     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
+       await helpers.abortSessionRequest(sessionID, "session.stop")
+     }
+@@ -161,6 +170,13 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+     const sessionID = resolveSessionEventID(props)
+     if (!sessionID) return
+ 
++    // Same echo protection as handleSessionStop: an idle that trails our own
++    // abort must not wipe fallback position mid-cycle (issue #6751).
++    if (deps.internallyAbortedSessions.has(sessionID)) {
++      log(`[${HOOK_NAME}] Ignoring session.idle echo of internal fallback abort`, { sessionID })
++      return
++    }
++
+     if (cancelledSessions.has(sessionID)) {
+       resetRetryState(sessionID)
+       log(`[${HOOK_NAME}] Cleared fallback retry state for cancelled session on idle`, { sessionID })

@@ -138,6 +138,15 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
+    // An abort we issued ourselves (fallback retry-signal override, quota
+    // fallback, fallback timeout) echoes back as session.stop. Wiping the
+    // fallback position here rewinds the cycle to the just-failed primary
+    // mid-hop (issue #6751); only genuine user stops may reset.
+    if (deps.internallyAbortedSessions.has(sessionID)) {
+      log(`[${HOOK_NAME}] Ignoring session.stop echo of internal fallback abort`, { sessionID })
+      return
+    }
+
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
     }
@@ -160,6 +169,13 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const handleSessionIdle = (props: Record<string, unknown> | undefined) => {
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
+
+    // Same echo protection as handleSessionStop: an idle that trails our own
+    // abort must not wipe fallback position mid-cycle (issue #6751).
+    if (deps.internallyAbortedSessions.has(sessionID)) {
+      log(`[${HOOK_NAME}] Ignoring session.idle echo of internal fallback abort`, { sessionID })
+      return
+    }
 
     if (cancelledSessions.has(sessionID)) {
       resetRetryState(sessionID)
