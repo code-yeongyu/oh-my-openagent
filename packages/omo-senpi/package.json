@@ -51,7 +51,7 @@
     "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.9.24-3"
+    "@code-yeongyu/senpi": "2026.9.26"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -59,7 +59,7 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.9.24-3",
+    "@code-yeongyu/senpi": "2026.9.26",
     "terser": "5.51.2"
   }
 }

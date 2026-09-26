@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+**OmO Native moves to senpi 2026.9.26.** ([#8882](https://github.com/code-yeongyu/oh-my-openagent/issues/8882), [senpi#2139](https://github.com/code-yeongyu/senpi/issues/2139), [senpi#2137](https://github.com/code-yeongyu/senpi/issues/2137), [senpi#2135](https://github.com/code-yeongyu/senpi/issues/2135), [senpi#2143](https://github.com/code-yeongyu/senpi/issues/2143)) The Cursor CLI lane now sends your request together with the hidden messages of the same turn, so the first request of a session no longer reaches the model as an empty plan reminder. The first-turn plan waits for your own first request instead of arming on an onboarding greeting. A handoff block that restates your request is no longer mistaken for a repeating turn, while a turn that really repeats is still stopped.
+
 ### Fixed
 
 **A delegated task no longer hangs forever when its first model fails.** When a subagent running on the shared daemon (the default on macOS and Linux) failed on one model and moved to the next, the new model's session could briefly mistake the task for an abandoned one and take it over. The real result was then ignored, the task stayed `running`, and `omo -p` never exited. A task whose owning process is still alive is now left to that process.
