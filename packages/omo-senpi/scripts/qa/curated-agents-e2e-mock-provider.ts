@@ -40,10 +40,10 @@ const EXPLORE_FALLBACK_MODEL: MockModel = {
 export default async function registerCuratedAgentsMockProvider(
 	pi: TaskE2EExtensionAPI,
 ): Promise<void> {
-	// The curated explore child runs IN-PROCESS, and senpi rebuilds an in-process child request from the
-	// provider config (a config without `baseUrl` is rejected outright), so the child never reaches an
-	// extension `streamSimple`. Serving the fallback model from 127.0.0.1 is what makes the child path
-	// observable and offline; the request body is also the only place its prompt and tools appear.
+	// The curated explore child runs IN-PROCESS on the explore fallback model. Serving that model from
+	// 127.0.0.1 is what makes the child path observable and offline: the request body is the only place
+	// its prompt and tools appear. The fallback provider therefore carries `baseUrl` and no scripted
+	// `streamSimple` (see below), so senpi sends the child's request over HTTP.
 	const server = startMockCompletionsServer({
 		steps: () => loadChildSteps(),
 		onRequest: (body: unknown) => appendChildContext(body),
@@ -61,8 +61,11 @@ export default async function registerCuratedAgentsMockProvider(
 		) => provider.streamSimple(model, context, options);
 		pi.registerProvider(name, { ...provider, streamSimple: wrappedStream });
 		if (name === "omo-mock") {
+			// senpi uses a provider's streamSimple for in-process children too (#8781), so inheriting the
+			// scripted one would bypass the 127.0.0.1 server and leave no captured child request.
+			const { streamSimple: _scripted, ...httpProvider } = provider;
 			pi.registerProvider(FALLBACK_PROVIDER_ID, {
-				...provider,
+				...httpProvider,
 				name: "omo mock explore fallback provider",
 				baseUrl: `${baseUrl}/v1`,
 				apiKey: "mock",

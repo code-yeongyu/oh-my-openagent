@@ -8,6 +8,10 @@
 // start and the omo.json agents key - never routed onto plan-reviewer/plan-consultant and never
 // carrying a deprecation notice - plus the task tool description wording.
 //   node plan-gated-agents-e2e.mjs --bundle <pluginDir> --scenario <name> --expect <gated|ungated>
+//   --expect gated is the contract for every bundle built since the gate landed (520edada8), including
+//   the committed plugin bundle. --expect ungated is only the differential baseline for a bundle built
+//   WITHOUT the gate, so it FAILs by design against a current bundle (#8781): e.g. sequence closes the
+//   gate after the ulw-execute read and denies the second spawn.
 //   scenarios: denial | read-unlock | sequence | retired-id | description | team-retired |
 //              dag-retired | retired-config   (the retired-name scenarios only take --expect gated)
 // Exit code: 0 on PASS, 1 on FAIL (the JSON verdict is printed either way).
