@@ -32,7 +32,7 @@ export async function reconcileOnSessionStart(
   // Ownership is checked before terminality, residency, or mode. A live sibling owns the record in
   // every status and this process must not mutate it.
   for (const record of context.store.list().records) {
-    if (await hasForeignLiveOwner(context, record)) {
+    if (await hasForeignLiveOwner(context, record, parentSessionId)) {
       outcomes.push(parentSessionId === undefined
         ? {
             task_id: record.task_id,
@@ -244,12 +244,26 @@ async function reattachLegacyRecord(
   return { task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" }
 }
 
-async function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): Promise<boolean> {
+async function hasForeignLiveOwner(
+  context: LifecycleContext,
+  record: TaskRecord,
+  parentSessionId: string | undefined,
+): Promise<boolean> {
   if (isHostSessionRecord(record)) {
     if (record.residency_state !== "resident") return false
+    // Its own parent session decides by session liveness (#8659). ANY other session only sweeps
+    // crashed-process orphans, so a live owning process still fences the record there: runtime
+    // fallback closes one rung's session before opening the next, and that next child session
+    // reconciles these same records from inside the daemon (omo 2026-09-26: it reattached the
+    // closed rung, bumped the epoch, and the parent's -p run waited forever).
+    if (record.parent_session_id !== parentSessionId && isLiveForeignProcess(context, record)) return true
     return await context.hostSessionProbe.daemonAlive(record.host_session)
       && await context.hostSessionProbe.sessionLive(record.host_session)
   }
+  return isLiveForeignProcess(context, record)
+}
+
+function isLiveForeignProcess(context: LifecycleContext, record: TaskRecord): boolean {
   return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
 }
 
