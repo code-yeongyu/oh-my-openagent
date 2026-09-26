@@ -87,6 +87,7 @@ import {
   MIN_SESSION_GONE_POLLS,
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
+import { getStoppedSessionError, MIN_ERRORED_IDLE_POLLS } from "./session-stopped-on-error"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import {
   hasOutputSignalFromPart,
@@ -2315,6 +2316,19 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
+  private async readStoppedSessionError(sessionID: string): Promise<string | undefined> {
+    try {
+      const response = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string; error?: unknown } }>, { preferResponseOnMissingData: true })
+      return getStoppedSessionError(messages)
+    } catch (error) {
+      log("[background-agent] Error reading session messages for stopped-session check:", error)
+      return undefined
+    }
+  }
+
   private clearNotificationsForTask(taskId: string): void {
     for (const [sessionID, tasks] of this.notifications.entries()) {
       const filtered = tasks.filter((t) => t.id !== taskId)
@@ -3069,6 +3083,7 @@ The task was re-queued on a fallback model after a retryable failure.
           // Only skip completion when session status is actively running.
           // Unknown or terminal statuses (like "interrupted") fall through to completion.
           if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
+            task.consecutiveErroredIdlePolls = 0
             log("[background-agent] Session still running, relying on event-based progress:", {
               taskId: task.id,
               sessionID,
@@ -3113,6 +3128,21 @@ The task was re-queued on a fallback model after a retryable failure.
               }
 
               task.consecutiveMissedPolls = 0
+            }
+            const stoppedError = await this.readStoppedSessionError(sessionID)
+            if (stoppedError) {
+              task.consecutiveErroredIdlePolls = (task.consecutiveErroredIdlePolls ?? 0) + 1
+              if (task.consecutiveErroredIdlePolls >= MIN_ERRORED_IDLE_POLLS) {
+                log("[background-agent] Session stopped on an error with no output and was not resumed, marking task as error:", {
+                  taskId: task.id,
+                  sessionID,
+                  error: stoppedError.slice(0, 200),
+                })
+                await this.failCrashedTask(task, `Subagent session stopped on an error without producing output: ${stoppedError}`)
+                continue
+              }
+            } else {
+              task.consecutiveErroredIdlePolls = 0
             }
             log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
             continue
