@@ -26,6 +26,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `verify-npm-payload.mjs` | npm payload verification |
 | `build-help-schemas.ts` | Generate CLI help schemas |
 | `build-schema.ts` + `build-schema-document.ts` | Zod schema to JSON Schema for `assets/oh-my-opencode.schema.json` |
+| `json-schema-defaulted-optional.ts` | Drops Zod-defaulted fields from generated `required` so both config schemas accept configs that omit them (#6445) |
 | `build-model-capabilities.ts` | Refresh the generated model-capabilities artifact consumed by `packages/model-core/` |
 | `patch-node-require-shim.ts` | Patches `dist/index.js` for Node/Electron require compatibility |
 | `publish.ts` | Local multi-package publish alternative (platform packages + npm) |

@@ -39,11 +39,6 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "mode",
-        "maxFileBytes",
-        "timeoutMs"
-      ],
       "additionalProperties": false
     },
     "$schema": {
@@ -818,10 +813,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "commit_footer",
-        "include_co_authored_by"
-      ],
       "additionalProperties": false
     },
     "task": {
@@ -876,13 +867,6 @@
               ]
             }
           },
-          "required": [
-            "enabled",
-            "backend",
-            "apply",
-            "merge",
-            "commits"
-          ],
           "additionalProperties": false
         },
         "default_execution_mode": {
@@ -1002,9 +986,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "unavailable_categories"
-          ],
           "additionalProperties": false
         },
         "wait": {
@@ -1034,11 +1015,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "min_ms",
-            "default_ms",
-            "max_ms"
-          ],
           "additionalProperties": false
         },
         "team": {
@@ -1068,11 +1044,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "max_members",
-            "max_parallel_members",
-            "max_wall_clock_minutes"
-          ],
           "additionalProperties": false
         },
         "dag": {
@@ -1127,35 +1098,9 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "max_nodes_per_run",
-            "max_runs_per_session",
-            "subscriber_ring",
-            "heartbeat_ms",
-            "history_default_limit",
-            "history_max_limit",
-            "retention_days",
-            "max_prompt_bytes"
-          ],
           "additionalProperties": false
         }
       },
-      "required": [
-        "isolation",
-        "default_execution_mode",
-        "process_runner",
-        "host_engine_policy",
-        "default_concurrency",
-        "global_concurrency",
-        "max_depth",
-        "residency_max_children",
-        "resident_idle_timeout_ms",
-        "ttl_ms",
-        "resume_children",
-        "warnings",
-        "wait",
-        "team"
-      ],
       "additionalProperties": false
     },
     "teams": {
@@ -1252,8 +1197,6 @@
                   },
                   "required": [
                     "name",
-                    "backendType",
-                    "isActive",
                     "kind",
                     "category",
                     "prompt"
@@ -1309,8 +1252,6 @@
                   },
                   "required": [
                     "name",
-                    "backendType",
-                    "isActive",
                     "kind",
                     "subagent_type"
                   ],
@@ -1321,7 +1262,6 @@
           }
         },
         "required": [
-          "version",
           "members"
         ],
         "additionalProperties": false
@@ -1592,10 +1532,6 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "step_count",
-                "on_compaction"
-              ],
               "additionalProperties": false
             },
             "merge": {
@@ -1627,14 +1563,6 @@
               ]
             }
           },
-          "required": [
-            "enabled",
-            "trigger",
-            "merge",
-            "category",
-            "timeout_minutes",
-            "sandbox"
-          ],
           "additionalProperties": false
         },
         "nudge": {
@@ -1655,10 +1583,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "every_user_turns"
-          ],
           "additionalProperties": false
         },
         "facts": {
@@ -1679,10 +1603,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "debounce_settles"
-          ],
           "additionalProperties": false
         },
         "dream": {
@@ -1729,14 +1649,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "idle_minutes",
-            "min_hours_between",
-            "shutdown_launch",
-            "auto_select_max",
-            "auto_select_max_chars"
-          ],
           "additionalProperties": false
         },
         "people": {
@@ -1764,11 +1676,6 @@
               "maximum": 500
             }
           },
-          "required": [
-            "enabled",
-            "max_entries",
-            "max_entry_chars"
-          ],
           "additionalProperties": false
         },
         "soul": {
@@ -1782,9 +1689,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "edit_notice"
-          ],
           "additionalProperties": false
         },
         "write_notice": {
@@ -1798,9 +1702,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         },
         "sync": {
@@ -1818,9 +1719,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         },
         "search": {
@@ -1834,9 +1732,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         },
         "recall": {
@@ -1905,12 +1800,6 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "tool_args",
-                "result_head",
-                "assistant",
-                "prompt"
-              ],
               "additionalProperties": false
             },
             "sidecar_max_tokens": {
@@ -1932,15 +1821,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "max_items",
-            "category",
-            "event_caps",
-            "sidecar_max_tokens",
-            "max_concurrent_wakes",
-            "tool_budget"
-          ],
           "additionalProperties": false
         },
         "compile_warn_tokens": {
@@ -2200,22 +2080,6 @@
           }
         }
       },
-      "required": [
-        "enabled",
-        "agent",
-        "reflection",
-        "nudge",
-        "facts",
-        "dream",
-        "people",
-        "soul",
-        "write_notice",
-        "sync",
-        "search",
-        "recall",
-        "compile_warn_tokens",
-        "agents"
-      ],
       "additionalProperties": false
     },
     "telemetry": {
@@ -2226,9 +2090,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "enabled"
-      ],
       "additionalProperties": false
     },
     "disabled_skills": {
@@ -11137,10 +10998,6 @@
                       "maximum": 10
                     }
                   },
-                  "required": [
-                    "enabled",
-                    "turns"
-                  ],
                   "additionalProperties": false
                 },
                 "protected_tools": {
@@ -11169,9 +11026,6 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "enabled"
-                      ],
                       "additionalProperties": false
                     },
                     "supersede_writes": {
@@ -11186,10 +11040,6 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "enabled",
-                        "aggressive"
-                      ],
                       "additionalProperties": false
                     },
                     "purge_errors": {
@@ -11206,21 +11056,12 @@
                           "maximum": 20
                         }
                       },
-                      "required": [
-                        "enabled",
-                        "turns"
-                      ],
                       "additionalProperties": false
                     }
                   },
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "enabled",
-                "notification",
-                "protected_tools"
-              ],
               "additionalProperties": false
             },
             "task_system": {
@@ -11385,11 +11226,6 @@
               "maximum": 1000
             }
           },
-          "required": [
-            "enabled",
-            "auto_start",
-            "default_max_iterations"
-          ],
           "additionalProperties": false
         },
         "ralph_loop": {
@@ -11605,10 +11441,6 @@
                     "type": "number"
                   }
                 },
-                "required": [
-                  "type",
-                  "method"
-                ],
                 "additionalProperties": false
               }
             },
@@ -11633,7 +11465,6 @@
                   }
                 },
                 "required": [
-                  "enabled",
                   "gateway",
                   "instruction"
                 ],
@@ -11682,21 +11513,9 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "authorizedDiscordUserIds",
-                "pollIntervalMs",
-                "rateLimitPerMinute",
-                "maxMessageLength",
-                "includePrefix"
-              ],
               "additionalProperties": false
             }
           },
-          "required": [
-            "enabled",
-            "gateways",
-            "hooks"
-          ],
           "additionalProperties": false
         },
         "i18n": {
@@ -11774,18 +11593,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "live_mode_enabled",
-            "max_monitors_per_session",
-            "max_runtime_ms",
-            "batch_max_lines",
-            "batch_max_bytes",
-            "flush_interval_ms",
-            "ring_max_lines",
-            "line_max_bytes",
-            "pattern_max_length"
-          ],
           "additionalProperties": false
         },
         "team_mode": {
@@ -11851,18 +11658,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "tmux_visualization",
-            "max_parallel_members",
-            "max_members",
-            "max_messages_per_run",
-            "max_wall_clock_minutes",
-            "max_member_turns",
-            "message_payload_max_bytes",
-            "recipient_unread_max_bytes",
-            "mailbox_poll_interval_ms"
-          ],
           "additionalProperties": false
         },
         "keyword_detector": {
@@ -11903,9 +11698,6 @@
               "type": "number"
             }
           },
-          "required": [
-            "timeout_ms"
-          ],
           "additionalProperties": false
         },
         "git_master": {
@@ -11932,11 +11724,6 @@
               "type": "string"
             }
           },
-          "required": [
-            "commit_footer",
-            "include_co_authored_by",
-            "git_env_prefix"
-          ],
           "additionalProperties": false
         },
         "browser_automation_engine": {
@@ -11958,9 +11745,6 @@
               }
             }
           },
-          "required": [
-            "provider"
-          ],
           "additionalProperties": false
         },
         "websearch": {
@@ -12020,14 +11804,6 @@
               ]
             }
           },
-          "required": [
-            "enabled",
-            "layout",
-            "main_pane_size",
-            "main_pane_min_width",
-            "agent_pane_min_width",
-            "isolation"
-          ],
           "additionalProperties": false
         },
         "tui": {
@@ -12049,15 +11825,9 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "enabled"
-              ],
               "additionalProperties": false
             }
           },
-          "required": [
-            "sidebar"
-          ],
           "additionalProperties": false
         },
         "sisyphus": {
@@ -12077,9 +11847,6 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "claude_code_compat"
-              ],
               "additionalProperties": false
             }
           },
@@ -12093,9 +11860,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "auto_commit"
-          ],
           "additionalProperties": false
         },
         "start_work": {
@@ -12106,9 +11870,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "auto_commit"
-          ],
           "additionalProperties": false
         },
         "default_mode": {
@@ -12123,10 +11884,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "ultrawork",
-            "goal"
-          ],
           "additionalProperties": false
         },
         "_migrations": {
@@ -12136,9 +11893,6 @@
           }
         }
       },
-      "required": [
-        "git_master"
-      ],
       "additionalProperties": false
     },
     "[native]": {
@@ -13278,8 +13032,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "category",
                         "prompt"
@@ -13335,8 +13087,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "subagent_type"
                       ],
@@ -15210,8 +14960,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "category",
                         "prompt"
@@ -15267,8 +15015,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "subagent_type"
                       ],
@@ -17142,8 +16888,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "category",
                         "prompt"
@@ -17199,8 +16943,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "subagent_type"
                       ],
@@ -19080,8 +18822,6 @@
                         },
                         "required": [
                           "name",
-                          "backendType",
-                          "isActive",
                           "kind",
                           "category",
                           "prompt"
@@ -19137,8 +18877,6 @@
                         },
                         "required": [
                           "name",
-                          "backendType",
-                          "isActive",
                           "kind",
                           "subagent_type"
                         ],
@@ -28772,10 +28510,6 @@
                             "maximum": 10
                           }
                         },
-                        "required": [
-                          "enabled",
-                          "turns"
-                        ],
                         "additionalProperties": false
                       },
                       "protected_tools": {
@@ -28804,9 +28538,6 @@
                                 "type": "boolean"
                               }
                             },
-                            "required": [
-                              "enabled"
-                            ],
                             "additionalProperties": false
                           },
                           "supersede_writes": {
@@ -28821,10 +28552,6 @@
                                 "type": "boolean"
                               }
                             },
-                            "required": [
-                              "enabled",
-                              "aggressive"
-                            ],
                             "additionalProperties": false
                           },
                           "purge_errors": {
@@ -28841,21 +28568,12 @@
                                 "maximum": 20
                               }
                             },
-                            "required": [
-                              "enabled",
-                              "turns"
-                            ],
                             "additionalProperties": false
                           }
                         },
                         "additionalProperties": false
                       }
                     },
-                    "required": [
-                      "enabled",
-                      "notification",
-                      "protected_tools"
-                    ],
                     "additionalProperties": false
                   },
                   "task_system": {
@@ -29020,11 +28738,6 @@
                     "maximum": 1000
                   }
                 },
-                "required": [
-                  "enabled",
-                  "auto_start",
-                  "default_max_iterations"
-                ],
                 "additionalProperties": false
               },
               "ralph_loop": {
@@ -29240,10 +28953,6 @@
                           "type": "number"
                         }
                       },
-                      "required": [
-                        "type",
-                        "method"
-                      ],
                       "additionalProperties": false
                     }
                   },
@@ -29268,7 +28977,6 @@
                         }
                       },
                       "required": [
-                        "enabled",
                         "gateway",
                         "instruction"
                       ],
@@ -29317,21 +29025,9 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "authorizedDiscordUserIds",
-                      "pollIntervalMs",
-                      "rateLimitPerMinute",
-                      "maxMessageLength",
-                      "includePrefix"
-                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "enabled",
-                  "gateways",
-                  "hooks"
-                ],
                 "additionalProperties": false
               },
               "i18n": {
@@ -29409,18 +29105,6 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "enabled",
-                  "live_mode_enabled",
-                  "max_monitors_per_session",
-                  "max_runtime_ms",
-                  "batch_max_lines",
-                  "batch_max_bytes",
-                  "flush_interval_ms",
-                  "ring_max_lines",
-                  "line_max_bytes",
-                  "pattern_max_length"
-                ],
                 "additionalProperties": false
               },
               "team_mode": {
@@ -29486,18 +29170,6 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "enabled",
-                  "tmux_visualization",
-                  "max_parallel_members",
-                  "max_members",
-                  "max_messages_per_run",
-                  "max_wall_clock_minutes",
-                  "max_member_turns",
-                  "message_payload_max_bytes",
-                  "recipient_unread_max_bytes",
-                  "mailbox_poll_interval_ms"
-                ],
                 "additionalProperties": false
               },
               "keyword_detector": {
@@ -29538,9 +29210,6 @@
                     "type": "number"
                   }
                 },
-                "required": [
-                  "timeout_ms"
-                ],
                 "additionalProperties": false
               },
               "git_master": {
@@ -29567,11 +29236,6 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "commit_footer",
-                  "include_co_authored_by",
-                  "git_env_prefix"
-                ],
                 "additionalProperties": false
               },
               "browser_automation_engine": {
@@ -29593,9 +29257,6 @@
                     }
                   }
                 },
-                "required": [
-                  "provider"
-                ],
                 "additionalProperties": false
               },
               "websearch": {
@@ -29655,14 +29316,6 @@
                     ]
                   }
                 },
-                "required": [
-                  "enabled",
-                  "layout",
-                  "main_pane_size",
-                  "main_pane_min_width",
-                  "agent_pane_min_width",
-                  "isolation"
-                ],
                 "additionalProperties": false
               },
               "tui": {
@@ -29684,15 +29337,9 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "enabled"
-                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "sidebar"
-                ],
                 "additionalProperties": false
               },
               "sisyphus": {
@@ -29712,9 +29359,6 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "claude_code_compat"
-                    ],
                     "additionalProperties": false
                   }
                 },
@@ -29728,9 +29372,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "auto_commit"
-                ],
                 "additionalProperties": false
               },
               "start_work": {
@@ -29741,9 +29382,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "auto_commit"
-                ],
                 "additionalProperties": false
               },
               "default_mode": {
@@ -29758,10 +29396,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "ultrawork",
-                  "goal"
-                ],
                 "additionalProperties": false
               },
               "_migrations": {
@@ -29771,9 +29405,6 @@
                 }
               }
             },
-            "required": [
-              "git_master"
-            ],
             "additionalProperties": false
           },
           "[native]": {
@@ -30913,8 +30544,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "category",
                               "prompt"
@@ -30970,8 +30599,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "subagent_type"
                             ],
@@ -32845,8 +32472,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "category",
                               "prompt"
@@ -32902,8 +32527,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "subagent_type"
                             ],
@@ -34777,8 +34400,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "category",
                               "prompt"
@@ -34834,8 +34455,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "subagent_type"
                             ],
@@ -35590,8 +35209,5 @@
       "additionalProperties": {}
     }
   },
-  "required": [
-    "profiles"
-  ],
   "additionalProperties": false
 }
