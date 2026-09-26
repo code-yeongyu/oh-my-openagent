@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { lspInstallDecisionsPath, projectLspConfigPaths, userLspConfigPath } from "./config-paths.js";
 import { resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime.js";
 
 interface ToolExecutionResult {
@@ -79,9 +80,9 @@ function currentSenpiRequestContext(
 	const home = resolve(homeDir ?? (env.HOME?.trim() || homedir()));
 	return {
 		cwd,
-		projectConfigPaths: [join(cwd, ".pi", "lsp-client.json")],
-		userConfigPath: join(home, ".pi", "lsp-client.json"),
-		installDecisionsPath: join(home, ".pi", "lsp-install-decisions.json"),
+		projectConfigPaths: projectLspConfigPaths(cwd),
+		userConfigPath: userLspConfigPath(home),
+		installDecisionsPath: lspInstallDecisionsPath(home),
 		capabilities: { installDecisionTool: false },
 	};
 }
