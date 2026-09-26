@@ -78,7 +78,7 @@ When an approach fails, change something material - an algorithm, library, or pa
 
 ## Codex tool and skills notes
 
-The actual Codex tool list and schemas determine the route. Read-only subagent roles live in `CODEX_HOME/agents/`. For `multi_agent_v1`, use `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_context":false})`. If the tool list instead exposes a flat `spawn_agent` requiring `task_name` (`multi_agent_v2`), use `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_turns":"none"})`. Finished agents end on their own; `wait_agent` takes only `timeout_ms`. Keep the two payloads distinct and do not send v1 fields to v2 or vice versa.
+The actual Codex tool list and schemas determine the route. Read-only subagent roles live in `CODEX_HOME/agents/`. For `multi_agent_v1`, use `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","agent_type":"<role>","fork_context":false})`. If the tool list instead exposes a flat `spawn_agent` requiring `task_name` (`multi_agent_v2`), use `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_turns":"none"})`. Finished agents end on their own; `wait_agent` takes only `timeout_ms`. Keep the two payloads distinct and do not send v1 fields to v2 or vice versa.
 
 - `explorer`: codebase search.
 - `librarian`: external docs, OSS code, and API contracts.
