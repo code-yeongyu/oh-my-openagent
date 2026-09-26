@@ -11,6 +11,7 @@ import type {
 } from "./types"
 
 const EMPTY_RESULT: CheckResult = { hasComments: false, message: "" }
+const MAX_FAILURE_STDERR = 500
 
 function normalizeMessage(message: string): string {
   return message.replace(/\r\n/g, "\n")
@@ -109,7 +110,7 @@ export async function runCommentChecker(
       return { hasComments: true, message: normalizeMessage(stderr) }
     }
 
-    return EMPTY_RESULT
+    return { ...EMPTY_RESULT, failure: { exitCode, stderr: normalizeMessage(stderr).trim().slice(0, MAX_FAILURE_STDERR) } }
   } catch (error) {
     if (error instanceof Error) {
       return EMPTY_RESULT
