@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { updateTarget } from "../bin/lib/package-paths.js"
+import { channelPackageSpec, updateTarget } from "../bin/lib/package-paths.js"
+
+// updateTarget reads the version of the install it is pointed at and falls back to this package's own
+// manifest, so the expected spelling follows the package channel (`omo-ai` stable, `omo-ai@beta` prerelease).
+const SPEC = channelPackageSpec()
 import {
   formatUpdateCommand,
   formatVersionChange,
@@ -17,8 +21,8 @@ describe("updateTarget", () => {
       const root = bunRoot("/tmp/custom-bun/install/global/node_modules/omo-ai")
       expect(updateTarget(root)).toEqual({
         manager: "bun",
-        command: "bun add -g omo-ai@beta",
-        argv: ["bun", "add", "-g", "omo-ai@beta"],
+        command: `bun add -g ${SPEC}`,
+        argv: ["bun", "add", "-g", SPEC],
         env: { BUN_INSTALL: "/tmp/custom-bun" },
       })
     })
@@ -27,8 +31,8 @@ describe("updateTarget", () => {
       const root = String.raw`C:\Users\omo user\.bun\install\global\node_modules\omo-ai`
       expect(updateTarget(root, "win32")).toEqual({
         manager: "bun",
-        command: "bun add -g omo-ai@beta",
-        argv: ["bun", "add", "-g", "omo-ai@beta"],
+        command: `bun add -g ${SPEC}`,
+        argv: ["bun", "add", "-g", SPEC],
         env: { BUN_INSTALL: "C:/Users/omo user/.bun" },
       })
     })
@@ -36,7 +40,7 @@ describe("updateTarget", () => {
     test("#then a path with shell metacharacters is carried in BUN_INSTALL, not quoted into the command", () => {
       const root = "/tmp/custom $HOME's bun/install/global/node_modules/omo-ai"
       const target = updateTarget(root)
-      expect(target.command).toBe("bun add -g omo-ai@beta")
+      expect(target.command).toBe(`bun add -g ${SPEC}`)
       expect(target.env).toEqual({ BUN_INSTALL: "/tmp/custom $HOME's bun" })
     })
   })
@@ -45,8 +49,8 @@ describe("updateTarget", () => {
     test("#then the command stays npm i -g with npm argv and no BUN_INSTALL overlay", () => {
       expect(updateTarget("/tmp/prefix/lib/node_modules/omo-ai")).toEqual({
         manager: "npm",
-        command: "npm i -g omo-ai@beta",
-        argv: ["npm", "i", "-g", "omo-ai@beta"],
+        command: `npm i -g ${SPEC}`,
+        argv: ["npm", "i", "-g", SPEC],
       })
     })
   })
@@ -56,14 +60,14 @@ describe("omo self-update", () => {
   describe("#given a resolved update target", () => {
     const bunUpdate = {
       manager: "bun",
-      command: "bun add -g omo-ai@beta",
-      argv: ["bun", "add", "-g", "omo-ai@beta"],
+      command: `bun add -g ${SPEC}`,
+      argv: ["bun", "add", "-g", SPEC],
       env: { BUN_INSTALL: "/tmp/custom-bun" },
     }
     const npmUpdate = {
       manager: "npm",
-      command: "npm i -g omo-ai@beta",
-      argv: ["npm", "i", "-g", "omo-ai@beta"],
+      command: `npm i -g ${SPEC}`,
+      argv: ["npm", "i", "-g", SPEC],
     }
 
     describe("#when --dry-run or --print is requested", () => {
@@ -112,11 +116,11 @@ describe("omo self-update", () => {
         expect(code).toBe(0)
         expect(spawned).toEqual([{
           command: "bun",
-          args: ["add", "-g", "omo-ai@beta"],
+          args: ["add", "-g", SPEC],
           env: { PATH: "/usr/bin", BUN_INSTALL: "/tmp/custom-bun" },
         }])
         expect(lines).toEqual([
-          "omo is updated via bun: bun add -g omo-ai@beta",
+          `omo is updated via bun: bun add -g ${SPEC}`,
           "omo 5.0.0-0.beta.88 -> 5.0.0-0.beta.89 (engine: senpi 2026.9.24)",
         ])
         expect(formatVersionChange(
@@ -140,7 +144,7 @@ describe("omo self-update", () => {
         expect(code).toBe(0)
         expect(spawned).toEqual([{
           command: "npm",
-          args: ["i", "-g", "omo-ai@beta"],
+          args: ["i", "-g", SPEC],
           env: { PATH: "/usr/bin" },
         }])
       })
@@ -158,8 +162,8 @@ describe("omo self-update", () => {
           error: (line) => errors.push(line),
         })
         expect(code).toBe(7)
-        expect(lines).toEqual(["omo is updated via bun: bun add -g omo-ai@beta"])
-        expect(errors).toEqual(["omo: update failed; retry with: bun add -g omo-ai@beta"])
+        expect(lines).toEqual([`omo is updated via bun: bun add -g ${SPEC}`])
+        expect(errors).toEqual([`omo: update failed; retry with: bun add -g ${SPEC}`])
       })
 
       test("#then a spawn error exits 1 with the same retry command", async () => {
@@ -174,7 +178,7 @@ describe("omo self-update", () => {
           error: (line) => errors.push(line),
         })
         expect(code).toBe(1)
-        expect(errors).toEqual(["omo: update failed; retry with: npm i -g omo-ai@beta"])
+        expect(errors).toEqual([`omo: update failed; retry with: npm i -g ${SPEC}`])
       })
     })
   })

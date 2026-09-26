@@ -57,7 +57,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 |----------|---------------|-------------|--------|
 | `visual-engineering` | anthropic/claude-fable-5-1 (variant: max) | google-categories.ts | Visual design, UI/UX, frontend |
 | `ultrabrain` | openai/gpt-6-astra (variant: max) | openai-categories.ts | Hard logic / heavy reasoning; GPT-6 Astra-specific prompt append |
-| `deep-low` | openai/gpt-6-sol-fast (variant: medium) | openai-categories.ts | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and autonomous multi-step work whose decisions the child can settle from evidence; gpt-6-sol medium fallback rung, gated on either GPT-6 Sol tier |
+| `deep-low` | openai/gpt-5.6-sol-fast (variant: medium) | openai-categories.ts | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and autonomous multi-step work whose decisions the child can settle from evidence; gpt-5.6-sol medium fallback rung, gated on either GPT-5.6 Sol tier |
 | `deep-high` | openai/gpt-6-astra (variant: high) | openai-categories.ts | Escalation deep lane: the goal's central decision cannot be settled from evidence (trade-off, cross-boundary contract, no in-repo pattern, correctness argued from invariants); single rung, gated on gpt-6-astra |
 | `artistry` | anthropic/claude-fable-5-1 (variant: max) | google-categories.ts | Creative / unconventional approaches |
 | `quick` | openai/gpt-6-luna-fast (variant: low) | openai-categories.ts | Trivial single-file changes |

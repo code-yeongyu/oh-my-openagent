@@ -108,22 +108,22 @@ requireCondition(unspecifiedHighPrimary.spec.provider === "kimi-coding", "unspec
 requireCondition(unspecifiedHighPrimary.spec.modelId === "k3", "unspecified-high primary model mismatch")
 requireCondition(unspecifiedHighPrimary.spec.variant === "max", "unspecified-high primary variant is not max")
 
-const deepSolRegistry = resolveCategory("deep", {}, registry([model("openai", "gpt-6-sol")]))
-requireCondition(deepSolRegistry.kind === "resolved", "deep did not resolve on a gpt-6-sol registry")
+const deepSolRegistry = resolveCategory("deep", {}, registry([model("openai", "gpt-5.6-sol")]))
+requireCondition(deepSolRegistry.kind === "resolved", "deep did not resolve on a gpt-5.6-sol registry")
 if (deepSolRegistry.kind !== "resolved") {
-  throw new Error("deep did not resolve on a gpt-6-sol registry")
+  throw new Error("deep did not resolve on a gpt-5.6-sol registry")
 }
-requireCondition(deepSolRegistry.spec.modelId === "gpt-6-sol", "deep model mismatch")
+requireCondition(deepSolRegistry.spec.modelId === "gpt-5.6-sol", "deep model mismatch")
 requireCondition(deepSolRegistry.spec.variant === "medium", "deep variant is not medium")
 
 const noSolRegistry = registry([model("kimi-coding", "k3"), model("anthropic", "claude-opus-5-5")])
 const deepGated = resolveCategory("deep", {}, noSolRegistry)
-requireCondition(deepGated.kind === "model_unavailable", "deep did not gate on a registry without gpt-6-sol")
+requireCondition(deepGated.kind === "model_unavailable", "deep did not gate on a registry without gpt-5.6-sol")
 if (deepGated.kind !== "model_unavailable") {
-  throw new Error("deep did not gate on a registry without gpt-6-sol")
+  throw new Error("deep did not gate on a registry without gpt-5.6-sol")
 }
-requireCondition(deepGated.attemptedModel === "chatgpt-subscription/gpt-6-sol-fast", "deep gate attempted model mismatch")
-requireCondition(!deepGated.availableCategories.includes("deep-low"), "deep stayed listed without gpt-6-sol")
+requireCondition(deepGated.attemptedModel === "chatgpt-subscription/gpt-5.6-sol-fast", "deep gate attempted model mismatch")
+requireCondition(!deepGated.availableCategories.includes("deep-low"), "deep stayed listed without gpt-5.6-sol")
 
 const disabled = resolveCategory(
   "ultrabrain",

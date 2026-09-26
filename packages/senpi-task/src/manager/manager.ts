@@ -18,6 +18,7 @@ import { createSteeringEngine } from "../steering"
 import type { CancelOptions, CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
 import { discardManagedHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
+import { runtimeFallbackCandidates } from "./credential-failure"
 import { createWorkpoolAdmission } from "./workpool-admission"
 import { withResidentStart } from "./resident-start"
 import { createWorkpoolEngine, type WorkpoolEngine } from "../workpool/engine"
@@ -1053,10 +1054,12 @@ class TaskManagerImpl implements TaskManager {
     }
 
     const record = this.#tryLoad(input.taskId)
-    const nextModel = record?.fallback_models?.[0]
+    const candidates = record == null ? undefined : runtimeFallbackCandidates(record, input.outcome.failure.message)
+    const nextModel = candidates?.remaining[0]
     const live = this.#live.get(input.taskId)
     if (
       record == null
+      || candidates === undefined
       || nextModel === undefined
       || live?.handle !== input.handle
       || live.managedSpec === undefined
@@ -1074,7 +1077,7 @@ class TaskManagerImpl implements TaskManager {
     this.#live.delete(input.taskId)
     this.#releaseSlot(input.taskId, input.model, input.epoch)
 
-    const remainingModels = record.fallback_models?.slice(1) ?? []
+    const remainingModels = candidates.remaining.slice(1)
     const fallbackAttempts = [
       ...(record.fallback_attempts
         ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
@@ -1104,6 +1107,7 @@ class TaskManagerImpl implements TaskManager {
         from_model: record.model,
         to_model: nextModel.display,
         error_message: input.outcome.failure.message,
+        ...(candidates.skipped.length === 0 ? {} : { skipped_models: candidates.skipped.map((model) => model.display) }),
       },
     })
 

@@ -127,7 +127,7 @@ describe("LazyCodex publish channels", () => {
       ["publish-main", "Build omo-ai payload"],
       ["publish-main", "Verify omo-ai payload"],
       ["publish-main", "Strip token auth before omo-ai publish"],
-      ["publish-main", "Publish omo-ai (beta only)"],
+      ["publish-main", "Publish omo-ai"],
       ["release", "Generate changelog"],
       ["release", "Create GitHub release"],
       ["release", "Download release-binary artifacts"],

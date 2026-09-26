@@ -8,7 +8,7 @@ import { runDoctor } from "./doctor.js"
 import { ensureEnginePrepared } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, resolveSenpi, updateTarget } from "./package-paths.js"
+import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
@@ -63,7 +63,7 @@ function brandProfile() {
     ...(changelog ? { changelog } : {}),
     update: {
       packageName: "omo-ai",
-      distTag: "beta",
+      distTag: releaseChannel(),
       command: update.command,
       changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
     },

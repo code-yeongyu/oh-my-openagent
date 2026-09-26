@@ -10,6 +10,31 @@ declare const process: {
   getBuiltinModule<T>(id: string): T
 }
 
+// A synthetic OAuth lane for the rejected-credential scenarios: the stored refresh token
+// `REJECTED_REFRESH_TOKEN` is refused by the (offline) exchange the way a revoked login is, any other
+// token renews. No network, no real identity endpoint.
+export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+
+type FixtureOAuthCredentials = { refresh: string; access: string; expires: number; [key: string]: unknown }
+
+function fixtureOAuth(providerId: string) {
+  return {
+    name: `${providerId} fixture login`,
+    async login(): Promise<FixtureOAuthCredentials> {
+      throw new Error(`${providerId} fixture login is not interactive`)
+    },
+    async refreshToken(credentials: FixtureOAuthCredentials): Promise<FixtureOAuthCredentials> {
+      if (credentials.refresh === REJECTED_REFRESH_TOKEN) {
+        throw new Error(`Token exchange rejected for ${providerId}: 401 unauthorized; body={"error":"invalid_grant"}`)
+      }
+      return { ...credentials, access: `${providerId}-renewed-access`, expires: Date.now() + 60 * 60 * 1000 }
+    },
+    getApiKey(credentials: FixtureOAuthCredentials): string {
+      return credentials.access
+    },
+  }
+}
+
 interface FsModule {
   appendFileSync(path: string, data: string): void
 }
@@ -108,12 +133,15 @@ export default function registerModelProfileMockProvider(pi: TaskE2EExtensionAPI
     if (id === "omo-mock") {
       // Every provider id a scenario lists serves the same mock models under that real id.
       const requested = (process.env.OMO_PROFILE_QA_PROVIDERS ?? "").split(",").filter((id) => id.length > 0)
+      const oauthLanes = (process.env.OMO_PROFILE_QA_OAUTH_PROVIDERS ?? "").split(",").filter((id) => id.length > 0)
       for (const providerId of requested) {
-        pi.registerProvider(providerId, {
+        const registration: MockProvider & { oauth?: ReturnType<typeof fixtureOAuth> } = {
           ...wrapped,
           name: `${providerId} fixture`,
           streamSimple: wrapStreamSimple(providerId, provider.streamSimple.bind(provider)),
-        })
+        }
+        if (oauthLanes.includes(providerId)) registration.oauth = fixtureOAuth(providerId)
+        pi.registerProvider(providerId, registration)
       }
     }
   }

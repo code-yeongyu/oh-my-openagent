@@ -158,7 +158,7 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 ### CommandBar (`components/landing/install-command.tsx`)
 
 - The primary CTA of the site (omp.sh grammar). Row: prompt cell (40px wide, `--accent` `$`/`>` glyph on `--ink-2`), mono command in `--text-hi` on `--ink-1`, fixed-width COPY cell (mono uppercase 11px, `--text-lo` → `--text-hi` on hover, → `--accent` + "COPIED" for 2s after click). 1px `--line` border, 0px radius, height 48px; on < sm the command scrolls horizontally inside the cell (no wrap) and COPY stays reachable.
-- One command, no tab row (v3): every CommandBar on the site renders `bun install -g omo-ai@beta`. Host/edition switching was removed with the Editions section; the bar is the whole install story.
+- One command, no tab row (v3): every CommandBar on the site renders `bun install -g omo-ai`. Host/edition switching was removed with the Editions section; the bar is the whole install story.
 - Glow: none by default; `focus-within` adds the inset ring `0 0 0 1px var(--accent-32)`.
 
 ### Eyebrow (`components/ledger/eyebrow.tsx`)

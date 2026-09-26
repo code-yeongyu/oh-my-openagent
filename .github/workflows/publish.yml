@@ -225,6 +225,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
       omo_ai_version: ${{ steps.omo-ai.outputs.omo_ai_version }}
+      omo_ai_dist_tag: ${{ steps.omo-ai.outputs.omo_ai_dist_tag }}
       already_published: ${{ steps.omo-ai.outputs.already_published }}
       previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
@@ -285,13 +286,19 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # The channel follows the version: a prerelease X.Y.Z-<suffix> ships as X.Y.Z-0.<suffix> on the
+          # beta dist-tag, a stable X.Y.Z ships as exactly X.Y.Z on latest, so a bare `bun add -g omo-ai`
+          # resolves the stable release.
           if [[ "$VERSION" == *"-"* ]]; then
             OMO_AI_VERSION="${VERSION/-/-0.}"
+            OMO_AI_DIST_TAG=beta
           else
-            OMO_AI_VERSION="${VERSION}-1"
+            OMO_AI_VERSION="${VERSION}"
+            OMO_AI_DIST_TAG=latest
           fi
 
           echo "omo_ai_version=$OMO_AI_VERSION" >> "$GITHUB_OUTPUT"
+          echo "omo_ai_dist_tag=$OMO_AI_DIST_TAG" >> "$GITHUB_OUTPUT"
 
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/omo-ai/${OMO_AI_VERSION}")
           if [ "$STATUS" = "200" ]; then
@@ -1018,10 +1025,12 @@ jobs:
             fi
           done
 
-      - name: Publish omo-ai (beta only)
+      - name: Publish omo-ai
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
         working-directory: packages/omo-native
-        run: npm publish --ignore-scripts --access public --provenance --tag beta
+        env:
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
+        run: npm publish --ignore-scripts --access public --provenance --tag "$OMO_AI_DIST_TAG"
 
       - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
@@ -1393,6 +1402,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
         run: |
           set -euo pipefail
@@ -1406,13 +1416,13 @@ jobs:
           READINESS_ATTEMPTS=60   # 60 x 15 s = 15 minutes
           for attempt in $(seq 1 "$READINESS_ATTEMPTS"); do
             IMMUTABLE_VERSION=$(npm view --prefer-online "omo-ai@$OMO_AI_VERSION" version 2>/dev/null || true)
-            BETA_READY=true
+            TAG_READY=true
             if [ "$ALREADY_PUBLISHED" != "true" ]; then
-              BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
-              [ "$BETA_VERSION" = "$OMO_AI_VERSION" ] || BETA_READY=false
+              TAGGED_VERSION=$(npm view --prefer-online omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
+              [ "$TAGGED_VERSION" = "$OMO_AI_VERSION" ] || TAG_READY=false
             fi
 
-            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$BETA_READY" = "true" ]; then
+            if [ "$IMMUTABLE_VERSION" = "$OMO_AI_VERSION" ] && [ "$TAG_READY" = "true" ]; then
               echo "omo-ai@$OMO_AI_VERSION is ready (attempt ${attempt}/${READINESS_ATTEMPTS})"
               break
             fi
@@ -1429,20 +1439,22 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
         run: |
           set -euo pipefail
 
+          # A stable release owns latest. A prerelease owns beta and must never land on latest.
           LATEST_VERSION=$(npm view omo-ai dist-tags.latest 2>/dev/null || true)
-          if [ "$LATEST_VERSION" != "0.0.0-beta.0" ]; then
-            echo "::error::omo-ai latest must remain pinned to 0.0.0-beta.0, got ${LATEST_VERSION:-missing}. Remediate with: npm dist-tag add omo-ai@0.0.0-beta.0 latest"
+          if [ "$OMO_AI_DIST_TAG" != "latest" ] && [ "$LATEST_VERSION" = "$OMO_AI_VERSION" ]; then
+            echo "::error::omo-ai latest points at the prerelease $OMO_AI_VERSION; move it back to the last stable release"
             exit 1
           fi
 
           if [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_VERSION=$(npm view omo-ai dist-tags.beta 2>/dev/null || true)
-            if [ "$BETA_VERSION" != "$OMO_AI_VERSION" ]; then
-              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, expected $OMO_AI_VERSION"
+            TAGGED_VERSION=$(npm view omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
+            if [ "$TAGGED_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::omo-ai $OMO_AI_DIST_TAG points to ${TAGGED_VERSION:-missing}, expected $OMO_AI_VERSION"
               exit 1
             fi
           fi
@@ -1451,6 +1463,7 @@ jobs:
         if: inputs.lazycodex_only != true
         env:
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
           ALREADY_PUBLISHED: ${{ needs.release-metadata.outputs.already_published }}
         run: |
           set -euo pipefail
@@ -1476,31 +1489,23 @@ jobs:
             exit 1
           fi
 
+          # The channel spelling users are told to run must install this release: bare `omo-ai` for a
+          # stable release (latest), `omo-ai@beta` for a prerelease.
           if [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-beta.XXXXXX")
-            npm i -g omo-ai@beta --prefix "$BETA_PREFIX"
-            BETA_INSTALLED_VERSION=$(jq -r '.version' "$BETA_PREFIX/lib/node_modules/omo-ai/package.json")
-            rm -rf "$BETA_PREFIX"
-            if [ "$BETA_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
-              echo "::error::omo-ai@beta installed $BETA_INSTALLED_VERSION, expected $OMO_AI_VERSION"
+            if [ "$OMO_AI_DIST_TAG" = "latest" ]; then
+              CHANNEL_SPEC=omo-ai
+            else
+              CHANNEL_SPEC="omo-ai@$OMO_AI_DIST_TAG"
+            fi
+            CHANNEL_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-channel.XXXXXX")
+            npm i -g "$CHANNEL_SPEC" --prefix "$CHANNEL_PREFIX"
+            CHANNEL_INSTALLED_VERSION=$(jq -r '.version' "$CHANNEL_PREFIX/lib/node_modules/omo-ai/package.json")
+            rm -rf "$CHANNEL_PREFIX"
+            if [ "$CHANNEL_INSTALLED_VERSION" != "$OMO_AI_VERSION" ]; then
+              echo "::error::$CHANNEL_SPEC installed $CHANNEL_INSTALLED_VERSION, expected $OMO_AI_VERSION"
               exit 1
             fi
           fi
-
-          BARE_PREFIX=$(mktemp -d "$RUNNER_TEMP/omoai-bare.XXXXXX")
-          BARE_ERROR="$RUNNER_TEMP/omoai-bare-error.txt"
-          if npm i -g omo-ai --prefix "$BARE_PREFIX" 2>"$BARE_ERROR"; then
-            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-            echo "::error::Bare omo-ai install unexpectedly succeeded; the beta-only channel is broken"
-            exit 1
-          fi
-          if ! grep -q "ETARGET" "$BARE_ERROR"; then
-            cat "$BARE_ERROR" >&2
-            rm -rf "$BARE_PREFIX" "$BARE_ERROR"
-            echo "::error::Bare omo-ai install failed without the required ETARGET beta gate"
-            exit 1
-          fi
-          rm -rf "$BARE_PREFIX" "$BARE_ERROR"
 
       - name: Smoke test published lazycodex-ai
         if: inputs.publish_lazycodex == true && needs.publish-main.outputs.lazycodex_publish_skipped != 'true'

@@ -1,7 +1,10 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { DEFAULT_MODEL_PROFILE_ID } from "./builtin-profiles"
-import { resolveModelProfile, type ModelProfileResolution, type ModelProfileSummary } from "./resolve"
+import { credentialRotationPolicy } from "./credential-policy"
+import { authFailedDetails, noticeContent } from "./notice"
+import { type AuthFailure, type ProbeRegistry, probeRequestAuth, probeRuntime, sanitizedAuthErrorDetail } from "./request-auth"
+import { resolveModelProfile, type ModelProfileResolution } from "./resolve"
 
 /**
  * Applies the active `model_profile` to the MAIN session model at session start.
@@ -14,6 +17,11 @@ import { resolveModelProfile, type ModelProfileResolution, type ModelProfileSumm
  * `defaultProvider`/`defaultModel` on the same event, so those keys mean "last used", not "pinned".
  * The pin lives in `model_profile` itself as a literal `provider/model`.
  *
+ * A rung counts only when the first turn could use it: `request-auth.ts` reproduces that turn's
+ * credential resolution (per credential slot, then the model's own request configuration), so a
+ * stored login that no longer refreshes drops its provider and a model whose headers do not
+ * resolve drops only itself. The walk continues with the survivors.
+ *
  * In-tier fallback is start-time only. Mid-session failures follow senpi's `retry.fallbackChains`
  * (keyed by model family); wiring those to the tier is a named follow-up, and the applied notice
  * says so.
@@ -22,8 +30,6 @@ import { resolveModelProfile, type ModelProfileResolution, type ModelProfileSumm
 export const MODEL_PROFILE_APPLIED_TYPE = "omo-model-profile:applied"
 export const MODEL_PROFILE_UNAVAILABLE_TYPE = "omo-model-profile:unavailable"
 export const MODEL_PROFILE_UNKNOWN_TYPE = "omo-model-profile:unknown"
-
-const MID_SESSION_NOTE = "mid-session fallback follows senpi's retry chains"
 
 export interface ModelProfileComponentOptions {
   readonly loadConfig?: typeof loadSenpiOmoConfig
@@ -34,9 +40,10 @@ type SessionModelApi = {
   setSessionThinkingLevel?(level: string): void
 }
 
-type SessionRegistry = {
+type SessionRegistry = ProbeRegistry & {
   getAvailable(): readonly unknown[]
   find(provider: string, modelId: string): unknown
+  getProviderAuthStatus?(provider: string): unknown
 }
 
 // Mirrors senpi-task's `asSenpiThinkingLevel` (packages/senpi-task/src/senpi/thinking-level.ts),
@@ -78,6 +85,14 @@ function extractSessionId(eventCtx: unknown): string | undefined {
   return typeof id === "string" ? id : undefined
 }
 
+function extractMode(eventCtx: unknown): string | undefined {
+  return isRecord(eventCtx) && typeof eventCtx["mode"] === "string" ? eventCtx["mode"] : undefined
+}
+
+function extractAgentDir(eventCtx: unknown): string | undefined {
+  return isRecord(eventCtx) && typeof eventCtx["agentDir"] === "string" ? eventCtx["agentDir"] : undefined
+}
+
 // Only a fresh session may receive the profile: a resume/fork carries its own model history, a
 // reload keeps the running session, and a `--model` flag or scoped model is explicit user state.
 // A session_start without any provenance is treated as explicit too: senpi omits the field on a
@@ -95,7 +110,7 @@ function isFreshSessionWithoutExplicitModel(payload: unknown): boolean {
 // interactive TUI session keeps the model the user started with. The desktop (rpc) and headless
 // runs still apply the profile.
 function isTuiSession(eventCtx: unknown): boolean {
-  return isRecord(eventCtx) && eventCtx["mode"] === "tui"
+  return extractMode(eventCtx) === "tui"
 }
 
 function extractCwd(pi: SenpiExtensionAPI, eventCtx: unknown): string {
@@ -115,25 +130,64 @@ function availableSelectors(registry: SessionRegistry): string[] {
   return selectors
 }
 
-function profileLabel(profile: ModelProfileSummary): string {
-  return profile.displayName !== profile.id ? `"${profile.id}" (${profile.displayName})` : `"${profile.id}"`
+function providerOf(selector: string): string {
+  return selector.slice(0, selector.indexOf("/"))
 }
 
-function noticeContent(resolution: ModelProfileResolution): string {
-  switch (resolution.kind) {
-    case "resolved": {
-      const model = `${resolution.provider}/${resolution.modelId}`
-      const reasoning = resolution.reasoning !== undefined ? ` ${resolution.reasoning}` : ""
-      const skipped = resolution.skipped.length > 0 ? ` (skipped: ${resolution.skipped.join(", ")})` : ""
-      return `OmO Native: model profile ${profileLabel(resolution.profile)} selected ${model}${reasoning}${skipped}; ${MID_SESSION_NOTE}`
-    }
-    case "unavailable":
-      return `OmO Native: model profile ${profileLabel(resolution.profile)} has no available model; none of the chain is in this session's model registry (${resolution.chain.join(", ")}); keeping senpi's default model`
-    case "empty":
-      return `OmO Native: model profile ${profileLabel(resolution.profile)} defines no models; keeping senpi's default model`
-    case "unknown":
-      return `OmO Native: ${resolution.message}`
+function logSkippedCandidate(ctx: ComponentContext, failure: AuthFailure): void {
+  const candidate = `${failure.provider}/${failure.model}`
+  ctx.logger.warn(`omo-senpi: model profile skipped ${candidate}: request auth did not resolve (${failure.reason}, ${failure.errorKind})`, {
+    provider: failure.provider,
+    model: failure.model,
+    reason: failure.reason,
+    errorKind: failure.errorKind,
+  })
+  if (process.env.OMO_DEBUG) {
+    ctx.logger.info(`omo-senpi: model profile skipped ${candidate}: ${sanitizedAuthErrorDetail(failure.error)}`)
   }
+}
+
+type ProbedResolution = { readonly resolution: ModelProfileResolution; readonly model: unknown; readonly failures: AuthFailure[] }
+
+// Each failed probe removes at least one selector (the whole provider for a credential failure,
+// the one model for a request-configuration failure), so the walk ends after at most one pass per
+// available selector. A literal pin is the user's explicit choice and is never swapped, so it is
+// not probed; a host whose registry exposes no runtime keeps the plain walk.
+async function resolveWithRequestAuth(
+  ctx: ComponentContext,
+  registry: SessionRegistry,
+  agentDir: string | undefined,
+  profiles: Parameters<typeof resolveModelProfile>[0]["profiles"],
+  active: string,
+): Promise<ProbedResolution> {
+  const available = availableSelectors(registry)
+  const excludedProviders = new Set<string>()
+  const excludedSelectors = new Set<string>()
+  const failures: AuthFailure[] = []
+  const resolve = () =>
+    resolveModelProfile({
+      profiles,
+      active,
+      availableModels: available.filter(
+        (selector) => !excludedSelectors.has(selector) && !excludedProviders.has(providerOf(selector)),
+      ),
+    })
+  const runtime = probeRuntime(registry)
+  const mayRotate = credentialRotationPolicy(registry, agentDir)
+  let resolution = resolve()
+  let model: unknown
+  while (resolution.kind === "resolved") {
+    model = registry.find(resolution.provider, resolution.modelId)
+    if (model === undefined || resolution.profile.source === "pin" || runtime === undefined) break
+    const failure = await probeRequestAuth(registry, runtime, mayRotate, resolution.provider, resolution.modelId, model)
+    if (failure === undefined) break
+    failures.push(failure)
+    logSkippedCandidate(ctx, failure)
+    if (failure.reason === "request") excludedSelectors.add(`${failure.provider}/${failure.model}`)
+    else excludedProviders.add(failure.provider)
+    resolution = resolve()
+  }
+  return { resolution, model, failures }
 }
 
 export function createModelProfileComponent(options: ModelProfileComponentOptions = {}): OmoSenpiComponent {
@@ -166,21 +220,27 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
           return
         }
 
-        const resolution = resolveModelProfile({
-          profiles: config.model_profiles,
+        const mode = extractMode(eventCtx)
+        const { resolution, model, failures } = await resolveWithRequestAuth(
+          ctx,
+          registry,
+          extractAgentDir(eventCtx),
+          config.model_profiles,
           active,
-          availableModels: availableSelectors(registry),
-        })
-        const content = noticeContent(resolution)
+        )
+        const content = noticeContent(resolution, failures, mode)
 
         if (resolution.kind !== "resolved") {
           const customType = resolution.kind === "unknown" ? MODEL_PROFILE_UNKNOWN_TYPE : MODEL_PROFILE_UNAVAILABLE_TYPE
-          pi.sendMessage({ customType, content, display: true })
+          const details =
+            resolution.kind === "unavailable" && failures.length > 0
+              ? { details: { profile: resolution.profile.id, ...authFailedDetails(failures) } }
+              : {}
+          pi.sendMessage({ customType, content, display: true, ...details })
           ctx.logger.warn(content)
           return
         }
 
-        const model = registry.find(resolution.provider, resolution.modelId)
         if (model === undefined) {
           const message = `OmO Native: model profile "${resolution.profile.id}" resolved ${resolution.provider}/${resolution.modelId} but the registry no longer lists it`
           pi.sendMessage({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE, content: message, display: true })
@@ -200,6 +260,7 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
             model: selectedModel,
             skipped: [...resolution.skipped],
             ...(resolution.reasoning !== undefined ? { reasoning: resolution.reasoning } : {}),
+            ...authFailedDetails(failures),
           },
         })
         ctx.logger.info(content, { profile: resolution.profile.id, model: selectedModel })

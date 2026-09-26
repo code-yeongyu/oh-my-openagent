@@ -2,10 +2,15 @@ import { PUBLISHED_PACKAGE_NAME } from "../../shared"
 import { getBundledVersion } from "../../hooks/auto-update-checker/checker/bundled-version"
 import { isPrereleaseVersion } from "../../hooks/auto-update-checker/version-channel"
 
-export const NATIVE_PACKAGE_SPEC = "omo-ai@beta"
+/** The omo-ai spec on this plugin's channel: `omo-ai@beta` for a prerelease build, bare `omo-ai` for a stable one. */
+export function nativePackageSpec(pluginVersion: string = getBundledVersion()): string {
+  return isPrereleaseVersion(pluginVersion) ? "omo-ai@beta" : "omo-ai"
+}
+
+export const NATIVE_PACKAGE_SPEC = nativePackageSpec()
 export const NATIVE_SETUP_COMMAND = "omo setup"
 export const NATIVE_RECOMMENDED_RUNTIME_NOTE =
-  "bun is the recommended runtime for OmO Native; npm works, but bun is what the beta channel is tested on."
+  "bun is the recommended runtime for OmO Native; npm works, but bun is what OmO Native is tested on."
 
 export type NativePackageManager = "bun" | "npm"
 

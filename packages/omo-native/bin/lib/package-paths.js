@@ -14,7 +14,26 @@ export function packageManifest() {
 
 const BUN_GLOBAL_PACKAGE_SUFFIX = "/install/global/node_modules/omo-ai"
 
-export function updateTarget(root = packageRoot, platform = process.platform) {
+/** The npm dist-tag this build ships on: a prerelease version is on beta, a stable one on latest. */
+export function releaseChannel(version = packageManifest().version) {
+  return typeof version === "string" && version.includes("-") ? "beta" : "latest"
+}
+
+/** The package spec that installs this build's channel: `omo-ai@beta` or the bare `omo-ai`. */
+export function channelPackageSpec(version = packageManifest().version) {
+  return releaseChannel(version) === "beta" ? "omo-ai@beta" : "omo-ai"
+}
+
+function installedVersion(root) {
+  try {
+    return readJson(join(root, "package.json")).version
+  } catch {
+    return packageManifest().version
+  }
+}
+
+export function updateTarget(root = packageRoot, platform = process.platform, version = installedVersion(root)) {
+  const spec = channelPackageSpec(version)
   const updateCwd = dirname(join(root, "package.json"))
   const normalizedRoot = updateCwd.replaceAll("\\", "/")
   if (normalizedRoot.endsWith(BUN_GLOBAL_PACKAGE_SUFFIX)) {
@@ -25,15 +44,15 @@ export function updateTarget(root = packageRoot, platform = process.platform) {
     const bunInstall = normalizedRoot.slice(0, -BUN_GLOBAL_PACKAGE_SUFFIX.length)
     return {
       manager: "bun",
-      command: "bun add -g omo-ai@beta",
-      argv: ["bun", "add", "-g", "omo-ai@beta"],
+      command: `bun add -g ${spec}`,
+      argv: ["bun", "add", "-g", spec],
       env: { BUN_INSTALL: bunInstall },
     }
   }
   return {
     manager: "npm",
-    command: "npm i -g omo-ai@beta",
-    argv: ["npm", "i", "-g", "omo-ai@beta"],
+    command: `npm i -g ${spec}`,
+    argv: ["npm", "i", "-g", spec],
   }
 }
 

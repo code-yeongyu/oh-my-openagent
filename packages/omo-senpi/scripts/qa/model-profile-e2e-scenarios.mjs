@@ -7,6 +7,10 @@ export const PROFILE_TYPES = [APPLIED_TYPE, UNKNOWN_TYPE, UNAVAILABLE_TYPE]
 // `mock-1` keeps the recommended-models builtin inert except in its precedence scenario.
 export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-normal, recommended"
 
+// The refresh token the fixture OAuth lane in model-profile-e2e-mock-provider.ts refuses to
+// exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
+export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+
 export const SCENARIOS = {
   "geeky-normal-api-sol": {
     omoConfig: { model_profile: "geeky-normal" },
@@ -185,5 +189,45 @@ export const SCENARIOS = {
     recommendedModels: undefined,
     registerProviders: ["chatgpt-subscription", "zai"],
     expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+  },
+  // A stored Claude login whose refresh token the (offline) fixture exchange rejects, the way a
+  // revoked subscription login is: Recommended must not pin it, and the turn must run on the next
+  // connected rung. `oauthProviders` gives the fixture lane an OAuth block; `authJson` is the
+  // sandbox's stored credential, expired so the engine has to refresh it.
+  "unset-rejected-login-falls-back": {
+    omoConfig: {},
+    mockModels: ["mock-1", "claude-opus-5-5", "glm-5.3"],
+    registerProviders: ["anthropic", "zai"],
+    oauthProviders: ["anthropic"],
+    authJson: { anthropic: { type: "oauth", access: "stale-access", refresh: REJECTED_REFRESH_TOKEN, expires: 0 } },
+    expect: {
+      model: "glm-5.3",
+      provider: "zai",
+      notice: APPLIED_TYPE,
+      thinking: "max",
+      authFailed: [{ provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" }],
+    },
+  },
+  // A credential pool whose flat (default) account is rejected but whose sibling account is valid:
+  // the provider stays selected, and the engine's first turn rotates onto the sibling (the fixture
+  // rejection reads as a credential-scoped failure to senpi's pool classifier, like a revoked key).
+  "unset-pooled-login-sibling-account": {
+    omoConfig: {},
+    mockModels: ["mock-1", "claude-opus-5-5", "glm-5.3"],
+    registerProviders: ["anthropic", "zai"],
+    oauthProviders: ["anthropic"],
+    authJson: {
+      anthropic: {
+        type: "oauth",
+        access: "stale-access",
+        refresh: REJECTED_REFRESH_TOKEN,
+        expires: 0,
+        accounts: [
+          { name: "stale", source: "login", access: "stale-access", refresh: REJECTED_REFRESH_TOKEN, expires: 0 },
+          { name: "valid", source: "login", access: "valid-access", refresh: "valid-refresh", expires: 4102444800000 },
+        ],
+      },
+    },
+    expect: { model: "claude-opus-5-5", provider: "anthropic", notice: APPLIED_TYPE, thinking: "medium", authFailedAbsent: true },
   },
 }

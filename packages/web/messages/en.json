@@ -37,7 +37,7 @@
       "getStarted": "Get started",
       "readManifesto": "Read the manifesto",
       "installLabel": "One command, one tool",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "command": {
       "copy": "Copy",
@@ -148,7 +148,7 @@
       "subtitle": "Install OmO, open your project, describe the job. That's the whole setup.",
       "installNow": "Install now",
       "readTheDocs": "Read the docs",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "dag": {
       "region": "OmO desktop with the workflow graph open",

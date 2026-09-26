@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { releaseChannel } from "../bin/lib/package-paths.js"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -8,7 +9,8 @@ import { runDoctor } from "../bin/lib/doctor.js"
 import { updateTarget } from "../bin/lib/package-paths.js"
 
 const RESTORE = "bun add -g omo-ai@beta"
-const REPAIR = "bunx oh-my-openagent@beta install --platform=native"
+// The repair installer is named on this package's own channel.
+const REPAIR = `bunx ${releaseChannel() === "beta" ? "oh-my-openagent@beta" : "oh-my-openagent"} install --platform=native`
 const MIGRATION_MODULE = join(import.meta.dir, "..", "bin", "lib", "doctor-migration.js")
 // Runs the report in a child so a read that blocks on a FIFO fails by timeout instead of hanging the suite.
 const CHILD_REPORT = `const { migrationReport } = await import(${JSON.stringify(MIGRATION_MODULE)})

@@ -35,17 +35,27 @@ describe("local omo launcher", () => {
           },
           update: {
             packageName: "omo-ai",
-            distTag: "beta",
-            command: "npm i -g omo-ai@beta",
+            distTag: "latest",
+            command: "bun add -g omo-ai",
             changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
           },
         })
+        expect(source).toContain("omo is updated via bun: bun add -g omo-ai")
+        expect(source).not.toContain("omo-ai@beta")
         expect(source).toContain("--extension")
         expect(source).toContain("OMO_SENPI_CLI_PATH")
         expect(source).toContain("OMO_PLUGIN_ROOT")
         expect(source).toContain("OMO_CODING_AGENT_DIR")
         expect(source).toContain("SENPI_CODING_AGENT_DIR")
         expect(source).toContain('join(homedir(), ".omo", "agent")')
+      })
+
+      test("#then a prerelease build stays on the beta channel", () => {
+        const source = renderLocalLauncher({ ...BASE, version: "5.0.0-beta.90" })
+        const brand = JSON.parse(source.match(/const brand = (\{.*\})/)?.[1] ?? "{}")
+
+        expect(brand.update).toMatchObject({ distTag: "beta", command: "bun add -g omo-ai@beta" })
+        expect(source).toContain("omo is updated via bun: bun add -g omo-ai@beta")
       })
     })
 

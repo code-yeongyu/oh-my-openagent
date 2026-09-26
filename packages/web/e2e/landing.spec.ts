@@ -39,7 +39,7 @@ test.describe("Landing Page", () => {
 
     // then
     await expect(hero.getByTestId("command-bar")).toHaveCount(1)
-    await expect(hero.getByText("bun install -g omo-ai@beta")).toBeVisible()
+    await expect(hero.getByText("bun install -g omo-ai", { exact: true })).toBeVisible()
     await expect(hero.getByRole("button", { name: "Copy install command" })).toBeVisible()
     await expect(hero.getByRole("tab")).toHaveCount(0)
   })

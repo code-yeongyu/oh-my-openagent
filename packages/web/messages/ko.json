@@ -37,7 +37,7 @@
       "getStarted": "시작하기",
       "readManifesto": "매니페스토 읽기",
       "installLabel": "명령 하나, 도구 하나",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "command": {
       "copy": "복사",
@@ -148,7 +148,7 @@
       "subtitle": "OmO를 설치하고, 프로젝트를 열고, 할 일을 말하세요. 더 설정할 것은 없어요.",
       "installNow": "지금 설치",
       "readTheDocs": "문서 읽기",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "dag": {
       "region": "워크플로우 그래프가 열린 OmO 데스크톱",

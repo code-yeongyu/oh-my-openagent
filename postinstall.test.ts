@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { delimiter } from "node:path"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -11,8 +11,8 @@ import { fileURLToPath } from "node:url"
 const postinstallPath = fileURLToPath(new URL("./postinstall.mjs", import.meta.url))
 const RENAME_NOTICE =
   "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release)."
-const NATIVE_NOTICE =
-  "oh-my-openagent: OmO Native (beta) is the same omo as one 'omo' command, with no OpenCode host: bun add -g omo-ai@beta"
+const PACKAGE_VERSION: string = JSON.parse(readFileSync(fileURLToPath(new URL("./package.json", import.meta.url)), "utf8")).version
+const NATIVE_NOTICE = `oh-my-openagent: OmO Native is the same omo as one 'omo' command, with no OpenCode host: bun add -g ${PACKAGE_VERSION.includes("-") ? "omo-ai@beta" : "omo-ai"}`
 const SUBPROCESS_TEST_TIMEOUT_MS = 30_000
 const HANGING_OPENCODE_MS = 60_000
 
@@ -70,6 +70,12 @@ function countNativeNotices(output: string): number {
 }
 
 describe("postinstall rename notice", () => {
+  test("names the install line of the package's own channel", async () => {
+    const { nativeNotice } = await import("./postinstall.mjs")
+    expect(nativeNotice("5.0.0")).toEndWith("bun add -g omo-ai")
+    expect(nativeNotice("5.0.0-beta.90")).toEndWith("bun add -g omo-ai@beta")
+  })
+
   test("announces the omo-agent-toolkit rename exactly once", () => {
     // #given
     // a fixture environment isolated from the real HOME and OpenCode plugin cache

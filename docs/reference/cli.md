@@ -21,7 +21,7 @@ The former `omo` bin was removed from these packages in this major release. The 
 
 | Bin | Package | Channel | What it is |
 | --- | --- | --- | --- |
-| `omo` | `omo-ai` | bun (recommended): `bun add -g omo-ai@beta`; npm fallback: `npm i -g omo-ai@beta` | Launches the pinned senpi release with the full OMO extension loaded. A bare `bun add -g omo-ai` or `npm i -g omo-ai` fails by design; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
+| `omo` | `omo-ai` | bun (recommended): `bun add -g omo-ai`; npm fallback: `npm i -g omo-ai` | Launches the pinned senpi release with the full OMO extension loaded. Prerelease builds live on `omo-ai@beta`; see the [omo-ai publishing runbook](./omo-ai-publishing.md). |
 
 The `omo-agent-toolkit` npm bin stays with the wrapper packages above; `omo-ai` never declares it.
 

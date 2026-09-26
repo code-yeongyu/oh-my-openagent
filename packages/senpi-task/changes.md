@@ -22,6 +22,30 @@ session is recorded) `reconcile.test.ts` (a dead-owner record in that gap is res
 it instead of losing it), and `manager-respawn-cleanup.test.ts` (a revived daemon child names its
 session).
 
+## Runtime fallback skips the rest of a provider whose credential is dead
+
+`manager/credential-failure.ts` (new): `isCredentialFailure(message)` recognizes a provider answer no other model on
+the same provider can fix (401, `invalid_grant`, `OAuth refresh failed`, `subscription is required`, invalid API
+key; a 403 only when its text names the account, credential, key, organization or subscription AND does not scope
+itself to a model - the word `model(s)` or the failed model id - so "Your organization must be verified to use
+this model" or "The API key is valid, but access to restricted-model is forbidden" keep the sibling rungs and get
+no re-authentication hint), and `runtimeFallbackCandidates(record, message)` drops every remaining `fallback_models`
+rung on the failed provider for such a message. `manager/manager.ts` `#tryRuntimeFallback` walks that list
+instead of `fallback_models[0]`, so a migrated OpenCode Go key whose subscription lapsed (403 on
+`minimax-m3`) no longer relaunches on `minimax-m2.7`: the next provider runs, or the task ends in error when
+none is left. `task_model_fallback` gains `skipped_models`. Any other failure keeps today's order. When the task ends on
+a credential failure, `manager-outcome.ts` records `terminalFailureMessage`: the provider error plus how to
+re-authenticate (`Provider authentication settings` on the desktop, `/login <provider>` in an interactive
+session - the manager has no session surface of its own, so both paths are named), re-add the key, or pin
+the category elsewhere. Scope: this is the manager's
+turn-level walk, which process children (`rpc-host`, `rpc`) use. An in-process child hands its chain to the
+engine as `retry.fallbackChains` (`runners/in-process/runtime-fallback-settings.ts`), and senpi's retry
+controller still retries same-provider rungs there; that belongs to the engine. A dead key is only visible
+at request time (a stored key resolves), so nothing here probes before the spawn. Tests:
+`auth-failure-fallback.test.ts` (non-credential failure keeps the same provider and its text, a subscription 403
+skips to zai, a rejected OAuth refresh with only same-provider rungs ends the task with the re-authentication hint),
+`credential-failure.test.ts` (the classifier's positive and negative cases, a model-scoped 403 keeping the sibling).
+
 ## Task-category coverage for omo doctor and omo setup (#8858)
 
 `category/coverage.ts` (new): `resolveCategoryCoverage(config, registry)` returns the usable categories (`resolveAvailableCategoryNames`) and, per unusable one, the chain providers with no model in the registry (the resolver's `missingChainProviders`, now exported with `parseAvailableModels`). Disabled categories are neither; a registry without a model list throws. Exported from `category/index.ts` and as `@oh-my-opencode/senpi-task/category-coverage`. omo#8857.

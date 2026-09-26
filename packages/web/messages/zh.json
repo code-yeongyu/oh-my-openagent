@@ -37,7 +37,7 @@
       "getStarted": "开始使用",
       "readManifesto": "阅读宣言",
       "installLabel": "一条命令，一个工具",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "command": {
       "copy": "复制",
@@ -148,7 +148,7 @@
       "subtitle": "安装 OmO，打开项目，说出要做的事。设置就这么多。",
       "installNow": "立即安装",
       "readTheDocs": "阅读文档",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "dag": {
       "region": "打开工作流图的 OmO 桌面端",

@@ -132,7 +132,7 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
       path: join(execDir, "plugin", "CHANGELOG.md"),
       ...(changelogVersion === undefined ? {} : { version: changelogVersion }),
     },
-    update: { packageName: "omo-ai", distTag: "beta", command: devUpdateCommand ?? updateLine(process.platform, process.arch), changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
+    update: { packageName: "omo-ai", distTag: displayVersion.includes("-") ? "beta" : "latest", command: devUpdateCommand ?? updateLine(process.platform, process.arch), changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
   })
   const binDir = nearestNodeBin(execDir)
   if (binDir) {

@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { createNativeEditionNudgeHook, NATIVE_NUDGE_TOAST_MESSAGE, NATIVE_NUDGE_TOAST_TITLE } from "./hook"
 import type { NudgeStateStore } from "./state"
 import { NUDGE_STATE_VERSION, type NudgeState, type NudgeStateRead } from "./types"
+import { NATIVE_EDITION_INSTALL_COMMAND } from "../../cli/native-edition-hint"
 
 const NOW = 1_700_000_000_000
 
@@ -67,7 +68,7 @@ describe("the nudge reaches the real toast surface", () => {
     expect(surface.toasts).toHaveLength(1)
     expect(surface.toasts[0]?.title).toBe(NATIVE_NUDGE_TOAST_TITLE)
     expect(surface.toasts[0]?.message).toBe(NATIVE_NUDGE_TOAST_MESSAGE)
-    expect(surface.toasts[0]?.message).toContain("bunx oh-my-openagent@beta install --platform=native")
+    expect(surface.toasts[0]?.message).toContain(NATIVE_EDITION_INSTALL_COMMAND)
   })
 
   test("#given repeated session events in one process #when they fire #then the toast is shown exactly once", async () => {

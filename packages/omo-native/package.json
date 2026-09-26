@@ -1,8 +1,8 @@
 {
   "name": "omo-ai",
-  "version": "5.0.0-0.beta.90",
+  "version": "5.0.0",
   "type": "module",
-  "description": "OmO Native - the standalone omo command with the OMO extension built in. Beta channel only: bun add -g omo-ai@beta",
+  "description": "OmO Native - the standalone omo command with the OMO extension built in: bun add -g omo-ai",
   "bin": {
     "omo": "bin/omo.js"
   },

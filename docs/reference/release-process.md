@@ -16,7 +16,7 @@ CI green is required for release readiness, but CI does not replace manual verif
 
 The `/publish` command accepts `patch`, `minor`, `major`, or an explicit semantic version such as `5.0.0-beta.9`. Bump selectors preserve the stable release flow. Explicit versions are passed to the workflow's `version` input unchanged, so prerelease channels do not fall back to the latest stable package. The command records the workflow URL returned by the dispatch and monitors that exact run ID; a latest-run lookup is not release ownership.
 
-For the `omo-ai` package (OmO Native, beta channel only), see the [omo-ai publishing runbook](./omo-ai-publishing.md): bootstrap state, the beta-gate mechanism, the Trusted Publisher merge gate, and the first-beta-release checklist.
+For the `omo-ai` package (OmO Native), see the [omo-ai publishing runbook](./omo-ai-publishing.md): the version-derived channel (stable on `latest`, prereleases on `beta`), the Trusted Publisher merge gate, and the release checklist.
 
 ## Resuming a Failed Publish
 
@@ -44,7 +44,7 @@ A failure before release state exists may still be rerun when it is purely trans
 - `dispatch-provenance-safe-publish` / `Tag prepared source and dispatch provenance-safe publish` reuses an existing tag only when it resolves to the prepared release SHA. It fails closed when the tag points to any other SHA.
 - `publish-platform` delegates platform publication to `publish-platform.yml`, whose `Check if already published` steps probe both platform package families and skip versions already present in npm.
 - `publish-main` / `Check if already published`, `Check if oh-my-openagent already published`, and `Check if lazycodex-ai already published` probe npm and gate each corresponding publish step with the probe's `skip` output.
-- `release-metadata` / `Calculate omo-ai metadata` exposes `already_published`; `publish-main` gates the omo-ai build and `Publish omo-ai (beta only)` step when that immutable version already exists.
+- `release-metadata` / `Calculate omo-ai metadata` exposes `already_published`; `publish-main` gates the omo-ai build and `Publish omo-ai` step when that immutable version already exists.
 - `release` / `Sync LazyCodex Codex marketplace` checks the staged marketplace payload with `git diff --cached --quiet` and does not commit or push when it is unchanged. `Create LazyCodex GitHub release` and `Create GitHub release` likewise view an existing release before creating one.
 
 The workflow uses two dispatches. The first run has an empty `prepared_release_sha`; it runs the gates, prepares or reuses release state, creates or validates the tag, and dispatches a second run from that tag. The second run carries the exact prepared SHA in `prepared_release_sha`; only this run can execute `publish-platform`, `publish-main`, and `release`.

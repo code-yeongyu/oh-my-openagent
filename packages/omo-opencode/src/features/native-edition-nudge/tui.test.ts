@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import { applyNativeEditionNudgeAction, NATIVE_NUDGE_OPTIONS } from "./tui"
+import { formatNativeInstallEntryCommand, resolveNativeInstallPlan } from "../../cli/install-native"
 import type { NudgeStateStore } from "../../hooks/native-edition-nudge"
 import { NUDGE_SNOOZE_MS, NUDGE_STATE_VERSION, type NudgeState, type NudgeStateRead } from "../../hooks/native-edition-nudge/types"
 
 const NOW = 1_700_000_000_000
+// The advertised installer follows the plugin's own channel (`@beta` only on a prerelease build).
+const BUN_ENTRY = formatNativeInstallEntryCommand(resolveNativeInstallPlan(true))
+const NPM_ENTRY = formatNativeInstallEntryCommand(resolveNativeInstallPlan(false))
 
 function store(initial: NudgeStateRead = "missing") {
   let current = initial
@@ -52,7 +56,7 @@ describe("install hands over the command without claiming the user migrated", ()
     const result = applyNativeEditionNudgeAction("install", { store: fake.store, now: NOW, bunAvailable: true })
 
     // then
-    expect(result.toast).toContain("bunx oh-my-openagent@beta install --platform=native")
+    expect(result.toast).toContain(BUN_ENTRY)
     expect(result.toast).toContain("omo setup")
     expect(fake.writes).toHaveLength(0)
   })
@@ -65,7 +69,7 @@ describe("install hands over the command without claiming the user migrated", ()
     const result = applyNativeEditionNudgeAction("install", { store: fake.store, now: NOW, bunAvailable: false })
 
     // then
-    expect(result.toast).toContain("npx oh-my-openagent@beta install --platform=native")
+    expect(result.toast).toContain(NPM_ENTRY)
   })
 })
 

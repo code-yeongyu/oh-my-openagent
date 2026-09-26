@@ -9,11 +9,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-**OmO Native moves to senpi 2026.9.26.** ([#8882](https://github.com/code-yeongyu/oh-my-openagent/issues/8882), [senpi#2139](https://github.com/code-yeongyu/senpi/issues/2139), [senpi#2137](https://github.com/code-yeongyu/senpi/issues/2137), [senpi#2135](https://github.com/code-yeongyu/senpi/issues/2135), [senpi#2143](https://github.com/code-yeongyu/senpi/issues/2143)) The Cursor CLI lane now sends your request together with the hidden messages of the same turn, so the first request of a session no longer reaches the model as an empty plan reminder. The first-turn plan waits for your own first request instead of arming on an onboarding greeting. A handoff block that restates your request is no longer mistaken for a repeating turn, while a turn that really repeats is still stopped.
+**A local `omo` install now tells you to update with bun.** The launcher that `oh-my-openagent install` writes for a local checkout answered `omo update` with `npm i -g omo-ai`; it now prints `bun add -g omo-ai` (`omo-ai@beta` on a prerelease build), like every other install instruction. Installs from npm keep getting the npm command from `omo update`.
 
 ### Fixed
 
 **A delegated task no longer hangs forever when its first model fails.** When a subagent running on the shared daemon (the default on macOS and Linux) failed on one model and moved to the next, the new model's session could briefly mistake the task for an abandoned one and take it over. The real result was then ignored, the task stayed `running`, and `omo -p` never exited. The task no longer points at the closed session while it switches models.
+
+**An expired Claude login no longer breaks the first headless or desktop turn.** With no `model_profile` set, OmO Native starts on the Recommended ladder, and a Claude subscription whose saved login can no longer be refreshed still counted as connected: the session was pinned to Claude Opus 5.5, every turn failed on the refresh, and the retry walked only other Claude models before giving up, even when another provider on the ladder (for example Z.ai GLM 5.3) was connected. A model profile now resolves a rung's credentials the way its first turn would before picking it: a login that cannot be refreshed drops that provider and the walk moves on; a provider with several accounts stays eligible while any of them (the pinned one, when an account is pinned) resolves, unless rotation is turned off for it (`credentials.rotation: false` in `models.json`, or a runtime API key), in which case only its default credential counts; a model whose own request configuration fails to resolve drops only that model. The start notice names what was skipped and how to recover on that surface: the desktop points at Provider authentication settings, a headless run at an interactive session's `/login <provider>`. A literal `provider/model` pin in `model_profile` is still applied as written. The resolution runs once per attempted account at session start, sequentially, so a rejected login can add up to the provider's refresh timeout before the next rung is picked.
+
+**A delegated task no longer retries a provider that already rejected your credentials.** When a subagent's turn failed because a provider refused the key (for example an OpenCode Go key whose subscription lapsed, carried over by `omo setup`) or an OAuth login could not be refreshed, the task retried the next model on the same provider, which failed the same way. It now skips the rest of that provider and moves to the next provider in the category, or, when none is left, reports the error with how to re-authenticate that provider (Provider authentication settings on the desktop, `/login <provider>` in an interactive session). This covers subagents running as separate processes (the default on macOS and Linux); an in-process subagent still walks its chain inside the engine.
+
+## [5.0.0] - 2026-09-26
+
+### PLEASE REMOVE OPENCODE V1 FOR OMO, LAZYCODEX, IMMEDIATELY.
+
+Because OmO Native is out for real. 5.0.0 is its first stable release, and `bun add -g omo-ai` installs it from npm's default channel with no `@beta` tag.
+
+```bash
+bun add -g omo-ai
+```
+
+Strictly speaking you don't have to remove anything. The OmO plugin for OpenCode v1 and LazyCodex keep running, but from here on they get degraded support: new features land in OmO Native first, and some never reach the plugins because the hosts cannot carry them. We recommend removing them anyway. We stopped using them weeks ago, not out of neglect, but because OmO Native is what we keep reaching for.
+
+OmO Native is the `omo` command: the pi-based senpi engine with the OMO extension built in. The rest of these notes are for people who run omo today as the OpenCode plugin (oh-my-openagent) or as LazyCodex on the Codex CLI.
+
+### Moving from the OpenCode edition or LazyCodex
+
+```bash
+bunx oh-my-openagent install --platform=native   # or: bun add -g omo-ai
+omo setup
+omo doctor
+```
+
+The installer removes the stale global `omo` that oh-my-openagent 4.19.x and older shipped, installs `omo-ai` with bun (npm when bun is missing) and checks that `omo` on your PATH is the new one. `omo setup` reads what your OpenCode install already knows and carries it across after one confirmation: provider API keys, custom OpenAI- or Anthropic-compatible providers from `opencode.jsonc`, MCP servers, global skills and your model choices. OAuth logins are listed with the `/login` command to run, since tokens do not move between tools. `omo doctor` then prints which task categories your connected providers can run and what the OpenCode edition left behind, each with the command that fixes it. `omo update` updates in place.
+
+### What you get that the plugins could not give you
+
+| | OpenCode edition / LazyCodex | OmO Native |
+| --- | --- | --- |
+| Runtime | a plugin inside someone else's host, restarted to apply | one `omo` binary on the senpi engine |
+| Tool calls | one tool per model turn | first-party CodeMode: code that calls tools, in parallel |
+| Memory | none built in | git-backed memory with a self block, reflection, and Kibitzer recall |
+| Multi-model work | Team Mode (OpenCode), `spawn_agent` (Codex) | mass ulw: a DAG of nodes routed to different models |
+| Browser | MCP add-ons | omowright built in, attached to your own browser |
+
+**The engine.** senpi is our fork of pi. The OMO extension loads into it directly instead of negotiating with a host's plugin API, so hooks, tools and the TUI behave the same on every platform. Cold start to ready fell from 5.8 s to 850 ms across three profiling rounds, and `omo --help` answers in 28 ms.
+
+**Memory, and Kibitzer.** Memory lives in a git repository of markdown files. Persona, the person you work with, and a self block are projected into every session. The self block is how the agent forms a self: from what you call it and how you work with it. Reflection and dreaming run as sandboxed background workers after a session settles. Kibitzer is the new part. It is a second agent loop that runs beside your main session on the cheap `quick` category, and it wakes only when a turn touches a memory it has not judged yet. It reads with five read-only tools, checks, and then drops the "oh right" into your conversation through a single hidden nudge. It cannot write memory. Recall costs about 5 ms per tool call on a large corpus, down from 308 ms, and the model it runs on is pinned to the `quick` chain so it never lands on a frontier-priced model.
+
+**CodeMode.** Every step can be a JavaScript or Python eval cell whose prelude carries `tool.<name>()`, `parallel()`, `pipeline()` and `agent()`. Twenty reads become one cell and one round trip. On our own sessions, with the model held the same, OmO Native used about half the context per round trip that the OpenCode edition did (0.39x on GPT-5.5, 0.69x on Opus 4.8), and a live GPT-6 Astra session reports a 97.5% prompt-cache hit in its footer.
+
+**mass ulw.** Put "mass ulw" in a prompt and the work becomes a graph: nodes with dependency edges, each routed by category to a different model, fed through workpools with retries and recovery. The graph runs live in the TUI and in a herdr side pane ([omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag) by @jc01rho).
+
+**Browser use.** omowright ships with OmO Native. It drives the browser you already use, with your logins, through BrowserSkill, and hands off to you for a login, CAPTCHA or one-time code. For bot-scored sites it runs its own Chromium on a cloaked profile. Nothing to install.
+
+**You can see what it is doing.** Your first request opens a phased todo list. Every todo change names your original request, the task in progress and the next one, and the agent reports when the plan is set, when a phase closes and when the work ends. A turn that stops with todos open gets one nudge to finish them. Persistent monitors survive a restart, and questions arrive as cards you answer with a digit or a click.
+
+**Lighter on your machine.** Subagents run as sessions inside one shared daemon instead of one engine process each. File watching is one worker per host, where 1,000 sessions used to mean 1,023 threads. Background processes die with the session that started them.
+
+**Models.** You name the kind of work and omo picks the model for it. `deep-low`, the default deep lane, now runs GPT-5.6 Sol Fast at medium. Model profiles offer Daily and Geeky lanes, each in Normal and Heavy. Claude, ChatGPT, Kimi and GLM subscriptions sign in with `/login`.
+
+### OpenCode v2
+
+We know about OpenCode v2. Our answer to it is coming, and it takes time. Until then, please run OmO Native: it is the version we use every day, and the one this release was built with.
+
+### Next
+
+A desktop app is coming soon, and computer use after it.
+
+### Changed
+
+**`deep-low` runs GPT-5.6 Sol Fast at medium.** ([#8885](https://github.com/code-yeongyu/oh-my-openagent/issues/8885)) The default deep delegation lane now starts on `gpt-5.6-sol-fast` (medium) on the ChatGPT subscription and OpenAI API lanes and falls back to `gpt-5.6-sol` (medium), which GitHub Copilot and OpenCode Zen also serve. The lane is offered whenever one of those two models is connected, so an account that only has GPT-6 Sol no longer sees it; pin `categories.deep-low.model` to keep a GPT-6 Sol setup.
+
+**A stable release ships OmO Native on `latest`, and a stable build stops asking for `@beta`.** ([#8887](https://github.com/code-yeongyu/oh-my-openagent/issues/8887)) The release pipeline now takes omo-ai's channel from the version it publishes: a prerelease still goes to `beta` as `X.Y.Z-0.<suffix>`, while a stable version goes to `latest` as exactly `X.Y.Z`, so `bun add -g omo-ai` installs it with no tag. The dist-tag guard and the live-install check follow the same channel. Every place that prints an install or update line (the update banner, `omo update`, `omo doctor`, the launcher's reinstall hints, the OpenCode installer and its in-session nudge, the post-install notice, and the release-notes footer) derives it from the running build's version.
+
+**OmO Native moves to senpi 2026.9.26.** ([#8882](https://github.com/code-yeongyu/oh-my-openagent/issues/8882), [senpi#2139](https://github.com/code-yeongyu/senpi/issues/2139), [senpi#2137](https://github.com/code-yeongyu/senpi/issues/2137), [senpi#2135](https://github.com/code-yeongyu/senpi/issues/2135), [senpi#2143](https://github.com/code-yeongyu/senpi/issues/2143)) The Cursor CLI lane now sends your request together with the hidden messages of the same turn, so the first request of a session no longer reaches the model as an empty plan reminder. The first-turn plan waits for your own first request instead of arming on an onboarding greeting. A handoff block that restates your request is no longer mistaken for a repeating turn, while a turn that really repeats is still stopped.
 
 ## [5.0.0-beta.90] - 2026-09-24
 
@@ -336,7 +406,6 @@ A selected row no longer earns a `border-l-2 border-primary` stripe, and a focus
 
 **A session that reattaches to another host generation keeps its memory.** Your memory identity was derived from the directory the host process happened to be started in, not from the session's own workspace. One shared host serves sessions from many projects, so a host ensured from somewhere else handed its own identity to every session that reattached to it: the session was told `memory identity conflict: session is bound to <workspace>-<hash>, but config resolved server-<hash>`, and its memory tools went away while the workspace had not moved at all. Identity now comes from the session's own working directory, and a reattach that still disagrees rebinds to the identity recorded in the session and notes it in the log instead of stopping. The error is kept for the case it was written for: you pointed `memory.agent` at a different identity yourself. ([#8556](https://github.com/code-yeongyu/oh-my-openagent/issues/8556))
 
-
 ## [5.0.0-beta.80] - 2026-09-20
 
 ### Changed
@@ -484,7 +553,6 @@ get it too instead of only a first spawn. ([#8492](https://github.com/code-yeong
 **Compaction summarization retries without the reasoning override after an empty stop.** (senpi [#1773](https://github.com/code-yeongyu/senpi/issues/1773))
 
 **RPC socket host: session-event credit on queue acceptance, 30 s dead-peer stall budget, observable cut notice.** (senpi [#1774](https://github.com/code-yeongyu/senpi/issues/1774))
-
 
 ### OmO
 
@@ -783,7 +851,6 @@ OmO Native stops greeting you with its entire history, and memory gains a reside
 ### Engine: senpi 2026.9.11
 
 The changelog selection fix above lives in the engine and ships with this release. Also included: a cold-start fix for the RPC host, a goal-contract correction so a harness goal advises the loop instead of gating it, and Windows fixes for thread-socket discovery and a DAG race.
-
 
 ## [5.0.0-beta.1] - 2026-08-09
 

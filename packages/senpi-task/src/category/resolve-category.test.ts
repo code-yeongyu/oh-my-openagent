@@ -42,13 +42,13 @@ const gpt56CategoryCases = [
   },
   {
     category: "deep",
-    modelId: "gpt-6-sol",
+    modelId: "gpt-5.6-sol",
     nativeVariant: "medium",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-6-sol", variant: "medium" },
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
     copilotVariant: "medium",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
-      model: "gpt-6-sol",
+      model: "gpt-5.6-sol",
       variant: "medium",
     },
   },
@@ -480,7 +480,7 @@ describe("builtin category defaults", () => {
       ["visual-engineering", "anthropic/claude-fable-5-1", "max"],
       ["artistry", "anthropic/claude-fable-5-1", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6-astra", "max"],
-      ["deep-low", "chatgpt-subscription/gpt-6-sol-fast", "medium"],
+      ["deep-low", "chatgpt-subscription/gpt-5.6-sol-fast", "medium"],
       ["deep-high", "chatgpt-subscription/gpt-6-astra", "xhigh"],
       ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
       ["unspecified-low", "xiaomi/mimo-v2.6-pro", "max"],
@@ -493,7 +493,7 @@ describe("builtin category defaults", () => {
     expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
       architect: ["claude-fable-5-1"],
       ultrabrain: ["gpt-6-astra", "gpt-5.6-sol"],
-      "deep-low": ["gpt-6-sol-fast", "gpt-6-sol"],
+      "deep-low": ["gpt-5.6-sol-fast", "gpt-5.6-sol"],
       "deep-high": ["gpt-6-astra"],
     })
   })

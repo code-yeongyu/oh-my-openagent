@@ -48,7 +48,7 @@ function namedStep(jobName: string, name: string): Step {
 function mapOmoAiVersion(rootVersion: string): string {
   const prereleaseIndex = rootVersion.indexOf("-")
   return prereleaseIndex === -1
-    ? `${rootVersion}-1`
+    ? rootVersion
     : `${rootVersion.slice(0, prereleaseIndex)}-0.${rootVersion.slice(prereleaseIndex + 1)}`
 }
 
@@ -99,20 +99,23 @@ describe("omo-ai publish workflow shape", () => {
     }
   })
 
-  test("maps every root release to a unique ordered prerelease", () => {
+  test("maps prereleases onto the beta channel and a stable release onto latest as the same version", () => {
     const inputs = ["1.2.3-alpha", "1.2.3-beta.0", "1.2.3-beta.1", "1.2.3-rc.1", "1.2.3"]
-    const expected = ["1.2.3-0.alpha", "1.2.3-0.beta.0", "1.2.3-0.beta.1", "1.2.3-0.rc.1", "1.2.3-1"]
+    const expected = ["1.2.3-0.alpha", "1.2.3-0.beta.0", "1.2.3-0.beta.1", "1.2.3-0.rc.1", "1.2.3"]
     const outputs = inputs.map(mapOmoAiVersion)
     const metadataRun = namedStep("release-metadata", "Calculate omo-ai metadata").run ?? ""
 
     expect(outputs).toEqual(expected)
     expect(new Set(outputs).size).toBe(outputs.length)
-    expect(outputs.every((version) => version.includes("-"))).toBe(true)
+    expect(outputs.slice(0, -1).every((version) => version.includes("-"))).toBe(true)
+    expect(outputs.at(-1)).not.toContain("-")
     for (let index = 1; index < outputs.length; index += 1) {
       expect(Bun.semver.order(outputs[index - 1]!, outputs[index]!)).toBeLessThan(0)
     }
-    expect(metadataRun).toContain('OMO_AI_VERSION="${VERSION}-1"')
-    expect(metadataRun).toContain('OMO_AI_VERSION="${VERSION/-/-0.}"')
+    expect(metadataRun).toContain('OMO_AI_VERSION="${VERSION}"\n  OMO_AI_DIST_TAG=latest')
+    expect(metadataRun).toContain('OMO_AI_VERSION="${VERSION/-/-0.}"\n  OMO_AI_DIST_TAG=beta')
+    expect(metadataRun).toContain('echo "omo_ai_dist_tag=$OMO_AI_DIST_TAG" >> "$GITHUB_OUTPUT"')
+    expect(job("release-metadata").outputs?.omo_ai_dist_tag).toBe("${{ steps.omo-ai.outputs.omo_ai_dist_tag }}")
     expect(metadataRun).toContain("https://registry.npmjs.org/omo-ai/${OMO_AI_VERSION}")
     expect(job("release-metadata").outputs?.omo_ai_version).toBe("${{ steps.omo-ai.outputs.omo_ai_version }}")
     expect(job("release-metadata").outputs?.already_published).toBe("${{ steps.omo-ai.outputs.already_published }}")
@@ -154,12 +157,12 @@ describe("omo-ai publish workflow shape", () => {
     expect(originalStripIndex).toBe(verifyIndex + 1)
   })
 
-  test("publishes omo-ai through beta-only OIDC after every wrapper publish", () => {
+  test("publishes omo-ai through OIDC on its version-derived dist-tag after every wrapper publish", () => {
     const publishSteps = steps("publish-main")
     const originalStripIndex = publishSteps.findIndex((step) => step.name === "Strip token auth from .npmrc to force OIDC")
     const lastWrapperPublishIndex = publishSteps.findIndex((step) => step.name === "Publish lazycodex-ai")
     const dedicatedStripIndex = publishSteps.findIndex((step) => step.name === "Strip token auth before omo-ai publish")
-    const publishIndex = publishSteps.findIndex((step) => step.name === "Publish omo-ai (beta only)")
+    const publishIndex = publishSteps.findIndex((step) => step.name === "Publish omo-ai")
     const publish = publishSteps[publishIndex]!
     const dedicatedStrip = publishSteps[dedicatedStripIndex]!
 
@@ -169,8 +172,9 @@ describe("omo-ai publish workflow shape", () => {
     expect(dedicatedStrip.if).toBe("needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true")
     expect(publish.if).toBe("needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true")
     expect(publish["working-directory"]).toBe("packages/omo-native")
-    expect(publish.run).toContain("npm publish --ignore-scripts --access public --provenance --tag beta")
-    expect(publish.run, "omo-ai publish must hardcode --tag beta rather than DIST_TAG").not.toContain("$DIST_TAG")
+    expect(publish.run).toContain('npm publish --ignore-scripts --access public --provenance --tag "$OMO_AI_DIST_TAG"')
+    expect(publish.env?.OMO_AI_DIST_TAG).toBe("${{ needs.release-metadata.outputs.omo_ai_dist_tag }}")
+    expect(publish.run, "omo-ai publish must use its own channel, never the wrapper DIST_TAG").not.toContain("$DIST_TAG")
     expect(publish.env ?? {}).not.toHaveProperty("NODE_AUTH_TOKEN")
   })
 
@@ -184,17 +188,23 @@ describe("omo-ai publish workflow shape", () => {
       expect(step.if).toBe("inputs.lazycodex_only != true")
       expect(step.env?.OMO_AI_VERSION).toBe("${{ needs.release-metadata.outputs.omo_ai_version }}")
       expect(step.env?.ALREADY_PUBLISHED).toBe("${{ needs.release-metadata.outputs.already_published }}")
+      expect(step.env?.OMO_AI_DIST_TAG).toBe("${{ needs.release-metadata.outputs.omo_ai_dist_tag }}")
     }
 
     expect(namedStep("post-publish-verify", "Wait for omo-ai registry readiness").run).toContain("npm view omo-ai@$OMO_AI_VERSION version")
-    expect(namedStep("post-publish-verify", "Guard omo-ai dist-tags").run).toContain("0.0.0-beta.0")
+    expect(namedStep("post-publish-verify", "Wait for omo-ai registry readiness").run).toContain('"dist-tags.$OMO_AI_DIST_TAG"')
+    const guardRun = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+    expect(guardRun).toContain('"dist-tags.$OMO_AI_DIST_TAG"')
+    expect(guardRun).toContain('if [ "$OMO_AI_DIST_TAG" != "latest" ] && [ "$LATEST_VERSION" = "$OMO_AI_VERSION" ]; then')
+    expect(guardRun).not.toContain("0.0.0-beta.0")
     const liveRun = namedStep("post-publish-verify", "Verify omo-ai live install").run ?? ""
     expect(liveRun).toContain('npm i -g "omo-ai@$OMO_AI_VERSION"')
     expect(liveRun).toContain("lib/node_modules/omo-ai/package.json")
     expect(liveRun).toContain('"$EXACT_PREFIX/bin/omo" --version')
-    expect(liveRun).toContain("npm i -g omo-ai@beta")
-    expect(liveRun).toContain("npm i -g omo-ai")
-    expect(liveRun).toContain("ETARGET")
+    expect(liveRun).toContain("CHANNEL_SPEC=omo-ai\n")
+    expect(liveRun).toContain('CHANNEL_SPEC="omo-ai@$OMO_AI_DIST_TAG"')
+    expect(liveRun).toContain('npm i -g "$CHANNEL_SPEC"')
+    expect(liveRun).not.toContain("ETARGET")
   })
 
   test("keeps trusted publishing unconditional and delegates validated channel metadata", () => {
