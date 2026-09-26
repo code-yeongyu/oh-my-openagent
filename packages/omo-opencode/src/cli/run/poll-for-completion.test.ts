@@ -98,13 +98,21 @@ describe("pollForCompletion", () => {
     eventState.mainSessionIdle = true
     eventState.hasReceivedMeaningfulWork = true
     const abortController = new AbortController()
+    // Virtual clock: abort at virtual 50ms, inside the 60ms stabilization window,
+    // so host scheduling cannot let the window elapse before the abort lands.
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= 50) {
+        abortController.abort()
+      }
+    })
 
     //#when - abort after 50ms (within the 60ms stabilization period)
-    abortAfter(abortController, 50)
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
       minStabilizationMs: 60,
+      now: clock.now,
+      sleep: clock.sleep,
     })
 
     //#then - should be aborted, not completed (stabilization blocked completion check)
@@ -309,13 +317,21 @@ describe("pollForCompletion", () => {
     ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
       throw thrown
     })
+    // Virtual clock: a slow real first sleep must not let the safety abort win
+    // before the first status read.
+    const clock = createVirtualClock((elapsedMs) => {
+      if (elapsedMs >= 50) {
+        abortController.abort()
+      }
+    })
 
     //#when & then
-    abortAfter(abortController, 50)
     await expect(pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 5,
       requiredConsecutive: 1,
       minStabilizationMs: 10,
+      now: clock.now,
+      sleep: clock.sleep,
     })).rejects.toBe(thrown)
   })
 
