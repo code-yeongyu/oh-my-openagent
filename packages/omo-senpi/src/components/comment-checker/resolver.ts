@@ -3,7 +3,7 @@ import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { delimiter, isAbsolute, join } from "node:path"
 
-import { commentCheckerBinaryName, commentCheckerCacheDir } from "@oh-my-opencode/comment-checker-core"
+import { commentCheckerBinaryName, commentCheckerCacheDir, isCachedCommentCheckerCurrent } from "@oh-my-opencode/comment-checker-core"
 
 import { COMMENT_CHECKER_CACHE_DIR_NAME, COMMENT_CHECKER_ENV_KEY, COMMENT_CHECKER_PACKAGE_NAME } from "./constants"
 import type { SenpiCommentCheckerBinaryResolverOptions } from "./types"
@@ -32,8 +32,10 @@ export function resolveSenpiCommentCheckerBinary(options: SenpiCommentCheckerBin
   const fromPath = pathLookup(binaryName)
   if (fromPath) return fromPath
 
-  const cached = join(options.cacheDir ?? defaultCommentCheckerCacheDir(platform, env), binaryName)
-  return checkExists(cached) ? cached : null
+  const cacheDir = options.cacheDir ?? defaultCommentCheckerCacheDir(platform, env)
+  const cached = join(cacheDir, binaryName)
+  // An unrecorded or older checker in the shared slot is left for the downloader to replace (#8850).
+  return checkExists(cached) && isCachedCommentCheckerCurrent(cacheDir) ? cached : null
 }
 
 export function defaultCommentCheckerCacheDir(

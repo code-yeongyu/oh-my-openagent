@@ -147,5 +147,8 @@ export function resolveCommentCheckerReleaseAsset(
 ): CommentCheckerReleaseAsset | null;
 export function commentCheckerBinaryName(platform: string): string;
 export function commentCheckerCacheDir(input: CommentCheckerCacheDirInput): string;
+export const COMMENT_CHECKER_VERSION_MARKER: string;
+export function isCachedCommentCheckerCurrent(cacheDir: string, readFile?: (path: string) => string): boolean;
+export function recordCachedCommentCheckerRelease(cacheDir: string): void;
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null;
 export function runCommentChecker(input: RunCommentCheckerInput, options: RunCommentCheckerOptions): Promise<CheckResult>;
