@@ -20,6 +20,7 @@ export { resolveCommentCheckerBinary, runCommentChecker } from "./runner"
 export type {
   ApplyPatchAccumulator,
   ApplyPatchFileMetadata,
+  CheckFailure,
   CheckResult,
   CheckerEdit,
   CommentFilter,

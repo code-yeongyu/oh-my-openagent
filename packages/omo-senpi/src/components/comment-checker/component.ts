@@ -65,7 +65,7 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           },
         })
         const resolvedBinaryPath = await ensuring
-        if (resolvedBinaryPath === null) {
+        if (resolvedBinaryPath === null || inertForSession) {
           return undefined
         }
 
@@ -76,6 +76,16 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           const path = hookInput.tool_input.file_path
           if (typeof path !== "string" || !uniquePaths.includes(path)) continue
           const result = await check({ binaryPath: resolvedBinaryPath, hookInput })
+          if (result.failure !== undefined) {
+            // A checker that cannot start fails the same way on every edit; stop re-running it (#8850).
+            inertForSession = true
+            ctx.logger.warn("omo-senpi comment-checker could not run; component disabled for this session", {
+              binaryPath: resolvedBinaryPath,
+              exitCode: result.failure.exitCode,
+              stderr: result.failure.stderr,
+            })
+            break
+          }
           const message = normalizeFeedbackText(result.message)
           if (result.hasComments && message.length > 0) {
             reportedFilesThisTurn.add(path)

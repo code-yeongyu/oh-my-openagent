@@ -73,6 +73,12 @@ export interface HookInput {
 export interface CheckResult {
 	readonly hasComments: boolean;
 	readonly message: string;
+	readonly failure?: CheckFailure;
+}
+
+export interface CheckFailure {
+	readonly exitCode: number;
+	readonly stderr: string;
 }
 
 export type SpawnSignal = "SIGTERM" | "SIGKILL";
