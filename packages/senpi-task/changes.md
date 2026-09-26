@@ -1,18 +1,26 @@
-## Another session's reconcile no longer steals a live parent's daemon child between fallback rungs
+## Runtime fallback forgets the closed rung's daemon session before the next one opens
 
-`lifecycle/reconcile.ts` `hasForeignLiveOwner` decided a resident `host-session` record's owner only by
-`daemonAlive && sessionLive` (#8659). Runtime fallback (`manager.ts` `#tryRuntimeFallback`) closes the failed
-rung's session before the next rung's session opens, and that next child session runs the omo
-extension INSIDE the daemon, whose `session_start` reconciles the same project records. In that gap the
-parent's record names a closed session, so the child's pass treated it as an orphan: it claimed the
-record (`host_pid` became the daemon worker), reattached the closed rung's session path, and bumped
-`run_epoch`. The parent's real outcome was then dropped as stale, the task stayed `running`, and
-`omo -p` never exited (reproduced 2/2 live on a lapsed OpenCode Go key).
+`manager/manager.ts` `#tryRuntimeFallback` closes the failed rung's child and hands the task to the next
+rung, but the record kept `runner_kind: "host-session"` and the CLOSED rung's `host_session` until the
+next rung's spawn stamped its own. The next rung's child session runs the omo extension inside the
+daemon, and its `session_start` reconciles the shared project records: since #8659 a resident
+host-session record whose session is gone is an orphan, so that pass claimed the live parent's task,
+reattached the closed session and moved `run_epoch`. The parent's real outcome was then dropped, the
+task stayed `running`, and `omo -p` never exited (reproduced 2/2 live on a lapsed OpenCode Go key).
 
-A host-session record of ANOTHER parent session is now foreign-owned while its `host_pid` is a live
-process other than this one, before the session probe is asked; its own parent session keeps the
-#8659 session-liveness decision, and a dead owner is still reclaimed. Tests:
-`host-session-owner-alive.test.ts`.
+The fallback record now drops `runner_kind` and `host_session` together with the epoch bump. Until the
+next spawn stamps its session, the record has no daemon session to judge by and falls back to the pid
+fence for its live owner; #8659's session-liveness rule is unchanged for every recorded session.
+`lifecycle/reconcile.ts`: a process record with no recorded pid now goes through `reviveClaimed`, the
+revival the daemon-session branch uses, instead of being marked lost: it resumes its newest transcript
+(or its v1 spawn spec), and a transient respawn failure parks it `rpc_detached` for a later revival. A
+parent that dies in that gap (the next rung can wait for capacity) is therefore recovered by the next
+sweep. `reattach_on_reconcile: false` keeps the old lost outcome. `manager/manager-reattach.ts`: a
+revived daemon child's record is stamped with its session (`recordSpawnedRunner`), as a fresh spawn is. Tests: `runtime-fallback-host-session.test.ts` (between rungs the record names
+no session, a foreign daemon-side reconcile defers it and respawns nothing, then the next rung's
+session is recorded) `reconcile.test.ts` (a dead-owner record in that gap is respawned, and a transient respawn failure parks
+it instead of losing it), and `manager-respawn-cleanup.test.ts` (a revived daemon child names its
+session).
 
 ## Task-category coverage for omo doctor and omo setup (#8858)
 

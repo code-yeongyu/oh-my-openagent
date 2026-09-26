@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-**A delegated task no longer hangs forever when its first model fails.** When a subagent running on the shared daemon (the default on macOS and Linux) failed on one model and moved to the next, the new model's session could briefly mistake the task for an abandoned one and take it over. The real result was then ignored, the task stayed `running`, and `omo -p` never exited. A task whose owning process is still alive is now left to that process.
+**A delegated task no longer hangs forever when its first model fails.** When a subagent running on the shared daemon (the default on macOS and Linux) failed on one model and moved to the next, the new model's session could briefly mistake the task for an abandoned one and take it over. The real result was then ignored, the task stayed `running`, and `omo -p` never exited. The task no longer points at the closed session while it switches models.
 
 ## [5.0.0-beta.90] - 2026-09-24
 
