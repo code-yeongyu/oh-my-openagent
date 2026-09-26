@@ -6,14 +6,15 @@ import { needsCrashSalvage, salvageCrashedIsolation, sweepIsolations } from "../
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { isFallbackHandoff } from "./fallback-handoff"
 import { isHostSessionRecord } from "./host-session"
 import { reconcileHostSessionOrphan } from "./host-session-revive"
+import { reviveClaimed } from "./reconcile-reclamation"
 import { getLifecycleReattachPorts } from "./port"
 import { beginLocalReclamation, reconcileScopedRevival } from "./reconcile-revival"
 import { reclaimOrphanedResident } from "./residency"
-import { detachTerminalResident } from "./reconcile-terminal"
 import { newestSessionPath } from "./session-path"
-import { terminateClaimedPid } from "./reconcile-terminal"
+import { reconcileLegacyTerminal, terminateClaimedPid } from "./reconcile-terminal"
 import type { ReconcileOutcome, ReconcileResult } from "./types"
 
 const HEARTBEAT_FRESH_MS = 30_000
@@ -135,6 +136,11 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 
   const pid = record.pid
   if (pid === undefined) {
+    // A runtime-fallback handoff whose owner died is revived onto its selected next model; any other
+    // pid-less child (queued, or a workpool worker that may never be replayed) has nothing to revive.
+    if (isFallbackHandoff(record) && context.config.reattach_on_reconcile !== false) {
+      return reviveClaimed(context, record, "rpc_detached", undefined)
+    }
     await markLost(context, record.task_id, "rpc task had no recorded pid")
     return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
   }
@@ -175,23 +181,6 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
   }
   return reattachLegacyRecord(context, context.store.load(record.task_id) ?? record, sessionPath)
-}
-
-async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (record.status === "lost" || record.status === "cancelled") {
-    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
-  }
-  if (record.residency_state !== "resident") return { task_id: record.task_id, kind: "resumed" }
-  if (newestSessionPath(context, record.task_id) === undefined) {
-    await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return {
-      task_id: record.task_id,
-      kind: "resumed",
-      reason: "terminal without transcript disposed; persisted result preserved",
-    }
-  }
-  return detachTerminalResident(context, record)
 }
 
 async function reattachLegacyRecord(

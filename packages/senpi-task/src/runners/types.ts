@@ -83,6 +83,9 @@ export type RpcTerminalAssistantMessage = {
 
 export type RpcChildHandle = ChildHandle & {
   readonly spawnSpec?: RpcSpawnSpec
+  // The daemon's answer to a resume open: true only when the session was still live there (mid-turn,
+  // nothing to replay). A session reopened from its JSONL is false and needs its turn continued.
+  readonly rejoinedLiveSession?: boolean
   terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
   wasAbortedByUser?(): boolean
   switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>

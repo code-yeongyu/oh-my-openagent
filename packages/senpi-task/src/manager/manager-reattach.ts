@@ -4,7 +4,7 @@ import type { ReattachResult } from "../lifecycle/port"
 import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { discardManagedHandle, type ManagedChildHandle } from "./child-handle"
-import { isTerminalRecord, nowIso } from "./manager-helpers"
+import { isTerminalRecord, nowIso, recordSpawnedRunner } from "./manager-helpers"
 
 /**
  * Bind a freshly respawned handle back onto its record: verify this host still holds the claim,
@@ -50,12 +50,14 @@ export async function reattachManagedTask(input: {
       }
       return { ok: true }
     }
-    const { error_message: _error, final_response: _final, killed: _killed, ...rest } = fresh
+    const { error_message: _error, final_response: _final, killed: _killed, fallback_handoff_epoch: _handoff, ...rest } = fresh
     const epoch = fresh.notification.run_epoch + 1
     const timestamp = nowIso(input.now)
     const sessionId = input.handle.sessionId
+    // A revived daemon child is identified by its session, exactly as a fresh spawn stamps it.
+    const withRunner = recordSpawnedRunner(rest, input.handle.kind, input.handle.hostSession) ?? rest
     const reattached: TaskRecord = {
-      ...rest,
+      ...withRunner,
       status: "running",
       started_at: fresh.started_at ?? timestamp,
       updated_at: timestamp,

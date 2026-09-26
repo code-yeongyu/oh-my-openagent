@@ -299,6 +299,11 @@ export type TaskRecord = TaskRecordInput & {
   readonly runner_kind?: RunnerKind
   // Host session identity when runner_kind is "host-session". Absent otherwise.
   readonly host_session?: HostSessionIdentity
+  // Runtime fallback's handoff: the run_epoch it handed the task to, written when the failed rung is
+  // closed and cleared when the next rung's spawn is recorded. While it equals notification.run_epoch
+  // the task sits between rungs with no child of its own, and a revival must launch the selected next
+  // model fresh instead of reopening the failed rung's transcript.
+  readonly fallback_handoff_epoch?: number
 }
 
 export type TaskTransition =

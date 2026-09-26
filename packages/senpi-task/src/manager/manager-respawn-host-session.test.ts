@@ -5,9 +5,15 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, type HostSessionIdentity, type TaskRecord } from "../state"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
+import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import { respawnManagedTask } from "./manager-respawn"
 
-afterEach(cleanupProjects)
+const harness = hostRunnerHarness()
+
+afterEach(async () => {
+  await harness.release()
+  cleanupProjects()
+})
 
 type HostRespawnCalls = {
   readonly specs: RpcRunnerSpec[]
@@ -32,7 +38,8 @@ function hostRunner(calls: HostRespawnCalls, attached: boolean) {
       const handle = {
         ...base,
         kind: "host-session" as const,
-        attached,
+        attached: true,
+        rejoinedLiveSession: attached,
         pid: undefined,
         subscribe: () => () => undefined,
         waitForIdle: () => Promise.resolve(),
@@ -132,6 +139,34 @@ describe("respawn of a daemon-hosted child", () => {
     expect(result.ok).toBe(true)
     expect(calls.specs.map((spec) => spec.resumeSessionPath)).toEqual([transcript])
     expect(calls.followUps).toHaveLength(1)
+  })
+
+  test("#given the real daemon runner and a session the daemon no longer holds #when respawn reopens it #then the interrupted turn is continued", async () => {
+    // given
+    const project = tempProject()
+    const transcript = interruptedTranscript(project)
+    const host = await harness.fakeHost()
+    const identity: HostSessionIdentity = {
+      socket: host.socketPath,
+      routing_id: "routing-evicted",
+      session_path: transcript,
+      instance_id: "fake-instance",
+    }
+
+    // when
+    const result = await respawnManagedTask({
+      beforeLaunch: () => undefined,
+      record: hostRecord(project, identity),
+      sessionPath: transcript,
+      stateDir: project,
+      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      rpcRunner: harness.runnerOver(host),
+    })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(host.commands.filter((command) => command.type === "prompt")).toHaveLength(1)
+    if (result.ok) await result.handle.dispose()
   })
 
   test("#given a host that is draining an old generation #when open_session reports session_path_in_use #then respawn defers as host_draining with the advertised delay", async () => {

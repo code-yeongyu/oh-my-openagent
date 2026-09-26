@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import { endFallbackHandoff, handOffToNextRung, isFallbackHandoff } from "../lifecycle/fallback-handoff"
 import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
 import type { RunnerFailureReason } from "../runners/in-process/child-handle"
@@ -891,6 +892,7 @@ class TaskManagerImpl implements TaskManager {
       ],
       updated_at: nowIso(this.#now),
       notification: { ...record.notification, run_epoch: nextEpoch },
+      ...(isFallbackHandoff(record) ? { fallback_handoff_epoch: nextEpoch } : {}),
     }
     this.#options.store.replace(nextRecord)
     this.#options.store.appendEvent(record.task_id, {
@@ -997,7 +999,8 @@ class TaskManagerImpl implements TaskManager {
   #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
     const current = this.#tryLoad(taskId)
     if (current === null || isTerminalRecord(current)) return
-    const withPid = recordSpawnedPid(current, handle.pid) ?? current
+    const spawned = endFallbackHandoff(current)
+    const withPid = recordSpawnedPid(spawned, handle.pid) ?? spawned
     const withRunner = recordSpawnedRunner(withPid, handle.kind, handle.hostSession) ?? withPid
     const withSession = recordSpawnedChildSession(withRunner, handle.sessionId) ?? withRunner
     const spawnSpec = handle.spawnSpec
@@ -1070,6 +1073,20 @@ class TaskManagerImpl implements TaskManager {
     const managedSpec = live.managedSpec
     const runner = live.runner
 
+    // Committed BEFORE the failed rung's teardown can yield: while the daemon closes that session, a
+    // reconciler must already see a handoff owned by this live pid, never a vanished session it could
+    // reclaim as an orphan (the 2026-09-26 `omo -p` hang). Fenced on this outcome's epoch and owner.
+    const handoff: { record?: TaskRecord } = {}
+    this.#options.store.mutate(input.taskId, (fresh) => {
+      if (fresh.notification.run_epoch !== input.epoch || fresh.host_pid !== record.host_pid) return fresh
+      handoff.record = handOffToNextRung(fresh, { model: nextModel, remaining: candidates.remaining.slice(1), timestamp: input.timestamp })
+      return handoff.record
+    })
+    const nextRecord = handoff.record
+    if (nextRecord === undefined) return false
+    const remainingModels = nextRecord.fallback_models ?? []
+    const nextEpoch = nextRecord.notification.run_epoch
+
     await (this.#options.destruction ?? NOOP_DESTRUCTION)
       .destroyResidentTask(input.taskId, "fallback_handoff")
 
@@ -1077,26 +1094,6 @@ class TaskManagerImpl implements TaskManager {
     this.#live.delete(input.taskId)
     this.#releaseSlot(input.taskId, input.model, input.epoch)
 
-    const remainingModels = candidates.remaining.slice(1)
-    const fallbackAttempts = [
-      ...(record.fallback_attempts
-        ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
-      nextModel,
-    ]
-    const nextEpoch = record.notification.run_epoch + 1
-    const nextRecord: TaskRecord = {
-      ...record,
-      model: nextModel.display,
-      resolved_model: nextModel,
-      fallback_models: remainingModels,
-      fallback_attempts: fallbackAttempts,
-      updated_at: input.timestamp,
-      notification: {
-        ...record.notification,
-        run_epoch: nextEpoch,
-      },
-    }
-    this.#options.store.replace(nextRecord)
     this.#options.store.appendEvent(input.taskId, {
       type: "task_model_fallback",
       payload: {
