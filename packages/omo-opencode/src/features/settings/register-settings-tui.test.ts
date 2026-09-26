@@ -28,6 +28,17 @@ function collectContents(node: TestNode, out: string[] = []): string[] {
   return out
 }
 
+function findById(node: TestNode, id: string): TestNode | undefined {
+  if (node.props.id === id) return node
+  for (const child of node.children) {
+    if (child !== null && typeof child === "object" && "props" in child) {
+      const found = findById(child as TestNode, id)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
 function createHarness() {
   const layers: TestLayer[] = []
   const slashCommands: Array<{ onSelect?: () => void }> = []
@@ -77,7 +88,7 @@ function createHarness() {
         borderSubtle: "#444",
       },
     },
-    renderer: { height: 40, requestRender: () => undefined },
+    renderer: { height: 40, requestRender: () => undefined, getSelection: () => null },
     lifecycle: { onDispose: () => () => undefined },
   })
   const solid = unsafeTestValue({
@@ -134,6 +145,21 @@ describe("registerSettingsTui", () => {
 
     harness.slashCommands[0]?.onSelect?.()
     bindingFor(harness.layers, "enter,return").cmd()
+
+    const contents = collectContents(harness.getRoot() as TestNode)
+    expect(contents.some((line) => line.includes("apply changes (1)"))).toBe(true)
+    expect(contents.some((line) => line.includes("pending: true"))).toBe(true)
+  })
+
+  it("#given a rendered setting card #when its mouse-up handler fires #then the setting toggles", async () => {
+    writeConfig(`{ "catalog": { "enabled": false } }`)
+    const harness = createHarness()
+    await registerSettingsTui(harness.api, harness.solid)
+
+    harness.slashCommands[0]?.onSelect?.()
+    const frame = findById(harness.getRoot() as TestNode, "catalog.enabled")
+    expect(typeof frame?.props.onMouseUp).toBe("function")
+    ;(frame?.props.onMouseUp as () => void)()
 
     const contents = collectContents(harness.getRoot() as TestNode)
     expect(contents.some((line) => line.includes("apply changes (1)"))).toBe(true)

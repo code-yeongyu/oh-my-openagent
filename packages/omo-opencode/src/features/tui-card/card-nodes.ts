@@ -41,11 +41,17 @@ function applyStyle<Node>(
   solid.setProp(refs.body, "fg", style.bodyFg)
 }
 
+export type CardNodeHandlers = {
+  readonly onHover?: () => void
+  readonly onActivate?: () => void
+}
+
 export function buildCardNode<Node>(
   solid: SolidRuntime<Node>,
   card: CardDescriptor,
   focused: boolean,
   theme: CardTheme,
+  handlers: CardNodeHandlers = {},
 ): CardNodeRefs<Node> {
   const style = cardStyle(card, focused, theme)
   const title = createTextNode(solid, style.titleText, {
@@ -79,6 +85,13 @@ export function buildCardNode<Node>(
     },
     [headerRow, body],
   )
+  if (handlers.onHover !== undefined) {
+    solid.setProp(frame, "onMouseOver", handlers.onHover)
+    solid.setProp(frame, "onMouseDown", handlers.onHover)
+  }
+  if (handlers.onActivate !== undefined) {
+    solid.setProp(frame, "onMouseUp", handlers.onActivate)
+  }
   const root =
     card.indent > 0
       ? createBoxNode(solid, { marginLeft: card.indent * 2 }, [frame])
@@ -96,6 +109,8 @@ export type CardListNodeInput = {
   readonly focusedIndex: number
   readonly theme: CardTheme
   readonly scrollRows: number
+  readonly onCardHover?: (index: number) => void
+  readonly onCardActivate?: (index: number) => void
 }
 
 export function buildCardListNode<Node>(
@@ -124,7 +139,11 @@ export function buildCardListNode<Node>(
     }
     for (const card of group.cards) {
       const focused = cardIndex === input.focusedIndex
-      const refs = buildCardNode(solid, card, focused, input.theme)
+      const index = cardIndex
+      const refs = buildCardNode(solid, card, focused, input.theme, {
+        onHover: input.onCardHover === undefined ? undefined : () => input.onCardHover?.(index),
+        onActivate: input.onCardActivate === undefined ? undefined : () => input.onCardActivate?.(index),
+      })
       cards.push(refs)
       cardChildren.push(refs.root)
       cardIndex += 1

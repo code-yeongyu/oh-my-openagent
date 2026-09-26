@@ -173,6 +173,8 @@ export async function registerSettingsTui<Node>(
       focusedIndex: state.focus.current(),
       theme: theme(),
       scrollRows: scrollRows(),
+      onCardHover: focusCardAt,
+      onCardActivate: activateCardAt,
     })
 
   const followFocus = (): void => {
@@ -225,12 +227,9 @@ export async function registerSettingsTui<Node>(
     requestRender()
   }
 
-  const moveFocusBy = (delta: number): void => {
-    if (!state.open || state.nodeRefs === null) return
-    const previous = state.focus.current()
-    if (!state.focus.move(delta)) return
-    const next = state.focus.current()
-    const refs = state.nodeRefs.cards
+  const restyleFocus = (previous: number, next: number): void => {
+    const refs = state.nodeRefs?.cards
+    if (refs === undefined) return
     const previousRef = refs[previous]
     const nextRef = refs[next]
     if (previousRef !== undefined) {
@@ -239,6 +238,23 @@ export async function registerSettingsTui<Node>(
     if (nextRef !== undefined) {
       restyleCard(solid, nextRef, state.visible[next], true, theme())
     }
+  }
+
+  const focusCardAt = (index: number): void => {
+    if (!state.open || state.nodeRefs === null) return
+    const previous = state.focus.current()
+    if (previous === index) return
+    state.focus.seek(index)
+    restyleFocus(previous, index)
+    followFocus()
+    requestRender()
+  }
+
+  const moveFocusBy = (delta: number): void => {
+    if (!state.open || state.nodeRefs === null) return
+    const previous = state.focus.current()
+    if (!state.focus.move(delta)) return
+    restyleFocus(previous, state.focus.current())
     followFocus()
     requestRender()
   }
@@ -385,6 +401,13 @@ export async function registerSettingsTui<Node>(
       return
     }
     openNumberPrompt(definition)
+  }
+
+  const activateCardAt = (index: number): void => {
+    if (!state.open) return
+    if (api.renderer.getSelection()?.getSelectedText()) return
+    state.focus.seek(index)
+    activate()
   }
 
   const handleFilterChar = (char: string): void => {
