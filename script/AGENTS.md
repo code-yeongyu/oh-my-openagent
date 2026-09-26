@@ -46,7 +46,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 
 ## TESTS (61 `*.test.ts`)
 
-Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `publish-lazycodex-workflow.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
+Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
 
 | File | Invariant |
 |------|-----------|

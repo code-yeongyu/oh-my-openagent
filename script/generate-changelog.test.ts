@@ -25,6 +25,28 @@ describe("selectPreviousReleaseTag", () => {
     // then
     expect(previous).toBe("v5.0.0")
   })
+
+  test("#given a first stable target #when only its own prereleases and an older stable precede it #then its latest prerelease is selected", () => {
+    // given
+    const tags = ["v5.1.0-beta.1", "v5.0.0-beta.90", "v5.0.0-beta.89", "v4.19.4", "v4.19.3"]
+
+    // when
+    const previous = selectPreviousReleaseTag("5.0.0", tags)
+
+    // then
+    expect(previous).toBe("v5.0.0-beta.90")
+  })
+
+  test("#given a stable target #when another version's prerelease is the newest lower release #then that prerelease is not selected", () => {
+    // given
+    const tags = ["v5.0.1-beta.3", "v5.0.0", "v5.0.0-beta.90"]
+
+    // when
+    const previous = selectPreviousReleaseTag("5.1.0", tags)
+
+    // then
+    expect(previous).toBe("v5.0.0")
+  })
 })
 
 describe("isExcludedReleaseNoteSubject", () => {

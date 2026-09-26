@@ -10,55 +10,35 @@
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** спонсирует OmO. Это OpenAI-совместимый шлюз, который объединяет множество провайдеров моделей под одним API. Спасибо за поддержку open source. |
 > | :-----| :----- |
 
-> [!NOTE]
-> **Рефакторинг в сторону мульти-harness агентной ОС**
->
-> Мы перестраиваем кодовую базу для поддержки нескольких agent harness (OpenCode, Codex, Pi, Claude Code и другие). Если вы хотите внести вклад, пожалуйста, ознакомьтесь с [ROADMAP](./ROADMAP.md) сначала. PR, связанные с ROADMAP, должны использовать метку `ROADMAP`.
-
 
 > [!NOTE]
 >
 > [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
 >
-> > **OmO поддерживается Jobdori — ИИ-ассистентом, показанным выше. Познакомьтесь со своим Jobdori — Dori. <br />Присоединяйтесь к листу ожидания [здесь](https://sisyphuslabs.ai).**
+> > **OmO поддерживается Jobdori, ИИ-ассистентом, показанным выше. Познакомьтесь со своим Jobdori, Dori. <br />Присоединяйтесь к листу ожидания [здесь](https://sisyphuslabs.ai).**
 
 > [!TIP] Будьте с нами!
 >
-> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | Вступайте в наш [Discord](https://discord.gg/PUwSMR9XNk), чтобы общаться с контрибьюторами и пользователями `oh-my-openagent`. |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | Вступайте в наш [Discord](https://discord.gg/PUwSMR9XNk), чтобы общаться с контрибьюторами и пользователями OmO. |
 > | :-----| :----- |
-> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | Обновления `oh-my-openagent` раньше публиковались на моём аккаунте X. <br /> После ошибочной блокировки [@justsisyphus](https://x.com/justsisyphus) публикует обновления вместо меня. |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | Обновления OmO раньше публиковались на моём аккаунте X. <br /> После ошибочной блокировки [@justsisyphus](https://x.com/justsisyphus) публикует обновления вместо меня. |
 > | [<img alt="GitHub Follow" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | Подпишитесь на [@code-yeongyu](https://github.com/code-yeongyu) на GitHub, чтобы следить за другими проектами. |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
 
-<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-icon-light.svg" alt="OmO" width="200" /></a>
+<a href="https://omo.dev"><img src="./.github/assets/omo-icon-light.svg" alt="OmO" width="200" /></a>
 
-[![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
+# OmO
 
-[![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
-
-</div>
-
-> Это oh-my-openagent в режиме Team Mode. С Kimi K3 и GPT-5.6 Sol.
-
-> Anthropic [**заблокировал OpenCode из-за нас.**](https://x.com/thdxr/status/2010149530486911014) **Да, это правда.**
-> Они хотят держать вас в замкнутой системе. Claude Code — красивая тюрьма, но всё равно тюрьма.
->
-> Не нужно платить $200 за 2 часа работы.
-> Будущее — не в выборе одного победителя, а в оркестровке всех. Модели дешевеют каждый месяц. Умнеют каждый месяц. Ни один провайдер не будет доминировать. Мы строим под этот открытый рынок, а не под их огороженные сады.
-
-<div align="center">
+**Your tool for real work. But it's an agent.**
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
-[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/omo-ai)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
-[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-openagent?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
 [![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md) | [Русский](README.ru.md)
@@ -67,384 +47,85 @@
 
 <!-- </CENTERED SECTION FOR GITHUB DISPLAY> -->
 
-## Отзывы
-
-> «Из-за него я отменил подписку на Cursor. В опенсорс-сообществе происходит что-то невероятное.» — [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
-
-> «Если Claude Code делает за 7 дней то, на что у человека уходит 3 месяца, Sisyphus справляется за 1 час. Он просто работает, пока задача не выполнена. Это дисциплинированный агент.» <br/>— B, исследователь в области квантовых финансов
-
-> «За один день устранил 8000 предупреждений eslint с помощью Oh My Opencode.» <br/>— [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
-
-> «За ночь конвертировал приложение на tauri в 45k строк в веб-SaaS с помощью Ohmyopencode и ralph loop. Начал с промпта «проинтервьюируй меня», попросил оценки и рекомендации по вопросам. Было удивительно наблюдать за работой и утром проснуться с почти рабочим сайтом!» — [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
-
-> «Используйте oh-my-opencode — вы не захотите возвращаться назад.» <br/>— [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
-
-> «Пока не могу точно объяснить, почему это так круто, но опыт разработки вышел на совершенно другой уровень.» — [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
-
-> «Экспериментирую с open code, oh my opencode и supermemory этим выходным, чтобы собрать нечто среднее между Minecraft и souls-like.» «Попросил добавить анимации приседания, пока хожу на обеденную прогулку. [Видео]» — [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
-
-> «Ребята, вам нужно включить это в ядро и нанять его. Серьёзно. Это очень, очень, очень хорошо.» <br/>— Henning Kilset
-
-> «Наймите @yeon_gyu_kim, если сможете его уговорить, этот парень революционизировал opencode.» <br/>— [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
-
-> «Oh My OpenCode — это что-то с чем-то» — [YouTube — Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
-
-------
-
-# Oh My OpenAgent
-
-Вы жонглируете Claude Code, Codex, случайными OSS-моделями. Настраиваете рабочие процессы. Дебажите агентов.
-
-Мы уже проделали эту работу. Протестировали всё. Оставили только то, что реально работает.
-
-Установите oh-my-openagent. Введите `ultrawork`. Готово.
+OmO это одна команда `omo`, которая превращает ваши токены в готовую работу: исследование по десяти тысячам источников, презентацию, которую действительно понимают, бэкенды, фронтенды, код. Она работает на senpi, нашем форке [pi](https://github.com/badlogic/pi-mono), и всё описанное ниже уже встроено.
 
 ## Установка
 
-### Для людей
-
-Скопируйте и вставьте этот промпт в ваш LLM-агент (Claude Code, AmpCode, Cursor и т.д.):
-
-```
-Install and configure oh-my-openagent by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
-```
-
-Или прочитайте [руководство по установке](docs/guide/installation.md), но серьёзно — пусть агент сделает это за вас. Люди ошибаются в конфигах.
-
-### Для LLM-агентов
-
-Загрузите руководство по установке и следуйте ему:
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
+bun add -g omo-ai
+omo
 ```
 
-**Примечание**: Опубликованное имя npm-пакета и CLI-бинарника по-прежнему `oh-my-opencode` (в переходный период пакет также дублируется под именем `oh-my-openagent`). Внутри `opencode.json` слой совместимости теперь предпочитает точку входа плагина `oh-my-openagent`, в то время как устаревшие записи `oh-my-opencode` всё ещё загружаются с предупреждением. Рабочая конфигурация — это `~/.omo/omo.jsonc` плюс проектные `.omo/omo.jsonc`, найденные при подъёме по дереву каталогов. Устаревшие файлы `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` импортируются движком миграции один раз и после этого не читаются.
+Нет bun? Подойдёт и `npm i -g omo-ai`. Пакет называется `omo-ai`, а пакет `omo` в npm не имеет к нам отношения.
 
-Рекомендуемый вызов через `bunx`/`npx` — `oh-my-openagent install` (или исходный `oh-my-opencode install`). После установки короткая команда — `omo-agent-toolkit`. Бинарник `omo` удалён из этих пакетов в текущем мажорном релизе; теперь это имя принадлежит редакции OmO Native, которая ставится через `bun add -g omo-ai`. **Не** используйте `bunx omo` или `npx omo`: `omo` в npm — это другой, не связанный с нами пакет другого автора, и эти команды попадут именно в него. Пакет редакции OmO Native называется `omo-ai`. `lazycodex-ai` — это узкоспециализированный Node/npm-пакет установщика: `npx lazycodex-ai install` напрямую запускает установщик Codex Light. Это не имя Codex marketplace (репозиторий marketplace — `code-yeongyu/lazycodex`). Codex видит marketplace `sisyphuslabs` и плагин `omo`, включённый как `omo@sisyphuslabs`.
+Откройте проект, запустите `omo` и опишите задачу. На этом настройка закончена.
 
-Анонимная телеметрия включена по умолчанию для подсчёта активных установок (DAU/WAU/MAU). Не более одного события на машину за UTC-сутки, использует хешированный идентификатор установки, никогда не использует исходное имя хоста, и не создаёт PostHog person profile. Можно отключить через `OMO_SEND_ANONYMOUS_TELEMETRY=0` или `OMO_DISABLE_POSTHOG=1`. См. [Политику конфиденциальности](docs/legal/privacy-policy.md) и [Условия обслуживания](docs/legal/terms-of-service.md).
+Переходите с OpenCode-версии или с LazyCodex? Один раз запустите `omo setup`. Команда перенесёт ключи провайдеров, пользовательских провайдеров, MCP-серверы, навыки и выбранные модели.
 
-**Ultimate, Light и OmO Native:** oh-my-openagent поставляется в трёх редакциях одного продукта: два плагина, которые загружаются в уже используемый вами хост, плюс одна standalone-редакция. **Ultimate** (`bunx oh-my-openagent install` или `--platform=opencode`, по умолчанию) — полнофункциональная редакция поверх OpenCode: 11 агентов, 54+ хука, Team Mode, 4 встроенных MCP (websearch, context7, grep_app, lsp), все слэш-команды, режимы IntentGate. **Light** (`npx lazycodex-ai install`) — портируемые компоненты omo для системы плагинов OpenAI Codex CLI: ядро (`rules`, `comment-checker`, `git-bash`, `lsp`, `ultrawork`, `ulw-loop`, `ulw-execute-continuation`, `telemetry`), а также `teammode` и вспомогательные компоненты (`bootstrap`, `lcx` и другие); TOML-файлы Codex-агентов устанавливаются в `~/.codex/agents/`. Чтобы установить обе плагинные редакции одной командой, используйте `--platform=both`. **OmO Native (standalone)** — команда `omo` со встроенным расширением OMO: `bun add -g omo-ai`, затем `omo`. Она ставится из `omo-ai` и не загружается в OpenCode или Codex. Переход с редакции для OpenCode описан в [Migrating from OpenCode](docs/guide/migrating-from-opencode.md). Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+Затем `omo doctor` покажет, какие категории задач могут выполнять ваши провайдеры и что осталось от старой установки. Подробная инструкция: [Миграция с OpenCode](docs/guide/migrating-from-opencode.md).
 
-------
+`omo update` обновляет установку на месте. `bun remove -g omo-ai` (или `npm uninstall -g omo-ai`) удаляет её.
 
-## Пропустите этот README
+## Почему OmO
 
-Мы вышли за пределы эпохи чтения документации. Просто вставьте это в своего агента:
+**ultrawork.** Не нужно ничего изучать. Если задача кажется сложной, добавьте в промпт `ultrawork` (или `ulw`).
 
-```
-Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/README.md
-```
+Агент прочитает кодовую базу, прежде чем менять хоть строку, составит план и проверит каждый шаг, прежде чем идти дальше. Он проверит результат в реальной среде и остановится, когда всё готово.
 
+**Сотни агентов, одно ключевое слово.** Напишите `mass ulw`, и вся задача превратится в граф агентов: глубокое исследование по тысячам источников, полный пайплайн машинного обучения, миграция, за которую никто не хочет браться.
 
-## Ключевые возможности
+Каждая часть выполняется параллельно на подходящей для неё модели и проверяется, прежде чем что-либо будет считаться готовым.
 
-### 🪄 `ultrawork`
+**Kibitzer. Агент не забывает ни вас, ни вашу работу.** Память хранится в git-репозитории из markdown-файлов.
 
-Вы правда это читаете? Поразительно.
+Небольшая дешёвая модель работает рядом с дорогим основным агентом, читает, что вы делали раньше, и подсказывает ему, прежде чем он повторит ошибку. Вам больше не придётся объяснять всё заново.
 
-Установите. Введите `ultrawork` (или `ulw`). Готово.
+**Смешивайте модели, не задумываясь.** Используйте любимые передовые модели вместе с дешёвыми. Просто войдите: `/login` поддерживает подписки Claude, ChatGPT, Kimi и GLM.
 
-Всё описанное ниже, каждая функция, каждая оптимизация — вам не нужно это знать. Оно просто работает.
+У каждой модели есть системный промпт, настроенный специально под неё, так что вы никогда не выберете не ту.
 
-Даже только со следующими подписками `ultrawork` работает отлично (проект не аффилирован с ними, это личные рекомендации):
+**Качественные навыки, и только нужные.** Ваша модель умна, но всё ещё мало знает о решении реальных задач.
 
-- [Подписка ChatGPT ($20)](https://chatgpt.com/)
-- [Подписка Kimi Code ($19)](https://www.kimi.com/code)
-- [Тариф GLM Coding ($10)](https://z.ai/subscribe)
-- Если у вас есть доступ к оплате за токены, использование моделей Kimi и GLM обойдётся недорого.
+OmO поставляет недостающие знания в виде навыков, включая работу с браузером, и загружает только то, что нужно для задачи.
 
-|     | Функция                                                  | Editions | Что делает                                                                                                                                                                                                                       |
-| --- | -------------------------------------------------------- | :------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🤖   | **Дисциплинированные агенты**                            | Ultimate | Главный агент оркестрирует консультацию архитектора, Librarian, Explore и воркеров категорий. Полноценная AI-команда разработки в параллельном режиме.                                                                          |
-| 🧩   | **Codex CLI Light Edition**                              | Light    | Портируемые компоненты omo в OpenAI Codex CLI (rules, comment-checker, git-bash, LSP, ultrawork, ulw-loop, ulw-execute continuation, telemetry, teammode и другие). Установка: `npx lazycodex-ai install`.                                                                |
-| 👥   | **Team Mode** (opt-in)                                   | Ultimate | Лид-агент + до 8 параллельных участников, визуализация в tmux в реальном времени, выделенные инструменты `team_*`. Питает `hyperplan` (5 враждебных критиков) и `security-research` (3 охотника + 2 PoC-инженера). [Документация →](docs/guide/team-mode.md) |
-| ⚡   | **`ultrawork` / `ulw`**                                  | Both     | Одно слово. Все агенты (Ultimate) или Codex-компонент `ultrawork` (Light) активируются. Не останавливается, пока задача не выполнена.                                                                                            |
-| 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Распознаёт ключевые слова `ultrawork`/`ulw`, `team` и `hyperplan` (семантической классификации намерения не делает). (Light распознаёт только ключевые слова `ulw` / `ultrawork`.)                                                   |
-| 🔗   | **Инструмент правок на основе хэш-якорей**               | Ultimate | Тегирование чтения/правок Hashline (`LINE#ID`). Включается вручную: `hashline_edit: true` в `~/.omo/omo.jsonc`. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex использует собственный `apply_patch`.) |
-| 🛠️   | **LSP + AST-Grep**                                       | Both     | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. LSP предоставляется через MCP, AST-Grep — через общий skill `ast-grep` и `sg`.                            |
-| 🧠   | **Фоновые агенты**                                       | Ultimate | Запускайте 5+ специалистов параллельно. Контекст остаётся компактным. Результаты — когда готовы.                                                                                                                                 |
-| 📚   | **Встроенные MCP**                                       | Both     | Ultimate внедряет websearch (Exa), context7 (официальная документация), grep_app (поиск по GitHub) и lsp во время выполнения. Light предоставляет plugin-scoped MCP: `grep_app`, `context7`, `git_bash`, `lsp`.                                                                                                     |
-| 🔁   | **Goal / `/goal`**                                       | Ultimate | `/goal` задаёт постоянную цель треда. Idle continuation работает только при `goal.enabled: true` (по умолчанию false).                                                                                                          |
-| ✅   | **Todo Enforcer** (Boulder)                              | Ultimate | Агент завис? Система немедленно возвращает его в работу. Ваша задача будет выполнена, точка.                                                                                                                                     |
-| 💬   | **Comment Checker**                                      | Both     | Никакого AI-мусора в комментариях. Тот же бинарник `@code-yeongyu/comment-checker` работает в обеих редакциях.                                                                                                                   |
-| 📜   | **Rules Injection**                                      | Both     | Иерархическое внедрение контекста из `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**`. В Ultimate это хук, в Light — компонент `rules`.                                                                                                |
-| 🧬   | **Ulw Loop**                                            | Light    | Codex-компонент + CLI для долговечной оркестрации нескольких целей с аудитом доказательств. В OpenCode используйте **Goal / `/goal`**.                                                                            |
-| 🖥️   | **Интеграция с Tmux**                                    | Ultimate | Полноценный интерактивный терминал. REPL, дебаггеры, TUI. Всё живое.                                                                                                                                                             |
-| 🔌   | **Совместимость с Claude Code**                          | Ultimate | Ваши хуки, команды, навыки, MCP и плагины? Всё работает без изменений. (У Codex своя нативная плагин-система.)                                                                                                                  |
-| 🎯   | **MCP, встроенные в навыки**                             | Ultimate | Навыки несут собственные MCP-серверы. Никакого раздувания контекста.                                                                                                                                                             |
-| 📋   | **Ultrawork Planner**                                    | Ultimate | Стратегическое планирование в режиме интервью перед любым выполнением.                                                                                                                                                           |
-| 🔍   | **`/init-deep`**                                         | Ultimate | Автоматически генерирует иерархические файлы `AGENTS.md` по всему проекту. Отлично работает на эффективность токенов и производительность агента.                                                                                |
+**Всё остальное тоже продумано.** Независимые вызовы инструментов выполняются вместе в одной небольшой программе, так что двадцать чтений занимают один цикл запроса. Некорректные аргументы инструментов исправляются до запуска.
 
-> **Editions, легенда.** **Ultimate** = только OpenCode (`bunx oh-my-openagent install`). **Light** = только Codex CLI (`npx lazycodex-ai install`). **Both** = поставляется в обеих редакциях, часто с немного отличающейся реализацией.
+Ожидание сборки или деплоя работает через подписку, а не через опрос. Долгая работа ведёт журнал проверенного, поэтому перезапущенная сессия продолжает с того места, где остановилась. Конфигурация, навыки и промпты перезагружаются на лету.
 
-### Дисциплинированные агенты
+## Настройка
 
-**Главный агент** работает на модели вашей сессии и выступает оркестратором. Он планирует, делегирует задачи специалистам и доводит их до завершения с агрессивным параллельным выполнением. Он не останавливается на полпути. Дайте ему цель, а не рецепт: он исследует кодовую базу, изучает паттерны и выполняет задачи сквозным образом без лишних подсказок. *Законный Мастер.*
+Продуманные настройки по умолчанию, которые можно изменить, если очень хочется. Ваши настройки хранятся в `~/.omo/omo.jsonc`, а проект может добавить свой `.omo/omo.jsonc`. Приоритет у ближайшего файла.
 
-**Ultrawork Planner** (`/ulw-plan`) — стратегический планировщик. Режим интервью: он задаёт вопросы, определяет объём работ и формирует детальный план до того, как написана хотя бы одна строка кода. Затем `/ulw-execute` выполняет этот план в той же сессии.
+Все ключи описаны в [справочнике по конфигурации](docs/reference/configuration.md).
 
-Каждый пресет промпта настроен под сильные стороны своей модели. Никакого ручного переключения между моделями. [Подробнее →](docs/guide/overview.md)
+## Документация
 
-> Anthropic [заблокировал OpenCode из-за нас.](https://x.com/thdxr/status/2010149530486911014) Именно поэтому главный агент зовётся «Законным Мастером». Ирония намеренная.
->
-> Мы работаем лучше всего на Opus или Kimi K3, но Kimi K3 + GPT-5.6 Sol уже превосходят ванильный Claude Code. Никакой настройки не требуется.
+- [omo.dev/docs](https://omo.dev/docs)
+- [Миграция с OpenCode](docs/guide/migrating-from-opencode.md)
+- [Справочник по конфигурации](docs/reference/configuration.md)
+- [Возможности](docs/reference/features.md)
+- [Манифест Ultrawork](docs/manifesto.md)
 
-### Team Mode
+## Отзывы
 
-Один агент — это быстро. Слаженная команда — это *разрушительно*.
+> "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community." - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
 
-**Team Mode** превращает oh-my-openagent из «одного агента с подагентами» в полноценную мультиагентную систему. Лид-агент оркестрирует команду специализированных по категориям участников, все они работают **параллельно** и общаются через выделенные инструменты (`team_create`, `team_send_message`, `team_task_create`, `team_status`, …). Наблюдайте за работой каждого участника одновременно в tmux-раскладке с focus- и grid-окнами.
+> "If Claude Code does in 7 days what a human does in 3 months, OmO does it in 1 hour." <br/>- B, Quant Researcher
 
-```jsonc
-// ~/.omo/omo.jsonc  (или проектный .omo/omo.jsonc)
-{
-  "team_mode": {
-    "enabled": true,
-    "max_parallel_members": 4,
-    "tmux_visualization": true
-  }
-}
-```
+> "You guys should pull this into core and recruit him. Seriously. It's really, really, really good." <br/>- Henning Kilset
 
-Перезапустите opencode — и семейство инструментов `team_*` будет активировано. Два навыка уже стоят на этом фундаменте:
+## От автора
 
-- **`hyperplan`** — 5 враждебных агентов разносят ваш план под ортогональными углами ещё до написания первой строчки кода.
-- **`security-research`** — 3 охотника за уязвимостями + 2 PoC-инженера параллельно проводят аудит кодовой базы. Серьёзность калибруется по *фактической эксплуатируемости*.
+Когда мне приходится забирать руль у агента, это не командная работа. Это сбой системы. На этой идее построен OmO.
 
-> **По умолчанию выключено. Включайте, когда нужно.** [Полное руководство по Team Mode →](docs/guide/team-mode.md)
+Вы говорите, что вам нужно. Агент исследует, планирует, пишет код, который не отличить от кода senior-инженера, проверяет его и продолжает, пока не закончит. Он тратит токены, когда это действительно ускоряет работу, а простые части отдаёт дешёвым моделям.
 
-### Оркестрация агентов
+Я самый одержимый пользователь этого проекта. У какой модели самая острая логика? Кто пишет лучшие тексты? Что выпустили другие на этой неделе? Ответы на эти вопросы попадают в OmO. Знаете способ лучше? PR приветствуются.
 
-Когда главный агент делегирует задачу субагенту, он выбирает не модель, а **категорию**. Категория автоматически сопоставляется с нужной моделью:
+Цель в том, чтобы агента просто перестаёшь замечать. Щёлкаешь выключателем, и загорается свет. Подробнее об этом в [Манифесте Ultrawork](docs/manifesto.md).
 
-| Категория            | Для чего предназначена                |
-| -------------------- | ------------------------------------- |
-| `visual-engineering` | Фронтенд, UI/UX, дизайн               |
-| `deep`               | Автономные исследования + выполнение  |
-| `quick`              | Изменения в одном файле, опечатки     |
-| `ultrabrain`         | Сложная логика, архитектурные решения |
+Проект не связан ни с одним из упомянутых проектов или моделей. Идеи Ultragoal и UltraQA взяты из [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex) и реализованы для OmO заново, на уровне концепции.
 
-Агент сообщает тип задачи, а обвязка подбирает нужную модель. `ultrabrain` направляется в GPT-6 Astra max, а `deep` в GPT-6 Astra high (OpenAI / OpenAI Codex, затем GitHub Copilot, затем OpenCode), а при недоступности откатываются к GPT-5.6 Sol. Вы ни к чему не прикасаетесь.
+## Пользуются специалисты из
 
-### Совместимость с Claude Code
-
-Вы тщательно настроили Claude Code. Хорошо.
-
-Каждый хук, команда, навык, MCP и плагин работают здесь без изменений. Полная совместимость, включая плагины.
-
-### Инструменты мирового класса для ваших агентов
-
-LSP, AST-Grep, Tmux, MCP — реально интегрированы, а не склеены скотчем.
-
-- **LSP**: `lsp_rename`, `lsp_goto_definition`, `lsp_find_references`, `lsp_diagnostics`. Точность IDE для каждого агента.
-- **AST-Grep**: Поиск и переписывание кода с учётом синтаксических паттернов для 25 языков.
-- **Tmux**: Полноценный интерактивный терминал. REPL, дебаггеры, TUI-приложения. Агент остаётся в сессии.
-- **MCP**: Веб-поиск, официальная документация, поиск по коду на GitHub. Всё встроено.
-
-### MCP, встроенные в навыки
-
-MCP-серверы съедают бюджет контекста. Мы это исправили.
-
-Навыки приносят собственные MCP-серверы. Запускаются по необходимости, ограничены задачей, исчезают по завершении. Контекстное окно остаётся чистым.
-
-### Лучше пишет код. Правки на основе хэш-якорей
-
-Проблема обвязки реальна. Большинство сбоев агентов — не вина модели, а вина инструмента правок.
-
-> *«Ни один из этих инструментов не даёт модели стабильный, проверяемый идентификатор строк, которые она хочет изменить... Все они полагаются на то, что модель воспроизведёт контент, который уже видела. Когда это не получается — а так бывает нередко — пользователь обвиняет модель.»*
->
-> <br/>— [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
-
-Вдохновлённые [oh-my-pi](https://github.com/can1357/oh-my-pi), мы сделали **Hashline**. Когда включён `hashline_edit`, каждая строка, которую читает агент, возвращается с тегом хэша содержимого:
-
-```
-11#VK| function hello() {
-22#XJ|   return "world";
-33#MB| }
-```
-
-Агент редактирует, ссылаясь на эти теги. Если файл изменился с момента последнего чтения, хэш не совпадёт, и правка будет отклонена до любого повреждения. Никакого воспроизведения пробелов. Никаких ошибок с устаревшими строками.
-
-### Глубокая инициализация. `/init-deep`
-
-Запустите `/init-deep`. Будут сгенерированы иерархические файлы `AGENTS.md`:
-
-```
-project/
-├── AGENTS.md              ← контекст всего проекта
-├── src/
-│   ├── AGENTS.md          ← контекст для src
-│   └── components/
-│       └── AGENTS.md      ← контекст для компонентов
-```
-
-Агенты автоматически читают нужный контекст. Никакого ручного управления.
-
-### Планирование. Ultrawork Planner
-
-Сложная задача? Не нужно молиться и надеяться на промпт.
-
-Ultrawork Planner (`/ulw-plan`) **интервьюирует вас как настоящий инженер**, определяет объём работ и неоднозначности и записывает проверенный план в `.omo/plans/` до прикосновения к коду. Затем `/ulw-execute` заставляет главного агента выполнить этот план в той же сессии. Агент знает, что строит, прежде чем начать.
-
-### Навыки
-
-Навыки — это не просто промпты. Каждый привносит:
-
-- Системные инструкции, настроенные под предметную область.
-- Встроенные MCP-серверы, запускаемые по необходимости.
-- Ограниченные разрешения, чтобы агенты оставались в рамках.
-
-Встроенные: `playwright` (автоматизация браузера), `git-master` (атомарные коммиты, хирургия rebase), `frontend` (UI с упором на дизайн).
-
-Добавьте свои в `.opencode/skills/*/SKILL.md` или `~/.config/opencode/skills/*/SKILL.md`.
-
-**Хотите полное описание возможностей?** Смотрите **[документацию по функциям](docs/reference/features.md)** — агенты, хуки, инструменты, MCP и всё остальное подробно.
-
-------
-
-> **Впервые в oh-my-openagent?** Прочитайте **[Overview](docs/guide/overview.md)**, чтобы понять, что у вас есть, или ознакомьтесь с **[Orchestration Guide](docs/guide/orchestration.md)**, чтобы узнать, как агенты взаимодействуют.
-
-## Удаление
-
-Чтобы удалить oh-my-openagent:
-
-1. **Удалите плагин из конфига OpenCode**
-
-   Отредактируйте `~/.config/opencode/opencode.json` (или `opencode.jsonc`) и уберите `"oh-my-openagent"` или устаревшую запись `"oh-my-opencode"` из массива `plugin`:
-
-   ```bash
-   # С помощью jq
-   jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
-       ~/.config/opencode/opencode.json > /tmp/oc.json && \
-       mv /tmp/oc.json ~/.config/opencode/opencode.json
-   ```
-
-2. **Удалите файлы конфигурации (опционально)**
-
-   ```bash
-   # Удалить рабочие файлы конфигурации
-   rm -f ~/.omo/omo.jsonc ~/.omo/omo.json
-
-   # Удалить конфиг проекта (если существует)
-   rm -f .omo/omo.jsonc .omo/omo.json
-
-   # Удалить оставшиеся резервные копии миграции (если есть)
-   rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
-         ~/.config/opencode/oh-my-opencode.jsonc ~/.config/opencode/oh-my-opencode.json \
-         .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
-         .opencode/oh-my-opencode.jsonc .opencode/oh-my-opencode.json
-   ```
-
-3. **Проверьте удаление**
-
-   ```bash
-   opencode --version
-   # Плагин больше не должен загружаться
-   ```
-
-4. **Удалите omo-codex (Codex CLI Light edition)**
-
-   ```bash
-   npx lazycodex-ai uninstall
-   # backward-compatible alias:
-   npx lazycodex-ai cleanup
-   ```
-
-   Команда uninstall удаляет управляемое состояние Codex-кэша и marketplace `sisyphuslabs`, вырезает блоки плагина `omo@sisyphuslabs` и hook-state из `~/.codex/config.toml` после создания резервной копии и удаляет ссылки на TOML агентов, перечисленные в манифесте установки. Если в каком-то проекте осталось старое проектное состояние Codex-плагина, запустите команду из этого проекта или передайте `--project <path>`; она исправит известные конфликты в проектном `.codex/config.toml` и сообщит о проектных артефактах `.codex`, не удаляя файлы, принадлежащие проекту.
-
-## Функции
-
-Функции, которые, как вы будете думать, должны были существовать всегда. Попробовав раз, вы не сможете вернуться назад.
-
-Полная [документация по функциям](docs/reference/features.md).
-
-**Краткий обзор:**
-
-- **Агенты**: главный агент (оркестратор), Ultrawork Planner (`/ulw-plan`), консультация архитектора (архитектура/отладка), Librarian (документация/поиск по коду), Explore (быстрый grep по кодовой базе), Multimodal Looker
-- **Фоновые агенты**: Запускайте несколько агентов параллельно, как настоящая команда разработки
-- **Инструменты LSP и AST**: Рефакторинг, переименование, диагностика, поиск кода с учётом AST
-- **Инструмент правок на основе хэш-якорей** (включается через `hashline_edit: true`): Ссылки `LINE#ID` проверяют содержимое перед применением каждого изменения. Хирургические правки, ноль ошибок с устаревшими строками
-- **Инъекция контекста**: Автоматическое добавление AGENTS.md, README.md, условных правил
-- **Совместимость с Claude Code**: Полная система хуков, команды, навыки, агенты, MCP
-- **Встроенные MCP**: websearch (Exa), context7 (документация), grep_app (поиск по GitHub), lsp — внедряются плагином во время выполнения и не показываются в `opencode mcp list` (см. [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
-- **Инструменты сессий**: Список, чтение, поиск и анализ истории сессий
-- **Инструменты продуктивности**: Goal, Todo Enforcer, Comment Checker, Think Mode и другое
-- **Команда Doctor**: Встроенная диагностика (`bunx oh-my-opencode doctor`) проверяет регистрацию плагина, конфиг, модели и окружение
-- **Фолбэки моделей**: `fallback_models` позволяет смешивать простые строки моделей и объектные настройки per-fallback в одном массиве
-- **Файловые промпты**: Загрузка промптов из файлов через `file://` в конфигурации агентов
-- **Восстановление сессии**: Автоматическое восстановление при ошибках сессии, достижении лимита контекстного окна и сбоях API
-- **Настройка моделей**: Сопоставление агент–модель встроено в [руководство по установке](docs/guide/installation.md#step-5-understand-your-model-setup)
-
-## Конфигурация
-
-Продуманные настройки по умолчанию, которые можно изменить при необходимости.
-
-Смотрите [документацию по конфигурации](docs/reference/configuration.md).
-
-**Краткий обзор:**
-
-- **Расположение конфигов**: Пользовательский `~/.omo/omo.jsonc` плюс проектные `.omo/omo.jsonc`, найденные при подъёме до `$HOME`; ближайший конфиг выигрывает. Устаревшие файлы `oh-my-*` мигрируются в `omo.jsonc` один раз.
-- **Поддержка JSONC**: Комментарии и конечные запятые поддерживаются
-- **Агенты**: Переопределение моделей, температур, промптов и разрешений для любого агента
-- **Встроенные навыки**: `playwright` (автоматизация браузера), `git-master` (атомарные коммиты)
-- **Главный агент**: Оркестратор с Ultrawork Planner (`/ulw-plan`) и Plan Consultant
-- **Фоновые задачи**: Настройка ограничений параллельности по провайдеру/модели
-- **Категории**: `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, плюс пользовательские имена
-- **Хуки**: 54+ встроенных хуков жизненного цикла (61 с включённым Team Mode), все настраиваются через `disabled_hooks`
-- **MCP**: Встроенные websearch (Exa), context7 (документация), grep_app (поиск по GitHub), lsp — внедряются во время выполнения, не показываются в `opencode mcp list`
-- **LSP**: Полная поддержка LSP с инструментами рефакторинга
-- **Экспериментальное**: Агрессивное усечение, упреждающее сжатие контекста и другое
-
-
-## Слово автора
-
-**Хотите узнать философию?** Прочитайте [Манифест Ultrawork](docs/manifesto.md).
-
-------
-
-Я потратил $24K на токены LLM в личных проектах. Попробовал все инструменты. Настраивал всё до смерти. OpenCode победил.
-
-Каждая проблема, с которой я столкнулся, — её решение уже встроено в этот плагин. Устанавливайте и работайте.
-
-Если OpenCode — это Debian/Arch, то oh-my-openagent — это Ubuntu/[Omarchy](https://omarchy.org/).
-
-Сильно вдохновлено [AmpCode](https://ampcode.com) и [Claude Code](https://code.claude.com/docs/overview). Функции портированы, часто улучшены. Продолжаем строить. Это **Open**Code.
-
-Другие обвязки обещают оркестрацию нескольких моделей. Мы её поставляем. Плюс стабильность. Плюс функции, которые реально работают.
-
-Я самый одержимый пользователь этого проекта:
-
-- Какая модель думает острее всего?
-- Кто бог отладки?
-- Кто пишет лучший код?
-- Кто рулит фронтендом?
-- Кто владеет бэкендом?
-- Что быстрее всего в ежедневной работе?
-- Что запускают конкуренты?
-
-Этот плагин — дистилляция. Берём лучшее. Есть улучшения? PR приветствуются.
-
-**Хватит мучиться с выбором обвязки.**
-**Я буду исследовать, воровать лучшее и поставлять это сюда.**
-
-Звучит высокомерно? Знаете, как сделать лучше? Контрибьютьте. Добро пожаловать.
-
-Никакой аффилиации с упомянутыми проектами или моделями. Только личные эксперименты.
-
-99% этого проекта было создано с помощью OpenCode. Я почти не знаю TypeScript, **но эту документацию я лично просматривал и во многом переписывал.**
-
-## Любимый профессионалами из
-
-- [Indent](https://indentcorp.com)
-  - Создатели Spray (решение для influencer-маркетинга), vovushop (платформа трансграничной торговли) и vreview (AI-решение для маркетинга отзывов в commerce).
-- [Google](https://google.com)
-- [Microsoft](https://microsoft.com)
-- [Vercel](https://vercel.com)
-- [ELESTYLE](https://elestyle.jp)
-  - Создатели elepay (мультимобильный платёжный шлюз) и OneQR (мобильное SaaS-приложение для безналичных расчётов).
-- [Deepgram](https://deepgram.com)
-
-*Особая благодарность [@junhoyeo](https://github.com/junhoyeo) за это потрясающее hero-изображение.*
+[Indent](https://indentcorp.com), makers of Spray (influencer marketing solution), vovushop (cross-border commerce platform) and vreview (AI commerce review marketing solution). [Google](https://google.com). [Microsoft](https://microsoft.com). [Vercel](https://vercel.com). [ELESTYLE](https://elestyle.jp), makers of elepay (multi-mobile payment gateway) and OneQR (mobile application SaaS for cashless solutions). [Deepgram](https://deepgram.com).
