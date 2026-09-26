@@ -1,0 +1,96 @@
+invocation=bash qa-live-opencode.sh <WORKTREE> <EVIDENCE_DIR>
+opencode_version=1.14.31
+plugin_source=file://<WORKTREE>/packages/omo-opencode/src/index.ts
+surface=real-opencode-serve GET-/global/health GET-/agent
+host_db_session_count_before=3
+sandbox=<TEMP_SANDBOX>
+assertion=PASS label=target-k3-256k.server_winpid_captured actual=true
+server_started scenario=target-k3-256k msys_pid=1317 winpid=29060 port=4096 model=kimi-for-coding/k3-256k
+assertion=PASS label=target-k3-256k.server_listened actual=true
+assertion=PASS label=target-k3-256k.health.http_status actual=200
+assertion=PASS label=target-k3-256k.health.healthy actual=true
+assertion=PASS label=target-k3-256k.health.version actual=1.14.31
+assertion=PASS label=target-k3-256k.agent.http_status actual=200
+assertion=PASS label=target-k3-256k.agent.json_array actual=true
+assertion=PASS label=target-k3-256k.sisyphus.resolved_model actual=kimi-for-coding/k3-256k
+assertion=PASS label=target-k3-256k.sisyphus.classification actual=kimi-k3
+assertion=PASS label=target-k3-256k.sisyphus-junior.resolved_model actual=kimi-for-coding/k3-256k
+assertion=PASS label=target-k3-256k.sisyphus-junior.classification actual=kimi-k3
+assertion=PASS label=target-k3-256k.atlas.resolved_model actual=kimi-for-coding/k3-256k
+assertion=PASS label=target-k3-256k.atlas.classification actual=kimi-k3
+assertion=PASS label=target-k3-256k.metis.resolved_model actual=kimi-for-coding/k3-256k
+assertion=PASS label=target-k3-256k.metis.classification actual=base
+server_cleanup scenario=target-k3-256k msys_pid=1317 winpid=29060 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+assertion=PASS label=target-k3-256k.cleanup.pid_gone actual=true
+assertion=PASS label=target-k3-256k.cleanup.winpid_gone actual=true
+assertion=PASS label=target-k3-256k.cleanup.port_http_closed actual=true
+assertion=PASS label=target-k3-256k.cleanup.port_listener_gone actual=true
+assertion=PASS label=positive-k3.server_winpid_captured actual=true
+server_started scenario=positive-k3 msys_pid=1404 winpid=41020 port=4096 model=opencode-go/kimi-k3
+assertion=PASS label=positive-k3.server_listened actual=true
+assertion=PASS label=positive-k3.health.http_status actual=200
+assertion=PASS label=positive-k3.health.healthy actual=true
+assertion=PASS label=positive-k3.health.version actual=1.14.31
+assertion=PASS label=positive-k3.agent.http_status actual=200
+assertion=PASS label=positive-k3.agent.json_array actual=true
+assertion=PASS label=positive-k3.sisyphus.resolved_model actual=opencode-go/kimi-k3
+assertion=PASS label=positive-k3.sisyphus.classification actual=kimi-k3
+assertion=PASS label=positive-k3.sisyphus-junior.resolved_model actual=opencode-go/kimi-k3
+assertion=PASS label=positive-k3.sisyphus-junior.classification actual=kimi-k3
+assertion=PASS label=positive-k3.atlas.resolved_model actual=opencode-go/kimi-k3
+assertion=PASS label=positive-k3.atlas.classification actual=kimi-k3
+assertion=PASS label=positive-k3.metis.resolved_model actual=opencode-go/kimi-k3
+assertion=PASS label=positive-k3.metis.classification actual=base
+server_cleanup scenario=positive-k3 msys_pid=1404 winpid=41020 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+assertion=PASS label=positive-k3.cleanup.pid_gone actual=true
+assertion=PASS label=positive-k3.cleanup.winpid_gone actual=true
+assertion=PASS label=positive-k3.cleanup.port_http_closed actual=true
+assertion=PASS label=positive-k3.cleanup.port_listener_gone actual=true
+assertion=PASS label=k2-control.server_winpid_captured actual=true
+server_started scenario=k2-control msys_pid=1486 winpid=52556 port=4096 model=opencode-go/kimi-k2.7-code
+assertion=PASS label=k2-control.server_listened actual=true
+assertion=PASS label=k2-control.health.http_status actual=200
+assertion=PASS label=k2-control.health.healthy actual=true
+assertion=PASS label=k2-control.health.version actual=1.14.31
+assertion=PASS label=k2-control.agent.http_status actual=200
+assertion=PASS label=k2-control.agent.json_array actual=true
+assertion=PASS label=k2-control.sisyphus.resolved_model actual=opencode-go/kimi-k2.7-code
+assertion=PASS label=k2-control.sisyphus.classification actual=kimi-k2-7
+assertion=PASS label=k2-control.sisyphus-junior.resolved_model actual=opencode-go/kimi-k2.7-code
+assertion=PASS label=k2-control.sisyphus-junior.classification actual=kimi-k2-7
+assertion=PASS label=k2-control.atlas.resolved_model actual=opencode-go/kimi-k2.7-code
+assertion=PASS label=k2-control.atlas.classification actual=kimi-k2-7
+assertion=PASS label=k2-control.metis.resolved_model actual=opencode-go/kimi-k2.7-code
+assertion=PASS label=k2-control.metis.classification actual=kimi-k2-7
+server_cleanup scenario=k2-control msys_pid=1486 winpid=52556 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+assertion=PASS label=k2-control.cleanup.pid_gone actual=true
+assertion=PASS label=k2-control.cleanup.winpid_gone actual=true
+assertion=PASS label=k2-control.cleanup.port_http_closed actual=true
+assertion=PASS label=k2-control.cleanup.port_listener_gone actual=true
+assertion=PASS label=default-control.server_winpid_captured actual=true
+server_started scenario=default-control msys_pid=1570 winpid=39004 port=4096 model=anthropic/claude-sonnet-5
+assertion=PASS label=default-control.server_listened actual=true
+assertion=PASS label=default-control.health.http_status actual=200
+assertion=PASS label=default-control.health.healthy actual=true
+assertion=PASS label=default-control.health.version actual=1.14.31
+assertion=PASS label=default-control.agent.http_status actual=200
+assertion=PASS label=default-control.agent.json_array actual=true
+assertion=PASS label=default-control.sisyphus.resolved_model actual=anthropic/claude-sonnet-5
+assertion=PASS label=default-control.sisyphus.classification actual=default
+assertion=PASS label=default-control.sisyphus-junior.resolved_model actual=anthropic/claude-sonnet-5
+assertion=PASS label=default-control.sisyphus-junior.classification actual=default
+assertion=PASS label=default-control.atlas.resolved_model actual=anthropic/claude-sonnet-5
+assertion=PASS label=default-control.atlas.classification actual=default
+assertion=PASS label=default-control.metis.resolved_model actual=anthropic/claude-sonnet-5
+assertion=PASS label=default-control.metis.classification actual=base
+server_cleanup scenario=default-control msys_pid=1570 winpid=39004 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+assertion=PASS label=default-control.cleanup.pid_gone actual=true
+assertion=PASS label=default-control.cleanup.winpid_gone actual=true
+assertion=PASS label=default-control.cleanup.port_http_closed actual=true
+assertion=PASS label=default-control.cleanup.port_listener_gone actual=true
+assertion=PASS label=k3.metis.base_prompt_hash_match actual=58ff8336284e59e3adbb5e17f477736a0dac699ecd82c9637b135bbea9a53218
+assertion=PASS label=sandbox.removed actual=true
+assertion=PASS label=host_db.session_count_unchanged actual=3
+host_db_session_count_after=3
+sandbox_removed=true
+assertions_passed=79 assertions_failed=0

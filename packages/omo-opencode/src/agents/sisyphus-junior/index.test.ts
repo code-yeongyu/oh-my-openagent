@@ -653,6 +653,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     // given
     const cases = [
       ["opencode-go/kimi-k3", "kimi-k3"],
+      ["kimi-for-coding/k3-256k", "kimi-k3"],
       ["opencode-go/kimi-k2.7", "kimi-k2-7"],
       ["opencode-go/kimi-k2.6", "kimi-k2"],
       ["openai/gpt-5.6-sol", "gpt-5-5"],
