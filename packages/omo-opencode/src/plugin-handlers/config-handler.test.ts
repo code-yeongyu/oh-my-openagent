@@ -573,6 +573,94 @@ describe("Plan agent demote behavior", () => {
   })
 })
 
+describe("hidden config-key aliases after applyToolConfig", () => {
+  test("sisyphus alias permission deep-equals the display-name entry after the full config hook", async () => {
+    // given builtin agents that applyToolConfig mutates in place
+    const createBuiltinAgentsMock = unsafeTestValue<{
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }>(agents.createBuiltinAgents)
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      prometheus: { name: "prometheus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+    })
+    const pluginConfig = createPluginConfig({
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    })
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when the full config hook runs
+    await handler(config)
+
+    // then hidden config-key aliases spread the post-tool-config display-name objects
+    const agentConfig = config.agent as Record<string, {
+      hidden?: boolean
+      permission?: Record<string, unknown>
+    }>
+    const sisyphusDisplayName = getAgentListDisplayName("sisyphus")
+    const prometheusDisplayName = getAgentListDisplayName("prometheus")
+    expect(agentConfig[sisyphusDisplayName]).toBeDefined()
+    expect(agentConfig["sisyphus"]).toBeDefined()
+    expect(agentConfig["sisyphus"].hidden).toBe(true)
+    expect(agentConfig[sisyphusDisplayName].hidden).not.toBe(true)
+    expect(agentConfig["sisyphus"].permission).toEqual(agentConfig[sisyphusDisplayName].permission)
+    expect(agentConfig["sisyphus"].permission?.task).toBe("allow")
+    expect(agentConfig["sisyphus"].permission?.teammate).toBe("allow")
+    expect(agentConfig["prometheus"]).toBeDefined()
+    expect(agentConfig["prometheus"].hidden).toBe(true)
+    expect(agentConfig["prometheus"].permission).toEqual(agentConfig[prometheusDisplayName].permission)
+    expect(agentConfig["prometheus"].permission?.bash).toBe("deny")
+  })
+
+  test("cache-hit aliases still match display-name permissions after applyToolConfig", async () => {
+    // given a handler that can reuse the remapped roster
+    const pluginConfig = createPluginConfig({})
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+    const firstConfig: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const secondConfig: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+
+    // when the config hook runs twice with the same cache key
+    await handler(firstConfig)
+    await handler(secondConfig)
+
+    // then the second pass still aliases the mutated display-name object
+    const agentConfig = secondConfig.agent as Record<string, {
+      hidden?: boolean
+      permission?: Record<string, unknown>
+    }>
+    const sisyphusDisplayName = getAgentListDisplayName("sisyphus")
+    expect(agentConfig["sisyphus"].hidden).toBe(true)
+    expect(agentConfig["sisyphus"].permission).toEqual(agentConfig[sisyphusDisplayName].permission)
+    expect(agentConfig["sisyphus"].permission?.task).toBe("allow")
+  })
+})
+
 describe("Agent permission defaults", () => {
   test("hephaestus should allow task", async () => {
     // #given
