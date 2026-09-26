@@ -26,6 +26,7 @@ import {
   removeMemoryTree,
   type TransientWarn,
 } from "./transient-identity"
+import { clearStrandedMarker, reportStrandedOnce } from "./transient-stranded"
 
 export const TRANSIENT_RUN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const TRANSIENT_IDENTITY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -118,7 +119,7 @@ async function rescueRunMemory(input: TransientSweepInput, totals: Totals, runRo
 /**
  * Moves a transient identity that turned out to hold memory into the durable agents root. A
  * target that already exists is never merged or overwritten: the transient tree is left on disk
- * (and, holding a `repo/`, is exempt from removal) and the caller is warned.
+ * (and, holding a `repo/`, is exempt from removal) and the caller is warned once.
  */
 async function promoteIdentityRoot(input: {
   readonly from: string
@@ -126,15 +127,13 @@ async function promoteIdentityRoot(input: {
   readonly warn?: TransientWarn
 }): Promise<"promoted" | "stranded"> {
   if (existsSync(input.to)) {
-    input.warn?.("omo-senpi memory transient run holds memory a durable identity already owns", {
-      from: input.from,
-      to: input.to,
-    })
+    await reportStrandedOnce(input)
     return "stranded"
   }
   try {
     await mkdir(dirname(input.to), { recursive: true })
     await rename(input.from, input.to)
+    await clearStrandedMarker(input.to, input.warn)
     return "promoted"
   } catch (error) {
     input.warn?.("omo-senpi memory transient run promotion failed", {
