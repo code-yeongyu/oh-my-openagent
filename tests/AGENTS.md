@@ -10,6 +10,7 @@ Cross-package invariants and integration fixtures that do not belong to one pack
 tests/
 ├── omo-config-category-drift.test.ts  # Config/category contract stays synchronized
 ├── omo-schema-freshness.test.ts       # Generated omo.schema.json matches source
+├── omo-schema-unique-ids.test.ts      # omo.schema.json gives each $id one schema; profiles $ref the [opencode] block (issue #6444)
 ├── reasoning-vocabulary-parity.test.ts  # model-core vs omo-config-core reasoning levels + normalization agree
 ├── ulw-loop-define-goal-reference.test.ts  # ulw-loop skills (omo-senpi + omo-codex editions) ship define-goal.md beside full-workflow.md
 ├── ulw-plan-review-convergence-contract.test.ts  # bounded review-convergence contract JSON present in every edition's full-workflow.md (issue #6128)

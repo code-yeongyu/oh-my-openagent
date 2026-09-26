@@ -25,8 +25,13 @@ export function createOmoJsonSchema(): Record<string, unknown> {
   const profileProperties = requiredRecord(profile.properties, "properties.profiles.additionalProperties.properties")
   const openCodeSchema = createOhMyOpenCodeJsonSchema()
 
+  const openCodeSchemaId = openCodeSchema.$id
+  if (typeof openCodeSchemaId !== "string") throw new Error("Expected the embedded [opencode] schema to carry an $id")
+
   properties["[opencode]"] = openCodeSchema
-  profileProperties["[opencode]"] = openCodeSchema
+  // Embed the [opencode] schema once and reference it from profiles: a second copy would carry the
+  // same $id, and validators such as ajv refuse a document where one $id names two schemas (#6444).
+  profileProperties["[opencode]"] = { $ref: openCodeSchemaId }
 
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
