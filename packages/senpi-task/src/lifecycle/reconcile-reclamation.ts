@@ -2,6 +2,7 @@ import type { TaskRecord } from "../state"
 import { isSpawnSpecV1 } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { isFallbackHandoff } from "./fallback-handoff"
 import { hostSessionResumePath, isHostSessionRecord } from "./host-session"
 import { clearSuspensionReason, markSuspensionReason } from "./host-session-record"
 import { detachTerminalResident } from "./reconcile-terminal"
@@ -106,8 +107,9 @@ export async function reviveClaimed(
   const fresh = context.store.load(claimed.task_id)
   const terminalAllowed = options.allowTerminal === true && fresh !== null && TERMINAL_STATUSES.has(fresh.status)
   // A daemon-hosted child resumes its RECORDED session path: the daemon, not the disk, owns the
-  // live transcript, so a directory scan can name the wrong file (or nothing at all).
-  const resumePath = hostSessionResumePath(fresh) ?? sessionPath
+  // live transcript, so a directory scan can name the wrong file (or nothing at all). A fallback
+  // handoff resumes nothing: its newest transcript is the failed rung's, so it launches fresh.
+  const resumePath = isFallbackHandoff(fresh) ? undefined : hostSessionResumePath(fresh) ?? sessionPath
   if (!isClaimHeld(context, fresh, claimed.parent_session_id) || fresh.killed === true || (!REVIVABLE_STATUSES.has(fresh?.status ?? "pending") && !terminalAllowed)) {
     return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "foreign_live_owner")
   }

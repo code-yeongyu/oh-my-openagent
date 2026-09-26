@@ -76,6 +76,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const suspensionReason = readOptionalSuspensionReason(value)
   const hostSession = parseOptionalHostSession(value)
   validateHostSessionConsistency(runnerKind, hostSession)
+  const fallbackHandoffEpoch = readOptionalNumber(value, "fallback_handoff_epoch")
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -127,6 +128,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(suspensionReason === undefined ? {} : { suspension_reason: suspensionReason }),
     ...(runnerKind === undefined ? {} : { runner_kind: runnerKind }),
     ...(hostSession === undefined ? {} : { host_session: hostSession }),
+    ...(fallbackHandoffEpoch === undefined ? {} : { fallback_handoff_epoch: fallbackHandoffEpoch }),
   }
 }
 

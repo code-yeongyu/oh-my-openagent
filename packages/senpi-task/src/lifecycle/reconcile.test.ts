@@ -165,51 +165,6 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(store.load("st_00000001")?.notification.run_epoch).toBe(1)
     expect(manager.getResidentHandle("st_00000001")?.pid).toBe(1001)
   })
-  // A daemon child between runtime-fallback rungs has no pid and no recorded session (the manager
-  // clears the closed rung's session). If its parent dies in that gap, another session's sweep must
-  // still recover it from its transcript instead of marking it lost.
-  test(" w2reattach #given a dead-owner process record between fallback rungs (no pid, no session) and persisted sessions #when reconciled #then the newest session is respawned, never lost", async () => {
-    // given
-    const { store, sessionPath, respawnRunner, lifecycle } = createHarness({ taskId: "st_0000001f" })
-    const seeded = store.load("st_0000001f")
-    if (seeded === null) throw new Error("expected the seeded record")
-    const { pid: _noPid, ...gapRecord } = seeded
-    store.replace({ ...gapRecord, host_pid: 4_404 })
-
-    // when
-    const result = await lifecycle.reconcileOnSessionStart()
-
-    // then
-    expect(result.outcomes[0]?.kind).toBe("resumed")
-    expect(store.load("st_0000001f")?.status).toBe("running")
-    expect(respawnRunner.startedSpecs[0]?.resumeSessionPath).toBe(sessionPath)
-  })
-  test(" w2reattach #given a dead-owner record between fallback rungs and a transient respawn failure #when reconciled #then it is parked for a later revival, never lost", async () => {
-    // given
-    const store = tempStore()
-    const seeded = seedProcessRecord(store, "st_0000002f")
-    const { pid: _noPid, ...gapRecord } = seeded
-    store.replace({ ...gapRecord, host_pid: 4_404 })
-    persistSessions(store, "st_0000002f")
-    const lifecycle = createTaskLifecycle({
-      store,
-      registry: new FakeRegistry(),
-      config: settings(),
-      now,
-      signaller: fakeSignaller(new Set(), []),
-      respawn: async () => ({ ok: false, disposition: "retryable", code: "respawn_failed", reason: "rpc respawn failed" }),
-      reattach: async () => ({ ok: true }),
-    })
-
-    // when
-    const result = await lifecycle.reconcileOnSessionStart()
-
-    // then
-    expect(result.outcomes[0]).toMatchObject({ task_id: "st_0000002f", kind: "deferred" })
-    const record = store.load("st_0000002f")
-    expect(record?.status).toBe("running")
-    expect(record?.residency_state).toBe("rpc_detached")
-  })
   test(" w2reattach #given injected reattach ports and a registered store fallback #when reconciled #then the injected ports take precedence", async () => {
     // given
     const { store, sessionPath } = createHarness({ taskId: "st_0000000d" })

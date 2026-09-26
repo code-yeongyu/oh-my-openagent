@@ -8,19 +8,37 @@ host-session record whose session is gone is an orphan, so that pass claimed the
 reattached the closed session and moved `run_epoch`. The parent's real outcome was then dropped, the
 task stayed `running`, and `omo -p` never exited (reproduced 2/2 live on a lapsed OpenCode Go key).
 
-The fallback record now drops `runner_kind` and `host_session` together with the epoch bump. Until the
-next spawn stamps its session, the record has no daemon session to judge by and falls back to the pid
-fence for its live owner; #8659's session-liveness rule is unchanged for every recorded session.
-`lifecycle/reconcile.ts`: a process record with no recorded pid now goes through `reviveClaimed`, the
-revival the daemon-session branch uses, instead of being marked lost: it resumes its newest transcript
-(or its v1 spawn spec), and a transient respawn failure parks it `rpc_detached` for a later revival. A
-parent that dies in that gap (the next rung can wait for capacity) is therefore recovered by the next
-sweep. `reattach_on_reconcile: false` keeps the old lost outcome. `manager/manager-reattach.ts`: a
-revived daemon child's record is stamped with its session (`recordSpawnedRunner`), as a fresh spawn is. Tests: `runtime-fallback-host-session.test.ts` (between rungs the record names
-no session, a foreign daemon-side reconcile defers it and respawns nothing, then the next rung's
-session is recorded) `reconcile.test.ts` (a dead-owner record in that gap is respawned, and a transient respawn failure parks
-it instead of losing it), and `manager-respawn-cleanup.test.ts` (a revived daemon child names its
-session).
+`lifecycle/fallback-handoff.ts` (new) names that span. `handOffToNextRung` builds the handed-off record:
+the next model selected, the epoch advanced, the closed child's `pid`, `runner_kind` and `host_session`
+dropped, and `fallback_handoff_epoch` set to the new epoch. `#tryRuntimeFallback` commits it in one
+`store.mutate` fenced on the failing outcome's epoch and owner, BEFORE awaiting the failed rung's
+teardown, so a reconciler that runs while the daemon is still closing that session already sees a
+handoff behind its live owner's pid fence (the first push wrote it after the teardown, which left the
+race open). `#recordSpawnFacts` and a reattach end the handoff; a start-fallback step inside it carries
+the marker to its new epoch. #8659's session-liveness rule is unchanged for every recorded session.
+
+`isFallbackHandoff` (marker equal to the run epoch, no pid, no daemon session) is the only pid-less
+process record `lifecycle/reconcile.ts` revives when its owner died; every other pid-less record
+(queued, or a workpool worker whose replay is refused by design) is lost as before, so no task parks
+forever. `reviveClaimed` launches a handoff FRESH from its v1 spawn spec on the selected model: the
+newest transcript is the failed rung's, and reopening it reported `resumed` while no turn ran. A
+transient launch failure parks it `rpc_detached`. `manager/manager-reattach.ts` stamps a revived daemon
+child's session (`recordSpawnedRunner`), as a fresh spawn does.
+
+`manager/manager-respawn.ts` decided "the daemon re-joined a live session, do not nudge" from the
+handle's own `attached` getter, which is true for every open handle, so a session reopened from its
+JSONL never got its interrupted turn continued. `runners/rpc-host.ts` now exposes the daemon's answer
+to the open as `rejoinedLiveSession`, and respawn keys on that.
+
+Tests: `runtime-fallback-host-session.test.ts` (the handed-off record carries no child identity and the
+marker; a daemon-side reconcile during the failed rung's slow close defers as `foreign_live_owner`,
+respawns nothing, and only the next rung's result lands), `fallback-handoff-reconcile.test.ts` (a
+dead-owner handoff, swept by another session or by its resumed parent, opens a fresh session and
+prompts it on the real daemon runner; a transient failure parks it; a stale marker and a dead workpool
+worker end `lost`), `manager-respawn-host-session.test.ts` (a reopened session on the real daemon
+runner is continued), `rpc-host.test.ts` (`rejoinedLiveSession` for a retained and a reopened session),
+and `manager-respawn-cleanup.test.ts` (a revived daemon child names its session).
+`reconcileLegacyTerminal` moved to `lifecycle/reconcile-terminal.ts` unchanged.
 
 ## Runtime fallback skips the rest of a provider whose credential is dead
 

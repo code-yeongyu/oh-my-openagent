@@ -50,7 +50,7 @@ export async function reattachManagedTask(input: {
       }
       return { ok: true }
     }
-    const { error_message: _error, final_response: _final, killed: _killed, ...rest } = fresh
+    const { error_message: _error, final_response: _final, killed: _killed, fallback_handoff_epoch: _handoff, ...rest } = fresh
     const epoch = fresh.notification.run_epoch + 1
     const timestamp = nowIso(input.now)
     const sessionId = input.handle.sessionId

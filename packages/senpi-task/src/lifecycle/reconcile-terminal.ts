@@ -1,6 +1,25 @@
 import { transitionTaskRecord, type TaskRecord } from "../state"
 import { delay, nowIso, type LifecycleContext } from "./context"
+import { destroyResidentTask } from "./destroy"
+import { newestSessionPath } from "./session-path"
 import type { ReconcileOutcome } from "./types"
+
+export async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
+  if (record.status === "lost" || record.status === "cancelled") {
+    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
+    return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
+  }
+  if (record.residency_state !== "resident") return { task_id: record.task_id, kind: "resumed" }
+  if (newestSessionPath(context, record.task_id) === undefined) {
+    await destroyResidentTask(context, record.task_id, "reconcile_lost")
+    return {
+      task_id: record.task_id,
+      kind: "resumed",
+      reason: "terminal without transcript disposed; persisted result preserved",
+    }
+  }
+  return detachTerminalResident(context, record)
+}
 
 /** Release a terminal resident without relaunching its completed child session. */
 export async function detachTerminalResident(
