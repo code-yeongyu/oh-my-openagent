@@ -3,6 +3,7 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
+import { createChatMessageHandler } from "./chat-message-handler"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 function createContext(): RuntimeFallbackPluginInput {
@@ -111,6 +112,363 @@ describe("createEventHandler", () => {
     expect(abortCalls).toEqual([])
     expect(state.pendingFallbackModel).toBe(undefined)
   })
+
+  it("#given a persisted final silent clean stop while a fallback result is pending #when session.idle fires #then the next fallback is dispatched", async () => {
+    // given
+    const sessionID = "session-idle-silent-clean-stop"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+        },
+      },
+    }
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { id: "message-user", sessionID, role: "user" },
+          parts: [{ type: "text", text: "retry this" }],
+        },
+        {
+          info: {
+            id: "message-silent-stop",
+            sessionID,
+            role: "assistant",
+            finish: "unknown",
+            tokens: {
+              input: 0,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+          parts: [
+            { type: "step-start" },
+            { type: "step-finish", reason: "unknown" },
+          ],
+        },
+      ],
+    })
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.currentModel = "openai/gpt-5.4"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionFallbackTimeouts.set(sessionID, 1)
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:pending"]))
+    const dispatches: Array<{ sessionID: string; model: string; agent: string | undefined; source: string }> = []
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const helpers = createHelpers(deps, abortCalls, clearCalls)
+    helpers.resolveAgentForSessionFromContext = async () => "sisyphus"
+    helpers.autoRetryWithFallback = async (dispatchedSessionID, model, agent, source) => {
+      dispatches.push({ sessionID: dispatchedSessionID, model, agent, source })
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createEventHandler(deps, helpers)
+
+    // when
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then
+    expect(dispatches).toEqual([{
+      sessionID,
+      model: "google/gemini-2.5-pro",
+      agent: "sisyphus",
+      source: "session.idle.silent-clean-stop",
+    }])
+    expect(abortCalls).toEqual([])
+    expect(clearCalls).toEqual([sessionID])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionStatusRetryKeys.get(sessionID)).toEqual(new Set([
+      "silent-clean-stop:message-silent-stop",
+    ]))
+    expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
+  })
+
+  it("#given OpenCode recovers with output before idle #when session.idle inspects the final persisted turn #then OMO stands down and completes normal cleanup", async () => {
+    // given
+    const sessionID = "session-idle-recovered-before-idle"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+        },
+      },
+    }
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: {
+            id: "message-silent-stop",
+            sessionID,
+            role: "assistant",
+            finish: "unknown",
+            tokens: { input: 0, output: 0, reasoning: 0 },
+          },
+          parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+        },
+        {
+          info: {
+            id: "message-recovered",
+            sessionID,
+            role: "assistant",
+            finish: "stop",
+            tokens: { input: 10, output: 4, reasoning: 0 },
+          },
+          parts: [{ type: "text", text: "recovered output" }],
+        },
+      ],
+    })
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.currentModel = "openai/gpt-5.4"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionFallbackTimeouts.set(sessionID, 1)
+    const dispatches: string[] = []
+    const helpers = createHelpers(deps, [], [])
+    helpers.resolveAgentForSessionFromContext = async () => "sisyphus"
+    helpers.autoRetryWithFallback = async (_sessionID, model) => {
+      dispatches.push(model)
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createEventHandler(deps, helpers)
+
+    // when
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then
+    expect(dispatches).toEqual([])
+    expect(state.pendingFallbackModel).toBe(undefined)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+  })
+
+  it("#given duplicate idle events for one persisted silent stop #when both are handled #then the fallback advances only one rung", async () => {
+    // given
+    const sessionID = "session-idle-duplicate-silent-stop"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-7",
+          fallback_models: ["openai/gpt-5.4", "google/gemini-2.5-pro"],
+        },
+      },
+    }
+    deps.ctx.client.session.messages = async () => ({
+      data: [{
+        info: {
+          id: "message-duplicate-silent-stop",
+          sessionID,
+          role: "assistant",
+          finish: "unknown",
+          tokens: { input: 0, output: 0, reasoning: 0 },
+        },
+        parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+      }],
+    })
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    const dispatches: string[] = []
+    const helpers = createHelpers(deps, [], [])
+    helpers.resolveAgentForSessionFromContext = async () => "sisyphus"
+    helpers.autoRetryWithFallback = async (_sessionID, model) => {
+      dispatches.push(model)
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createEventHandler(deps, helpers)
+
+    // when
+    await Promise.all([
+      handler({ event: { type: "session.idle", properties: { sessionID } } }),
+      handler({ event: { type: "session.idle", properties: { sessionID } } }),
+    ])
+
+    // then
+    expect(dispatches).toEqual(["openai/gpt-5.4"])
+    expect(deps.sessionStates.get(sessionID)?.fallbackIndex).toBe(0)
+  })
+
+  it("#given a blocked silent-stop fallback dispatch #when the same idle arrives later #then the message may retry the same rung", async () => {
+    // given
+    const sessionID = "session-idle-blocked-silent-stop"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-7",
+          fallback_models: ["openai/gpt-5.4"],
+        },
+      },
+    }
+    deps.ctx.client.session.messages = async () => ({
+      data: [{
+        info: {
+          id: "message-blocked-silent-stop",
+          sessionID,
+          role: "assistant",
+          finish: "unknown",
+          tokens: { input: 0, output: 0, reasoning: 0 },
+        },
+        parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+      }],
+    })
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    const dispatches: string[] = []
+    const helpers = createHelpers(deps, [], [])
+    helpers.resolveAgentForSessionFromContext = async () => "sisyphus"
+    helpers.autoRetryWithFallback = async (_sessionID, model) => {
+      dispatches.push(model)
+      return { accepted: false, status: "blocked", reason: "reserved" }
+    }
+    const handler = createEventHandler(deps, helpers)
+
+    // when
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+    // then
+    expect(dispatches).toEqual(["openai/gpt-5.4", "openai/gpt-5.4"])
+    expect(deps.sessionStates.get(sessionID)?.fallbackIndex).toBe(-1)
+  })
+
+  for (const invalidation of ["session.stop", "session.deleted", "chat.message"] as const) {
+    it(`#given silent-stop history lookup is pending #when ${invalidation} invalidates the session #then stale idle cannot dispatch`, async () => {
+      // given
+      const sessionID = `session-idle-history-race-${invalidation}`
+      const deps = createDeps()
+      deps.pluginConfig = {
+        agents: {
+          sisyphus: {
+            model: "anthropic/claude-opus-4-7",
+            fallback_models: ["openai/gpt-5.4"],
+          },
+        },
+      }
+      const state = createFallbackState("anthropic/claude-opus-4-7")
+      deps.sessionStates.set(sessionID, state)
+      let releaseMessages: (() => void) | undefined
+      let markMessagesStarted: (() => void) | undefined
+      const messagesStarted = new Promise<void>((resolve) => {
+        markMessagesStarted = resolve
+      })
+      deps.ctx.client.session.messages = async () => {
+        markMessagesStarted?.()
+        await new Promise<void>((resolve) => {
+          releaseMessages = resolve
+        })
+        return {
+          data: [{
+            info: {
+              id: "message-history-race",
+              sessionID,
+              role: "assistant",
+              finish: "unknown",
+              tokens: { input: 0, output: 0, reasoning: 0 },
+            },
+            parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+          }],
+        }
+      }
+      const dispatches: string[] = []
+      const helpers = createHelpers(deps, [], [])
+      helpers.resolveAgentForSessionFromContext = async () => "sisyphus"
+      helpers.autoRetryWithFallback = async (_sessionID, model) => {
+        dispatches.push(model)
+        return { accepted: true, status: "dispatched" }
+      }
+      const handler = createEventHandler(deps, helpers)
+      const idlePromise = handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await messagesStarted
+
+      // when
+      if (invalidation === "chat.message") {
+        await createChatMessageHandler(deps)(
+          { sessionID, model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+          { message: {} },
+        )
+      } else {
+        await handler({ event: { type: invalidation, properties: { sessionID } } })
+      }
+      if (!releaseMessages) throw new Error("message lookup did not start")
+      releaseMessages()
+      await idlePromise
+
+      // then
+      expect(dispatches).toEqual([])
+    })
+
+    it(`#given silent-stop agent resolution is pending #when ${invalidation} invalidates the session #then stale idle cannot mutate fallback state`, async () => {
+      // given
+      const sessionID = `session-idle-agent-race-${invalidation}`
+      const deps = createDeps()
+      deps.pluginConfig = {
+        agents: {
+          sisyphus: {
+            model: "anthropic/claude-opus-4-7",
+            fallback_models: ["openai/gpt-5.4"],
+          },
+        },
+      }
+      const state = createFallbackState("anthropic/claude-opus-4-7")
+      deps.sessionStates.set(sessionID, state)
+      deps.ctx.client.session.messages = async () => ({
+        data: [{
+          info: {
+            id: "message-agent-race",
+            sessionID,
+            role: "assistant",
+            finish: "unknown",
+            tokens: { input: 0, output: 0, reasoning: 0 },
+          },
+          parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+        }],
+      })
+      let releaseAgent: (() => void) | undefined
+      let markAgentStarted: (() => void) | undefined
+      const agentStarted = new Promise<void>((resolve) => {
+        markAgentStarted = resolve
+      })
+      const dispatches: string[] = []
+      const helpers = createHelpers(deps, [], [])
+      helpers.resolveAgentForSessionFromContext = async () => {
+        markAgentStarted?.()
+        await new Promise<void>((resolve) => {
+          releaseAgent = resolve
+        })
+        return "sisyphus"
+      }
+      helpers.autoRetryWithFallback = async (_sessionID, model) => {
+        dispatches.push(model)
+        return { accepted: true, status: "dispatched" }
+      }
+      const handler = createEventHandler(deps, helpers)
+      const idlePromise = handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await agentStarted
+
+      // when
+      if (invalidation === "chat.message") {
+        await createChatMessageHandler(deps)(
+          { sessionID, model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+          { message: {} },
+        )
+      } else {
+        await handler({ event: { type: invalidation, properties: { sessionID } } })
+      }
+      if (!releaseAgent) throw new Error("agent resolution did not start")
+      releaseAgent()
+      await idlePromise
+
+      // then
+      expect(dispatches).toEqual([])
+      expect(state.fallbackIndex).toBe(-1)
+    })
+  }
 
   it("#given a cancelled session #when session.error receives an abort error #then fallback retry state is reset", async () => {
     const sessionID = "session-cancelled"

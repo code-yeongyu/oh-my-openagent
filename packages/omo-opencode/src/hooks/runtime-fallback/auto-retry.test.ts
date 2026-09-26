@@ -212,7 +212,11 @@ describe("createAutoRetryHelpers", () => {
     // then
     expect(promptCalls.count).toBe(1)
     expect(capturedBody?.messageID).toBe("msg_original_user")
-    expect(capturedBody?.parts).toEqual([{ type: "text", text: "retry this", id: "prt_original" }])
+    expect(capturedBody?.parts).toEqual([{
+      type: "text",
+      text: `retry this\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+      id: "prt_original",
+    }])
   })
 
   test("#given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed", async () => {
