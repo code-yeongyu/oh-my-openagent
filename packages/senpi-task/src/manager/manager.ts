@@ -1081,8 +1081,12 @@ class TaskManagerImpl implements TaskManager {
       nextModel,
     ]
     const nextEpoch = record.notification.run_epoch + 1
+    // The failed rung's daemon session was just closed. Until the next rung's spawn stamps its own
+    // session, the record must not name the closed one: a daemon child session reconciling these
+    // records would find it gone and reclaim this live task as an orphan (omo 2026-09-26 -p hang).
+    const { runner_kind: _closedRunner, host_session: _closedSession, ...withoutClosedSession } = record
     const nextRecord: TaskRecord = {
-      ...record,
+      ...withoutClosedSession,
       model: nextModel.display,
       resolved_model: nextModel,
       fallback_models: remainingModels,

@@ -8,6 +8,7 @@ import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { isHostSessionRecord } from "./host-session"
 import { reconcileHostSessionOrphan } from "./host-session-revive"
+import { reviveClaimed } from "./reconcile-reclamation"
 import { getLifecycleReattachPorts } from "./port"
 import { beginLocalReclamation, reconcileScopedRevival } from "./reconcile-revival"
 import { reclaimOrphanedResident } from "./residency"
@@ -32,7 +33,7 @@ export async function reconcileOnSessionStart(
   // Ownership is checked before terminality, residency, or mode. A live sibling owns the record in
   // every status and this process must not mutate it.
   for (const record of context.store.list().records) {
-    if (await hasForeignLiveOwner(context, record, parentSessionId)) {
+    if (await hasForeignLiveOwner(context, record)) {
       outcomes.push(parentSessionId === undefined
         ? {
             task_id: record.task_id,
@@ -135,8 +136,15 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 
   const pid = record.pid
   if (pid === undefined) {
-    await markLost(context, record.task_id, "rpc task had no recorded pid")
-    return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
+    // No pid means no process can still hold it. A daemon child between runtime-fallback rungs has
+    // neither a pid nor a recorded session, and a sweep after its owner died must recover it through
+    // the same revival the daemon-session branch uses: resume its transcript (or its v1 spawn spec),
+    // and park it rpc_detached on a transient respawn failure instead of losing it.
+    if (context.config.reattach_on_reconcile === false) {
+      await markLost(context, record.task_id, "rpc task had no recorded pid")
+      return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
+    }
+    return reviveClaimed(context, record, "rpc_detached", newestSessionPath(context, record.task_id))
   }
 
   const alive = context.signaller.isAlive(pid)
@@ -244,26 +252,12 @@ async function reattachLegacyRecord(
   return { task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" }
 }
 
-async function hasForeignLiveOwner(
-  context: LifecycleContext,
-  record: TaskRecord,
-  parentSessionId: string | undefined,
-): Promise<boolean> {
+async function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): Promise<boolean> {
   if (isHostSessionRecord(record)) {
     if (record.residency_state !== "resident") return false
-    // Its own parent session decides by session liveness (#8659). ANY other session only sweeps
-    // crashed-process orphans, so a live owning process still fences the record there: runtime
-    // fallback closes one rung's session before opening the next, and that next child session
-    // reconciles these same records from inside the daemon (omo 2026-09-26: it reattached the
-    // closed rung, bumped the epoch, and the parent's -p run waited forever).
-    if (record.parent_session_id !== parentSessionId && isLiveForeignProcess(context, record)) return true
     return await context.hostSessionProbe.daemonAlive(record.host_session)
       && await context.hostSessionProbe.sessionLive(record.host_session)
   }
-  return isLiveForeignProcess(context, record)
-}
-
-function isLiveForeignProcess(context: LifecycleContext, record: TaskRecord): boolean {
   return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
 }
 
