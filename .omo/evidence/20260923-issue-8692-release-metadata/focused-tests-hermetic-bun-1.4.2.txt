@@ -1,0 +1,29 @@
+bun test v1.4.2 (744846f84)
+
+script/omo-ai-publish-shape.test.ts:
+(pass) omo-ai publish workflow shape > preserves an explicit prerelease version and derives its beta dist tag [23.51ms]
+(pass) omo-ai publish workflow shape > derives GitHub prerelease and Latest flags from the release semver [14.16ms]
+(pass) omo-ai publish workflow shape > maps every root release to a unique ordered prerelease [5.17ms]
+(pass) omo-ai publish workflow shape > checks out before asserting root bin ownership [1.61ms]
+(pass) omo-ai publish workflow shape > stamps omo-native in both release paths and stages its manifest [2.25ms]
+(pass) omo-ai publish workflow shape > builds and verifies the payload before stripping token auth [0.37ms]
+(pass) omo-ai publish workflow shape > publishes omo-ai through beta-only OIDC after every wrapper publish [2.14ms]
+(pass) omo-ai publish workflow shape > always runs readiness, dist-tag guard, and live verification [2.13ms]
+(pass) omo-ai publish workflow shape > keeps trusted publishing unconditional and delegates validated channel metadata [0.27ms]
+
+script/release-latest-flag.test.ts:
+(pass) resolveReleaseFlags > #given a prerelease above every published release #when resolved #then it is a non-Latest prerelease [1.52ms]
+(pass) resolveReleaseFlags > #given an older-line hotfix below a published release #when resolved #then Latest is left alone [0.56ms]
+(pass) resolveReleaseFlags > #given a rerun for an already published prerelease #when resolved #then it stays a non-Latest prerelease [0.04ms]
+(pass) resolveReleaseFlags > #given a stable version after its own betas #when resolved #then the stable becomes Latest [0.13ms]
+(pass) resolveReleaseFlags > #given prerelease channels #when resolved #then all stay outside Latest [0.08ms]
+(pass) resolveReleaseFlags > #given tags that are not semver #when resolved #then they are ignored instead of throwing [0.07ms]
+(pass) resolveReleaseFlags > #given a leading v on the candidate #when resolved #then it is tolerated like the tag list [0.28ms]
+(pass) resolveReleaseFlags > #given no published releases yet #when resolved #then the first release is Latest [0.04ms]
+(pass) resolveReleaseFlags > #given a candidate that is not a release version #when resolved #then it throws instead of guessing [9.42ms]
+(pass) local publish path > #given the local publish script #when it creates a release #then it passes a resolved flag from the published tags [3.57ms]
+
+ 19 pass
+ 0 fail
+ 94 expect() calls
+Ran 19 tests across 2 files. [509.00ms]

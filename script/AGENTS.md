@@ -30,7 +30,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `patch-node-require-shim.ts` | Patches `dist/index.js` for Node/Electron require compatibility |
 | `publish.ts` | Local multi-package publish alternative (platform packages + npm) |
 | `generate-changelog.ts` | Release notes from git log, filters bot commits (imports `RELEASE_VERSION_PATTERN` from `release-latest-flag.ts`) |
-| `release-latest-flag.ts` | Owns the GitHub **Latest** badge rule for every release-creation path (`publish.yml` omo + LazyCodex steps, `publish.ts`): `resolveLatestFlag(version, publishedTags)` -> `--latest` unless an already published tag has a higher semver, then `--latest=false`. CLI reads tags on stdin: `gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' \| bun script/release-latest-flag.ts <version>`. The pipeline never passes `--prerelease` |
+| `release-latest-flag.ts` | Owns GitHub release metadata for every release-creation path (`publish.yml` omo + LazyCodex steps, `publish.ts`): semver prereleases resolve to `--prerelease` plus `--latest=false`; stable versions resolve to `--latest` unless a published tag has a higher semver. The CLI reads tags on stdin and prints one flag per line. |
 | `stats.ts` | npm + GitHub-release download counts (`gh api --paginate --slurp`; weekly `stats.yml`) |
 | `sync-lazycodex-marketplace.ts` | Copy plugin + marketplace payload into the `code-yeongyu/lazycodex` repo (publish.yml stable releases) |
 | `lazycodex-marketplace-validation.ts` | Validate the synced marketplace payload (runtime path args incl. Windows/absolute/`components/*/dist/*.js`) |

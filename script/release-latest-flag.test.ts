@@ -2,48 +2,48 @@
 
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { resolveLatestFlag } from "./release-latest-flag"
+import { resolveReleaseFlags } from "./release-latest-flag"
 
 const RELEASED = ["v5.0.0-beta.40", "v5.0.0-beta.39", "v5.0.0-beta.20", "v5.0.0-beta.19", "v4.19.4", "_pr-attachments"]
 
-describe("resolveLatestFlag", () => {
-  test("#given a version above every published release #when resolved #then it becomes Latest", () => {
+describe("resolveReleaseFlags", () => {
+  test("#given a prerelease above every published release #when resolved #then it is a non-Latest prerelease", () => {
     // given / when
-    const flag = resolveLatestFlag("5.0.0-beta.41", RELEASED)
+    const flags = resolveReleaseFlags("5.0.0-beta.41", RELEASED)
 
     // then
-    expect(flag).toBe("--latest")
+    expect(flags).toEqual(["--prerelease", "--latest=false"])
   })
 
   test("#given an older-line hotfix below a published release #when resolved #then Latest is left alone", () => {
     // given / when
-    const flag = resolveLatestFlag("4.19.5", RELEASED)
+    const flags = resolveReleaseFlags("4.19.5", RELEASED)
 
     // then
-    expect(flag).toBe("--latest=false")
+    expect(flags).toEqual(["--latest=false"])
   })
 
-  test("#given a rerun for an already published version #when resolved #then it still resolves to Latest", () => {
+  test("#given a rerun for an already published prerelease #when resolved #then it stays a non-Latest prerelease", () => {
     // given / when
-    const flag = resolveLatestFlag("5.0.0-beta.40", RELEASED)
+    const flags = resolveReleaseFlags("5.0.0-beta.40", RELEASED)
 
     // then
-    expect(flag).toBe("--latest")
+    expect(flags).toEqual(["--prerelease", "--latest=false"])
   })
 
   test("#given a stable version after its own betas #when resolved #then the stable becomes Latest", () => {
     // given / when
-    const flag = resolveLatestFlag("5.0.0", RELEASED)
+    const flags = resolveReleaseFlags("5.0.0", RELEASED)
 
     // then
-    expect(flag).toBe("--latest")
+    expect(flags).toEqual(["--latest"])
   })
 
-  test("#given multi-digit prerelease counters #when compared #then ordering is numeric, not lexical", () => {
+  test("#given prerelease channels #when resolved #then all stay outside Latest", () => {
     // given / when / then
-    expect(resolveLatestFlag("5.0.0-beta.10", ["v5.0.0-beta.9"])).toBe("--latest")
-    expect(resolveLatestFlag("5.0.0-beta.9", ["v5.0.0-beta.10"])).toBe("--latest=false")
-    expect(resolveLatestFlag("5.0.0-beta.100", ["v5.0.0-beta.99"])).toBe("--latest")
+    expect(resolveReleaseFlags("5.0.0-beta.10", ["v5.0.0-beta.9"])).toEqual(["--prerelease", "--latest=false"])
+    expect(resolveReleaseFlags("5.0.0-rc.1", [])).toEqual(["--prerelease", "--latest=false"])
+    expect(resolveReleaseFlags("5.0.0-alpha.1", [])).toEqual(["--prerelease", "--latest=false"])
   })
 
   test("#given tags that are not semver #when resolved #then they are ignored instead of throwing", () => {
@@ -51,25 +51,25 @@ describe("resolveLatestFlag", () => {
     const tags = ["_pr-attachments", "next", "release-notes", "", "v5.0.0-beta.40"]
 
     // when / then
-    expect(resolveLatestFlag("5.0.0-beta.41", tags)).toBe("--latest")
-    expect(resolveLatestFlag("5.0.0-beta.39", tags)).toBe("--latest=false")
+    expect(resolveReleaseFlags("5.0.0", tags)).toEqual(["--latest"])
+    expect(resolveReleaseFlags("4.19.3", tags)).toEqual(["--latest=false"])
   })
 
   test("#given a leading v on the candidate #when resolved #then it is tolerated like the tag list", () => {
     // given / when / then
-    expect(resolveLatestFlag("v5.0.0-beta.41", RELEASED)).toBe("--latest")
-    expect(resolveLatestFlag("v4.19.5", RELEASED)).toBe("--latest=false")
+    expect(resolveReleaseFlags("v5.0.0-beta.41", RELEASED)).toEqual(["--prerelease", "--latest=false"])
+    expect(resolveReleaseFlags("v4.19.5", RELEASED)).toEqual(["--latest=false"])
   })
 
   test("#given no published releases yet #when resolved #then the first release is Latest", () => {
     // given / when / then
-    expect(resolveLatestFlag("0.1.0", [])).toBe("--latest")
+    expect(resolveReleaseFlags("0.1.0", [])).toEqual(["--latest"])
   })
 
   test("#given a candidate that is not a release version #when resolved #then it throws instead of guessing", () => {
     // given / when / then
-    expect(() => resolveLatestFlag("next", RELEASED)).toThrow()
-    expect(() => resolveLatestFlag("5.0.0-beta.41+build.7", RELEASED)).toThrow()
+    expect(() => resolveReleaseFlags("next", RELEASED)).toThrow()
+    expect(() => resolveReleaseFlags("5.0.0-beta.41+build.7", RELEASED)).toThrow()
   })
 })
 
@@ -87,10 +87,9 @@ describe("local publish path", () => {
       .find((line) => line.includes("gh release create"))
 
     // then
-    expect(source).toContain('import { resolveLatestFlag } from "./release-latest-flag"')
+    expect(source).toContain('import { resolveReleaseFlags } from "./release-latest-flag"')
     expect(source).toContain("gh release list --exclude-drafts")
-    expect(createLine).toContain("${latestFlag}")
-    expect(createLine).not.toContain("--prerelease")
+    expect(createLine).toContain("${releaseFlags}")
     expect(createLine).not.toContain("--latest ")
   })
 })
