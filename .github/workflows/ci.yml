@@ -711,7 +711,11 @@ jobs:
 
       - name: Dry-run publish
         if: needs.ci-mode.outputs.run_heavy == 'true'
-        run: npm publish --dry-run --ignore-scripts --tag beta
+        # dev carries the last released version, which npm refuses to publish over.
+        # Stamp a throwaway prerelease in this job's checkout so the dry run checks the package, not release timing.
+        run: |
+          npm pkg set version="0.0.0-ci.${{ github.run_id }}.${{ github.run_attempt }}"
+          npm publish --dry-run --ignore-scripts --tag ci
         working-directory: packages/omo-native
 
       - name: Write job summary
