@@ -18,6 +18,7 @@ export const BUILD_NODES: BuildNode[] = [
 	{ id: "tui", command: "bun", args: ["build", "packages/omo-opencode/src/tui.ts", "--outdir", "dist", "--target", "bun", "--format", "esm", ...OPENTUI_EXTERNALS.flatMap((name) => ["--external", name])], deps: [] },
 	{ id: "shared-skills-assets", command: "bun", args: ["run", "build:shared-skills-assets"], deps: ["index"] },
 	{ id: "node-require-shim", command: "bun", args: ["run", "build:node-require-shim"], deps: ["index"] },
+	{ id: "v2-index", command: "node", args: ["script/write-v2-shim.mjs"], deps: ["index"] },
 	{ id: "declarations", command: "tsc", args: ["--emitDeclarationOnly"], deps: [] },
 	{ id: "cli", command: "bun", args: ["build", "packages/omo-opencode/src/cli/index.ts", "--outdir", "dist/cli", "--target", "bun", "--format", "esm"], deps: [] },
 	{ id: "cli-node", command: "bun", args: ["run", "build:cli-node"], deps: [] },
