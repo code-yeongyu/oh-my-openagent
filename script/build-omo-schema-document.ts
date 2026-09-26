@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { OmoConfigSchema } from "../packages/omo-config-core/src/schema"
 import { createOhMyOpenCodeJsonSchema } from "./build-schema-document"
+import { optionalizeDefaultedProperties } from "./json-schema-defaulted-optional"
 
 export const OMO_SCHEMA_ID =
   "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
@@ -19,6 +20,7 @@ export function createOmoJsonSchema(): Record<string, unknown> {
     target: "draft-7",
     unrepresentable: "any",
   }) as Record<string, unknown>
+  optionalizeDefaultedProperties(jsonSchema)
   const properties = requiredRecord(jsonSchema.properties, "properties")
   const profiles = requiredRecord(properties.profiles, "properties.profiles")
   const profile = requiredRecord(profiles.additionalProperties, "properties.profiles.additionalProperties")
