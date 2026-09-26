@@ -114,6 +114,8 @@ export interface DelegateTaskToolOptions {
   /** Reload model-bearing config at task invocation time so edits are honored without rebuilding tools. */
   loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories">
   sisyphusAgentConfig?: SisyphusAgentConfig
+  /** Mirrors `claude_code.agents`; when false, `.claude/agents` definitions are not read during subagent matching. */
+  claudeCodeAgentsEnabled?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
