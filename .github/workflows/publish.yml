@@ -755,7 +755,10 @@ jobs:
           set -uo pipefail
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
-          ATTEMPTS="${PROPAGATION_ATTEMPTS:-20}"
+          # npm reads have lagged successful publishes by up to 16 minutes in
+          # this release lane. Keep a 25-minute default budget so the wrapper
+          # publish does not strand an otherwise successful platform release.
+          ATTEMPTS="${PROPAGATION_ATTEMPTS:-100}"
           DELAY="${PROPAGATION_DELAY:-15}"
 
           PENDING=()

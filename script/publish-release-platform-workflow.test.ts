@@ -37,6 +37,8 @@ describe("release and platform publish workflows", () => {
     const releaseUsesMetadata = workflow.includes("VERSION: ${{ needs.release-metadata.outputs.version }}")
     const wrappersVerifyPlatformPackages = workflow.includes("name: Verify platform packages are published") &&
       workflow.includes("Missing platform package(s); refusing to publish wrappers.")
+    const platformPropagationBudget = workflow.includes('ATTEMPTS="${PROPAGATION_ATTEMPTS:-100}"') &&
+      workflow.includes('DELAY="${PROPAGATION_DELAY:-15}"')
 
     // #then
     expect(computesReleaseMetadata, "release metadata must be a first-class job output").toBe(true)
@@ -45,6 +47,7 @@ describe("release and platform publish workflows", () => {
     expect(mainWaitsForPlatform, "wrapper publish must wait for platform success unless pre-published platforms are explicitly verified").toBe(true)
     expect(releaseUsesMetadata, "release tail must use the shared release metadata").toBe(true)
     expect(wrappersVerifyPlatformPackages, "wrappers must verify matching platform binaries exist before npm publish").toBe(true)
+    expect(platformPropagationBudget, "wrapper publish must tolerate the observed 12-16 minute npm propagation lag").toBe(true)
   })
 
   test("fails when a required platform artifact is missing", () => {
