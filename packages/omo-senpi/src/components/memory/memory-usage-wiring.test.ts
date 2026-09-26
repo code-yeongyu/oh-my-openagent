@@ -6,6 +6,31 @@ import { registerMemoryUsage } from "./memory-usage-wiring"
 import { eventContext, fixture, toolCall } from "./memory-usage.test-support"
 
 describe("registerMemoryUsage", () => {
+  test("#given a read tool and context only on the callback context #when dispatched then flushed #then the memory ledger records the read", async () => {
+    // #given
+    const { context, repoDir } = await fixture()
+    const pi = new FakeExtensionAPI()
+    const sessionContext = eventContext("session-1")
+    const trackers = registerMemoryUsage(pi, {
+      resolveContext: (candidate) => candidate === sessionContext ? context : undefined,
+      resolveCwd: () => repoDir,
+      now: () => new Date("2026-01-15T10:00:00Z"),
+    })
+
+    // #when
+    await pi.dispatch(
+      "tool_call",
+      toolCall("read", { path: join(repoDir, "reference", "project", "foo.md") }),
+      sessionContext,
+    )
+    const tracker = trackers.get(context.identity)
+    await tracker?.flush()
+
+    // #then
+    const ledger = await readMemoryUsageLedger(memoryUsagePaths(context.identityPaths).ledgerPath)
+    expect(ledger["reference/project/foo.md"]).toEqual({ count: 1, lastUsedAt: "2026-01-15T10:00:00.000Z" })
+  })
+
   test("#given a read tool targeting reference/project/foo.md #when dispatched then flushed #then foo.md.count is 1", async () => {
     const { context, repoDir } = await fixture()
     const pi = new FakeExtensionAPI()
