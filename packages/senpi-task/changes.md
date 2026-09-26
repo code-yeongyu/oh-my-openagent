@@ -1,3 +1,19 @@
+## Another session's reconcile no longer steals a live parent's daemon child between fallback rungs
+
+`lifecycle/reconcile.ts` `hasForeignLiveOwner` decided a resident `host-session` record's owner only by
+`daemonAlive && sessionLive` (#8659). Runtime fallback (`manager.ts` `#tryRuntimeFallback`) closes the failed
+rung's session before the next rung's session opens, and that next child session runs the omo
+extension INSIDE the daemon, whose `session_start` reconciles the same project records. In that gap the
+parent's record names a closed session, so the child's pass treated it as an orphan: it claimed the
+record (`host_pid` became the daemon worker), reattached the closed rung's session path, and bumped
+`run_epoch`. The parent's real outcome was then dropped as stale, the task stayed `running`, and
+`omo -p` never exited (reproduced 2/2 live on a lapsed OpenCode Go key).
+
+A host-session record of ANOTHER parent session is now foreign-owned while its `host_pid` is a live
+process other than this one, before the session probe is asked; its own parent session keeps the
+#8659 session-liveness decision, and a dead owner is still reclaimed. Tests:
+`host-session-owner-alive.test.ts`.
+
 ## Task-category coverage for omo doctor and omo setup (#8858)
 
 `category/coverage.ts` (new): `resolveCategoryCoverage(config, registry)` returns the usable categories (`resolveAvailableCategoryNames`) and, per unusable one, the chain providers with no model in the registry (the resolver's `missingChainProviders`, now exported with `parseAvailableModels`). Disabled categories are neither; a registry without a model list throws. Exported from `category/index.ts` and as `@oh-my-opencode/senpi-task/category-coverage`. omo#8857.
