@@ -170,9 +170,13 @@ async function respawnProcess(input: {
   }
 }
 
-/** A session the daemon still held when this child re-opened it: re-joined, not restarted. */
+/**
+ * A session the daemon still held when this child re-opened it: re-joined, not restarted. This is the
+ * daemon's answer to the open, never the handle's own liveness (`attached`), which is true for every
+ * freshly opened handle and would leave a reopened, stopped session without its continuation.
+ */
 function isAttachedHostSession(handle: RpcChildHandle): boolean {
-  return "kind" in handle && handle.kind === "host-session" && (handle as { attached?: unknown }).attached === true
+  return handle.rejoinedLiveSession === true
 }
 
 async function continueInterruptedTurn(record: TaskRecord, sessionPath: string, handle: ManagedChildHandle): Promise<void> {

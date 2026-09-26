@@ -170,6 +170,7 @@ export class RpcHostRunner {
     // from its JSONL keeps its transcript - replaying the prompt would duplicate the work.
     if (spec.resumeSessionPath === undefined) await this.startTurn(handle, spec)
     return Object.assign(handle, {
+      rejoinedLiveSession: opened.attached,
       spawnSpec: {
         cwd: spec.cwd,
         ...(spec.extensions === undefined ? {} : { extensions: spec.extensions }),

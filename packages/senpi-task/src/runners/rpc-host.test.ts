@@ -106,6 +106,7 @@ describe("RpcHostRunner start", () => {
     expect(ofType(host.commands, "prompt")).toHaveLength(1)
     expect(ofType(host.commands, "switch_session")).toHaveLength(0)
     expect(host.sessions().map((session) => session.sessionPath)).toEqual([sessionPath])
+    expect(resumed.rejoinedLiveSession).toBe(true)
   })
 
   test("#given a session path the daemon no longer holds #when the child resumes #then it reopens from the path, never re-prompts and stays steerable", async () => {
@@ -119,6 +120,7 @@ describe("RpcHostRunner start", () => {
 
     // then
     expect(isHostSessionHandle(handle) && handle.attached).toBe(true)
+    expect(handle.rejoinedLiveSession).toBe(false)
     expect(ofType(host.commands, "prompt")).toHaveLength(0)
     expect(ofType(host.commands, "switch_session")).toHaveLength(0)
     expect(host.sessions().map((session) => session.sessionPath)).toEqual([sessionPath])
