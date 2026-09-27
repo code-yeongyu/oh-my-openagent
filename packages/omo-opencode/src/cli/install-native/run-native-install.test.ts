@@ -9,6 +9,7 @@ import {
   nativeInstallSuccessLine,
   runNativeInstall,
 } from "./index"
+import { nativePackageSpec } from "./plan"
 import type { NativeInstallSpawnResult, OmoBinEnvironment } from "./index"
 import { createBinFixtureRoot, writeGlobalPackageBin } from "./omo-bin-test-fixtures"
 
@@ -16,6 +17,9 @@ interface SpawnCall {
   readonly command: string
   readonly args: readonly string[]
 }
+
+// The installed spec follows the plugin's own channel: `omo-ai` for a stable build, `omo-ai@beta` for a prerelease.
+const SPEC = nativePackageSpec()
 
 const roots: string[] = []
 
@@ -51,7 +55,7 @@ function recordingSpawn(result: NativeInstallSpawnResult | (() => never), onSpaw
 }
 
 describe("runNativeInstall", () => {
-  test("#given bun on PATH #when the native edition is installed #then it runs bun add -g omo-ai@beta", async () => {
+  test("#given bun on PATH #when the native edition is installed #then it runs bun add -g on the plugin's channel", async () => {
     // given
     const { calls, spawn } = recordingSpawn({ exitCode: 0 })
 
@@ -64,7 +68,7 @@ describe("runNativeInstall", () => {
     })
 
     // then
-    expect(calls).toEqual([{ command: "bun", args: ["add", "-g", "omo-ai@beta"] }])
+    expect(calls).toEqual([{ command: "bun", args: ["add", "-g", SPEC] }])
     expect(outcome.ok).toBe(true)
     expect(outcome.notes).toEqual([])
   })
@@ -82,7 +86,7 @@ describe("runNativeInstall", () => {
     })
 
     // then
-    expect(calls).toEqual([{ command: "npm", args: ["i", "-g", "omo-ai@beta"] }])
+    expect(calls).toEqual([{ command: "npm", args: ["i", "-g", SPEC] }])
     expect(outcome.ok).toBe(true)
     expect(outcome.notes).toEqual([NATIVE_RECOMMENDED_RUNTIME_NOTE])
   })
@@ -101,7 +105,7 @@ describe("runNativeInstall", () => {
 
     // then
     expect(outcome.ok).toBe(false)
-    expect(outcome.failure?.manualCommand).toBe("bun add -g omo-ai@beta")
+    expect(outcome.failure?.manualCommand).toBe(`bun add -g ${SPEC}`)
     expect(outcome.failure?.reason).toContain("exited with code 7")
     expect(outcome.failure?.reason).toContain("EACCES: permission denied")
   })
@@ -123,7 +127,7 @@ describe("runNativeInstall", () => {
     // then
     expect(outcome.ok).toBe(false)
     expect(outcome.failure?.reason).toBe("spawn npm ENOENT")
-    expect(outcome.failure?.manualCommand).toBe("npm i -g omo-ai@beta")
+    expect(outcome.failure?.manualCommand).toBe(`npm i -g ${SPEC}`)
   })
 })
 
@@ -185,7 +189,7 @@ describe("runNativeInstall legacy omo bin", () => {
     // then
     const trapNotes = npmOutcome.notes.filter((note) => note.includes("npm uninstall -g oh-my-openagent"))
     expect(trapNotes).toHaveLength(1)
-    expect(trapNotes[0]).toContain("npm i -g omo-ai@beta")
+    expect(trapNotes[0]).toContain(`npm i -g ${SPEC}`)
     expect(npmOutcome.verified).toBe(true)
   })
 
@@ -259,7 +263,7 @@ describe("native install messages", () => {
     const lines = nativeInstallFailureLines(failure)
 
     // then
-    expect(lines.join("\n")).toContain("npm i -g omo-ai@beta")
+    expect(lines.join("\n")).toContain(`npm i -g ${SPEC}`)
     expect(lines.join("\n")).toContain("npm exited with code 1")
     expect(lines.join("\n")).toContain(NATIVE_SETUP_COMMAND)
   })

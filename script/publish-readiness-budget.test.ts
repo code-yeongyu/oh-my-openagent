@@ -43,7 +43,7 @@ interface Outcome { readonly status: number; readonly stdout: string; readonly s
  * shims) - the first version of this harness did that and both cases hung to the 30 s budget on
  * Windows while passing on POSIX. The workflow text itself stays untouched.
  */
-function runReadiness(readyAfterViews: number): Outcome {
+function runReadiness(readyAfterViews: number, channel: { version: string; distTag: string } = { version: "5.0.0-0.beta.42", distTag: "beta" }): Outcome {
   const root = mkdtempSync(join(tmpdir(), "publish-readiness-"))
   try {
     const counter = join(root, "npm-views")
@@ -64,7 +64,7 @@ function runReadiness(readyAfterViews: number): Outcome {
     writeFileSync(script, preamble + readinessRunBlock())
     const result = spawnSync("bash", [script], {
       encoding: "utf8",
-      env: { ...process.env, COUNTER: counter, SLEEPS: sleeps, READY_AFTER: String(readyAfterViews), OMO_AI_VERSION: "5.0.0-0.beta.42", ALREADY_PUBLISHED: "false" },
+      env: { ...process.env, COUNTER: counter, SLEEPS: sleeps, READY_AFTER: String(readyAfterViews), OMO_AI_VERSION: channel.version, OMO_AI_DIST_TAG: channel.distTag, ALREADY_PUBLISHED: "false" },
     })
     return {
       status: result.status ?? -1,
@@ -82,6 +82,12 @@ describe("publish.yml post-publish-verify registry readiness", () => {
     const outcome = runReadiness(2 * 20)
     expect(outcome.status).toBe(0)
     expect(outcome.stdout).toContain("is ready")
+  })
+
+  test("#given a stable release on the latest dist-tag #when the registry catches up #then readiness passes on the same budget", () => {
+    const outcome = runReadiness(2 * 20, { version: "5.0.0", distTag: "latest" })
+    expect(outcome.status).toBe(0)
+    expect(outcome.stdout).toContain("omo-ai@5.0.0 is ready")
   })
 
   test("#given the registry never exposes the version #when the budget is exhausted #then it fails and names the publish-vs-propagation distinction", () => {

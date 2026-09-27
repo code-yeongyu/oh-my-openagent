@@ -21,7 +21,7 @@ Late 4.x releases of oh-my-openagent and oh-my-opencode, up to and including 4.1
 omo --version
 ```
 
-A bare version such as `4.19.4` means the legacy package still owns the name. OmO Native answers with `omo 5.0.0-0.beta.NN (engine: senpi ...)` instead.
+A bare version such as `4.19.4` means the legacy package still owns the name. OmO Native answers with `omo 5.0.0 (engine: senpi ...)` instead.
 
 To see whether npm installed the legacy copy:
 
@@ -40,21 +40,21 @@ You need bun (recommended) or npm, and Node 24 or newer. Everything below uses b
 Run the installer, not a raw `bun add -g`:
 
 ```bash
-bunx oh-my-openagent@beta install --platform=native
+bunx oh-my-openagent install --platform=native
 ```
 
-Without bun, use `npx oh-my-openagent@beta install --platform=native`. The `@beta` tag is required either way: `latest` is still 4.19.4, and that release has no `native` platform.
+Without bun, use `npx oh-my-openagent install --platform=native`. It needs oh-my-openagent 5.0.0 or newer; 4.19.x has no `native` platform.
 
 What the command does, in order:
 
 1. Looks for a global `omo` owned by oh-my-openagent, oh-my-opencode or lazycodex and removes that one file. The package that owns it and every other command it installs stay in place. An installer doesn't get to uninstall someone's whole global package.
-2. Runs `bun add -g omo-ai@beta` (or `npm i -g omo-ai@beta`).
+2. Runs `bun add -g omo-ai` (or `npm i -g omo-ai`).
 3. Checks that `omo --version` on your PATH now answers as omo-ai. If another `omo` still shadows it, the installer prints the exact `export PATH="...:$PATH"` line that fixes the order.
 4. Offers to run `omo setup` right away. With `--no-tui` it prints the command to run instead.
 
 Why the raw install isn't enough on an older machine: npm refuses to overwrite the existing `omo` (EEXIST), and bun installs beside it, so `omo --version` keeps printing `4.19.4`. The installer removes the stale command first.
 
-If you already ran `bun add -g omo-ai@beta` by hand and the old `omo` still wins, run the installer line anyway. It's idempotent, and it prints the repair it made.
+If you already ran `bun add -g omo-ai` by hand and the old `omo` still wins, run the installer line anyway. It's idempotent, and it prints the repair it made.
 
 ## Setup
 
@@ -172,7 +172,7 @@ Update omo with its own command:
 omo update
 ```
 
-It prints the package-manager line it runs (`bun add -g omo-ai@beta`, or `npm i -g omo-ai@beta` for an npm install) and then the version change. `omo update --print` shows the line without running it. The engine is pinned by the package, so this is the only update path; there's no separate engine update.
+It prints the package-manager line it runs (`bun add -g omo-ai`, or `npm i -g omo-ai` for an npm install) and then the version change. `omo update --print` shows the line without running it. The engine is pinned by the package, so this is the only update path; there's no separate engine update.
 
 Removing the legacy package once you're settled: use the package manager that installed it. The `WARN legacy package` line of `omo doctor` names it and prints the exact command. For an npm install:
 
@@ -182,7 +182,7 @@ npm uninstall -g oh-my-openagent
 
 For a bun install, `bun remove -g oh-my-openagent`. The other manager's command doesn't help: `bun remove -g` on an npm install exits cleanly and leaves the package where it was. Use `oh-my-opencode` instead if that's the name you had.
 
-npm unlinks every bin name the package declared, including an `omo` that an npm-installed omo-ai now owns. If you installed omo-ai with npm too, run `npm i -g omo-ai@beta` right after the uninstall to put the command back. An omo-ai installed with bun keeps its `omo`. The installer prints the same warning when it installs omo-ai with npm after removing a legacy `omo`.
+npm unlinks every bin name the package declared, including an `omo` that an npm-installed omo-ai now owns. If you installed omo-ai with npm too, run `npm i -g omo-ai` right after the uninstall to put the command back. An omo-ai installed with bun keeps its `omo`. The installer prints the same warning when it installs omo-ai with npm after removing a legacy `omo`.
 
 Removing OmO Native itself:
 
@@ -192,4 +192,4 @@ bun remove -g omo-ai
 
 (or `npm uninstall -g omo-ai`). On a bun install, omo-ai replaces bun's `omo` symlink with a small launcher shim so each start skips a node boot, and `bun remove` leaves that file behind; delete it with `rm ~/.bun/bin/omo` (the shim says so in its header). Your state under `~/.omo/agent/` and `~/.omo/omo.jsonc` stays on disk; delete it yourself if you want a clean slate. The OpenCode plugin, if you kept it, is unaffected.
 
-See also: [Installation](./installation.md#omo-native-beta-omo-via-omo-ai) for where omo keeps its state, and [Agent Model Matching](./agent-model-matching.md) for choosing models per category.
+See also: [Installation](./installation.md#omo-native-omo-via-omo-ai) for where omo keeps its state, and [Agent Model Matching](./agent-model-matching.md) for choosing models per category.

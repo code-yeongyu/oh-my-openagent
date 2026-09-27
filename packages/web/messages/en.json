@@ -37,12 +37,13 @@
       "getStarted": "Get started",
       "readManifesto": "Read the manifesto",
       "installLabel": "One command, one tool",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "command": {
       "copy": "Copy",
       "copied": "Copied",
-      "copyAria": "Copy install command"
+      "copyAria": "Copy install command",
+      "copiedStatus": "Install command copied"
     },
     "proof": {
       "label": "Live numbers",
@@ -118,7 +119,21 @@
       "item6Name": "Goals that survive",
       "item6Desc": "Long work is checkpointed with evidence, so a session restart resumes where it stopped.",
       "item7Name": "Hot-reloading everything",
-      "item7Desc": "Config, skills and prompts reload live. No restarts to try a change."
+      "item7Desc": "Config, skills and prompts reload live. No restarts to try a change.",
+      "stage": {
+        "roundTrip": "one round trip",
+        "oneStep": "1 step",
+        "repaired": "repaired before it ran",
+        "splits": "splits the job",
+        "parallel": "working in parallel",
+        "waiting": "waiting · 0 polls",
+        "woke": "woke up",
+        "goalProgress": "goal · 3 of 4 checked",
+        "resumes": "restart → resumes at step 4",
+        "saved": "saved",
+        "reloaded": "reloaded · no restart",
+        "stageLabel": "A single cell acting out the selected detail"
+      }
     },
     "platforms": {
       "titlePrefix": "And from your",
@@ -148,7 +163,7 @@
       "subtitle": "Install OmO, open your project, describe the job. That's the whole setup.",
       "installNow": "Install now",
       "readTheDocs": "Read the docs",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "dag": {
       "region": "OmO desktop with the workflow graph open",

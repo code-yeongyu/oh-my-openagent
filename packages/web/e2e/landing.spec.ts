@@ -39,7 +39,7 @@ test.describe("Landing Page", () => {
 
     // then
     await expect(hero.getByTestId("command-bar")).toHaveCount(1)
-    await expect(hero.getByText("bun install -g omo-ai@beta")).toBeVisible()
+    await expect(hero.getByText("bun install -g omo-ai", { exact: true })).toBeVisible()
     await expect(hero.getByRole("button", { name: "Copy install command" })).toBeVisible()
     await expect(hero.getByRole("tab")).toHaveCount(0)
   })
@@ -187,6 +187,72 @@ test.describe("Landing Page", () => {
     await expect(stage.locator("[data-kib-nudge]")).toHaveCSS("opacity", "1")
     await expect(stage.locator(".kib-after")).toHaveCSS("opacity", "1")
     await expect(stage.locator(".kib-before")).toBeHidden()
+  })
+
+  test("moves the crafted stage to the item the reader picks and keeps it moving on its own", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "true")
+
+    const fill = stage.locator(".morph-fill")
+    const before = await fill.evaluate((node) => getComputedStyle(node).transform)
+    await expect
+      .poll(async () => fill.evaluate((node) => getComputedStyle(node).transform), {
+        timeout: 8000,
+      })
+      .not.toBe(before)
+
+    const team = page.getByTestId("crafted-list").locator('[data-crafted-index="3"]')
+    await team.click()
+    await expect(stage).toHaveAttribute("data-state", "team")
+    await expect(team).toHaveAttribute("aria-current", "true")
+    await expect(page.getByTestId("crafted-list").locator('[aria-current="true"]')).toHaveCount(1)
+  })
+
+  test("holds the crafted stage still under reduced motion and still follows the list", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "false")
+    await expect(stage.locator(".morph-cursor")).toHaveCount(0)
+
+    const fill = stage.locator(".morph-fill")
+    const first = await fill.evaluate((node) => getComputedStyle(node).transform)
+    await page.waitForTimeout(3200)
+    expect(await fill.evaluate((node) => getComputedStyle(node).transform)).toBe(first)
+
+    await page.getByTestId("crafted-list").locator('[data-crafted-index="4"]').click()
+    await expect(stage).toHaveAttribute("data-state", "monitor")
+    await expect(stage).toHaveClass(/is-live/)
+  })
+
+  test("confirms a copied install command with a check and a status message", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"])
+    await page.goto("/")
+    const bar = page.locator('[data-section="hero"]').getByTestId("command-bar")
+    await bar.getByRole("button", { name: "Copy install command" }).click()
+
+    await expect(bar.getByRole("button", { name: "Copy install command" })).toHaveAttribute(
+      "data-copied",
+      "true",
+    )
+    await expect(bar.getByRole("status")).toHaveText("Install command copied")
+    const check = bar.getByTestId("copy-check")
+    await expect(check).toBeVisible()
+    await expect
+      .poll(async () => check.evaluate((node) => getComputedStyle(node).transform))
+      .toBe("matrix(1, 0, 0, 1, 0, 0)")
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("bun install -g omo-ai")
   })
 
   test("renders the desktop DAG view in the hero with 10 nodes across 5 waves", async ({

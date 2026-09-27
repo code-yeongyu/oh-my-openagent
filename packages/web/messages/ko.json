@@ -37,12 +37,13 @@
       "getStarted": "시작하기",
       "readManifesto": "매니페스토 읽기",
       "installLabel": "명령 하나, 도구 하나",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "command": {
       "copy": "복사",
       "copied": "복사됨",
-      "copyAria": "설치 명령 복사"
+      "copyAria": "설치 명령 복사",
+      "copiedStatus": "설치 명령을 복사했습니다"
     },
     "proof": {
       "label": "실시간 지표",
@@ -118,7 +119,21 @@
       "item6Name": "살아남는 목표",
       "item6Desc": "긴 작업은 테스트 결과와 스크린샷을 남기며 중간 저장됩니다. 세션이 다시 시작돼도 멈춘 곳에서 이어갑니다.",
       "item7Name": "전부 핫 리로드",
-      "item7Desc": "설정, 스킬, 프롬프트를 바꾸면 바로 반영됩니다. 재시작은 없어요."
+      "item7Desc": "설정, 스킬, 프롬프트를 바꾸면 바로 반영됩니다. 재시작은 없어요.",
+      "stage": {
+        "roundTrip": "왕복 한 번",
+        "oneStep": "한 단계",
+        "repaired": "실행 전에 고쳐짐",
+        "splits": "일을 나눔",
+        "parallel": "동시에 작업 중",
+        "waiting": "대기 중 · 폴링 0회",
+        "woke": "깨어남",
+        "goalProgress": "목표 · 4개 중 3개 확인",
+        "resumes": "재시작 → 4단계부터 이어감",
+        "saved": "저장됨",
+        "reloaded": "바로 반영 · 재시작 없음",
+        "stageLabel": "선택한 항목을 하나의 칸이 직접 보여 줍니다"
+      }
     },
     "platforms": {
       "titlePrefix": "그리고 당신의",
@@ -148,7 +163,7 @@
       "subtitle": "OmO를 설치하고, 프로젝트를 열고, 할 일을 말하세요. 더 설정할 것은 없어요.",
       "installNow": "지금 설치",
       "readTheDocs": "문서 읽기",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "dag": {
       "region": "워크플로우 그래프가 열린 OmO 데스크톱",

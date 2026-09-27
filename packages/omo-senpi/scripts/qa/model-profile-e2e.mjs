@@ -19,6 +19,10 @@
 //   cli-model-wins   `--model` (provenance "cli") with an active lane: the CLI model survives.
 //   lane-beats-recommended-models  senpi recommended-models first auto-switches to gpt-6-sol;
 //                    Daily · Normal still wins with glm-5.3.
+//   unset-rejected-login-falls-back / unset-every-login-rejected / unset-pooled-login-sibling-account
+//                    a stored login the fixture OAuth exchange refuses to refresh (offline, no real
+//                    identity endpoint): the walk skips it and the turn runs on the next rung, or
+//                    stays on the engine default; a pool whose sibling account is valid is kept.
 // Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
 // ~/.senpi/agent credential files are digest-compared before/after and MUST stay identical.
 import { spawnSync } from "node:child_process"
@@ -114,6 +118,9 @@ function seedScenario(pluginRoot, scenario) {
   if (!("recommendedModels" in scenario)) settings.recommendedModels = ["mock-1"]
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`)
   writeFileSync(join(sandbox.agentDir, "trust.json"), `${JSON.stringify({ [sandbox.canonicalCwd]: true }, null, 2)}\n`)
+  if (scenario.authJson !== undefined) {
+    writeFileSync(join(sandbox.agentDir, "auth.json"), `${JSON.stringify(scenario.authJson, null, 2)}\n`)
+  }
   const sessionDir = join(sandbox.root, "sessions")
   mkdirSync(sessionDir, { recursive: true })
   const omoDir = join(sandbox.cwd, ".omo")
@@ -138,6 +145,7 @@ function spawnEnv(sandbox, sessionDir, scenario) {
   const env = { ...process.env }
   for (const key of INHERITED_RUNTIME_KEYS) delete env[key]
   env.OMO_PROFILE_QA_PROVIDERS = (scenario.registerProviders ?? []).join(",")
+  env.OMO_PROFILE_QA_OAUTH_PROVIDERS = (scenario.oauthProviders ?? []).join(",")
   return {
     ...env,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
@@ -209,6 +217,20 @@ function runScenario(name, scenario, args, senpiBin) {
     }
     if (scenario.expect.label !== undefined) {
       checks.notice_names_lane = profileNotices[0]?.content.includes(scenario.expect.label) === true
+    }
+    if (scenario.expect.authFailed !== undefined) {
+      checks.auth_failed_details = JSON.stringify(profileNotices[0]?.details?.authFailed ?? null) === JSON.stringify(scenario.expect.authFailed)
+    }
+    if (scenario.expect.authFailedAbsent === true) {
+      checks.auth_failed_absent = profileNotices[0]?.details !== null && !("authFailed" in (profileNotices[0]?.details ?? {}))
+    }
+    if (scenario.oauthProviders !== undefined) {
+      // The fixture exchange error carries the provider's response body; neither the notice nor the
+      // engine's stderr may repeat it.
+      const rawError = "invalid_grant"
+      checks.notice_no_raw_error = profileNotices.every((notice) => !notice.content.includes(rawError) && !JSON.stringify(notice.details).includes(rawError))
+      checks.stderr_no_raw_error = runs.every((each) => !(each.stderr ?? "").includes(rawError))
+      checks.no_retry_fallback_turns = assistantMessages.every((message) => message.model === scenario.expect.model)
     }
     if (scenario.expect.thinking !== undefined) {
       checks.engine_thinking = engine.fromCapture === scenario.expect.thinking

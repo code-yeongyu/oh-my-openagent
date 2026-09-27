@@ -32,8 +32,8 @@ function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): 
 const GPT_CATEGORY_CASES = [
   { category: "ultrabrain", modelId: "gpt-6-astra", variant: "max" },
   { category: "deep-high", modelId: "gpt-6-astra", variant: "xhigh" },
-  { category: "deep-low", modelId: "gpt-6-sol-fast", variant: "medium" },
-  { category: "deep-low", modelId: "gpt-6-sol", variant: "medium" },
+  { category: "deep-low", modelId: "gpt-5.6-sol-fast", variant: "medium" },
+  { category: "deep-low", modelId: "gpt-5.6-sol", variant: "medium" },
 ] as const
 
 describe("openai lane policy", () => {
@@ -75,8 +75,8 @@ describe("openai lane policy", () => {
       // given
       const models = registry([
         model("openai", "gpt-6-astra"),
-        model("openai", "gpt-6-sol"),
-        model("chatgpt-subscription", "gpt-6-sol"),
+        model("openai", "gpt-5.6-sol"),
+        model("chatgpt-subscription", "gpt-5.6-sol"),
         model("chatgpt-subscription", "gpt-6-astra"),
       ])
 
@@ -86,7 +86,7 @@ describe("openai lane policy", () => {
 
       // then
       expect(high.spec.modelId).toBe("gpt-6-astra")
-      expect(low.spec.modelId).toBe("gpt-6-sol")
+      expect(low.spec.modelId).toBe("gpt-5.6-sol")
       expect(high.spec.fallback_models ?? []).toEqual([])
       expect(low.spec.fallback_models ?? []).toEqual([])
     })

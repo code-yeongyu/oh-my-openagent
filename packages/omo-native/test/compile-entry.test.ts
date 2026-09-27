@@ -547,6 +547,10 @@ describe("compiledBannerLines", () => {
     ])
   })
 
+  test("#given a stable release build #when the banner renders #then it does not call itself beta", () => {
+    expect(compiledBannerLines({ omoAiVersion: "5.0.0", buildInfo: undefined })).toEqual(["omo (omo-ai 5.0.0)"])
+  })
+
   test("#given malformed build info #when the banner renders #then it degrades to the release one-liner", () => {
     const malformed = { command: "omob", omo: { commit: "nope", committedAt: "", branch: "" }, engine: {} }
 

@@ -211,6 +211,38 @@
     --lit-follow-rise: var(--space-6);
     --lit-line: 50vh;
     --lit-band: 1vh;
+    --dur-swap-out: 80ms;
+    --dur-swap-in: 220ms;
+    --dur-spring: 900ms;
+    --swap-blur: 6px;
+    --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1.04);
+    --ease-spring: linear(
+      0,
+      0.058,
+      0.189,
+      0.348,
+      0.505,
+      0.644,
+      0.759,
+      0.849,
+      0.915,
+      0.96,
+      0.99,
+      1.007,
+      1.016,
+      1.02,
+      1.019,
+      1.017,
+      1.014,
+      1.011,
+      1.008,
+      1.006,
+      1.004,
+      1.002,
+      1.001,
+      1,
+      1
+    );
 
     /* Legacy shadcn variables remapped onto the ledger tokens */
     --background: var(--ink-0);
@@ -1119,6 +1151,201 @@
     }
     .kib-before {
       visibility: hidden;
+    }
+  }
+
+  /* §5 MorphStage: one cell whose edges, fill and content ride transforms computed each frame */
+  .morph-stage {
+    position: relative;
+    overflow: hidden;
+    min-height: 20rem;
+    border: 1px solid var(--line);
+    background-color: var(--ink-1);
+    background-image: radial-gradient(var(--line-faint) 1px, transparent 1px);
+    background-size: 28px 28px;
+    contain: layout paint;
+  }
+  @media (min-width: 64rem) {
+    .morph-stage {
+      min-height: 28rem;
+    }
+  }
+  .morph-fill,
+  .morph-edge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .morph-fill {
+    width: 100%;
+    height: 100%;
+    background-color: var(--ink-2);
+    transition: background-color var(--dur-micro) var(--ease-standard);
+  }
+  .morph-edge {
+    background-color: var(--line-strong);
+    transition: background-color var(--dur-micro) var(--ease-standard);
+  }
+  .morph-edge-x {
+    width: 100%;
+    height: 1px;
+  }
+  .morph-edge-y {
+    width: 1px;
+    height: 100%;
+  }
+  .morph-stage.is-live .morph-fill {
+    background-color: var(--accent-8);
+  }
+  .morph-stage.is-live .morph-edge {
+    background-color: var(--accent-32);
+  }
+  .morph-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: grid;
+    pointer-events: none;
+  }
+  .morph-scene {
+    grid-area: 1 / 1;
+    justify-self: center;
+    align-self: center;
+  }
+  .morph-scene-in {
+    animation: morph-scene-in var(--dur-swap-in) var(--ease-out-quart) 60ms both;
+  }
+  .morph-scene-out {
+    animation: morph-scene-out var(--dur-swap-out) var(--ease-standard) both;
+  }
+  .morph-cursor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: var(--text-hi);
+    fill: currentColor;
+    stroke: var(--ink-0);
+    stroke-width: 1;
+    pointer-events: none;
+    transition: opacity var(--dur-micro) var(--ease-standard);
+  }
+  .morph-cursor.is-idle {
+    opacity: 0;
+  }
+  @keyframes morph-scene-in {
+    from {
+      opacity: 0;
+      transform: scale(0.94);
+      filter: blur(var(--swap-blur));
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+  @keyframes morph-scene-out {
+    to {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+  }
+  .crafted-item {
+    position: relative;
+    cursor: pointer;
+    transition: color var(--dur-micro) var(--ease-standard);
+  }
+  .crafted-item-wash {
+    position: absolute;
+    inset: 0;
+    background-color: var(--accent-4);
+    opacity: 0;
+    transition: opacity var(--dur-micro) var(--ease-standard);
+    pointer-events: none;
+  }
+  .crafted-item[aria-current="true"] .crafted-item-wash {
+    opacity: 1;
+  }
+  .crafted-item-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--text-faint);
+    transform: scale(0.67);
+    transition:
+      transform var(--dur-spring) var(--ease-spring),
+      background-color var(--dur-micro) var(--ease-standard);
+  }
+  .crafted-item[aria-current="true"] .crafted-item-dot {
+    background-color: var(--accent);
+    transform: scale(1);
+  }
+
+  /* §5 CommandBar copy morph: the wash grows on the spring curve, the label blur-swaps to a check */
+  .copy-cell {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+  .copy-wash {
+    position: absolute;
+    inset: 0;
+    background-color: var(--accent-8);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--dur-spring) var(--ease-spring);
+    pointer-events: none;
+  }
+  .copy-cell[data-copied="true"] .copy-wash {
+    transform: scaleX(1);
+  }
+  .copy-label {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition:
+      opacity var(--dur-swap-in) var(--ease-standard),
+      filter var(--dur-swap-in) var(--ease-standard),
+      transform var(--dur-swap-in) var(--ease-out-quart);
+  }
+  .copy-label[data-shown="false"] {
+    opacity: 0;
+    filter: blur(var(--swap-blur));
+    transform: scale(0.9);
+    transition-duration: var(--dur-swap-out);
+  }
+  .copy-check {
+    transform: scale(0.4);
+    transition: transform var(--dur-spring) var(--ease-spring) 60ms;
+  }
+  .copy-cell[data-copied="true"] .copy-check {
+    transform: scale(1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .morph-scene-in,
+    .morph-scene-out {
+      animation: none;
+    }
+    .morph-scene-out {
+      display: none;
+    }
+    .crafted-item-dot,
+    .copy-wash {
+      transition: none;
+    }
+    .copy-label,
+    .copy-label[data-shown="false"] {
+      filter: none;
+      transform: none;
+      transition: opacity var(--dur-micro) var(--ease-standard);
+    }
+    .copy-check {
+      transform: none;
+      transition: none;
     }
   }
 

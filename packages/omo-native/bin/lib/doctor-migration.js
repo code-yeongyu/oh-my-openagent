@@ -2,6 +2,7 @@ import { closeSync, lstatSync, openSync, readFileSync, readSync, realpathSync, s
 import { homedir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, win32 } from "node:path"
 import { parseJsonc } from "./jsonc.js"
+import { releaseChannel } from "./package-paths.js"
 import { opencodeConfigSources } from "./setup-opencode-assets.js"
 
 // Migration leftovers from the OpenCode edition, reported and never touched: another `omo` ahead of
@@ -13,7 +14,12 @@ const NATIVE_PACKAGE = "omo-ai"
 const LEGACY_PACKAGES = ["oh-my-openagent", "oh-my-opencode"]
 // The native installer repairs an `omo` owned by any of these, so the fix it names works for them.
 const REPAIRABLE_BIN_OWNERS = [...LEGACY_PACKAGES, "lazycodex"]
-const REPAIR_COMMAND = "bunx oh-my-openagent@beta install --platform=native"
+// The installer that repairs it is published on the same channel as this build. Resolved when a line
+// is formatted, never at import: the compiled omo binary imports this module before first-run
+// provisioning, when no package manifest is readable yet (#8891).
+function repairCommand() {
+  return `bunx ${releaseChannel() === "beta" ? "oh-my-openagent@beta" : "oh-my-openagent"} install --platform=native`
+}
 
 const CODEX_LIGHT_WRAPPER_MARKER = "# OMO_GENERATED_RUNTIME_WRAPPER"
 const CODEX_LIGHT_CACHE_VERSION = /[\\/]plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/]([^\\/"'\s]+)[\\/]/
@@ -244,7 +250,7 @@ export function formatMigrationLines({ shadowing, nativeDirectory, legacyPackage
   const lines = []
   for (const entry of shadowing) {
     const fix = entry.kind === "legacy"
-      ? `${REPAIR_COMMAND} (repairs it), or remove that file.`
+      ? `${repairCommand()} (repairs it), or remove that file.`
       : nativeDirectory === null
         ? "remove that file, or put omo-ai's bin dir ahead of it on PATH."
         : `remove that file, or move ${nativeDirectory} ahead of ${entry.directory} on PATH.`

@@ -37,9 +37,9 @@ describe("gated category listing", () => {
       const high = entryFor("deep-high", {})
 
       // then
-      expect(low?.description).toContain("(requires gpt-6-sol-fast or gpt-6-sol)")
+      expect(low?.description).toContain("(requires gpt-5.6-sol-fast or gpt-5.6-sol)")
       expect(low?.description).toContain(requiredAnnotation("deep-low"))
-      expect(low?.description).not.toContain("gpt-5.6-sol")
+      expect(low?.description).not.toContain("gpt-6-sol")
       expect(high?.description).toContain("(requires gpt-6-astra)")
       expect(high?.description).toContain(requiredAnnotation("deep-high"))
     })

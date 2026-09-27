@@ -37,12 +37,13 @@
       "getStarted": "开始使用",
       "readManifesto": "阅读宣言",
       "installLabel": "一条命令，一个工具",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "command": {
       "copy": "复制",
       "copied": "已复制",
-      "copyAria": "复制安装命令"
+      "copyAria": "复制安装命令",
+      "copiedStatus": "已复制安装命令"
     },
     "proof": {
       "label": "实时数据",
@@ -118,7 +119,21 @@
       "item6Name": "能存活的目标",
       "item6Desc": "长任务带着证据设检查点，会话重启后从停下的地方继续。",
       "item7Name": "一切热重载",
-      "item7Desc": "配置、技能、提示词实时重新加载。试一个改动不需要重启。"
+      "item7Desc": "配置、技能、提示词实时重新加载。试一个改动不需要重启。",
+      "stage": {
+        "roundTrip": "只需一次往返",
+        "oneStep": "1 步",
+        "repaired": "执行前已修正",
+        "splits": "拆分任务",
+        "parallel": "并行工作中",
+        "waiting": "等待中 · 轮询 0 次",
+        "woke": "被唤醒",
+        "goalProgress": "目标 · 4 项中已确认 3 项",
+        "resumes": "重启 → 从第 4 步继续",
+        "saved": "已保存",
+        "reloaded": "即时生效 · 无需重启",
+        "stageLabel": "由一个单元格演示所选的细节"
+      }
     },
     "platforms": {
       "titlePrefix": "并且，在你的",
@@ -148,7 +163,7 @@
       "subtitle": "安装 OmO，打开项目，说出要做的事。设置就这么多。",
       "installNow": "立即安装",
       "readTheDocs": "阅读文档",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installCommand": "bun install -g omo-ai"
     },
     "dag": {
       "region": "打开工作流图的 OmO 桌面端",

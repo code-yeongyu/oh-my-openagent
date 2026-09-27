@@ -17,6 +17,8 @@ One line per lane. A lane with no line did not run.
 - **Prior art (own)**: `planet-simulator/src/components/asteroid/Asteroid3D.tsx` — R3F scene with IntersectionObserver defer, WebGL probe + static image fallback, `prefers-reduced-motion` gate, `dpr=[1,2]`, Suspense SVG fallback; LHCI 100/100/100/100 mobile asserts; size-limit budgets. Adopted and tightened in §9.
 - **Lazyweb**: skipped — the three user-supplied live references already cover real shipped agent-tool landing pages; recorded as intentional.
 
+- **Motion study (2026-09-27)** — a public motion-design prompt template (one shape never cut; springs as closed-form step responses summed per retarget; the leading and trailing edges on different springs; blur content swap with separate enter/exit timing; a cursor driving every change; frames as a pure function of time; no `will-change` on scaled text) plus beui.dev `dynamic-island`, `action-swap` and `tabs` sources read via the curl recipe. It produced MorphStage (§5) and the §6 spring tokens. Ink + cyan, 0 radius and the transform-only rule are unchanged.
+
 ## 1. Atmosphere & Identity
 
 An operations ledger read at night. The whole site is one framed sheet of ink ruled by hairlines; content lives in rows and cells, never in floating cards. Everything is still until it is _live_: the only light on the page comes from wires that carry work — the edges of the agent graph, the prompt glyph in the install bar, the active node, the cursor in the terminal — and that light is OmO cyan with a white-hot core.
@@ -157,9 +159,20 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 ### CommandBar (`components/landing/install-command.tsx`)
 
-- The primary CTA of the site (omp.sh grammar). Row: prompt cell (40px wide, `--accent` `$`/`>` glyph on `--ink-2`), mono command in `--text-hi` on `--ink-1`, fixed-width COPY cell (mono uppercase 11px, `--text-lo` → `--text-hi` on hover, → `--accent` + "COPIED" for 2s after click). 1px `--line` border, 0px radius, height 48px; on < sm the command scrolls horizontally inside the cell (no wrap) and COPY stays reachable.
-- One command, no tab row (v3): every CommandBar on the site renders `bun install -g omo-ai@beta`. Host/edition switching was removed with the Editions section; the bar is the whole install story.
+- The primary CTA of the site (omp.sh grammar). Row: prompt cell (40px wide, `--accent` `$`/`>` glyph on `--ink-2`), mono command in `--text-hi` on `--ink-1`, fixed-width COPY cell (mono uppercase 11px, `--text-lo` → `--text-hi` on hover). A click grows an `--accent-8` wash across the cell (`scaleX 0 → 1` on `--ease-spring`), blur-swaps COPY out (`--dur-swap-out`, blur `--swap-blur`) and a check (springing `scale .4 → 1`) + "COPIED" in (`--dur-swap-in`) in `--accent` for 2s. An `aria-live=polite` status announces the copy. The cell width never changes. 1px `--line` border, 0px radius, height 48px; on < sm the command scrolls horizontally inside the cell (no wrap) and COPY stays reachable.
+- One command, no tab row (v3): every CommandBar on the site renders `bun install -g omo-ai`. Host/edition switching was removed with the Editions section; the bar is the whole install story.
 - Glow: none by default; `focus-within` adds the inset ring `0 0 0 1px var(--accent-32)`.
+
+### MorphStage (`components/landing/crafted/morph-stage.tsx`)
+
+- The crafted section's demonstration: one `--ink-1` cell with the dot grid. Inside it, one shape never cuts. Four 1px `--line-strong` edges and an `--ink-2` fill morph between the seven crafted states. Content swaps in the shape's center.
+- Geometry is a pure function of a virtual clock (`lib/morph-spring.ts`). Every edge is a sum of closed-form spring steps, one per target change, so a retarget mid-flight never snaps. The edge that grows in the direction of travel rides `--spring-lead` and the edge that follows rides `--spring-trail`, so the shape stretches before it settles.
+- Only transforms change per frame (translate + scaleX/scaleY on the edges and fill, translate on content and cursor). There is no `will-change`; text is never scaled.
+- Content swap: the outgoing scene leaves in `--dur-swap-out` with no blur, and the incoming one enters after 60ms over `--dur-swap-in` from `blur(--swap-blur) scale(.94)`. Separate enter and exit timing keeps text from overlapping.
+- Live moment: `monitor` (build finished) and `reload` (config applied) turn the fill `--accent-8` and the edges `--accent-32`. Cyan appears only when something woke or was applied.
+- A scripted cursor (`--text-hi` arrow, `--ink-0` stroke) travels to the next state on a softer spring (ω 7.5, ζ .92), presses (scale .86 for 140ms), and the stage advances. Each state holds 2.8s.
+- The list beside it (`crafted-list`) is the control. Hover (mouse only), focus, or click on an item moves the stage there, hides the scripted cursor, and holds for 6s before autoplay resumes. The active item gets `aria-current`, an `--accent-4` wash and an `--accent` dot that springs to full size.
+- The clock advances only while the stage is ≥20% on screen and the tab is visible. Reduced motion: no frame loop and no cursor; the stage jumps to the selected state and shows its live moment statically.
 
 ### Eyebrow (`components/ledger/eyebrow.tsx`)
 
@@ -214,15 +227,23 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 | `--dur-type`       | 40ms/char                        | terminal typewriter                                      |
 | `--dur-pulse`      | 2200ms                           | status dot pulse (opacity 1 → .55 → 1)                   |
 | `--dur-wave`       | 12s cycle                        | graph wave loop (shared by 3D scene and terminal)        |
+| `--dur-swap-out`   | 80ms                             | outgoing content in a morph (no blur)                    |
+| `--dur-swap-in`    | 220ms (+60ms delay)              | incoming content in a morph, from `blur(--swap-blur)`    |
+| `--swap-blur`      | 6px                              | blur on content entering a morph                         |
+| `--dur-spring`     | 900ms                            | CSS spring window for `--ease-spring`                    |
+| `--ease-spring`    | `linear()` from `--spring-lead`  | CSS-driven springs (copy wash, active dot)               |
+| `--spring-lead`    | ω 10 rad/s, ζ 0.78 (~2% over)    | MorphStage edge moving with the travel                   |
+| `--spring-trail`   | ω 6.6 rad/s, ζ 0.95              | MorphStage edge following behind                         |
 
 ### Rules
 
 - Only `transform`, `opacity`, `filter` and the color family (`color`, `background-color`, `border-color`, `fill`, `stroke`) animate — never layout properties (`width`, `height`, `top`, `left`, margin, padding). Height morphs (mobile nav) use `grid-template-rows: 0fr → 1fr` on a wrapper, not `max-height`.
 - Entrance: `.reveal` uses `animation-timeline: view()` (`animation-range: entry 0% entry 40%`) when `@supports (animation-timeline: view())`, else the IntersectionObserver `.is-visible` class. Stagger `calc(var(--index) * 60ms)`. Each element reveals once.
 - Every motion maps to a state or affordance: hover → underline/tint, press → 1px translate, live data → count-up, scene progress → wave lights. Motion on non-interactive decoration is banned (this includes floating shapes, parallax, cursor trails, magnetic buttons, scroll-jacking).
+- Springs are closed-form step responses (`lib/morph-spring.ts`), not a library. A value that retargets is the sum of one step per change, so it stays continuous and interruptible. CSS springs use `--ease-spring`, the same lead spring sampled into `linear()` with a cubic-bezier fallback declared first.
 - No motion library. GSAP, Lottie, `framer-motion` are banned; `motion/react` is allowed only for a `layoutId` shared-layout need, currently unused.
 - `prefers-reduced-motion: reduce`: reveals render final state, count-ups render final numbers, terminal renders its final frame, typewriter and pulses stop, the 3D scene is not mounted (poster only).
-- Interaction mechanics traced to beui.dev catalog patterns: `action-swap` (COPY → COPIED), `number` (count-up), `tabs` underline indicator (command bar tabs, CSS-only), `tooltip`-style label chip for hovered graph nodes (opacity 150ms).
+- Interaction mechanics traced to beui.dev catalog patterns: `action-swap` blur preset (COPY → check + COPIED: exit fast and blur-free, enter from blur), `dynamic-island` (MorphStage: one shell springing between views, content blur crossfade, exit 80ms before the enter), `tabs` (the active crafted dot: spring indicator), `number` (count-up), `tabs` underline indicator (command bar tabs, CSS-only), `tooltip`-style label chip for hovered graph nodes (opacity 150ms).
 
 ## 7. Depth & Surface
 

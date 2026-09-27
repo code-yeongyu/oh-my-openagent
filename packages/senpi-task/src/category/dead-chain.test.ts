@@ -139,7 +139,7 @@ describe("dead-chain category disabling", () => {
   describe("#given a gateway-prefixed registry id", () => {
     test("#when the unwrapped id matches a rung #then the category stays available", () => {
       // given
-      const models = registry([model("vercel", "openai/gpt-6-sol")])
+      const models = registry([model("vercel", "openai/gpt-5.6-sol")])
 
       // when
       const result = resolveCategory("deep-low", {}, models)

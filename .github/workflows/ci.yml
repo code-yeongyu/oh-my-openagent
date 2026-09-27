@@ -711,7 +711,11 @@ jobs:
 
       - name: Dry-run publish
         if: needs.ci-mode.outputs.run_heavy == 'true'
-        run: npm publish --dry-run --ignore-scripts --tag beta
+        # dev carries the last released version, which npm refuses to publish over.
+        # Stamp a throwaway prerelease in this job's checkout so the dry run checks the package, not release timing.
+        run: |
+          npm pkg set version="0.0.0-ci.${{ github.run_id }}.${{ github.run_attempt }}"
+          npm publish --dry-run --ignore-scripts --tag ci
         working-directory: packages/omo-native
 
       - name: Write job summary
@@ -797,43 +801,34 @@ jobs:
         with:
           bun-version: "1.4.2"
 
+      # The notes travel as a file: passed through a step output into env, a long range exceeded the
+      # per-string exec limit and failed the job with "Argument list too long" (#8894).
       - name: Generate release notes
-        id: notes
-        run: |
-          NOTES=$(bun run script/generate-changelog.ts)
-          {
-            echo "notes<<EOF"
-            echo "$NOTES"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+        run: bun run script/generate-changelog.ts > "$RUNNER_TEMP/draft-release-notes.md"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or update draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NOTES: ${{ steps.notes.outputs.notes }}
           TARGET_SHA: ${{ github.sha }}
         run: |
+          NOTES_FILE="$RUNNER_TEMP/draft-release-notes.md"
           EXISTING_DRAFT=$(gh release list --json tagName,isDraft --jq '.[] | select(.isDraft == true and .tagName == "next") | .tagName')
-          
+
           if [ -n "$EXISTING_DRAFT" ]; then
             echo "Updating existing draft release..."
             gh release edit next \
               --title "Upcoming Changes 🍿" \
-              --notes-file - \
-              --draft <<EOF
-          $NOTES
-          EOF
+              --notes-file "$NOTES_FILE" \
+              --draft
           else
             echo "Creating new draft release..."
             gh release create next \
               --title "Upcoming Changes 🍿" \
-              --notes-file - \
+              --notes-file "$NOTES_FILE" \
               --draft \
-              --target "$TARGET_SHA" <<EOF
-          $NOTES
-          EOF
+              --target "$TARGET_SHA"
           fi
 
       - name: Write job summary

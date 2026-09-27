@@ -1,3 +1,71 @@
+## local launcher: `omo update` points at bun
+
+`src/install/local-launcher.ts`: the generated local `omo` launcher (sibling-store installs) printed
+`omo is updated via npm: npm i -g omo-ai[@beta]` and carried the same npm command as the brand's
+`update.command`, so a local install was the one surface still steering users to an npm install of
+omo-ai. It now prints `omo is updated via bun: bun add -g omo-ai[@beta]` and carries that command,
+matching the README, the install guide, and senpi's Node.js runtime notice (code-yeongyu/senpi#2157).
+The published launcher (`omo-native/bin/lib/package-paths.js`) is unchanged: it already answers with
+the manager that installed omo-ai. `plugin/scripts/install.mjs` is regenerated from the source.
+
+## model profiles: a rung the first turn could not use is skipped
+
+`components/model-profile/index.ts`: the rung walk matched against `modelRegistry.getAvailable()`,
+which lists every provider with STORED credentials. An Anthropic OAuth login whose refresh token the
+provider rejects (`invalid_grant`) stayed listed, so an unset `model_profile` (Recommended, #8770)
+pinned `anthropic/claude-opus-5-5` on every headless and desktop start; the first turn failed on the
+refresh and senpi's `retry.fallbackChains` walked only opus-5, opus-4-8 and opus-4-6 before exiting,
+never reaching a connected `zai/glm-5.3`. New `request-auth.ts` reproduces the first turn's
+resolution through senpi's public `ModelRuntime.getAuth` (`modelRegistry.modelRuntime`) in two stages:
+the provider credential, per account when `modelRegistry.authStorage.get(provider).accounts` holds a
+pool and the engine may rotate it (a `pinned` account is the only candidate, otherwise any resolving
+account keeps the provider; new `credential-policy.ts` turns rotation off, and with it every account
+but the flat credential, exactly where senpi's `couldRotateCredentials` does: a runtime API key -
+`getProviderAuthStatus(p).source === "runtime"` - or `providers.<p>.credentials.rotation: false` in
+`<agentDir>/models.json`, read as JSONC since the runtime exposes no accessor for it), then the model
+itself, which adds the model's configured headers. Limits of the equivalence: whether a rotating
+pool actually fails over on the first turn depends on senpi's pool classifier (401/unauthorized/
+invalid-key text fails over, a plain `invalid_grant` body does not), and a slot the pool sidecar has
+blocked still counts here. A provider-scope failure (`refresh`: senpi's `ModelsError` code `oauth`; `credentials`: any other
+throw) drops every `<provider>/*` selector, a model-scope failure (`request`) drops only that
+selector, and the walk resolves again - bounded by the number of available selectors. The plain
+`getApiKeyAndHeaders` probe is gone: it resolves only the flat credential (a rejected default account
+hid a healthy sibling) and folds a model-local header failure into a provider-wide one. New
+`notice.ts` writes the applied/unavailable text: `skipped <provider>: its login could not be
+refreshed ... (if it has expired, re-authenticate <provider> in Provider authentication settings)` on
+the desktop (`mode === "rpc"`), `... in an interactive session with /login <provider>` elsewhere
+(the slash command exists only in the terminal), `... its credentials did not resolve ... (check that
+provider's credential configuration)`, `skipped <provider>/<model>: its request configuration did not
+resolve (check that model's headers in models.json)`. `details.authFailed` is exactly
+`{ provider, model, reason }[]`. The default log line carries the candidate, the reason and the
+error class/code only (`ModelsError/oauth`), because the composed logger writes warnings to stderr
+without `OMO_DEBUG` and the raw message quotes shell commands and response bodies;
+`sanitizedAuthErrorDetail` (first line per cause, class name verbatim; in the message, shell commands /
+`body=` / `details=` / stacks dropped, the whole value of any secret-named field - `Authorization: Bearer
+<token>`, JSON `"access_token": "..."`, `api_key=...` - and of `bearer`/`basic` schemes, URL userinfo and
+query strings redacted whatever their length, remaining 24+ character opaque strings masked; 240 chars)
+is logged at info level only under
+`OMO_DEBUG`. Hosts whose registry exposes no `modelRuntime` keep the plain walk; a literal
+`provider/model` pin is applied unprobed. Cost: one resolution per attempted account (and one per
+model whose provider resolved) at start, sequentially; a rejected refresh waits for senpi's exchange
+timeout. Out of scope: senpi's retry chain
+still retries same-provider models after an auth failure mid-session, and senpi's own
+`recommended-models` builtin still treats a stored credential as connected. Tests: `index.test.ts`
+(desktop vs headless guidance, two rejected providers then a healthy one, exhaustion across
+providers with the exact details shape, a model-local failure keeping the sibling, a pool with a
+healthy sibling, a pinned dead account, rotation off via JSONC models.json / via a runtime key / for
+another provider only, one probe pair on a healthy first rung, an unprobed pin, a host without a
+runtime, and the composed default logger with a long private marker and short bearer/JSON-token
+secrets with and without
+`OMO_DEBUG`); `request-auth.test.ts` runs the same walk against senpi's real `ModelRegistry`
+(`AuthStorage.inMemory` pool with a rejecting fixture OAuth lane, a pinned rejected account, the same
+pool under a runtime built over a `models.json` with `rotation: false`, a provider whose one model
+header cannot resolve) plus the sanitizer with short secrets in eight formats; `scripts/qa/model-profile-e2e.mjs`
+gains `unset-rejected-login-falls-back` and `unset-pooled-login-sibling-account` (`authJson` seeds
+the sandbox `auth.json`, `oauthProviders` gives the fixture lane an offline OAuth block whose exchange
+refuses `rejected-refresh`) checking the assistant turn's provider, `authFailed`, no `invalid_grant`
+in notices or stderr, and unchanged settings.
+
 ## ultrawork: the directive reports at handoffs instead of state changes only (#8847)
 
 `skills/ultrawork/SKILL.md` `# Role` now reads `Expert coding agent. Ship verified work; report at handoffs, not between them.` (was `... No process narration.`). In `# Output discipline`, the during-execution bullet `surface only state changes (existing tests read, scenario PASS/FAIL with evidence paths, reviewer verdict)` becomes one handoff block at every todo phase change, blocker, plan change, and before a long pass, written after weighing what the user asked and needs to know now: `Ask / wanted / For you (ledger, evidence paths, PASS/FAIL, reviewer verdict) / Now / Next`, with nothing between handoffs. The first-line and final-message bullets are unchanged. `src/components/ultrawork/generated-directive.ts` and `plugin/extensions/omo.js` are regenerated (`embed-directive.mjs`, `build-extension.mjs`). The forbidden-token guard passes because the new text uses no codex-only tool names. `TODO_FANOUT_REMINDER` stays as it is because it already fits the handoff contract.

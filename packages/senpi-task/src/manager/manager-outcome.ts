@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TaskRecord, TaskRunStats, TaskTransition } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
+import { terminalFailureMessage } from "./credential-failure"
 import { nowIso } from "./manager-helpers"
 
 export type ManagedOutcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
@@ -139,7 +140,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     persistTerminal(input.taskId, owned, input.timestamp, {
       type: "fail",
       timestamp: input.timestamp,
-      error_message: input.outcome.failure.message,
+      error_message: terminalFailureMessage(owned, input.outcome.failure.message),
       ...(input.outcome.killed === true ? { killed: true } : {}),
       ...(input.runStats === undefined ? {} : { run_stats: input.runStats }),
     })
