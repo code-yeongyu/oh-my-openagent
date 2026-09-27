@@ -1,5 +1,6 @@
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import type { CompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
+import { isActiveCompactionPin } from "../../shared/compaction-pin-state"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { normalizePromptTools } from "../../shared/prompt-tools"
@@ -55,7 +56,15 @@ export async function resolveSessionPromptConfig(
 
       if (!promptConfig.model) {
         const model = resolveValidatedModel(info)
-        if (model) {
+        // fix: compaction-pin-checkpoint — a marker/summary row carrying the
+        // active compaction pin (often tagged with the working agent, not
+        // "compaction") is the summarizer's model, never the working model.
+        if (model && isActiveCompactionPin(sessionID, model)) {
+          log("[compaction-context-injector] skipped compaction pin model in checkpoint capture (compaction-pin-checkpoint)", {
+            sessionID,
+            skipped: `${model.providerID}/${model.modelID}`,
+          })
+        } else if (model) {
           promptConfig.model = model
         }
       }
@@ -79,7 +88,7 @@ export async function resolveSessionPromptConfig(
     })
   }
 
-  if (!promptConfig.model && storedModel) {
+  if (!promptConfig.model && storedModel && !isActiveCompactionPin(sessionID, storedModel)) {
     promptConfig.model = storedModel
   }
 
