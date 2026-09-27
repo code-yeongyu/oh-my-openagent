@@ -3,6 +3,7 @@ import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } fr
 import { isFailureParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakePendingQueue } from "./parent-wake-pending-queue"
+import { logParentWakeLedger } from "./parent-wake-ledger"
 import { sendParentWakePrompt } from "./parent-wake-prompt-dispatch"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 import type { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
@@ -136,6 +137,7 @@ export class ParentWakeFlushRunner {
     const dispatchedWake = this.deps.dispatchedTracker.getWake(sessionID)
     if (dispatchedWake && isRedundantParentWake(latestWake, dispatchedWake)) {
       this.deps.pendingQueue.deleteWake(sessionID)
+      logParentWakeLedger("duplicate-suppressed", sessionID, latestWake)
       log("[background-agent] Suppressed duplicate parent wake already dispatched:", { sessionID })
       return
     }
@@ -198,6 +200,7 @@ export class ParentWakeFlushRunner {
     }
     this.deps.pendingQueue.deleteWake(sessionID)
     this.deps.dispatchedTracker.clearWake(sessionID)
+    logParentWakeLedger("consumed-dropped", sessionID, latestWake)
     log("[background-agent] Dropped retained parent wake after parent consumed admitted notification:", { sessionID })
     return true
   }
