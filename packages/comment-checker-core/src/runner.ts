@@ -117,12 +117,15 @@ export async function runCommentChecker(
     }
 
     const [_stdout, stderr, exitCode, delivered] = race
-    if (!delivered || exitCode === 0) {
+    if (exitCode === 0) {
       return EMPTY_RESULT
     }
     if (exitCode === 2) {
-      return { hasComments: true, message: normalizeMessage(stderr) }
+      // Feedback about input the checker never fully read is not trustworthy.
+      return delivered ? { hasComments: true, message: normalizeMessage(stderr) } : EMPTY_RESULT
     }
+    // Outside the protocol, whether or not the input was delivered: a checker that cannot start
+    // exits before reading stdin, and that is the case callers need to see (#8850).
 
     return { ...EMPTY_RESULT, failure: { exitCode, stderr: normalizeMessage(stderr).trim().slice(0, MAX_FAILURE_STDERR) } }
   } catch (error) {

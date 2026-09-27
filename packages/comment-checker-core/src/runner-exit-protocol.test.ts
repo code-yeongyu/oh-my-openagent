@@ -3,9 +3,9 @@ import { describe, expect, test } from "bun:test"
 import { runCommentChecker } from "./runner"
 import type { SpawnProcess } from "./types"
 
-function fakeProcess(exitCode: number, stderr: string): SpawnProcess {
+function fakeProcess(exitCode: number, stderr: string, delivered = true): SpawnProcess {
   return {
-    stdin: { write() {}, end() {} },
+    stdin: { send: () => (delivered ? Promise.resolve() : Promise.reject(new Error("write EPIPE"))) },
     stdout: new Response("").body as ReadableStream<Uint8Array>,
     stderr: new Response(stderr).body as ReadableStream<Uint8Array>,
     exited: Promise.resolve(exitCode),
@@ -13,10 +13,10 @@ function fakeProcess(exitCode: number, stderr: string): SpawnProcess {
   }
 }
 
-function run(exitCode: number, stderr = "") {
+function run(exitCode: number, stderr = "", delivered = true) {
   return runCommentChecker(
     { binaryPath: "/fake/comment-checker", hookInput: { tool_name: "Write", tool_input: {} } as never },
-    { existsSync: () => true, spawn: () => fakeProcess(exitCode, stderr) },
+    { existsSync: () => true, spawn: () => fakeProcess(exitCode, stderr, delivered) },
   )
 }
 
@@ -48,5 +48,21 @@ describe("comment-checker exit protocol (#8850)", () => {
     expect(result.hasComments).toBe(false)
     expect(result.message).toBe("")
     expect(result.failure).toEqual({ exitCode, stderr: stderr.trim() })
+  })
+
+  test("#given a checker that cannot start exits before reading its input #when run #then the failure is still exposed", async () => {
+    // when
+    const result = await run(3221225781, "", false)
+
+    // then
+    expect(result).toEqual({ hasComments: false, message: "", failure: { exitCode: 3221225781, stderr: "" } })
+  })
+
+  test("#given a checker that exits 0 before reading its input #when run #then it is a clean result without a failure", async () => {
+    // when
+    const result = await run(0, "", false)
+
+    // then
+    expect(result).toEqual({ hasComments: false, message: "" })
   })
 })
