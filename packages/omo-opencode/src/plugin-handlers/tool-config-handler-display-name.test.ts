@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { OhMyOpenCodeConfig } from "../config";
+import { PROMETHEUS_BASH_PERMISSION } from "../plugin/prometheus-bash-visibility";
 import { applyToolConfig } from "./tool-config-handler";
 
 function createDisplayNameParams(displayName: string): {
@@ -33,7 +34,7 @@ describe("applyToolConfig with custom display names", () => {
 		const agent = params.agentResult[displayName] as {
 			permission: Record<string, unknown>;
 		};
-		expect(agent.permission.bash).toBe("deny");
+		expect(agent.permission.bash).toEqual(PROMETHEUS_BASH_PERMISSION);
 		expect(agent.permission.interactive_bash).toBe("deny");
 		expect(agent.permission.task).toBe("allow");
 	});

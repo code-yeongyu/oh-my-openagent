@@ -114,6 +114,7 @@ describe("createToolExecuteBeforeHandler", () => {
   test("does not trigger session notification hook for non-question tools", async () => {
     let called = false
     const ctx = {
+      directory: "/tmp/tool-execute-before-test",
       client: {
         session: {
           messages: async () => ({ data: [] }),
@@ -178,6 +179,7 @@ describe("createToolExecuteBeforeHandler", () => {
 
     function createCtxWithSessionMessages(messages: Array<{ info?: { agent?: string; role?: string } }> = []) {
       return {
+        directory: "/tmp/tool-execute-before-test",
         client: {
           session: {
             messages: async () => ({ data: messages }),

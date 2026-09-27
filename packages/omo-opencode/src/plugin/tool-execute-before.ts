@@ -3,6 +3,8 @@ import type { PluginContext } from "./types"
 import { isTrackedBtwSideSession } from "../features/btw-side"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { log, replaceToolArgs } from "../shared"
+import { refusePrometheusBash } from "./prometheus-bash-guard"
+import type { AgentDisplayNameOverrides } from "./prometheus-bash-visibility"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
 
@@ -42,11 +44,12 @@ export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
   backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
+  agentOverrides?: AgentDisplayNameOverrides
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks, backgroundManager } = args
+  const { ctx, hooks, backgroundManager, agentOverrides } = args
 
   return async (input, output): Promise<void> => {
     // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
@@ -68,6 +71,10 @@ export function createToolExecuteBeforeHandler(args: {
       isTrackedBtwSideSession(input.sessionID)
     ) {
       throw new Error("BTW side conversations cannot delegate work.")
+    }
+
+    if (normalizedToolName === "bash") {
+      await refusePrometheusBash(input.sessionID, ctx, agentOverrides)
     }
 
     if (input.tool.toLowerCase() === "bash" && typeof output.args.command === "string") {

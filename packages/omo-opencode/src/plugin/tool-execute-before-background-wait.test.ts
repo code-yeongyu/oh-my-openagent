@@ -4,6 +4,7 @@ import { createToolExecuteBeforeHandler } from "./tool-execute-before"
 
 function createTestContext() {
   return {
+    directory: "/tmp/tool-execute-before-background-wait-test",
     client: {
       session: {
         messages: async () => ({ data: [] }),

@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
+import { PROMETHEUS_BASH_PERMISSION } from "../plugin/prometheus-bash-visibility";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
@@ -139,7 +140,7 @@ export function applyToolConfig(params: {
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
-      bash: "deny",
+      bash: PROMETHEUS_BASH_PERMISSION,
       interactive_bash: "deny",
     };
   }

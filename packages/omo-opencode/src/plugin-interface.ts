@@ -3,6 +3,7 @@ import type { OhMyOpenCodeConfig } from "./config"
 
 import { applyAgentVariant } from "./shared/agent-variant"
 import { createChatParamsHandler } from "./plugin/chat-params"
+import { hidePrometheusBashOutsideZenFree } from "./plugin/prometheus-bash-visibility"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
 import { createCommandExecuteBeforeHandler } from "./plugin/command-execute-before"
@@ -37,6 +38,7 @@ export function createPluginInterface(args: {
     tool: tools,
 
     "chat.params": async (input: unknown, output: unknown) => {
+      hidePrometheusBashOutsideZenFree(input, pluginConfig.agents)
       const chatParamsInput = input as {
         agent?: string | { name?: string }
         model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
@@ -100,6 +102,7 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
       backgroundManager: managers.backgroundManager,
+      agentOverrides: pluginConfig.agents,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({
