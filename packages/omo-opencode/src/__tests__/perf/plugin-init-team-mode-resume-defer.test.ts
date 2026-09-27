@@ -40,9 +40,9 @@ function createPluginInput(directory: string, client: PluginInput["client"]): Pl
   }
 }
 
-async function importFreshPluginModule(): Promise<(typeof import("../../index"))["default"]> {
+async function importFreshPluginModule(): Promise<(typeof import("../../index"))["omoPlugin"]> {
   const token = `${Date.now()}-${Math.random()}`
-  return (await import(`../../index?regr=${token}`)).default
+  return (await import(`../../index?regr=${token}`)).omoPlugin
 }
 
 function seedStaleActiveRuntime(omoBaseDir: string): void {
@@ -111,7 +111,7 @@ describe("plugin init defers team-mode resume", () => {
 
       // when serverPlugin is called with a hanging session.get
       const start = performance.now()
-      const initPromise = pluginModule.server(input, {})
+      const initPromise = pluginModule(input, {})
       const timeoutPromise = new Promise<"timeout">((resolve) => {
         globalThis.setTimeout(() => resolve("timeout"), 3000)
       })

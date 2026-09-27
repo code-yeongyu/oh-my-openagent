@@ -1,3 +1,4 @@
+import { Plugin as TuiPlugin } from "@opencode/plugin/tui"
 import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
 
 import { registerBtwSideTui } from "./features/btw-side"
@@ -196,4 +197,14 @@ const module: TuiPluginModule = {
   },
 }
 
-export default module
+export const legacyTuiModule = module
+
+export default {
+  ...TuiPlugin.define({
+    id: "oh-my-openagent",
+    setup() {
+      log("[oh-my-openagent] OpenCode V2 TUI plugin loaded")
+    },
+  }),
+  tui: module.tui,
+}

@@ -7,7 +7,7 @@ import { join } from "node:path"
 
 import type { TuiPluginApi, TuiPluginMeta, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
 
-import tuiModule, { handleTuiPollError, registerSidebarContentSlot } from "./tui"
+import tuiModule, { handleTuiPollError, legacyTuiModule, registerSidebarContentSlot } from "./tui"
 
 type SolidNode = {
   readonly tag: string
@@ -159,7 +159,10 @@ describe("TUI sidebar polling", () => {
     } satisfies SidebarApiForTest
 
     // when
-    await tuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
+    await legacyTuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
+    expect(tuiModule.id).toBe("oh-my-openagent")
+    expect(typeof tuiModule.setup).toBe("function")
+    expect(typeof tuiModule.tui).toBe("function")
 
     // then
     expect(calls).toEqual(["register", "register", "render"])
