@@ -1,0 +1,58 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/memory-core/src/git/repo-worktree-add.test.ts:
+20 |   }
+21 |   return segments.join("/")
+22 | }
+23 | 
+24 | export function commandError(argv: readonly string[], result: GitExecResult): GitCommandError {
+25 |   return new GitCommandError(argv, result.code, result.stdout, result.stderr)
+              ^
+GitCommandError: git worktree add -b memory/torn /tmp/memory-wt-add-parent-AQ18Dz/checkout 1e3647e17b893370ddc169a9ad748d4ac8a60803 failed: Preparing worktree (new branch 'memory/torn')
+fatal: failed to read /tmp/memory-wt-add-LHCSwT/.git/worktrees/checkout-5/commondir: Success
+   argv: [ "worktree", "add", "-b", "memory/torn", "/tmp/memory-wt-add-parent-AQ18Dz/checkout", "1e3647e17b893370ddc169a9ad748d4ac8a60803" ],
+   code: 128,
+ stdout: "",
+ stderr: "Preparing worktree (new branch 'memory/torn')\nfatal: failed to read /tmp/memory-wt-add-LHCSwT/.git/worktrees/checkout-5/commondir: Success",
+
+      at commandError (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/repo-arguments.ts:25:10)
+      at git (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/repo.ts:243:34)
+      at async withGitLockRetry (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/config-lock.ts:46:20)
+(fail) GitMemoryRepo torn worktree add recovery > #given a torn add that lost the commondir race and left its branch #when worktreeAdd retries #then the worktree lands on the reused branch [1615.53ms]
+20 |   }
+21 |   return segments.join("/")
+22 | }
+23 | 
+24 | export function commandError(argv: readonly string[], result: GitExecResult): GitCommandError {
+25 |   return new GitCommandError(argv, result.code, result.stdout, result.stderr)
+              ^
+GitCommandError: git worktree add -b memory/torn /tmp/memory-wt-add-parent-TiBQmS/checkout 50f285ac1c0851c8b071522bbff51bc429a5d7bc failed: Preparing worktree (new branch 'memory/torn')
+fatal: failed to read /tmp/memory-wt-add-oLAQtS/.git/worktrees/checkout-5/commondir: Success
+   argv: [ "worktree", "add", "-b", "memory/torn", "/tmp/memory-wt-add-parent-TiBQmS/checkout", "50f285ac1c0851c8b071522bbff51bc429a5d7bc" ],
+   code: 128,
+ stdout: "",
+ stderr: "Preparing worktree (new branch 'memory/torn')\nfatal: failed to read /tmp/memory-wt-add-oLAQtS/.git/worktrees/checkout-5/commondir: Success",
+
+      at commandError (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/repo-arguments.ts:25:10)
+      at git (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/repo.ts:243:34)
+      at async withGitLockRetry (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/config-lock.ts:46:20)
+(fail) GitMemoryRepo torn worktree add recovery > #given a torn add that died before creating its branch #when worktreeAdd retries #then the retry recreates the branch with -b [654.72ms]
+139 |     const failure = await tornRepo.worktreeAdd(join(parent, "checkout"), "memory/torn").catch(
+140 |       (error: unknown) => error,
+141 |     )
+142 | 
+143 |     // then - bounded attempts, and the real error is preserved
+144 |     expect(exec.addAttempts.length).toBe(5)
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: 5
+Received: 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6852/packages/memory-core/src/git/repo-worktree-add.test.ts:144:37)
+(fail) GitMemoryRepo torn worktree add recovery > #given a commondir race that never clears #when the retry budget is exhausted #then the original error surfaces loudly [458.72ms]
+
+ 0 pass
+ 3 fail
+ 1 expect() calls
+Ran 3 tests across 1 file. [3.90s]
