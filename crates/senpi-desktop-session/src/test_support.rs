@@ -14,7 +14,7 @@ use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::protocol_params::{CaptureParams, PointParams};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, DisplaySelector, PointerOptions, Target,
+    DesktopCapabilities, DesktopSessionOptions, PointerOptions, Target,
 };
 use senpi_desktop_safety::{Clock, FakeClock, MutatingAction, StopPathId, Supervisor};
 use serde_json::{json, Value};
@@ -45,7 +45,7 @@ struct Factory {
 }
 
 impl BackendFactory for Factory {
-    fn create(&self, _selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+    fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
         let backend = FakeBackend::new(self.scenario.clone());
         *self.built.lock() = Some((backend.sink(), backend.faults()));
         Ok(Box::new(panicky::PanickyFake {

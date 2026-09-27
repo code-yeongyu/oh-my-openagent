@@ -142,7 +142,9 @@ function connectParent(input: ConnectParentInput): ParentSession {
     modelAdmission: () => Promise.resolve(),
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,
-    onWarning: (message) => warnings.push(message),
+    onWarning: (message) => {
+      warnings.push(message)
+    },
     ...(input.options.useFallback === true ? { fallback } : {}),
   })
   // The record fields a started child leaves behind. Production stamps them when the omo-senpi

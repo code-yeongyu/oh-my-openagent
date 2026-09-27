@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, realpathSync } from "node:fs"
+import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { dirname, isAbsolute, join, posix, win32 } from "node:path"
 
 export const NATIVE_OMO_PACKAGE = "omo-ai"
@@ -136,12 +136,13 @@ function resolveOwner(binPath: string): OmoBinOwner | null {
   if (fromLink !== null) return fromLink
 
   const shim = readShimText(binPath)
-  if (shim === null) return null
-  const lightWrapper = codexLightWrapperOwner(shim)
+  const lightWrapper = shim === null ? null : codexLightWrapperOwner(shim)
   if (lightWrapper !== null) return lightWrapper
-  // Ownership comes from the manifest of an installed package the shim really launches, never from
-  // the text alone: a script that merely mentions a legacy package path stays foreign and is kept.
-  for (const entry of shimEntryPaths(shim, dirname(binPath))) {
+  // Ownership comes from the manifest of an installed package the shim or its Bun sidecar really
+  // launches, never from the text alone: a script that merely mentions a legacy package path stays
+  // foreign and is kept.
+  const entries = [...(shim === null ? [] : shimEntryPaths(shim, dirname(binPath))), ...bunxEntryPaths(binPath)]
+  for (const entry of entries) {
     if (!isInsideNodeModules(entry) || !pathExists(entry)) continue
     const owner = ownerOfFile(entry)
     if (owner !== null) return owner
@@ -161,6 +162,24 @@ function shimEntryPaths(shim: string, shimDirectory: string): readonly string[] 
     else if (isAbsolute(quoted)) paths.push(quoted)
   }
   return paths
+}
+
+// Bun's Windows bin is a copied `omo.exe` plus an `omo.bunx` sidecar: UTF-16LE, the target path up to
+// a `"` and a NUL. Bun writes that path relative to the bin dir's parent (`..\node_modules\...` or
+// `install\global\node_modules\...` from `~/.bun`), and its shim resolves it against that same dir.
+function bunxEntryPaths(binPath: string): readonly string[] {
+  if (!/\.exe$/i.test(binPath)) return []
+  const sidecar = `${binPath.slice(0, -4)}.bunx`
+  let contents: string
+  try {
+    if (!statSync(sidecar).isFile()) return []
+    contents = readFileSync(sidecar).toString("utf16le")
+  } catch {
+    return []
+  }
+  const end = contents.indexOf('"\0')
+  if (end <= 0) return []
+  return [join(dirname(dirname(binPath)), contents.slice(0, end).replace(/\\/g, "/"))]
 }
 
 function codexLightWrapperOwner(shim: string): OmoBinOwner | null {

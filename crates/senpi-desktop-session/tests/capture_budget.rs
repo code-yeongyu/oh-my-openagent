@@ -13,8 +13,7 @@ use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_params::CaptureParams;
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, DisplaySelector,
-    Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, Target,
 };
 use senpi_desktop_session::{BackendFactory, Op, Session, SessionTimeouts};
 use serde_json::{json, Value};
@@ -87,7 +86,7 @@ struct NoisyFactory {
 }
 
 impl BackendFactory for NoisyFactory {
-    fn create(&self, _selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+    fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
         Ok(Box::new(NoisyFake {
             fake: FakeBackend::new(self.scenario.clone()),
             noise: Arc::clone(&self.noise),

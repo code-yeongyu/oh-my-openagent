@@ -105,13 +105,16 @@ function resolveOwner(binPath) {
   const fromLink = isInsideNodeModules(real) ? ownerOfFile(real) : null
   if (fromLink !== null) return fromLink
   const shim = readFileHead(binPath, SHIM_READ_LIMIT)
-  if (shim === undefined) return null
-  if (shim.includes(CODEX_LIGHT_WRAPPER_MARKER)) {
+  if (shim?.includes(CODEX_LIGHT_WRAPPER_MARKER)) {
     const version = shim.match(CODEX_LIGHT_CACHE_VERSION)?.[1]
     if (version !== undefined) return { name: "lazycodex", version }
   }
-  // Ownership comes from an installed package the shim really launches, never from its text alone.
-  for (const entry of shimEntryPaths(shim, dirname(binPath))) {
+  // Ownership comes from an installed package the shim or its Bun sidecar really launches, never text alone.
+  const entries = [
+    ...(shim === undefined ? [] : shimEntryPaths(shim, dirname(binPath))),
+    ...bunxEntryPaths(binPath),
+  ]
+  for (const entry of entries) {
     if (!isInsideNodeModules(entry) || !pathExists(entry)) continue
     const owner = ownerOfFile(entry)
     if (owner !== null) return owner
@@ -130,6 +133,24 @@ function shimEntryPaths(shim, shimDirectory) {
     else if (isAbsolute(quoted)) paths.push(quoted)
   }
   return paths
+}
+
+// Bun's Windows bin is a copied `omo.exe` plus an `omo.bunx` sidecar: UTF-16LE, the target path up to
+// a `"` and a NUL. Bun writes that path relative to the bin dir's parent (`..\node_modules\...` or
+// `install\global\node_modules\...` from `~/.bun`), and its shim resolves it against that same dir.
+function bunxEntryPaths(binPath) {
+  if (!/\.exe$/i.test(binPath)) return []
+  const sidecar = `${binPath.slice(0, -4)}.bunx`
+  let contents
+  try {
+    if (!statSync(sidecar).isFile()) return []
+    contents = readFileSync(sidecar).toString("utf16le")
+  } catch {
+    return []
+  }
+  const end = contents.indexOf('"\0')
+  if (end <= 0) return []
+  return [join(dirname(dirname(binPath)), contents.slice(0, end).replace(/\\/g, "/"))]
 }
 
 function isInsideNodeModules(path) {

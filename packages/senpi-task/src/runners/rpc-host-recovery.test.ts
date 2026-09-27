@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { HOST_SESSION_REATTACH_TAG } from "./rpc-host/reattach"
+import { HostSessionClient } from "./rpc-host/session-client"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import type { RpcRunnerSpec } from "./types"
@@ -42,6 +43,48 @@ describe("RpcHostRunner transport recovery", () => {
     await handle.waitForIdle()
     expect(handle.lastAssistantText()).toBe("finished on the new host")
     await handle.terminate()
+  })
+
+  test("#given a child that reattached after its daemon died #when the manager reads entries and switches sessions #then both are served by the NEW port and never by the dead one", async () => {
+    // given - every session client the runner creates counts the queries it serves
+    const host = await fakeHost()
+    const served: Array<{ readonly client: HostSessionClient; readonly calls: string[] }> = []
+    const runner = runnerOver(host, {
+      ...NO_WAIT,
+      createClient: (socketPath) => {
+        const client = new HostSessionClient({ socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() } })
+        const calls: string[] = []
+        const getEntries = client.getEntries.bind(client)
+        const switchSession = client.switchSession.bind(client)
+        client.getEntries = (since) => {
+          calls.push("get_entries")
+          return getEntries(since)
+        }
+        client.switchSession = (target) => {
+          calls.push("switch_session")
+          return switchSession(target)
+        }
+        served.push({ client, calls })
+        return client
+      },
+    })
+    const handle = await runner.start(childSpec())
+    const reattached = host.waitForCommand("prompt")
+    await host.restart()
+    await reattached
+
+    // when
+    const entries = await handle.getEntries?.()
+    const switched = await handle.switchSession?.("/tmp/dh-30-state/sessions/st_30/other.jsonl")
+
+    // then
+    expect(served).toHaveLength(2)
+    expect(served[0]?.calls).toEqual([])
+    expect(served[1]?.calls).toEqual(["get_entries", "switch_session"])
+    expect(entries).toEqual({ entries: [], leafId: null })
+    expect(switched).toEqual({ cancelled: false })
+    await handle.terminate()
+    for (const { client } of served) await client.detach()
   })
 
   test("#given a child mid-turn #when the daemon never comes back #then the child ends crashed with transport_gone after the retries", async () => {
@@ -114,5 +157,36 @@ describe("RpcHostRunner memory admission", () => {
     expect(waits).toEqual([30_000, 30_000])
     expect(fallback.starts).toEqual([])
     expect(host.sessions()).toHaveLength(0)
+  })
+
+  test("#given one start waited on memory pressure #when a later unrelated start fails #then the pressure note does not outlive its admission episode", async () => {
+    // given
+    const host = await fakeHost({
+      openFailure: { code: "host_memory_pressure", data: { rssMb: 8300, retry_after_ms: 30_000 } },
+    })
+    const notes = new Map<string, string>()
+    const runner = runnerOver(host, {
+      onWarning: (message) => {
+        const token = message.split(" ")[0] ?? message
+        notes.set(token, message)
+        return () => {
+          notes.delete(token)
+        }
+      },
+      sleep: () => {
+        host.failOpen(undefined)
+        return Promise.resolve()
+      },
+    })
+    const first = await runner.start(childSpec())
+    await first.terminate()
+    host.failOpen({ code: "open_failed" })
+
+    // when
+    const failure = await runner.start(childSpec()).catch((error: unknown) => error)
+
+    // then
+    expect(failure).toMatchObject({ failure: { kind: "session_unavailable" } })
+    expect([...notes.values()]).toEqual([])
   })
 })

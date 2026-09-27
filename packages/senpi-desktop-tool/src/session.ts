@@ -43,6 +43,7 @@ export function sessionOpenParams(settings: ComputerSettings, context: ComputerH
 	const { auditLog, screenshotGc } = settings;
 	return {
 		display: settings.display,
+		macosCanary: settings.macosCanary,
 		allowHostRelayOnlyStop: settings.allowHostRelayOnlyStop,
 		auditPath: auditLog.enabled ? join(context.sessionManager.getSessionDir(), AUDIT_FILE_NAME) : null,
 		artifactDir: tmpdir(),

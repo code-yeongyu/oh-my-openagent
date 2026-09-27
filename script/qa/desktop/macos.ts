@@ -36,7 +36,8 @@ function runScenario(name: ScenarioName, options: RunOptions): Promise<ScenarioR
     case "tcc-diagnostic": return tccDiagnostic(options)
     case "screenshot-budget": return screenshotBudget(options)
     case "capabilities-truth": return capabilitiesTruth(options)
-    case "canary": return canary(options)
+    case "canary": return canary(options, "session")
+    case "canary-off": return canary(options, "off")
     default: return assertNever(name)
   }
 }

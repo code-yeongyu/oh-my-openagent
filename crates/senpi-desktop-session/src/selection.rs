@@ -6,16 +6,16 @@ use std::path::PathBuf;
 use senpi_desktop_backend_fake::{FakeBackend, FakeScenario};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::types::DisplaySelector;
+use senpi_desktop_core::types::{DesktopSessionOptions, DisplaySelector};
 
 /// Builds the backend on the session thread: once at start (the capabilities
-/// probe) and again at every `session.open` with its display selector.
+/// probe) and again at every `session.open` with its session options.
 pub trait BackendFactory: Send + 'static {
     /// # Errors
     /// The reason no backend exists on this host; the session then reports
     /// `DesktopCapabilities::unavailable()` and fails every backend request
     /// with this error.
-    fn create(&self, selector: DisplaySelector) -> CoreResult<Box<dyn Backend>>;
+    fn create(&self, options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,9 +57,9 @@ impl BackendSelection {
 }
 
 impl BackendFactory for BackendSelection {
-    fn create(&self, selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+    fn create(&self, options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
         match self {
-            Self::Platform => platform_backend(selector),
+            Self::Platform => platform_backend(options),
             Self::FakeFile(path) => FakeScenario::load(path)
                 .map(fake_backend)
                 .map_err(|error| DesktopError::capture_failed(error.to_string())),
@@ -74,13 +74,23 @@ fn fake_backend(scenario: FakeScenario) -> Box<dyn Backend> {
 
 /// The backend crate for the compile target.
 #[cfg(target_os = "macos")]
-fn platform_backend(selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
-    let backend = senpi_desktop_backend_macos::MacosBackend::new(selector)?;
+fn platform_backend(options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
+    use senpi_desktop_backend_macos::CanaryMode;
+    use senpi_desktop_core::types::MacosCanaryMode;
+
+    let mut backend = senpi_desktop_backend_macos::MacosBackend::new(DisplaySelector::parse(
+        options.display.clone(),
+    ))?;
+    backend.set_canary_mode(match options.macos_canary {
+        MacosCanaryMode::Session => CanaryMode::Session,
+        MacosCanaryMode::Off => CanaryMode::Off,
+    });
     Ok(Box::new(backend))
 }
 
 #[cfg(target_os = "windows")]
-fn platform_backend(selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+fn platform_backend(options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
+    let selector = DisplaySelector::parse(options.display.clone());
     let backend = senpi_desktop_backend_win32::Win32Backend::new(selector)?;
     Ok(Box::new(backend))
 }
@@ -105,7 +115,8 @@ fn linux_display_server(is_set: impl Fn(&str) -> bool) -> Option<LinuxDisplaySer
 }
 
 #[cfg(target_os = "linux")]
-fn platform_backend(selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+fn platform_backend(options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
+    let selector = DisplaySelector::parse(options.display.clone());
     match linux_display_server(|name| std::env::var_os(name).is_some()) {
         Some(LinuxDisplayServer::Wayland) => {
             let backend = senpi_desktop_backend_wayland::WaylandBackend::new(selector);
@@ -122,7 +133,7 @@ fn platform_backend(selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-fn platform_backend(_selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+fn platform_backend(_options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
     Err(DesktopError::capture_failed(format!(
         "{} desktop backend not yet ported",
         std::env::consts::OS
@@ -189,7 +200,7 @@ mod tests {
     #[test]
     fn platform_backend_is_not_yet_ported() {
         let error = BackendSelection::Platform
-            .create(DisplaySelector::All)
+            .create(&DesktopSessionOptions::default())
             .err()
             .map(|error| error.code);
         assert_eq!(error, Some(senpi_desktop_core::error::ErrorCode::CaptureFailed));

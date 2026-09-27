@@ -3,6 +3,7 @@
 //! core's `AxRegistry`.
 
 mod actions;
+mod foreground;
 pub(crate) mod element;
 mod props;
 mod tree;
@@ -12,6 +13,7 @@ use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::types::DesktopWindow;
 
 pub use self::element::is_trusted;
+pub(crate) use self::foreground::{make_frontmost, prepare_foreground_input};
 use self::element::{element, handle};
 
 #[derive(Debug, Default)]
@@ -71,13 +73,6 @@ pub(crate) fn text_area_value(window: &DesktopWindow) -> Option<String> {
     None
 }
 
-/// Raises `window` and marks it main/focused so a foreground action lands in
-/// it (oh-my-pi's `prepare_foreground_input`).
-pub(crate) fn prepare_foreground_input(window: &DesktopWindow) -> CoreResult<()> {
-    let root = tree::window_root(window)?;
-    actions::set_window_main_and_focused(&root)?;
-    actions::perform(&root, "AXRaise")
-}
 
 impl AxBackend for MacAx {
     fn window_root(&mut self, win: &DesktopWindow) -> CoreResult<AxHandle> {

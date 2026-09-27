@@ -1,3 +1,276 @@
+## A TTL tombstone belongs to the sweep that wrote it until that sweep's close settles
+
+`lifecycle/ttl.ts`, `store/expunge-owner.ts` (new): every tombstone now names the sweep attempt that
+wrote it (`ExpungeOwner`, `<taskId>.json.expunging.owner`), and only that attempt restores or deletes it
+(`completeExpunge`/`restoreExpunging` take the owner; `completeExpunge` now reports whether it deleted).
+Crash recovery takes over (`takeOverExpunging`) only tombstones whose owning process is gone: a second
+sweep used to mistake a live sweep's tombstone for a crashed one and restore it, a revival then claimed
+the task, and the first sweep's late close and unconditional deletion killed the revived run and erased
+its record. A record recovery restores is not swept again in the same sweep, and a throw while ending a
+child restores the owned tombstone before propagating.
+
+`lifecycle/host-session-close.ts` `closeHostSession` tells a refusal from a close still in flight when
+`hostCloseTimeoutMs` passes. TTL keeps the tombstone (the record stays unrevivable) while that close is
+in flight and deletes or restores the record once it settles: restoring at the timeout let a revival
+start and the late close then end the revived run's session.
+
+`manager/manager-reattach.ts`: a revived handle attaches only while the record still holds the
+`residency_claim` and run epoch it was launched under, so an older revival that succeeds after a newer
+same-epoch claim no longer attaches on the newer claim (which the newer revival's failure would then roll
+back under a live handle). A record without a token (written before this change) keeps the old check.
+
+`manager/manager.ts` `#failStrandedHandoff`: a failed handoff now clears only the handoff marker, and
+`#keepUnclosedChild` moves `fallback_closing_child` into the record's own identity in one write.
+Clearing both first left one committed state naming no session; a parent that died there left recovery
+marking the task lost while the failed rung's session kept running.
+
+Tests: `ttl-expunge-owner.test.ts`, `runtime-fallback-rejected-close.test.ts`, and an obsolete-success
+case in `revival-claim-fence.test.ts`; each fails with its fix reverted. `runtime-fallback-live-close`
+no longer leaves an unawaited `AbortSignal.timeout` wait behind in its acknowledged variant.
+
+Follow-ups found while reviewing the above:
+
+- `manager/manager-reattach.ts`: a reattach rejected because another owner holds the task (claim not
+  held, claim superseded, task already attached) now only detaches a revived daemon-session handle. That
+  handle is attached to the task's one daemon session, which the other owner may be using; discarding it
+  sent `abort` + `close_session` and ended the other owner's run. A rejected process child, spawned for
+  that attempt alone, is still ended.
+- `store/expunge-owner.ts`: the owner file is written to a staging name and renamed into place under the
+  record lock, and an owner file that does not parse counts as no owner, so a torn file can never block
+  every later recovery (other read errors still surface).
+- `lifecycle/expunge-attempts.ts` (new): an attempt owned by this process is live only while it has work
+  in flight here (the sweep, or a pending close it left). A sweep that threw, or a late close whose
+  completion failed, no longer strands its tombstone until the process exits: the next sweep takes it
+  over. The late-close completion catches and logs its storage errors instead of leaving an unhandled
+  rejection, and a confirmed close is not turned into a refusal by a failure to record its event.
+- Crash recovery keeps `dev`'s rules from #8992: an unreadable tombstone still finishes phase 2, and only a
+  daemon session is closed after a crash, never a process pid from an old tombstone.
+
+Tests: `manager-reattach-rejected.test.ts`, plus torn-owner and failed-late-completion cases in
+`ttl-expunge-owner.test.ts`; each fails with its fix reverted.
+
+## A child that starts after its task was stopped, and a child whose cleanup rejects
+
+`manager/manager.ts`: every launch now re-reads the record once `runner.start()` resolves and keeps the child only
+while the task is still `running` on the same run epoch and owner (`#ownsLaunch`). This covers the primary launch,
+the `model_unavailable` walk (`#advanceStartFallback`, whose epoch advance is now one fenced `mutate`) and the
+runtime-fallback launch. A cancel, interrupt or another owner that landed during the start used to let the late child
+subscribe and stay resident on the stopped task (an interrupted primary launch, a runtime-fallback launch), or let the
+walk rewrite a cancelled record onto the next model. A stale child is discarded instead: this run's own cancel still
+tears it down through the destruction port, any other stale child is discarded directly, and neither is attached to
+the task (only a child whose cleanup rejects is kept, as below). `manager/manager-reattach.ts` likewise refuses a respawned child whose running task ended while it respawned.
+
+A child whose cleanup rejects may still be alive, so it keeps a cleanup owner on the record its run ended (epoch-fenced;
+a newer run's record is never touched, a `child_cleanup_failed` event is appended instead). A child reachable from
+outside this process has its pid or daemon session written back and is ended by the destruction port's orphan path
+(`reconcile_lost`, added to `steering/types.ts` `DestructionCause`). An in-process child has neither, so it becomes a
+cleanup owner: its record stays `resident` (`mark_resident` when a cancel had already disposed it) and the lifecycle's
+LRU eviction, idle reclaim, session shutdown and TTL see it through `getResidentHandle`/`residentTaskIds` and retry
+its teardown. It is kept apart from the live children, so steering never reaches it (`task_send` answers
+`not_continuable` instead of reviving it), and `manager.forget` keeps it: only a teardown that succeeds releases it
+(`child-handle.ts` `releaseOnDispose`), so a retry that rejects again leaves the same owner for the next one.
+
+`lifecycle/destroy.ts` `terminateOrphan`: a pid the orphan path has handled - signalled, or already dead - is now
+cleared from the record (fenced on the same pid). It used to stay on the disposed record, so after the OS reused the
+number the TTL sweep could signal an unrelated process. A `lost` record keeps its pid: TTL reads it as the pid-dead
+proof, never signals it, and only retains the record while that pid is alive. Test: `lifecycle/orphan-pid-consumed.test.ts`.
+
+`#tryRuntimeFallback`: the handoff write is also fenced on `status === "running"`. A cancel or interrupt that landed
+between reading the failed rung's record and writing the handoff used to be rewritten into a handoff (epoch and model
+advanced, marker set on the stopped record). The stop now stands: nothing is handed off, this run's lease is released
+and waiters settle here, because the stop's own teardown may already have dropped the live entry the normal outcome
+path would need.
+
+`#tryRuntimeFallback`: a rejected `destroyResidentTask(..., "fallback_handoff")` (any rejection value, `undefined`
+included) no longer escapes before cleanup or strands the task `running` behind this owner's pid fence. One fenced
+write clears the handoff marker while this owner still holds that handoff; the task then fails ("Runtime fallback
+could not close the failed model's child (...); <next> was not started.", event `task_fallback_teardown_failed`) only
+from `running`, so a cancel that landed first stands, and the next rung is not started beside a child that may still
+be alive. The failed child gets its cleanup owner (above) before its slot is released and waiters settle. Tests: `runtime-fallback-launch-races.test.ts`,
+`launch-ownership-races.test.ts`.
+
+## A child is ended only while its owner holds it exclusively, and only on a confirmed close
+
+`lifecycle/ttl.ts`: an expired record's child (its daemon session, or its process) is now ended only
+after the record is tombstoned, while no revival can see or claim it. A close the daemon does not
+confirm puts the record back (`store.restoreExpunging`, new with `store.loadExpunging`) with its
+residency unchanged, so it stays revivable and the next sweep retries; crash recovery applies the same
+close-or-restore rule to tombstones a crashed sweep left behind. Closing before the tombstone let a
+`task_send` revival claim the task between the liveness probe and the close, and TTL then closed the
+session the revived run was using.
+
+`lifecycle/host-session-close.ts` (new) `closeHostSessionConfirmed` is the one confirmed close:
+refusals and a daemon that does not answer within `hostCloseTimeoutMs` (new lifecycle dep, 10s) count
+as unconfirmed. TTL, orphan destruction and the closing-child obligation use it.
+`lifecycle/destroy.ts`: a `fallback_handoff` teardown now also requires the failed rung's session to be
+confirmed closed. The live handle's own teardown is best-effort and bounded, so it resolved even when the
+daemon never acknowledged `close_session`, and the next model started beside the old session; the
+handoff now fails the task instead and the old session stays on the record.
+
+`lifecycle/residency.ts`: every residency claim writes a fresh `residency_claim` token.
+`revive-rollback.ts` `holdsClaim` fences rollback, `markLost` and the new `disposeClaimed` on it:
+reviving an interrupted or terminal task keeps its `run_epoch`, so the epoch alone let a failed revival
+undo another revival's successful claim on the same epoch.
+
+Tests: `revival-claim-fence.test.ts` (a failed scoped or `task_send` revival beside a same-epoch
+winner), `runtime-fallback-live-close.test.ts` (real `RpcHostRunner` over the fake daemon, close
+acknowledged or withheld), and a TTL-during-close case in `fallback-closing-obligation.test.ts`.
+`#8932` (on dev) already made the production liveness probe list worker sessions.
+
+## Each generation of a task owns only its own lease, handle and claim while an old rung closes
+
+A reload can revive the task while runtime fallback is still closing its failed rung, so two runs of one
+task coexist. `manager/manager.ts`: `#releaseSlot`'s per-task high-water mark skipped every lease below
+the newest released epoch, so a revived run that finished first stranded the old rung's lease (and the
+handoff's) for good; a lease that is still held is now always released. `#closingRungs` records the
+closing rung's handle as well as its epoch, so steering hides and `#releaseSlotForTask` targets only
+that handle: an interrupt of the revived run aborts it and releases its own lease, not the old rung's.
+`forget()` releases a cancelled run's lease before it drops the live entry that names it. The next
+rung is refused before it takes a slot if the task moved while the old rung closed.
+`lifecycle/revive-rollback.ts`: a revival's rollback is fenced on the epoch it claimed, so a revival
+that lost to a later one no longer detaches the winner's run. `lifecycle/ttl.ts`: an expired record's
+own daemon session is closed before the record is tombstoned, and a close the daemon did not confirm
+keeps the record for the next sweep instead of deleting its only pointer to a session that is still
+open. Tests: `runtime-fallback-generation-races.test.ts` (the revived run completing, interrupted or
+cancelled before the old close resolves or rejects, at concurrency two; two racing revivals), and a
+retained-session TTL case in `fallback-closing-obligation.test.ts`.
+
+## The closing rung's child is ended only on a confirmed close, by whoever owns the record next
+
+`lifecycle/host-session-default.ts`: `defaultHostSessionCloser` discarded `closeHostSession`'s
+`"unreachable"` answer (a refused attach or `close_session`), so every caller read a session that was
+still open as closed. It now rejects unless the daemon confirmed the close. `lifecycle/fallback-closing-child.ts`
+keeps `fallback_closing_child` on the record whenever the close is not confirmed (or the process
+outlived SIGKILL), and `reviveClaimed` defers instead of launching beside it. The child is now an
+obligation of every owner of the record, not only a revival: `destroy.ts` `terminateOrphan` ends it for
+a cancelled, lost or non-revivable record, and the TTL sweep keeps an expired record until its child is
+confirmed gone.
+
+`reviveClaimed` re-reads its claim after the awaited cleanup, and `manager.respawn`'s `beforeLaunch`
+refuses to launch when the task's status, owner, epoch or kill flag moved since the revival began: a
+cancel that lands while a dead owner's handoff is being recovered no longer gets the next rung's prompt
+sent. A rejected fallback close only drops the live entry that is still its own, so a reload that
+revived the task meanwhile keeps its handle, and an in-process child whose record has moved on stays a
+cleanup owner of this process. Tests: `fallback-closing-obligation.test.ts` (production closer and
+probe over a real socket: refused close keeps the identity, a cancelled handoff is closed by the global
+and the parent's reconcile, TTL retries), `runtime-fallback-revival-races.test.ts` (a reload during a
+resolving and a rejecting close; a cancel during the recovery close in both scopes).
+
+## A closing rung is never revived, a stale launch never runs or fails a newer run, and a crash mid-close leaves an owner
+
+`manager/manager.ts`: while `#tryRuntimeFallback` closes the failed rung, steering's `liveHandle` no
+longer returns that rung's handle, so an interrupt followed by `task_send`/`continueTask` in that window
+cannot revive a child that is being torn down (it answered `continued` and the old close then deleted
+the new run's live entry and stranded its lease). The fallback path only drops the live entry that is
+still its own.
+
+`manager/launch-fence.ts` (new): `ownsRun` checks status, epoch and owner, and `failOwnedRun` applies a
+start failure in one locked write only while the launch's own run still holds the record.
+`#launchRuntimeFallback` now checks ownership before starting anything (it checked `status` alone, so
+another owner's epoch still got the obsolete next rung started), and both the primary and the fallback
+start-rejection paths fail the task through `failOwnedRun`, so a stale rejection no longer writes
+`error` onto a newer owner's run.
+
+`lifecycle/fallback-handoff.ts`: the handoff moves the closing child's pid/daemon session into
+`fallback_closing_child` instead of dropping it, and the fallback path clears it once the close
+succeeds. `lifecycle/fallback-closing-child.ts` (new): `reviveClaimed` ends that child (session close
+while the daemon answers, or SIGTERM/SIGKILL) before it launches the next rung, and defers if the child
+may still be alive (see the section above for which answers count as confirmed). A parent that died between the handoff commit and the close used to leave the old
+retained daemon session open beside the revived one.
+
+Tests: `runtime-fallback-handoff-races.test.ts` (interrupt + continue during a resolving and a
+rejecting close; another owner during the close; a stale next-rung start rejection; a rejecting close
+interrupted or cancelled for a daemon and an in-process rung), `fallback-closing-child.test.ts`
+(retained session closed, live process signalled, refused close defers), and
+`runtime-fallback-crash-before-close.test.ts` (the crash on the real `RpcHostRunner` over the fake
+daemon socket: one session left, the old one closed). `runtime-fallback-launch-races.test.ts` was split
+into it plus `runtime-fallback-teardown-rejection.test.ts` and `runtime-fallback-cleanup-owner.test.ts`
+(fixtures in `__fixtures__/fallback-launch-fakes.ts`) to stay under the 250-line ceiling.
+
+## The failed rung's lease survives a stop during the handoff, and a lost handoff lets go of its run
+
+The handoff record names the next epoch while the failed rung's child is still closing and still holds
+its own lease. `cancelTask`/`interruptTask` released by the record's epoch, so they released the next
+epoch (which no lease held yet), raised the release high-water mark, and the old lease was then never
+returned: one lane slot lost for good. `#tryRuntimeFallback` now records the closing rung's epoch for
+the length of the teardown and `#releaseSlotForTask` releases that one; the next rung's launch already
+refuses a record that is no longer running and returns its own lease. A lost handoff fence
+(another owner took the task at this epoch) used to return with the old subscription, live entry,
+lease and handle still held; it now retires exactly those, releasing the handle with
+`releaseSupersededHandle` (a detach for a daemon session), and never touches the winner's record or
+session. Tests: `runtime-fallback-handoff-races.test.ts` (a lost fence, an interrupt and a cancel
+during the slow close, at concurrency one).
+
+## Runtime fallback forgets the closed rung's daemon session before the next one opens
+
+`manager/manager.ts` `#tryRuntimeFallback` closes the failed rung's child and hands the task to the next
+rung, but the record kept `runner_kind: "host-session"` and the CLOSED rung's `host_session` until the
+next rung's spawn stamped its own. The next rung's child session runs the omo extension inside the
+daemon, and its `session_start` reconciles the shared project records: since #8659 a resident
+host-session record whose session is gone is an orphan, so that pass claimed the live parent's task,
+reattached the closed session and moved `run_epoch`. The parent's real outcome was then dropped, the
+task stayed `running`, and `omo -p` never exited (reproduced 2/2 live on a lapsed OpenCode Go key).
+
+`lifecycle/fallback-handoff.ts` (new) names that span. `handOffToNextRung` builds the handed-off record:
+the next model selected, the epoch advanced, the closed child's `pid`, `runner_kind` and `host_session`
+dropped, and `fallback_handoff_epoch` set to the new epoch. `#tryRuntimeFallback` commits it in one
+`store.mutate` fenced on the failing outcome's epoch and owner, BEFORE awaiting the failed rung's
+teardown, so a reconciler that runs while the daemon is still closing that session already sees a
+handoff behind its live owner's pid fence (the first push wrote it after the teardown, which left the
+race open). `#recordSpawnFacts` and a reattach end the handoff; a start-fallback step inside it carries
+the marker to its new epoch. #8659's session-liveness rule is unchanged for every recorded session.
+
+`isFallbackHandoff` (marker equal to the run epoch, no pid, no daemon session) is the only pid-less
+process record `lifecycle/reconcile.ts` revives when its owner died; every other pid-less record
+(queued, or a workpool worker whose replay is refused by design) is lost as before, so no task parks
+forever. `reviveClaimed` launches a handoff FRESH from its v1 spawn spec on the selected model: the
+newest transcript is the failed rung's, and reopening it reported `resumed` while no turn ran. A
+transient launch failure parks it `rpc_detached`. `manager/manager-reattach.ts` stamps a revived daemon
+child's session (`recordSpawnedRunner`), as a fresh spawn does.
+
+`manager/manager-respawn.ts` decided "the daemon re-joined a live session, do not nudge" from the
+handle's own `attached` getter, which is true for every open handle, so a session reopened from its
+JSONL never got its interrupted turn continued. Respawn now keys on the host's answer to the open,
+`openDisposition` (#9003 on dev fixed the same defect; this branch adopts that field).
+
+Tests: `runtime-fallback-host-session.test.ts` (the handed-off record carries no child identity and the
+marker; a daemon-side reconcile during the failed rung's slow close defers as `foreign_live_owner`,
+respawns nothing, and only the next rung's result lands), `fallback-handoff-reconcile.test.ts` (a
+dead-owner handoff, swept by another session or by its resumed parent, opens a fresh session and
+prompts it on the real daemon runner; a transient failure parks it; a stale marker and a dead workpool
+worker end `lost`), `manager-respawn-host-session.test.ts` (a reopened session on the real daemon
+runner is continued), `rpc-host.test.ts` (`openDisposition` for a retained and a reopened session),
+and `manager-respawn-cleanup.test.ts` (a revived daemon child names its session).
+`reconcileLegacyTerminal` moved to `lifecycle/reconcile-terminal.ts` unchanged.
+
+## A host session reopened from its transcript continues its interrupted turn; post-reattach queries use the current port (#9003)
+
+`manager/manager-respawn.ts` `respawnProcess` decided "re-joined a live session" from `isAttachedHostSession`, which read the handle's `attached` getter. That getter is connection liveness (`runners/rpc-host/handle.ts`), true after ANY successful open, so a daemon child whose session the host reopened from its JSONL (open_session answered `attached: false`) was treated as attached and never got `switchSession` + the one interrupted-turn continuation. The host's answer is now carried on the handle as `openDisposition: "attached" | "reopened"` (`HostSessionHandleOptions.openDisposition`, set by `RpcHostRunner.openChild` from `OpenedHostSession.attached` and updated when a reattach adopts a new port), and respawn keys on `openDisposition === "attached"`. The tail rule (`sessionTailNeedsContinuation`) still decides whether a reopened session needs the continuation, but `manager/interrupted-turn.ts` now reads the last CONVERSATION message instead of the literal last JSONL record: it walks back only over `custom:senpi.hooks.stop-state`, `custom:pi-rules.scan`, and `custom:senpi-memory.session-binding`. Live QA showed why: a killed host leaves the stop-state row after the interrupted tool result, and the reopening host appends the rules scan and memory binding before respawn reads the tail, so the old rule answered "answered" for every host reopen. A malformed record, `custom_message`, or unknown custom entry after the last message ends the walk with no continuation. Once the last message is known, the search back to the turn's opening user message walks past every non-message row (only a malformed record stops it, with no continuation), so a hook-written `custom_message` inside a continued turn can no longer hide the continuation prompt and trigger a second one. An unanswered user prompt followed only by those named bookkeeping rows now counts as interrupted and gets exactly one continuation across host reopen and in-process respawn. A turn that was already continued once is never continued again, even if it is interrupted again (by design). The continuation wording and the reattach backoff are unchanged.
+
+`runners/rpc-host.ts` bound `getEntries`/`switchSession` to the client captured at open, so after a transport reattach both went to the dead port and threw `session_detached`. `HostSessionPort` now carries both queries, the handle serves them from its CURRENT port (waiting for an in-flight reattach), and the runner routes through the handle. RED->GREEN: `manager/manager-respawn-host-session.test.ts` (real runner over the fake host: `attached: false` + interrupted tail -> `reopened` and exactly one followUp prompt; `attached: true` -> `attached` and none; `attached: false` + completed tail -> none; interrupted tail followed by bookkeeping rows -> exactly one; answered tail followed by bookkeeping rows -> none; malformed final record -> none; a continued turn holding an unknown `custom_message` or `custom` row, re-interrupted and reopened by a restarted host -> one prompt in total; malformed record inside the turn -> none) and `runners/rpc-host-recovery.test.ts` (after a host restart both queries hit the new client, zero calls on the old one).
+
+## A suspended child frees its lane slot (#8973)
+
+`TaskManager.forget()` now releases the forgotten run's concurrency lease (`#releaseSlotForTask`). Suspension (session shutdown's `suspendHandle`, `parkHostSessionOnDaemonLoss`) forgets the handle first, and the outcome tracker's `ownedRecord` then refuses to settle a handle it no longer owns, so the lease of a suspended run was never released: every suspension leaked one lane slot until the parent's lane was full, new spawns queued behind it, and revival/`task_send` answered `lane_capacity`. The per-(task, epoch) release guard keeps a late settle of the stale handle from releasing a newer run's lease. `src/manager/suspended-lane-release.test.ts` covers both: a sibling starts in a one-slot lane after the suspension (RED: it queued), and a late settle of the suspended handle leaves the new holder's lease intact.
+
+## Task residency is unlimited by default (#8999)
+
+`packages/omo-config-core/src/schema/task.ts`: `residency_max_children` defaults to `"unlimited"` in both the schema and `resolveOmoTaskSettings` (was `8` in the schema and `min(16, max(8, parallelism * 2))` when resolved). An explicit number or `0` keeps its meaning. Tests that pinned the bounded default now pin `"unlimited"`; `packages/senpi-task/src/manager/residency-unlimited.test.ts` gains a default-path case in which nine children of one parent all start (RED on the old default: the ninth was `residency_denied`). `assets/omo.schema.json` and `docs/reference/omo-json.md` follow.
+
+## Task start failures preserve their closed cause and daemon admission is single-flight (#8960)
+
+Task records and every `task` / `task_output` result now carry the closed `failure_kind` and
+`failure_reason` for start failures, while the user-facing sentence is authored by the parent and
+never includes child stderr or an unknown host string. The real absent-socket client path reports
+`host_unreachable`; Senpi's readiness-deadline envelope reports `ensure_timed_out`; closed session
+refusals retain their code. Concurrent starts on one daemon socket share one in-flight ensure, a
+failed flight is never cached, and memory-pressure notices live only while their admission episodes
+are active. TTL expunge recovery closes an identifiable daemon session before deleting its child
+directory, tolerates malformed tombstones per record, and never signals a pid from an old process
+tombstone. Focused tests cover persistence and single/batch result projection, real-client
+classification, overlapping admission notices, rejected-flight retry, revival fact reset, and
+crash-recovery ordering.
+
 ## Task progress subscribers survive a host-session reattach (#8983)
 
 `runners/rpc-host/handle.ts`: `subscribe` registered the listener on the port that was current at subscribe time, and a

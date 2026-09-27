@@ -76,6 +76,8 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
   const {
     final_response: _final,
     error_message: _error,
+    failure_kind: _failureKind,
+    failure_reason: _failureReason,
     run_stats: _stats,
     terminal_at: _terminalAt,
     ...rest

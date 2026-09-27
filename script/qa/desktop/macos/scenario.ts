@@ -13,6 +13,7 @@ export const SCENARIOS = [
   "screenshot-budget",
   "capabilities-truth",
   "canary",
+  "canary-off",
 ] as const
 
 export type ScenarioName = (typeof SCENARIOS)[number]

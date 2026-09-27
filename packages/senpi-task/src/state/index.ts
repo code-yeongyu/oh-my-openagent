@@ -44,3 +44,18 @@ export { bumpTaskId, createTaskId, parseTaskId, syncTaskIdFloor } from "./id"
 export type { TaskId } from "./id"
 export { messageability } from "./messageability"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
+export {
+  TASK_START_FAILURE_KINDS,
+  TASK_START_FAILURE_REASONS,
+  MODEL_START_FAILURE_REASONS,
+  HOST_START_FAILURE_REASONS,
+  SESSION_START_FAILURE_REASONS,
+  isTaskStartFailureKind,
+  isTaskStartFailureReason,
+} from "./start-failure"
+export type {
+  TaskStartFailureKind,
+  TaskStartFailureReason,
+  TaskStartFailureRecordFields,
+  TaskStartFailureTransition,
+} from "./start-failure"

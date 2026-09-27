@@ -75,13 +75,21 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
       }
     case "complete":
       return { ...record, final_response: transition.final_response, ...runStatsField(transition.run_stats) }
-    case "fail":
+    case "fail": {
+      const {
+        failure_kind: _failureKind,
+        failure_reason: _failureReason,
+        ...withoutFailureFacts
+      } = record
       return {
-        ...record,
+        ...withoutFailureFacts,
         error_message: transition.error_message,
+        ...(transition.failure_kind === undefined ? {} : { failure_kind: transition.failure_kind }),
+        ...(transition.failure_reason === undefined ? {} : { failure_reason: transition.failure_reason }),
         ...(transition.killed === true ? { killed: true } : {}),
         ...runStatsField(transition.run_stats),
       }
+    }
     case "lose":
       return { ...record, error_message: transition.error_message }
     case "cancel":

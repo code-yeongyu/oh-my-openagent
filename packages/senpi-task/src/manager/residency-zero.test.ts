@@ -73,10 +73,9 @@ function makeZeroCapManager(): TaskManager {
 }
 
 describe("TaskManager zero residency cap", () => {
-  test("#given a zero residency cap #when sixteen children start #then admits more than the default residency cap", async () => {
+  test("#given a zero residency cap #when sixteen children start #then every child is admitted", async () => {
     // given
     const manager = makeZeroCapManager()
-    expect(settings().residency_max_children).toBe(8)
 
     // when
     const results = await Promise.all(

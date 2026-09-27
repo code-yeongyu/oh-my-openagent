@@ -22,6 +22,7 @@ import {
 /** `session.open` params, forwarded verbatim; every policy they configure is enforced by the engine. */
 export interface DesktopSessionOpenParams {
 	readonly display?: string | null;
+	readonly macosCanary?: "session" | "off";
 	readonly allowHostRelayOnlyStop?: boolean;
 	readonly auditPath?: string | null;
 	readonly artifactDir?: string | null;

@@ -146,6 +146,17 @@ impl<S: XServer + Send, I: InputServer + Send> Backend for X11Backend<S, I> {
         self.input()?.type_text(target, text, mode)
     }
 
+    fn type_text_interruptible(
+        &mut self,
+        target: &Target,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<()> {
+        self.input()?.type_text_interruptible(target, text, mode, check_stop, delivered)
+    }
+
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.input()?.key_chord(target, keys, mode)
     }

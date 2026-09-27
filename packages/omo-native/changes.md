@@ -1,3 +1,15 @@
+## 2026-09-28 - The doctor recognizes a Bun-installed omo on Windows (#8909)
+
+### What changed
+
+- `bin/lib/doctor-migration.js`: Bun's Windows global bin is a copied `omo.exe` plus an `omo.bunx` sidecar. The owner resolver now reads that sidecar (UTF-16LE, target up to `"` + NUL) and resolves the target against the bin dir's parent, the way Bun's shim does (`install\global\node_modules\omo-ai\bin\omo.js` from `~/.bun`, `..\node_modules\...` for a home-root install). Ownership still requires that file to exist inside an installed package, so the omo.exe is `native` and the "another omo precedes omo-ai on PATH" warning no longer fires for omo-ai's own launcher.
+- `bin/lib/package-paths.js` `updateTarget()`: a legacy Bun home-root install (`<home>/node_modules/omo-ai` next to `<home>/bun.lock` or `bun.lockb`) is updated with `bun add -g` under the user's own Bun configuration. The default `install/global` layout keeps its `BUN_INSTALL` overlay; every other layout still gets the npm command.
+- The native installer's PATH check (`packages/omo-opencode/src/cli/install-native/legacy-omo-bin.ts`) reads the same sidecar, so `install --platform=native` on Windows verifies the Bun-installed omo instead of reporting that no omo-ai command exists.
+
+### Tests
+
+`test/doctor-migration.test.ts` writes the sidecar bytes a real `bun add -g omo-ai` produced on a windows-latest runner (default layout behind a legacy `omo.cmd`, and a home-root install reached through `..\node_modules`) and covers the home-root update target with and without a Bun lockfile. `legacy-omo-bin.test.ts` covers the installer scan over the same bytes.
+
 ## 2026-09-27 - Native doctor reports computer-use readiness (#8939)
 
 ### What changed

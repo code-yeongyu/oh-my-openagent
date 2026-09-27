@@ -19,6 +19,7 @@ import { defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
 export { createIdleReclaimerScheduler, defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
 
 const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
+const DEFAULT_HOST_CLOSE_TIMEOUT_MS = 10_000
 
 export type LifecycleContext = {
   readonly revivePolicy?: LifecycleDeps["revivePolicy"]
@@ -41,6 +42,7 @@ export type LifecycleContext = {
   readonly hostSessionProbe: HostSessionProbe
   readonly hostSessionClose: HostSessionCloser | undefined
   readonly hostRetry: HostSessionRetryPolicy
+  readonly hostCloseTimeoutMs: number
   readonly isolation: IsolationRuntime | undefined
   readonly isolationProbe: OwnerProbe | undefined
 }
@@ -84,6 +86,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     hostSessionProbe: deps.hostSessionProbe ?? defaultHostSessionProbe(),
     hostSessionClose: deps.hostSessionClose ?? defaultHostSessionCloser,
     hostRetry: deps.hostRetry ?? DEFAULT_HOST_SESSION_RETRY_POLICY,
+    hostCloseTimeoutMs: deps.hostCloseTimeoutMs ?? DEFAULT_HOST_CLOSE_TIMEOUT_MS,
     isolation: deps.isolation,
     isolationProbe: deps.isolationProbe,
   }

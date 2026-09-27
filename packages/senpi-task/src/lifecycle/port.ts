@@ -199,6 +199,9 @@ export type LifecycleDeps = {
   readonly hostSessionProbe?: HostSessionProbe
   readonly hostSessionClose?: HostSessionCloser
   readonly hostRetry?: HostSessionRetryPolicy
+  // How long a close this process must see confirmed (a failed rung, an expired record) waits for the
+  // daemon's answer before it counts as unconfirmed. Defaults to 10s.
+  readonly hostCloseTimeoutMs?: number
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {

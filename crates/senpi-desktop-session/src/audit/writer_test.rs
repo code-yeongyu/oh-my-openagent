@@ -29,6 +29,7 @@ fn sample() -> AuditRecord {
         screenshot_width: None,
         screenshot_height: None,
         text_length: None,
+        text_delivered: None,
         text_sha256: None,
         keys: None,
         message: None,
@@ -135,6 +136,7 @@ fn audit_type_records_text_sha256_and_never_the_text() {
     assert!(line.get("text").is_none());
     assert!(line["textSha256"].as_str().is_some_and(|h| h.len() == 16));
     assert_eq!(line["textLength"], 19);
+    assert_eq!(line["textDelivered"], 19);
 }
 
 #[test]

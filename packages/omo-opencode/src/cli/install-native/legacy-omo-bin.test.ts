@@ -163,6 +163,35 @@ describe("scanOmoBins", () => {
     expect(entries[0]?.shimPaths).toEqual([join(prefix, "omo.cmd"), join(prefix, "omo.ps1")])
   })
 
+  test("#given bun's windows omo.exe whose .bunx sidecar targets omo-ai #when scanning #then the entry is native", () => {
+    // given the layout `bun add -g omo-ai` writes on Windows: a copied omo.exe plus omo.bunx, whose
+    // UTF-16LE target is relative to ~/.bun (bytes as observed on a windows-latest runner)
+    const bunRoot = root("win-bunx")
+    const packageDir = join(bunRoot, "install", "global", "node_modules", "omo-ai")
+    const binDir = join(bunRoot, "bin")
+    mkdirSync(join(packageDir, "bin"), { recursive: true })
+    mkdirSync(binDir, { recursive: true })
+    writeFileSync(join(packageDir, "package.json"), JSON.stringify({ name: "omo-ai", version: "5.0.1" }))
+    writeFileSync(join(packageDir, "bin", "omo.js"), "#!/usr/bin/env node\n")
+    writeFileSync(join(binDir, "omo.exe"), "MZ\0bun shim")
+    writeFileSync(
+      join(binDir, "omo.bunx"),
+      Buffer.concat([
+        Buffer.from('install\\global\\node_modules\\omo-ai\\bin\\omo.js"\0', "utf16le"),
+        Buffer.from("6e006f006400650020005a0000000a00000037ab", "hex"),
+      ]),
+    )
+
+    // when
+    const entries = scanOmoBins({ pathDirectories: [binDir], extraDirectories: [], isWindows: true })
+
+    // then
+    expect(entries[0]?.binPath).toBe(join(binDir, "omo.exe"))
+    expect(entries[0]?.kind).toBe("native")
+    expect(entries[0]?.packageName).toBe("omo-ai")
+    expect(nativeOmoBin(entries)?.binPath).toBe(join(binDir, "omo.exe"))
+  })
+
   test("#given the user's own omo script that only mentions a legacy package path #when scanning #then it stays foreign and is never removed", () => {
     // given
     const binDir = join(root("own-script"), "bin")

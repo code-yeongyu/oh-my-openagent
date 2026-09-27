@@ -79,16 +79,6 @@ impl Win32Input {
         }
     }
 
-    pub(crate) fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
-        match (target, mode) {
-            (Target::Desktop, _) => self.enigo.text(text).map_err(enigo_error),
-            (Target::Window(id), DeliveryMode::Foreground) => {
-                self.with_foreground(id, |_| system::unicode_text(utf16_units(text)))
-            }
-            (Target::Window(id), DeliveryMode::Background) => background::post_text(id, self.integrity, text),
-        }
-    }
-
     pub(crate) fn key_chord(
         &mut self,
         target: &Target,
@@ -258,6 +248,6 @@ pub(super) fn utf16_units(text: &str) -> impl Iterator<Item = u16> + '_ {
     })
 }
 
-fn enigo_error(error: impl std::fmt::Display) -> DesktopError {
+pub(super) fn enigo_error(error: impl std::fmt::Display) -> DesktopError {
     DesktopError::input_failed(format!("Win32 global input failed: {error}"))
 }

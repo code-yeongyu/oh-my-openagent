@@ -10,7 +10,13 @@ import {
   type SessionExitCause,
   type SessionExitClassification,
 } from "./exit-mapping"
-import type { HostSessionChildHandle, HostSessionHandleOptions, HostSessionIdentity, HostSessionPort } from "./handle-port"
+import type {
+  HostSessionChildHandle,
+  HostSessionHandleOptions,
+  HostSessionIdentity,
+  HostSessionOpenDisposition,
+  HostSessionPort,
+} from "./handle-port"
 import { recoverLostTransport } from "./handle-reattach"
 import { isTransportLossError } from "./reattach"
 import type { HostSessionCommand, HostSessionParked } from "./session-client"
@@ -31,6 +37,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   // routing handle on a possibly new host generation. The session PATH is the child's identity.
   let client: HostSessionPort = options.client
   let session: HostSessionIdentity = options.session
+  let openDisposition: HostSessionOpenDisposition = options.openDisposition
   const idleWaiters: Array<() => void> = []
   const outcomeWaiters: Array<(settled: RunnerOutcome) => void> = []
   const exitWaiters: Array<(outcome: ChildExitOutcome) => void> = []
@@ -167,6 +174,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
         adopt: (next) => {
           client = next.client
           session = next.session
+          openDisposition = next.attached ? "attached" : "reopened"
           bindClient(client)
         },
         continueTurn: (prompt) => client.send({ type: "prompt", message: prompt, streamingBehavior: "steer" }),
@@ -252,6 +260,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     settleClassified(classifySessionExit({ cause: { kind: "session_closed", reason }, intent }))
   }
 
+  // Queries follow the child to whichever port it holds now; one issued mid-reattach waits for it.
+  const currentPort = async (): Promise<HostSessionPort> => {
+    await reattaching
+    return client
+  }
+
   const detach = async (): Promise<void> => {
     detached = true
     eventListeners.clear()
@@ -272,6 +286,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     get attached() {
       return outcome === undefined && !parked && !detached
     },
+    get openDisposition() {
+      return openDisposition
+    },
+    getEntries: async (since) => (await currentPort()).getEntries(since),
+    switchSession: async (sessionPath) => (await currentPort()).switchSession(sessionPath),
     steer: async (text) => {
       beginTurn()
       try {

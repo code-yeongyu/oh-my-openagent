@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -12,6 +13,7 @@ import { join } from "node:path"
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
 import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
+import { holdsTombstone, removeExpungeOwner, readExpungeOwnerFile, restoreTombstone, takeOverTombstone, writeExpungeOwner } from "./expunge-owner"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
 import { writeRecord } from "./record-write"
@@ -107,7 +109,7 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
       const path = taskPath(stateDir, parsedTaskId)
       withTaskRecordLock(path, () => removeRecord(stateDir, parsedTaskId, cache, appendFds))
     },
-    tombstoneIfExpired(taskId, shouldRetain) {
+    tombstoneIfExpired(taskId, shouldRetain, owner) {
       const parsedTaskId = parseTaskId(taskId)
       const path = taskPath(stateDir, parsedTaskId)
       // The lock file lives beside the record, so the tasks dir must exist even when the record
@@ -119,17 +121,37 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
         const current = readRecord(path)
         if (current === null) return { kind: "missing" } as const
         if (shouldRetain(current)) return { kind: "retained" } as const
+        if (owner !== undefined) writeExpungeOwner(tombstonePath(stateDir, parsedTaskId), owner)
         renameSync(path, tombstonePath(stateDir, parsedTaskId))
         cache.delete(path)
         return { kind: "tombstoned", record: current } as const
       })
     },
-    completeExpunge(taskId) {
+    completeExpunge(taskId, owner) {
       const parsedTaskId = parseTaskId(taskId)
-      // Phase 2 (and crash recovery): the record is already tombstoned - committed to deletion,
-      // invisible to load/list, never resurrected - so this is idempotent and needs no lock.
+      const tombstone = tombstonePath(stateDir, parsedTaskId)
+      // Phase 2 (and crash recovery): the tombstone is committed to deletion and invisible to load/list.
+      // An owned attempt first confirms, under the record lock, that the tombstone is still its own.
+      if (owner !== undefined && !holdsTombstone(taskPath(stateDir, parsedTaskId), tombstone, owner)) return false
       removeRecord(stateDir, parsedTaskId, cache, appendFds)
-      rmSync(tombstonePath(stateDir, parsedTaskId), { force: true })
+      rmSync(tombstone, { force: true })
+      removeExpungeOwner(tombstone)
+      return true
+    },
+    loadExpunging(taskId) {
+      return readRecord(tombstonePath(stateDir, parseTaskId(taskId)))
+    },
+    restoreExpunging(taskId, owner) {
+      const parsedTaskId = parseTaskId(taskId)
+      const path = taskPath(stateDir, parsedTaskId)
+      if (restoreTombstone(path, tombstonePath(stateDir, parsedTaskId), owner)) cache.delete(path)
+    },
+    readExpungeOwner(taskId) {
+      return readExpungeOwnerFile(tombstonePath(stateDir, parseTaskId(taskId)))
+    },
+    takeOverExpunging(taskId, from, to) {
+      const parsedTaskId = parseTaskId(taskId)
+      return takeOverTombstone(taskPath(stateDir, parsedTaskId), tombstonePath(stateDir, parsedTaskId), from, to)
     },
     listExpunging() {
       const tasksDir = join(stateDir, "tasks")

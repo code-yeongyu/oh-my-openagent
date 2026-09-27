@@ -98,6 +98,24 @@ pub trait Backend: Send {
         mode: DeliveryMode,
     ) -> CoreResult<()>;
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()>;
+    /// Backends with incremental text delivery check between Unicode scalars
+    /// and report each fully delivered scalar. The default preserves the
+    /// existing one-call behavior for backends without incremental input.
+    fn type_text_interruptible(
+        &mut self,
+        target: &Target,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<()> {
+        check_stop()?;
+        self.type_text(target, text, mode)?;
+        for _ in text.chars() {
+            delivered();
+        }
+        Ok(())
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
     fn raise_window(&mut self, id: &str) -> CoreResult<()>;
     fn ax(&mut self) -> Option<&mut dyn AxBackend>;

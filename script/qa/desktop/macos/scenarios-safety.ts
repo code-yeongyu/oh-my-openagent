@@ -158,12 +158,16 @@ export async function capabilitiesTruth(options: RunOptions): Promise<ScenarioRe
   } finally { await quitTextEdit() }
 }
 
-export async function canary(options: RunOptions): Promise<ScenarioResult> {
+// `computer.macos_canary`: "session" shows the canary dialog exactly once per session, "off" never
+// shows it. Either way both background inputs must still succeed. The dialog count comes from an
+// independent System Events observer, not from the engine.
+export async function canary(options: RunOptions, mode: "session" | "off"): Promise<ScenarioResult> {
   const doc = "qa-canary.txt"
+  const expectedDialogs = mode === "session" ? 1 : 0
   await quitTextEdit()
   await openTextEdit(doc, "canary target\n")
   try {
-    return await withSession(options, { macos_canary: "session" }, async (session) => {
+    return await withSession(options, { macos_canary: mode }, async (session) => {
       const counter = await countCanaryDialogs()
       let first: ToolOutcome
       let second: ToolOutcome
@@ -174,8 +178,9 @@ export async function canary(options: RunOptions): Promise<ScenarioResult> {
       } finally {
         dialogs = await counter.stop()
       }
-      return { scenario: "canary", pass: !first.isError && !second.isError && dialogs.length === 1,
-        facts: { firstError: toolError(first), secondError: toolError(second), canaryDialogPids: dialogs } }
+      return { scenario: mode === "session" ? "canary" : "canary-off",
+        pass: !first.isError && !second.isError && dialogs.length === expectedDialogs,
+        facts: { mode, expectedDialogs, firstError: toolError(first), secondError: toolError(second), canaryDialogPids: dialogs } }
     })
   } finally { await quitTextEdit() }
 }

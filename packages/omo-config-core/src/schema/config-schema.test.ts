@@ -86,7 +86,7 @@ describe("omo config schema", () => {
     expect(result.data.task?.process_runner).toBe("host")
     expect(result.data.task?.host_engine_policy).toBe("upgrade")
     expect(result.data.task?.default_concurrency).toBe(5)
-    expect(result.data.task?.residency_max_children).toBe(8)
+    expect(result.data.task?.residency_max_children).toBe("unlimited")
     expect(result.data.categories?.deep?.max_tokens).toBe(12000)
     expect(result.data.categories?.deep?.reasoning).toBe("high")
     expect(result.data.categories?.deep?.provider_options).toEqual({

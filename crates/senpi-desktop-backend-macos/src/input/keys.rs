@@ -184,7 +184,19 @@ pub(super) fn type_text(
     text: &str,
     route: KeyRoute,
 ) -> CoreResult<()> {
+    type_text_interruptible(source, held, text, route, &|| Ok(()), &mut || {})
+}
+
+pub(super) fn type_text_interruptible(
+    source: &CGEventSource,
+    held: &mut Held,
+    text: &str,
+    route: KeyRoute,
+    check_stop: &dyn Fn() -> CoreResult<()>,
+    delivered: &mut dyn FnMut(),
+) -> CoreResult<()> {
     for character in text.chars() {
+        check_stop()?;
         let value = character.to_string();
         for down in [true, false] {
             post_key(
@@ -198,6 +210,7 @@ pub(super) fn type_text(
             )?;
             thread::sleep(Duration::from_millis(8));
         }
+        delivered();
     }
     Ok(())
 }

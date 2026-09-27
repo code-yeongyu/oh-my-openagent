@@ -66,6 +66,10 @@ pub struct AuditEvent {
     pub duration_ms: u64,
     pub focus_restored: Option<bool>,
     pub text_length: Option<u32>,
+    /// Fully delivered Unicode scalars; may be shorter than `text_length`
+    /// when a stop or cancellation interrupts typing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_delivered: Option<u32>,
     /// First 16 hex digits of the typed text's SHA-256; the text itself is
     /// never audited.
     pub text_sha256: Option<String>,

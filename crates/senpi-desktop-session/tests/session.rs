@@ -12,8 +12,7 @@ use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_params::{CaptureParams, PointParams};
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, DisplaySelector,
-    Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, Target,
 };
 use senpi_desktop_safety::{FakeClock, StopPathId, Supervisor};
 use senpi_desktop_session::{
@@ -247,7 +246,7 @@ impl SharedSinkFactory {
 }
 
 impl BackendFactory for SharedSinkFactory {
-    fn create(&self, _selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+    fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
         let backend = FakeBackend::new(self.scenario.clone());
         self.sinks.lock().push(backend.sink());
         Ok(Box::new(backend))
@@ -257,7 +256,7 @@ impl BackendFactory for SharedSinkFactory {
 struct PanickingFactory;
 
 impl BackendFactory for PanickingFactory {
-    fn create(&self, _selector: DisplaySelector) -> CoreResult<Box<dyn Backend>> {
+    fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
         Ok(Box::new(PanicsOnDisplays))
     }
 }

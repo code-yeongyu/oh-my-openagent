@@ -114,16 +114,17 @@ describe("model_unavailable start failures", () => {
     expect(eventLog).toContain('"failure_reason":"model_not_in_child_profile"')
   })
 
-  test("#given a model_unavailable failure whose reason is not a known member #when the task starts #then it reports the classification without echoing the reason", async () => {
+  test("#given a model_unavailable failure whose reason is not a known member #when the task starts #then it reports the trusted classification without echoing the reason", async () => {
     // given: the reason is only ever used as a lookup key, so an unexpected value can never be echoed.
-    // The kind itself is still trustworthy, so the caller keeps the model-unavailable classification.
+    // The kind stays structured, while the off-enum reason cannot select or enter public text.
     const runner = new FakeRunner()
-    runner.startError = new RunnerError({
+    const offEnum = new RunnerError({
       kind: "model_unavailable",
-      // biome-ignore lint/suspicious/noExplicitAny: proving the lookup is total against an off-enum value.
-      reason: ADVERSARIAL_ERROR as any,
+      reason: "model_not_in_child_profile",
       message: ADVERSARIAL_ERROR,
     })
+    Object.defineProperty(offEnum.failure, "reason", { value: ADVERSARIAL_ERROR })
+    runner.startError = offEnum
     const { manager } = makeManager({ planner, process: runner })
 
     // when

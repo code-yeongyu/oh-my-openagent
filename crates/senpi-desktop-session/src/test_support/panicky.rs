@@ -60,6 +60,16 @@ impl Backend for PanickyFake {
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.inner.type_text(target, text, mode)
     }
+    fn type_text_interruptible(
+        &mut self,
+        target: &Target,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<()> {
+        self.inner.type_text_interruptible(target, text, mode, check_stop, delivered)
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.inner.key_chord(target, keys, mode)
     }

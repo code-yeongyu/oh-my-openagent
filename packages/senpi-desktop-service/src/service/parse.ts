@@ -54,6 +54,7 @@ const AUDIT_EVENT: FieldSpec = {
 	durationMs: "number",
 	focusRestored: "boolean?",
 	textLength: "number?",
+	textDelivered: "number?",
 	textSha256: "string?",
 };
 

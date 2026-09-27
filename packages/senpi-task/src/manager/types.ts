@@ -6,7 +6,14 @@ import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/own
 import type { IsolationRuntime, IsolationStartedDetails } from "../isolation"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { KernelToolGrant } from "../kernel-tools/resolve"
-import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
+import type {
+  ResolvedModelRecord,
+  TaskRecord,
+  TaskRunStats,
+  TaskStartFailureKind,
+  TaskStartFailureReason,
+  TaskStatus,
+} from "../state"
 import type {
   CancelOptions,
   CancelOutcome,
@@ -19,7 +26,6 @@ import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
 import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 import type { TaskConcurrency } from "./concurrency"
-import type { RunnerFailure } from "../runners/in-process/child-handle"
 import type { InheritedExtensions } from "../runners/rpc/parent-extensions"
 import type { WorkpoolEngine } from "../workpool/engine"
 
@@ -167,7 +173,8 @@ export type StartResult =
       // The runner's typed failure kind (RunnerFailure["kind"]) when the runner rejected the start,
       // or `isolation_unavailable` when the child's copy-on-write clone could not be created.
       // so a caller can classify the refusal without parsing the sanitized message.
-      readonly failure_kind?: RunnerFailure["kind"] | "isolation_unavailable"
+      readonly failure_kind?: TaskStartFailureKind | "isolation_unavailable"
+      readonly failure_reason?: TaskStartFailureReason
     }
   | ResidencyDenied
 

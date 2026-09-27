@@ -110,6 +110,7 @@ export async function runSpawn(
       ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
       run_in_background: started.run_in_background,
       ...(started.failure_kind === undefined ? {} : { failure_kind: started.failure_kind }),
+      ...(started.failure_reason === undefined ? {} : { failure_reason: started.failure_reason }),
       reason: started.error_message,
       ...(spec.skills === undefined ? {} : { skills: spec.skills }),
     })

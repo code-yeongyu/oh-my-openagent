@@ -345,7 +345,7 @@ Task engine settings. The whole object is optional, but `provider_concurrency`, 
 | `model_concurrency` | record<string, non-negative int (0 = unlimited)> | unset |
 | `global_concurrency` | non-negative int (0 = unlimited) | effective default `max(8, availableParallelism() * 2)` |
 | `max_depth` | int >= 0 | `1` |
-| `residency_max_children` | non-negative int or `"unlimited"` (0 = unlimited) | effective default `max(8, availableParallelism() * 3)` |
+| `residency_max_children` | non-negative int or `"unlimited"` (0 = unlimited) | `"unlimited"`: a parent keeps every child it started. Set a number to cap how many children one parent session keeps resident; at the cap the oldest finished idle child is evicted, and a spawn is refused only when every resident is still running. |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (runtime uses `<project>/.omo/senpi-task`) |
 | `reattach_on_reconcile` | boolean | unset |

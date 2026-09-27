@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeAlias
 
@@ -38,6 +38,8 @@ class Session:
     parent_id: str | None = None
     agent: str | None = None
     last_user_message: str = ""
+    # Every user prompt the scanner already parsed, kept for search only; None when the scanner did not read the whole transcript.
+    user_messages: tuple[str, ...] | None = field(default=None, compare=False, repr=False)
 
     def to_json(self) -> JsonMap:
         return {

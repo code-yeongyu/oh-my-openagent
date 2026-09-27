@@ -34,6 +34,8 @@ export interface AuditEvent {
 	readonly durationMs: number;
 	readonly focusRestored?: boolean | null;
 	readonly textLength?: number | null;
+	/** Fully delivered Unicode scalars, including when typing was interrupted. */
+	readonly textDelivered?: number | null;
 	/** First 16 hex digits of the typed text's SHA-256; the text itself is never audited. */
 	readonly textSha256?: string | null;
 	readonly keys?: readonly string[] | null;

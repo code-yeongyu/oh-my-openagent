@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+
 import type { TaskRecord } from "../state"
 import { log } from "@oh-my-opencode/utils"
 
@@ -170,7 +172,7 @@ export function claimResidencySlot(
   const claimed = context.store.mutate(taskId, (fresh) => {
     if (!expect(fresh)) return fresh
     applied = true
-    return { ...fresh, residency_state: "resident", host_pid: context.hostPid, updated_at: nowIso(context) }
+    return { ...fresh, residency_state: "resident", host_pid: context.hostPid, updated_at: nowIso(context), residency_claim: randomUUID() }
   })
   if (claimed === null) return "not_claimable"
   return applied ? "claimed" : "not_claimable"

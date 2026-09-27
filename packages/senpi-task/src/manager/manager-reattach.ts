@@ -3,8 +3,18 @@ import { log } from "@oh-my-opencode/utils"
 import type { ReattachResult } from "../lifecycle/port"
 import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
-import { discardManagedHandle, type ManagedChildHandle } from "./child-handle"
-import { isTerminalRecord, nowIso } from "./manager-helpers"
+import { discardManagedHandle, releaseSupersededHandle, type ManagedChildHandle } from "./child-handle"
+import { isTerminalRecord, nowIso, recordSpawnedRunner } from "./manager-helpers"
+
+/**
+ * A handle rejected because someone else owns the task now. A revived daemon child reattaches to the
+ * task's one daemon session, which that owner may be using: this process only detaches from it. A
+ * process child was spawned for this attempt alone and is ended.
+ */
+async function letGoOfRejected(handle: ManagedChildHandle): Promise<void> {
+  if (handle.kind === "host-session") await releaseSupersededHandle(handle)
+  else await discardManagedHandle(handle)
+}
 
 /**
  * Bind a freshly respawned handle back onto its record: verify this host still holds the claim,
@@ -26,12 +36,25 @@ export async function reattachManagedTask(input: {
 }): Promise<ReattachResult> {
   const fresh = input.store.load(input.record.task_id)
   if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident") {
-    await discardManagedHandle(input.handle)
+    await letGoOfRejected(input.handle)
     return { ok: false, kind: "failed", reason: "task ownership claim is not held by this host" }
   }
+  // The revival that launched this handle must still hold the claim it launched under: another revival
+  // may have claimed the task since (at the same epoch when the task was interrupted or terminal), and
+  // an obsolete handle must not attach on that newer claim.
+  if (input.record.residency_claim !== undefined && (fresh.residency_claim !== input.record.residency_claim || fresh.notification.run_epoch !== input.record.notification.run_epoch)) {
+    await letGoOfRejected(input.handle)
+    return { ok: false, kind: "failed", reason: "the revival's residency claim was superseded" }
+  }
   if (input.isAttached(fresh.task_id)) {
-    await discardManagedHandle(input.handle)
+    await letGoOfRejected(input.handle)
     return { ok: false, kind: "already_attached", reason: "task already has a live handle" }
+  }
+  // A respawn begun for a live run whose task was stopped meanwhile must not become resident: only a
+  // task that was already terminal when its revival began is reattached as terminal.
+  if (isTerminalRecord(fresh) && !isTerminalRecord(input.record)) {
+    await discardManagedHandle(input.handle)
+    return { ok: false, kind: "failed", reason: "task ended while its child was being reattached" }
   }
   let unsubscribe: (() => void) | undefined
   let attached = false
@@ -50,12 +73,22 @@ export async function reattachManagedTask(input: {
       }
       return { ok: true }
     }
-    const { error_message: _error, final_response: _final, killed: _killed, ...rest } = fresh
+    const {
+      error_message: _error,
+      failure_kind: _failureKind,
+      failure_reason: _failureReason,
+      final_response: _final,
+      killed: _killed,
+      fallback_handoff_epoch: _handoff,
+      ...rest
+    } = fresh
     const epoch = fresh.notification.run_epoch + 1
     const timestamp = nowIso(input.now)
     const sessionId = input.handle.sessionId
+    // A revived daemon child is identified by its session, exactly as a fresh spawn stamps it.
+    const withRunner = recordSpawnedRunner(rest, input.handle.kind, input.handle.hostSession) ?? rest
     const reattached: TaskRecord = {
-      ...rest,
+      ...withRunner,
       status: "running",
       started_at: fresh.started_at ?? timestamp,
       updated_at: timestamp,

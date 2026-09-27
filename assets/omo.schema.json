@@ -956,7 +956,7 @@
           "maximum": 9007199254740991
         },
         "residency_max_children": {
-          "default": 8,
+          "default": "unlimited",
           "anyOf": [
             {
               "type": "integer",

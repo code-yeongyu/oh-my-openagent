@@ -1,3 +1,10 @@
+## computer use: forward the macOS canary policy (#8945)
+
+The shipped extension now passes `computer.macos_canary` through the desktop
+service to the native session. Explicit `off` reaches the macOS backend;
+omitting the setting keeps `session`. The native session validates the policy
+and applies it again when opening or reconfiguring a backend.
+
 ## Facts: bounded recovery for one oversized entry (#8984)
 
 **Behavior change for memory users.** A facts entry larger than the 128 KiB batch cap used to be parked and never extracted; it now gets one bounded extraction run after all ordinary batches are done: the complete entry up to 512 KiB, at most 8 provider requests of at most 4,096 output tokens each, no retry and no model fallback. That run costs provider calls and can commit new facts to the memory repository. Entries above 512 KiB, or whose pinned model's context is unknown or too small, stay parked as before.

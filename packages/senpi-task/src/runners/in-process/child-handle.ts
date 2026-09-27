@@ -1,3 +1,5 @@
+import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
+
 export type ChildSessionEvent = {
   readonly type: string
   readonly message?: unknown
@@ -23,25 +25,12 @@ export type ChildSession = {
  * ever derived from child output, so it is the one part of a failure that is safe to surface and
  * persist verbatim - and `manager.ts` still treats it only as a lookup key, never as text to echo.
  */
-export type RunnerFailureReason =
-  | "model_not_in_child_profile"
-  | "catalog_probe_timed_out"
-  | "catalog_probe_failed"
+export type RunnerFailureReason = TaskStartFailureReason
 
 export type RunnerFailure = {
   // The snake_case kinds map 1:1 onto the manager's respawn disposition codes (todo 12): a resume
   // rebuild failure is TYPED and retryable, never a silently weakened tool set or transcript.
-  readonly kind:
-    | "child-prompt-failed"
-    | "child-turn-failed"
-    | "session-create-failed"
-    | "depth-exceeded"
-    | "model_unavailable"
-    | "tools_unavailable"
-    | "session_unavailable"
-    // The shared task daemon cannot host this child and no per-child fallback was allowed
-    // (`runners/rpc-host/daemon.ts`): the client fails closed instead of starting a second host.
-    | "host_unavailable"
+  readonly kind: TaskStartFailureKind
   readonly message: string
   readonly reason?: RunnerFailureReason
   readonly cause?: unknown

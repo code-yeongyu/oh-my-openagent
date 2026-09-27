@@ -8,6 +8,7 @@
 //! sends no input; suspension always wins over cancellation (gajae
 //! `execute_one`).
 
+use std::cell::Cell;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -64,6 +65,9 @@ pub(crate) struct Mutation<'a> {
     pub(crate) frame_id: Option<&'a str>,
     /// Typed text or an AX value: audited by length and hash only.
     pub(crate) text: Option<&'a str>,
+    /// Fully delivered Unicode scalars, updated inside an interruptible
+    /// backend call while this single transaction owns the input lock.
+    pub(crate) text_delivered: Cell<u32>,
     pub(crate) keys: Option<&'a [String]>,
 }
 
@@ -75,6 +79,7 @@ impl Mutation<'_> {
             delivery,
             frame_id: None,
             text: None,
+            text_delivered: Cell::new(0),
             keys: None,
         }
     }
@@ -250,5 +255,7 @@ fn input_may_proceed(input_permission: &str) -> bool {
 mod permission_tests;
 #[cfg(test)]
 mod stop_tests;
+#[cfg(test)]
+mod typing_tests;
 #[cfg(test)]
 mod tests;

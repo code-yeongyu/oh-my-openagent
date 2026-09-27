@@ -148,6 +148,18 @@ describe("computer tool execute", HANG_GUARD, () => {
 		expect(open?.params).toMatchObject({ auditPath: null, captureCaps: { coordinateSafe: false } });
 	});
 
+	it.each(["session", "off"] as const)("carries the %s canary policy into an engine session", async (macosCanary) => {
+		// Given
+		const { handle, log } = desktopFixture({ macosCanary });
+
+		// When
+		await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext());
+
+		// Then
+		const open = log.requests.find((request) => request.method === "session.open");
+		expect(open?.params).toMatchObject({ macosCanary });
+	});
+
 	it("arms the configured stop chord once across repeated calls", async () => {
 		// Given
 		const { handle, log } = desktopFixture({ stopHotkey: "ctrl+alt+shift+f12" });

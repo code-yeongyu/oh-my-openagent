@@ -85,12 +85,28 @@ impl<S: InputServer> X11Input<S> {
     /// As [`Self::pointer`], plus `InvalidKey` for a character the keymap
     /// cannot type (checked before any key is sent).
     pub fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
+        self.type_text_interruptible(target, text, mode, &|| Ok(()), &mut || {})
+    }
+
+    pub fn type_text_interruptible(
+        &mut self,
+        target: &Target,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<()> {
         let strokes = text
             .chars()
             .map(|ch| self.server.keymap().strokes(KeyName::Char(ch)))
             .collect::<CoreResult<Vec<_>>>()?;
         self.deliver_keys(target, mode, "text", |this, route| {
-            strokes.iter().try_for_each(|chord| this.chord(route, chord))
+            for chord in &strokes {
+                check_stop()?;
+                this.chord(route, chord)?;
+                delivered();
+            }
+            Ok(())
         })
     }
 

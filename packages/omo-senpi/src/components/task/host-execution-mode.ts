@@ -24,20 +24,33 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 
 /** One line per distinct reason. The token (`host_unavailable:<reason>`) is the dedup key. */
 export interface HostNotices {
-  add(message: string): void
+  add(message: string): () => void
   list(): readonly string[]
 }
 
 export function createHostNotices(log: (message: string) => void): HostNotices {
-  const byToken = new Map<string, string>()
+  const byToken = new Map<string, { message: string; references: number }>()
   return {
     add: (message) => {
       const token = message.split(" ")[0] ?? message
-      if (byToken.has(token)) return
-      byToken.set(token, message)
-      log(message)
+      const existing = byToken.get(token)
+      if (existing === undefined) {
+        byToken.set(token, { message, references: 1 })
+        log(message)
+      } else {
+        existing.references += 1
+      }
+      let released = false
+      return () => {
+        if (released) return
+        released = true
+        const current = byToken.get(token)
+        if (current === undefined) return
+        current.references -= 1
+        if (current.references === 0) byToken.delete(token)
+      }
     },
-    list: () => [...byToken.values()],
+    list: () => [...byToken.values()].map((entry) => entry.message),
   }
 }
 

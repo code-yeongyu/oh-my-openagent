@@ -525,6 +525,14 @@
           ],
           "default": null
         },
+        "macosCanary": {
+          "default": "session",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MacosCanaryMode"
+            }
+          ]
+        },
         "allowHostRelayOnlyStop": {
           "type": "boolean",
           "description": "Accept a heartbeating host relay as the only stop path.",
@@ -573,6 +581,14 @@
       },
       "description": "`session.open` parameters supplied by the host.",
       "additionalProperties": false
+    },
+    "MacosCanaryMode": {
+      "type": "string",
+      "enum": [
+        "session",
+        "off"
+      ],
+      "description": "Whether macOS verifies background delivery before the session's first input."
     },
     "ScreenshotGc": {
       "type": "object",
@@ -1727,6 +1743,15 @@
           ],
           "format": "uint32",
           "minimum": 0
+        },
+        "textDelivered": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Fully delivered Unicode scalars; may be shorter than `text_length`\nwhen a stop or cancellation interrupts typing."
         },
         "textSha256": {
           "type": [

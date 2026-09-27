@@ -1,5 +1,6 @@
 import type { DagTaskOwner } from "../dag/owner"
 import type { IsolationBackendKind } from "@oh-my-opencode/omo-config-core"
+import type { TaskStartFailureRecordFields, TaskStartFailureTransition } from "./start-failure"
 
 export type { IsolationBackendKind } from "@oh-my-opencode/omo-config-core"
 
@@ -259,7 +260,7 @@ export type TaskRecordInput = {
   readonly host_session?: HostSessionIdentity
 }
 
-export type TaskRecord = TaskRecordInput & {
+export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly isolation?: IsolationRecord
   readonly task_id: string
   readonly status: TaskStatus
@@ -299,6 +300,18 @@ export type TaskRecord = TaskRecordInput & {
   readonly runner_kind?: RunnerKind
   // Host session identity when runner_kind is "host-session". Absent otherwise.
   readonly host_session?: HostSessionIdentity
+  // Runtime fallback's handoff: the run_epoch it handed the task to, written when the failed rung is
+  // closed and cleared when the next rung's spawn is recorded. While it equals notification.run_epoch
+  // the task sits between rungs with no child of its own, and a revival must launch the selected next
+  // model fresh instead of reopening the failed rung's transcript.
+  readonly fallback_handoff_epoch?: number
+  // The failed rung's child while that handoff closes it, kept apart from the task's own pid/session so
+  // no reconciler reads it as the live child; a revival of a handoff whose owner died ends it first.
+  readonly fallback_closing_child?: { readonly pid?: number; readonly host_session?: HostSessionIdentity }
+  // Identity of the residency claim that made this record resident, written by every claim. A revival
+  // that fails rolls back only its own claim: two revivals of an interrupted or terminal task share one
+  // run_epoch, so the epoch alone cannot tell the loser's claim from the winner's.
+  readonly residency_claim?: string
 }
 
 export type TaskTransition =
@@ -316,13 +329,7 @@ export type TaskTransition =
       readonly final_response: string
       readonly run_stats?: TaskRunStats
     }
-  | {
-      readonly type: "fail"
-      readonly timestamp: string
-      readonly error_message: string
-      readonly killed?: boolean
-      readonly run_stats?: TaskRunStats
-    }
+  | TaskStartFailureTransition<TaskRunStats>
   | {
       readonly type: "cancel"
       readonly timestamp: string

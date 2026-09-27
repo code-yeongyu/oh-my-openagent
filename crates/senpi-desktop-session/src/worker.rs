@@ -9,7 +9,7 @@ use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::types::{
-    DesktopCapabilities, DesktopSessionOptions, DesktopWindow, DisplaySelector, Target,
+    DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target,
 };
 
 use crate::audit::ArtifactGc;
@@ -48,7 +48,7 @@ impl Worker {
         capabilities: Arc<Mutex<DesktopCapabilities>>,
         safety: SessionSafety,
     ) -> Self {
-        let backend = factory.create(DisplaySelector::All);
+        let backend = factory.create(&DesktopSessionOptions::default());
         let mut worker = Self {
             factory,
             backend,
@@ -68,9 +68,7 @@ impl Worker {
     /// Re-creates the backend for the requested display; every earlier ref
     /// and frame belongs to the previous backend and is dropped.
     pub(crate) fn open(&mut self, options: DesktopSessionOptions) -> DesktopCapabilities {
-        self.backend = self
-            .factory
-            .create(DisplaySelector::parse(options.display.clone()));
+        self.backend = self.factory.create(&options);
         self.registry = AxRegistry::default();
         self.frames = FrameCache::default();
         self.options = Some(options);

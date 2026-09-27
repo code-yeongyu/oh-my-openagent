@@ -124,8 +124,8 @@ impl MacInput {
                         }
                         background::pointer(&self.source, &mut self.held, pid, wid, &window, event)
                     }
-                    DeliveryMode::Foreground => skylight::with_foreground(pid, wid, || {
-                        let _ = crate::ax::prepare_foreground_input(&window);
+                    DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                        crate::ax::prepare_foreground_input(&window)?;
                         global::pointer(&self.source, &mut self.held, event)
                     }),
                 }
@@ -140,8 +140,22 @@ impl MacInput {
         mode: DeliveryMode,
         capture: &MacCapture,
     ) -> CoreResult<()> {
+        self.type_text_interruptible(target, text, mode, capture, &|| Ok(()), &mut || {})
+    }
+
+    pub(crate) fn type_text_interruptible(
+        &mut self,
+        target: &Target,
+        text: &str,
+        mode: DeliveryMode,
+        capture: &MacCapture,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<()> {
         match target {
-            Target::Desktop => keys::type_text(&self.source, &mut self.held, text, KeyRoute::Global),
+            Target::Desktop => keys::type_text_interruptible(
+                &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
+            ),
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
@@ -151,11 +165,15 @@ impl MacInput {
                         guard::guard(&window, "keyboard", None)?;
                         guard::prepare_keys(&window, pid, wid, capture)?;
                         self.last_activated = Some((pid, wid));
-                        keys::type_text(&self.source, &mut self.held, text, KeyRoute::Process(pid))
+                        keys::type_text_interruptible(
+                            &self.source, &mut self.held, text, KeyRoute::Process(pid), check_stop, delivered,
+                        )
                     }
-                    DeliveryMode::Foreground => skylight::with_foreground(pid, wid, || {
-                        let _ = crate::ax::prepare_foreground_input(&window);
-                        keys::type_text(&self.source, &mut self.held, text, KeyRoute::Global)
+                    DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                        crate::ax::prepare_foreground_input(&window)?;
+                        keys::type_text_interruptible(
+                            &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
+                        )
                     }),
                 }
             }
@@ -182,8 +200,8 @@ impl MacInput {
                         self.last_activated = Some((pid, wid));
                         keys::chord(&self.source, &mut self.held, chord, KeyRoute::Process(pid))
                     }
-                    DeliveryMode::Foreground => skylight::with_foreground(pid, wid, || {
-                        let _ = crate::ax::prepare_foreground_input(&window);
+                    DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                        crate::ax::prepare_foreground_input(&window)?;
                         keys::chord(&self.source, &mut self.held, chord, KeyRoute::Global)
                     }),
                 }

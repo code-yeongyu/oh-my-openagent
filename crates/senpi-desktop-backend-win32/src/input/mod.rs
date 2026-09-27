@@ -25,6 +25,8 @@ mod global;
 mod native;
 #[cfg(target_os = "windows")]
 mod system;
+#[cfg(target_os = "windows")]
+mod typing;
 
 #[cfg(target_os = "windows")]
 pub(crate) use dispatch::{cursor_position, warp_cursor, Win32Input};

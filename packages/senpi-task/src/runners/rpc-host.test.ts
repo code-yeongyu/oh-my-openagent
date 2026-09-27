@@ -106,6 +106,7 @@ describe("RpcHostRunner start", () => {
     expect(ofType(host.commands, "prompt")).toHaveLength(1)
     expect(ofType(host.commands, "switch_session")).toHaveLength(0)
     expect(host.sessions().map((session) => session.sessionPath)).toEqual([sessionPath])
+    expect(isHostSessionHandle(resumed) ? resumed.openDisposition : undefined).toBe("attached")
   })
 
   test("#given a session path the daemon no longer holds #when the child resumes #then it reopens from the path, never re-prompts and stays steerable", async () => {
@@ -119,6 +120,7 @@ describe("RpcHostRunner start", () => {
 
     // then
     expect(isHostSessionHandle(handle) && handle.attached).toBe(true)
+    expect(isHostSessionHandle(handle) ? handle.openDisposition : undefined).toBe("reopened")
     expect(ofType(host.commands, "prompt")).toHaveLength(0)
     expect(ofType(host.commands, "switch_session")).toHaveLength(0)
     expect(host.sessions().map((session) => session.sessionPath)).toEqual([sessionPath])
@@ -141,7 +143,9 @@ describe("RpcHostRunner fallback", () => {
           new HostUnavailableError("capability", { fallbackAllowed: true, detail: "missing session_context" }),
         ),
       fallback,
-      onWarning: (message) => warnings.push(message),
+      onWarning: (message) => {
+        warnings.push(message)
+      },
     })
 
     // when

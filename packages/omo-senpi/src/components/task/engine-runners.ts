@@ -54,7 +54,7 @@ export interface RunnerBuildContext {
   readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
   // Where a daemon fallback reason goes. Defaults to the module logger; the engine passes the
   // session's deduped notice list so the same reason reaches `task_output` exactly once.
-  readonly onHostWarning?: (message: string) => void
+  readonly onHostWarning?: (message: string) => void | (() => void)
 }
 
 export interface TaskRunnerFactories {

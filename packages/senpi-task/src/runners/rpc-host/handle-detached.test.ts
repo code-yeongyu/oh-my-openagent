@@ -44,7 +44,7 @@ test("#given site-1 close is pending #when close detaches the client #then its h
   }
   const handle = createHostSessionHandle({
     client: port, session: FAKE_SESSION, taskId: "pending-close",
-    heartbeatIntervalMs: 60_000, now: () => 7, closeGraceMs: 60_000,
+    heartbeatIntervalMs: 60_000, now: () => 7, closeGraceMs: 60_000, openDisposition: "attached",
   })
 
   // when

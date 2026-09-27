@@ -88,3 +88,32 @@ fn session_options_missing_fields_take_documented_defaults() {
     assert_eq!(options.screenshot_gc, ScreenshotGc::default());
     assert_eq!((options.audit_path, options.artifact_dir), (None, None));
 }
+
+#[test]
+fn session_options_preserve_explicit_canary_policy() {
+    // Given
+    let options: DesktopSessionOptions =
+        serde_json::from_value(json!({"macosCanary": "off"})).unwrap();
+    // When
+    let value = serde_json::to_value(options).unwrap();
+    // Then
+    assert_eq!(value["macosCanary"], "off");
+}
+
+#[test]
+fn session_options_default_to_session_canary() {
+    // Given
+    let options: DesktopSessionOptions = serde_json::from_value(json!({})).unwrap();
+    // When
+    let value = serde_json::to_value(options).unwrap();
+    // Then
+    assert_eq!(value["macosCanary"], "session");
+}
+
+#[test]
+fn session_options_reject_unknown_canary_policy() {
+    // When
+    let result = serde_json::from_value::<DesktopSessionOptions>(json!({"macosCanary": "always"}));
+    // Then
+    assert!(result.is_err());
+}

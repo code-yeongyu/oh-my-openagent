@@ -141,8 +141,8 @@ async function respawnProcess(input: {
     })
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
     // reopen what is already open, and a continuation nudge would inject a second prompt into a
-    // turn that never stopped. A reopened (evicted/parked) session still gets both.
-    if (isAttachedHostSession(handle)) return { ok: true, handle: adaptRpcHandle(handle) }
+    // turn that never stopped. A session the host reopened from its JSONL still gets both.
+    if (joinedLiveHostSession(handle)) return { ok: true, handle: adaptRpcHandle(handle) }
     if (handle.switchSession === undefined) return cleanupFailure(handle, "respawned RPC handle cannot switch sessions")
     const switched = await handle.switchSession(sessionPath)
     if (switched.cancelled) return cleanupFailure(handle, "switch_session was cancelled")
@@ -170,13 +170,21 @@ async function respawnProcess(input: {
   }
 }
 
-/** A session the daemon still held when this child re-opened it: re-joined, not restarted. */
-function isAttachedHostSession(handle: RpcChildHandle): boolean {
-  return "kind" in handle && handle.kind === "host-session" && (handle as { attached?: unknown }).attached === true
+/**
+ * A session the daemon still held when this child re-opened it: re-joined, not restarted. Decided by
+ * the host's answer to the open (`openDisposition`), never by the handle's connection liveness
+ * (`attached`), which is true after ANY successful open.
+ */
+function joinedLiveHostSession(handle: RpcChildHandle): boolean {
+  return (
+    "kind" in handle &&
+    handle.kind === "host-session" &&
+    (handle as { openDisposition?: unknown }).openDisposition === "attached"
+  )
 }
 
 async function continueInterruptedTurn(record: TaskRecord, sessionPath: string, handle: ManagedChildHandle): Promise<void> {
-  if (!isTerminalRecord(record) && await sessionTailNeedsContinuation(sessionPath)) {
+  if (!isTerminalRecord(record) && await sessionTailNeedsContinuation(sessionPath, CONTINUATION_MESSAGE)) {
     await handle.followUp(CONTINUATION_MESSAGE)
   }
 }

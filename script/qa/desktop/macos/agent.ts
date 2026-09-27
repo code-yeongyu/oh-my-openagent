@@ -182,7 +182,8 @@ export class AgentSession {
   async command(args: string): Promise<string> {
     const notice = this.waitFor((event) => event.type === "extension_ui_request" &&
       event.method === "notify" && typeof event.message === "string" &&
-      (event.message.includes("Computer use") || event.message.startsWith(`/computer ${args}:`)))
+      (event.message.includes("Computer use") || event.message.startsWith(`/computer ${args}:`) ||
+        (args === "resume" && event.message.startsWith("Computer input resumed:"))))
     await this.#send({ type: "prompt", message: `/computer ${args}` })
     return String((await notice).message)
   }

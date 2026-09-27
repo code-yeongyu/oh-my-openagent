@@ -333,6 +333,7 @@ describe("ensureTaskDaemon", () => {
     // then
     expect(host.probes).toHaveLength(2)
   })
+
 })
 
 // What the ensured daemon can do decides `task.default_execution_mode: "auto"`, so the ensure hands

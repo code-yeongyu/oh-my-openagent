@@ -45,6 +45,7 @@ pub(crate) fn audit_event(
         text_length: mutation
             .text
             .map(|text| u32::try_from(text.chars().count()).unwrap_or(u32::MAX)),
+        text_delivered: mutation.text.map(|_| mutation.text_delivered.get()),
         text_sha256: mutation.text.map(text_sha256_prefix),
         keys: mutation.keys.map(<[String]>::to_vec),
     }
@@ -90,6 +91,8 @@ pub(crate) struct AuditRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_length: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_delivered: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keys: Option<Vec<String>>,
@@ -129,6 +132,7 @@ impl AuditRecord {
             screenshot_width: None,
             screenshot_height: None,
             text_length: event.text_length,
+            text_delivered: event.text_delivered,
             text_sha256: event.text_sha256.clone(),
             keys: event.keys.clone(),
             message: error.map(|error| error.message.clone()),

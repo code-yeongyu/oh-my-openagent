@@ -45,6 +45,15 @@ pub(crate) fn set_window_main_and_focused(element: &AXUIElement) -> CoreResult<(
     Ok(())
 }
 
+/// Writes a boolean attribute.
+pub(crate) fn set_bool(element: &AXUIElement, attribute: &str, value: bool) -> CoreResult<()> {
+    let name = CFString::from_str(attribute);
+    // SAFETY: The singleton CFBoolean and retained element stay valid for the
+    // synchronous setter call.
+    let error = unsafe { element.set_attribute_value(&name, CFBoolean::new(value)) };
+    ax_result(error, format!("setting {attribute}={value} failed"))
+}
+
 /// Model-facing action names (`press`, `show_menu`) -> native `AX*` names.
 pub(super) fn action_name(action: &str) -> String {
     match action.trim().to_ascii_lowercase().as_str() {

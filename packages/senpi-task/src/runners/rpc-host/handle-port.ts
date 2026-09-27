@@ -1,5 +1,11 @@
 import type { RunnerOutcome } from "../in-process/child-handle"
-import type { ChildEventListener, RpcChildHandle, RpcTerminalAssistantMessage } from "../types"
+import type {
+  ChildEventListener,
+  RpcChildHandle,
+  RpcEntriesResult,
+  RpcSwitchSessionResult,
+  RpcTerminalAssistantMessage,
+} from "../types"
 import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked } from "./session-client"
 
@@ -23,9 +29,17 @@ export interface HostSessionPort {
   onEvent(listener: ChildEventListener): () => void
   onParked(listener: (event: HostSessionParked) => void): () => void
   onClosed(listener: (event: HostSessionClosed) => void): () => void
+  getEntries(since?: string): Promise<RpcEntriesResult>
+  switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
   close(): Promise<void>
   detach(): Promise<void>
 }
+
+/**
+ * The host's word on the open that produced the current port: `attached` re-joined a session the
+ * host still had live (its turn, if any, is still running there); `reopened` loaded it from its JSONL.
+ */
+export type HostSessionOpenDisposition = "attached" | "reopened"
 
 /** Where a child lives on the daemon. `instanceId` is informational - it rotates on a handoff. */
 export interface HostSessionIdentity {
@@ -46,6 +60,7 @@ export type HostSessionHandleOptions = {
   readonly heartbeatIntervalMs: number
   readonly now: () => number
   readonly closeGraceMs: number
+  readonly openDisposition: HostSessionOpenDisposition
   /** Transport recovery. Absent: a lost transport ends the child as crashed(transport_gone). */
   readonly reattach?: HostSessionReattach
 }
@@ -54,7 +69,12 @@ export type HostSessionChildHandle = RpcChildHandle & {
   readonly kind: "host-session"
   /** False once the session was parked, closed, lost or deliberately left behind. */
   readonly attached: boolean
+  /** How the host answered the open behind the current port - never connection liveness. */
+  readonly openDisposition: HostSessionOpenDisposition
   readonly hostSession: HostSessionFacts
+  /** Served by the CURRENT port, so they keep working after a reattach. */
+  getEntries(since?: string): Promise<RpcEntriesResult>
+  switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
   /** Drop this child's connection and leave the session running on the daemon. */
   detach(): Promise<void>
   /** End the session on the host without aborting a turn first (`clean`). */

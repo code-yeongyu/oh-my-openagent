@@ -2,7 +2,7 @@
 //! latest capture and map through its frame to global logical points.
 
 use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
-use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{
@@ -164,9 +164,26 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
         self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
-            worker.backend()?.type_text(&target, &params.text, mode)?;
+            let check_stop = || {
+                let is_cancelled = cancelled();
+                if supervisor.is_suspended() {
+                    Err(DesktopError::new(ErrorCode::Suspended, "input was suspended while typing"))
+                } else if is_cancelled {
+                    Err(DesktopError::new(ErrorCode::Cancelled, "the request was cancelled while typing"))
+                } else {
+                    Ok(())
+                }
+            };
+            worker.backend()?.type_text_interruptible(
+                &target,
+                &params.text,
+                mode,
+                &check_stop,
+                &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
+            )?;
             Ok(Response::Unit)
         })
     }

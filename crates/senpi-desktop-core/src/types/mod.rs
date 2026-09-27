@@ -20,6 +20,7 @@ pub use window::{DesktopPoint, DesktopWindow, FrontWindow, PointerOptions, Targe
 #[serde(default, rename_all = "camelCase")]
 pub struct DesktopSessionOptions {
     pub display: Option<String>,
+    pub macos_canary: MacosCanaryMode,
     /// Accept a heartbeating host relay as the only stop path.
     pub allow_host_relay_only_stop: bool,
     /// Audit JSONL file; `None` turns auditing off.
@@ -28,6 +29,15 @@ pub struct DesktopSessionOptions {
     pub artifact_dir: Option<PathBuf>,
     pub screenshot_gc: ScreenshotGc,
     pub capture_caps: CaptureCaps,
+}
+
+/// Whether macOS verifies background delivery before the session's first input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum MacosCanaryMode {
+    #[default]
+    Session,
+    Off,
 }
 
 /// Screenshot artifact garbage-collection knobs.

@@ -95,7 +95,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
  */
 export function assertHostUsable(info: SenpiHostProtocolInfo | undefined): SenpiHostProtocolInfo {
   if (info === undefined) {
-    throw new HostUnavailableError("protocol", {
+    throw new HostUnavailableError("host_unreachable", {
       fallbackAllowed: false,
       detail: "the daemon did not answer get_protocol_info",
     })
