@@ -1,6 +1,18 @@
 import type { Plugin } from "@opencode/plugin"
 
 import { log } from "../shared/logger"
+import { createAdapterState, type AdapterState } from "./adapter-state"
+import { agentsFrom, configData, modelsFrom, providersFrom, serveOrigin, sessionCatalog, sessionStatusMap, skillsFrom } from "./catalog"
+import { listenPortOf } from "./serve-http"
+import {
+  childSessions,
+  createSession,
+  readMessage,
+  readMessages,
+  sendPrompt,
+  sessionIDFrom,
+  withParent,
+} from "./session-actions"
 
 type V2Context = Plugin.Context
 
@@ -16,113 +28,69 @@ function sdkResult(data: unknown): { data: unknown } {
   return { data }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
-
-function sessionIDFrom(input: unknown): string | undefined {
-  if (!isRecord(input)) return undefined
-  if (typeof input.sessionID === "string") return input.sessionID
-  if (isRecord(input.path) && typeof input.path.id === "string") return input.path.id
-  return undefined
-}
-
-function textFromPrompt(input: unknown): string {
-  if (!isRecord(input)) return ""
-  if (typeof input.text === "string") return input.text
-  if (!isRecord(input.body) || !Array.isArray(input.body.parts)) return ""
-  return input.body.parts
-    .map((part) => {
-      if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string") return ""
-      return part.text
-    })
-    .filter((text) => text.length > 0)
-    .join("\n")
-}
-
-function promptDelivery(input: unknown): "steer" | "queue" | undefined {
-  if (!isRecord(input)) return undefined
-  if (input.delivery === "steer" || input.delivery === "queue") return input.delivery
-  if (!isRecord(input.body)) return undefined
-  if (input.body.delivery === "steer" || input.body.delivery === "queue") return input.body.delivery
-  return undefined
-}
-
-function createSessionInput(input: unknown): {
-  title?: string
-  agent?: string
-  location?: { directory: string }
-} {
-  const body = isRecord(input) && isRecord(input.body) ? input.body : isRecord(input) ? input : {}
-  const query = isRecord(input) && isRecord(input.query) ? input.query : {}
-  const directory = typeof query.directory === "string" ? query.directory : undefined
-  return {
-    ...(typeof body.title === "string" ? { title: body.title } : {}),
-    ...(typeof body.agent === "string" ? { agent: body.agent } : {}),
-    ...(directory ? { location: { directory } } : {}),
-  }
+export type FacadeDeps = {
+  state?: AdapterState
+  fetchImpl?: typeof fetch
+  argv?: readonly string[]
+  listenPort?: () => Promise<number | undefined>
 }
 
 /**
- * V1 hook code calls `ctx.client.session.*` with the OpenAPI `{ path, body }`
- * shape and reads `{ data }`. OpenCode 2 exposes those operations on the
- * plugin context. Toasts have no V2 equivalent, so they are logged.
+ * V1 hook code calls `ctx.client` with the OpenAPI `{ path, body }` shape
+ * and reads `{ data }`. This facade speaks that shape on top of OpenCode 2.
  */
-export function createV1PluginInput(ctx: V2Context): {
+export function createV1PluginInput(ctx: V2Context, deps: FacadeDeps = {}): {
   directory: string
   worktree: string
   serverUrl: URL | undefined
   project: { id: string; worktree: string; time: { created: number } }
   client: {
     session: Record<string, unknown>
-    tui: { showToast: (input?: { body?: { title?: string; message?: string; variant?: string } }) => Promise<void> }
-    app: { log: () => Promise<void> }
+    tui: { showToast: (input?: { body?: { title?: string; message?: string; variant?: string; duration?: number } }) => Promise<void> }
+    app: {
+      log: () => Promise<void>
+      agents: () => Promise<{ data: unknown }>
+      skills: () => Promise<{ data: unknown }>
+    }
+    provider: { list: () => Promise<{ data: unknown }> }
+    model: { list: () => Promise<{ data: unknown }> }
+    config: { get: () => Promise<{ data: unknown }> }
   }
   $: unknown
 } {
   const directory = ctx.location.directory
   const worktree = ctx.location.project?.directory ?? directory
+  const state = deps.state ?? createAdapterState(`${directory}/.omo/v2-state`)
+  const fetchImpl = deps.fetchImpl ?? fetch
+  const argv = deps.argv ?? process.argv
+  const listenPort = deps.listenPort ?? listenPortOf
   const sessionApi = ctx.session as V2Context["session"] & {
+    remove?: (input: { sessionID: string }) => Promise<unknown>
     compact?: (input: { sessionID: string }) => Promise<unknown>
-    active?: () => Promise<Record<string, unknown>>
   }
+
+  const origin = () => serveOrigin(argv, listenPort)
 
   const session: Record<string, unknown> = {
     async get(input: unknown) {
       const sessionID = sessionIDFrom(input)
       if (!sessionID) return sdkResult(undefined)
-      return sdkResult(await sessionApi.get({ sessionID }))
+      return sdkResult(withParent(await sessionApi.get({ sessionID }), state))
     },
     async messages(input: unknown) {
-      const sessionID = sessionIDFrom(input)
-      if (!sessionID) return sdkResult([])
-      return sdkResult(await sessionApi.context({ sessionID }))
+      return sdkResult(await readMessages(sessionApi, input))
+    },
+    async message(input: unknown) {
+      return sdkResult(await readMessage(sessionApi, input))
     },
     async prompt(input: unknown) {
-      const sessionID = sessionIDFrom(input)
-      if (!sessionID) return sdkResult(undefined)
-      return sdkResult(await sessionApi.prompt({
-        sessionID,
-        text: textFromPrompt(input),
-        ...(promptDelivery(input) ? { delivery: promptDelivery(input) } : {}),
-      }))
+      return sdkResult(await sendPrompt(sessionApi, input))
     },
     async promptAsync(input: unknown) {
-      const sessionID = sessionIDFrom(input)
-      if (!sessionID) return sdkResult(undefined)
-      void sessionApi.prompt({
-        sessionID,
-        text: textFromPrompt(input),
-        ...(promptDelivery(input) ? { delivery: promptDelivery(input) } : {}),
-      }).catch((error: unknown) => {
-        log("[oh-my-openagent] async prompt failed", {
-          error: error instanceof Error ? error.message : String(error),
-        })
-      })
-      return sdkResult(undefined)
+      return sdkResult(await sendPrompt(sessionApi, input))
     },
     async create(input: unknown) {
-      return sdkResult(await sessionApi.create(createSessionInput(input)))
+      return sdkResult(await createSession(sessionApi, input, state, directory))
     },
     async abort(input: unknown) {
       const sessionID = sessionIDFrom(input)
@@ -137,16 +105,37 @@ export function createV1PluginInput(ctx: V2Context): {
       }
       return sdkResult(await sessionApi.compact({ sessionID }))
     },
-    async status() {
-      if (typeof sessionApi.active !== "function") {
-        logMissing("session.status")
-        return sdkResult({})
+    async delete(input: unknown) {
+      const sessionID = sessionIDFrom(input)
+      if (!sessionID || typeof sessionApi.remove !== "function") {
+        logMissing("session.delete")
+        return sdkResult(undefined)
       }
-      return sdkResult(await sessionApi.active())
+      return sdkResult(await sessionApi.remove({ sessionID }))
     },
-    async todo() {
-      logMissing("session.todo")
-      return sdkResult([])
+    async status() {
+      return sdkResult(await sessionStatusMap({ origin: await origin(), fetchImpl, state }))
+    },
+    async list() {
+      const known = [...state.sessions.values()]
+      const resolvedOrigin = await origin()
+      const sessions = await sessionCatalog({ origin: resolvedOrigin, fetchImpl, state, known })
+      log("[oh-my-openagent] v2 session.list", {
+        origin: resolvedOrigin ?? "none",
+        count: sessions.length,
+      })
+      return sdkResult(sessions)
+    },
+    async children(input: unknown) {
+      const parentID = sessionIDFrom(input)
+      if (!parentID) return sdkResult([])
+      const known = [...state.sessions.values()]
+      const sessions = await sessionCatalog({ origin: await origin(), fetchImpl, state, known })
+      return sdkResult(childSessions(sessions, parentID, state))
+    },
+    async todo(input: unknown) {
+      const sessionID = sessionIDFrom(input)
+      return sdkResult(sessionID ? state.todos(sessionID) : [])
     },
   }
 
@@ -173,17 +162,41 @@ export function createV1PluginInput(ctx: V2Context): {
       }),
       tui: {
         async showToast(input) {
-          log("[oh-my-openagent] toast", {
+          state.recordToast({
             title: input?.body?.title,
             message: input?.body?.message,
             variant: input?.body?.variant,
+            duration: input?.body?.duration,
           })
         },
       },
       app: {
         async log() {},
+        async agents() {
+          return agentsFrom(await ctx.agent.list())
+        },
+        async skills() {
+          return skillsFrom(await ctx.skill.list())
+        },
+      },
+      provider: {
+        async list() {
+          return providersFrom(await ctx.provider.list(), await ctx.model.list())
+        },
+      },
+      model: {
+        async list() {
+          return modelsFrom(await ctx.model.list())
+        },
+      },
+      config: {
+        async get() {
+          return configData()
+        },
       },
     },
     $: typeof Bun === "undefined" ? undefined : Bun.$,
   }
 }
+
+export { createAdapterState }

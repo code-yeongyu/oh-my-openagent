@@ -9,6 +9,7 @@ import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
 import { resolveRunModel } from "./model-resolver"
 import { pollForCompletion } from "./poll-for-completion"
+import { preferV2RunClient } from "./v2-client"
 import { waitForPromptStart } from "./prompt-start"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
@@ -68,11 +69,13 @@ export async function run(options: RunOptions): Promise<number> {
   try {
     const resolvedModel = resolveRunModel(options.model)
 
-    const { client, cleanup: serverCleanup } = await createServerConnection({
+    const { client: connectedClient, cleanup: serverCleanup } = await createServerConnection({
       port: options.port,
       attach: options.attach,
       signal: abortController.signal,
     })
+    const baseUrl = options.attach ?? (options.port ? `http://127.0.0.1:${options.port}` : undefined)
+    const client = baseUrl ? await preferV2RunClient(connectedClient, baseUrl, directory) : connectedClient
 
     const cleanup = () => {
       serverCleanup()

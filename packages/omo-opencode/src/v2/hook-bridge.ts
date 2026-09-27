@@ -1,6 +1,9 @@
 import type { Plugin } from "@opencode/plugin"
 
 import { log } from "../shared/logger"
+import type { AdapterState } from "./adapter-state"
+import { toV1Event } from "./event-shape"
+import { hookMessagesToV1, writeHookMessagesBack } from "./message-shape"
 
 type V2Context = Plugin.Context
 
@@ -42,11 +45,60 @@ async function safeCall(name: string, action: () => Promise<void> | void): Promi
   }
 }
 
+function noteRuntimeEvent(state: AdapterState | undefined, event: ReturnType<typeof toV1Event>): void {
+  if (!state) return
+  const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
+  if (!sessionID) return
+  if (event.type === "session.idle") state.noteStatus(sessionID, "idle")
+  if (event.type === "session.deleted") state.sessions.delete(sessionID)
+  if (event.type === "session.created" && isRecord(event.properties.info)) {
+    state.noteSession({ id: sessionID, ...event.properties.info })
+  }
+  if (event.type === "session.status" && isRecord(event.properties.status) && typeof event.properties.status.type === "string") {
+    state.noteStatus(sessionID, event.properties.status.type)
+  }
+}
+
+async function continueAfterManualCompaction(
+  ctx: V2Context,
+  state: AdapterState | undefined,
+  event: ReturnType<typeof toV1Event>,
+  autocontinue: V1Handler | undefined,
+): Promise<void> {
+  if (!state) return
+  const sessionID = typeof event.properties.sessionID === "string" ? event.properties.sessionID : undefined
+  if (!sessionID) return
+  if (event.type === "session.compaction.ended" && autocontinue) {
+    const output = { enabled: true }
+    await autocontinue({
+      sessionID,
+      agent: typeof event.properties.agent === "string" ? event.properties.agent : undefined,
+    }, output)
+    if (event.properties.reason === "manual" && output.enabled !== false) state.pendingManualContinue.add(sessionID)
+  }
+  if (event.type === "session.idle" && state.pendingManualContinue.has(sessionID)) {
+    state.pendingManualContinue.delete(sessionID)
+    await ctx.session.prompt({ sessionID, text: "Continue." })
+  }
+}
+
 /**
  * Registers OpenCode V2 hooks that forward one mutable event into the
  * existing V1 `(input, output)` handlers.
  */
-export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise<() => void> {
+function toolErrorText(error: unknown): string {
+  if (typeof error === "string") return error
+  if (error instanceof Error) return error.message
+  if (isRecord(error) && typeof error.message === "string") return error.message
+  return "tool failed"
+}
+
+function copyRecord(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const key of Object.keys(target)) delete target[key]
+  Object.assign(target, source)
+}
+
+export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap, state?: AdapterState): Promise<() => void> {
   const controller = new AbortController()
   const chatMessage = asHandler(hooks["chat.message"])
   const chatParams = asHandler(hooks["chat.params"])
@@ -83,9 +135,10 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
           event.system.splice(0, event.system.length, ...output.system.map((text) => ({ type: "text" as const, text })))
         }
         if (messagesTransform) {
-          const output = { messages: event.messages }
+          const output = { messages: hookMessagesToV1(event.messages, event.sessionID) }
           await messagesTransform({}, output)
-          event.messages.splice(0, event.messages.length, ...output.messages)
+          const next = writeHookMessagesBack(event.messages, output.messages)
+          event.messages.splice(0, event.messages.length, ...next)
         }
         if (chatParams) {
           const output: {
@@ -121,6 +174,7 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
           provider: { id: event.model.providerID },
           message: {},
         }, output)
+        if (output.headers !== event.headers) copyRecord(event.headers, output.headers)
       })
     })
   }
@@ -145,6 +199,7 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
         await toolBefore(input, output)
         event.tool = input.tool
         event.input = output.args
+        if (state && event.tool === "todowrite") state.recordTodos(event.sessionID, output.args)
       })
     })
   }
@@ -152,14 +207,19 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
   if (toolAfter) {
     await ctx.tool.hook("execute.after", (event) => {
       return safeCall("tool.execute.after", async () => {
-        if (event.status !== "completed") return
-        const content = typeof event.result.content === "string"
-          ? event.result.content
-          : JSON.stringify(event.result.content ?? "")
+        const failed = event.status === "error"
+        const rawContent = event.status === "completed" ? event.result.content : undefined
+        const content = failed
+          ? toolErrorText(event.error)
+          : typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent ?? "")
+        const metadata: Record<string, unknown> = { ...(event.status === "completed" ? event.result.metadata ?? {} : {}) }
+        if (typeof metadata.sessionID !== "string" && typeof metadata.sessionId !== "string" && typeof metadata.session_id !== "string") {
+          metadata.sessionID = event.sessionID
+        }
         const output = {
           title: "",
           output: content,
-          metadata: { ...(event.result.metadata ?? {}) },
+          metadata,
         }
         await toolAfter({
           tool: event.tool,
@@ -167,10 +227,12 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
           callID: event.id,
           args: event.input,
         }, output)
-        event.result = {
-          ...event.result,
-          content: output.output,
-          metadata: output.metadata,
+        if (event.status === "completed") {
+          event.result = {
+            ...event.result,
+            content: output.output,
+            metadata: output.metadata,
+          }
         }
       })
     })
@@ -181,6 +243,7 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
       return safeCall("shell.env", async () => {
         const output = { env: event.env }
         await shellEnv({}, output)
+        if (output.env !== event.env) copyRecord(event.env, output.env)
       })
     })
   }
@@ -202,11 +265,15 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
     })
   }
 
-  if (eventHandler) {
+  const autocontinue = asHandler(hooks["experimental.compaction.autocontinue"])
+  if (eventHandler || autocontinue) {
     void (async () => {
       try {
-        for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
-          await safeCall("event", () => eventHandler({ event }))
+        for await (const raw of ctx.event.subscribe({ signal: controller.signal })) {
+          const event = toV1Event(raw)
+          noteRuntimeEvent(state, event)
+          if (eventHandler) await safeCall("event", () => eventHandler({ event }))
+          await safeCall("compaction.autocontinue", () => continueAfterManualCompaction(ctx, state, event, autocontinue))
         }
       } catch (error) {
         if (controller.signal.aborted) return
@@ -215,10 +282,6 @@ export async function registerV1Hooks(ctx: V2Context, hooks: V1HookMap): Promise
         })
       }
     })()
-  }
-
-  if (asHandler(hooks["experimental.compaction.autocontinue"])) {
-    log("[oh-my-openagent] experimental.compaction.autocontinue has no OpenCode V2 hook; continuation after compaction stays off")
   }
 
   return () => {

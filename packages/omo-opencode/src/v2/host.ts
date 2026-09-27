@@ -1,6 +1,8 @@
 import type { Plugin } from "@opencode/plugin"
 
 import { log } from "../shared/logger"
+import { setVersionCache } from "../shared/opencode-version"
+import { createAdapterState } from "./adapter-state"
 import { createV1PluginInput } from "./context-facade"
 import { registerV1Hooks, type V1HookMap } from "./hook-bridge"
 import { projectV1Surface } from "./project-config"
@@ -18,7 +20,9 @@ export async function setupOpenCodeV2(
     agentDirectory?: string
   },
 ): Promise<(() => Promise<void> | void) | void> {
-  const v1Input = createV1PluginInput(ctx)
+  if (typeof ctx.app.version === "string" && ctx.app.version.length > 0) setVersionCache(ctx.app.version)
+  const state = createAdapterState(`${ctx.location.directory}/.omo/v2-state`)
+  const v1Input = createV1PluginInput(ctx, { state })
   let hooks: V1HookMap
   try {
     hooks = await deps.server(v1Input as never, ctx.options)
@@ -34,7 +38,7 @@ export async function setupOpenCodeV2(
     return
   }
 
-  const stopEvents = await registerV1Hooks(ctx, hooks)
+  const stopEvents = await registerV1Hooks(ctx, hooks, state)
   const scratch: Record<string, unknown> = {}
   if (typeof hooks.config === "function") {
     try {
@@ -57,6 +61,7 @@ export async function setupOpenCodeV2(
         ? hooks["command.execute.before"] as (commandInput: { command: string; sessionID: string; arguments: string }, output: { parts: Array<{ type: string; text?: string }> }) => Promise<void>
         : undefined,
       ...(deps.agentDirectory ? { agentDirectory: deps.agentDirectory } : {}),
+      recordTodos: { read: state.todos, write: state.recordTodos },
     })
   } catch (error) {
     log("[oh-my-openagent] domain projection failed", {

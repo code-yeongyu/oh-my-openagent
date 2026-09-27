@@ -197,12 +197,32 @@ const module: TuiPluginModule = {
   },
 }
 
+export function registerV2Sidebar(context: {
+  data: { session: { list: () => ReadonlyArray<{ id: string; title?: string }> } }
+  ui: {
+    toast: { show: (options: { title?: string; message: string; variant?: "info" | "success" | "error" | "warning" }) => void }
+    slot: (claim: { append: "sidebar.content"; render: (input: { sessionID: string }) => unknown }) => void
+  }
+}): () => ReadonlyArray<string> {
+  context.ui.toast.show({ title: "oh-my-openagent", message: "Sidebar ready", variant: "info" })
+  let lines: ReadonlyArray<string> = []
+  context.ui.slot({
+    append: "sidebar.content",
+    render() {
+      lines = context.data.session.list().map((session) => session.title ?? session.id)
+      return lines
+    },
+  })
+  return () => lines
+}
+
 export const legacyTuiModule = module
 
 export default {
   ...TuiPlugin.define({
     id: "oh-my-openagent",
-    setup() {
+    setup(context) {
+      registerV2Sidebar(context)
       log("[oh-my-openagent] OpenCode V2 TUI plugin loaded")
     },
   }),

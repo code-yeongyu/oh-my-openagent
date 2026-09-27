@@ -151,6 +151,43 @@ async function projectTools(input: {
   })
 }
 
+function todoTool(
+  name: string,
+  description: string,
+  todos: { read: (sessionID: string) => unknown; write: (sessionID: string, input: unknown) => void },
+) {
+  return {
+    name,
+    description,
+    input: {
+      type: "object",
+      properties: {
+        todos: { type: "array" },
+      },
+    },
+    execute: async (args: unknown, context: { sessionID: string }) => {
+      if (name === "todowrite") todos.write(context.sessionID, args)
+      return toolResult(name === "todoread" ? { todos: todos.read(context.sessionID) } : "todos updated")
+    },
+  }
+}
+
+async function registerTodoTools(
+  ctx: V2Context,
+  todos: { read: (sessionID: string) => unknown; write: (sessionID: string, input: unknown) => void },
+): Promise<void> {
+  await ctx.tool.transform((editor) => {
+    const names = new Set(editor.list().map((tool) => tool.name))
+    for (const tool of [
+      todoTool("todowrite", "Update the session todo list", todos),
+      todoTool("todoread", "Read the session todo list", todos),
+    ]) {
+      if (names.has(tool.name)) continue
+      editor.add(tool)
+    }
+  })
+}
+
 export async function projectV1Surface(input: {
   ctx: V2Context
   directory: string
@@ -159,6 +196,10 @@ export async function projectV1Surface(input: {
   defineTool?: unknown
   commandBefore?: (commandInput: { command: string; sessionID: string; arguments: string }, output: { parts: Array<{ type: string; text?: string }> }) => Promise<void> | void
   agentDirectory?: string
+  recordTodos?: {
+    read: (sessionID: string) => unknown
+    write: (sessionID: string, input: unknown) => void
+  }
 }): Promise<void> {
   const agents = isRecord(input.config.agent) ? input.config.agent : {}
   const written = writeAgentMarkdown({
@@ -192,6 +233,7 @@ export async function projectV1Surface(input: {
     disabled: input.config.tools,
     defineTool: input.defineTool,
   })
+  if (input.recordTodos) await registerTodoTools(input.ctx, input.recordTodos)
 
   const commands = isRecord(input.config.command) ? input.config.command : {}
   await input.ctx.command.transform((editor) => {
