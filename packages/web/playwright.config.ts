@@ -24,6 +24,14 @@ export default defineConfig({
         headless: true,
       },
     },
+    {
+      name: "firefox",
+      testMatch: /hero-visibility\.spec\.ts$/,
+      use: {
+        ...devices["Desktop Firefox"],
+        headless: true,
+      },
+    },
   ],
 
   webServer: {

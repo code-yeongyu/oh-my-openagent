@@ -31,11 +31,14 @@ const workflowExpectations = [
   },
   { path: ".github/workflows/cla.yml", jobs: ["cla"] },
   { path: ".github/workflows/compiled-worker.yml", jobs: ["relocated-worker"] },
+  { path: ".github/workflows/desktop-engine.yml", jobs: ["native-contract"] },
+  { path: ".github/workflows/desktop-linux-qa.yml", jobs: ["linux-desktop-qa"] },
+  { path: ".github/workflows/desktop-windows-qa.yml", jobs: ["windows-desktop-qa"] },
   { path: ".github/workflows/bot-merge.yml", jobs: ["merge"] },
   { path: ".github/workflows/lint-workflows.yml", jobs: ["actionlint"] },
   { path: ".github/workflows/npm-dist-tag-rollback.yml", jobs: ["retag"] },
   { path: ".github/workflows/package-labels.yml", jobs: ["ensure-labels", "label-pull-request", "label-issue"] },
-  { path: ".github/workflows/publish-platform.yml", jobs: ["build", "publish", "smoke-linux-arm64"] },
+  { path: ".github/workflows/publish-platform.yml", jobs: ["desktop-engine", "build", "publish", "smoke-linux-arm64"] },
   {
     path: ".github/workflows/publish.yml",
     jobs: [

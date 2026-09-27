@@ -120,6 +120,8 @@
       "item6Desc": "Long work is checkpointed with evidence, so a session restart resumes where it stopped.",
       "item7Name": "Hot-reloading everything",
       "item7Desc": "Config, skills and prompts reload live. No restarts to try a change.",
+      "item8Name": "Computer use",
+      "item8Desc": "The agent reads the screen and accessibility tree of native apps on macOS, Linux and Windows, then clicks and types in the background, so your focus and cursor stay put. A stop chord suspends it; only you resume.",
       "stage": {
         "roundTrip": "one round trip",
         "oneStep": "1 step",
@@ -132,6 +134,8 @@
         "resumes": "restart → resumes at step 4",
         "saved": "saved",
         "reloaded": "reloaded · no restart",
+        "background": "in the background",
+        "focusKept": "clicked · your focus never moved",
         "stageLabel": "A single cell acting out the selected detail"
       }
     },

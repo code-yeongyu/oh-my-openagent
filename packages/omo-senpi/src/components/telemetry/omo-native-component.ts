@@ -16,6 +16,10 @@ import type { OmoSenpiComponent } from "../../extension/types"
 import { resolveStateDir } from "@oh-my-opencode/senpi-task"
 
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "../task/terminal-observers"
+import {
+  type ComputerUseTelemetryObservers,
+  registerOmoNativeComputerUseTelemetry,
+} from "./omo-native-computer-use"
 import { createOmoNativeDelegationCapture } from "./omo-native-delegation"
 import { createOmoNativeNoticeRegistration } from "./omo-native-notice"
 import { registerOmoNativeKibitzerSummary } from "./omo-native-kibitzer-summary"
@@ -49,6 +53,7 @@ export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
   readonly taskTerminalObservers?: TaskTerminalObservers
   /** Where senpi-task keeps its records and per-task event logs. Defaults to the session's project. */
   readonly taskStateDir?: string
+  readonly computerUseTelemetryObservers?: ComputerUseTelemetryObservers
 }
 
 export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryComponentOptions = {}): OmoSenpiComponent {
@@ -91,6 +96,14 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         client,
         hashSessionId: options.hashSessionId,
       }).register(pi, ctx)
+
+      registerOmoNativeComputerUseTelemetry(pi, {
+        captureEvent: client.captureEvent,
+        hashSessionId: options.hashSessionId,
+        ...(options.computerUseTelemetryObservers === undefined
+          ? {}
+          : { observers: options.computerUseTelemetryObservers }),
+      })
 
       createOmoNativeSessionComponent({
         ...options,

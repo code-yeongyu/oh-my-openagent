@@ -17,6 +17,7 @@ export {
 } from "./release"
 export type { CommentCheckerArchiveExtension, CommentCheckerCacheDirInput, CommentCheckerReleaseAsset } from "./release"
 export { resolveCommentCheckerBinary, runCommentChecker } from "./runner"
+export { sendAndCloseStdin } from "./stdin-delivery"
 export type {
   ApplyPatchAccumulator,
   ApplyPatchFileMetadata,

@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const COLLISION_TEXT = "Task record already exists"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -170,7 +171,7 @@ function startSenpi(senpiBin, parent, projectDir, timeoutMs) {
   ], {
     cwd: projectDir,
     env: {
-      ...process.env,
+      ...isolatedChildEnv(process.env, parent.agentDir),
       HOME: parent.home,
       SENPI_CODING_AGENT_DIR: parent.agentDir,
       SENPI_CODING_AGENT_SESSION_DIR: parent.sessionDir,

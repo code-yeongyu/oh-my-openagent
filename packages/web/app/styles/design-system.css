@@ -408,24 +408,23 @@
     color: var(--text-lo);
   }
 
-  /* §6 Entrance — scroll-driven when supported, IntersectionObserver `.is-visible` otherwise */
-  .reveal {
-    opacity: 0;
-    transform: translate3d(0, 16px, 0);
-    transition:
-      opacity var(--dur-reveal) var(--ease-out-quart),
-      transform var(--dur-reveal) var(--ease-out-quart);
-    transition-delay: calc(var(--index, 0) * 60ms);
-  }
-  .reveal.is-visible {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
+  /* §6 Entrance — content is visible by default; motion only enhances it. Scroll-driven when
+     supported; otherwise the `Reveal` component arms `data-reveal="pending"` on elements below
+     the fold and clears it from an IntersectionObserver. Nothing waits on either to show up. */
+  @supports not (animation-timeline: view()) {
+    .reveal {
+      transition:
+        opacity var(--dur-reveal) var(--ease-out-quart),
+        transform var(--dur-reveal) var(--ease-out-quart);
+      transition-delay: calc(var(--index, 0) * 60ms);
+    }
+    .reveal[data-reveal="pending"] {
+      opacity: 0;
+      transform: translate3d(0, 16px, 0);
+    }
   }
   @supports (animation-timeline: view()) {
     .reveal {
-      opacity: 1;
-      transform: none;
-      transition: none;
       animation: reveal-in var(--dur-reveal) var(--ease-out-quart) both;
       animation-timeline: view();
       animation-range: entry 0% entry 40%;
@@ -484,7 +483,7 @@
   /* §6 Reduced motion: final states, no pulses, no transitions on the motion utilities */
   @media (prefers-reduced-motion: reduce) {
     .reveal,
-    .reveal.is-visible {
+    .reveal[data-reveal="pending"] {
       opacity: 1;
       transform: none;
       transition: none;
@@ -829,6 +828,7 @@
 
   /* Ticker: a vertical column of rows scrolling on translateY. */
   .ticker {
+    max-height: var(--ticker-max-h);
     overflow: hidden;
     mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
   }
@@ -1375,6 +1375,10 @@
     .ticker {
       mask-image: none;
       overflow: visible;
+    }
+    /* The static list shows every row, so the scrolling window must grow to hold it. */
+    .ticker {
+      max-height: none;
     }
     .marquee-track,
     .ticker-track {

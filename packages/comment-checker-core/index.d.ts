@@ -85,8 +85,7 @@ export type SpawnSignal = "SIGTERM" | "SIGKILL";
 
 export type SpawnProcess = {
 	readonly stdin: {
-		write(input: string): void;
-		end(): void;
+		send(input: string): Promise<void>;
 	};
 	readonly stdout: ReadableStream<Uint8Array>;
 	readonly stderr: ReadableStream<Uint8Array>;
@@ -155,3 +154,10 @@ export function commentCheckerBinaryName(platform: string): string;
 export function commentCheckerCacheDir(input: CommentCheckerCacheDirInput): string;
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null;
 export function runCommentChecker(input: RunCommentCheckerInput, options: RunCommentCheckerOptions): Promise<CheckResult>;
+export function sendAndCloseStdin(stdin: {
+	on(event: "error", listener: (error: Error) => void): unknown;
+	end(chunk: string, callback: (error?: Error | null) => void): unknown;
+} | {
+	write(chunk: string): unknown;
+	end(): unknown;
+}, input: string): Promise<void>;

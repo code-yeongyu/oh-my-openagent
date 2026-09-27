@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path"
 
 import { seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 export function seedResumeProject(sandbox, omoConfig) {
   seedSandbox(sandbox)
@@ -33,7 +34,7 @@ export function startResumeRun(input) {
   const child = spawn(input.senpiBin, args, {
     cwd: input.sandbox.cwd,
     env: {
-      ...process.env,
+      ...isolatedChildEnv(process.env, input.sandbox.agentDir),
       SENPI_CODING_AGENT_DIR: input.sandbox.agentDir,
       XDG_CONFIG_HOME: input.sandbox.xdgConfigHome,
       // Same HOME isolation as the team runtime: the omo user-scope config resolves from HOME.

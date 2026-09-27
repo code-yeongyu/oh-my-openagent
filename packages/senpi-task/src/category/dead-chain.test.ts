@@ -124,9 +124,21 @@ describe("dead-chain category disabling", () => {
       expect(result.availableCategories).not.toContain("writing")
     })
 
-    test("#when Copilot serves its dotted Fable id #then writing resolves on it", () => {
+    test("#when only Claude Fable 5.1 is connected #then writing is unavailable because Fable is no longer a writing rung", () => {
       // given
-      const models = registry([model("github-copilot", "claude-fable-5.1")])
+      const models = registry([model("anthropic", "claude-fable-5-1"), model("github-copilot", "claude-fable-5.1")])
+
+      // when
+      const result = resolveCategory("writing", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("writing")
+    })
+
+    test("#when Copilot serves its dotted Opus 5.5 id #then writing resolves on it", () => {
+      // given
+      const models = registry([model("github-copilot", "claude-opus-5.5")])
 
       // when
       const result = resolveCategory("writing", {}, models)

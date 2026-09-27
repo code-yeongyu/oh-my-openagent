@@ -27,6 +27,7 @@ import {
 	snapshotProtectedState,
 	directoryIdentityAvailable,
 } from "./isolation-state.mjs";
+import { isolatedChildEnv } from "./sandbox-child-env.mjs";
 
 export {
 	changedSnapshotPaths,
@@ -156,7 +157,7 @@ function runSenpi(senpiBin, sandbox, prompt, script, extraEnv = {}) {
 		{
 			cwd: sandbox.cwd,
 			env: {
-				...process.env,
+				...isolatedChildEnv(process.env, sandbox.agentDir),
 				...extraEnv,
 				OMO_CODING_AGENT_DIR: sandbox.agentDir,
 				SENPI_CODING_AGENT_DIR: sandbox.agentDir,

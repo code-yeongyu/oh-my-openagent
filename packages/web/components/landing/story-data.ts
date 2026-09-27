@@ -49,5 +49,5 @@ export const SKILLS: readonly SkillEntry[] = [
   { name: "lsp-setup", blurb: "language servers wired for the agent" },
 ]
 
-export const CRAFTED_ITEM_COUNT = 7
+export const CRAFTED_ITEM_COUNT = 8
 export const KIBITZER_STEP_COUNT = 4

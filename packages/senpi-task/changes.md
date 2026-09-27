@@ -1,3 +1,22 @@
+## Task progress subscribers survive a host-session reattach (#8983)
+
+`runners/rpc-host/handle.ts`: `subscribe` registered the listener on the port that was current at subscribe time, and a
+reattach after a lost transport (#8563) swapped `client` and re-bound only the handle's own listener. Every observer that
+subscribed at launch (the manager's progress and stats in `manager/manager.ts`, the transcript log in
+`manager/transcript-log.ts`) therefore stayed on the dead port: the turn still completed on the new host, but live
+progress, stats and the transcript went silent from the cut onward. The handle now owns its subscribers in a set and
+`bindClient` fans each event out from the current port only, so subscribers keep receiving events across any number of
+reattaches, a superseded port never delivers (no duplicates), an unsubscribe taken before a reattach still works, and the
+set is cleared on exit and detach (a parked child keeps it, since parking is not an exit). Event order is unchanged: the
+handle's own turn tracking still runs before subscribers. `runners/rpc/handle.ts` and `runners/in-process/child-handle.ts`
+never swap their client or session and are unaffected. Tests: `handle-reattach.test.ts` (two replacements over in-memory
+ports, and a real socket cut on the fake host; both assertions fail on dev with the subscriber receiving nothing).
+Contributed by @deadcode-walker in #8978.
+
+## Host-session liveness lists worker sessions on the wire (#8932)
+
+`runners/rpc-host/liveness.ts` `liveSessionPaths` sends `list_sessions { include_workers: true }` over a one-shot connection to the daemon socket and reads the reply carrying its id, instead of calling the engine `RpcClient.listSessions()`: the pinned engine client sends a bare `list_sessions` and drops the option, and the daemon hides `kind: "worker"` rows by default, so every task child read as not live. Since #8875 `hasForeignLiveOwner` (`lifecycle/reconcile.ts`) decides host-session ownership by `daemonAlive && sessionLive`, so any other session start in the project (including a child session starting inside the daemon) claimed a live child, reattached it under a new `run_epoch`, and fenced the owner's outcome off: the owner's `waitFor` never settled and a DAG node stayed `running`. The daemon runner exists only on POSIX, where the socket path is the transport address. `lifecycle/host-session.ts` compares canonical session paths on both sides: the daemon lists a session by its realpath while the record keeps the path omo requested, so a project reached through a symlink (`/tmp` on macOS, a linked workspace) never matched even with worker rows listed (`host-session-probe.test.ts`). The unused optional `HostRpcClient.listSessions` and `HostSessionRow` are removed. `rpc-host.foreign-owner.integration.test.ts` drives the production probe against the fake daemon: a live worker child reads as live, and a second process's session start defers it as `foreign_live_owner` while the owner's `waitFor` settles `completed`. The host-world fixture gains `hostPid` and `productionProbe` parent options.
+
 ## Runtime fallback skips the rest of a provider whose credential is dead
 
 `manager/credential-failure.ts` (new): `isCredentialFailure(message)` recognizes a provider answer no other model on

@@ -20,6 +20,7 @@ import {
 	assertIsolatedRejected,
 	assertNotApplied,
 } from "./isolation-e2e-scenarios.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -68,7 +69,7 @@ function runSenpi(senpiBin, sandbox, prompt) {
 	return spawnSync(senpiBin, ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", prompt], {
 		cwd: sandbox.cwd,
 		env: {
-			...process.env,
+			...isolatedChildEnv(process.env, sandbox.agentDir),
 			OMO_CODING_AGENT_DIR: sandbox.agentDir,
 			SENPI_CODING_AGENT_DIR: sandbox.agentDir,
 			PI_CODING_AGENT_DIR: sandbox.agentDir,

@@ -2,6 +2,7 @@ import * as z from "zod"
 
 import { OmoAgentsConfigSchema } from "./agent"
 import { OmoCategoriesConfigSchema } from "./category"
+import { OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema } from "./computer"
 import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./git-master"
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
@@ -35,6 +36,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
 }).strict()
 
@@ -50,6 +52,7 @@ export const OmoConfigProfileSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -70,6 +73,7 @@ export const OmoConfigSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -93,6 +97,7 @@ export const OmoConfigLayerSchema = z.object({
   model_profile: z.string().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),

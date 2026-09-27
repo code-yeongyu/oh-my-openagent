@@ -15,6 +15,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 export const PACKAGE_ROOT = resolve(scriptDir, "..", "..")
@@ -158,7 +159,7 @@ export function sandboxEnv(sandbox) {
   const env = { ...process.env }
   for (const name of SCRUBBED_ENV) delete env[name]
   return {
-    ...env,
+    ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     OMO_MEMORY_HOME: sandbox.memoryHome,
     HOME: sandbox.homeDir,

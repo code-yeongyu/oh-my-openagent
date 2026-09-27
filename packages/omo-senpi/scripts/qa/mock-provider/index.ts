@@ -27,7 +27,7 @@ const { existsSync, readFileSync, rmSync, writeFileSync } = process.getBuiltinMo
 const { dirname, join } = process.getBuiltinModule<PathModule>("path")
 const { fileURLToPath, pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 
-type MockStep =
+export type MockStep =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
 
@@ -47,6 +47,7 @@ interface Model<TApi extends string = Api> {
 
 interface Context {
   cwd?: string
+  messages?: unknown
 }
 
 interface SimpleStreamOptions {
@@ -165,10 +166,15 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
 let callCount = 0
 
 function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
-  const stream = createLocalAssistantMessageEventStream()
   const script = loadMockScript(context.cwd ?? process.cwd())
   const step = script.steps[Math.min(callCount, script.steps.length - 1)]
   callCount += 1
+  return streamMockStep(step, callCount, options)
+}
+
+/** Streams one scripted step; for drivers that choose the step themselves instead of by call order. */
+export function streamMockStep(step: MockStep, callCount: number, options?: SimpleStreamOptions) {
+  const stream = createLocalAssistantMessageEventStream()
   const message = stepToAssistantMessage(step, callCount)
 
   queueMicrotask(() => {

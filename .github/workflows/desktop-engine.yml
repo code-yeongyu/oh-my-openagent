@@ -1,0 +1,130 @@
+name: Desktop engine
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - "crates/**"
+      - "packages/senpi-desktop-*/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "script/build-omo-binary.ts"
+      - "script/desktop-engine-*.ts"
+      - "script/release-desktop-engine-target.ts"
+      - "script/desktop-engine-ci-proof.ts"
+      - "script/release-desktop-engine-fixture.json"
+      - ".github/workflows/publish-platform.yml"
+      - ".github/workflows/publish.yml"
+      - ".github/workflows/desktop-engine.yml"
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "crates/**"
+      - "packages/senpi-desktop-*/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "script/build-omo-binary.ts"
+      - "script/desktop-engine-*.ts"
+      - "script/release-desktop-engine-target.ts"
+      - "script/desktop-engine-ci-proof.ts"
+      - "script/release-desktop-engine-fixture.json"
+      - ".github/workflows/publish-platform.yml"
+      - ".github/workflows/publish.yml"
+      - ".github/workflows/desktop-engine.yml"
+
+concurrency:
+  group: desktop-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-contract:
+    name: desktop native contract (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, rust_target: aarch64-apple-darwin }
+          - { os: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu }
+          - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install display test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y xvfb at-spi2-core dbus dbus-x11 xterm xdotool xfce4-terminal
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          # ubuntu-22.04 ships Python 3.10, which has no tomllib.
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal --component clippy
+          rustup default "$toolchain"
+          rustup target add "${{ matrix.rust_target }}"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --workspace --locked
+
+      - name: Build desktop engine
+        run: cargo build --release -p senpi-desktop-engine --locked --target "${{ matrix.rust_target }}"
+
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Prove staged desktop engine resolution and selftest
+        env:
+          OMO_DESKTOP_CI_STAGE_DIR: ${{ runner.temp }}/omo-desktop-ci-engine
+        run: bun script/desktop-engine-ci-proof.ts
+
+      - name: Verify release asset assembly without publishing
+        run: bun test script/desktop-engine-release.test.ts script/release-desktop-engine-target.test.ts script/publish-release-platform-workflow.test.ts
+
+      - name: Desktop package tests
+        env:
+          OMO_PACKAGE_DIR: ${{ runner.temp }}/omo-desktop-ci-engine
+        run: bun run test:desktop
+
+      # Each #[ignore]d display test runs in the environment its module docs name. The X11 input tests need a
+      # window manager and QA windows, so they run in the Linux QA driver instead.
+      - name: X11 display tests
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact capture::live_tests::captures_root_window stop_path::live_tests::raw_key_chord_latches_supervisor
+          env -u DISPLAY cargo test -p senpi-desktop-backend-x11 --locked --lib -- --ignored --exact stop_path::live_tests::start_without_a_display_is_unavailable_and_not_live
+
+      # One fresh session bus per AT-SPI test, as the module docs require.
+      - name: AT-SPI display tests
+        if: runner.os == 'Linux'
+        run: |
+          for test in ax_tree_of_xterm_lists_window permission_is_toolkits_silent_until_a_toolkit_publishes; do
+            dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact "live_tests::$test"
+          done
+          env -u AT_SPI_BUS_ADDRESS DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/senpi-no-bus cargo test -p senpi-desktop-backend-atspi --locked --lib -- --ignored --exact live_tests::no_bus_reports_bus_unreachable
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Desktop engine native contract (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Clippy (-D warnings) and tests across the crates/senpi-desktop-* workspace.
+            - Release build of senpi-desktop-engine, then the packages/senpi-desktop-* vitest suites against it.
+            - Linux: X11 and AT-SPI display tests under Xvfb and per-test session buses.
+          JOB_SUMMARY_NEXT: Start with the first clippy or test failure; a backend crate failing on one OS is usually a cfg-gated path.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

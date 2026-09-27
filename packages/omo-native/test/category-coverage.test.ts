@@ -134,7 +134,8 @@ describe("category coverage from the engine's model list", () => {
         loadRuntime,
       })
 
-      expect(coverage?.usable).toEqual(["architect", "artistry", "quick", "unspecified-high", "visual-engineering", "writing"])
+      // acme serves only claude-fable-5-1, which is not a writing rung
+      expect(coverage?.usable).toEqual(["architect", "artistry", "quick", "unspecified-high", "visual-engineering"])
       expect(readdirSync(agentDir)).toEqual([])
     })
   })

@@ -66,6 +66,7 @@ export class RpcProcessRunner {
       taskId: spec.task_id,
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
+      childEnv: descriptor.env,
     })
     const resume = spec.resumeSessionPath === undefined ? undefined : client.switchSession(spec.resumeSessionPath)
     try {

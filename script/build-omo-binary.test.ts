@@ -491,10 +491,11 @@ describe("sidecar parity set", () => {
     })
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node")
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_grep.darwin-arm64.node")
-    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(2)
+    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(3)
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi-desktop-engine")
   })
 
-  test("#given a native-absent target #when the expected sidecar set is resolved #then no native prebuild is required", () => {
+  test("#given a native-addon-absent target #when expected paths are resolved #then the desktop engine remains required", () => {
     // given
     const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "linux-x64")
     expect(target).toBeDefined()
@@ -503,7 +504,9 @@ describe("sidecar parity set", () => {
     const relPaths = resolveExpectedSidecarRelPaths(target!)
 
     // then
-    expect(relPaths.some((relPath) => relPath.startsWith("native/prebuilds/"))).toBe(false)
+    expect(relPaths.filter((relPath) => relPath.startsWith("native/prebuilds/"))).toEqual([
+      "native/prebuilds/linux-x64/senpi-desktop-engine",
+    ])
     expect(relPaths).toContain("package.json")
   })
 })

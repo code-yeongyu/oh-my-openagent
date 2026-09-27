@@ -1,0 +1,177 @@
+name: Desktop Linux QA
+
+# Exercise the real X11 and Wayland backends on a hosted Linux desktop, with independent
+# xterm/X11 and D-Bus/EIS observers. A sabotaged Wayland run must fail for the intended reason.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-linux-qa.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/senpi-desktop-*/**"
+      - "packages/senpi-desktop-*/**"
+      - "script/qa/desktop/linux.ts"
+      - "script/qa/desktop/linux/**"
+  push:
+    branches: [master, dev]
+    paths:
+      - ".github/workflows/desktop-linux-qa.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/senpi-desktop-*/**"
+      - "packages/senpi-desktop-*/**"
+      - "script/qa/desktop/linux.ts"
+      - "script/qa/desktop/linux/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-linux-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-desktop-qa:
+    name: Linux interactive-desktop QA
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Install X11 and headless Wayland tools
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
+            xvfb xfwm4 xterm xclip xdotool x11-utils sway dbus dbus-x11 at-spi2-core
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-linux-qa
+
+      - name: Build desktop engine and recording fake EIS
+        run: |
+          cargo build --release -p senpi-desktop-engine --locked
+          cargo build --release --locked \
+            --manifest-path script/qa/desktop/linux/fake-eis/Cargo.toml \
+            --target-dir "${RUNNER_TEMP}/desktop-linux-fake-eis-target"
+
+      - name: Run four X11 and three Wayland scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa="${RUNNER_TEMP}/desktop-linux-qa"
+          mkdir -p "$qa"
+          workdir=$(mktemp -d "${RUNNER_TEMP}/omo-desktop-qa.XXXXXX")
+          cleanup() {
+            code=$?
+            rm -rf "$workdir"
+            if test ! -e "$workdir"; then
+              printf 'staging REMOVED %s\n' "$workdir" | tee -a "$qa/cleanup.log"
+            else
+              printf 'staging LEFT %s\n' "$workdir" | tee -a "$qa/cleanup.log"
+              code=1
+            fi
+            exit "$code"
+          }
+          trap cleanup EXIT
+          bun script/qa/desktop/linux.ts --all --json \
+            --workdir "$workdir" \
+            --engine target/release/senpi-desktop-engine \
+            --fake-eis "${RUNNER_TEMP}/desktop-linux-fake-eis-target/release/senpi-qa-fake-eis" \
+            2> >(tee "$qa/linux.stderr.log" >&2) | tee "$qa/desktop-linux-qa.jsonl"
+          jq -s -e '
+            ([.[] | select(has("scenario")) | .scenario] == [
+              "x11-capture-click-xterm", "x11-focus-guard",
+              "x11-background-keeps-active-window", "x11-chord-latches",
+              "wayland-capabilities-honest", "wayland-input-refused-without-optin",
+              "wayland-input-with-optin"
+            ])
+            and all(.[] | select(has("scenario")); .pass == true)
+            and any(.[]; .receipt == "procs 0" and .pass == true)
+            and any(.[]; ((.receipt // "") | startswith("dir REMOVED ")) and .pass == true)
+          ' "$qa/desktop-linux-qa.jsonl" >/dev/null
+          display=$(jq -r 'select(.scenario == "x11-capture-click-xterm") | .facts.display' "$qa/desktop-linux-qa.jsonl")
+          test -n "$display"
+          test ! -e "/tmp/.X11-unix/X${display#:}"
+          printf 'X11 socket REMOVED %s\n' "$display" | tee -a "$qa/cleanup.log"
+          printf 'scenario verdict: X11 4/4 Wayland 3/3\n'
+
+      - name: Negative control - missing Wayland opt-in must fail
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa="${RUNNER_TEMP}/desktop-linux-qa"
+          workdir=$(mktemp -d "${RUNNER_TEMP}/omo-desktop-qa-sabotage.XXXXXX")
+          cleanup() {
+            code=$?
+            rm -rf "$workdir"
+            if test ! -e "$workdir"; then
+              printf 'sabotage staging REMOVED %s\n' "$workdir" | tee -a "$qa/cleanup.log"
+            else
+              printf 'sabotage staging LEFT %s\n' "$workdir" | tee -a "$qa/cleanup.log"
+              code=1
+            fi
+            exit "$code"
+          }
+          trap cleanup EXIT
+          if bun script/qa/desktop/linux.ts --scenario wayland-input-with-optin \
+            --sabotage skip-optin --json --workdir "$workdir" \
+            --engine target/release/senpi-desktop-engine \
+            --fake-eis "${RUNNER_TEMP}/desktop-linux-fake-eis-target/release/senpi-qa-fake-eis" \
+            2> >(tee "$qa/sabotage.stderr.log" >&2) | tee "$qa/desktop-linux-qa-sabotage.jsonl"; then
+            echo "sabotaged Wayland run unexpectedly exited 0" >&2
+            exit 1
+          fi
+          bun script/qa/desktop/linux/expect-sabotage.ts "$qa/desktop-linux-qa-sabotage.jsonl"
+
+      - name: Upload Linux QA evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux-qa-jsonl
+          path: ${{ runner.temp }}/desktop-linux-qa/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove artifact staging
+        if: always()
+        shell: bash
+        run: |
+          qa="${RUNNER_TEMP}/desktop-linux-qa"
+          if test -d "$qa"; then rm -r "$qa"; fi
+          test ! -e "$qa"
+          printf 'artifact staging REMOVED %s\n' "$qa"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Desktop Linux QA
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Release engine and standalone recording fake-EIS builds.
+            - Xvfb plus xfwm4: four X11 scenarios with independent xterm/X11 observations.
+            - Headless sway: three Wayland scenarios with D-Bus and EIS observations.
+            - Negative control: skipping host-relay opt-in must fail and be identified by its JSONL checks.
+            - Tracked process count zero; both run directories, X11 socket and outer staging removed.
+          JOB_SUMMARY_NEXT: Open the desktop-linux-qa-jsonl artifact for per-scenario checks and cleanup receipts.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

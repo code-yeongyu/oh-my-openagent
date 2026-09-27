@@ -61,7 +61,7 @@ The harness ships a prompt preset per model family. When your session model matc
 | `claude-fable-5` | Claude Fable 5 | Highest compliance with long, mechanics-driven prompts. |
 | `claude-opus-5-5` | Claude Opus 5.5 | Current best Opus. Steerable and literal. The reference configuration. |
 | `claude-opus-5` | Other Claude Opus 5 ids | The Opus 5 core. |
-| `claude-opus-4-5` and later 4.x presets | The Claude Opus 4.x line | One preset per 4.x release; `claude-opus-4-6` is still the third `writing` rung. |
+| `claude-opus-4-5` and later 4.x presets | The Claude Opus 4.x line | One preset per 4.x release; `claude-opus-4-6` is still the second `writing` rung. |
 | `gpt-6-astra` | Every GPT-6 model: Astra, Sol, Sol Fast, Luna | The GPT-6 family shares one prompting guide, so they share one preset. This is what Geeky · Heavy and the `ultrabrain`, `deep-low`, `deep-high` and `quick` categories run. |
 | `gpt-5.6` / `gpt-5.5` | GPT-5.6 ids (Sol, Terra) and GPT-5.5 | GPT-native prompt: concise principles, explicit decision criteria. Geeky · Normal runs on it. |
 | `gpt-5.4`, `gpt-5.3-codex` and older GPT-5 presets | Older GPT-5 ids | Kept for configs that still pin them. |
@@ -124,7 +124,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `visual-engineering`, `artistry` and `writing` categories, and of Daily · Heavy, and the second rung of Recommended. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
+Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `visual-engineering` and `artistry` categories, and of Daily · Heavy, and the second rung of Recommended. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
 
 ```jsonc
 {
@@ -133,8 +133,7 @@ Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `vi
   },
   "categories": {
     "visual-engineering": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
-    "artistry": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" },
-    "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" }
+    "artistry": { "model": "anthropic/claude-opus-5-5", "reasoning": "max" }
   }
 }
 ```
@@ -156,7 +155,7 @@ When the main agent delegates implementation work, it doesn't pick a model name.
 | `quick` | Trivial tasks: single-file changes, typos | `chatgpt-subscription/gpt-6-luna-fast (low)` | `chatgpt-subscription\|openai/gpt-6-luna-fast (low)` -> `deepseek/deepseek-flash (off)` -> `qwen3.6-flash (low)` -> cheaper utility rungs -> `xai/grok-4.20-0309-non-reasoning` -> `claude-haiku-4-5 (off)` |
 | `unspecified-low` | Doesn't fit elsewhere, low effort | `xiaomi/mimo-v2.6-pro (max)` | `xiaomi\|opencode-go/mimo-v2.6-pro (max)` -> `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` -> `gpt-5.6-terra (high)` -> `claude-sonnet-5 (low)` -> `qwen3.8-max-preview (max)` -> `deepseek\|opencode-go/deepseek-v4-pro (max)` -> `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | `unspecified-high` | Doesn't fit elsewhere, high effort | `anthropic/claude-opus-5-5 (medium)` | `claude-opus-5-5 (medium)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` -> `kimi-k3 (max)` |
-| `writing` | Documentation, prose, technical writing | `anthropic/claude-fable-5-1 (low)` | `claude-fable-5-1 (low)` -> `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`; unavailable when none of these is connected, with no fallback to another family |
+| `writing` | Documentation, prose, technical writing | `anthropic/claude-opus-5-5 (low)` | `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`; unavailable when none of these is connected, with no fallback to another family |
 
 Every Claude rung is headed by `anthropic-subscription` and every GPT rung by `chatgpt-subscription`, so a subscription login always outranks an API key for the same model.
 
@@ -240,7 +239,7 @@ Because this is your own configuration, `deep-low` stays on the list even on a m
 - `plan-consultant`: any Claude-family model, Kimi K3, GLM 5.2 / 5.3.
 - `plan-reviewer`: GPT-6 Astra at xhigh or high; Claude Opus 5.5 at max as a communicative fallback.
 - `visual-engineering`, `artistry`: swap among Claude Fable 5.1, Claude Opus 5.5, and Kimi K3.
-- `writing`: Claude Fable 5.1, Claude Opus 5.5, or Claude Opus 4.6.
+- `writing`: Claude Opus 5.5 or Claude Opus 4.6.
 
 **Lower-confidence**, works but thinly validated:
 

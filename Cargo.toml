@@ -1,0 +1,83 @@
+[workspace]
+members = [
+    "crates/senpi-desktop-core",
+    "crates/senpi-desktop-safety",
+    "crates/senpi-desktop-session",
+    "crates/senpi-desktop-backend-fake",
+    "crates/senpi-desktop-backend-atspi",
+    "crates/senpi-desktop-backend-macos",
+    "crates/senpi-desktop-backend-x11",
+    "crates/senpi-desktop-backend-wayland",
+    "crates/senpi-desktop-backend-win32",
+    "crates/senpi-desktop-engine",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+# Desktop stack: pins copied from oh-my-pi crates/pi-natives (and its workspace resolutions).
+image = { version = "=0.25.10", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+    "webp",
+    "bmp",
+] }
+png = "=0.18.1"
+flume = "=0.12.0"
+parking_lot = "=0.12.5"
+xcap = { version = "=0.9.6", default-features = false }
+core-graphics = { version = "=0.25.0", features = ["highsierra"] }
+objc2 = "=0.6.4"
+objc2-app-kit = "=0.3.2"
+objc2-core-graphics = "=0.3.2"
+objc2-foundation = "=0.3.2"
+objc2-application-services = { version = "=0.3.2", default-features = true }
+objc2-core-foundation = "=0.3.2"
+foreign-types = "=0.5.0"
+tempfile = "=3.27.0"
+libc = "=0.2.189"
+libloading = "=0.8.9"
+x11rb = { version = "=0.13.2", features = ["randr", "xinput", "xtest"] }
+atspi = { version = "=0.30.0", features = ["tokio", "zbus"] }
+ashpd = { version = "=0.11.1", default-features = false, features = ["tokio"] }
+reis = { version = "=0.5.0", features = ["tokio"] }
+zbus = { version = "=5.19.0", default-features = false, features = [
+    "async-io",
+    "blocking-api",
+] }
+xkeysym = "=0.2.1"
+windows-sys = { version = "=0.61.2", features = [
+    "Wdk_Storage_FileSystem",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_Power",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+enigo = { version = "=0.6.1", default-features = false }
+uiautomation = "=0.25.1"
+
+# Engine + later-lane pins (not in pi-natives' desktop list).
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["preserve_order"] }
+schemars = "=1.2.2"
+thiserror = "=2.0.21"
+tokio = { version = "=1.53.1", features = [
+    "rt-multi-thread",
+    "io-util",
+    "process",
+    "net",
+] }
+clap = { version = "=4.6.7", features = ["derive"] }
+ulid = "=3.0.0"
+sha2 = "=0.10.9"
+proptest = "=1.11.0"

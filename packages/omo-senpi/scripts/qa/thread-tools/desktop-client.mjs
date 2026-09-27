@@ -35,6 +35,7 @@ import {
   writeCliShim,
   writeMockModelsJson,
 } from "./lib/harness.mjs"
+import { isolatedChildEnv } from "../sandbox-child-env.mjs"
 
 const CREATE_NEEDLE = "t13b-desktop-created-needle"
 const SEND_NEEDLE = "t13b-desktop-send-needle"
@@ -106,7 +107,7 @@ try {
       cwd: scratch.cwd,
       socketPath,
       env: {
-        ...scratch.env,
+        ...isolatedChildEnv(scratch.env, scratch.agentDir),
         SENPI_CODING_AGENT_DIR: scratch.agentDir,
         OMO_CODING_AGENT_DIR: scratch.agentDir,
       },

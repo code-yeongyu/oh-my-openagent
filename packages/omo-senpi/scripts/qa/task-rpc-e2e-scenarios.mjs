@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { mkdirSync, rmSync, watch, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { createSandbox, seedSandbox } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
@@ -46,7 +47,7 @@ function childArgv(sessionDir, prompt) {
 }
 
 function childEnv(sandbox, sessionDir, senpiBin) {
-  return { ...process.env, SENPI_BIN: senpiBin, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" }
+  return { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_BIN: senpiBin, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" }
 }
 
 function writeScript(sandbox, parentSteps, childSteps) {

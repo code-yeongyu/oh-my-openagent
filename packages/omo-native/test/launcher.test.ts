@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -284,6 +284,36 @@ await runLauncher(["say", "hi"])
         const result = run(fixture, ["say", "hi"], { SENPI_BIN: "/stale/senpi" })
         expect(result.status).toBe(0)
         expect(capture(fixture).env.SENPI_BIN).toBeUndefined()
+      })
+
+      test("#then inherited package dirs cannot redirect the engine while PI_PACKAGE_DIR remains explicit", () => {
+        const fixture = createFixture({ installLayout: "npm" })
+        const override = join(fixture.root, "deliberate-package")
+        const result = run(fixture, ["say", "hi"], {
+          OMO_PACKAGE_DIR: join(fixture.root, "foreign-omo"),
+          SENPI_PACKAGE_DIR: join(fixture.root, "foreign-senpi"),
+          PI_PACKAGE_DIR: override,
+        })
+        expect(result.status).toBe(0)
+        const environment = capture(fixture).env
+        expect(environment.OMO_PACKAGE_DIR).toBeUndefined()
+        expect(environment.SENPI_PACKAGE_DIR).toBeUndefined()
+        expect(environment.PI_PACKAGE_DIR).toBe(override)
+      })
+
+      test("#then a package dir that names the launched engine is still forwarded, including through a link", () => {
+        const fixture = createFixture({ installLayout: "npm" })
+        const engineRoot = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi")
+        const alias = join(fixture.root, "engine-alias")
+        symlinkSync(engineRoot, alias, process.platform === "win32" ? "junction" : "dir")
+        const result = run(fixture, ["say", "hi"], {
+          OMO_PACKAGE_DIR: alias,
+          SENPI_PACKAGE_DIR: fixture.packageRoot,
+        })
+        expect(result.status).toBe(0)
+        const environment = capture(fixture).env
+        expect(environment.OMO_PACKAGE_DIR).toBe(alias)
+        expect(environment.SENPI_PACKAGE_DIR).toBe(fixture.packageRoot)
       })
     })
 

@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = dirname(scriptDir)
@@ -69,7 +70,7 @@ function childEnv(baseEnv, sandbox, sessionDir) {
     env[key] = value
   }
   return {
-    ...env,
+    ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     SENPI_CODING_AGENT_SESSION_DIR: sessionDir,

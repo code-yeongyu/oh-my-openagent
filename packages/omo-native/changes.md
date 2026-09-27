@@ -1,3 +1,15 @@
+## 2026-09-27 - Native doctor reports computer-use readiness (#8939)
+
+### What changed
+
+- `computer-use-doctor-runtime.ts` is bundled into the existing Native doctor runtime. It loads the effective `[native]` computer config, honors `computer.engine_path`, otherwise follows the desktop locator and versioned release acquisition path, and preserves `native-unavailable`, `quarantined`, and ABI/handshake diagnostics with every attempted path.
+- The probe starts the engine under a five-second bound and sends only `engine.hello` and `capabilities`. It never sends `session.open`, so it does not create a desktop session, arm input, or trigger an OS permission request.
+- `bin/lib/computer-use-doctor.js` renders enabled/supported state, engine path plus version/ABI/protocol, backend and capture/input/accessibility permissions, display count and lock state, and stop-path availability as `INFO` / `PASS` / `WARN` / `FAIL` lines. `launcher.js` computes those lines alongside task-category coverage and `doctor.js` includes them in its existing exit status.
+
+### Tests
+
+`test/computer-use-doctor.test.ts` covers the healthy output, degraded permission/display/stop-path warnings, quarantined paths, disabled config, explicit engine-path precedence, and the exact prompt-free request sequence (`engine.hello`, `capabilities`, no `session.open`).
+
 ## 2026-09-24 - omo doctor and omo setup report task-category coverage (#8858)
 
 ### What changed
@@ -68,10 +80,6 @@ After #8799 and #8803, custom providers were the one hand-configured OpenCode as
 
 `bin/lib/setup-import.js` `runSetup` (every setup stage lands there), `bin/lib/setup-models.js` (the report rewrite lane).
 
-||||||| 0009632c6
-
-||||||| 2a04ce61b
-
 ## 2026-09-24 - omo doctor reports the OpenCode-edition migration leftovers (#8831)
 
 `omo doctor` said nothing about the machine it had just been migrated from: an `omo` earlier on PATH than omo-ai's, the legacy `oh-my-openagent` / `oh-my-opencode` package still installed globally (the one whose `npm uninstall -g` can take omo-ai's `omo` with it, #8793), and the OpenCode plugin still registered in the OpenCode config. `packages/omo-native/bin/lib/doctor-migration.js` is new and adds three report-only checks, printed right after the `INFO Update:` line; `doctor.js` only imports and calls it.
@@ -82,7 +90,6 @@ After #8799 and #8803, custom providers were the one hand-configured OpenCode as
 
 Nothing is deleted or rewritten. `runDoctor` options gain `env` / `homeDir` / `platform`, following the existing `env` injection, so `test/doctor-migration.test.ts` runs every check against fixture trees and never reads the real PATH or home.
 
-||||||| 07452eda9
 ## 2026-09-24 - omo update runs the detected package-manager command (#8830)
 
 ### What changed

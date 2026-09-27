@@ -19,6 +19,7 @@ import {
 	parseJsonEvents,
 	snapshotDir,
 } from "./task-e2e-analysis.mjs";
+import { isolatedChildEnv } from "./sandbox-child-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mockProvider = join(scriptDir, "curated-agents-e2e-mock-provider.ts");
@@ -73,7 +74,7 @@ function driveSenpi(senpiBin, scenario) {
 		{
 			cwd: scenario.sandbox.cwd,
 			env: {
-				...process.env,
+				...isolatedChildEnv(process.env, scenario.sandbox.agentDir),
 				SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
 				XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,
 				SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,

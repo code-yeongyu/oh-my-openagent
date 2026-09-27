@@ -33,6 +33,7 @@ import {
 } from "./task-e2e-scenarios.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
 import { runTaskResumeScenarios } from "./task-resume-e2e.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -73,7 +74,7 @@ function driveSenpi(senpiBin, scenario, prompt, pids) {
     ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", scenario.sessionDir, prompt],
     {
       cwd: scenario.sandbox.cwd,
-      env: { ...process.env, SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
+      env: { ...isolatedChildEnv(process.env, scenario.sandbox.agentDir), SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
       encoding: "utf8",
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,

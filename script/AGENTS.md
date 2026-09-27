@@ -11,6 +11,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | File | Purpose |
 |------|---------|
 | `build-binaries.ts` | Writes 12 generated Node launcher packages for darwin/linux/windows (AVX2 + baseline) |
+| `build-omo-binary.ts` + `release-desktop-engine-fixture.json` | Embed release sidecars, including `native/prebuilds/<host>/senpi-desktop-engine[.exe]` on declared-available targets; preserve executable mode, fail on a missing promised engine, and explicitly omit unsupported hosts |
 | `build-cli-node.ts` | Node-runtime CLI bundle (`dist/cli-node`) for environments without Bun |
 | `build.ts` | Main build entry (`bun run build`) |
 | `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/`. Also embeds a source-freshness marker (`// omo-codex-install:<sourceDigest>:<bodyDigest>`) as line 2 of the generated bundle and exports `buildCodexInstaller()` / `digestCodexInstallerSources()` / `parseCodexInstallerArtifact()` for non-destructive freshness checks; guarded by `import.meta.main` |

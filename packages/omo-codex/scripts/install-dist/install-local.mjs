@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ef5d219cf082ecf69c39a20e65382313d3dcd918a838405f034fd955a2705cc4:6641bbcf099f2f29b873324f5895ebd73887719cd81bbd8b2933b3e4fa6e1e6f
+// omo-codex-install:4a9ae103659984de257ed432b198e976be11c3745a40de12ea10d69a2bdcdf41:ceb5eedf4cdd5d21b7addb3e23d8e3a82be0bc9295696fda7daefe9e21151847
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -6394,7 +6394,7 @@ class SyncSpanContextManager {
 var init_context = () => {};
 
 // node_modules/.bun/@posthog+core@1.55.0/node_modules/@posthog/core/dist/traces/config.mjs
-function positiveInteger(value, fallback) {
+function positiveInteger2(value, fallback) {
   return typeof value == "number" && Number.isInteger(value) && value >= 1 ? value : fallback;
 }
 function withUsableIdentityKeys(attributes) {
@@ -6429,22 +6429,22 @@ function resolveTracesConfig(config, hostResourceAttributes, logger) {
   const resourceAttributes = assignUserAttributes({
     ...hostResourceAttributes
   }, withUsableIdentityKeys(config?.resourceAttributes));
-  const maxExportBatchSize = positiveInteger(config?.maxExportBatchSize, DEFAULT_MAX_EXPORT_BATCH_SIZE);
+  const maxExportBatchSize = positiveInteger2(config?.maxExportBatchSize, DEFAULT_MAX_EXPORT_BATCH_SIZE);
   return {
     serviceName: resourceAttributes?.["service.name"] ?? config?.serviceName,
     serviceVersion: resourceAttributes?.["service.version"] ?? config?.serviceVersion,
     environment: resourceAttributes?.["deployment.environment"] ?? config?.environment,
     resourceAttributes,
     beforeSpanSend: resolveBeforeSpanSend(config?.beforeSpanSend, logger),
-    maxAttributesPerSpan: positiveInteger(config?.maxAttributesPerSpan, DEFAULT_MAX_ATTRIBUTES_PER_SPAN),
-    maxEventsPerSpan: positiveInteger(config?.maxEventsPerSpan, DEFAULT_MAX_EVENTS_PER_SPAN),
+    maxAttributesPerSpan: positiveInteger2(config?.maxAttributesPerSpan, DEFAULT_MAX_ATTRIBUTES_PER_SPAN),
+    maxEventsPerSpan: positiveInteger2(config?.maxEventsPerSpan, DEFAULT_MAX_EVENTS_PER_SPAN),
     maxAttributesPerEvent: DEFAULT_MAX_ATTRIBUTES_PER_EVENT,
-    maxAttributeValueLength: positiveInteger(config?.maxAttributeValueLength, DEFAULT_MAX_ATTRIBUTE_VALUE_LENGTH),
-    flushIntervalMs: positiveInteger(config?.flushIntervalMs, DEFAULT_FLUSH_INTERVAL_MS2),
+    maxAttributeValueLength: positiveInteger2(config?.maxAttributeValueLength, DEFAULT_MAX_ATTRIBUTE_VALUE_LENGTH),
+    flushIntervalMs: positiveInteger2(config?.flushIntervalMs, DEFAULT_FLUSH_INTERVAL_MS2),
     maxExportBatchSize,
-    maxQueueSize: Math.max(positiveInteger(config?.maxQueueSize, DEFAULT_MAX_QUEUE_SIZE), maxExportBatchSize),
-    maxLiveSpans: positiveInteger(config?.maxLiveSpans, DEFAULT_MAX_LIVE_SPANS),
-    maxSpanAgeMs: positiveInteger(config?.maxSpanAgeMs, DEFAULT_MAX_SPAN_AGE_MS)
+    maxQueueSize: Math.max(positiveInteger2(config?.maxQueueSize, DEFAULT_MAX_QUEUE_SIZE), maxExportBatchSize),
+    maxLiveSpans: positiveInteger2(config?.maxLiveSpans, DEFAULT_MAX_LIVE_SPANS),
+    maxSpanAgeMs: positiveInteger2(config?.maxSpanAgeMs, DEFAULT_MAX_SPAN_AGE_MS)
   };
 }
 var DEFAULT_FLUSH_INTERVAL_MS2 = 5000, DEFAULT_MAX_EXPORT_BATCH_SIZE = 512, DEFAULT_MAX_QUEUE_SIZE = 2048, DEFAULT_MAX_ATTRIBUTES_PER_SPAN = 128, DEFAULT_MAX_EVENTS_PER_SPAN = 128, DEFAULT_MAX_ATTRIBUTES_PER_EVENT = 128, DEFAULT_MAX_ATTRIBUTE_VALUE_LENGTH = 8192, DEFAULT_MAX_LIVE_SPANS = 1e4, DEFAULT_MAX_SPAN_AGE_MS = 3600000, IDENTITY_KEYS;
@@ -9984,7 +9984,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.0.0",
+    version: "5.0.1",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -16502,6 +16502,25 @@ var OmoCategoryConfigObjectSchema = object({
 var OmoCategoryConfigSchema = preprocess((value) => isRecord3(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 
+// packages/omo-config-core/src/schema/computer.ts
+var positiveInteger = number2().int().positive();
+var nonNegativeInteger = number2().int().nonnegative();
+var OmoComputerSettingsLayerSchema = object({
+  enabled: boolean2(),
+  display: string2().min(1),
+  max_width: positiveInteger,
+  max_height: positiveInteger,
+  screenshot_max_bytes: positiveInteger,
+  stop_hotkey: string2().min(1),
+  allow_host_relay_only_stop: boolean2(),
+  macos_canary: _enum(["session", "off"]),
+  audit_log: object({ enabled: boolean2() }).partial().strict(),
+  screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
+  engine_path: string2().min(1),
+  cua_adapter: boolean2()
+}).partial().strict();
+var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
+
 // packages/omo-config-core/src/schema/git-master.ts
 var OmoGitMasterSettingsShape = {
   commit_footer: union([boolean2(), string2()]),
@@ -16963,6 +16982,7 @@ var OmoTypedHarnessConfigSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
@@ -16977,6 +16997,7 @@ var OmoConfigProfileSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -16996,6 +17017,7 @@ var OmoConfigSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -17018,6 +17040,7 @@ var OmoConfigLayerSchema = object({
   model_profile: string2().optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),

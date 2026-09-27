@@ -144,7 +144,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
       // writing - docs/prose
-      "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "low" },
+      "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
       // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3 max
       "visual-engineering": {
@@ -348,7 +348,7 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | `quick`              | `openai/gpt-6-luna-fast` (low) | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `xiaomi/mimo-v2.6-pro` (max)     | General tasks, low effort                      |
 | `unspecified-high`   | `anthropic/claude-opus-5-5` (medium) | General tasks, high effort                     |
-| `writing`            | `anthropic/claude-fable-5-1` (low)     | Documentation, prose, technical writing. Unavailable when none of its Claude models (`claude-fable-5-1`, `claude-opus-5-5`, `claude-opus-4-6`) is connected; it never falls back to another family, and the installer leaves it out. |
+| `writing`            | `anthropic/claude-opus-5-5` (low)      | Documentation, prose, technical writing. Unavailable when none of its Claude models (`claude-opus-5-5`, `claude-opus-4-6`) is connected; it never falls back to another family, and the installer leaves it out. |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -443,7 +443,7 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 | **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` |
 | **Unspecified Low** | `mimo-v2.6-pro` | `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
-| **Writing** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
+| **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
 

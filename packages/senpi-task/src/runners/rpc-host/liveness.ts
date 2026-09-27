@@ -1,6 +1,8 @@
+import { createConnection } from "node:net"
+
 import { log } from "@oh-my-opencode/utils"
 
-import { probeWithEngine, createSenpiRpcClient, type HostRpcClient } from "./session-transport"
+import { probeWithEngine } from "./session-transport"
 
 /**
  * The two questions the lifecycle asks a daemon once per pass: "are you there?" (`get_protocol_info`
@@ -9,6 +11,9 @@ import { probeWithEngine, createSenpiRpcClient, type HostRpcClient } from "./ses
  * child is a worker). Both answer conservatively on failure: an unreachable daemon holds nothing,
  * which makes the lifecycle reopen from JSONL rather than attach, and close nothing.
  */
+
+const LIST_REQUEST_ID = "omo-task-liveness"
+const LIST_TIMEOUT_MS = 10_000
 
 export async function daemonReachable(socket: string): Promise<boolean> {
   try {
@@ -19,19 +24,64 @@ export async function daemonReachable(socket: string): Promise<boolean> {
   }
 }
 
+/**
+ * Asked on the wire, never through the engine's `RpcClient.listSessions()`: that client sends a bare
+ * `list_sessions` and drops `include_workers`, so every task child would read as gone - and a live
+ * child that reads as gone is claimed by the next omo session that reconciles the store (#8932).
+ */
 export async function liveSessionPaths(socket: string): Promise<readonly string[]> {
-  let client: HostRpcClient | undefined
-  try {
-    client = await createSenpiRpcClient({ socketPath: socket, onDisconnect: () => undefined })
-    const listSessions = client.listSessions
-    if (listSessions === undefined) return []
-    await client.start()
-    const rows = await listSessions.call(client, { include_workers: true })
-    return rows.flatMap((row) => (row.sessionPath === undefined ? [] : [row.sessionPath]))
-  } catch (error) {
-    log("senpi-task daemon session list failed", { socket, error: String(error) })
+  const reply = await askDaemon(socket, { id: LIST_REQUEST_ID, type: "list_sessions", include_workers: true })
+  if (reply === undefined) {
+    log("senpi-task daemon session list failed", { socket })
     return []
-  } finally {
-    await client?.stop().catch(() => undefined)
   }
+  const sessions = reply.sessions
+  if (!Array.isArray(sessions)) return []
+  return sessions.flatMap((row: unknown) => (isRecord(row) && typeof row.sessionPath === "string" ? [row.sessionPath] : []))
+}
+
+// One short-lived connection, one command, the reply carrying its id. A daemon broadcasts lifecycle
+// records to every connection, so the first line is not necessarily the answer. The daemon runner
+// exists only on POSIX, where the socket path is the transport address.
+function askDaemon(socket: string, request: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>> | undefined> {
+  return new Promise((resolve) => {
+    const connection = createConnection(socket)
+    let buffer = ""
+    let settled = false
+    const finish = (data: Readonly<Record<string, unknown>> | undefined): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      connection.destroy()
+      resolve(data)
+    }
+    const timeout = setTimeout(() => finish(undefined), LIST_TIMEOUT_MS)
+    connection.setEncoding("utf8")
+    connection.once("connect", () => connection.write(`${JSON.stringify(request)}\n`))
+    connection.on("data", (chunk: string) => {
+      buffer += chunk
+      for (let newline = buffer.indexOf("\n"); newline !== -1; newline = buffer.indexOf("\n")) {
+        const answer = answerFor(buffer.slice(0, newline), request.id)
+        buffer = buffer.slice(newline + 1)
+        if (answer !== undefined) return finish(answer)
+      }
+    })
+    connection.once("error", () => finish(undefined))
+    connection.once("close", () => finish(undefined))
+  })
+}
+
+function answerFor(line: string, id: unknown): Readonly<Record<string, unknown>> | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(line)
+  } catch {
+    return undefined
+  }
+  if (!isRecord(parsed) || parsed.id !== id || parsed.success !== true) return undefined
+  return isRecord(parsed.data) ? parsed.data : {}
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

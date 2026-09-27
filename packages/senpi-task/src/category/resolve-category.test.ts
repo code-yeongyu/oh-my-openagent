@@ -271,9 +271,9 @@ describe("resolveCategory", () => {
     })
   })
 
-  test("#given writing's Fable 5.1 default is unavailable and Opus 5.5 is available #when resolved #then the Opus 5.5 rung is selected at low", () => {
+  test("#given writing's Opus 5.5 default is unavailable and Opus 4.6 is available #when resolved #then the Opus 4.6 rung is selected at max", () => {
     // given
-    const models = registry([model("anthropic", "claude-opus-5-5")])
+    const models = registry([model("anthropic", "claude-fable-5-1"), model("anthropic", "claude-opus-4-6")])
 
     // when
     const result = resolveCategory("writing", {}, models)
@@ -281,13 +281,13 @@ describe("resolveCategory", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.spec.provider).toBe("anthropic")
-    expect(resolved.spec.modelId).toBe("claude-opus-5-5")
-    expect(resolved.spec.variant).toBe("low")
+    expect(resolved.spec.modelId).toBe("claude-opus-4-6")
+    expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: "claude-opus-5-5",
-      variant: "low",
+      model: "claude-opus-4-6",
+      variant: "max",
     })
   })
 
@@ -486,7 +486,7 @@ describe("builtin category defaults", () => {
       ["unspecified-low", "xiaomi/mimo-v2.6-pro", "max"],
       ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
       ["architect", "anthropic/claude-fable-5-1", "max"],
-      ["writing", "anthropic/claude-fable-5-1", "low"],
+      ["writing", "anthropic/claude-opus-5-5", "low"],
     ])
 
     // then: availability gating applies only to the model-gated builtins; any listed id opens the gate

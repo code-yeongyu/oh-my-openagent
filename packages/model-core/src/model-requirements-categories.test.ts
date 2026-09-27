@@ -253,7 +253,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("writing follows the approved 3-rung chain", () => {
+  test("writing leads with claude-opus-5-5 low and no longer carries claude-fable-5-1", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
@@ -261,12 +261,8 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const chain = requirement.fallbackChain
 
     // then
+    expect(chain.map(({ model }) => model)).not.toContain("claude-fable-5-1")
     expect(chain).toEqual([
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-1",
-        variant: "low",
-      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",

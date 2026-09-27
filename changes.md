@@ -1,3 +1,98 @@
+## 2026-09-27 - macOS computer focus guard preserves the visible window (#8925)
+
+The macOS engine now captures the frontmost application's first on-screen layer-0 WindowServer window instead of assuming its AX-focused window is visually on top. Foreground delivery passes that captured window to SkyLight; when the foreground SPI is unavailable, it retains the existing public app-activation fallback. Synthetic window-order tests reject off-screen, non-normal-layer, and other-process windows. Window enumeration no longer cuts off after 48 windows, so a target behind many other windows remains addressable.
+
+Background clicks keep the user's frontmost app, visible front window, focused window, cursor, and next-keystroke destination. The target can move directly beneath the front window; macOS QA records that rank without treating it as a focus failure, and foreground sabotage still fails the invariant. The guide, tool reference, and model-facing computer guidance describe the same accepted behavior.
+
+## 2026-09-27 - OmO Native records privacy-safe computer-use outcomes (#8940)
+
+OmO Native telemetry now measures whether computer use activates, what blocks it, and which desktop-engine failures occur without exporting desktop content. Three strict events use only closed vocabularies:
+
+- `computer_use_activation`: active/inactive, source (`tool_call`, `/computer on`, `/computer off`), platform and backend.
+- `computer_use_permission_denied`: OS capability (`capture`, `input`, `ax`) or OmO permission tier (`read`, `exec`), plus platform and backend.
+- `computer_use_engine_error`: the frozen engine error code, startup diagnostics (`native-unavailable`, `quarantined`, `abi-mismatch`), or `other`.
+
+The computer-use adapter publishes through the existing OmO Native telemetry client, so every existing environment, config and component opt-out disables these events too. Session ids remain salted hashes. Screenshots, window and application names, coordinates, typed text, tool code and arguments, permission feedback, paths, error messages and recovery hints never enter an event.
+
+## 2026-09-27 - The computer-use skill says when to stop and ask (#8941)
+
+The `computer-use` skill that `materializeComputerSkill()` writes (`packages/senpi-desktop-tool/src/skill.ts`) was the helper reference plus the safety block. It now opens with the two decisions the reference did not cover: read `computer.capabilities()` before the first action and, when a permission the task needs is not `granted`, name it (on macOS, Screen Recording or Accessibility for the launching app) and stop instead of working around it; and ask the user when the target is ambiguous or an action still fails after a fresh observation.
+
+## 2026-09-27 - The computer-use QA proves tool_search discovery (#8893)
+
+`computer-use-e2e.mjs` now also drives the path a model takes to a deferred tool. It runs `tool_search` for a desktop-control capability, calls the matched `computer` tool by name, and confirms the eval `computer` global. It passes 5 of 5 against senpi 2026.9.27-2, and the check fails when the query cannot match.
+
+## 2026-09-27 - Computer use acquires its engine for npm installs (#8893)
+
+`omo-ai` installed from npm ships no native binaries. So the `computer-use` component used to report `native-unavailable` unless the engine had been built locally.
+
+The component's default engine source is now `packages/omo-senpi/src/components/computer-use/engine-source.ts`:
+- `computer.engine_path` still wins.
+- Under an OmO launch, it acquires the engine for OmO's own release. That version comes from the compiled runtime's stamped manifest (`OMO_PACKAGE_DIR`) or from the `omo-ai` package the npm launcher runs from (`OMO_BIN`).
+- Acquiring means the local sidecar or prebuild first, then the checksum-verified GitHub release download. `acquireDesktopEngine` (#8923) caches the result.
+- Anything else keeps the synchronous locator.
+
+`senpi-desktop-service`'s `ChildFactory` may now resolve asynchronously. The new `acquiringEngineChildFactory` acquires once and reuses the path. When acquisition finds no engine, it rejects with `DesktopEngineUnavailableError` carrying the acquisition diagnostic and spawns nothing.
+
+## 2026-09-27 - Desktop engine binaries join the OmO release channels (#8893)
+
+The compiled OmO binaries stage `senpi-desktop-engine` inside their extracted runtime on supported macOS, glibc Linux x64 and Windows x64 hosts. The locator checks that runtime before the executable directory, while targets without an engine still report `native-unavailable`. The release workflow builds and uploads the engine binaries with checksums. An independent asynchronous API can acquire and verify the corresponding asset into a versioned cache for npm installs; hooking that API into the computer-use component follows the separate component PR.
+
+## 2026-09-27 - Computer-use QA harnesses and OmO documentation (#8893)
+
+The desktop engine's Windows, Linux and macOS QA drivers now live in OmO under `script/qa/desktop/`, alongside the executable Windows PR workflow. Windows runs seven scenarios plus a deliberate sabotage check. Linux covers the source harness's four X11 and three Wayland scenarios, with isolated provisioning and teardown. The macOS driver exercises the real Senpi binary with OmO's computer-use component and supplies a non-live self-test for hosts without an unlocked graphical console.
+
+The root Cargo pin guard now runs with the desktop package tests, and the bunshin desktop capability installer discovers OmO's engine location. The Native computer-use guide and tool reference describe `omo.jsonc`, permission tiers, the eval global, `/computer`, engine lookup and `--mcp` without the unpublished senpi desktop packages.
+
+## 2026-09-27 - omo adopts senpi 2026.9.27-2 (#8893)
+
+Every `@code-yeongyu/senpi` pin moves from 2026.9.27 to 2026.9.27-2: the root devDependency, the `omo-native` dependency, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, and `bun.lock`. The release carries the generic extension hooks that the computer-use component relies on:
+- `ToolDefinition.kernelPrelude`, which puts `computer` into the eval kernels.
+- `ToolDefinition.permissionParser`, which lets the read and exec permission tiers gate the tool.
+- The `tool_activated` event.
+
+It also fixes session rebinding after a repository moves, fork-confirmation answers, and several pty issues. `packages/omo-native/bin/lib/provider-map.json` still matches the new engine's `builtinProviders()`, which `provider-map-registry.test.ts` checks against the installed package, so only its version comment changes.
+
+## 2026-09-27 - Committed conflict markers fail the root suite (#8919)
+
+Merge resolutions had left twelve `||||||| <base>` diff3 lines as content: one in `changes.md`, three in `packages/omo-native/changes.md` and eight in `packages/omo-senpi/changes.md`. They are gone, and every tracker keeps all of its entries (128, 17 and 96 headings). `script/conflict-markers.test.ts` now scans every tracked text file in the root `bun test` and fails with `path:line` on a line that opens (`<<<<<<< `), bases (`||||||| `) or closes (`>>>>>>> `) a conflict. A bare `=======` is allowed, because it is a Markdown setext underline, and binary and untracked files are skipped.
+
+## 2026-09-27 - memory usage ledgers resolve the session from the tool callback context (#8864, #8865)
+
+`registerSkillsUsage` and `registerMemoryUsage` (`packages/omo-senpi/src/components/memory/{skills,memory}-usage-wiring.ts`) passed the `tool_call` event to `resolveContext`. Senpi hands a handler the event first and the session-bound extension context second, and only the context carries `sessionManager`, so `sessionIdFrom` returned `undefined`, no tracker was ever created, and `runtime/skills-usage.json` / `runtime/memory-usage.json` never existed: every dream run received `{}` for both. Both recorders now resolve from the second argument, like every other `tool_call` / `tool_result` handler in the package. `usage-ledgers-wiring.test.ts` registers the real memory component and asserts both ledger files after a quitting shutdown; it fails on the previous code. Fix by @MoerAI.
+
+## 2026-09-27 - omo-senpi ships desktop computer use (#8893)
+
+A new `computer-use` component registers the `computer` tool from the moved `@oh-my-opencode/senpi-desktop-*` packages:
+- It is search-exposed, so tool_search finds it for desktop tasks, and it starts nothing until it is activated.
+- It exposes a `computer` global in the eval kernels while it is active.
+- Its read and exec tiers are gated by permission rules such as `computer:exec=deny`.
+- `/computer` turns it on or off, reports status, and stops or resumes input (user-only).
+- `computer_actions` (OpenAI computer-use actions) is added when `computer.cua_adapter` is set.
+
+Settings live in a new `computer` block of the omo config: `enabled`, `display`, `max_width`, `max_height`, `screenshot_max_bytes`, `stop_hotkey`, `allow_host_relay_only_stop`, `macos_canary`, `audit_log`, `screenshot_gc`, `engine_path` and `cua_adapter`. It is native-only and included in the generated schema. The tiers and the eval global use senpi's new tool hooks (code-yeongyu/senpi#2178), and an older senpi ignores them.
+
+`scripts/qa/computer-use-e2e.mjs` proves this on the real surface with the real engine's fake desktop backend: the screenshot passes an exec deny, the click is refused before the engine, the allowed click is audited, and `eval` sees the global. The bundle budget rises to 1,420,000 bytes for this first-party code, with no new third-party dependency.
+
+## 2026-09-27 - The desktop computer-use TypeScript packages move into omo (#8893)
+
+The five packages that sit between a harness and the `senpi-desktop-engine` binary move from senpi as private `@oh-my-opencode/senpi-desktop-*` workspaces:
+- `-protocol`: the JSON-RPC wire types, generated from the engine schema.
+- `-engine`: the locator, the ABI handshake and the bunshin descriptor.
+- `-prelude`: the `computer` eval global.
+- `-service`: the engine child client and the `computer.run` runtime.
+- `-tool`: the `computer` tool, its permission tiers and the `/computer` command.
+
+None of them imports senpi. They export their sources directly like the other omo core packages, and senpi's vendored macOS engine prebuild is not carried over, because the locator falls back to the workspace's `target/release` build and platform packages will ship the binary. Each package keeps its vitest suite, excluded from the root `bun test` and run as `bun run test:desktop`: protocol 16, engine 67, prelude 27, service 24 and tool 57. The tool suite's three rule-evaluation cases moved to the upcoming omo-senpi component, where they run through senpi's public permission hook instead of senpi's internals. `desktop-engine.yml` now also runs `test:desktop` against the engine it builds on macOS, Ubuntu and Windows.
+
+## 2026-09-27 - The desktop computer-use engine moves into omo as a Rust workspace (#8893)
+
+Computer use ships from omo, not as separate senpi packages. This step brings over the engine: the ten `crates/senpi-desktop-*` crates, the fake, macOS, X11, AT-SPI, Wayland and Win32 backends, the safety gate, sessions, and the `senpi-desktop-engine` JSON-RPC binary with its `--serve`, `--oneshot`, `--resume` and `--mcp` modes. They come from senpi unchanged (the file trees match byte for byte). The root `Cargo.toml` holds the desktop-only subset of senpi's exact dependency pins, and `Cargo.lock` is pruned to it. `.github/workflows/desktop-engine.yml` runs clippy (`-D warnings`), the tests and a release build on macOS, Ubuntu and Windows, plus the Linux X11 and AT-SPI display tests, whenever `crates/**` or the Rust manifests change. The TypeScript packages, the omo-senpi component and binary delivery follow in later PRs.
+
+## 2026-09-27 - writing drops Claude Fable 5.1 and leads with Claude Opus 5.5 low (#8907)
+
+The `writing` chain was `claude-fable-5-1 (low)` -> `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`. The Fable rung is removed, so the chain is `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)` with unchanged provider lists. Both definitions move together: `packages/senpi-task/src/category/fallback-chains.ts` and its mirror `packages/model-core/src/category-model-requirements.ts`, plus the builtin single-model config in both `kimi-categories.ts` files (`anthropic/claude-opus-5-5`, `low`). The Claude-only contract from #8723 is unchanged, so a registry whose only Claude model is Fable 5.1 now leaves `writing` unavailable. Pinning tests move with the chain, `dead-chain.test.ts` asserts that a Fable-only registry no longer opens `writing`, and `model-requirements-categories.test.ts` asserts Fable is not a `writing` rung. Docs tables and examples (`docs/guide/agent-model-matching.md`, `docs/guide/overview.md`, `docs/reference/configuration.md`, `docs/reference/features.md`, `docs/examples/{default,planning-focused}.jsonc`, `packages/omo-opencode/src/tools/AGENTS.md`) and the regenerated omo-senpi plugin bundles carry the new chain.
+
 ## 2026-09-24 - omo doctor and omo setup show which task categories your providers serve (#8858)
 
 A user who migrated with one subscription found out that a task category had no usable model only when a spawn failed (a zai-only machine serves 1 of the 10 builtin categories, an anthropic-only one 7). `omo doctor` now prints a categories line computed from the model list the pinned engine would use for this user: its ModelRuntime over `auth.json`, `models.json` custom providers and provider env keys, read-only, no network, nothing written. When every category is served that is one `PASS task categories: all N usable ...` line; otherwise a `WARN` line with the usable set plus one `WARN` line per unusable category, naming the unconnected chain providers and the two fixes (`/login <provider>`, or pin `categories.<name>.model` in omo.json), in the category-unavailable notice's wording. The `omo setup` summary gets a `categories` row for the plan it is about to apply (the keys and custom providers it imports and the category pins it writes), so a migrant sees it while deciding what to log into. Classification is the spawn path's own resolver (`resolveCategoryCoverage` in `packages/senpi-task/src/category/coverage.ts`, over `resolveAvailableCategoryNames` and the resolver's missing-provider list); the plain-JS launcher reaches it through `plugin/runtime/category-coverage/index.js`, which `build:omo-native` bundles from `packages/omo-native/category-coverage-entry.ts`. Any failure prints no line and omits the row. Details in `packages/omo-native/changes.md`.

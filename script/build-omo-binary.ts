@@ -34,6 +34,7 @@ import {
   omoBinaryEngineStamp,
   releaseEngineBuildStamp,
 } from "./engine-build-defines"
+import { desktopEngineTarget, stageCompiledDesktopEngine } from "./release-desktop-engine-target"
 
 export { compileDefinesForOmoBinary }
 
@@ -433,6 +434,8 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   for (const entry of target.nativePrebuilds) {
     relPaths.add(nativePrebuildRelPath(entry))
   }
+  const desktopEngine = desktopEngineTarget(target.target).payload
+  if (desktopEngine !== null) relPaths.add(desktopEngine)
   return [...relPaths].sort()
 }
 
@@ -555,6 +558,7 @@ export function stageSidecarPayload(
   stageDir: string,
   omoAiVersion: string,
   buildInfo?: OmoBuildInfo,
+  desktopEngineSourceRoot?: string,
 ): string[] {
   mkdirSync(stageDir, { recursive: true })
   const staged = new Set<string>()
@@ -564,6 +568,8 @@ export function stageSidecarPayload(
   for (const source of engineSidecarSources()) stageSource(source, stageDir, staged)
   stagePluginPayload(stageDir, staged)
   for (const entry of target.nativePrebuilds) stageNativePrebuild(entry, stageDir, staged)
+  const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
+  if (desktopEngine !== null) staged.add(desktopEngine)
   return [...staged].sort()
 }
 

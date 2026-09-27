@@ -1,6 +1,6 @@
 {
   "name": "omo-ai",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "type": "module",
   "description": "OmO Native - the standalone omo command with the OMO extension built in: bun add -g omo-ai",
   "bin": {
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@babel/parser": "8.0.4",
-    "@code-yeongyu/senpi": "2026.9.26"
+    "@code-yeongyu/senpi": "2026.9.27-2"
   },
   "repository": {
     "type": "git",

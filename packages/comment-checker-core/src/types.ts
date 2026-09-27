@@ -90,8 +90,13 @@ export type SpawnSignal = "SIGTERM" | "SIGKILL"
 
 export type SpawnProcess = {
   readonly stdin: {
-    write(input: string): void
-    end(): void
+    /**
+     * Writes `input`, closes stdin, and settles exactly once: resolves when the whole input was
+     * written, rejects with the stream error otherwise (EPIPE, or EOF on win32, when the checker
+     * exited without reading). The adapter owns every stdin `error` event for the stream's
+     * lifetime, so none can escape as an uncaught exception and end the host (#6396).
+     */
+    send(input: string): Promise<void>
   }
   readonly stdout: ReadableStream<Uint8Array>
   readonly stderr: ReadableStream<Uint8Array>

@@ -1294,6 +1294,14 @@ jobs:
           path: .omo/release-binaries
           merge-multiple: true
 
+      - name: Download desktop-engine artifacts
+        if: inputs.skip_platform != true && inputs.lazycodex_only != true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-engine-*
+          path: .omo/release-binaries
+          merge-multiple: true
+
       - name: Upload release assets
         # Runs for both stable and dist-tagged releases: the compiled binaries
         # and SHA256SUMS are part of the release contract on every channel.
@@ -1303,39 +1311,63 @@ jobs:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          # Partial reruns skip binaries already present on the release. Restore
+          # those original bytes before rebuilding the complete checksum set.
+          for TARGET in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            NAME="omo-${TARGET}"
+            if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
+            if [ ! -f ".omo/release-binaries/$NAME" ]; then
+              gh release download "v${VERSION}" --pattern "$NAME" --dir .omo/release-binaries
+            fi
+          done
           ls -la .omo/release-binaries/
-          # Generate the combined checksum file from the 12 downloaded binaries:
-          # each matrix leg uploads only its own omo-* binary (per-leg SHA256SUMS
-          # would collide under merge-multiple), so the release job owns the
-          # release-level SHA256SUMS covering every binary.
+          # The release owns two checksum assets: one for 12 omo launchers,
+          # and one for the four separately downloadable desktop engines.
           (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
-          cat .omo/release-binaries/SHA256SUMS
-          gh release upload "v${VERSION}" .omo/release-binaries/omo-* .omo/release-binaries/SHA256SUMS --clobber
+          bun script/desktop-engine-release.ts checksums .omo/release-binaries
+          gh release upload "v${VERSION}" .omo/release-binaries/omo-* \
+            .omo/release-binaries/SHA256SUMS \
+            .omo/release-binaries/senpi-desktop-engine-darwin-* \
+            .omo/release-binaries/senpi-desktop-engine-linux-* \
+            .omo/release-binaries/senpi-desktop-engine-win32-* \
+            .omo/release-binaries/senpi-desktop-engine-checksums.txt --clobber
 
       - name: Verify uploaded assets
         # Intentionally ungated: release assets are part of the release
-        # contract, so reruns that skip the platform jobs must still prove the
-        # assets are downloadable and hash-verified. Reruns are safe because
-        # upload is --clobber-idempotent and the per-target build is
-        # unconditional, so this can only stay green when the release actually
-        # carries its 13 assets (12 per-target omo binaries + SHA256SUMS).
+        # contract, so skip_platform reruns must fail when an engine asset is
+        # absent rather than treating a skipped upload as success.
         if: inputs.lazycodex_only != true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           VERIFY_DIR="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_DIR"' EXIT
           gh release download "v${VERSION}" --dir "$VERIFY_DIR"
-          ASSET_COUNT="$(find "$VERIFY_DIR" -maxdepth 1 -type f | wc -l)"
-          if [ "$ASSET_COUNT" -ne 13 ]; then
-            echo "::error::Release v${VERSION} must expose 13 assets (12 per-target omo binaries + SHA256SUMS); found ${ASSET_COUNT}."
-            exit 1
-          fi
+          EXPECTED_DIR="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_DIR" "$EXPECTED_DIR"' EXIT
+          for TARGET in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            NAME="omo-${TARGET}"
+            if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
+            touch "$EXPECTED_DIR/$NAME"
+          done
+          for HOST in darwin-arm64 darwin-x64 linux-x64; do
+            touch "$EXPECTED_DIR/senpi-desktop-engine-${HOST}"
+          done
+          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" \
+            "$EXPECTED_DIR/SHA256SUMS" "$EXPECTED_DIR/senpi-desktop-engine-checksums.txt"
+          diff -u <(cd "$EXPECTED_DIR" && printf '%s\n' * | sort) \
+            <(cd "$VERIFY_DIR" && printf '%s\n' * | sort)
           (
             cd "$VERIFY_DIR"
+            test "$(wc -l < SHA256SUMS)" -eq 12
+            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 4
             shasum -a 256 -c SHA256SUMS
+            shasum -a 256 -c senpi-desktop-engine-checksums.txt
           )
-          echo "Verified ${ASSET_COUNT}/13 release assets for v${VERSION}"
+          echo "Verified 18/18 release assets for v${VERSION}"
 
       - name: Delete draft release
         if: inputs.lazycodex_only != true

@@ -24,7 +24,7 @@ The category chains below are edition-aware. Senpi uses `kimi-coding` for Kimi r
 | **category: quick** | `gpt-6-luna-fast` | `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` |
 | **category: unspecified-low** | `mimo-v2.6-pro` | `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | **category: unspecified-high** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
-| **category: writing** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
+| **category: writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 ### Invoking Agents
 
@@ -171,7 +171,7 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `quick`              | `openai/gpt-6-luna-fast` (low) | Trivial tasks - single file changes, typo fixes, simple modifications                                                  |
 | `unspecified-low`    | `xiaomi/mimo-v2.6-pro` (max) | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `anthropic/claude-opus-5-5` (medium) | Tasks that don't fit other categories, high effort required. Falls back to GLM 5.3, then Kimi K3.          |
-| `writing`            | `anthropic/claude-fable-5-1` (low)    | Documentation, prose, technical writing. Unavailable when none of its Claude models is connected; it never falls back to another family. |
+| `writing`            | `anthropic/claude-opus-5-5` (low)     | Documentation, prose, technical writing. Unavailable when none of its Claude models is connected; it never falls back to another family. |
 
 ### Usage
 
@@ -687,6 +687,12 @@ path is explicitly allowed.
 | Tool        | Description                                                                                                                                                    |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **look_at** | Analyze media files (PDFs, images, diagrams) via Multimodal-Looker agent. Extracts specific information or summaries from documents, describes visual content. |
+
+### Computer Use (OmO Native)
+
+OmO Native agents can drive native desktop applications through the `computer` tool: screenshots, window lists, accessibility trees, and mouse and keyboard input on macOS, Linux and Windows. The engine starts only when the tool is first used; input goes to the target in the background by default, a global stop chord (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape elsewhere) suspends it, and `/computer on|off|status|stop|resume` controls it from the prompt. Inspection needs the `computer:read` permission tier and input needs `computer:exec`.
+
+Setup per OS, configuration, the safety model, privacy and troubleshooting are in the [computer use guide](../guide/computer-use.md); the tool contract is in the [computer tool reference](computer.md).
 
 ### Skill Tools
 

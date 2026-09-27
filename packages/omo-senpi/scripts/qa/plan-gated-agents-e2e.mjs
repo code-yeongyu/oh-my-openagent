@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 
 import { createSandbox, digestDirectory } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 // Isolation gate: auth/models/trust byte-identical plus settings.json compared with the live
 // host session's own bookkeeping keys stripped (workflow-skills/tipsHistory/skills - proven to
@@ -313,7 +314,7 @@ const SENPI_TIMEOUT_MS = 120_000
 // retired-config scenario (drive.mjs convention).
 function senpiEnv(sandbox, sessionDir) {
   return {
-    ...process.env,
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     HOME: sandbox.homeDir,
     USERPROFILE: sandbox.homeDir,

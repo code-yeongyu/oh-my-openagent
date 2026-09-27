@@ -136,6 +136,7 @@ function seedScenario(pluginRoot, scenario) {
 }
 
 import { readSessionEntries, loadStreamCaptures, observeEngineThinking } from "./model-profile-e2e-observations.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 // An omo/senpi session exports its own runtime locators; a child senpi that inherits them boots
 // against that runtime dir instead of the binary on PATH, so they are dropped from the spawn env.
@@ -147,7 +148,7 @@ function spawnEnv(sandbox, sessionDir, scenario) {
   env.OMO_PROFILE_QA_PROVIDERS = (scenario.registerProviders ?? []).join(",")
   env.OMO_PROFILE_QA_OAUTH_PROVIDERS = (scenario.oauthProviders ?? []).join(",")
   return {
-    ...env,
+    ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     XDG_DATA_HOME: sandbox.xdgDataHome,

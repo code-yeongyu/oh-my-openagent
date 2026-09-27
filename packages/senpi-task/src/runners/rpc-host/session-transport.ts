@@ -17,10 +17,6 @@ export interface HostRpcClient {
   onEvent(listener: (record: unknown) => void): () => void
   openSession(options: HostOpenSessionWire): Promise<{ sessionId: string; attached?: boolean }>
   closeSession(sessionId?: string): Promise<void>
-  // `include_workers` reaches the wire only on an engine whose client forwards it; on an older one
-  // the option is dropped and worker rows stay hidden, which reads as "no session is live" - the
-  // conservative answer (reopen from JSONL instead of attaching, and close nothing).
-  listSessions?(options?: { readonly include_workers?: boolean }): Promise<readonly HostSessionRow[]>
   sendExtensionUIResponse(response: RpcExtensionUIResponse): Promise<void>
   prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp" }): Promise<void>
   steer(message: string): Promise<void>
@@ -29,11 +25,6 @@ export interface HostRpcClient {
   getState(): Promise<RpcSessionState>
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
-}
-
-/** One `list_sessions` row, narrowed to the only field liveness keys on. */
-export interface HostSessionRow {
-  readonly sessionPath?: string
 }
 
 /** The wire shape of `open_session`, in the engine's names. */

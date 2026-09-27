@@ -15,6 +15,8 @@ export interface StageLabels {
   readonly resumes: string
   readonly saved: string
   readonly reloaded: string
+  readonly background: string
+  readonly focusKept: string
   readonly stageLabel: string
 }
 
@@ -131,6 +133,14 @@ function scene(id: StageStateId, live: boolean, labels: StageLabels): JSX.Elemen
         <div className="text-center">
           <Line tone="lo">~/.omo/omo.jsonc</Line>
           <LiveLine live={live} idle={labels.saved} done={labels.reloaded} />
+        </div>
+      )
+    case "computer":
+      return (
+        <div>
+          <Line tone="lo">{"computer:read  screen · a11y tree"}</Line>
+          <Line tone="hi">{'computer:exec  click "Save"'}</Line>
+          <LiveLine live={live} idle={labels.background} done={labels.focusKept} />
         </div>
       )
   }

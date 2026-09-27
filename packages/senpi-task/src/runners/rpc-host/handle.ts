@@ -34,6 +34,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const idleWaiters: Array<() => void> = []
   const outcomeWaiters: Array<(settled: RunnerOutcome) => void> = []
   const exitWaiters: Array<(outcome: ChildExitOutcome) => void> = []
+  const eventListeners = new Set<ChildEventListener>()
   const parkedListeners = new Set<(event: HostSessionParked) => void>()
   let reachedIdle = false
   let sessionId: string | undefined
@@ -91,6 +92,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const settleExit = (built: ChildExitOutcome): void => {
     if (outcome) return
     outcome = built
+    eventListeners.clear()
     clearInterval(heartbeat)
     flush(idleWaiters)
     if (turnOutcome === undefined) settleTurn(exitTurnOutcome(built, finalText))
@@ -179,7 +181,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
 
   const bindClient = (port: HostSessionPort): void => {
     port.onEvent((event) => {
-      if (client === port) onSessionEvent(event)
+      if (client !== port) return
+      onSessionEvent(event)
+      for (const listener of eventListeners) listener(event)
     })
     port.onParked((event) => {
       if (client !== port || parked || detached || outcome !== undefined) return
@@ -250,6 +254,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
 
   const detach = async (): Promise<void> => {
     detached = true
+    eventListeners.clear()
     clearInterval(heartbeat)
     await client.detach()
   }
@@ -281,7 +286,10 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       abortedByUser = true
       return issue({ type: "abort" })
     },
-    subscribe: (listener: ChildEventListener) => client.onEvent(listener),
+    subscribe: (listener: ChildEventListener) => {
+      eventListeners.add(listener)
+      return () => eventListeners.delete(listener)
+    },
     onParked: (listener) => {
       parkedListeners.add(listener)
       return () => parkedListeners.delete(listener)

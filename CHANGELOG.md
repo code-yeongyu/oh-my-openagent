@@ -7,11 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**OmO Native can use your computer.** ([#8893](https://github.com/code-yeongyu/oh-my-openagent/issues/8893)) Agents get a `computer` tool that takes screenshots, lists windows, reads accessibility trees and clicks and types in native applications on macOS, Linux and Windows. Input goes to the target app in the background by default, so your frontmost app, focus and cursor stay where they are. A global stop chord (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape on Linux and Windows) or `/computer stop` suspends it until you run `/computer resume`, and permission rules split looking (`computer:read`) from touching (`computer:exec`). The compiled binary carries the engine; an npm install downloads the checksum-verified engine for its release on first use. On macOS, grant Screen Recording and Accessibility to the app you run OmO from. Setup, settings, safety, privacy and troubleshooting: [Computer use](docs/guide/computer-use.md).
+
 ### Changed
+
+**Memory now learns from a very long conversation instead of parking it forever.** ([#8984](https://github.com/code-yeongyu/oh-my-openagent/issues/8984), contributed by @deadcode-walker in [#8985](https://github.com/code-yeongyu/oh-my-openagent/pull/8985)) Facts extraction sends conversations to the model in batches of at most 128 KiB. A single conversation entry larger than that used to be parked and never read, so the facts in it were lost. Now, after all normal batches are done, OmO Native gives one such entry a separate extraction run with a fixed budget:
+
+- the whole entry, up to 512 KiB, never split or trimmed
+- at most 8 model requests, each with at most 4,096 output tokens
+- no retries and no fallback to another model
+
+The run only starts when the memory model's context window is known to fit the whole entry. If the context gets compacted, the output is cut off, or any limit is hit, the run is thrown away and the entry stays queued exactly as before. This means extra model calls, and possibly new memory commits, for people who have such long entries queued. Entries above 512 KiB are still parked; see them with `/facts` and unpark them with `/facts retry`.
+
+### Fixed
+
+**`omo doctor` now diagnoses computer use before you start a desktop session.** ([#8939](https://github.com/code-yeongyu/oh-my-openagent/issues/8939)) OmO Native reports whether computer use is enabled and supported, which desktop engine it selected and whether its ABI matches, the backend's capture/input/Accessibility permissions, and display and screen-lock state; the emergency stop chord is reported as not armed until computer use starts input, which is when the engine arms it. The check uses only the engine's read-only handshake and capabilities requests under a bounded timeout, so it does not open a desktop session, grab input, or request OS permissions.
+
+**DAG nodes finish when their child task finishes again.** ([#8932](https://github.com/code-yeongyu/oh-my-openagent/issues/8932), reported by @ayalcoh) A DAG child that ran as a session of the shared task daemon could complete while its node stayed `running`, so the nodes that depend on it never started and the run had to be cancelled. The liveness check asked the daemon for its sessions without including worker sessions, so every task child looked gone; the next omo session that started in the same project took the still-running child over, and the run that was waiting on it never heard it finish. The check now sees task children, including in projects reached through a symlink, so a live child stays with the session that started it.
+
+**Memory dreaming sees which skills and memory files you actually read.** ([#8864](https://github.com/code-yeongyu/oh-my-openagent/issues/8864), reported by @katamana, fixed by @MoerAI in [#8865](https://github.com/code-yeongyu/oh-my-openagent/pull/8865)) The usage ledgers that `dream` reads to find unused skills and to move hot or stale memory files between tiers were never written, so every dream run worked from empty evidence. Reading a `skills/<name>/...` file or a memory file outside `system/` now adds a row to `runtime/skills-usage.json` or `runtime/memory-usage.json` again.
+
+## [5.0.1] - 2026-09-27
+
+A patch release for problems people hit on 5.0.0. `omo update` installs it, or run:
+
+```bash
+bun add -g omo-ai
+```
+
+### Changed
+
+**OmO Native moves to senpi 2026.9.27.** ([#8906](https://github.com/code-yeongyu/oh-my-openagent/issues/8906), [senpi#2157](https://github.com/code-yeongyu/senpi/issues/2157)) The fixes below come with it. npm, pnpm and Yarn installs now run on Bun when Bun 1.4.0 or newer is installed, the way `bun add -g` installs already did; set `OMO_RUNTIME=node` to stay on Node.js. When OmO Native does start on Node.js, it says once per version how to move to Bun.
 
 **A local `omo` install now tells you to update with bun.** The launcher that `oh-my-openagent install` writes for a local checkout answered `omo update` with `npm i -g omo-ai`; it now prints `bun add -g omo-ai` (`omo-ai@beta` on a prerelease build), like every other install instruction. Installs from npm keep getting the npm command from `omo update`.
 
+**`writing` leads with Claude Opus 5.5 at `low` and no longer runs on Claude Fable 5.1.** ([#8907](https://github.com/code-yeongyu/oh-my-openagent/issues/8907)) The builtin `writing` chain is now `claude-opus-5-5` (low), then `claude-opus-4-6` (max), on both OmO Native and the OpenCode edition, with the same Claude providers as before. It stays Claude-only: with neither model connected the category is unavailable instead of falling back to another family, so a setup whose only Claude model is Fable 5.1 no longer offers `writing` unless you pin `categories.writing.model`. A `writing` entry in your own config still wins over the default.
+
 ### Fixed
+
+**Extensions load on Bun 1.3.x again.** ([senpi#2164](https://github.com/code-yeongyu/senpi/issues/2164), reported by @odurif0) An extension that declared its package directory as the entry (`"pi": { "extensions": ["."] }`) or depended on a package that requires a JSON file (ajv does) failed with `Cannot find module 'file:/…'`. Both load now.
+
+**Session titles work on models that cannot turn reasoning off.** ([senpi#2163](https://github.com/code-yeongyu/senpi/issues/2163), [senpi#1239](https://github.com/code-yeongyu/senpi/issues/1239), reported by @jtoronto and @VXNCXNX) Z.ai GLM 5.3 and other mandatory-reasoning models rejected the title request with `Reasoning is mandatory for this endpoint and cannot be disabled. (HTTP 400)`. The title request now asks for the lowest reasoning level the model supports, and a title that still fails is written to `logs/session.log` instead of showing an error. Thanks to @ImStillBlue, whose [senpi#1266](https://github.com/code-yeongyu/senpi/pull/1266) took the first shot at this fix.
+
+**One rejected image no longer breaks the rest of a session.** ([senpi#2170](https://github.com/code-yeongyu/senpi/issues/2170)) After a provider rejected an image, every later turn failed, text-only ones too. The rejected image is now replaced by a note naming its file, and the next message goes through, also after a restart. The read tool also finds a file whose path is wrapped in quotes, like the one Windows Explorer's "Copy as path" produces.
+
+**A stable build no longer calls itself beta.** ([#8901](https://github.com/code-yeongyu/oh-my-openagent/issues/8901)) The 5.0.0 startup banner printed `omo (omo-ai beta 5.0.0)`. Both the npm launcher and the compiled binary now take the channel from the version, so 5.0.1 prints `omo (omo-ai 5.0.1)`.
+
+**A terminal session's output no longer picks up a stray line break** when another session is spawned at the same moment. ([senpi#2161](https://github.com/code-yeongyu/senpi/issues/2161))
 
 **An expired Claude login no longer breaks the first headless or desktop turn.** With no `model_profile` set, OmO Native starts on the Recommended ladder, and a Claude subscription whose saved login can no longer be refreshed still counted as connected: the session was pinned to Claude Opus 5.5, every turn failed on the refresh, and the retry walked only other Claude models before giving up, even when another provider on the ladder (for example Z.ai GLM 5.3) was connected. A model profile now resolves a rung's credentials the way its first turn would before picking it: a login that cannot be refreshed drops that provider and the walk moves on; a provider with several accounts stays eligible while any of them (the pinned one, when an account is pinned) resolves, unless rotation is turned off for it (`credentials.rotation: false` in `models.json`, or a runtime API key), in which case only its default credential counts; a model whose own request configuration fails to resolve drops only that model. The start notice names what was skipped and how to recover on that surface: the desktop points at Provider authentication settings, a headless run at an interactive session's `/login <provider>`. A literal `provider/model` pin in `model_profile` is still applied as written. The resolution runs once per attempted account at session start, sequentially, so a rejected login can add up to the provider's refresh timeout before the next rung is picked.
 

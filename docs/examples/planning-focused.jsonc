@@ -36,7 +36,7 @@
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
     // Documentation from plans
-    "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "medium" },
+    "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
     // Visual architecture
     "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },

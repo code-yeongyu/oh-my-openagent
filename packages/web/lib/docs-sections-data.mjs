@@ -8,6 +8,8 @@ export const DOC_SECTIONS_DATA = /** @type {const} */ ([
     title: "Agent / Model Matching",
   },
   { id: "team-mode", file: "guide/team-mode.md", title: "Team Mode" },
+  { id: "computer-use", file: "guide/computer-use.md", title: "Computer Use" },
+  { id: "computer-tool", file: "reference/computer.md", title: "Computer Tool" },
   { id: "cli", file: "reference/cli.md", title: "CLI Reference" },
   { id: "configuration", file: "reference/configuration.md", title: "Configuration" },
   { id: "features", file: "reference/features.md", title: "Features" },

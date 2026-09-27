@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, classifyRealSenpiChanges, parseJsonEvents, snapshotDir } from "./task-e2e-analysis.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-lane-spill-mock-provider.ts")
@@ -277,7 +278,7 @@ function runScenario(scenario, senpiBin, outDir, pids, helpers) {
     {
       cwd: sandbox.cwd,
       env: {
-        ...process.env,
+        ...isolatedChildEnv(process.env, sandbox.agentDir),
         HOME: homeDir,
         // resolveAgentHome() reads OMO_CODING_AGENT_DIR, then SENPI_CODING_AGENT_DIR, then
         // PI_CODING_AGENT_DIR, and the FIRST one wins. An omo session exports OMO_CODING_AGENT_DIR

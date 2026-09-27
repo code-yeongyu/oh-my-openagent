@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
 import { parseJsonEvents } from "./task-e2e-analysis.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-runtime-fallback-mock-provider.ts")
@@ -123,7 +124,7 @@ function runScenario(scenario, outDir) {
       {
         cwd: sandbox.cwd,
         env: {
-          ...process.env,
+          ...isolatedChildEnv(process.env, sandbox.agentDir),
           HOME: homeDir,
           SENPI_CODING_AGENT_DIR: sandbox.agentDir,
           XDG_CONFIG_HOME: sandbox.xdgConfigHome,

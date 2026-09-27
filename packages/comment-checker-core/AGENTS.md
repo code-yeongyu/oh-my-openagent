@@ -26,6 +26,7 @@ Two responsibilities: (1) parse LLM apply-patch edits into structured `CheckerEd
 
 - **Exit-code contract:** `0` = clean, `2` = has comments; any other code / error / timeout silently returns `{hasComments: false, message: ""}`.
 - **Spawn timeouts:** default 30s, 1s kill grace, SIGTERM→SIGKILL escalation.
-- **`SpawnProcess` is an injected interface** — `stdin.write/end`, `ReadableStream<Uint8Array>` stdout/stderr, `exited: Promise<number>` — never the Node `ChildProcess` type directly.
+- **`SpawnProcess` is an injected interface** — `stdin.send(input): Promise<void>` (write + close, settles once; the adapter owns every stdin `error` event so a checker that exits without reading cannot crash the host, #6396), `ReadableStream<Uint8Array>` stdout/stderr, `exited: Promise<number>` — never the Node `ChildProcess` type directly. A failed `send` kills the child and returns the empty result.
+- **Spawn and stdin failures are contained:** a synchronous `spawn` throw and a rejected `send` both return `{hasComments: false, message: ""}`.
 - **`HookInput` mirrors OpenCode's `tool.execute.before` input schema** exactly, so the same parser serves the Codex `PreToolUse`/`PostToolUse` adapters.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).

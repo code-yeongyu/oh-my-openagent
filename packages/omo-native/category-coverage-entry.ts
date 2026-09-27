@@ -7,6 +7,7 @@
 
 import { loadOmoConfig, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 import { resolveCategoryCoverage, type CategoryCoverage } from "@oh-my-opencode/senpi-task/category-coverage"
+export { computerUseDoctorReport } from "./computer-use-doctor-runtime"
 
 export type CategoryCoverageInput = {
   // The engine's available models: provider id and model id per entry.

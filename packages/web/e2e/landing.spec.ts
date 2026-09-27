@@ -213,6 +213,26 @@ test.describe("Landing Page", () => {
     await expect(page.getByTestId("crafted-list").locator('[aria-current="true"]')).toHaveCount(1)
   })
 
+  test("re-entering a live crafted state waits for its live moment again", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "true")
+    const list = page.getByTestId("crafted-list")
+
+    await list.locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).toHaveClass(/is-live/, { timeout: 5000 })
+
+    await list.locator('[data-crafted-index="3"]').click()
+    await expect(stage).toHaveAttribute("data-state", "team")
+    await list.locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).not.toHaveClass(/is-live/)
+    await expect(stage).toHaveClass(/is-live/, { timeout: 5000 })
+  })
+
   test("holds the crafted stage still under reduced motion and still follows the list", async ({
     page,
   }) => {
@@ -230,6 +250,10 @@ test.describe("Landing Page", () => {
 
     await page.getByTestId("crafted-list").locator('[data-crafted-index="4"]').click()
     await expect(stage).toHaveAttribute("data-state", "monitor")
+    await expect(stage).toHaveClass(/is-live/)
+
+    await page.getByTestId("crafted-list").locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
     await expect(stage).toHaveClass(/is-live/)
   })
 

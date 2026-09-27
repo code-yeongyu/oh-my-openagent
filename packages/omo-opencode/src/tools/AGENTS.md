@@ -63,7 +63,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `quick` | openai/gpt-6-luna-fast (variant: low) | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | xiaomi/mimo-v2.6-pro (variant: max) | openai-categories.ts | Moderate effort fallback |
 | `unspecified-high` | anthropic/claude-opus-5-5 (variant: medium) | openai-categories.ts | High effort fallback; keeps the GPT-6 Astra-specific prompt append for a user override onto a GPT-6 model |
-| `writing` | anthropic/claude-fable-5-1 (variant: low) | kimi-categories.ts | Documentation, prose |
+| `writing` | anthropic/claude-opus-5-5 (variant: low) | kimi-categories.ts | Documentation, prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 

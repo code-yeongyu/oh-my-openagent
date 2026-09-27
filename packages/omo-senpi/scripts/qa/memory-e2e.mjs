@@ -14,6 +14,7 @@ import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -67,7 +68,7 @@ const realOmoMemoryBefore = hashDir(join(homedir(), ".omo", "memory"))
 
 function baseEnv(sandbox, extra = {}) {
   return {
-    ...process.env,
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     OMO_MEMORY_HOME: join(sandbox.root, "memory"),

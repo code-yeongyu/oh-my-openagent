@@ -6,6 +6,12 @@ import { mkdtempSync } from "node:fs"
 import {
   BUILTIN_CATEGORY_NAMES,
   BUILTIN_SKILL_NAMES,
+  COMPUTER_USE_ACTIVATION_SOURCES,
+  COMPUTER_USE_BACKENDS,
+  COMPUTER_USE_ENGINE_ERROR_CODES,
+  COMPUTER_USE_PERMISSIONS,
+  COMPUTER_USE_PERMISSION_SCOPES,
+  COMPUTER_USE_PLATFORMS,
   CURATED_AGENTS,
   KNOWN_MODELS,
   KNOWN_PROVIDERS,
@@ -267,6 +273,30 @@ describe("OmO Native product identity", () => {
 
     // and: session_started now carries the honestly-labeled timezone signal
     expect(OMO_NATIVE_EVENT_SCHEMAS.session_started.timezone).toEqual({ type: "string" })
+  })
+
+  test("#given computer-use telemetry schemas #when inspected #then every property and string value is closed", () => {
+    // given
+    const activation = OMO_NATIVE_EVENT_SCHEMAS.computer_use_activation
+    const permission = OMO_NATIVE_EVENT_SCHEMAS.computer_use_permission_denied
+    const engineError = OMO_NATIVE_EVENT_SCHEMAS.computer_use_engine_error
+
+    // then
+    expect(Object.keys(activation).sort()).toEqual([
+      "$session_id", "active", "backend", "host_platform", "source",
+    ].sort())
+    expect(Object.keys(permission).sort()).toEqual([
+      "$session_id", "backend", "host_platform", "permission", "scope",
+    ].sort())
+    expect(Object.keys(engineError).sort()).toEqual([
+      "$session_id", "backend", "code", "host_platform",
+    ].sort())
+    expect(activation.source.values).toEqual(COMPUTER_USE_ACTIVATION_SOURCES)
+    expect(activation.host_platform.values).toEqual(COMPUTER_USE_PLATFORMS)
+    expect(activation.backend.values).toEqual(COMPUTER_USE_BACKENDS)
+    expect(permission.scope.values).toEqual(COMPUTER_USE_PERMISSION_SCOPES)
+    expect(permission.permission.values).toEqual(COMPUTER_USE_PERMISSIONS)
+    expect(engineError.code.values).toEqual(COMPUTER_USE_ENGINE_ERROR_CODES)
   })
 
   test("#given the shared schema version #when the native clients are configured #then one exported constant carries it", () => {

@@ -6,6 +6,7 @@ import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo
 
 import { createManagerResidencyRegistry } from "../../../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle, createHostSessionProbe, type TaskLifecycle } from "../../../lifecycle"
+import { defaultHostSessionProbe } from "../../../lifecycle/host-session-default"
 import { createTaskManager } from "../../../manager/manager"
 import { createRpcManagedRunner } from "../../../manager/runner"
 import type { StartResult } from "../../../manager/types"
@@ -38,6 +39,10 @@ export interface ParentOptions {
   readonly maxDrainAttempts?: number
   /** Controlled clock: idle parking is a cutoff comparison, never a wait. */
   readonly now?: () => number
+  /** Run this parent as ANOTHER omo process: its manager and lifecycle claim records under this pid. */
+  readonly hostPid?: number
+  /** Ask the daemon through the production liveness adapter instead of the fixture's own wire probe. */
+  readonly productionProbe?: boolean
 }
 
 export interface ParentSession {
@@ -173,16 +178,20 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
     destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
+    ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })
   const lifecycle = createTaskLifecycle({
     store,
     config,
     registry: createManagerResidencyRegistry(() => manager),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
-    hostSessionProbe: createHostSessionProbe({
-      daemonReachable: async (socket) => (await probeFakeHost(socket)) !== undefined,
-      liveSessionPaths: (socket) => listFakeHostSessions(socket, { includeWorkers: true }),
-    }),
+    ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
+    hostSessionProbe: input.options.productionProbe === true
+      ? defaultHostSessionProbe()
+      : createHostSessionProbe({
+        daemonReachable: async (socket) => (await probeFakeHost(socket)) !== undefined,
+        liveSessionPaths: (socket) => listFakeHostSessions(socket, { includeWorkers: true }),
+      }),
     hostSessionClose: async (request) => {
       await closeHostSession(request, { createChannel: fakeCloseChannel })
     },

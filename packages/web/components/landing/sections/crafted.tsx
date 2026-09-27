@@ -30,6 +30,8 @@ export async function CraftedSection(): Promise<JSX.Element> {
     resumes: t("crafted.stage.resumes"),
     saved: t("crafted.stage.saved"),
     reloaded: t("crafted.stage.reloaded"),
+    background: t("crafted.stage.background"),
+    focusKept: t("crafted.stage.focusKept"),
     stageLabel: t("crafted.stage.stageLabel"),
   }
 

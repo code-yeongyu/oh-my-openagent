@@ -12,6 +12,7 @@ import type {
 } from "../types"
 import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
 import { RpcCommandError } from "./errors"
+import { recordTaskChildDeath } from "./crash-record"
 import { classifyChildExit } from "./exit-mapping"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
@@ -23,6 +24,8 @@ export type CreateRpcChildHandleOptions = {
   readonly taskId: string
   readonly heartbeatIntervalMs: number
   readonly now: () => number
+  /** The child's spawn env: where it keeps its agent dir, so its unexpected death is recorded there. */
+  readonly childEnv?: NodeJS.ProcessEnv
 }
 
 export type TrackedRpcChildHandle = RpcChildHandle & {
@@ -49,6 +52,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let abortedByUser = false
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
+  let terminationRequested = false
+  // Wall clock on purpose: the injected `now` is the heartbeat's clock, and tests observe its calls.
+  const startedAt = Date.now()
 
   const settleTurn = (settled: RunnerOutcome): void => {
     if (turnOutcome !== undefined) return
@@ -105,7 +111,13 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   }
 
   child.once("error", (error) => settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })))
-  child.once("close", (code, signal) => settleExit(classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })))
+  child.once("close", (code, signal) => {
+    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })
+    if (options.childEnv !== undefined) {
+      recordTaskChildDeath({ env: options.childEnv, outcome: built, terminationRequested, startedAt, now: Date.now() })
+    }
+    settleExit(built)
+  })
 
   const runCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
     const response = await client.send(command)
@@ -192,7 +204,10 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
         log("senpi-task rpc detach failed", { taskId, error: String(error) })
       }
     },
-    terminate: (terminateOptions?: TerminateOptions) => terminateRpcChild(child, terminateOptions),
+    terminate: (terminateOptions?: TerminateOptions) => {
+      terminationRequested = true
+      return terminateRpcChild(child, terminateOptions)
+    },
     startInitialPrompt: (text) => runPrompt(text),
   }
 }

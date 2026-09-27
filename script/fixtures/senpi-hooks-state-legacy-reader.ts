@@ -10,7 +10,8 @@ import lockfileModule from "../../node_modules/@code-yeongyu/senpi/node_modules/
 const root = actualFs.mkdtempSync(join(tmpdir(), "omo-hooks-legacy-"))
 const cwd = join(root, "project")
 const agentDir = join(root, "agent")
-const statePath = join(cwd, ".senpi", "hooks-state.json")
+const { CONFIG_DIR_NAME } = await import("../../node_modules/@code-yeongyu/senpi/dist/config.js")
+const statePath = join(cwd, CONFIG_DIR_NAME, "hooks-state.json")
 const lockPath = `${statePath}.lock`
 const trustedEntry = {
   enabled: true,

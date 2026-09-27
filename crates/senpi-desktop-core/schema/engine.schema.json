@@ -1,0 +1,2079 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "senpi-desktop engine protocol",
+  "protocolVersion": "1",
+  "abi": "senpi-desktop/1",
+  "methods": {
+    "engine.hello": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/HelloResult"
+      }
+    },
+    "session.open": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/DesktopSessionOptions"
+      },
+      "result": {
+        "$ref": "#/definitions/SessionOpenResult"
+      }
+    },
+    "session.close": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "capabilities": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/DesktopCapabilities"
+      }
+    },
+    "displays": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/DesktopDisplay"
+        }
+      }
+    },
+    "windows": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/DesktopWindow"
+        }
+      }
+    },
+    "capture": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/CaptureParams"
+      },
+      "result": {
+        "$ref": "#/definitions/CaptureResult"
+      }
+    },
+    "click": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/PointParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "moveMouse": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/PointParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "drag": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/DragParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "scroll": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ScrollParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "typeText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/TypeTextParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "keyChord": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/KeyChordParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "raiseWindow": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/RaiseWindowParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "clipboard.read": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/ClipboardText"
+      }
+    },
+    "clipboard.write": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/ClipboardText"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "ax.snapshot": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxSnapshotParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxSnapshot"
+      }
+    },
+    "ax.query": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxQueryParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/AxNode"
+        }
+      }
+    },
+    "ax.elementAt": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxElementAtParams"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/AxNode"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "ax.focused": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/AxNode"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "ax.node": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxRefParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxNode"
+      }
+    },
+    "ax.attributes": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxRefParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "maxItems": 2,
+          "minItems": 2,
+          "items": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    "ax.children": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxRefParams"
+      },
+      "result": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/AxNode"
+        }
+      }
+    },
+    "ax.parent": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxRefParams"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/AxNode"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "ax.perform": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxPerformParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "ax.setValue": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxSetValueParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "ax.focus": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxRefParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "ax.click": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxClickParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "stopPath.start": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/StopPathStartParams"
+      },
+      "result": {
+        "$ref": "#/definitions/StopPathStatus"
+      }
+    },
+    "stopPath.status": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/StopPathStatus"
+      }
+    },
+    "stopPath.heartbeat": {
+      "effect": "read",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "stopPath.stop": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/StopPathStopParams"
+      },
+      "result": {
+        "$ref": "#/definitions/StopPathStatus"
+      }
+    },
+    "stopPath.resume": {
+      "effect": "exec",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/StopPathResumeParams"
+      },
+      "result": {
+        "$ref": "#/definitions/StopPathStatus"
+      }
+    },
+    "$/cancel": {
+      "effect": "read",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/CancelParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "$/test.advanceClock": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": true,
+      "params": {
+        "$ref": "#/definitions/AdvanceClockParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    }
+  },
+  "notifications": {
+    "audit": {
+      "params": {
+        "$ref": "#/definitions/AuditEvent"
+      }
+    },
+    "stopPath.changed": {
+      "params": {
+        "$ref": "#/definitions/StopPathStatus"
+      }
+    },
+    "engine.log": {
+      "params": {
+        "$ref": "#/definitions/EngineLog"
+      }
+    }
+  },
+  "errors": {
+    "PermissionDenied": -32000,
+    "CaptureFailed": -32001,
+    "InputFailed": -32002,
+    "BackgroundUnavailable": -32003,
+    "WindowNotFound": -32004,
+    "InvalidTarget": -32005,
+    "InvalidKey": -32006,
+    "InvalidCoordinateFrame": -32007,
+    "StaleRef": -32008,
+    "AxUnsupported": -32009,
+    "AxFailed": -32010,
+    "Timeout": -32011,
+    "Closed": -32012,
+    "Internal": -32013,
+    "StopPathUnavailable": -32014,
+    "Suspended": -32015,
+    "ScreenLocked": -32016,
+    "Cancelled": -32017,
+    "CursorRestoreFailed": -32018,
+    "FocusRestoreFailed": -32019,
+    "TransactionFailed": -32020
+  },
+  "standardErrors": {
+    "parseError": -32700,
+    "invalidRequest": -32600,
+    "methodNotFound": -32601,
+    "invalidParams": -32602
+  },
+  "definitions": {
+    "EmptyParams": {
+      "type": "object",
+      "description": "Parameters of a method that takes none: `{}`.",
+      "additionalProperties": false
+    },
+    "HelloResult": {
+      "type": "object",
+      "properties": {
+        "protocolVersion": {
+          "type": "string",
+          "description": "Always `PROTOCOL_VERSION`."
+        },
+        "engineVersion": {
+          "type": "string"
+        },
+        "buildSha": {
+          "type": "string"
+        },
+        "abi": {
+          "type": "string",
+          "description": "Always `ABI`; a host refuses an engine whose ABI differs."
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "engineVersion",
+        "buildSha",
+        "abi"
+      ],
+      "description": "`engine.hello` handshake reply.",
+      "additionalProperties": false
+    },
+    "DesktopSessionOptions": {
+      "type": "object",
+      "properties": {
+        "display": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "allowHostRelayOnlyStop": {
+          "type": "boolean",
+          "description": "Accept a heartbeating host relay as the only stop path.",
+          "default": false
+        },
+        "auditPath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Audit JSONL file; `None` turns auditing off.",
+          "default": null
+        },
+        "artifactDir": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Directory for artifact-only screenshots.",
+          "default": null
+        },
+        "screenshotGc": {
+          "default": {
+            "staleMs": 43200000,
+            "scanIntervalMs": 1800000
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/ScreenshotGc"
+            }
+          ]
+        },
+        "captureCaps": {
+          "default": {
+            "maxWidth": null,
+            "maxHeight": null,
+            "coordinateSafe": false,
+            "maxBytes": 5000000
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/CaptureCaps"
+            }
+          ]
+        }
+      },
+      "description": "`session.open` parameters supplied by the host.",
+      "additionalProperties": false
+    },
+    "ScreenshotGc": {
+      "type": "object",
+      "properties": {
+        "staleMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 43200000
+        },
+        "scanIntervalMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 1800000
+        }
+      },
+      "description": "Screenshot artifact garbage-collection knobs.",
+      "additionalProperties": false
+    },
+    "CaptureCaps": {
+      "type": "object",
+      "properties": {
+        "maxWidth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "maxHeight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "coordinateSafe": {
+          "type": "boolean",
+          "description": "Clamp to the coordinate-safe size for models that click in image pixels.",
+          "default": false
+        },
+        "maxBytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
+          "default": 5000000
+        }
+      },
+      "additionalProperties": false
+    },
+    "SessionOpenResult": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "$ref": "#/definitions/DesktopCapabilities"
+        },
+        "resumeToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "capabilities",
+        "resumeToken"
+      ],
+      "description": "`session.open` reply. `resume_token` is the only way to lift a stop latch\n(`stopPath.resume`) and is never forwarded past the host process.",
+      "additionalProperties": false
+    },
+    "DesktopCapabilities": {
+      "type": "object",
+      "properties": {
+        "backend": {
+          "type": "string"
+        },
+        "displayServer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capture": {
+          "type": "boolean"
+        },
+        "input": {
+          "type": "boolean"
+        },
+        "ax": {
+          "type": "boolean"
+        },
+        "backgroundWindowInput": {
+          "type": "boolean"
+        },
+        "deliveryModes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capturePermission": {
+          "type": "string"
+        },
+        "inputPermission": {
+          "type": "string"
+        },
+        "axPermission": {
+          "type": "string"
+        },
+        "displayCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "focusGuard": {
+          "type": "boolean",
+          "description": "Whether foreground delivery restores the previous front window and cursor."
+        },
+        "stopPath": {
+          "type": "string",
+          "description": "Live stop path: `global`, `host-relay`, or `none`."
+        },
+        "stopReason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why the stop path is not `global`, when it is not."
+        },
+        "integrityLevel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Windows mandatory integrity level of the engine process."
+        },
+        "screenLocked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "backend",
+        "capture",
+        "input",
+        "ax",
+        "backgroundWindowInput",
+        "deliveryModes",
+        "capturePermission",
+        "inputPermission",
+        "axPermission",
+        "displayCount",
+        "focusGuard",
+        "stopPath",
+        "screenLocked"
+      ],
+      "description": "Runtime truth about what this host's backend can do right now.\n\nFROZEN field set (IS-2): later todos fill values, never add fields.",
+      "additionalProperties": false
+    },
+    "DesktopDisplay": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "pixelX": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "pixelY": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "pixelWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "pixelHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "isPrimary": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "x",
+        "y",
+        "width",
+        "height",
+        "scale",
+        "pixelX",
+        "pixelY",
+        "pixelWidth",
+        "pixelHeight",
+        "isPrimary"
+      ],
+      "description": "Monitor geometry in both global logical desktop coordinates and composite\nscreenshot pixels.",
+      "additionalProperties": false
+    },
+    "DesktopWindow": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Backend-defined opaque window id, valid as a capture target while the\nwindow lives. Numeric on X11/Win32/macOS; a composite AT-SPI string on\nWayland (e.g. `atspi::1.31:/org/a11y/atspi/accessible/1`). Never parse\nit."
+        },
+        "title": {
+          "type": "string",
+          "description": "Window title; may be empty for untitled windows."
+        },
+        "app": {
+          "type": "string",
+          "description": "Owning application name."
+        },
+        "pid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Owning process id when the platform exposes it."
+        },
+        "x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "focused": {
+          "type": "boolean",
+          "description": "Whether the window currently holds input focus."
+        },
+        "elevated": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether the owning process runs above the engine's integrity level\n(Windows); `None` where the platform has no such notion."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "app",
+        "x",
+        "y",
+        "width",
+        "height",
+        "focused"
+      ],
+      "description": "One capturable top-level window in global logical desktop coordinates.",
+      "additionalProperties": false
+    },
+    "CaptureParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "caps": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaptureCaps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "description": "`capture`: one target (`desktop` or a window id) under optional caps.",
+      "additionalProperties": false
+    },
+    "CaptureResult": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/CaptureMode"
+        },
+        "data": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Base64 image bytes when `mode` is inline."
+        },
+        "mimeType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "artifactPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "scale": {
+          "type": "number",
+          "format": "double"
+        },
+        "target": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "width",
+        "height",
+        "sourceWidth",
+        "sourceHeight",
+        "scale",
+        "target",
+        "frameId"
+      ],
+      "description": "The wire result of `capture`.",
+      "additionalProperties": false
+    },
+    "CaptureMode": {
+      "type": "string",
+      "enum": [
+        "inline-png",
+        "inline-jpeg",
+        "artifact-only"
+      ],
+      "description": "How a capture was delivered under the byte budget."
+    },
+    "PointParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When present it must name the target's latest capture frame, otherwise\nthe call fails `InvalidCoordinateFrame`."
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y"
+      ],
+      "description": "`click` / `moveMouse`: a point in the pixels of the target's latest frame.",
+      "additionalProperties": false
+    },
+    "PointerOptions": {
+      "type": "object",
+      "properties": {
+        "button": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "modifiers": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "default": null
+        },
+        "deliveryMode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "DragParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DesktopPoint"
+          }
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "path"
+      ],
+      "description": "`drag`: a pointer path in the pixels of the target's latest frame.",
+      "additionalProperties": false
+    },
+    "DesktopPoint": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "additionalProperties": false
+    },
+    "ScrollParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "dx": {
+          "type": "number",
+          "format": "double"
+        },
+        "dy": {
+          "type": "number",
+          "format": "double"
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y",
+        "dx",
+        "dy"
+      ],
+      "description": "`scroll`: wheel deltas at a point in the target's latest frame.",
+      "additionalProperties": false
+    },
+    "TypeTextParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "KeyChordParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "RaiseWindowParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "additionalProperties": false
+    },
+    "ClipboardText": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "description": "`clipboard.write` params and `clipboard.read` result.",
+      "additionalProperties": false
+    },
+    "AxSnapshotParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AxSnapshotOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "AxSnapshotOptions": {
+      "type": "object",
+      "properties": {
+        "maxDepth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "maxNodes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        },
+        "all": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "AxSnapshot": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "nodeCount",
+        "truncated"
+      ],
+      "additionalProperties": false
+    },
+    "AxQueryParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "query": {
+          "$ref": "#/definitions/AxQuery"
+        }
+      },
+      "required": [
+        "target",
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "AxQuery": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "AxNode": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "nativeRole": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "x": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "y": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "width": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "height": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "actions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "childCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ref",
+        "role",
+        "nativeRole",
+        "enabled",
+        "focused",
+        "childCount"
+      ],
+      "additionalProperties": false
+    },
+    "AxElementAtParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "target",
+        "x",
+        "y"
+      ],
+      "description": "`ax.elementAt`: hit-test at global logical desktop coordinates.",
+      "additionalProperties": false
+    },
+    "AxRefParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "description": "An `eN` ref from `ax.snapshot` / `ax.query`.",
+      "additionalProperties": false
+    },
+    "AxPerformParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "AxSetValueParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "AxClickParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "StopPathStartParams": {
+      "type": "object",
+      "properties": {
+        "chord": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "chord"
+      ],
+      "description": "`stopPath.start`: the stop chord the Global listener arms, e.g.\n`ctrl+alt+shift+escape`.",
+      "additionalProperties": false
+    },
+    "StopPathStatus": {
+      "type": "object",
+      "properties": {
+        "suspended": {
+          "type": "boolean"
+        },
+        "globalLive": {
+          "type": "boolean"
+        },
+        "hostRelayLive": {
+          "type": "boolean"
+        },
+        "heartbeatFresh": {
+          "type": "boolean"
+        },
+        "stopPath": {
+          "$ref": "#/definitions/StopPathKind"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why input is not allowed, when it is not (e.g. `no-global-listener`,\n`heartbeat-stale`)."
+        }
+      },
+      "required": [
+        "suspended",
+        "globalLive",
+        "hostRelayLive",
+        "heartbeatFresh",
+        "stopPath"
+      ],
+      "description": "`stopPath.*` reply and the `stopPath.changed` notification payload.",
+      "additionalProperties": false
+    },
+    "StopPathKind": {
+      "type": "string",
+      "enum": [
+        "global",
+        "host-relay",
+        "none"
+      ],
+      "description": "Which stop path currently guards input."
+    },
+    "StopPathStopParams": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/StopRequestSource"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "StopRequestSource": {
+      "type": "string",
+      "enum": [
+        "host-relay",
+        "api"
+      ],
+      "description": "Who asked `stopPath.stop` to latch."
+    },
+    "StopPathResumeParams": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "description": "`stopPath.resume`: the per-process token only the `session.open` reply\ncarries.",
+      "additionalProperties": false
+    },
+    "CancelParams": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "description": "`$/cancel`: aborts the pending request `id`.",
+      "additionalProperties": false
+    },
+    "RequestId": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A JSON-RPC request id: a number or a string, echoed verbatim."
+    },
+    "AdvanceClockParams": {
+      "type": "object",
+      "properties": {
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ms"
+      ],
+      "description": "`$/test.advanceClock`: moves the injected fake clock forward.",
+      "additionalProperties": false
+    },
+    "AuditEvent": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/Method"
+        },
+        "target": {
+          "type": "string"
+        },
+        "delivery": {
+          "type": "string",
+          "description": "`background` or `foreground`."
+        },
+        "frameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ErrorCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`None` when the request succeeded."
+        },
+        "durationMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "focusRestored": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "textLength": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "textSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "First 16 hex digits of the typed text's SHA-256; the text itself is\nnever audited."
+        },
+        "keys": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "action",
+        "target",
+        "delivery",
+        "durationMs"
+      ],
+      "description": "The `audit` notification: one per mutating request, success or failure.",
+      "additionalProperties": false
+    },
+    "Method": {
+      "type": "string",
+      "enum": [
+        "engine.hello",
+        "session.open",
+        "session.close",
+        "capabilities",
+        "displays",
+        "windows",
+        "capture",
+        "click",
+        "moveMouse",
+        "drag",
+        "scroll",
+        "typeText",
+        "keyChord",
+        "raiseWindow",
+        "clipboard.read",
+        "clipboard.write",
+        "ax.snapshot",
+        "ax.query",
+        "ax.elementAt",
+        "ax.focused",
+        "ax.node",
+        "ax.attributes",
+        "ax.children",
+        "ax.parent",
+        "ax.perform",
+        "ax.setValue",
+        "ax.focus",
+        "ax.click",
+        "stopPath.start",
+        "stopPath.status",
+        "stopPath.heartbeat",
+        "stopPath.stop",
+        "stopPath.resume",
+        "$/cancel",
+        "$/test.advanceClock"
+      ],
+      "description": "Every engine method, by wire name."
+    },
+    "ErrorCode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "PermissionDenied",
+            "CaptureFailed",
+            "InputFailed",
+            "BackgroundUnavailable",
+            "WindowNotFound",
+            "InvalidTarget",
+            "InvalidKey",
+            "InvalidCoordinateFrame",
+            "StaleRef",
+            "AxUnsupported",
+            "AxFailed",
+            "Timeout",
+            "Closed",
+            "Internal",
+            "StopPathUnavailable",
+            "Suspended",
+            "ScreenLocked",
+            "CursorRestoreFailed",
+            "FocusRestoreFailed",
+            "TransactionFailed"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "Cancelled",
+          "description": "A request aborted by `$/cancel` or a host abort."
+        }
+      ],
+      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."
+    },
+    "EngineLog": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "$ref": "#/definitions/LogLevel"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "message"
+      ],
+      "description": "The `engine.log` notification.",
+      "additionalProperties": false
+    },
+    "LogLevel": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warn",
+        "info",
+        "debug"
+      ]
+    },
+    "RpcRequest": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/definitions/JsonRpcVersion"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "default": null
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "method"
+      ],
+      "description": "A client request, or a client notification when `id` is absent\n(`$/cancel`). `method` stays a string so unknown names parse and get\nrejected with `-32601`.",
+      "additionalProperties": false
+    },
+    "JsonRpcVersion": {
+      "type": "string",
+      "enum": [
+        "2.0"
+      ],
+      "description": "The `jsonrpc` member, always `\"2.0\"`."
+    },
+    "RpcResponse": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RpcSuccess"
+        },
+        {
+          "$ref": "#/definitions/RpcFailure"
+        }
+      ],
+      "description": "A reply to one request."
+    },
+    "RpcSuccess": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/definitions/JsonRpcVersion"
+        },
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "result": true
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "RpcFailure": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/definitions/JsonRpcVersion"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "$ref": "#/definitions/RpcError"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "error"
+      ],
+      "description": "`id` is `null` only when the request id could not be read (parse error).",
+      "additionalProperties": false
+    },
+    "RpcError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RpcErrorData"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "RpcErrorData": {
+      "anyOf": [
+        {
+          "description": "Carried by every `ErrorCode` error (`code == rpc_error_code(data.code)`).",
+          "allOf": [
+            {
+              "$ref": "#/definitions/EngineErrorData"
+            }
+          ]
+        },
+        {
+          "description": "Carried by every `-32601` rejection.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MethodRejectionData"
+            }
+          ]
+        }
+      ]
+    },
+    "EngineErrorData": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/ErrorCode"
+        },
+        "hint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Recovery hint for the model, e.g. `capture it again`."
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "additionalProperties": false
+    },
+    "MethodRejectionData": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/MethodRejection"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "MethodRejection": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "unknown",
+          "description": "Not in the method table."
+        },
+        {
+          "type": "string",
+          "const": "hostOnly",
+          "description": "A bridge (`--oneshot`) refused a host-only method."
+        },
+        {
+          "type": "string",
+          "const": "testOnly",
+          "description": "A test-only method without `SENPI_DESKTOP_FAKE_CLOCK=1`."
+        }
+      ],
+      "description": "Why a request was answered `-32601`."
+    },
+    "RpcNotification": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/definitions/JsonRpcVersion"
+        },
+        "method": {
+          "$ref": "#/definitions/Notification"
+        },
+        "params": true
+      },
+      "required": [
+        "jsonrpc",
+        "method",
+        "params"
+      ],
+      "description": "A server-to-client notification.",
+      "additionalProperties": false
+    },
+    "Notification": {
+      "type": "string",
+      "enum": [
+        "audit",
+        "stopPath.changed",
+        "engine.log"
+      ],
+      "description": "Every server-to-client notification, by wire name."
+    }
+  }
+}

@@ -156,6 +156,13 @@ bunx oh-my-openagent doctor
 
 - The current minimum OpenCode version check is `>= 1.4.0`.
 - The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
+- OmO Native's `doctor` subcommand also reports computer use without opening a desktop session or requesting OS permissions. It prints:
+  - whether the effective Native config enables computer use and whether the host is supported;
+  - the selected engine path and its version, protocol, and ABI, or the engine-location diagnostic and every path tried;
+  - the backend plus capture, input, and accessibility permission state;
+  - display count and screen-lock state;
+  - the stop path, reported as not armed until computer use starts input, because the engine arms the stop chord only then.
+  The probe sends only the read-only `engine.hello` and `capabilities` requests and is bounded by the doctor's timeout.
 
 ---
 

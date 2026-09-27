@@ -1,3 +1,6 @@
+import { realpathSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
+
 import type { HostSessionIdentity, TaskRecord } from "../state"
 
 /**
@@ -49,14 +52,29 @@ export function createHostSessionProbe(ports: HostSessionProbePorts): HostSessio
     const taken = Promise.all([
       ports.daemonReachable(socket).catch(() => false),
       ports.liveSessionPaths(socket).catch((): readonly string[] => []),
-    ]).then(([daemonAlive, livePaths]) => ({ daemonAlive, livePaths: new Set(livePaths) }))
+    ]).then(([daemonAlive, livePaths]) => ({ daemonAlive, livePaths: new Set(livePaths.map(canonicalSessionPath)) }))
     passes.set(socket, taken)
     return taken
   }
   return {
     daemonAlive: async (hostSession) => (await snapshot(hostSession.socket)).daemonAlive,
-    sessionLive: async (hostSession) => (await snapshot(hostSession.socket)).livePaths.has(hostSession.session_path),
+    sessionLive: async (hostSession) =>
+      (await snapshot(hostSession.socket)).livePaths.has(canonicalSessionPath(hostSession.session_path)),
     refresh: () => passes.clear(),
+  }
+}
+
+// The daemon lists a session by its canonical path while the record keeps the path omo asked for, so
+// a project reached through a symlink (/tmp on macOS, a linked workspace) would never match (#8932).
+function canonicalSessionPath(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    try {
+      return join(realpathSync(dirname(path)), basename(path))
+    } catch {
+      return path
+    }
   }
 }
 

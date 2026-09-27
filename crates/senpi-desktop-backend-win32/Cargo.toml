@@ -1,0 +1,26 @@
+[package]
+name = "senpi-desktop-backend-win32"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+# The background-delivery matrix, the key vocabulary, the held-state ledger,
+# and the stop-chord mapping are pure and tested on every host.
+[dependencies]
+senpi-desktop-core = { path = "../senpi-desktop-core" }
+senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+enigo.workspace = true
+image.workspace = true
+parking_lot.workspace = true
+uiautomation.workspace = true
+windows-sys = { workspace = true, features = ["Win32_UI_HiDpi"] }
+xcap.workspace = true
+
+# The message-only probe windows of the input tests register a class.
+[target.'cfg(target_os = "windows")'.dev-dependencies]
+windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }

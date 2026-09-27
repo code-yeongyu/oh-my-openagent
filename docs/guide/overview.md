@@ -195,7 +195,7 @@ Override specific categories or curated agents in `omo.json`:
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-fable-5-1", "reasoning": "low" }
+    "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" }
   }
 }
 ```

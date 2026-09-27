@@ -6,6 +6,7 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
@@ -149,7 +150,7 @@ function print({ result, reason, continuationQaPath, beforeDigest }) {
 
 function senpiEnv(sandbox, binDir, sessionDir) {
   return {
-    ...process.env,
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
     PATH: `${binDir}:${process.env.PATH ?? ""}`,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,

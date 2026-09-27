@@ -72,9 +72,23 @@ export async function runCommentChecker(
   const setTimer = options.setTimeoutFn ?? setTimeout
   const clearTimer = options.clearTimeoutFn ?? clearTimeout
 
-  const process = options.spawn(args)
-  process.stdin.write(JSON.stringify(input.hookInput))
-  process.stdin.end()
+  let process: SpawnProcess
+  try {
+    process = options.spawn(args)
+  } catch (error) {
+    if (error instanceof Error) {
+      return EMPTY_RESULT
+    }
+    throw error
+  }
+  const spawned = process
+  const inputDelivered = spawned.stdin.send(JSON.stringify(input.hookInput)).then(
+    () => true,
+    () => {
+      killProcessSafely(spawned, "SIGKILL")
+      return false
+    },
+  )
 
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   let graceId: ReturnType<typeof setTimeout> | null = null
@@ -95,15 +109,15 @@ export async function runCommentChecker(
     const stdoutPromise = new Response(process.stdout).text()
     const stderrPromise = new Response(process.stderr).text()
     const exitCodePromise = process.exited
-    const completed = Promise.all([stdoutPromise, stderrPromise, exitCodePromise] as const)
+    const completed = Promise.all([stdoutPromise, stderrPromise, exitCodePromise, inputDelivered] as const)
     const race = await Promise.race([completed, timeoutPromise] as const)
 
     if (race === "timeout") {
       return EMPTY_RESULT
     }
 
-    const [_stdout, stderr, exitCode] = race
-    if (exitCode === 0) {
+    const [_stdout, stderr, exitCode, delivered] = race
+    if (!delivered || exitCode === 0) {
       return EMPTY_RESULT
     }
     if (exitCode === 2) {

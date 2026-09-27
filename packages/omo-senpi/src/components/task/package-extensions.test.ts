@@ -1,5 +1,5 @@
 import { describe, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -45,8 +45,9 @@ describe("package extension inheritance", () => {
   })
 
   test("#given no package-root override #when the real package lookup is empty or throws #then argv-only extensions still reach the runner", async () => {
-    const { DefaultPackageManager } = await loadSenpiBarrel()
+    const { CONFIG_DIR_NAME, DefaultPackageManager } = await loadSenpiBarrel()
     const cwd = mkdtempSync(join(tmpdir(), "omo-package-extensions-"))
+    mkdirSync(join(cwd, CONFIG_DIR_NAME))
     const originalArgv = process.argv
     process.argv = ["bun", "omo", "-e", "/installed/omo/plugin"]
     const stopped = new Error("stop before spawning")

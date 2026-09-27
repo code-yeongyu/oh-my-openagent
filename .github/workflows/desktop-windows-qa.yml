@@ -1,0 +1,127 @@
+name: Desktop Windows QA
+
+# Live Windows QA of senpi-desktop-engine on a hosted runner, which has an interactive desktop
+# (proven first by the interactive-desktop smoke): the win32 backend's live tests, then the QA
+# driver's seven scenarios against the release engine, each fact read by an independent PowerShell
+# observer, then a sabotaged run that must fail. Pull requests of any base run it, so stacked
+# desktop PRs are covered too.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-windows-qa.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/senpi-desktop-*/**"
+      - "packages/senpi-desktop-*/**"
+      - "script/qa/desktop/windows.ts"
+      - "script/qa/desktop/windows/**"
+  push:
+    branches: [master, dev]
+    paths:
+      - ".github/workflows/desktop-windows-qa.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/senpi-desktop-*/**"
+      - "packages/senpi-desktop-*/**"
+      - "script/qa/desktop/windows.ts"
+      - "script/qa/desktop/windows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-desktop-qa:
+    name: Windows interactive-desktop QA
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      RUST_TARGET: x86_64-pc-windows-msvc
+      ENGINE: target/x86_64-pc-windows-msvc/release/senpi-desktop-engine.exe
+    steps:
+      # The runner context is unavailable in jobs.<id>.env, so the QA dir is exported from a step.
+      - name: Export QA dir
+        shell: bash
+        run: echo "QA_DIR=${RUNNER_TEMP}/desktop-windows-qa" >> "${GITHUB_ENV}"
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+
+      # SendInput and UI Automation need an interactive window station; fail fast without one.
+      - name: Windows interactive-desktop smoke
+        shell: powershell
+        run: ./script/qa/desktop/windows/interactive-desktop-smoke.ps1
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+          rustup target add "${RUST_TARGET}"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-windows-qa-${{ env.RUST_TARGET }}
+
+      - name: Build desktop engine (msvc x64, release)
+        shell: bash
+        run: cargo build --release -p senpi-desktop-engine --target "${RUST_TARGET}" --locked
+
+      # The live tests inject real input; one thread keeps one test's keys out of another's window.
+      - name: Win32 backend tests, live ones included
+        shell: bash
+        run: cargo test -p senpi-desktop-backend-win32 --target "${RUST_TARGET}" --locked -- --include-ignored --test-threads=1 --nocapture
+
+      - name: QA driver - every scenario
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:QA_DIR | Out-Null
+          bun script/qa/desktop/windows.ts --all --json --engine $env:ENGINE --out "$env:QA_DIR/desktop-windows-qa.jsonl"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: QA driver - an invalid stop chord must fail hotkey-latches with InvalidKey
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          New-Item -ItemType Directory -Force -Path $env:QA_DIR | Out-Null
+          $sabotaged = "$env:QA_DIR/desktop-windows-qa-sabotage.jsonl"
+          bun script/qa/desktop/windows.ts --scenario hotkey-latches --sabotage invalid-chord --json --engine $env:ENGINE --out $sabotaged
+          if ($LASTEXITCODE -eq 0) { throw 'the sabotaged hotkey-latches run exited 0' }
+          bun script/qa/desktop/windows/expect-sabotage.ts $sabotaged hotkey-latches InvalidKey
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload QA JSONL
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-windows-qa-jsonl
+          path: ${{ runner.temp }}/desktop-windows-qa/*.jsonl
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Desktop Windows QA
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Interactive-desktop smoke: SendInput click plus UI Automation read on a WinForms form.
+            - Release build of senpi-desktop-engine (msvc x64) and the win32 backend's live tests.
+            - Seven QA driver scenarios (capture, foreground/background delivery, WPF refusal, UIPI refusal, UIA snapshot, stop-chord latch), each checked by an independent PowerShell observer.
+            - Sabotage: an invalid stop chord must fail hotkey-latches with reason InvalidKey.
+          JOB_SUMMARY_NEXT: Open the desktop-windows-qa-jsonl artifact; each failing line names its first failed check in `reason` and carries the observer's before/after state.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
