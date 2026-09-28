@@ -690,7 +690,7 @@ path is explicitly allowed.
 
 ### Computer Use (OmO Native)
 
-OmO Native agents can drive native desktop applications through the `computer` tool: screenshots, window lists, accessibility trees, and mouse and keyboard input on macOS, Linux and Windows. The engine starts only when the tool is first used; input goes to the target in the background by default, a global stop chord (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape elsewhere) suspends it, and `/computer on|off|status|stop|resume` controls it from the prompt. Inspection needs the `computer:read` permission tier and input needs `computer:exec`.
+**Experimental.** OmO Native agents can drive native desktop applications through the `computer` tool: screenshots, window lists, accessibility trees, and mouse and keyboard input on macOS, Linux and Windows. The engine starts only when the tool is first used; input goes to the target in the background by default, a global stop chord (Control+Option+Command+Escape on macOS, Ctrl+Alt+Shift+Escape elsewhere) suspends it, and `/computer on|off|status|stop|resume` controls it from the prompt. Inspection needs the `computer:read` permission tier and input needs `computer:exec`.
 
 Setup per OS, configuration, the safety model, privacy and troubleshooting are in the [computer use guide](../guide/computer-use.md); the tool contract is in the [computer tool reference](computer.md).
 

@@ -88,7 +88,7 @@ OpenCode 版や LazyCodex から移行する場合は、`omo setup` を一度実
 - [OpenCode からの移行](docs/guide/migrating-from-opencode.md)
 - [設定リファレンス](docs/reference/configuration.md)
 - [機能一覧](docs/reference/features.md)
-- [コンピューター操作](docs/guide/computer-use.md)
+- [コンピューター操作](docs/guide/computer-use.md)（実験的機能）
 - [Ultrawork マニフェスト](docs/manifesto.md)
 
 ## レビュー

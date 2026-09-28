@@ -104,7 +104,7 @@ OmO 把缺失的知识做成技能，包括浏览器操作，只加载当前任�
 - [从 OpenCode 迁移](docs/guide/migrating-from-opencode.md)
 - [配置参考](docs/reference/configuration.md)
 - [功能](docs/reference/features.md)
-- [电脑操作](docs/guide/computer-use.md)
+- [电脑操作](docs/guide/computer-use.md)（实验性功能）
 - [Ultrawork 宣言](docs/manifesto.md)
 
 ## 评价

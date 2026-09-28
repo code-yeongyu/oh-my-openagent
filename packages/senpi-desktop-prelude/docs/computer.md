@@ -1,4 +1,4 @@
-computer → host desktop facade (present while the `computer` tool is active)
+computer → host desktop facade, experimental (present while the `computer` tool is active)
     Drives the REAL desktop: windows, screenshots, native input, OS accessibility (AX), clipboard. Not a browser; no DOM.
     Find it with tool_search ("computer") or call `computer` by name; the global appears in the NEXT cell. The user controls it with `/computer on|off|status|stop|resume`.
     Every helper is one `tool.computer({ action: "call", chain })` call. Permission tiers: inspection needs `computer:read`, input and mutation need `computer:exec`; a denied call throws.

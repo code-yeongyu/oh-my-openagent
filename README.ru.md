@@ -104,7 +104,7 @@ OmO поставляет недостающие знания в виде нав�
 - [Миграция с OpenCode](docs/guide/migrating-from-opencode.md)
 - [Справочник по конфигурации](docs/reference/configuration.md)
 - [Возможности](docs/reference/features.md)
-- [Управление компьютером](docs/guide/computer-use.md)
+- [Управление компьютером](docs/guide/computer-use.md) (экспериментальная функция)
 - [Манифест Ultrawork](docs/manifesto.md)
 
 ## Отзывы

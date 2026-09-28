@@ -87,7 +87,7 @@ Opinionated defaults, adjustable if you insist. Your settings live in `~/.omo/om
 - [Migrating from OpenCode](docs/guide/migrating-from-opencode.md)
 - [Configuration reference](docs/reference/configuration.md)
 - [Features](docs/reference/features.md)
-- [Computer use](docs/guide/computer-use.md)
+- [Computer use](docs/guide/computer-use.md) (experimental)
 - [Ultrawork Manifesto](docs/manifesto.md)
 
 ## Reviews

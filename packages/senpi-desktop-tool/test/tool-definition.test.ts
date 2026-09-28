@@ -52,7 +52,7 @@ describe("computer ToolDefinition", () => {
 		// When / Then
 		expect(computerToolDefinition.promptGuidelines).toEqual(bullets);
 		expect(computerToolDefinition.searchText).toBe(
-			"Operate the real desktop: screenshots, clicks, typing, key chords, window list, accessibility tree, clipboard; macOS/Linux/Windows",
+			"Operate the real desktop (experimental): screenshots, clicks, typing, key chords, window list, accessibility tree, clipboard; macOS/Linux/Windows",
 		);
 		expect(computerToolDefinition.kernelPrelude).toBe(computerPreludeAssets);
 	});

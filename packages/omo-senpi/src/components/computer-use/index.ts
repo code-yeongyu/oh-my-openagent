@@ -141,7 +141,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             })
 
       pi.registerCommand("computer", {
-        description: "Computer use: on, off, status, stop, or resume (stop and resume are user-only)",
+        description: "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)",
         argumentHint: COMPUTER_SUBCOMMANDS.join("|"),
         getArgumentCompletions: (prefix: string) =>
           COMPUTER_SUBCOMMANDS.filter((name) => name.startsWith(prefix.trim())).map((name) => ({

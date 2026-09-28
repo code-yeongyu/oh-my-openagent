@@ -7,7 +7,7 @@ import { computerPreludeAssets } from "@oh-my-opencode/senpi-desktop-prelude";
 export const COMPUTER_SKILL_NAME = "computer-use";
 
 const COMPUTER_SKILL_DESCRIPTION =
-	"MUST read before driving the desktop with the computer tool: every helper, coordinate frames, accessibility refs, background vs foreground delivery, the stop and resume rules, and the safety rules for consequential actions.";
+	"Experimental computer use. MUST read before driving the desktop with the computer tool: every helper, coordinate frames, accessibility refs, background vs foreground delivery, the stop and resume rules, and the safety rules for consequential actions.";
 
 export function computerSkillMarkdown(): string {
 	return [
@@ -17,6 +17,8 @@ export function computerSkillMarkdown(): string {
 		"---",
 		"",
 		"# Computer use",
+		"",
+		"Computer use is experimental: its behavior, platform coverage and settings may change between releases.",
 		"",
 		"Find the `computer` tool with `tool_search` (query `computer`). Once it is active, eval cells get the `computer` global in the next cell.",
 		"",

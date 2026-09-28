@@ -2235,7 +2235,8 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
         },
         "display": {
           "type": "string",
@@ -2306,7 +2307,8 @@
           "type": "boolean"
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
     },
     "disabled_skills": {
       "type": "array",
@@ -14145,7 +14147,8 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
             },
             "display": {
               "type": "string",
@@ -14216,7 +14219,8 @@
               "type": "boolean"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
           "type": "array",
@@ -16154,7 +16158,8 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
             },
             "display": {
               "type": "string",
@@ -16225,7 +16230,8 @@
               "type": "boolean"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
           "type": "array",
@@ -18163,7 +18169,8 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
             },
             "display": {
               "type": "string",
@@ -18234,7 +18241,8 @@
               "type": "boolean"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
           "type": "array",
@@ -20178,7 +20186,8 @@
             "type": "object",
             "properties": {
               "enabled": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
               },
               "display": {
                 "type": "string",
@@ -20249,7 +20258,8 @@
                 "type": "boolean"
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
           },
           "disabled_skills": {
             "type": "array",
@@ -32088,7 +32098,8 @@
                 "type": "object",
                 "properties": {
                   "enabled": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
                   },
                   "display": {
                     "type": "string",
@@ -32159,7 +32170,8 @@
                     "type": "boolean"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
                 "type": "array",
@@ -34097,7 +34109,8 @@
                 "type": "object",
                 "properties": {
                   "enabled": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
                   },
                   "display": {
                     "type": "string",
@@ -34168,7 +34181,8 @@
                     "type": "boolean"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
                 "type": "array",
@@ -36106,7 +36120,8 @@
                 "type": "object",
                 "properties": {
                   "enabled": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
                   },
                   "display": {
                     "type": "string",
@@ -36177,7 +36192,8 @@
                     "type": "boolean"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
                 "type": "array",

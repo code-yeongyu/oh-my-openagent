@@ -95,7 +95,7 @@ OpenCode 에디션이나 LazyCodex에서 넘어오셨다면 `omo setup`을 한 �
 - [OpenCode에서 옮겨 오기](docs/guide/migrating-from-opencode.md)
 - [설정 레퍼런스](docs/reference/configuration.md)
 - [기능](docs/reference/features.md)
-- [컴퓨터 사용](docs/guide/computer-use.md)
+- [컴퓨터 사용](docs/guide/computer-use.md) (실험적 기능)
 - [Ultrawork 선언문](docs/manifesto.md)
 
 ## 리뷰
