@@ -45,6 +45,7 @@ import {
   SETTINGS_DEFINITIONS,
   nextBooleanValue,
   nextEnumValue,
+  readCurrentSettingValue,
   readSettingValue,
   settingBaseValue,
   settingId,
@@ -172,6 +173,8 @@ export async function registerSettingsTui<Node>(
       focusedIndex: state.focus.current(),
       theme: theme(),
       scrollRows: scrollRows(),
+      onCardHover: focusCardAt,
+      onCardActivate: activateCardAt,
     })
 
   const followFocus = (): void => {
@@ -216,23 +219,17 @@ export async function registerSettingsTui<Node>(
   }
 
   const refreshCards = (): void => {
-    if (!state.open || state.nodeRefs === null) return
+    if (!state.open) return
     rebuildCards()
-    const refs = state.nodeRefs.cards
-    for (let index = 0; index < refs.length; index += 1) {
-      const card = state.visible[index]
-      const ref = refs[index]
-      if (card === undefined || ref === undefined) continue
-      restyleCard(solid, ref, card, index === state.focus.current(), theme())
-    }
+    mountDialog(buildNodeList)
+    state.open = true
+    activateMode()
+    requestRender()
   }
 
-  const moveFocusBy = (delta: number): void => {
-    if (!state.open || state.nodeRefs === null) return
-    const previous = state.focus.current()
-    if (!state.focus.move(delta)) return
-    const next = state.focus.current()
-    const refs = state.nodeRefs.cards
+  const restyleFocus = (previous: number, next: number): void => {
+    const refs = state.nodeRefs?.cards
+    if (refs === undefined) return
     const previousRef = refs[previous]
     const nextRef = refs[next]
     if (previousRef !== undefined) {
@@ -241,6 +238,23 @@ export async function registerSettingsTui<Node>(
     if (nextRef !== undefined) {
       restyleCard(solid, nextRef, state.visible[next], true, theme())
     }
+  }
+
+  const focusCardAt = (index: number): void => {
+    if (!state.open || state.nodeRefs === null) return
+    const previous = state.focus.current()
+    if (previous === index) return
+    state.focus.seek(index)
+    restyleFocus(previous, index)
+    followFocus()
+    requestRender()
+  }
+
+  const moveFocusBy = (delta: number): void => {
+    if (!state.open || state.nodeRefs === null) return
+    const previous = state.focus.current()
+    if (!state.focus.move(delta)) return
+    restyleFocus(previous, state.focus.current())
     followFocus()
     requestRender()
   }
@@ -248,7 +262,7 @@ export async function registerSettingsTui<Node>(
   const readCurrent = (
     definition: SettingDefinition,
   ): { readonly present: boolean; readonly value: unknown } =>
-    readSettingValue(state.currentValues, definition.path)
+    readCurrentSettingValue(state.currentValues, definition)
 
   const queueEdit = (
     definition: SettingDefinition,
@@ -299,12 +313,12 @@ export async function registerSettingsTui<Node>(
               variant: "warning",
               message: `"${value}" is not a number; ${definition.path.join(".")} stays unchanged.`,
             })
+            refreshCards()
           } else {
             queueEdit(definition, parsed)
           }
-          openDialog()
         },
-        onCancel: () => openDialog(),
+        onCancel: () => refreshCards(),
       }),
     )
     requestRender()
@@ -387,6 +401,13 @@ export async function registerSettingsTui<Node>(
       return
     }
     openNumberPrompt(definition)
+  }
+
+  const activateCardAt = (index: number): void => {
+    if (!state.open) return
+    if (api.renderer.getSelection()?.getSelectedText()) return
+    state.focus.seek(index)
+    activate()
   }
 
   const handleFilterChar = (char: string): void => {
