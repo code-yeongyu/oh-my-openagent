@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import {
   EVREN_BASE_URL,
+  EVREN_OUTPUT_LIMIT,
   EVREN_PROVIDER_CONFIG,
   EVREN_PROVIDER_ID,
   applyBuiltinEvrenProvider,
@@ -55,9 +56,9 @@ describe("applyBuiltinEvrenProvider", () => {
     applyBuiltinEvrenProvider(config, { liveContextLimits: { "glm-5.3": 131072 } })
 
     const models = getInjectedEntry(config).models as EvrenModels
-    expect(models["glm-5.3"]?.limit).toEqual({ context: 131072 })
-    expect(models["auto"]?.limit).toEqual({ context: 250000 })
-    expect(EVREN_PROVIDER_CONFIG.models["glm-5.3"]?.limit).toEqual({ context: 250000 })
+    expect(models["glm-5.3"]?.limit).toEqual({ context: 131072, output: EVREN_OUTPUT_LIMIT })
+    expect(models["auto"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
+    expect(EVREN_PROVIDER_CONFIG.models["glm-5.3"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
   })
 
   it("#given live context limits for an unknown or invalid model #when injected #then they are ignored", () => {
@@ -69,7 +70,7 @@ describe("applyBuiltinEvrenProvider", () => {
 
     const models = getInjectedEntry(config).models as EvrenModels
     expect(models["rogue-model"]).toBeUndefined()
-    expect(models["auto"]?.limit).toEqual({ context: 250000 })
+    expect(models["auto"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
   })
 
   it("#given an existing user-defined evren entry #when live context limits exist #then the user entry is still untouched", () => {
@@ -114,6 +115,7 @@ describe("applyBuiltinEvrenProvider", () => {
     if (auto === undefined) throw new Error("auto model missing")
     auto.name = "MUTATED"
     auto.limit.context = 1
+    auto.limit.output = 1
     ;(models as Record<string, unknown>)["rogue"] = {
       name: "rogue",
       limit: { context: 1, output: 1 },
@@ -122,6 +124,7 @@ describe("applyBuiltinEvrenProvider", () => {
     expect(EVREN_PROVIDER_CONFIG.name).toBe("EVREN LLM")
     expect(EVREN_PROVIDER_CONFIG.models["auto"]?.name).toBe("EVREN Auto")
     expect(EVREN_PROVIDER_CONFIG.models["auto"]?.limit.context).toBe(250000)
+    expect(EVREN_PROVIDER_CONFIG.models["auto"]?.limit.output).toBe(EVREN_OUTPUT_LIMIT)
     expect(EVREN_PROVIDER_CONFIG.models["rogue"]).toBeUndefined()
   })
 
@@ -149,12 +152,12 @@ describe("EVREN_PROVIDER_CONFIG", () => {
       "qwen3-vl-30b",
       "qwen3.8-flash-next",
     ])
-    expect(models["auto"]?.limit).toEqual({ context: 250000 })
-    expect(models["glm-5.3"]?.limit).toEqual({ context: 250000 })
-    expect(models["deepseek-v4-flash"]?.limit).toEqual({ context: 250000 })
-    expect(models["qwen3.8-flash-next"]?.limit).toEqual({ context: 250000 })
-    expect(models["gemma-4-31b"]?.limit).toEqual({ context: 250000 })
-    expect(models["qwen3-vl-30b"]?.limit).toEqual({ context: 250000 })
+    expect(models["auto"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
+    expect(models["glm-5.3"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
+    expect(models["deepseek-v4-flash"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
+    expect(models["qwen3.8-flash-next"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
+    expect(models["gemma-4-31b"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
+    expect(models["qwen3-vl-30b"]?.limit).toEqual({ context: 250000, output: EVREN_OUTPUT_LIMIT })
   })
 
   it("#given the three vision models #when inspecting modalities #then exactly those accept image input", () => {

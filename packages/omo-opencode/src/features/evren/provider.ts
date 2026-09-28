@@ -3,9 +3,11 @@ import { log } from "../../shared/logger"
 export const EVREN_PROVIDER_ID = "evren"
 export const EVREN_BASE_URL = "https://evren-llmapi.ssyz.org.tr/v1"
 
+export const EVREN_OUTPUT_LIMIT = 65536
+
 export type EvrenModelConfig = {
   name: string
-  limit: { context: number }
+  limit: { context: number; output: number }
   modalities?: { input: string[] }
 }
 
@@ -18,16 +20,19 @@ export type EvrenProviderConfig = {
 
 // The context values are a FALLBACK: compaction uses them until the live
 // /models refresh reports a real serving limit for the model (see
-// live-context-limits.ts). No output limit is declared on purpose - the
-// gateway does not cap output per model.
+// live-context-limits.ts). OpenCode's config schema requires limit.output
+// whenever a limit block is present (1.18.33+ hard-fails startup without
+// it), and its request layer clamps max_tokens to OUTPUT_TOKEN_MAX (32000)
+// regardless, so declaring 65536 satisfies validation without throttling:
+// the gateway does not cap output per model.
 function textOnly(name: string, context: number): EvrenModelConfig {
-  return { name, limit: { context } }
+  return { name, limit: { context, output: EVREN_OUTPUT_LIMIT } }
 }
 
 function textAndImage(name: string, context: number): EvrenModelConfig {
   return {
     name,
-    limit: { context },
+    limit: { context, output: EVREN_OUTPUT_LIMIT },
     modalities: { input: ["text", "image"] },
   }
 }
