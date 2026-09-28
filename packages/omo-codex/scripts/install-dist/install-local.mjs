@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:4736ea222523dcceaed325b2a48519945caf4c1d8ebcb1e977ea02c28da47f90:081b375b005dc903205a106eca728a5ea5701eddef7e7db46c03d14e7f3cd0ba
+// omo-codex-install:6c5304ec33a2ff03e6eb25afc8eec9465318bad76b9ed45d56d53daaab581f82:db4cf3b89c492ebbdd98e52b09ae518288a8728f0a9357572302ae240873ae50
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -16506,7 +16506,7 @@ var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 var positiveInteger = number2().int().positive();
 var nonNegativeInteger = number2().int().nonnegative();
 var OmoComputerSettingsLayerSchema = object({
-  enabled: boolean2(),
+  enabled: boolean2().describe("Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"),
   display: string2().min(1),
   max_width: positiveInteger,
   max_height: positiveInteger,
@@ -16518,7 +16518,7 @@ var OmoComputerSettingsLayerSchema = object({
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
   cua_adapter: boolean2()
-}).partial().strict();
+}).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 
 // packages/omo-config-core/src/schema/git-master.ts
