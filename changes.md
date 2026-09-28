@@ -1,3 +1,13 @@
+## 2026-09-28 - Computer use says it is experimental on every user-facing surface (#9124)
+
+OmO 5.1.0 ships computer use as experimental support, and every surface a user or model reads now says so. Only the wording changes: registration, gating, defaults, permissions and the #9049 root-object parameter schemas are unchanged (`published-parameters.fixture.json` is untouched).
+
+- Settings: `packages/omo-config-core/src/schema/computer.ts` gives the `computer` block and `computer.enabled` a `describe()` text that starts with "Experimental", carried into `assets/omo.schema.json` by `bun run build:omo-schema`. The `enabled` description in `packages/senpi-desktop-tool/src/settings.ts` reads "Register the computer tool (experimental; default: host supported)".
+- Tool: the `computer` description, `searchText` and `promptSnippet` (`packages/senpi-desktop-tool/src/tool-definition.ts`) and the `computer_actions` description and `searchText` (`cua-definition.ts`) say "(experimental)". `/computer` is described as "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)".
+- Skill: the `computer-use` skill description opens with "Experimental computer use.", and its intro says behavior, platform coverage and settings may change between releases. The prelude facade line in `packages/senpi-desktop-prelude/docs/computer.md` reads "host desktop facade, experimental", regenerated into `src/assets.generated.json`; `test/assets.sha256.json` consciously moves only `COMPUTER_DOCUMENTATION` to the new bytes (the other four prelude assets are byte-identical).
+- Docs: the computer-use guide has an experimental notice at the top and in setup, and Known limitations is grouped per OS, each marked experimental, with every earlier fact kept. The computer reference, the features section, the CLI doctor note, the Unreleased CHANGELOG headline and the README links in English, Korean, Japanese, Simplified Chinese and Russian say it too.
+- The committed plugin bundles are regenerated on linux/amd64 with bun 1.4.2.
+
 ## 2026-09-28 - Adopt senpi 2026.9.28-6: GitHub Copilot Business and Enterprise requests reach the account's own host (#8662)
 
 Every senpi pin moves from 2026.9.28-5 to 2026.9.28-6 (root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins, their pin tests, `bun.lock`, and the version comment in `packages/omo-native/bin/lib/provider-map.json`). The new engine carries:

@@ -2,6 +2,8 @@
 
 The OmO Native computer-use component registers a search-exposed `computer` tool and, after activation, a `computer` global in JavaScript and Python eval kernels. For setup, stop paths, platform limits and permissions, see [Computer use](../guide/computer-use.md).
 
+> **Experimental.** Computer use is experimental support. The tool contract below may change between releases.
+
 ## Source of the contract
 
 - Component registration, session lifecycle and resource discovery: `packages/omo-senpi/src/components/computer-use/index.ts`

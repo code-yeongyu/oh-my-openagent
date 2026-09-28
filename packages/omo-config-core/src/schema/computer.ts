@@ -11,7 +11,11 @@ const nonNegativeInteger = z.number().int().nonnegative()
  */
 export const OmoComputerSettingsLayerSchema = z
   .object({
-    enabled: z.boolean(),
+    enabled: z
+      .boolean()
+      .describe(
+        "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)",
+      ),
     display: z.string().min(1),
     max_width: positiveInteger,
     max_height: positiveInteger,
@@ -29,6 +33,9 @@ export const OmoComputerSettingsLayerSchema = z
   })
   .partial()
   .strict()
+  .describe(
+    "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.",
+  )
 
 export const OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema
 

@@ -1,5 +1,7 @@
 # Computer use in OmO Native
 
+> **Experimental.** Computer use is experimental support. Its behavior, platform coverage and settings may change between releases, and each OS has known gaps (see [Known limitations](#known-limitations)).
+
 OmO Native can capture your desktop, inspect windows and accessibility trees, and send mouse and keyboard input to native applications. The `computer` tool is backed by the `senpi-desktop-engine` binary. The OmO Senpi component registers the tool when a session loads, but starts the engine only when the tool is first used. Computer use is available on macOS, Linux and Windows. It does not drive web pages through a browser API; for pages, use the `browser` skill.
 
 The tool's parameters and permission classification are in [the computer tool reference](../reference/computer.md). Scroll amounts are pixels on every OS, and one mouse-wheel notch is about 40 px, so the same scroll moves a similar distance on macOS, Linux and Windows. This feature belongs to OmO Native; the same `computer` block does not enable it in the OpenCode or Codex editions.
@@ -29,6 +31,8 @@ You control it with these commands:
 Without `computer.engine_path`, the locator also checks the compiled executable's sidecar, the `@oh-my-opencode/senpi-desktop-engine` package's native prebuild, and the development build at `target/release/senpi-desktop-engine` (`packages/senpi-desktop-engine/src/locator.ts`). A candidate carrying macOS's `com.apple.quarantine` attribute is skipped and reported, never cleared. Hosts with no released engine (Linux arm64, Windows arm64) keep the tool registered and report `native-unavailable` on first use.
 
 ## Set up your operating system
+
+Computer use is experimental on macOS, Linux and Windows: the setup below works today, but the steps and the supported desktops may still change.
 
 Computer use needs a graphical desktop session. It cannot use a desktop it is not logged into, so an SSH session, a CI runner without a display, or a locked screen will refuse capture or input.
 
@@ -148,10 +152,11 @@ omo --permission computer:read=allow --permission computer:exec=deny
 
 ## Known limitations
 
-- macOS: a background click can raise the clicked window to just below the frontmost window; your frontmost app, front window, focus, cursor and next-keystroke destination are kept. Restoring the full previous window order is tracked in [#8930](https://github.com/code-yeongyu/oh-my-openagent/issues/8930).
-- Wayland: no single-window capture, no per-window input, no `raise()`; the stop chord needs the GlobalShortcuts portal.
-- No released engine for Linux arm64 or Windows arm64 yet.
-- Windows: no input into elevated applications from a non-elevated OmO (UIPI), including accessibility click fallback. Background input is action-specific: WPF pointer/text and Chromium posted input remain restricted; see [Windows](#windows).
+Computer use is experimental on every OS. These are the known gaps:
+
+- macOS (experimental): a background click can raise the clicked window to just below the frontmost window; your frontmost app, front window, focus, cursor and next-keystroke destination are kept. Restoring the full previous window order is tracked in [#8930](https://github.com/code-yeongyu/oh-my-openagent/issues/8930).
+- Linux (experimental): on Wayland, no single-window capture, no per-window input, no `raise()`; the stop chord needs the GlobalShortcuts portal. No released engine for Linux arm64 yet.
+- Windows (experimental): no input into elevated applications from a non-elevated OmO (UIPI), including accessibility click fallback. Background input is action-specific: WPF pointer/text and Chromium posted input remain restricted; see [Windows](#windows). No released engine for Windows arm64 yet.
 
 ## Engine modes and bunshin
 
