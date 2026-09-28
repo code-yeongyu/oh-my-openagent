@@ -9,6 +9,7 @@ import {
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
+import { externalTaskPayload, sharedExternalTaskSources, type ExternalTaskSources } from "./external-task-sources"
 import {
   boundedTaskOutput,
   invalidArguments,
@@ -42,6 +43,7 @@ export interface TaskRpcTimers {
 export interface TaskRpcBridgeDeps {
   readonly timers?: TaskRpcTimers
   readonly coalesceMs?: number
+  readonly externalSources?: ExternalTaskSources
 }
 
 const globalTimers: TaskRpcTimers = {
@@ -67,6 +69,7 @@ export function wireTaskRpcBridge(
 ): TaskRpcBridge {
   const timers = deps.timers ?? globalTimers
   const coalesceMs = deps.coalesceMs ?? PROGRESS_COALESCE_MS
+  const externalSources = deps.externalSources ?? sharedExternalTaskSources()
   const subscriptions = new Map<string, () => void>()
   const liveProgress = new Map<string, TaskLiveProgressSnapshot>()
   let activeSessionId: string | undefined
@@ -99,6 +102,7 @@ export function wireTaskRpcBridge(
     const sessionId = activeSessionId
     if (disposed || sessionId === undefined || pi.rpc?.emit === undefined) return
     if (selection === undefined) return
+    const externalTasks = externalTaskPayload(externalSources.snapshot(sessionId))
     const data = {
       parent_session_id: sessionId,
       tasks: selection.records.map((record) =>
@@ -108,6 +112,7 @@ export function wireTaskRpcBridge(
           liveProgress.get(record.task_id),
         ),
       ),
+      ...(externalTasks.length === 0 ? {} : { external_tasks: externalTasks }),
       ...(selection.truncatedTasks === 0 ? {} : { truncated_tasks: selection.truncatedTasks }),
     }
     const fingerprint = JSON.stringify(data)
@@ -126,6 +131,9 @@ export function wireTaskRpcBridge(
       emit()
     }, coalesceMs)
   }
+
+  // External rows change outside the task store; they ride the same coalesced push as progress.
+  const unsubscribeExternal = externalSources.subscribe(scheduleProgressFlush)
 
   const removeSubscription = (taskId: string): void => {
     subscriptions.get(taskId)?.()
@@ -198,6 +206,7 @@ export function wireTaskRpcBridge(
     dispose() {
       if (disposed) return
       disposed = true
+      unsubscribeExternal()
       detach()
     },
   }

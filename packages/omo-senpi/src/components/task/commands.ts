@@ -2,6 +2,7 @@ import { taskIdentityLabel } from "@oh-my-opencode/senpi-task"
 import type { CancelOutcome, ListScope, ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
+import { formatExternalTaskRow, sharedExternalTaskSources, type ExternalTaskSources } from "./external-task-sources"
 import { formatTaskRow } from "./status-ui"
 
 // Cancellable = anything still holding a live/resident child worth stopping.
@@ -28,10 +29,14 @@ interface CommandUi {
 
 const KILL_REASON = "/task-kill"
 
-export function registerTaskCommands(pi: SenpiExtensionAPI, manager: CommandManager): void {
+export function registerTaskCommands(
+  pi: SenpiExtensionAPI,
+  manager: CommandManager,
+  externalSources: ExternalTaskSources = sharedExternalTaskSources(),
+): void {
   pi.registerCommand("tasks", {
     description: "List session tasks (--all for every session).",
-    handler: (args: string, ctx: CommandContext) => runTasksCommand(manager, args, ctx),
+    handler: (args: string, ctx: CommandContext) => runTasksCommand(manager, externalSources, args, ctx),
   })
   pi.registerCommand("task-kill", {
     description: "Cancel a session task via selector.",
@@ -51,11 +56,22 @@ function collect(manager: CommandManager, scope: ListScope | undefined): readonl
   return manager.list(scope).map((entry) => entry.record)
 }
 
-async function runTasksCommand(manager: CommandManager, args: string, ctx: CommandContext): Promise<void> {
+async function runTasksCommand(
+  manager: CommandManager,
+  externalSources: ExternalTaskSources,
+  args: string,
+  ctx: CommandContext,
+): Promise<void> {
   const allScope = args.trim().split(/\s+/).includes("--all")
-  const records = collect(manager, scopeFor(ctx, allScope))
+  const scope = scopeFor(ctx, allScope)
+  const records = collect(manager, scope)
+  const external = scope === undefined ? [] : externalSources.snapshot(ctx.sessionManager?.getSessionId(), { allSessions: allScope })
+  const lines = [
+    ...records.map(formatTaskRow),
+    ...external.flatMap((snapshot) => snapshot.rows.map((row) => formatExternalTaskRow(snapshot, row))),
+  ]
   const scopeLabel = allScope ? "all sessions" : "this session"
-  const text = records.length === 0 ? `No tasks in ${scopeLabel}.` : records.map(formatTaskRow).join("\n")
+  const text = lines.length === 0 ? `No tasks in ${scopeLabel}.` : lines.join("\n")
   ctx.ui?.notify(text, "info")
 }
 

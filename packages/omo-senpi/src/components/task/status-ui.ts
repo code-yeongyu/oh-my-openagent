@@ -9,6 +9,7 @@ import {
   type TaskRunStats,
 } from "@oh-my-opencode/senpi-task"
 
+import { externalWidgetRows, sharedExternalTaskSources, type ExternalTaskSources } from "./external-task-sources"
 import type { CapturedUi } from "./runtime-context"
 import {
   backgroundWidgetRows,
@@ -61,6 +62,8 @@ export interface TaskStatusUiDeps {
   readonly terminalWidth?: () => number | undefined
   // Local rendering time used by the live-refresh timer and deterministic tests.
   readonly now?: () => number
+  // Read-only rows from other extensions; defaults to the process-shared registry.
+  readonly externalSources?: ExternalTaskSources
 }
 
 export interface TaskStatusUi {
@@ -87,6 +90,8 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   let pending: TimerHandle | undefined
   let liveRefresh: TimerHandle | undefined
   const reportedRenderFaults = new Set<string>()
+  const externalSources = deps.externalSources ?? sharedExternalTaskSources()
+  const unsubscribeExternal = externalSources.subscribe(() => scheduleSync())
 
   // Render runs from bare timer callbacks; an uncontained throw escapes as an uncaughtException
   // and kills the host process (the beta.20 pi-tui incident). Warn once per distinct fault so the
@@ -139,9 +144,10 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     const liveStats = deps.manager.runStatsSnapshot?.bind(deps.manager)
     const terminalWidth = deps.terminalWidth?.() ?? process.stdout.columns
     const residentTaskIds = new Set(deps.manager.residentTaskIds?.() ?? [])
-    const rows = deps.manager.wasBackground === undefined
+    const taskRows = deps.manager.wasBackground === undefined
       ? buildWidgetRows(records, residentTaskIds)
       : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, terminalWidth, residentTaskIds)
+    const rows = [...taskRows, ...externalWidgetRows(externalSources.snapshot(deps.runtime.sessionId()), renderedAt, terminalWidth)]
     if (rows.length === 0) {
       clearLiveRefresh()
       ui.setWidget(UI_KEY, undefined)
@@ -217,6 +223,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       pending = undefined
     }
     clearLiveRefresh()
+    unsubscribeExternal()
     for (const unsubscribe of subscriptions.values()) unsubscribe()
     subscriptions.clear()
     liveActivity.clear()

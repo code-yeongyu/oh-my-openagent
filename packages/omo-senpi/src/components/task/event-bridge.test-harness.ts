@@ -14,6 +14,7 @@ import { wireEventBridge } from "./event-bridge"
 import { fakeSummary } from "./event-bridge.test-fixtures"
 import type { TaskEngine } from "./engine"
 import type { TaskRpcTimers } from "./task-rpc-bridge"
+import type { ExternalTaskSources } from "./external-task-sources"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
 
@@ -28,6 +29,7 @@ type HarnessOptions = {
   readonly withRpc?: boolean | "emit-only"
   // Drives the task RPC bridge's progress-coalescing timer deterministically (no wall-clock waits).
   readonly taskRpcTimers?: TaskRpcTimers
+  readonly externalSources?: ExternalTaskSources
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -224,7 +226,12 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
   } as unknown as ComponentContext
 
   wireEventBridge(pi, ctx, engine, statusUi, transitions, state, {
-    ...(options.taskRpcTimers === undefined ? {} : { taskRpc: { timers: options.taskRpcTimers } }),
+    ...(options.taskRpcTimers === undefined && options.externalSources === undefined ? {} : {
+      taskRpc: {
+        ...(options.taskRpcTimers === undefined ? {} : { timers: options.taskRpcTimers }),
+        ...(options.externalSources === undefined ? {} : { externalSources: options.externalSources }),
+      },
+    }),
   })
 
   return {
