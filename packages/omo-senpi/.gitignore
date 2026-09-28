@@ -1,4 +1,5 @@
 /plugin/extensions/*
+!/plugin/extensions/assets.generated.json
 !/plugin/extensions/dream-persona.md
 !/plugin/extensions/facts-persona.md
 !/plugin/extensions/kibitzer-persona.md
