@@ -3,6 +3,7 @@
 !/plugin/extensions/facts-persona.md
 !/plugin/extensions/kibitzer-persona.md
 !/plugin/extensions/memory-run-supervisor.mjs
+!/plugin/extensions/omo-computer-use.js
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
 !/plugin/extensions/omo-task.js

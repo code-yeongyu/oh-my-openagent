@@ -6,6 +6,7 @@
   "type": "module",
   "imports": {
     "#omo-task-runtime": "./extensions/omo-task.js",
+    "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
     "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js"
   },
   "keywords": [

@@ -1,16 +1,10 @@
-import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-engine"
 import type { DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol"
-import {
-  DesktopEngineRpcError,
-  DesktopEngineUnavailableError,
-  DesktopServiceError,
-} from "@oh-my-opencode/senpi-desktop-service"
 import {
   COMPUTER_ACTIONS_TOOL_NAME,
   COMPUTER_TOOL_NAME,
   computerActionsPermissionParser,
   computerPermissionParser,
-} from "@oh-my-opencode/senpi-desktop-tool"
+} from "@oh-my-opencode/senpi-desktop-tool/registration"
 
 import {
   computerUseBackend,
@@ -30,7 +24,8 @@ export interface ComputerUseTelemetry {
     readonly source: ComputerUseActivationSource
     readonly backend: unknown
   }): void
-  engineError(context: unknown, error: Error, backend: unknown): void
+  /** `code` is `engineErrorCode(error)`, classified by the runtime that owns the error classes. */
+  engineError(context: unknown, code: ComputerUseEngineErrorCode, backend: unknown): void
   osPermissions(context: unknown, capabilities: DesktopCapabilities): void
   toolExecutionStarted(payload: unknown): boolean
   permissionTierDenied(payload: unknown, context: unknown, backend: unknown): void
@@ -57,13 +52,13 @@ export function createComputerUseTelemetry(options: {
         backend: computerUseBackend(input.backend),
       })
     },
-    engineError(context, error, backend) {
+    engineError(context, code, backend) {
       const sessionId = computerUseSessionId(context)
       if (sessionId === undefined) return
       observers.publish({
         kind: "engine_error",
         sessionId,
-        code: engineErrorCode(error),
+        code,
         platform,
         backend: computerUseBackend(backend),
       })
@@ -103,16 +98,6 @@ export function createComputerUseTelemetry(options: {
       })
     },
   }
-}
-
-export function engineErrorCode(error: Error): ComputerUseEngineErrorCode {
-  if (error instanceof DesktopEngineUnavailableError) return error.diagnostic.code
-  if (error instanceof DesktopEngineAbiMismatchError) return "abi-mismatch"
-  if (error instanceof DesktopEngineRpcError) {
-    return error.data !== null && "code" in error.data ? error.data.code : "other"
-  }
-  if (error instanceof DesktopServiceError) return error.code
-  return "other"
 }
 
 function permissionRequest(value: unknown): {

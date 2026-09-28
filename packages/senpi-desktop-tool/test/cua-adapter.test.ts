@@ -2,7 +2,8 @@ import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ComputerActionsInput } from "../src/cua-actions";
 import { ComputerActionsParams } from "../src/cua-actions";
-import { computerActionsPermissionParser, createComputerActionsTool } from "../src/cua-adapter";
+import { createComputerActionsTool } from "../src/cua-adapter";
+import { computerActionsPermissionParser } from "../src/cua-definition";
 import { closeDesktops, desktopFixture, hostContext, methodsOf } from "./fixtures";
 
 // Every case waits on real child-process I/O; the guard only catches a hang, it never times behavior.

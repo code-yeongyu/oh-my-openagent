@@ -2,11 +2,15 @@ import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-eng
 import type { EngineMethod, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
   type CallOptions,
+  DesktopEngineRpcError,
   DesktopEngineUnavailableError,
   DesktopService,
+  DesktopServiceError,
   type DesktopServiceOptions,
   type DesktopSessionOpenParams,
 } from "@oh-my-opencode/senpi-desktop-service"
+
+import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
 
 export type EngineDiagnostic = "native-unavailable" | "quarantined" | "abi-mismatch"
 
@@ -91,4 +95,14 @@ export class TrackedDesktopService extends DesktopService {
       throw error
     }
   }
+}
+
+export function engineErrorCode(error: Error): ComputerUseEngineErrorCode {
+  if (error instanceof DesktopEngineUnavailableError) return error.diagnostic.code
+  if (error instanceof DesktopEngineAbiMismatchError) return "abi-mismatch"
+  if (error instanceof DesktopEngineRpcError) {
+    return error.data !== null && "code" in error.data ? error.data.code : "other"
+  }
+  if (error instanceof DesktopServiceError) return error.code
+  return "other"
 }

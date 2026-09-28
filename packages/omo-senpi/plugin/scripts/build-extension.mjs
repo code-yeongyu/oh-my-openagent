@@ -60,6 +60,8 @@ const supervisorEntryPath = join(packageRoot, "src", "components", "memory", "wo
 const supervisorOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "memory-run-supervisor.mjs") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "memory-run-supervisor.mjs")
 const toolkitSdkEntryPath = join(packageRoot, "src", "extension", "agent-toolkit-sdk.ts")
 const toolkitSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
+const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
+const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const builtinModuleNames = builtinModules
@@ -67,6 +69,7 @@ const builtinModuleNames = builtinModules
   .sort()
 const externalSpecifiers = [
   "#omo-task-runtime",
+  "#omo-computer-use-runtime",
   "#omo-agent-toolkit-sdk",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
@@ -83,6 +86,22 @@ const BUILD_SETTINGS = JSON.stringify({
   loaderAliases: SENPI_LOADER_ALIASES,
 })
 
+// An explicit path wins; with only `outputPath` set, every sidecar lands beside it.
+function resolveOutputs(options) {
+  const output = options.outputPath ?? outputPath
+  const sibling = (explicit, fallback, relativePath) =>
+    explicit ?? (options.outputPath === undefined ? fallback : join(dirname(output), relativePath))
+  return {
+    output,
+    taskOutput: sibling(options.taskOutputPath, taskOutputPath, "omo-task.js"),
+    memberOutput: sibling(options.memberOutputPath, memberOutputPath, "omo-member.js"),
+    supervisorOutput: sibling(options.supervisorOutputPath, supervisorOutputPath, "memory-run-supervisor.mjs"),
+    advisorRuntimeOutput: sibling(options.advisorRuntimeOutputPath, advisorRuntimeOutputPath, "omo-init-deep-advisor.js"),
+    toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
+    computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
+  }
+}
+
 export async function buildExtension(options = {}) {
   const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"))
   if (typeof packageManifest.version !== "string" || packageManifest.version.length === 0) {
@@ -92,34 +111,21 @@ export async function buildExtension(options = {}) {
     OMO_SENPI_PACKAGE_VERSION: packageManifest.version,
     OMO_SENPI_BUNDLED: true,
   }
-  const output = options.outputPath ?? outputPath
-  const taskOutput = options.taskOutputPath ?? (options.outputPath === undefined
-    ? taskOutputPath
-    : join(dirname(output), "omo-task.js"))
-  const memberOutput = options.memberOutputPath ?? (options.outputPath === undefined
-    ? memberOutputPath
-    : join(dirname(output), "omo-member.js"))
-  const supervisorOutput = options.supervisorOutputPath ?? (options.outputPath === undefined
-    ? supervisorOutputPath
-    : join(dirname(output), "memory-run-supervisor.mjs"))
-  const advisorRuntimeOutput = options.advisorRuntimeOutputPath ?? (options.outputPath === undefined
-    ? advisorRuntimeOutputPath
-    : join(dirname(output), "omo-init-deep-advisor.js"))
-  const toolkitSdkOutput = options.toolkitSdkOutputPath ?? (options.outputPath === undefined
-    ? toolkitSdkOutputPath
-    : join(dirname(output), "runtime", "agent-toolkit-sdk", "sdk.js"))
+  const { output, taskOutput, memberOutput, supervisorOutput, advisorRuntimeOutput, toolkitSdkOutput, computerUseOutput } =
+    resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
   const advisorRuntimeInputs = await buildEntry(advisorRuntimeEntryPath, advisorRuntimeOutput, buildDefines)
+  const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   // Bundling inlines assets.ts but its markdown is read from disk at runtime next to the bundle,
   // so the persona must be staged into the extension output directory the loader executes from.
   await Promise.all([
     stageRuntimePersonas(repoRoot, dirname(output)),
   ])
-  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, toolkitSdkInputs }
+  return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, computerUseInputs, toolkitSdkInputs }
 }
 
 async function buildEntry(entry, output, buildDefines, externals = externalSpecifiers) {
@@ -149,22 +155,8 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
 }
 
 export async function checkExtensionCurrent(options = {}) {
-  const output = options.outputPath ?? outputPath
-  const taskOutput = options.taskOutputPath ?? (options.outputPath === undefined
-    ? taskOutputPath
-    : join(dirname(output), "omo-task.js"))
-  const memberOutput = options.memberOutputPath ?? (options.outputPath === undefined
-    ? memberOutputPath
-    : join(dirname(output), "omo-member.js"))
-  const supervisorOutput = options.supervisorOutputPath ?? (options.outputPath === undefined
-    ? supervisorOutputPath
-    : join(dirname(output), "memory-run-supervisor.mjs"))
-  const advisorRuntimeOutput = options.advisorRuntimeOutputPath ?? (options.outputPath === undefined
-    ? advisorRuntimeOutputPath
-    : join(dirname(output), "omo-init-deep-advisor.js"))
-  const toolkitSdkOutput = options.toolkitSdkOutputPath ?? (options.outputPath === undefined
-    ? toolkitSdkOutputPath
-    : join(dirname(output), "runtime", "agent-toolkit-sdk", "sdk.js"))
+  const { output, taskOutput, memberOutput, supervisorOutput, advisorRuntimeOutput, toolkitSdkOutput, computerUseOutput } =
+    resolveOutputs(options)
   const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
   const currentMain = await readBuiltEntry(output)
@@ -179,6 +171,8 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentAdvisorRuntime === undefined) {
     return { ok: false, reason: "missing-output", output: advisorRuntimeOutput }
   }
+  const currentComputerUse = await readBuiltEntry(computerUseOutput)
+  if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
 
   // Rebuild OUTSIDE the repository: an output tree inside repoRoot is a transient sibling of the
   // sources being hashed, and on some CI runners the sidecar built into it differed from a build
@@ -191,6 +185,7 @@ export async function checkExtensionCurrent(options = {}) {
   const expectedSupervisorOutput = join(tempRoot, "memory-run-supervisor.mjs")
   const expectedAdvisorRuntimeOutput = join(tempRoot, "omo-init-deep-advisor.js")
   const expectedToolkitSdkOutput = join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
+  const expectedComputerUseOutput = join(tempRoot, "omo-computer-use.js")
   try {
     await buildExtension({
       outputPath: expectedOutput,
@@ -199,6 +194,7 @@ export async function checkExtensionCurrent(options = {}) {
       supervisorOutputPath: expectedSupervisorOutput,
       advisorRuntimeOutputPath: expectedAdvisorRuntimeOutput,
       toolkitSdkOutputPath: expectedToolkitSdkOutput,
+      computerUseOutputPath: expectedComputerUseOutput,
     })
     if (!artifactsMatch(currentToolkitSdk, await readFile(expectedToolkitSdkOutput, "utf8"))) {
       return { ok: false, reason: "stale-output", output: toolkitSdkOutput }
@@ -218,9 +214,12 @@ export async function checkExtensionCurrent(options = {}) {
     if (!artifactsMatch(currentAdvisorRuntime, await readFile(expectedAdvisorRuntimeOutput, "utf8"))) {
       return { ok: false, reason: "stale-output", output: advisorRuntimeOutput }
     }
+    if (!artifactsMatch(currentComputerUse, await readFile(expectedComputerUseOutput, "utf8"))) {
+      return { ok: false, reason: "stale-output", output: computerUseOutput }
+    }
     const stalePersona = await findStaleRuntimePersona(tempRoot, dirname(output), repoRoot)
     if (stalePersona !== undefined) return { ok: false, reason: "stale-output", output: stalePersona }
-    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput }
+    return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, computerUseOutput }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
@@ -233,21 +232,6 @@ function run(command, args) {
   })
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
-}
-
-async function digestBuildSources(metadata, entry, buildDefines) {
-  const inputs = metadata !== null && typeof metadata === "object" && metadata.inputs !== null
-    && typeof metadata.inputs === "object" ? Object.keys(metadata.inputs).sort() : []
-  const hash = createHash("sha256")
-    .update(BUILD_SETTINGS)
-    .update(JSON.stringify(buildDefines))
-    .update(toPortableBuildPath(relative(repoRoot, entry)))
-  for (const input of inputs) {
-    const inputPath = resolve(repoRoot, input)
-    hash.update(toPortableBuildPath(relative(repoRoot, inputPath))).update(await readFile(inputPath))
-  }
-  hash.update(await readFile(fileURLToPath(import.meta.url)))
-  return hash.digest("hex")
 }
 
 function isErrno(error, code) {
@@ -278,6 +262,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.log(`omo-senpi extension build is current: ${result.output}`)
   } else {
     await buildExtension()
-    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}`)
+    console.log(`Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}, ${computerUseOutputPath}`)
   }
 }

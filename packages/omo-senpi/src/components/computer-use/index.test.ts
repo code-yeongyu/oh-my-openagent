@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
@@ -271,6 +271,78 @@ describe("computer-use component", () => {
 
     // then
     expect(host.getActiveTools()).toEqual(["read", "bash", "computer"])
+  })
+
+  test("#given cua_adapter #when registered #then both tools publish dev's root-object parameter schemas byte for byte", () => {
+    // given: the #9049 root-object schemas as dev published them; Anthropic tool search rejects a root union
+    const published = JSON.parse(
+      readFileSync(join(dirname(fileURLToPath(import.meta.url)), "published-parameters.fixture.json"), "utf8"),
+    ) as Record<string, unknown>
+
+    // when
+    const { pi } = register({ block: { cuaAdapter: true } })
+
+    // then
+    for (const name of ["computer", "computer_actions"]) {
+      const parameters = tool(pi, name)?.parameters as { type?: unknown } | undefined
+      expect(parameters?.type).toBe("object")
+      expect(JSON.stringify(parameters)).toBe(JSON.stringify(published[name]))
+    }
+  })
+
+  test("#given a registered component #when only startup events fire #then the runtime loads on first use and once", async () => {
+    // given
+    let loads = 0
+    const pi = new HostApi()
+    const engine = fakeEngine()
+    createComputerUseComponent({
+      platform: "linux",
+      engineChild: () => engine.factory,
+      loadSettings: (_cwd, platform) => resolveComputerSettings({ cuaAdapter: true }, platform),
+      loadRuntime: () => {
+        loads += 1
+        return import("#omo-computer-use-runtime")
+      },
+    }).register(pi, componentContext(logger()))
+
+    // when: everything a session that never uses the desktop dispatches
+    await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, hostContext())
+    await pi.dispatch("resources_discover", {})
+    await pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["x_search"] }, hostContext())
+    await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "c1", toolName: "read", args: {} })
+    await pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "c1", toolName: "read", isError: false, result: {} })
+    const beforeUse = loads
+    const status = await runCommand(pi, "status")
+    const execute = tool(pi, "computer")?.execute as (...args: unknown[]) => Promise<{ content: Array<{ text?: string }> }>
+    const closed = await execute("call-1", { action: "close" }, undefined, undefined, hostContext())
+
+    // then
+    expect(beforeUse).toBe(0)
+    expect(loads).toBe(1)
+    expect(status).toEqual([expect.stringContaining("Computer use: enabled=true active=false engine=not started")])
+    expect(closed.content[0]?.text).toBe("Closed the desktop session.")
+    expect(engine.methods).toEqual([])
+  })
+
+  test("#given the runtime never loaded #when the session shuts down #then it stays unloaded", async () => {
+    // given
+    let loads = 0
+    const pi = new HostApi()
+    createComputerUseComponent({
+      platform: "linux",
+      engineChild: () => fakeEngine().factory,
+      loadSettings: (_cwd, platform) => resolveComputerSettings(undefined, platform),
+      loadRuntime: () => {
+        loads += 1
+        return import("#omo-computer-use-runtime")
+      },
+    }).register(pi, componentContext(logger()))
+
+    // when
+    await pi.dispatch("session_shutdown", {})
+
+    // then
+    expect(loads).toBe(0)
   })
 
   test("#given an enabled host #when resources_discover fires #then the computer skill path is contributed", async () => {

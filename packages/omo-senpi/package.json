@@ -6,6 +6,7 @@
   "description": "Senpi harness adapter for oh-my-openagent.",
   "imports": {
     "#omo-task-runtime": "./src/extension/omo-task.ts",
+    "#omo-computer-use-runtime": "./src/components/computer-use/runtime.ts",
     "#omo-agent-toolkit-sdk": "./src/extension/agent-toolkit-sdk.ts"
   },
   "exports": {

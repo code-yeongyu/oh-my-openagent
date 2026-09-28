@@ -43,6 +43,7 @@ function outputPathsIn(root) {
     supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
     advisorRuntimeOutputPath: join(root, "omo-init-deep-advisor.js"),
     toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
+    computerUseOutputPath: join(root, "omo-computer-use.js"),
   }
 }
 
@@ -243,6 +244,25 @@ describe("checkExtensionCurrent", () => {
       .toBe(true)
   })
 
+  test("#given the split extension build #when metafile inputs are inspected #then the computer-use implementation lives only in its lazy entry", async () => {
+    // given / when
+    const { mainInputs, computerUseInputs } = await sharedOutputs()
+    const inMain = (suffix) => mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))
+    const inRuntime = (suffix) => computerUseInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))
+
+    // then
+    for (const implementation of [
+      "packages/senpi-desktop-service/src/index.ts",
+      "packages/senpi-desktop-engine/src/index.ts",
+      "packages/senpi-desktop-tool/src/activation.ts",
+      "packages/omo-senpi/src/components/computer-use/engine-status.ts",
+    ]) {
+      expect(inMain(implementation), implementation).toBe(false)
+      expect(inRuntime(implementation), implementation).toBe(true)
+    }
+    expect(inMain("packages/senpi-desktop-tool/src/registration.ts")).toBe(true)
+  })
+
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
@@ -255,6 +275,7 @@ describe("checkExtensionCurrent", () => {
     expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
     expect(manifest.imports).toEqual({
       "#omo-task-runtime": "./extensions/omo-task.js",
+      "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })
   })

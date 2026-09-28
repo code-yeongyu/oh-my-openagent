@@ -5,6 +5,7 @@ export interface BuildExtensionOptions {
   supervisorOutputPath?: string
   advisorRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
+  computerUseOutputPath?: string
 }
 export function buildExtension(options?: BuildExtensionOptions): Promise<{
   mainInputs: string[]
@@ -12,6 +13,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   memberInputs: string[]
   supervisorInputs: string[]
   advisorRuntimeInputs: string[]
+  computerUseInputs: string[]
   toolkitSdkInputs: string[]
 }>
 export const SENPI_LOADER_ALIASES: readonly [
