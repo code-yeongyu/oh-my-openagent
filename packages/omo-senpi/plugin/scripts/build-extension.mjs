@@ -62,6 +62,10 @@ const toolkitSdkEntryPath = join(packageRoot, "src", "extension", "agent-toolkit
 const toolkitSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
+// The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
+// same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
+const COMPUTER_PRELUDE_ASSET_NAME = "assets.generated.json"
+const computerPreludeAssetSource = join(repoRoot, "packages", "senpi-desktop-prelude", "src", "assets.generated.json")
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const builtinModuleNames = builtinModules
@@ -124,6 +128,7 @@ export async function buildExtension(options = {}) {
   // so the persona must be staged into the extension output directory the loader executes from.
   await Promise.all([
     stageRuntimePersonas(repoRoot, dirname(output)),
+    writeFile(join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME), await readFile(computerPreludeAssetSource, "utf8")),
   ])
   return { mainInputs, taskInputs, memberInputs, supervisorInputs, advisorRuntimeInputs, computerUseInputs, toolkitSdkInputs }
 }
@@ -219,6 +224,11 @@ export async function checkExtensionCurrent(options = {}) {
     }
     const stalePersona = await findStaleRuntimePersona(tempRoot, dirname(output), repoRoot)
     if (stalePersona !== undefined) return { ok: false, reason: "stale-output", output: stalePersona }
+    const expectedPrelude = await readFile(join(tempRoot, COMPUTER_PRELUDE_ASSET_NAME), "utf8")
+    const currentPrelude = await readFile(join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME), "utf8").catch(() => undefined)
+    if (currentPrelude !== expectedPrelude) {
+      return { ok: false, reason: "stale-output", output: join(dirname(output), COMPUTER_PRELUDE_ASSET_NAME) }
+    }
     return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, computerUseOutput }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })

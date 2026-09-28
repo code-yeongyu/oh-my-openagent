@@ -34,9 +34,9 @@ export function computerSkillMarkdown(): string {
 }
 
 /**
- * Writes the skill to a content-addressed file and returns its path. The prelude assets are compiled into
- * the module, so this works unchanged in the compiled binary and the release bundle, where a
- * module-relative asset file does not exist.
+ * Writes the skill to a content-addressed file and returns its path. The prelude texts load from the
+ * generated JSON beside this module (source tree) or beside the bundle (plugin `extensions/`, staged by
+ * `build-extension.mjs`), so materialization needs no compiled-in strings (#9113).
  */
 export function materializeComputerSkill(root: string = tmpdir()): string {
 	const markdown = computerSkillMarkdown();

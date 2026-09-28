@@ -1,12 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { computerPreludeAssets } from "@oh-my-opencode/senpi-desktop-prelude";
 import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
 import { ComputerHandle } from "../src/activation";
 import { ComputerArgumentsError } from "../src/action-schema";
 import { ComputerParams } from "../src/params";
 import { resolveComputerSettings } from "../src/settings";
+import { computerToolDefinition } from "../src/tool-definition";
 import { createComputerTool, parseComputerParams } from "../src/tool";
 import { closedService } from "./fixtures";
 
@@ -38,6 +40,21 @@ describe("computer ToolDefinition", () => {
 
 		// Then
 		expect(keywords).toContain("cua");
+	});
+
+	it("keeps the registration shell's search surface and prompt guidelines on dev's bytes (#9113)", () => {
+		// Given: the prelude texts now load from the staged JSON; the published surface must not move.
+		const bullets = computerPreludeAssets.safety
+			.split("\n")
+			.filter((line) => line.startsWith("- "))
+			.map((line) => line.slice(2));
+
+		// When / Then
+		expect(computerToolDefinition.promptGuidelines).toEqual(bullets);
+		expect(computerToolDefinition.searchText).toBe(
+			"Operate the real desktop: screenshots, clicks, typing, key chords, window list, accessibility tree, clipboard; macOS/Linux/Windows",
+		);
+		expect(computerToolDefinition.kernelPrelude).toBe(computerPreludeAssets);
 	});
 
 	it("contributes exactly the computer global to the eval kernels", () => {

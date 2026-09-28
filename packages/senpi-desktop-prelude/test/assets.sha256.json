@@ -1,0 +1,8 @@
+{
+	"_comment": "sha256 of each published prelude asset on dev (bc64056efc's unchanged asset sources). Any change to the published bytes must consciously update this fixture (#9113 prelude contingency).",
+	"COMPUTER_PRELUDE_JAVASCRIPT": "f64bb81f88b0c3e1891667044886f638fde78fb5e8128310a53045e0b116492b",
+	"COMPUTER_PRELUDE_PYTHON": "5aec9549c378eea1d5584b2ca4686ffe6e628273cabf90b73cdc66cf1575d16b",
+	"COMPUTER_DECLARATIONS": "c198f9d22c02351aec92cf51252e708e29d6067b9f4e8d40b0b88f6a67bb2fee",
+	"COMPUTER_DOCUMENTATION": "2a3a044dd54f591dd899edd09f143c7ba086e79ad7b43bab78b22bccd6a9ba66",
+	"COMPUTER_SAFETY": "0c9f2d6223d92fdff268f1ee1eebc6f33870f5737bc09ab0dadafb96a4f36124"
+}

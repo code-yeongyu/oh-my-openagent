@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test"
+import { createHash } from "node:crypto"
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -24,6 +25,32 @@ const IMPLEMENTATION_MARKERS = [
   "Computer use is off for this session",
   "Closed the desktop session.",
 ] as const
+
+// One marker per prelude asset; the sha256 values are dev's published bytes, mirrored from
+// senpi-desktop-prelude/test/assets.sha256.json so a corrupted or stale staged JSON fails here too.
+const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, sha256: string])[] = [
+  [
+    "COMPUTER_PRELUDE_JAVASCRIPT",
+    "computer.run() expects a function or code string",
+    "f64bb81f88b0c3e1891667044886f638fde78fb5e8128310a53045e0b116492b",
+  ],
+  [
+    "COMPUTER_PRELUDE_PYTHON",
+    "Positional args with trailing Nones dropped",
+    "5aec9549c378eea1d5584b2ca4686ffe6e628273cabf90b73cdc66cf1575d16b",
+  ],
+  [
+    "COMPUTER_DECLARATIONS",
+    "interface ComputerClickOptions extends ComputerDeliveryOptions",
+    "c198f9d22c02351aec92cf51252e708e29d6067b9f4e8d40b0b88f6a67bb2fee",
+  ],
+  [
+    "COMPUTER_DOCUMENTATION",
+    "host desktop facade (present while the `computer` tool is active)",
+    "2a3a044dd54f591dd899edd09f143c7ba086e79ad7b43bab78b22bccd6a9ba66",
+  ],
+  ["COMPUTER_SAFETY", "<critical>", "0c9f2d6223d92fdff268f1ee1eebc6f33870f5737bc09ab0dadafb96a4f36124"],
+]
 
 const roots: string[] = []
 
@@ -53,6 +80,23 @@ describe("computer-use lazy runtime (#9113)", () => {
     expect(manifest.imports?.["#omo-computer-use-runtime"]).toBe(`./extensions/${RUNTIME_FILE}`)
   })
 
+  it("#given the built plugin #when the prelude asset is inspected #then the texts live only in the staged JSON, byte-identical to dev (#9113)", () => {
+    const main = readExtension("omo.js")
+    const runtime = readExtension(RUNTIME_FILE)
+    const asset = JSON.parse(readExtension("assets.generated.json")) as Record<string, string>
+
+    for (const [field, marker, sha256] of PRELUDE_ASSET_FIELDS) {
+      expect(main.includes(marker), `omo.js still bundles prelude text ${JSON.stringify(marker)}`).toBe(false)
+      expect(runtime.includes(marker), `${RUNTIME_FILE} still bundles prelude text ${JSON.stringify(marker)}`).toBe(false)
+      expect(typeof asset[field], `staged prelude JSON lacks ${field}`).toBe("string")
+      expect(
+        createHash("sha256").update(asset[field]).digest("hex"),
+        `staged prelude JSON's ${field} drifted from dev's published bytes`,
+      ).toBe(sha256)
+      expect(asset[field].includes(marker)).toBe(true)
+    }
+  })
+
   it("#given the built main bundle #when a session never uses the desktop #then the runtime entry is evaluated only on first use", async () => {
     // given: a copy of the plugin whose runtime entry counts its own evaluations. It sits inside the
     // package so the bundle's senpi peers resolve exactly as they do from plugin/extensions.
@@ -62,6 +106,7 @@ describe("computer-use lazy runtime (#9113)", () => {
     mkdirSync(copyExtensions, { recursive: true })
     copyFileSync(join(pluginRoot, "package.json"), join(root, "plugin", "package.json"))
     copyFileSync(join(extensionsDir, "omo.js"), join(copyExtensions, "omo.js"))
+    copyFileSync(join(extensionsDir, "assets.generated.json"), join(copyExtensions, "assets.generated.json"))
     const realRuntime = join(extensionsDir, RUNTIME_FILE)
     const reexport = existsSync(realRuntime)
       ? `export * from ${JSON.stringify(pathToFileURL(copyRuntime(realRuntime, copyExtensions)).href)}\n`
