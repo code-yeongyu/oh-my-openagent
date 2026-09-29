@@ -106,9 +106,14 @@ session: stop retrying.
 A question answered through an omo from before the answer states existed cannot tell a delivered
 answer from one whose attempt died halfway, so it counts as an answer in flight since it was
 answered: after 120 s the next answer takes it over. If the session already has that answer, it
-refuses the new one: the question is marked delivered with the earlier answer, and the new one is
-`already_answered` (exit 1), as is every answer after it. Such a question costs at most one refused
-frame, and nothing reaches the session twice.
+refuses the new one (`question_already_resolved`): the question is marked delivered with the earlier
+answer, and the new one is `already_answered` (exit 1), as is every answer after it. When the
+session instead no longer knows the question at all (`unknown_extension_ui_request`,
+`unknown_request`), it was closed some other way: answered in the terminal or Desktop, timed out,
+or cancelled. The question is then marked delivered with no answer text, and the new answer and
+every later one are `already_answered` with "The session no longer waits for this question
+(answered or closed elsewhere)". Such a question costs at most one refused frame, and nothing
+reaches the session twice.
 
 The answer text takes the form of the request the session reported (`--request-kind`):
 

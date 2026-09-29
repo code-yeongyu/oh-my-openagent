@@ -12,7 +12,7 @@ import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, n
 import type { GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
-import type { AnswerClaimRef, AnswerDelivered, BindingsFilter, ReportOpResult } from "./store-relay-ops"
+import { CLOSED_ELSEWHERE, type AnswerClaimRef, type AnswerDelivered, type BindingsFilter, type ReportOpResult } from "./store-relay-ops"
 import type { GatewayDeliveryResult, StoreRefusal } from "./types"
 
 export type RelayResult<T> = ({ readonly kind: "ok" } & T) | { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -175,12 +175,18 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       }
       if (!reply.delivered) {
         // The session answered and refused: it no longer waits on that request, or cannot read the answer.
-        // An answer that took over an expired claim and hears "no longer waits" means the session took
-        // the expired claim's answer: the question is delivered with that one, not pending again.
+        // An answer that took over an expired claim and hears "no longer waits" is not pending again.
+        // Only question_already_resolved says the session took an answer, the expired claim's; the
+        // unknown_* codes also mean it was closed another way (answered locally, timed out, cancelled),
+        // so the question is delivered with no answer text rather than the dead claimant's.
         const priorAnswer = claim.taken_over
         if (priorAnswer !== null && SESSION_NO_LONGER_WAITS.has(reply.error)) {
-          await settleClaim(() => store.markPriorDelivered({ ...own, prior: priorAnswer }))
-          return failure("already_answered", `The session already took an earlier answer to this question (${reply.error}).`, { session: claim.session_durable_id, reason: reply.error })
+          if (reply.error === "question_already_resolved") {
+            await settleClaim(() => store.markPriorDelivered({ ...own, prior: priorAnswer }))
+            return failure("already_answered", `The session already took an earlier answer to this question (${reply.error}).`, { session: claim.session_durable_id, reason: reply.error })
+          }
+          await settleClaim(() => store.markPriorDelivered({ ...own, prior: { answer: null, answered_at: own.claimed_at } }))
+          return failure("already_answered", `${CLOSED_ELSEWHERE} (${reply.error}).`, { session: claim.session_durable_id, reason: reply.error }, "Nothing to do: the session no longer waits for this question.")
         }
         await release(own)
         const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"

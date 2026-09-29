@@ -572,6 +572,9 @@ export type AnswerDelivered = AnswerClaimRef & { readonly answer: string }
  */
 export const ANSWER_IN_FLIGHT_MAX_MS = 120_000
 
+/** How a question the session closed another way (answered locally, timed out, cancelled) reads: delivered with no answer text. */
+export const CLOSED_ELSEWHERE = "The session no longer waits for this question (answered or closed elsewhere)"
+
 /**
  * First phase of `thread_answer`. `binding_id` is the binding the answer ARRIVED through; the token
  * names the binding that emitted the question. A mismatch is refused before anything is written, so
@@ -594,7 +597,7 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
     const inFlight = row.question_state === "answered" && row.answer_state !== "delivered"
     const abandoned = inFlight && Number(row.answered_at) + ANSWER_IN_FLIGHT_MAX_MS <= request.now
     if (inFlight && !abandoned) return refused("answer_in_progress", "Another answer to this question is still being handed to the session.", { cursor: Number(row.cursor) })
-    if (row.question_state === "answered" && !abandoned) return refused("already_answered", "This question was already answered.", { cursor: Number(row.cursor) })
+    if (row.question_state === "answered" && !abandoned) return refused("already_answered", row.answer === null && row.answer_state === "delivered" ? `${CLOSED_ELSEWHERE}.` : "This question was already answered.", { cursor: Number(row.cursor) })
     const kind: UiRequestKind | null = isUiRequestKind(row.ui_request_kind) ? row.ui_request_kind : null
     const shape = answerShape(kind, request.answer)
     if (!shape.ok) return refused("invalid_arguments", shape.reason, { ui_request_kind: kind })
