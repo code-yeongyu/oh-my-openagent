@@ -33,6 +33,7 @@ export const THREAD_ERROR_CODES = [
   "model_not_found",
   "model_ambiguous",
   "thinking_level_unsupported",
+  "loop_detected",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]

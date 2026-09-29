@@ -228,6 +228,7 @@ describe("thread error taxonomy", () => {
       "model_not_found",
       "model_ambiguous",
       "thinking_level_unsupported",
+      "loop_detected",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })
