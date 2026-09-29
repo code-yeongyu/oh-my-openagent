@@ -15,11 +15,15 @@ type SessionMessage = {
     model?: {
       providerID?: string
       modelID?: string
+      variant?: string
     }
     providerID?: string
     modelID?: string
+    variant?: string
     tools?: Record<string, boolean | "allow" | "deny" | "ask">
   }
+  // fix: compaction-part-marker — marker rows carry a compaction part
+  parts?: Array<{ type?: string }>
 }
 
 type ResolverContext = {
@@ -49,12 +53,25 @@ export async function resolveSessionPromptConfig(
 
     for (let index = messages.length - 1; index >= 0; index--) {
       const info = messages[index].info
+      // fix: compaction-part-marker — a row carrying a compaction part is a
+      // marker (bookkeeping), never working-model evidence, even when tagged
+      // with the working agent (observed 2026-09-27T23:37Z).
+      const rowParts = messages[index]?.parts
+      const markerRow =
+        Array.isArray(rowParts) &&
+        rowParts.some((part) => part?.type === "compaction")
 
       if (!promptConfig.agent && info?.agent && !isCompactionAgent(info.agent)) {
         promptConfig.agent = info.agent
       }
 
-      if (!promptConfig.model) {
+      if (!promptConfig.model && markerRow) {
+        log("[compaction-context-injector] skipped compaction-part marker row in working-model scan (compaction-part-marker)", {
+          sessionID,
+          skippedAgent: info?.agent,
+        })
+      }
+      if (!promptConfig.model && !markerRow) {
         const model = resolveValidatedModel(info)
         // fix: compaction-pin-checkpoint — a marker/summary row carrying the
         // active compaction pin (often tagged with the working agent, not
@@ -104,13 +121,18 @@ export async function resolveLatestSessionPromptConfig(
     const messages = normalizeSDKResponse(response, [] as SessionMessage[], {
       preferResponseOnMissingData: true,
     })
-    const latestInfo = messages.at(-1)?.info
+    const latestMessage = messages.at(-1)
+    const latestInfo = latestMessage?.info
+    // fix: compaction-part-marker
+    const latestMarkerRow =
+      Array.isArray(latestMessage?.parts) &&
+      latestMessage.parts.some((part) => part?.type === "compaction")
 
     if (!latestInfo) {
       return {}
     }
 
-    const model = resolveValidatedModel(latestInfo)
+    const model = latestMarkerRow ? undefined : resolveValidatedModel(latestInfo)
     const tools = normalizePromptTools(latestInfo.tools)
 
     return {
