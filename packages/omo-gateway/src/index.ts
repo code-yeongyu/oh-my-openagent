@@ -12,3 +12,17 @@
 //    session map) and never re-implements any of it.
 //
 // See AGENTS.md in this directory for the invariants and the agent-messenger dependency audit.
+
+export * from "./adapter/contract"
+export { checkCapability, requiredCapabilities } from "./adapter/capability"
+export { parseRich, plainText } from "./adapter/rich"
+export {
+  createTranscriber,
+  isAudioAttachment,
+  NO_TRANSCRIPT,
+  voiceFields,
+  type SttConfig,
+  type TranscribeResult,
+  type Transcriber,
+  type TranscriberOptions,
+} from "./stt/transcribe"

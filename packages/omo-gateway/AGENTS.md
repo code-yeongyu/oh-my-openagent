@@ -49,14 +49,30 @@ contract until the adapter/connector todos land.
 ## LAYOUT
 
 ```
-src/index.ts    module contract (scaffold barrel; todos 3-10 fill src/)
+src/index.ts                 barrel: adapter contract, rich body, transcriber
+src/adapter/contract.ts      SurfaceAdapter contract (published API)
+src/adapter/rich.ts          gateway body markup -> RichBody, plainText
+src/adapter/capability.ts    capability -> refusal mapping (checkCapability)
+src/adapter/conformance.ts   `@oh-my-opencode/omo-gateway/conformance` entry: runAdapterConformance + re-exports
+src/adapter/conformance/     the checks, fixtures types and bounded waits
+src/adapter/conformance-bun.ts  thin bun:test wrapper for in-repo adapters
+src/adapters/fake/           FakePlatform (reusable in-memory platform) + FakeAdapter
+src/stt/                     voice transcription (gateway.stt; soniox), audio never on disk
+scripts/build-conformance.ts standalone conformance build -> dist/conformance (installable outside the repo)
+docs/adapters.md             adapter author guide: contract, capability model, platform matrix, conformance
 ```
+
+The adapter contract is a public extension point (third-party adapters, e.g. Feishu/Lark, build on
+it): read [docs/adapters.md](docs/adapters.md) before changing any type in `src/adapter/`. Core
+modules (`src/adapter`, `src/rules`, `src/admission`, `src/dispatch`, `src/connector`) stay
+platform-neutral; `src/adapter/platform-neutral.test.ts` fails on Slack wire vocabulary there.
 
 ## COMMANDS
 
 ```sh
 bun test src/**/*.test.ts      # package tests (root: bun test packages/omo-gateway)
 bunx tsgo --noEmit -p tsconfig.json
+bun run build:conformance      # dist/conformance: self-contained conformance entry for third-party adapters
 ```
 
 The CLI surface (`omo gateway status|connect|lead|rules|link|service`) lives in

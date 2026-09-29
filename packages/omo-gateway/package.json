@@ -7,9 +7,13 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./conformance": {
+      "import": "./src/adapter/conformance.ts"
     }
   },
   "scripts": {
+    "build:conformance": "bun scripts/build-conformance.ts",
     "test": "bun test src/**/*.test.ts",
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   }
