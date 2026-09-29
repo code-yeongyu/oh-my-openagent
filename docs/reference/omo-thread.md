@@ -36,9 +36,10 @@ instead of acting twice (`deduplicated: true`); reusing a key with other argumen
 
 ## Sending
 
-A bindingless `send` delivers as `cli:<uid>`. `--mode auto` steers a running turn and otherwise
-starts one; `steer` needs `--expected-turn` (the target's turn epoch) and is `turn_conflict` when
-it changed; `follow_up` queues behind the running turn. A target with no live endpoint gets
+A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) starts a turn on an idle
+session and otherwise queues behind the running turn, like `follow_up`; only `steer` enters a
+running turn, and it needs `--expected-turn` (the target's turn epoch): a missing epoch is
+`invalid_arguments`, a changed one `turn_conflict`. A target with no live endpoint gets
 `delivery.kind: "queued_offline"`: the row is durable and the session takes it when it runs again.
 A terminal session is never prompted directly; the message lands in its inbox and its own
 extension admits it (a held draft in the editor is never overwritten).
@@ -46,7 +47,38 @@ extension admits it (a held draft in the editor is never overwritten).
 `send --binding <id>` is the connector inbound path: the message is delivered to the binding's
 session with the binding's `inbound_mode`, as `binding:<id>`, and `--idempotency-key` is the
 platform's event id, so one platform message is admitted once. A target, when given, must be the
-binding's session.
+binding's session. `--mode` and `--expected-turn` are usage errors here (exit 2), because the
+binding decides the mode.
+
+What the receiving session does with a delivery depends on its state when its drain runs:
+
+| State | `auto` | `steer` | `follow_up` |
+| --- | --- | --- | --- |
+| idle | starts a turn (`started`) | refused `not_steerable` | starts a turn (`started`) |
+| mid-turn | queued behind the turn (`queued`) | steered into the turn when `--expected-turn` is the current epoch (`steered`), else `turn_conflict` | queued behind the turn (`queued`) |
+| waiting on a question | queued (`queued`) | refused `not_steerable` | queued (`queued`) |
+| compacting | queued (`queued`) | refused `not_steerable` | queued (`queued`) |
+| offline (no live endpoint) | kept for the next run (`queued_offline`) | refused `turn_conflict` | kept for the next run (`queued_offline`) |
+
+The user always wins over a delivery: while the terminal's editor holds a draft, or a submission
+has not reached the session yet, the delivery waits and is admitted on the next wake. The session
+shows a one-line notice ("remote message from <actor> queued (<delivery_id>)") once per delivery
+that waits. The `send` reply reports what happened by the time it returns, so a message the
+session has not admitted yet is `queued` with a `queue_position`.
+
+Every send is checked against fixed budgets, which no setting raises:
+
+| Guard | Limit | Answer |
+| --- | --- | --- |
+| Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
+| Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
+| One sender to one target | bursts of 8, then one every 5 s | `overloaded` with `retry_after_ms` |
+| One turn | reaches at most 16 sessions | `overloaded` |
+| One causal chain (a message and the messages it caused) | 4 hops, 64 deliveries, 7 days | `loop_detected` |
+| Replies | a direct reply to the session that messaged this one, or a send to itself | `loop_detected` |
+| An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
+
+Answers to another session flow back through `read`, `report` and `answer`, not through a reply.
 
 ## Connector loop
 
@@ -54,14 +86,81 @@ binding's session.
 id=$(omo thread bind my-session --platform custom --account bot --chat c1 --thread t1 --json | jq -r .binding.binding_id)
 omo thread send --binding "$id" --idempotency-key evt-1 "hello from outside"
 omo thread outbox "$id" --json          # rows the session reported, oldest first
-omo thread outbox "$id" --ack --json    # the same read, then ack through the newest row
+token=$(omo thread outbox "$id" --json | jq -r '[.rows[] | select(.event == "question" and .question_state == "pending")][0].reply_token')
 omo thread answer --binding "$id" --token "$token" "yes"
+omo thread outbox "$id" --ack --json    # the same read, then ack through the newest row
 ```
 
 A question row carries a `reply_token`. The answer must arrive through the binding that asked:
 another binding is `binding_mismatch` (the question stays pending), a token minted before a
 rebind, expiry or session restart is `stale_token`, and a second answer is `already_answered`.
-An acked row is not returned again; `--after <cursor>` re-reads from an older cursor.
+Only a match marks the question answered and hands the answer to the session's own endpoint; if
+the session cannot take it, the answer is `host_unavailable` and the question stays pending.
+
+## Bindings
+
+A binding attaches one session to one external thread, named by `(platform, account, chat,
+thread)`; `--thread` defaults to `@chat` (the chat itself). Nothing here talks to a chat platform:
+a connector drives the binding.
+
+- At most one `active` binding holds a thread. Binding a thread that is already held is
+  `binding_conflict`, with the holder's `binding_id`, `revision` and session in `details`; there is
+  no implicit takeover.
+- `unbind` and `rebind` name the revision they expect (`--revision`) and are `stale_revision`
+  when it moved. Each bumps the revision. An already closed binding unbinds again with
+  `already_closed: true`, and `in_flight` lists the deliveries that came through it and are not
+  taken yet.
+- `rebind` moves the binding to another session: `lease_started_at` resets, `expires_at` does not
+  move (a TTL is never extended), and deliveries still queued under the old revision are refused
+  `binding_closed` (listed in `closed`), never moved. A detached or expired binding is
+  `binding_inactive`.
+- `--ttl` is in seconds (default 604800, 7 days); `--ttl none` never expires. `--direction` and
+  `--events` (default all four) decide what may flow each way.
+
+## Reports and the outbox
+
+`report` writes a row to a binding's outbox for the connector to post. Only the session a binding
+is attached to reports through it (`scope_denied` otherwise), only while the binding is active
+(`binding_inactive`) and subscribed to that event (`unsupported`). Without `--binding` the report
+goes to the session's ORIGINATING binding, the one its newest admitted external message came
+through; a session that took no message through a binding must name `--binding` (`invalid_arguments`).
+Nothing is ever copied to the session's other bindings.
+
+- `milestone` and `report` rows are written at once. The first `--provider-message-id` acked for
+  a milestone becomes the binding's `progress_message_id`, and later milestone rows carry it as
+  `edit_message_id`, so a connector can edit one progress message in place.
+- `question` needs `--request-id`, the session's pending question id, and returns the
+  `reply_token` the answer must carry.
+- `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
+  row appears when the session settles.
+
+`outbox <binding-id>` reads rows in cursor order. Without `--after` it continues after the
+acknowledged cursor; `--after <cursor>` re-reads from an older one. `ack` (or `outbox --ack`,
+which acks through the newest row it read) is idempotent: an older or equal cursor changes
+nothing (`changed: false`), and a cursor past the newest row is `cursor_invalid`. Acked rows are
+kept 30 days after their ack; unacked rows live as long as their binding plus 30 days. A detached
+binding's outbox stays readable.
+
+### Completion arms
+
+A completion is opt-in. Only a session with an arm (from `report ... completion`, here or through
+its `thread_report` tool) writes one; every other session settles without touching the gateway
+store. The arm is durable: the store row is the source of truth, and it is kept until its
+completion is written, with the outcome of the run that settled (`completed`, `failed` or
+`cancelled`), never at an intermediate turn end.
+
+`report <session> completion` arms the completion (`armed: true`) and wakes the session's
+endpoint, so a running session writes it when it next settles, with that run's outcome. The arm is
+durable: when no endpoint answers the wake, the session writes it at the first settle after it
+next starts. An arm that lands while a run is settling is written at the next run, with that
+run's outcome.
+
+A session picks up arms it did not make itself (left by an earlier runtime after a restart or a
+crash, or made by `omo thread`) when it starts and on each wake, with a read that takes no write
+lock. Settling never waits on the store for long: the session gives the write 250 ms and lets it
+finish in the background. A write that cannot get the store's write lock gives up at about 25 s
+(never past 30 s) and is retried after the store's 5 s busy timeout, with the same outcome, until
+it lands.
 
 ## JSON
 
@@ -70,7 +169,7 @@ every other subcommand prints the full result.
 
 | Subcommand | `--json` on success |
 | --- | --- |
-| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, error_note?}]` |
+| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, error_note?, ...}]`; a live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
 | `send` | `{kind:"ok", thread_id, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
 | `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
@@ -91,12 +190,6 @@ A failure is `{kind:"error", error: {code, message, next_action, details?}}`; th
 the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`, "Error taxonomy").
 The failures the CLI answers itself use the same shape: a usage error is `invalid_arguments`
 (exit 2), and win32 or a runtime without `node:sqlite` is `unsupported` (exit 4).
-
-`report <session> completion` arms the completion (`armed: true`) and wakes the session's
-endpoint, so a running session writes it when it next settles, with that run's outcome. The arm is
-durable: when no endpoint answers the wake, the session writes it at the first settle after it
-next starts. An arm that lands while a run is settling is written at the next run, with that
-run's outcome.
 
 ## Exit codes
 

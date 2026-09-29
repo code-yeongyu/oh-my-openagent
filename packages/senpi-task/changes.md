@@ -121,6 +121,10 @@
   any other session, and a live owner, still defer (`foreign_live_owner`), and a dead session still falls through (#8659).
   `host-session-revival.test.ts` pins both sides: dead owner -> resumed on the recorded session path, live owner -> deferred.
 
+## docs: the operator surface names `adopt`, not `attach`
+
+`AGENTS.md`'s operator-surface line is `omo daemon run|adopt|status|stop|handoff|gc|rollback-prepare`; every command but `run` and `adopt` covers every endpoint. Docs only.
+
 ## unspecified-low opens on Claude Sonnet 5.5; deep-low opens on plain GPT-5.6 Sol
 
 `CATEGORY_FALLBACK_CHAINS["unspecified-low"]` and the builtin category config now lead with

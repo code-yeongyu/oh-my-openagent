@@ -149,6 +149,10 @@
 - `components/x-search/index.ts`: the conditional `x-search` skill goes through it. Both tools stay registered.
 - `extension/types.ts`: `getCommands()` entries carry the optional `sourceInfo.path` senpi already reports.
 
+## thread: AGENTS documents endpoint kinds, the delivery table, budgets, binding invariants, the outbox contract and completion arms
+
+`src/components/thread/AGENTS.md` gains the `rpc_host`/`tui` endpoint kinds, the 15-cell `decideDelivery` table (the gateway's `auto` queues as a follow-up and never steers, unlike the mailbox path), every fixed budget with its constant (250 ms settle wait, the lock wait that gives up at about 25 s and never past 30 s, the retry on `lock_wait_exceeded`, the loop guards and rate limits), the binding invariants, the outbox contract, the completion arm lifecycle including the settle race, and the QA commands for the CLI, adopt and the built SDK. The live-surface row no longer says `omo daemon attach` sessions live on the legacy socket, and the package `AGENTS.md` names `omo daemon run` and `adopt` for `rpc.sock`. Docs only.
+
 ## thread: script-callable SDK (`plugin/runtime/thread-sdk/sdk.js`) for the `omo thread` CLI and connectors
 
 - `components/thread/sdk.ts` (exported from the component barrel): `createThreadSdk({ agentDir, cwd, uid, user,

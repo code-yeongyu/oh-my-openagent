@@ -257,6 +257,10 @@ reads the `legacyPiAgentDir.copiedAt` the engine records in `migrations-state.js
 record existed, falls back to the agent copy's preserved mtime. Unlike the engine notice, doctor reports every such edit
 on every run. `~/.pi/agent` is only read.
 
+## 2026-09-29 - AGENTS: `omo daemon` lists `adopt`, not `attach`
+
+The `omo daemon` row names `run|adopt|status|stop|handoff|gc|rollback-prepare`; `run` alone ensures the operator endpoint, and the note that attach stays spawn-based is gone with the subcommand (removed by the senpi adoption; `adopt` moves a host session into a terminal instead). Docs only; no code changed.
+
 ## 2026-09-29 - `omo thread` CLI, `omo daemon adopt`, and terminal rows in `omo daemon status`
 
 - `bin/lib/thread.js` (+ `thread-args.js`, `thread-output.js`): `omo thread list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack [--json]`

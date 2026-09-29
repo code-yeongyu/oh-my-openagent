@@ -5,8 +5,10 @@ A terminal session's `process` children run on a task host keyed by that session
 (`p-*`), and each Desktop interactive thread runs on its own thread host (`i-*`).
 A crash, an idle exit, or a handoff on one of those hosts does not touch the others.
 The socket `rpc.sock` stays as the operator endpoint: `omo daemon run` ensures it, and
-the thread tools create their sessions there. A terminal session runs its own session in
-its own process and never joins a host.
+`thread_create` opens its sessions there. A terminal session runs its own session in its own
+process and never joins a host; other sessions reach it through its control endpoint (see
+[omo thread](./omo-thread.md)), and `omo daemon adopt` moves a session a host holds into a
+terminal.
 `omo daemon` is the operator's view of every one of these hosts in one agent directory.
 Everything that decides *who serves a socket* lives in the engine (`senpi host`);
 this command supplies omo's launch spec, reads the policy out of the omo config, and
@@ -31,7 +33,7 @@ engine ahead of a session's first child: on its first prompt by default, at sess
 only at the first spawn per `task.host_shard_prewarm`, never by bare `omo` itself); `status`, `gc` and `stop` work on an install whose plugin payload was
 never built. `--persistent` is still accepted and does nothing; `--foreground` exits 2,
 because the engine host always detaches. There is no `attach` subcommand any more: a terminal
-no longer runs its session on a host, so there is no host environment to print.
+no longer runs its session on a host, so to continue a host session in a terminal, adopt it.
 
 ## Per-session hosts
 
@@ -53,7 +55,7 @@ per-child-process child, a Desktop thread) is the root of its own tree: its chil
 go to `p-<its own key>`. Each child a host session opens carries its tree's key in its
 session context as `tree_key` and `shard_key`. When that child spawns children of its
 own, it reads `shard_key` and puts them on the host it already lives on. It may only
-attach to that host: it never ensures, starts, or hands it off, and a silent host is
+connect to that host: it never ensures, starts, or hands it off, and a silent host is
 `own_host_unreachable`. A child is never routed on a guess. With no session id at
 routing time the spawn fails with `shard_identity_missing`.
 
@@ -83,8 +85,8 @@ idle retained session is 30 minutes, but OmO's launch path sets
 `SENPI_RPC_SESSION_IDLE_EVICTION_MS` to the idle-exit window, so both are 15 minutes by
 default. A longer inherited eviction window is kept. The trade-off, measured in the cost
 section below: a departed parent's own host idles out even when other clients stay
-connected elsewhere, while one shared host kept alive by any other client used to keep
-the departed parent's retained sessions for the whole eviction window.
+connected elsewhere, while the previous release's single host, kept alive by any other
+client, used to keep the departed parent's retained sessions for the whole eviction window.
 
 **Memory pressure is observability only.** Every host samples and reports its own
 memory. `status` shows `rss_mb` (the endpoint's whole process tree) and `host_rss_mb`
@@ -153,7 +155,7 @@ live generation, or holds a live claim.
 update meets its own `p-*` host running the older build and, under the default
 `upgrade` policy, hands that host off to the new build. With N live session hosts that
 is N successor spawns, one per host as each session next ensures it, instead of the
-single handoff one shared host used to need.
+single handoff the previous release's one host needed.
 
 **Older clients see only `rpc.sock`.** An `omo daemon status` from before per-session
 hosts asks for the single socket `rpc.sock`, and so does an older Desktop. Neither
@@ -167,15 +169,15 @@ scales with the number of busy sessions. Nothing caps it: there is no limit on h
 children, or memory.
 
 Measured on an Apple M-series 14-core machine with 64 GB, under load from other work,
-with engine senpi 2026.9.28-3, against the previous release's single shared host
-(20 samples per latency scenario):
+with engine senpi 2026.9.28-3, against the previous release, which ran every session's
+children on one host (20 samples per latency scenario):
 
 | Idle endpoint (0 sessions) | RSS MB | Physical footprint MB |
 | --- | --- | --- |
 | One task host (supervisor + host) | 245.4 | 126.2 |
-| Previous shared host (supervisor + host) | 248.6 | 137.3 |
+| Previous release's one host (supervisor + host) | 248.6 | 137.3 |
 
-| Parents, 4 children each | Per-session hosts RSS / footprint MB | One shared host RSS / footprint MB |
+| Parents, 4 children each | Per-session hosts RSS / footprint MB | One host for all RSS / footprint MB |
 | --- | --- | --- |
 | 1 | 620.7 / 203.8 | 666.6 / 228.6 |
 | 2 | 1353.7 / 432.5 | 753.7 / 255.3 |
@@ -200,8 +202,8 @@ at 4 children.
 
 Idle exit: with no client left, every endpoint was gone 16 minutes later in both
 configurations. With one parent still connected and two departed, both departed
-parents' hosts were gone by then while the live parent kept its own. The shared host
-stayed up for the live parent: it held 0 retained sessions under the default eviction
+parents' hosts were gone by then while the live parent kept its own. The previous
+release's one host stayed up for the live parent: it held 0 retained sessions under the default eviction
 window and 4 under a 1-hour window. The per-session configuration also used less
 memory in both cases (237.5 against 279.7 MB RSS by default, 235.7 against 263.9 MB
 with the 1-hour window).
@@ -391,14 +393,14 @@ logged and changes nothing for the first child.
 Measured on the compiled binary (a fresh session, its first turn, a mock model answering
 after 1-3 s with a `task` call; time from the parent's `task` call to the child's first
 model request; 60 samples per configuration over two runs, interleaved with a control on
-an already-running shared host of the previous release):
+the previous release's one host, already running):
 
 | configuration | p50 | p95 |
 | --- | --- | --- |
 | `off` (host boots at the first child; 20 samples) | 1666 ms | 3280 ms |
 | `first-turn` (default) | 1116 ms | 1678 ms |
 | `session-start` | 1115 ms | 1648 ms |
-| previous release, shared host already running | 979 ms | 1593 ms |
+| previous release, its one host already running | 979 ms | 1593 ms |
 
 The pre-warm removes the host boot from the first child's wait; what remains, about
 0.1 s at p50, is the new host's first turn. `first-turn` is the default because it
