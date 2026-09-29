@@ -201,6 +201,26 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(w.dialed).not.toContain(tui)
   })
 
+  test("#given a registry row for a terminal whose socket and secret are gone #when thread_list runs #then its thread reports error_note dead, not a raw host_unavailable path", async () => {
+    // given: the engine still lists the endpoint (its directory outlived the process) but the terminal exited
+    const dir = tempDir("thr-tui-")
+    const legacy = join(dir, "rpc.sock")
+    const tui = join(dir, "t-0123456789abcdef.sock")
+    const sessionPath = join(dir, "tui.jsonl")
+    writeFileSync(sessionPath, `${JSON.stringify({ type: "session", version: 3, id: "dur-gone", timestamp: "2026-09-28T04:19:00.000Z", cwd: process.cwd() })}\n`)
+    await hostEndpoint(legacy)
+    const w = surfaceFor(legacy, [{ socket: tui, reachable: false, session_paths: [sessionPath], endpoint_kind: "tui" }])
+
+    // when
+    const threads = threadsOf(await w.run("thread_list", { all_scope: true }))
+
+    // then
+    const gone = threads.find((thread) => thread.thread_id === "dur-gone")
+    expect(gone).toMatchObject({ status: "resumable", alive: false, error_note: "dead", surface: "tui" })
+    expect(JSON.stringify(gone)).not.toContain("host_unavailable")
+    expect(w.dialed).not.toContain(tui)
+  })
+
   test("#given a wrong secret #when a terminal is listed #then the connection is refused by the endpoint and the thread tools report it unreachable instead of hanging", async () => {
     const dir = tempDir("thr-tui-")
     const legacy = join(dir, "rpc.sock")
@@ -226,7 +246,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const tuiWake = await w.surface.gateway.wake({ kind: "tui", socket: tui, routing_id: "dur-tui" }, ["d1"])
     const hostWake = await w.surface.gateway.wake({ kind: "rpc_host", socket: legacy, routing_id: "rpc-1" }, ["d2"])
     const liveness = await w.surface.gateway.classifyLiveness?.({ kind: "tui", socket: tui, routing_id: "dur-tui" })
-    const release = await (w.surface.gateway.releaseSession?.({ kind: "tui", socket: tui, routing_id: "dur-tui" }, {}) ?? Promise.resolve(undefined)).then(() => "released", (error: unknown) => (error instanceof Error ? error.message : String(error)))
+    const release = await (w.surface.gateway.releaseSession?.({ kind: "tui", socket: tui, routing_id: "dur-tui" }, { reason: "takeover" }) ?? Promise.resolve(undefined)).then(() => "released", (error: unknown) => (error instanceof Error ? error.message : String(error)))
 
     // then
     expect(tuiWake).toEqual({ admitted: [{ delivery_id: "d1", kind: "started" }] })

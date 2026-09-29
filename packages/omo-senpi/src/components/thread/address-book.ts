@@ -5,7 +5,7 @@ import type { ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
-import { messageText, threadTitle, type SessionFacts } from "./session-facts"
+import { parseSessionLines, summarizeSessionEntries, threadTitle, type SessionFacts } from "./session-facts"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -279,12 +279,6 @@ export function toGatewayAddressEntries(entries: readonly AddressEntry[]): Gatew
   }))
 }
 
-type JsonRecord = Record<string, unknown>
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
 /** One session file's durable identity, or null when the file is unreadable or has no header. */
 export function readDiskSession(path: string, sourceHost: string | null): DiskSession | null {
   let content: string
@@ -296,41 +290,17 @@ export function readDiskSession(path: string, sourceHost: string | null): DiskSe
     return null
   }
 
-  let header: JsonRecord | null = null
-  let name: string | null = null
-  let firstUserText: string | undefined
-  let latestTimestamp = ""
-  for (const line of content.split("\n")) {
-    if (line.trim().length === 0) continue
-    let entry: unknown
-    try {
-      entry = JSON.parse(line)
-    } catch {
-      continue
-    }
-    if (!isRecord(entry)) continue
-    if (header === null && entry.type === "session" && typeof entry.id === "string") header = entry
-    if (entry.type === "session_info") {
-      name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null
-    }
-    if (firstUserText === undefined && entry.type === "message" && isRecord(entry.message) && entry.message.role === "user") {
-      const text = messageText(entry.message.content).trim()
-      if (text.length > 0) firstUserText = text
-    }
-    if (typeof entry.timestamp === "string" && entry.timestamp > latestTimestamp) latestTimestamp = entry.timestamp
-  }
-
+  const { header, name, first_user_text: firstUserText, newest_timestamp: latestTimestamp } = summarizeSessionEntries(parseSessionLines(content))
   if (header === null || typeof header.id !== "string" || typeof header.cwd !== "string") return null
-  const createdAt = validTimestamp(header.timestamp, modified)
   return {
     durable_id: header.id,
     name,
     cwd: header.cwd,
-    created_at: createdAt,
+    created_at: validTimestamp(header.timestamp, modified),
     updated_at: latestTimestamp || modified,
     session_path: path,
     source_host: sourceHost,
-    ...(firstUserText === undefined ? {} : { first_user_text: firstUserText }),
+    ...(firstUserText === null ? {} : { first_user_text: firstUserText }),
   }
 }
 

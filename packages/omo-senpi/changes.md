@@ -174,6 +174,16 @@
   (`registerControlEndpoint`, `admissionGate`, `admitExternalMessage`, `listAdmittedDeliveries`, `persistHeaderNow`),
   the thread component persists the session header and registers the session's control endpoint with the gateway
   inbox drain; shutdown disposes the endpoint before the store. On today's engine nothing is registered.
+- `components/thread/gateway/store.ts`, `plugin/scripts/build-extension-core.mjs`, `check-extension-current.mjs`,
+  `src/install/plugin-artifacts.ts`: the gateway store's worker thread ships as its own build output,
+  `extensions/gateway-store-worker.mjs`, beside `omo.js` (a bundler cannot inline a `Worker` entry). The store
+  resolves it from its own module location and falls back to `store-worker.ts` in source; `build-extension --check`
+  and the installer's required-artifact list include it. Without it the built extension's inbox drain could not open
+  its store (`MODULE_NOT_FOUND`).
+- `components/thread/gateway/registration.ts`: the store is stamped with `pi.sessionContext.host_instance`, so a host
+  `release_session` settles only its own runtime's claims.
+- `components/thread/live-surface.ts`: a terminal endpoint whose socket is gone is reported `dead` instead of a raw
+  `host_unavailable:<path>`.
 
 ## thread: gateway store and delivery engine (SQLite, receipts, causal loop guard)
 

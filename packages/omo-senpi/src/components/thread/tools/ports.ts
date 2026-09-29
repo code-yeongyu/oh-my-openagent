@@ -1,6 +1,6 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
 import type { EndpointKind } from "../endpoint-registry"
-import type { GatewayWakeReply, ReleaseSessionReply } from "../gateway/adapter"
+import type { GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
 import type { ThreadTranscriptEntry } from "../reader"
 
 export type ThreadHostSession = {
@@ -61,7 +61,7 @@ export type ThreadHost = {
   /** Runs the session's registered inbox drain once (`wake`); every endpoint kind answers it. */
   readonly wake?: (sessionId: string, deliveryIds: readonly string[]) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
-  readonly releaseSession?: (sessionId: string, options: { readonly interrupt?: boolean; readonly force?: boolean }) => Promise<ReleaseSessionReply>
+  readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: () => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */

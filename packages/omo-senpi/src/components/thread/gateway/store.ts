@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto"
+import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
 import { GATEWAY_BUSY_TIMEOUT_MS } from "./constants"
@@ -26,8 +28,21 @@ export type GatewayStoreOptions = {
   readonly runtimeInstance?: string
   readonly legacyMailboxDirectories?: readonly string[]
   readonly now?: () => number
-  /** Test seams only: a shorter busy timeout and commit-boundary hooks. */
-  readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number }
+  /** Test seams only: a shorter busy timeout, commit-boundary hooks, and the module location the worker is resolved from. */
+  readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly moduleUrl?: string | URL }
+}
+
+/** The store worker's file name beside the built extension bundle (`plugin/extensions/`). */
+export const GATEWAY_STORE_WORKER_BUNDLE_NAME = "gateway-store-worker.mjs"
+
+/**
+ * Where the worker thread's module is, seen from the module the store facade runs in: inside the
+ * built extension that is the `gateway-store-worker.mjs` sidecar the build emits beside `omo.js`
+ * (a bundler cannot inline a Worker's entry); from source it is `store-worker.ts` next to this file.
+ */
+export function gatewayStoreWorkerUrl(moduleUrl: string | URL = import.meta.url): URL {
+  const bundled = new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, moduleUrl)
+  return existsSync(fileURLToPath(bundled)) ? bundled : new URL("./store-worker.ts", moduleUrl)
 }
 
 export type DeliveryView = { readonly row: DeliveryRow; readonly queue_position: number }
@@ -106,7 +121,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   function start(): Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }> {
     if (disposed) return Promise.reject(new Error("the gateway store is disposed"))
     if (opened !== undefined) return opened
-    const spawned = new Worker(new URL("./store-worker.ts", import.meta.url))
+    const spawned = new Worker(gatewayStoreWorkerUrl(options._test?.moduleUrl))
     worker = spawned
     spawned.unref()
     spawned.on("message", (message: WorkerMessage) => {

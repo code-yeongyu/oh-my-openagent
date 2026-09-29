@@ -1,11 +1,14 @@
-import type {
-  AdmitExternalMessageInput,
-  DrainWakeEvent,
-  ExternalAdmissionKind,
-  RuntimePhase,
-  SessionAdmissionGate,
-  SessionRuntimePort,
-  WakeReason,
+import {
+  toSessionControlDrainResult,
+  type AdmitExternalMessageInput,
+  type DrainWakeEvent,
+  type ExternalAdmissionKind,
+  type RegisterControlEndpointOptions,
+  type RuntimePhase,
+  type SessionAdmissionGate,
+  type SessionControlRegistrar,
+  type SessionRuntimePort,
+  type WakeReason,
 } from "./adapter"
 import { createInboxDrain, type InboxDrain, type InboxDrainOptions } from "./drain"
 import { gatewayInboxDirectory } from "./paths"
@@ -17,26 +20,10 @@ import { createGatewayStore, type GatewayStore } from "./store"
  * host whose `pi` has no such surface registers nothing, and the session is simply not reachable
  * through the gateway.
  */
-export type SenpiWakeEvent = {
-  readonly type?: string
-  readonly reason: string
-  readonly reasons?: readonly string[]
-  readonly delivery_ids?: readonly string[]
-}
-
-export type SenpiDrainResult = { readonly admitted: readonly { readonly delivery_id: string; readonly kind: ExternalAdmissionKind }[] }
-
-export type SenpiControlRegistration =
-  | { readonly status: "registered"; readonly socket: string; readonly dispose: () => Promise<void> }
-  | { readonly status: "unsupported"; readonly reason: string }
-  | { readonly status: "failed"; readonly reason: string }
+export type SenpiWakeEvent = Parameters<RegisterControlEndpointOptions["drain"]>[0]
 
 export type SessionControlActionsPort = {
-  readonly registerControlEndpoint: (options: {
-    readonly inboxDir: string
-    readonly drain: (event: SenpiWakeEvent) => Promise<SenpiDrainResult>
-    readonly isSessionReferenced: () => Promise<boolean>
-  }) => Promise<SenpiControlRegistration>
+  readonly registerControlEndpoint: SessionControlRegistrar
   readonly admissionGate: () => SessionAdmissionGate
   readonly admitExternalMessage: (input: AdmitExternalMessageInput) => { readonly kind: ExternalAdmissionKind; readonly turn_epoch: number }
   readonly listAdmittedDeliveries: () => { readonly pending: readonly string[]; readonly emitted: readonly string[] }
@@ -93,9 +80,20 @@ export type RegistrationOutcome =
   | { readonly status: "unsupported"; readonly reason: string }
   | { readonly status: "failed"; readonly reason: string }
 
+/** The senpi host generation a host session runs in (`pi.sessionContext.host_instance`); `undefined` in a terminal. */
+export function hostInstanceOf(pi: unknown): string | undefined {
+  if (typeof pi !== "object" || pi === null) return undefined
+  const context = (pi as { readonly sessionContext?: unknown }).sessionContext
+  if (typeof context !== "object" || context === null) return undefined
+  const instance = (context as { readonly host_instance?: unknown }).host_instance
+  return typeof instance === "string" && instance.length > 0 ? instance : undefined
+}
+
 export type ControlEndpointRegistrantOptions = {
   readonly control: SessionControlActionsPort
   readonly agentDir: () => string
+  /** Stamped on this process's claims so a host `release_session` settles only its own runtime's rows. */
+  readonly runtimeInstance?: string
   readonly log?: (line: string) => void
   /** Test seams: the store to use, and drain options (clock, crash hooks, a foreign identity). */
   readonly _test?: {
@@ -113,7 +111,6 @@ export type ControlEndpointRegistrant = {
 }
 
 const SENPI_REASONS: ReadonlySet<string> = new Set<WakeReason>(["idle", "submission", "draft_cleared", "command", "inbox", "emitted", "continue"])
-const EXTERNAL_KINDS: ReadonlySet<string> = new Set<ExternalAdmissionKind>(["started", "queued", "steered", "turn_conflict", "held_draft", "already_admitted"])
 
 function drainEvent(event: SenpiWakeEvent): DrainWakeEvent {
   const reason = SENPI_REASONS.has(event.reason) ? (event.reason as WakeReason) : "inbox"
@@ -171,7 +168,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       return { status: "failed", reason }
     }
     const agentDir = options.agentDir()
-    store ??= createGatewayStore({ agentDir })
+    store ??= createGatewayStore({ agentDir, ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }) })
     const runtime: SessionRuntimePort = {
       phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : "mid_turn"),
       admissionGate: () => control.admissionGate(),
@@ -182,11 +179,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     let retired = false
     const reply = await control.registerControlEndpoint({
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
-      drain: async (event) => {
-        if (retired) return { admitted: [] }
-        const result = await drain.drain(drainEvent(event))
-        return { admitted: result.admitted.flatMap((entry) => (EXTERNAL_KINDS.has(entry.kind) ? [{ delivery_id: entry.delivery_id, kind: entry.kind as ExternalAdmissionKind }] : [])) }
-      },
+      drain: async (event) => (retired ? { admitted: [] } : toSessionControlDrainResult(await drain.drain(drainEvent(event)))),
       isSessionReferenced: () => drain.isSessionReferenced(),
     })
     if (reply.status !== "registered") {

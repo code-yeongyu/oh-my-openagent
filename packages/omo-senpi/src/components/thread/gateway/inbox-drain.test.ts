@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { EndpointLiveness, GatewayEndpointPort } from "./adapter"
+import type { EndpointLiveness, GatewayEndpointPort, SessionControlDrainResult } from "./adapter"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./constants"
 import type { InboxDrainOptions } from "./drain"
 import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry, type GatewayEngine } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
 import { processStartTime } from "./process-identity"
-import { createControlEndpointRegistrant, type ControlEndpointRegistrant, type SenpiDrainResult, type SenpiWakeEvent, type SessionControlActionsPort } from "./registration"
+import { createControlEndpointRegistrant, type ControlEndpointRegistrant, type SenpiWakeEvent, type SessionControlActionsPort } from "./registration"
 import { createGatewayStore, type GatewayStore } from "./store"
 import { FakeSessionRuntime } from "./testing/fake-runtime"
 import type { DeliveryRow, DeliveryState, GatewayDeliveryResult, ProcessIdentity } from "./types"
@@ -23,17 +23,22 @@ const REASON_PRIORITY: readonly Reason[] = ["submission", "draft_cleared", "idle
  * drain pass at a time, edges arriving during a pass coalesced into exactly one more, a first
  * `inbox` pass right after registration, idle / emitted edges from the runtime, and the clean-exit
  * question `isSessionReferenced` asked when the registration is disposed. `crash()` is the process
- * dying: no edge reaches the drain again.
+ * dying: no edge reaches the drain again. The inbox watcher is modelled without `fs.watch` timing:
+ * `observeInbox()` diffs the inbox listing and, when an entry appeared or disappeared, raises one
+ * `inbox` edge; it runs after every pass (the drain's own marker deletions) and whenever a test
+ * says a sender's marker landed.
  */
 class FakeSessionControl implements SessionControlActionsPort {
   readonly passes: Reason[] = []
   readonly errors: string[] = []
   persisted = 0
   referencedAtExit: boolean | undefined
-  private drainFn: ((event: SenpiWakeEvent) => Promise<SenpiDrainResult>) | undefined
+  private drainFn: ((event: SenpiWakeEvent) => SessionControlDrainResult | undefined | Promise<SessionControlDrainResult | undefined>) | undefined
+  private inboxDir: string | undefined
+  private inboxListing = ""
   private crashed = false
   private running = false
-  private next: { reasons: Set<Reason>; ids: Set<string>; waiters: Array<(result: SenpiDrainResult) => void> } | undefined
+  private next: { reasons: Set<Reason>; ids: Set<string>; waiters: Array<(result: SessionControlDrainResult) => void> } | undefined
   private idleWaiters: Array<() => void> = []
 
   constructor(readonly runtime: FakeSessionRuntime) {
@@ -44,6 +49,8 @@ class FakeSessionControl implements SessionControlActionsPort {
   readonly registerControlEndpoint: SessionControlActionsPort["registerControlEndpoint"] = async (options) => {
     mkdirSync(options.inboxDir, { recursive: true, mode: 0o700 })
     this.drainFn = options.drain
+    this.inboxDir = options.inboxDir
+    this.inboxListing = this.listInbox()
     void this.wake("inbox")
     return {
       status: "registered",
@@ -51,7 +58,7 @@ class FakeSessionControl implements SessionControlActionsPort {
       dispose: async () => {
         await this.settled()
         this.drainFn = undefined
-        this.referencedAtExit = await options.isSessionReferenced()
+        this.referencedAtExit = (await options.isSessionReferenced?.()) ?? false
       },
     }
   }
@@ -61,6 +68,23 @@ class FakeSessionControl implements SessionControlActionsPort {
   readonly listAdmittedDeliveries: SessionControlActionsPort["listAdmittedDeliveries"] = () => this.runtime.listAdmittedDeliveries()
   readonly persistHeaderNow: SessionControlActionsPort["persistHeaderNow"] = async () => {
     this.persisted += 1
+  }
+
+  /** The watcher's edge: one `inbox` wake when the listing changed since it was last looked at. */
+  observeInbox(): void {
+    const listing = this.listInbox()
+    if (listing === this.inboxListing) return
+    this.inboxListing = listing
+    void this.wake("inbox")
+  }
+
+  inboxPasses(): number {
+    return this.passes.filter((reason) => reason === "inbox").length
+  }
+
+  private listInbox(): string {
+    if (this.inboxDir === undefined || !existsSync(this.inboxDir)) return ""
+    return readdirSync(this.inboxDir).sort().join("\n")
   }
 
   crash(): void {
@@ -73,13 +97,13 @@ class FakeSessionControl implements SessionControlActionsPort {
     void this.wake("submission")
   }
 
-  wake(reason: Reason, ids: readonly string[] = []): Promise<SenpiDrainResult> {
+  wake(reason: Reason, ids: readonly string[] = []): Promise<SessionControlDrainResult> {
     if (this.crashed || this.drainFn === undefined) return Promise.resolve({ admitted: [] })
     this.next ??= { reasons: new Set(), ids: new Set(), waiters: [] }
     const batch = this.next
     batch.reasons.add(reason)
     for (const id of ids) batch.ids.add(id)
-    const settled = new Promise<SenpiDrainResult>((resolve) => batch.waiters.push(resolve))
+    const settled = new Promise<SessionControlDrainResult>((resolve) => batch.waiters.push(resolve))
     if (!this.running) void this.run()
     return settled
   }
@@ -98,15 +122,16 @@ class FakeSessionControl implements SessionControlActionsPort {
         const reasons = REASON_PRIORITY.filter((candidate) => batch.reasons.has(candidate))
         const reason = reasons[0] ?? "inbox"
         this.passes.push(reason)
-        let result: SenpiDrainResult = { admitted: [] }
+        let result: SessionControlDrainResult = { admitted: [] }
         const drain = this.drainFn
         if (drain !== undefined && !this.crashed) {
           try {
-            result = await drain({ type: "session_control_wake", reason, reasons, ...(batch.ids.size > 0 ? { delivery_ids: [...batch.ids] } : {}) })
+            result = (await drain({ type: "session_control_wake", reason, reasons, ...(batch.ids.size > 0 ? { delivery_ids: [...batch.ids] } : {}) })) ?? { admitted: [] }
           } catch (error) {
             this.errors.push(error instanceof Error ? error.message : String(error))
           }
         }
+        if (!this.crashed && this.drainFn !== undefined) this.observeInbox()
         for (const waiter of batch.waiters) waiter(result)
       }
     } finally {
@@ -222,23 +247,25 @@ async function deadIdentity(): Promise<ProcessIdentity> {
   child.stdin.end()
   await child.exited
   if (startTime === null) throw new Error("could not read the holder's start time")
-  return { pid: child.pid, process_start_time: startTime, instance_id: randomUUID() }
+  return { pid: child.pid, process_start_time: startTime, instance_id: randomUUID(), runtime_instance: null }
 }
 
 describe("session inbox drain through the control endpoint registrant", () => {
-  test("#given an idle terminal #when three deliveries arrive #then they are applied in seq order, one transcript entry each, with no user input and no timer", async () => {
+  test("#given three deliveries queued while the terminal was offline #when it registers and one drain pass takes them all #then they are admitted and written in seq order, one transcript entry each", async () => {
     // given
     const w = await world()
-    const b = await w.process()
+    const ids = [okId(await send(w, "one")), okId(await send(w, "two")), okId(await send(w, "three"))]
 
     // when
-    const ids = [okId(await send(w, "one")), okId(await send(w, "two")), okId(await send(w, "three"))]
+    const b = await w.process()
     b.runtime.endTurn()
     await b.control.settled()
     b.runtime.endTurn()
     await b.control.settled()
 
     // then
+    expect(b.runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(ids)
+    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start", "followUp", "followUp"])
     expect(tokensOnDisk(w.sessionPath)).toEqual(ids)
     expect(await Promise.all(ids.map((id) => stateOf(w.senderStore, id)))).toEqual(["applied", "applied", "applied"])
     expect(b.control.persisted).toBe(1)
@@ -254,21 +281,23 @@ describe("session inbox drain through the control endpoint registrant", () => {
     expect({ state: await stateOf(w.senderStore, id), tokens: tokensOnDisk(w.sessionPath) }).toEqual({ state: "applied", tokens: [id] })
   })
 
-  test("#given the user is composing a draft #when a delivery arrives, inbox wakes repeat and then the user presses Enter #then nothing is written while held, the draft runs first and the delivery is applied exactly once after it", async () => {
+  test("#given the user is composing a draft #when a delivery arrives and its marker lands #then the receiver writes nothing, takes at most one inbox wake and keeps the marker; Enter then runs the draft first and applies the delivery exactly once", async () => {
     // given
     const w = await world()
     const b = await w.process()
     b.runtime.typeDraft()
+    const writesBefore = (await b.store.stats()).writes
+    const inboxBefore = b.control.inboxPasses()
 
-    // when
+    // when: the send's own wake is the first pass; the sender's marker then reaches the watcher
     const result = await send(w, "while you type")
     const id = okId(result)
-    const before = await b.store.stats()
-    await b.control.wake("inbox")
-    await b.control.wake("inbox")
-    const during = await b.store.stats()
-    const heldState = await stateOf(b.store, id)
-    const heldMarker = markerExists(w, id)
+    b.control.observeInbox()
+    await b.control.settled()
+    b.control.observeInbox()
+    await b.control.settled()
+    const held = { writes: (await b.store.stats()).writes - writesBefore, inboxWakes: b.control.inboxPasses() - inboxBefore, state: await stateOf(b.store, id), marker: markerExists(w, id), row: (await b.store.deliveryView(id))?.row }
+    const inboxBeforeEnter = b.control.inboxPasses()
     b.control.submit()
     await b.control.settled()
     b.runtime.endTurn()
@@ -276,7 +305,9 @@ describe("session inbox drain through the control endpoint registrant", () => {
 
     // then
     expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
-    expect({ writes: during.writes - before.writes, state: heldState, marker: heldMarker }).toEqual({ writes: 0, state: "queued", marker: true })
+    expect({ writes: held.writes, state: held.state, marker: held.marker, attempt: held.row?.attempt, claimedBy: held.row?.admitted_by ?? null }).toEqual({ writes: 0, state: "queued", marker: true, attempt: 0, claimedBy: null })
+    expect(held.inboxWakes).toBeLessThanOrEqual(1)
+    expect(b.control.inboxPasses() - inboxBeforeEnter).toBeLessThanOrEqual(1)
     expect(await stateOf(b.store, id)).toBe("applied")
     expect(markerExists(w, id)).toBe(false)
     const lines = readFileSync(w.sessionPath, "utf8").split("\n").filter((line) => line.length > 0).map((line) => JSON.parse(line) as { type: string; message?: { role?: string } })

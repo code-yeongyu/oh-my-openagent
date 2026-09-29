@@ -1,10 +1,13 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
+import { spawn } from "node:child_process"
 import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
+
+import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
 import {
   buildExtension,
@@ -45,6 +48,7 @@ function outputPathsIn(root) {
     toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(root, "runtime", "rollback-migrate.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
+    gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),
   }
 }
 
@@ -70,6 +74,67 @@ async function mutableOutputs() {
   await cp(shared.root, root, { recursive: true })
   return { root, ...outputPathsIn(root), mainInputs: shared.mainInputs, taskInputs: shared.taskInputs }
 }
+
+describe("gateway store worker sidecar", () => {
+  test("#given the built extension #when the store facade resolves its worker from the built omo.js location #then it starts the emitted sidecar and round-trips store operations", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const agentDir = await mkdtemp(join(tmpdir(), "omo-gateway-built-worker-"))
+    perTestRoots.push(agentDir)
+    const builtModule = pathToFileURL(outputs.outputPath)
+    const store = createGatewayStore({ agentDir, _test: { moduleUrl: builtModule } })
+
+    // when
+    try {
+      const journal = await store.journalMode()
+      const referenced = await store.isReferenced("no-such-session")
+      const stats = await store.stats()
+
+      // then
+      expect(fileURLToPath(gatewayStoreWorkerUrl(builtModule))).toBe(outputs.gatewayStoreWorkerOutputPath)
+      expect({ journal, referenced, transactions: typeof stats.transactions }).toEqual({ journal: "wal", referenced: false, transactions: "number" })
+    } finally {
+      await store.dispose()
+    }
+  })
+
+  test("#given the built sidecar #when plain node starts it as a worker thread #then it answers init and stats", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const agentDir = await mkdtemp(join(tmpdir(), "omo-gateway-node-worker-"))
+    perTestRoots.push(agentDir)
+    const config = { agent_dir: agentDir, busy_timeout_ms: 5000, instance_id: "built-worker-probe", runtime_instance: null, legacy_mailbox_directories: [], test_hooks: {} }
+    const probe = [
+      "const { Worker } = require('node:worker_threads')",
+      `const worker = new Worker(${JSON.stringify(outputs.gatewayStoreWorkerOutputPath)})`,
+      "const replies = []",
+      "worker.on('error', (error) => { console.error(String(error)); process.exit(2) })",
+      "worker.on('message', (message) => { if (message.type !== 'response') return; replies.push(message); if (replies.length === 2) { console.log(JSON.stringify(replies)); worker.terminate() } })",
+      `worker.postMessage({ type: 'request', id: 1, op: 'init', args: { config: ${JSON.stringify(config)}, now: Date.now() } })`,
+      "worker.postMessage({ type: 'request', id: 2, op: 'stats', args: null })",
+    ].join("\n")
+
+    // when
+    const child = spawn("node", ["-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.on("data", (chunk) => { stdout += chunk })
+    child.stderr.on("data", (chunk) => { stderr += chunk })
+    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+
+    // then
+    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
+    const replies = JSON.parse(stdout.trim())
+    expect(replies.map((reply) => [reply.id, reply.ok])).toEqual([[1, true], [2, true]])
+    expect(replies[0].value.self.instance_id).toBe("built-worker-probe")
+  })
+
+  test("#given the built extension without its store worker sidecar #when freshness is checked #then it reports that output missing", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.gatewayStoreWorkerOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.gatewayStoreWorkerOutputPath })
+  })
+})
 
 describe("checkExtensionCurrent", () => {
   test("#given the eval SDK build #when inputs and exports are inspected #then the standalone entry has no dependencies", async () => {

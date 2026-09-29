@@ -14,6 +14,8 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),
+  // The thread gateway store worker: the inbox drain cannot open its store without it.
+  join("extensions", "gateway-store-worker.mjs"),
   ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),
   join("skills", "ast-grep", "SKILL.md"),
   join("skills", "browser", "SKILL.md"),

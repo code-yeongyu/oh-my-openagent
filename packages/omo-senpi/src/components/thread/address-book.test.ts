@@ -13,6 +13,7 @@ import {
   type DiskSession,
 } from "./address-book"
 import { readSessionFacts, SESSION_FACTS_WINDOW_BYTES, THREAD_TITLE_MAX_CHARS } from "./session-facts"
+import { summary } from "./tools/internals"
 
 const scratch: string[] = []
 afterEach(() => {
@@ -187,6 +188,29 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
     expect(entry?.title).toBe(FIRST_USER.slice(0, THREAD_TITLE_MAX_CHARS))
     expect(entry?.title).not.toContain("019a0000")
     expect(entry?.surface).toBe("desktop")
+  })
+
+  test("#given a live session with no name and no user message #when listed through thread_list's summary #then its name is empty and never its UUID", () => {
+    // given: a header plus an assistant entry only, and an endpoint that reports no name either
+    const dir = tempSessions()
+    const durableId = "019a0000-0000-7000-8000-00000000000d"
+    const path = join(dir, `${durableId}.jsonl`)
+    writeFileSync(path, `${[
+      { type: "session", version: 3, id: durableId, timestamp: HEADER_TIME, cwd: "/work/project" },
+      { type: "message", id: "e1", parentId: null, timestamp: LAST_TIME, message: { role: "assistant", content: [{ type: "text", text: "hello" }] } },
+    ].map((line) => JSON.stringify(line)).join("\n")}\n`)
+    const session = { sessionId: "rpc-9", durableSessionId: durableId, sessionPath: path, cwd: "/work/project", status: "open" as const }
+
+    // when
+    const [entry] = assembleAddressBook([{ socket: "/a/rpc/rpc.sock", result: { sessions: [session] } }], [], { facts: readSessionFacts })
+    const listed = summary(session, entry)
+    const unaddressed = summary(session)
+
+    // then
+    expect({ name: entry?.name, title: entry?.title, created: entry?.created_at, updated: entry?.updated_at }).toEqual({ name: null, title: null, created: HEADER_TIME, updated: LAST_TIME })
+    expect(listed.name).toBe("")
+    expect(unaddressed.name).toBe("")
+    expect(JSON.stringify([listed.name, unaddressed.name, entry?.title])).not.toContain("019a0000")
   })
 
   test("#given a transcript larger than two read windows #when its facts are read #then the header, first user message and the /name plus last timestamp in the tail are all found", () => {

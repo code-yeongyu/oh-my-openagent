@@ -10,7 +10,7 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worker/senpi-command"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
 import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
-import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef, ReleaseSessionReply } from "./gateway/adapter"
+import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadSessionPort } from "./tools/ports"
 
@@ -211,12 +211,28 @@ function isConnectRefusal(error: unknown): boolean {
   return code === "ENOENT" || code === "ECONNREFUSED"
 }
 
+/** senpi's `release_session` frame as the adapter's union: the success payload, or the refusal code with its `errorData`. */
 function releaseReply(frame: RpcFrame): ReleaseSessionReply {
-  if (frame.success === true && record(frame.data) && frame.data.released === true) return frame.data as ReleaseSessionReply
-  const data = record(frame.errorData) ? frame.errorData : {}
-  const dropped = record(data.dropped) ? (data.dropped as { deliveries: string[]; user_messages: string[] }) : undefined
-  const busy = Array.isArray(data.busy) ? data.busy.filter((entry): entry is string => typeof entry === "string") : undefined
-  return { released: false, error: typeof frame.error === "string" ? frame.error : "release_failed", ...(busy === undefined ? {} : { busy }), ...(dropped === undefined ? {} : { dropped }) }
+  if (frame.success === true && record(frame.data) && frame.data.released === true) {
+    return { success: true, data: frame.data as Extract<ReleaseSessionReply, { success: true }>["data"] }
+  }
+  const error = typeof frame.error === "string" ? frame.error : "release_failed"
+  return record(frame.errorData)
+    ? { success: false, error, errorData: frame.errorData as NonNullable<Extract<ReleaseSessionReply, { success: false }>["errorData"]> }
+    : { success: false, error }
+}
+
+const EXTERNAL_ADMISSION_KINDS: ReadonlySet<string> = new Set<ExternalAdmissionKind>(["started", "queued", "steered", "turn_conflict", "held_draft", "already_admitted"])
+
+function wakeReply(data: { readonly admitted?: unknown }): GatewayWakeReply {
+  if (!Array.isArray(data.admitted)) return { admitted: [] }
+  return {
+    admitted: data.admitted.flatMap((entry: unknown) =>
+      record(entry) && typeof entry.delivery_id === "string" && typeof entry.kind === "string" && EXTERNAL_ADMISSION_KINDS.has(entry.kind)
+        ? [{ delivery_id: entry.delivery_id, kind: entry.kind as ExternalAdmissionKind }]
+        : [],
+    ),
+  }
 }
 
 /**
@@ -312,6 +328,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThr
       lastListed.set(endpoint.socket, tagged.flatMap((session) => (typeof session.sessionPath === "string" ? [session.sessionPath] : [])))
       return { host: { socket: endpoint.socket, list_sessions: { sessions: tagged }, endpoint_kind: endpoint.kind, alive: true, reason: null, legacy: endpoint.socket === legacy }, sessions: tagged, disk: [] }
     } catch (error) {
+      // A terminal removes its socket when it exits, so a registered terminal whose socket is gone has ended.
+      if (tui && !exists(endpoint.socket)) return degraded(endpoint, new Error("dead"), "dead")
       const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
       return degraded(endpoint, error, endpoint.verdict.reason ?? (timedOut ? "live_unresponsive" : isConnectRefusal(error) ? "dead" : null))
     }
@@ -339,14 +357,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThr
     },
     setThinkingLevel: async (sessionId, level, scope) => { await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }) },
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
-    wake: async (sessionId, deliveryIds) => {
-      const { admitted } = await send<{ admitted?: { delivery_id: string; kind: string }[] }>("wake", { sessionId, delivery_ids: [...deliveryIds] })
-      return { admitted: Array.isArray(admitted) ? admitted : [] }
-    },
-    releaseSession: async (sessionId, release) => {
-      const target = socket ?? legacy
-      return releaseReply(await callFrame(target, "release_session", { sessionId, reason: "takeover", ...release }))
-    },
+    wake: async (sessionId, deliveryIds) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] })),
+    releaseSession: async (sessionId, release) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release })),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -371,12 +383,11 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThr
     wake: async (endpoint, deliveryIds) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
       const target = endpoint.kind === "rpc_host" && endpoint.routing_id !== null ? { sessionId: endpoint.routing_id } : {}
-      const { admitted } = await callOn<{ admitted?: { delivery_id: string; kind: string }[] }>(endpoint.socket, "wake", { ...target, delivery_ids: [...deliveryIds] })
-      return { admitted: Array.isArray(admitted) ? admitted : [] }
+      return wakeReply(await callOn<{ admitted?: unknown }>(endpoint.socket, "wake", { ...target, delivery_ids: [...deliveryIds] }))
     },
-    releaseSession: async (endpoint, release) => {
+    releaseSession: async (endpoint, request) => {
       if (endpoint.kind !== "rpc_host" || endpoint.routing_id === null) throw new Error("unsupported:release_session")
-      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, reason: "takeover", ...release }))
+      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, ...request }))
     },
     classifyLiveness: liveness,
   }

@@ -1,6 +1,6 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { controlSessionOf, createControlEndpointRegistrant, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
+import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
 
@@ -24,9 +24,11 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
 function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions): void {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
   if (control === undefined) return
+  const runtimeInstance = hostInstanceOf(pi)
   const registrant = createControlEndpointRegistrant({
     control,
     agentDir: options.agentDir ?? (() => resolveAgentHome({ env: process.env })),
+    ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
     log: (line) => ctx.logger.warn(line),
     ...(options.controlEndpointTest === undefined ? {} : { _test: options.controlEndpointTest }),
   })

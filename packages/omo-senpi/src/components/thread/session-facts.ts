@@ -16,7 +16,7 @@ export type SessionFacts = {
   readonly first_user_text: string | null
 }
 
-type JsonRecord = Record<string, unknown>
+export type JsonRecord = Record<string, unknown>
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -37,7 +37,8 @@ export function threadTitle(name: string | null | undefined, firstUserText: stri
   return [...text].slice(0, THREAD_TITLE_MAX_CHARS).join("")
 }
 
-function parseLines(text: string, dropFirst: boolean, dropLast: boolean): JsonRecord[] {
+/** Each line of a session JSONL that parses as an object; `dropFirst`/`dropLast` discard lines a window may have cut. */
+export function parseSessionLines(text: string, dropFirst = false, dropLast = false): JsonRecord[] {
   const lines = text.split("\n")
   if (dropFirst) lines.shift()
   if (dropLast) lines.pop()
@@ -52,30 +53,32 @@ function parseLines(text: string, dropFirst: boolean, dropLast: boolean): JsonRe
   })
 }
 
-type NameState = { readonly seen: boolean; readonly name: string | null }
-
-function lastName(entries: readonly JsonRecord[], initial: NameState): NameState {
-  let state = initial
-  for (const entry of entries) {
-    if (entry.type !== "session_info") continue
-    state = { seen: true, name: typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null }
-  }
-  return state
+export type SessionEntrySummary = {
+  /** The first `session` entry naming an id. */
+  readonly header: JsonRecord | null
+  /** The last `session_info` name; a later `session_info` without one clears it. */
+  readonly name: string | null
+  readonly first_user_text: string | null
+  /** The newest entry timestamp, `""` when no entry carries one. */
+  readonly newest_timestamp: string
 }
 
-function firstUser(entries: readonly JsonRecord[]): string | null {
+/** One pass over session entries in file order: the rules every reader of a session file shares. */
+export function summarizeSessionEntries(entries: readonly JsonRecord[]): SessionEntrySummary {
+  let header: JsonRecord | null = null
+  let name: string | null = null
+  let firstUserText: string | null = null
+  let newest = ""
   for (const entry of entries) {
-    if (entry.type !== "message" || !isRecord(entry.message) || entry.message.role !== "user") continue
-    const text = messageText(entry.message.content).trim()
-    if (text.length > 0) return text
+    if (header === null && entry.type === "session" && typeof entry.id === "string") header = entry
+    if (entry.type === "session_info") name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null
+    if (firstUserText === null && entry.type === "message" && isRecord(entry.message) && entry.message.role === "user") {
+      const text = messageText(entry.message.content).trim()
+      if (text.length > 0) firstUserText = text
+    }
+    if (typeof entry.timestamp === "string" && entry.timestamp > newest) newest = entry.timestamp
   }
-  return null
-}
-
-function newestTimestamp(entries: readonly JsonRecord[], floor: string): string {
-  let newest = floor
-  for (const entry of entries) if (typeof entry.timestamp === "string" && entry.timestamp > newest) newest = entry.timestamp
-  return newest
+  return { header, name, first_user_text: firstUserText, newest_timestamp: newest }
 }
 
 /**
@@ -98,25 +101,24 @@ export function readSessionFacts(path: string): SessionFacts | null {
     const head = Buffer.alloc(headLength)
     readSync(fd, head, 0, headLength, 0)
     const whole = size <= SESSION_FACTS_WINDOW_BYTES
-    const headEntries = parseLines(head.toString("utf8"), false, !whole)
-    const header = headEntries[0]
-    if (header === undefined || header.type !== "session" || typeof header.id !== "string" || typeof header.cwd !== "string" || typeof header.timestamp !== "string") return null
+    const headEntries = parseSessionLines(head.toString("utf8"), false, !whole)
+    const first = headEntries[0]
+    if (first === undefined || first.type !== "session" || typeof first.id !== "string" || typeof first.cwd !== "string" || typeof first.timestamp !== "string") return null
     let tailEntries: JsonRecord[] = []
     if (!whole) {
       const tailStart = Math.max(headLength, size - SESSION_FACTS_WINDOW_BYTES)
       const tail = Buffer.alloc(size - tailStart)
       readSync(fd, tail, 0, tail.length, tailStart)
-      tailEntries = parseLines(tail.toString("utf8"), true, false)
+      tailEntries = parseSessionLines(tail.toString("utf8"), true, false)
     }
-    const named = lastName(tailEntries, lastName(headEntries, { seen: false, name: null }))
-    const updated = newestTimestamp(tailEntries, newestTimestamp(headEntries, header.timestamp))
+    const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
     return {
-      durable_id: header.id,
-      cwd: header.cwd,
-      created_at: header.timestamp,
-      updated_at: updated,
-      name: named.name,
-      first_user_text: firstUser(headEntries) ?? firstUser(tailEntries),
+      durable_id: first.id,
+      cwd: first.cwd,
+      created_at: first.timestamp,
+      updated_at: summary.newest_timestamp > first.timestamp ? summary.newest_timestamp : first.timestamp,
+      name: summary.name,
+      first_user_text: summary.first_user_text,
     }
   } catch {
     return null
