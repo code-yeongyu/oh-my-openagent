@@ -164,7 +164,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   function start(): Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }> {
     if (disposed) return Promise.reject(new Error("the gateway store is disposed"))
     if (opened !== undefined) return opened
-    const spawned = new Worker(gatewayStoreWorkerUrl(options._test?.moduleUrl ?? options.workerModuleUrl))
+    // A worker inherits the parent's execArgv, and node refuses `--input-type` for a file entry: a
+    // script run as `node --input-type=module -e` would otherwise never open the store.
+    const execArgv = process.execArgv.filter((argument) => !argument.startsWith("--input-type"))
+    const spawned = new Worker(gatewayStoreWorkerUrl(options._test?.moduleUrl ?? options.workerModuleUrl), { execArgv })
     worker = spawned
     spawned.unref()
     spawned.on("message", (message: WorkerMessage) => {

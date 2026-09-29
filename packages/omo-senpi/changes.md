@@ -159,6 +159,11 @@
 - `tools/gateway-services.ts` and `tools/read-ops.ts`: the store/engine/relay composition and the `thread_list` /
   `thread_read` bodies moved out of `tools.ts`, shared by the tools and the SDK (tool behavior unchanged).
 - `gateway/store.ts`: `workerModuleUrl` option (where the worker sidecar is resolved from outside `omo.js`).
+  Its worker no longer inherits `--input-type` (node refuses it for a file worker), so an inline
+  `node --input-type=module -e` connector script can open the store.
+- `live-surface.ts` takes `resolveTaskHostSocket` from `daemon-contract.ts` and `memory/worker/senpi-command.ts` takes
+  the launcher helpers from `@oh-my-opencode/senpi-task/rpc-spawn`: the standalone SDK bundle no longer pulls the
+  task engine (the full barrel made `bun build --outfile` emit assets and fail).
 - Build: new entry `src/extension/thread-sdk.ts` -> `plugin/runtime/thread-sdk/sdk.js` (node builtins only external),
   in `--check`, the installer's required artifacts and the omo-ai payload verifier.
 
