@@ -10,15 +10,13 @@ import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } fr
 import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
 
 /**
- * SESSION GATEWAY SEND SWITCH (todo 13 -> todo 10). While false, `thread_send` / `thread_handoff`
- * keep the mailbox's `prompt` path: the senpi release that ships `wake`, `admitExternalMessage` and
- * the control endpoint is not adopted yet, and a gateway-only send would leave every delivery
- * `queued_offline` on today's runtime. Todo 10's adoption commit sets it to true; the wiring commit
- * after it deletes this constant, the `sendThroughGateway` option, the mailbox branch of
- * `tools.ts` `deliver`, `mailbox.ts`, `mailbox-journal*.ts` and the file receipts in `receipts.ts`.
- * It is a code switch on purpose, not a setting: the gateway has no user-facing flag.
+ * SESSION GATEWAY SEND SWITCH (todo 13 -> todo 10). True since omo adopted senpi 2026.9.29-4, which
+ * ships `wake`, `admitExternalMessage` and the terminal control endpoint: `thread_send` /
+ * `thread_handoff` go through `gateway/engine.deliver`. The next commit deletes this constant, the
+ * `sendThroughGateway` option, the mailbox branch of `tools.ts` `deliver`, `mailbox.ts`,
+ * `mailbox-journal*.ts` and the file receipts in `receipts.ts`.
  */
-export const THREAD_SENDS_THROUGH_GATEWAY: boolean = false
+export const THREAD_SENDS_THROUGH_GATEWAY: boolean = true
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
