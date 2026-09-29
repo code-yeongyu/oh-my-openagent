@@ -229,16 +229,27 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
-export function migrate(ctx: StoreContext): Promise<void> {
-  const current = Number(ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0)
-  return (async () => {
-    for (let version = current; version < GATEWAY_MIGRATIONS.length; version++) {
-      await transaction(ctx, "migrate", () => {
-        for (const statement of GATEWAY_MIGRATIONS[version]) ctx.sql.exec(statement)
-        ctx.sql.exec(`PRAGMA user_version = ${version + 1}`)
-      })
-    }
-  })()
+function schemaVersion(ctx: StoreContext): number {
+  return Number(ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0)
+}
+
+/**
+ * Applies pending migrations. A store that is already current takes no write lock (opening must
+ * never wait behind another process's transaction); otherwise each step re-reads the version under
+ * the lock, so two processes opening a fresh store at once apply every migration exactly once.
+ */
+export async function migrate(ctx: StoreContext): Promise<void> {
+  if (schemaVersion(ctx) >= GATEWAY_MIGRATIONS.length) return
+  for (;;) {
+    const applied = await transaction(ctx, "migrate", () => {
+      const version = schemaVersion(ctx)
+      if (version >= GATEWAY_MIGRATIONS.length) return false
+      for (const statement of GATEWAY_MIGRATIONS[version]) ctx.sql.exec(statement)
+      ctx.sql.exec(`PRAGMA user_version = ${version + 1}`)
+      return true
+    })
+    if (!applied) return
+  }
 }
 
 type ReceiptRecord = {

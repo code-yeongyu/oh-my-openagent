@@ -10,7 +10,7 @@ import { parentPort } from "node:worker_threads"
 
 import { gatewayDatabasePath, gatewayRootDirectory } from "./paths"
 import { processStartTime } from "./process-identity"
-import { Sql, type SqliteConnection } from "./sql"
+import { isBusyError, Sql, type SqliteConnection } from "./sql"
 import * as ops from "./store-ops"
 import type { GatewayStoreConfig, GatewayStoreEvent } from "./types"
 
@@ -19,6 +19,8 @@ type WorkerControl = { readonly type: "resume"; readonly hook: string }
 
 const port = parentPort
 if (port === null) throw new Error("the gateway store worker must run as a worker thread")
+
+const WAL_SWITCH_RETRY_MS = 10
 
 const queue: WorkerRequest[] = []
 const barriers = new Map<string, () => void>()
@@ -106,7 +108,17 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   connection = new sqlite.DatabaseSync(path, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
   const sql = new Sql(connection)
   sql.exec(`PRAGMA busy_timeout = ${Math.trunc(config.busy_timeout_ms)}`)
-  sql.exec("PRAGMA journal_mode = WAL")
+  // Two processes opening a brand-new store race for the WAL switch, which does not wait on
+  // busy_timeout; the loser retries until the winner's switch is published.
+  for (;;) {
+    try {
+      sql.exec("PRAGMA journal_mode = WAL")
+      break
+    } catch (error) {
+      if (!isBusyError(error)) throw error
+      await delay(WAL_SWITCH_RETRY_MS)
+    }
+  }
   sql.exec("PRAGMA synchronous = FULL")
   for (const suffix of ["-wal", "-shm"]) if (existsSync(`${path}${suffix}`)) chmodSync(`${path}${suffix}`, 0o600)
   const self = { pid: process.pid, process_start_time: await processStartTime(process.pid), instance_id: config.instance_id, runtime_instance: config.runtime_instance }
