@@ -41,6 +41,8 @@ export type GatewayStoreOptions = {
   readonly runtimeInstance?: string
   readonly legacyMailboxDirectories?: readonly string[]
   readonly now?: () => number
+  /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
+  readonly workerModuleUrl?: string | URL
   /** Test seams only: a shorter busy timeout and lock-wait bound, commit-boundary hooks, and the module location the worker is resolved from. */
   readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly lockWaitMaxMs?: number; readonly moduleUrl?: string | URL }
 }
@@ -162,7 +164,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   function start(): Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }> {
     if (disposed) return Promise.reject(new Error("the gateway store is disposed"))
     if (opened !== undefined) return opened
-    const spawned = new Worker(gatewayStoreWorkerUrl(options._test?.moduleUrl))
+    const spawned = new Worker(gatewayStoreWorkerUrl(options._test?.moduleUrl ?? options.workerModuleUrl))
     worker = spawned
     spawned.unref()
     spawned.on("message", (message: WorkerMessage) => {

@@ -15,6 +15,7 @@ turns the engine's answer into an exit code a script can branch on.
 ```bash
 omo daemon run                 # ensure the operator daemon on rpc.sock: start, reuse, or hand off
 omo daemon run --json          # the engine's JSON line verbatim
+omo daemon adopt <session> [--interrupt] [--force]   # take a host session into this terminal
 omo daemon status [--json] [--include-workers]   # every endpoint, then a machine aggregate
 omo daemon gc [--json] [--prune-store-index]     # remove dead endpoint state and its owner sidecars
 omo daemon stop [--drain]      # the operator endpoint only
@@ -447,15 +448,44 @@ A user-set `in-process` / `process`, and every per-agent `execution_mode`, still
 wins over the host check. Real fallbacks to a per-child process happen only for
 a capability or policy `engine_mismatch`, on win32, or on a Node without bun.
 
+## Adopting a session into this terminal
+
+`omo daemon adopt <session-id|name>` takes a session a host holds (a Desktop thread on its `i-*`
+host, a daemon or task session) into the terminal you run it in. It finds the session through the
+thread address book (`omo thread list --all-scope`), asks its host to hand it over (senpi
+`release_session`, reason `takeover`), and then resumes it with the normal interactive launch on
+`--session <session file>`, in the session's own directory. The host keeps nothing: it writes a
+`session_released` entry, closes the session and releases the file.
+
+- A quiet session is handed over as is. A session that is running a turn, or owes one to queued
+  input, is refused `turn_active` (exit 4); `--interrupt` stops the turn first. Input the
+  interrupt took out of the host's queue becomes this terminal's first prompts, in their queued
+  order (a message starting with `@` is printed instead, since the launch would read it as a file).
+  When the release is refused after the interrupt, that input is printed so it can be sent again.
+- A session another client is attached to (a Desktop thread window) is refused `attached` with
+  the client count (exit 4); `--force` takes it anyway, and those clients are told the session was
+  released.
+- A terminal session is refused as "already a terminal session" (exit 4), and a session no running
+  host holds exits 3 with the `omo --session` command that resumes it instead.
+- Gateway messages the host had admitted but not yet written are not lost: the adopting terminal's
+  inbox applies them again.
+- `--json` prints `{kind:"released", thread_id, session_path, attachments, dropped}` or
+  `{kind:"refused", error, thread_id?, dropped?}` on stdout before the terminal starts.
+
+Terminal endpoints are listed by `status` as `tui <name> pid <n> cwd <path>`
+(`endpoint_kind: "tui"` in `--json`), but they belong to their terminal: `handoff` prints them as
+skipped, `stop --all [--wait]` neither stops nor waits on them, and `gc` reaps only a terminal whose
+process is gone (the engine's evidence rules).
+
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | 0 | done — the engine's `action` says which of start / reuse / handoff |
 | 2 | usage: no subcommand, an unknown one, or `--foreground` (the engine is not called) |
-| 3 | `status`: no endpoint answers (`daemon: not running`); `stop --all`: an endpoint refused or, with `--wait`, is still live at the timeout; `handoff`: an endpoint refused; `rollback-prepare`: refused before writing |
-| 4 | unsupported platform: win32 has no unix socket to share (the engine is not called) |
-| 5 | the engine refused — read its line; the launch spec may be missing |
+| 3 | `adopt`: no running host holds the session; `status`: no endpoint answers (`daemon: not running`); `stop --all`: an endpoint refused or, with `--wait`, is still live at the timeout; `handoff`: an endpoint refused; `rollback-prepare`: refused before writing |
+| 4 | unsupported platform: win32 has no unix socket to share (the engine is not called); `adopt`: the host refused the hand-over (`turn_active`, `attached`, `session_busy`, ...) or the session is already a terminal session |
+| 5 | the engine refused — read its line; the launch spec may be missing; `adopt`: the host could not write the hand-over (`release_failed`) |
 
 ## Troubleshooting
 

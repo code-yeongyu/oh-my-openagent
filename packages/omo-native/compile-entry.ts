@@ -18,6 +18,7 @@ import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migr
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { nearestNodeBin, readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
+import { runThreadCommand } from "./bin/lib/thread.js"
 import { runDoctor } from "./bin/lib/doctor.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
@@ -249,8 +250,21 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
   }
+  if (command === "thread") {
+    process.exitCode = await runThreadCommand(args.slice(1), {
+      engine,
+      pluginRoot: join(execDir, "plugin"),
+      agentDir: canonicalAgentDir(),
+      env: process.env,
+      cwd: process.cwd(),
+      stdout: process.stdout,
+      stderr: process.stderr,
+      platform: process.platform,
+    })
+    return true
+  }
   if (command === "daemon") {
-    const outcome = runDaemonCommand(args.slice(1), {
+    const outcome = await runDaemonCommand(args.slice(1), {
       engine,
       migration: compiledRollbackMigration(),
       pluginRoot: join(execDir, "plugin"),
@@ -260,6 +274,12 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
       stderr: process.stderr,
       platform: process.platform,
     })
+    if (typeof outcome === "object" && "launch" in outcome) {
+      // `omo daemon adopt`: the released session resumes here as a normal launch, in its own directory.
+      process.argv.splice(2, process.argv.length - 2, ...outcome.launch)
+      if (typeof outcome.cwd === "string" && existsSync(outcome.cwd)) process.chdir(outcome.cwd)
+      return false
+    }
     if (typeof outcome === "object") {
       // A reachable daemon: continue as a normal launch pointed at the shared socket.
       process.argv.splice(2, process.argv.length - 2, ...outcome.args)

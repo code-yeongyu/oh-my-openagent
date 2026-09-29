@@ -10,6 +10,8 @@ import {
   runStopAll,
 } from "./daemon-operations.js"
 import { runRollbackPrepare } from "./daemon-rollback.js"
+import { runAdoptCommand } from "./daemon-adopt.js"
+import { loadThreadSdk } from "./thread.js"
 import { blockingPause, DAEMON_EXIT, readTimeoutSeconds } from "./daemon-args.js"
 import { readDaemonConfig } from "./daemon-config.js"
 
@@ -29,14 +31,15 @@ export { daemonReportLines } from "./daemon-doctor-report.js"
  * gets an exit code it can branch on without reading prose.
  */
 
-const SUBCOMMANDS = new Set(["run", "status", "stop", "handoff", "gc", "rollback-prepare"])
+const SUBCOMMANDS = new Set(["run", "adopt", "status", "stop", "handoff", "gc", "rollback-prepare"])
 /** The subcommands that can bring a host into existence, and therefore need omo's argv source. */
 const NEEDS_SPEC = new Set(["run", "handoff"])
 
 const USAGE = [
-  "usage: omo daemon <run|status|stop|handoff|gc|rollback-prepare> [options]",
+  "usage: omo daemon <run|adopt|status|stop|handoff|gc|rollback-prepare> [options]",
   "",
   "  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)",
+  "  adopt     take a session a host holds into this terminal (--interrupt, --force)",
   "  status    report who is serving and which sessions exist",
   "  stop      end the daemon; --drain lets in-flight work finish first",
   "  handoff   hand the socket to this build, keeping live sessions",
@@ -89,6 +92,20 @@ function summarize(subcommand, parsed, exitCode) {
   return `daemon: ${parsed.action ?? subcommand}${pid}`
 }
 
+/** `omo daemon adopt`: the thread SDK finds and releases the session; the result is an exit code or a launch. */
+async function adopt(args, options) {
+  const loaded = await (options.threadSdk ?? loadThreadSdk)({ ...options, cwd: options.cwd ?? process.cwd() })
+  if (loaded.error !== undefined) {
+    options.stderr.write(`omo daemon adopt: ${loaded.error}\n`)
+    return DAEMON_EXIT.unsupported
+  }
+  try {
+    return await runAdoptCommand(args, { sdk: loaded.sdk, stdout: options.stdout, stderr: options.stderr })
+  } finally {
+    await loaded.sdk.dispose()
+  }
+}
+
 /**
  * @param args argv after `omo daemon`
  * @param options.engine  something that can run the engine CLI; injected so tests never spawn one
@@ -123,6 +140,8 @@ export function runDaemonCommand(args, options) {
 
   // Only the subcommands that may START something need the spec; asking who is serving, or
   // asking it to stop, must still work on an install whose plugin payload was never built.
+  if (subcommand === "adopt") return adopt(args.slice(1), options)
+
   const specPath = join(pluginRoot, "daemon-launch-spec.json")
   if (NEEDS_SPEC.has(subcommand) && !existsSync(specPath)) {
     stderr.write(`omo daemon: launch spec missing at ${specPath}\n`)

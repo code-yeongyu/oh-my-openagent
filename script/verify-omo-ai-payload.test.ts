@@ -32,6 +32,7 @@ const PACKED_ARTIFACTS = [
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
+  "plugin/runtime/thread-sdk/sdk.js",
   "plugin/runtime/category-coverage/index.js",
   "plugin/runtime/category-coverage/assets.generated.json",
   "plugin/runtime/task-config/index.js",

@@ -257,6 +257,23 @@ reads the `legacyPiAgentDir.copiedAt` the engine records in `migrations-state.js
 record existed, falls back to the agent copy's preserved mtime. Unlike the engine notice, doctor reports every such edit
 on every run. `~/.pi/agent` is only read.
 
+## 2026-09-29 - `omo thread` CLI, `omo daemon adopt`, and terminal rows in `omo daemon status`
+
+- `bin/lib/thread.js` (+ `thread-args.js`, `thread-output.js`): `omo thread list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack [--json]`
+  over the plugin's thread SDK (`plugin/runtime/thread-sdk/sdk.js`) as `cli:<uid>`, wired in `launcher.js` and
+  `compile-entry.ts`. Exit codes: 0 ok, 1 refused as data, 2 usage, 3 `host_unavailable`, 4 win32 or no `node:sqlite`
+  (probed lazily), 5 `internal_error`. `--json` shapes and the connector loop: `docs/reference/omo-thread.md`.
+- `bin/lib/daemon-adopt.js`: `omo daemon adopt <session> [--interrupt] [--force] [--json]` releases a host session
+  (senpi `release_session`, reason `takeover`) and resumes it in this terminal with `--session <path>` in the
+  session's directory; user input an `--interrupt` took out becomes the first prompts, or is printed when the
+  release is refused. Refusals exit 4 (`turn_active`, `attached`, ..., already a terminal session), a session no
+  host serves exits 3, `release_failed` twice exits 5 (`release_failed` then `unknown_session` counts as released).
+- `daemon-status.js`: `endpoint_kind: "tui"` rows print `tui <name> pid <n> cwd <path>` (an unresponsive one with its
+  reason) and count in `aggregate.terminals`, not as live hosts. `daemon-operations.js`: handoff, `stop --all` and its
+  `--wait` never act on a terminal endpoint; handoff lists them as skipped.
+- Tests: `thread.test.ts`, `daemon-adopt.test.ts`, `daemon-operations.test.ts` (mixed host/live tui/dead tui fixture),
+  `sqlite-import-discipline.test.ts` covers `thread.js`.
+
 ## 2026-09-28 - The compiled binary enters a shard supervisor without the engine CLI graph
 
 `compile-entry.ts` routes an `--internal-rpc-host-supervisor` launch through `supervisor-fast-path.ts`, which applies

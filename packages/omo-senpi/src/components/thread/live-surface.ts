@@ -246,7 +246,7 @@ function wakeReply(data: { readonly admitted?: unknown }): GatewayWakeReply {
  * per-host counters. `thread_create` opens on the legacy endpoint. A terminal is only ever sent the
  * commands in TUI_ENDPOINT_COMMANDS, with its secret first.
  */
-export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThreadSurfaceOptions = {}): LiveThreadSurface {
+export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, options: LiveThreadSurfaceOptions = {}): LiveThreadSurface {
   const env = options.env ?? process.env
   const exists = options.exists ?? existsSync
   const connect = options.connect ?? ((path: string) => createConnection(path))

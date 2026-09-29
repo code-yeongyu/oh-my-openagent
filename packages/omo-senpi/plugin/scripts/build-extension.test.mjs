@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { appendFile, cp, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { appendFile, cp, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
 import { dirname, join } from "node:path"
@@ -49,6 +49,7 @@ function outputPathsIn(root) {
     rollbackRuntimeOutputPath: join(root, "runtime", "rollback-migrate.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),
+    threadSdkOutputPath: join(root, "runtime", "thread-sdk", "sdk.js"),
   }
 }
 
@@ -133,6 +134,54 @@ describe("gateway store worker sidecar", () => {
     const outputs = await mutableOutputs()
     await rm(outputs.gatewayStoreWorkerOutputPath)
     expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.gatewayStoreWorkerOutputPath })
+  })
+})
+
+describe("thread SDK runtime", () => {
+  test("#given the thread SDK build #when its inputs and exports are inspected #then it is a standalone entry over the thread component", async () => {
+    const outputs = await sharedOutputs()
+    expect(outputs.threadSdkInputs.some(input => input.endsWith("src/extension/thread-sdk.ts"))).toBe(true)
+    expect(outputs.threadSdkInputs.filter(input => input.includes("node_modules/"))).toEqual([])
+    const sdk = await import(outputs.threadSdkOutputPath)
+    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "createThreadSdk"])
+  })
+
+  test("#given the built SDK two levels below the extensions directory #when plain node opens it #then the store runs on the emitted worker sidecar", async () => {
+    // given: the plugin layout, runtime/thread-sdk/sdk.js beside extensions/gateway-store-worker.mjs
+    const outputs = await sharedOutputs()
+    const plugin = await mkdtemp(join(tmpdir(), "omo-thread-sdk-built-"))
+    perTestRoots.push(plugin)
+    await mkdir(join(plugin, "runtime", "thread-sdk"), { recursive: true })
+    await mkdir(join(plugin, "extensions"), { recursive: true })
+    await cp(outputs.threadSdkOutputPath, join(plugin, "runtime", "thread-sdk", "sdk.js"))
+    await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
+    const agentDir = join(plugin, "agent")
+    const probe = [
+      `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "thread-sdk", "sdk.js")).href)})`,
+      `const sdk = createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined })`,
+      "const listed = await sdk.bindings({})",
+      "const missing = await sdk.outbox({ binding_id: 'no-such-binding' })",
+      "await sdk.dispose()",
+      "console.log(JSON.stringify({ listed: listed.kind, bindings: listed.bindings, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
+    ].join("\n")
+
+    // when
+    const child = spawn("node", ["--input-type=module", "-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.on("data", (chunk) => { stdout += chunk })
+    child.stderr.on("data", (chunk) => { stderr += chunk })
+    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+
+    // then
+    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
+    expect(JSON.parse(stdout.trim())).toEqual({ listed: "ok", bindings: [], missing: "not_found", principal: "cli:501" })
+  })
+
+  test("#given the built extension without the thread SDK #when freshness is checked #then it reports that output missing", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.threadSdkOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.threadSdkOutputPath })
   })
 })
 

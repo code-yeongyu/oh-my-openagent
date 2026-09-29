@@ -60,6 +60,11 @@ const gatewayStoreWorkerEntryPath = join(packageRoot, "src", "components", "thre
 const gatewayStoreWorkerOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", GATEWAY_STORE_WORKER_NAME)
 const toolkitSdkEntryPath = join(packageRoot, "src", "extension", "agent-toolkit-sdk.ts")
 const toolkitSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
+// The `omo thread` CLI and connector scripts import this SDK without an agent session; it points
+// the gateway store at the worker sidecar in `extensions/` (two levels up from its own file).
+export const THREAD_SDK_RELATIVE_PATH = join("runtime", "thread-sdk", "sdk.js")
+const threadSdkEntryPath = join(packageRoot, "src", "extension", "thread-sdk.ts")
+const threadSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, THREAD_SDK_RELATIVE_PATH)
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
@@ -100,6 +105,7 @@ export const extensionBuildPaths = {
   memberOutputPath,
   supervisorOutputPath,
   toolkitSdkOutputPath,
+  threadSdkOutputPath,
   advisorRuntimeOutputPath,
   rollbackRuntimeOutputPath,
   computerUseOutputPath,
@@ -118,6 +124,7 @@ export function resolveOutputs(options) {
     supervisorOutput: sibling(options.supervisorOutputPath, supervisorOutputPath, "memory-run-supervisor.mjs"),
     advisorRuntimeOutput: sibling(options.advisorRuntimeOutputPath, advisorRuntimeOutputPath, "omo-init-deep-advisor.js"),
     toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
+    threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
@@ -140,6 +147,7 @@ export async function buildExtension(options = {}) {
     supervisorOutput,
     advisorRuntimeOutput,
     toolkitSdkOutput,
+    threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
     gatewayStoreWorkerOutput,
@@ -153,6 +161,7 @@ export async function buildExtension(options = {}) {
   const rollbackRuntimeInputs = await buildEntry(rollbackRuntimeEntryPath, rollbackRuntimeOutput, buildDefines, sdkExternalSpecifiers)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
+  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, sdkExternalSpecifiers)
   // Bundling inlines assets.ts but its markdown is read from disk at runtime next to the bundle,
   // so the persona and the computer-use prelude are staged into the directory the loader runs from.
   await Promise.all([
@@ -169,6 +178,7 @@ export async function buildExtension(options = {}) {
     rollbackRuntimeInputs,
     computerUseInputs,
     gatewayStoreWorkerInputs,
+    threadSdkInputs,
   }
 }
 

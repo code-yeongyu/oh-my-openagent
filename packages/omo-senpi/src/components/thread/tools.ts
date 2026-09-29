@@ -1,7 +1,6 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static } from "typebox"
-import { toGatewayAddressEntries } from "./address-book"
-import { fuzzyMatch, resolveTarget, workspaceEntries, type ThreadAddressEntry } from "./addressing"
+import { fuzzyMatch, workspaceEntries } from "./addressing"
 import {
   parseThreadParams,
   threadToolParamSchemas,
@@ -18,14 +17,12 @@ import {
   type ThreadToolResult,
 } from "./contracts"
 import { createOrderedDeliveryMailbox, type MailboxTargetPort } from "./mailbox"
-import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_SEARCH_METADATA } from "./metadata"
-import { readTranscript } from "./reader"
+import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 export type { ThreadTranscriptEntry } from "./reader"
-import type { GatewayEndpointPort, GatewayEndpointRef } from "./gateway/adapter"
 import { hashArgs } from "./gateway/bindings"
-import { createGatewayEngine, resolveFromEntries } from "./gateway/engine"
-import { createGatewayRelay } from "./gateway/relay"
-import { createGatewayStore } from "./gateway/store"
+import type { GatewayEngine } from "./gateway/engine"
+import { createGatewayServices } from "./tools/gateway-services"
+import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -41,19 +38,11 @@ import {
   resolveEntries,
   routingId,
   sessionPort,
-  transcriptRole,
   summary,
   targetSession,
   type AnyTool,
   type ToolOutput,
 } from "./tools/internals"
-
-/** A host without the gateway port reaches no endpoint: every gateway send lands `queued_offline`. */
-const UNREACHABLE: GatewayEndpointPort = {
-  wake: async (endpoint) => {
-    throw new Error(`host_unavailable:${endpoint.socket}`)
-  },
-}
 
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
@@ -61,15 +50,7 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
 
 function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: readonly AnyTool[]; readonly dispose: () => void } {
   const now = options.now ?? Date.now
-  const store = options.store ?? createGatewayStore({ agentDir: options.stateDirectory })
-  const endpoints = options.host.gateway ?? UNREACHABLE
-  const gatewayEntries = async () => toGatewayAddressEntries(addressBook(options, await view()))
-  const engine = createGatewayEngine({ store, endpoints, resolve: resolveFromEntries(gatewayEntries, options.callerWorkspaceRoot), now })
-  const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
-    const entry = (await gatewayEntries()).find((candidate) => candidate.thread_id === durableId)
-    return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint
-  }
-  const relay = createGatewayRelay({ store, engine, endpoints, locate, now })
+  const { store, engine, relay } = createGatewayServices(options, view)
   const mailbox = createOrderedDeliveryMailbox({
     directory: `${options.stateDirectory}/mailbox`,
     portFor: (target): MailboxTargetPort | undefined => ({
@@ -141,21 +122,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const list: AnyTool = {
     ...metadata("thread_list"),
     parameters: threadToolParamSchemas.thread_list,
-    execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) => execute("thread_list", id, args, ectx, async (current, value) => {
-      // Default scope is the caller's workspace, the same test thread_send applies before it
-      // delivers; the address book itself spans every workspace the host knows.
-      const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
-      const inScope = (threadId: string) => value.all_scope === true || scoped.some((entry) => entry.thread_id === threadId)
-      const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
-      const book = addressBook(options, current)
-      const entryOf = (session: ThreadHostSession) => book.find((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId) && entry.source_host === (session.socket ?? entry.source_host))
-      // A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
-      // as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
-      const degraded = book.filter((entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id))
-      return { kind: "ok", threads: [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)], scope: value.all_scope === true ? "all" : "workspace" }
-    }),
+    execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) => execute("thread_list", id, args, ectx, async (current, value) => listThreads(options, current, value.all_scope)),
   }
-  const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return readDegraded(current, resolved.entry.thread_id, value); const messages = await sessionPort(options, session).getMessages(routingId(session)); const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); if (live.kind === "error") return { kind: "error", error: live.error }; return { kind: "ok", thread_id: resolved.entry.thread_id, items: live.items.map((item, index) => ({ seq: index + 1, role: transcriptRole(item.role), content: JSON.stringify(item.content ?? item) })), truncated: live.truncated, ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }), source: live.source } }) }
+  const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => readThread(options, current, value, callerId)) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
   const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
   const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { const entries = resolveEntries(options, current); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
@@ -219,27 +188,6 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const relayTools = createRelayTools({ options, relay, view, failure })
   return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose: relay.dispose }
 
-  /**
-   * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
-   * book then carries the durable path and the endpoint's failure. Any other non-live thread stays
-   * `not_resumable`, as before endpoints were enumerated.
-   */
-  function readDegraded(current: ThreadHostView, threadId: string, value: ThreadReadInput): ThreadToolResult {
-    const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
-    if (entry === undefined || entry.error_note === undefined || entry.session_path === null) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-    const durable = readTranscript({ kind: "jsonl", path: entry.session_path, live_host_present: false }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor })
-    if (durable.kind === "error") return { kind: "error", error: durable.error }
-    // A session file interleaves messages with bookkeeping (the session header, model and thinking
-    // changes, names): only message entries are transcript, rendered with the live path's roles.
-    const messages = durable.items.flatMap((item) => {
-      const message = item.message
-      if (item.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
-      return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
-    })
-    const items = messages.map((message, index) => ({ seq: index + 1, role: transcriptRole(message.role), content: JSON.stringify(message.content ?? message) }))
-    return { kind: "ok", thread_id: threadId, items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
-  }
-
   function deliverThroughGateway(current: ThreadHostView, threadId: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
     return deliverThroughGatewayImpl(options, engine, current, threadId, value, idempotencyKey, callerId, resolvedBy)
   }
@@ -273,7 +221,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
  */
 async function deliverThroughGatewayImpl(
   options: ThreadToolSurfaceOptions,
-  engine: ReturnType<typeof createGatewayEngine>,
+  engine: GatewayEngine,
   current: ThreadHostView,
   threadId: string,
   value: ThreadSendInput | ThreadHandoffInput,

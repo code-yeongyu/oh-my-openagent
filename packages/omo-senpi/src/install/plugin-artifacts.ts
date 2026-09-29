@@ -38,6 +38,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("skills", "visual-qa", "SKILL.md"),
   join("skills-conditional", "x-search", "SKILL.md"),
   join("runtime", "agent-toolkit-sdk", "sdk.js"),
+  join("runtime", "thread-sdk", "sdk.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "index.js"),

@@ -149,6 +149,19 @@
 - `components/x-search/index.ts`: the conditional `x-search` skill goes through it. Both tools stay registered.
 - `extension/types.ts`: `getCommands()` entries carry the optional `sourceInfo.path` senpi already reports.
 
+## thread: script-callable SDK (`plugin/runtime/thread-sdk/sdk.js`) for the `omo thread` CLI and connectors
+
+- `components/thread/sdk.ts` (exported from the component barrel): `createThreadSdk({ agentDir, cwd, uid, user,
+  engineStatusAll? })` runs every thread operation without an agent session as `cli:<uid>`: `list`, `read`, `send`
+  (bindingless = the engine's `cli` sender; with `binding_id` = the connector inbound path, the idempotency key as the
+  event id), `bind`/`unbind`/`rebind`/`bindings`/`report`/`outbox`/`ack`/`answer`, `locate` and `release` (senpi
+  `release_session` for `omo daemon adopt`). Refusals and transport failures come back as data.
+- `tools/gateway-services.ts` and `tools/read-ops.ts`: the store/engine/relay composition and the `thread_list` /
+  `thread_read` bodies moved out of `tools.ts`, shared by the tools and the SDK (tool behavior unchanged).
+- `gateway/store.ts`: `workerModuleUrl` option (where the worker sidecar is resolved from outside `omo.js`).
+- Build: new entry `src/extension/thread-sdk.ts` -> `plugin/runtime/thread-sdk/sdk.js` (node builtins only external),
+  in `--check`, the installer's required artifacts and the omo-ai payload verifier.
+
 ## thread: chat-thread bindings, report/outbox/answer relay tools, SQLite tool receipts, gateway send path behind a switch
 
 - `components/thread/tools/relay-tools.ts`, `contracts/`, `metadata.ts`: eight new tools - `thread_bind`,
