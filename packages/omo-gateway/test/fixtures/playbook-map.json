@@ -1,0 +1,15 @@
+{
+  "entries": {
+    "rules/slack.md#write-in-english-only-in-the-shared-workspace": {
+      "gate": "language",
+      "params": {
+        "allow": [
+          "en"
+        ]
+      }
+    },
+    "rules/slack.md#never-post-a-bare-url-label-every-link-repo-number-title": {
+      "gate": "link_label"
+    }
+  }
+}
