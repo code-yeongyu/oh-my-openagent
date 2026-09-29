@@ -8,7 +8,7 @@
   Linux, the command to schedule elsewhere) runs `omomeow.mjs nudge --scheduled` from a runtime copy of the scripts under
   the state dir every `interval_minutes`. It reads `herdr tab list`, joins the thread/tab/session map, and DMs each
   requester through the agent-messenger bot CLI only when something is working or blocked and the
-  task/state/title/progress fingerprint changed. It does not use `schedule_prompt`, so scheduled prompts keep senpi's
+  task/state/name/title/progress/thread fingerprint changed. It does not use `schedule_prompt`, so scheduled prompts keep senpi's
   own delivery and busy-session guard. `service uninstall` keeps the service file and fails when the timer cannot be
   stopped.
 - A setup done by hand before the skill (the old gist) is reported by `reconcile` (`existing`: Herdr and bot CLIs on

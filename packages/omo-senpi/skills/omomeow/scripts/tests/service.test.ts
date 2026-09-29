@@ -91,6 +91,15 @@ describe("installNudgeService", () => {
     expect(result.ok).toBe(false)
   })
 
+  test("#given launchctl print fails for an unknown reason #when installed #then it stops before bootstrap with ok false", () => {
+    const { spawn, calls } = fakeSpawn({ "launchctl print": { status: 1 } })
+
+    const result = installNudgeService({ spec: spec(), platform: "darwin", env, spawn, uid: 501 })
+
+    expect(result.ok).toBe(false)
+    expect(calls).toEqual(["launchctl print gui/501/ai.omo.omomeow-nudge"])
+  })
+
   test("#given Windows #when installed #then it fails with the manual command instead of writing anything", () => {
     const { spawn, calls } = fakeSpawn({})
 
@@ -123,6 +132,17 @@ describe("uninstallNudgeService", () => {
     expect(result.ok).toBe(true)
     expect(calls).toEqual(["launchctl print gui/501/ai.omo.omomeow-nudge"])
     expect(existsSync(serviceFiles("darwin", env)[0])).toBe(false)
+  })
+
+  test("#given launchctl print fails for an unknown reason #when uninstalled #then nothing is booted out or deleted and ok is false", () => {
+    installNudgeService({ spec: spec(), platform: "darwin", env, spawn: fakeSpawn({}).spawn, uid: 501 })
+    const { spawn, calls } = fakeSpawn({ "launchctl print": { status: 1, stderr: "Could not connect to launchd" } })
+
+    const result = uninstallNudgeService({ platform: "darwin", env, spawn, uid: 501 })
+
+    expect(result.ok).toBe(false)
+    expect(calls).toEqual(["launchctl print gui/501/ai.omo.omomeow-nudge"])
+    expect(existsSync(serviceFiles("darwin", env)[0])).toBe(true)
   })
 
   test("#given systemd cannot disable the timer #when uninstalled #then both unit files are kept", () => {

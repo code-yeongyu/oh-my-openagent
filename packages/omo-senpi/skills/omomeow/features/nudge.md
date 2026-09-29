@@ -6,7 +6,7 @@ How it runs, with no model turn per nudge:
 
 - A user-level timer service runs `CLI nudge --scheduled` every interval: a launchd agent (`ai.omo.omomeow-nudge`, `StartInterval`) on macOS, a systemd user timer (`omomeow-nudge.timer`) on Linux. It runs a copy of the scripts under `~/.omo/omomeow/runtime/`, so an omo update that moves the skill never breaks it (`reconcile` refreshes the copy), and it runs in the directory it was installed from, so it reads the same `omo.json` layers.
 - The nudge has nothing to do with `schedule_prompt` or `senpi schedule run`: scheduled prompts keep senpi's own delivery.
-- `nudge` reads `herdr tab list`, joins it with the session map (`CLI session ...`), drops tabs with nothing to report, compares a fingerprint of task, state, title, and progress with what each recipient got last time, and sends through the agent-messenger bot CLI only when it differs. Tasks recorded with a requester go to that person; everything else goes to the owner.
+- `nudge` reads `herdr tab list`, joins it with the session map (`CLI session ...`), drops tabs with nothing to report, compares a fingerprint of task, state, name, title, progress, and thread link with what each recipient got last time, and sends through the agent-messenger bot CLI only when it differs. Tasks recorded with a requester go to that person; everything else goes to the owner.
 
 ## Install
 

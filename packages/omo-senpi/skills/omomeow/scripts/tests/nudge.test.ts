@@ -13,7 +13,11 @@ function herdrOutput(tabs: Array<[string, string, string]>) {
   })
 }
 
-function itemsAt(output: string, now: number, sessions: Record<string, any> = {}, previous: Record<string, any> = {}) {
+type Recipient = { platform: string; target: string; bot?: string }
+type SessionFixture = { title?: string; thread?: string; progress?: string; progressAt?: string; startedAt?: string; requester?: Recipient }
+type TrackedFixture = { firstSeenAt: number; status: string; statusSince: number }
+
+function itemsAt(output: string, now: number, sessions: Record<string, SessionFixture> = {}, previous: Record<string, TrackedFixture> = {}) {
   const tabs = parseHerdrTabs(output)
   const tracked = trackTabs(previous, tabs, now)
   return { tabs, tracked, items: buildItems({ tabs, tracked, sessions }) }
@@ -81,6 +85,17 @@ describe("planNudge", () => {
 
     expect(planNudge({ items: blocked.items, owner, sent }).deliveries).toHaveLength(1)
     expect(planNudge({ items: progressed.items, owner, sent }).deliveries).toHaveLength(1)
+  })
+
+  test("#given a tab renamed or given a thread link #when planned #then a new nudge goes out", () => {
+    const first = itemsAt(herdrOutput([["t1", "working", "tab-3"]]), 0, { t1: { title: "T" } })
+    const sent = { [recipientKey(owner)]: { fingerprint: planNudge({ items: first.items, owner, sent: {} }).deliveries[0].fingerprint } }
+
+    const renamed = itemsAt(herdrOutput([["t1", "working", "fix-login"]]), MIN, { t1: { title: "T" } }, first.tracked)
+    const linked = itemsAt(herdrOutput([["t1", "working", "tab-3"]]), MIN, { t1: { title: "T", thread: "https://chat/t/1" } }, first.tracked)
+
+    expect(planNudge({ items: renamed.items, owner, sent }).deliveries).toHaveLength(1)
+    expect(planNudge({ items: linked.items, owner, sent }).deliveries).toHaveLength(1)
   })
 
   test("#given a task with its own requester #when planned #then it goes to that person and the rest to the owner", () => {

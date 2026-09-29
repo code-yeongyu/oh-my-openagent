@@ -109,11 +109,56 @@ function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-/** Resolve the `omomeow` section of the merged omo.json layers, with defaults and per-key diagnostics. */
+const SECTION_KEYS = ["language", "nudge"]
+const NUDGE_KEYS = ["enabled", "interval_minutes"]
+
+/**
+ * Check one layer's `omomeow` section as a unit, the way the omo loader checks a layer: unknown keys are
+ * dropped with a diagnostic, and a wrongly typed value rejects the whole section so it can never erase
+ * what a lower layer set.
+ */
+function validateSection(section, where) {
+  const diagnostics = []
+  const errors = []
+  if (!isPlainObject(section)) return { value: null, diagnostics: [`${where}: omomeow must be an object; layer ignored`] }
+  const value = {}
+  for (const key of Object.keys(section)) {
+    if (!SECTION_KEYS.includes(key)) diagnostics.push(`${where}: unknown key omomeow.${key} ignored`)
+  }
+  if (section.language !== undefined) {
+    if (LANGUAGES.includes(section.language)) value.language = section.language
+    else errors.push(`omomeow.language must be one of ${LANGUAGES.join(", ")}`)
+  }
+  if (section.nudge !== undefined) {
+    if (!isPlainObject(section.nudge)) errors.push("omomeow.nudge must be an object")
+    else {
+      value.nudge = {}
+      for (const key of Object.keys(section.nudge)) {
+        if (!NUDGE_KEYS.includes(key)) diagnostics.push(`${where}: unknown key omomeow.nudge.${key} ignored`)
+      }
+      const { enabled, interval_minutes: minutes } = section.nudge
+      if (enabled !== undefined) {
+        if (typeof enabled === "boolean") value.nudge.enabled = enabled
+        else errors.push("omomeow.nudge.enabled must be a boolean")
+      }
+      if (minutes !== undefined) {
+        if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440) value.nudge.interval_minutes = minutes
+        else errors.push("omomeow.nudge.interval_minutes must be an integer from 1 to 1440")
+      }
+    }
+  }
+  if (errors.length > 0) return { value: null, diagnostics: [...diagnostics, `${where}: ${errors.join("; ")}; omomeow section of this layer ignored`] }
+  return { value, diagnostics }
+}
+
+/**
+ * Resolve the `omomeow` section over the omo.json layers, lowest first, on top of the defaults. Only the
+ * `omomeow` section is checked; errors elsewhere in a file are left to the omo loader.
+ */
 export function loadOmoMeowSettings({ cwd = process.cwd(), env = process.env } = {}) {
   const diagnostics = []
   const sources = []
-  const merged = { nudge: {} }
+  const settings = { language: DEFAULT_SETTINGS.language, nudge: { ...DEFAULT_SETTINGS.nudge } }
   for (const layer of configLayerPaths({ cwd, env })) {
     let parsed
     try {
@@ -124,31 +169,12 @@ export function loadOmoMeowSettings({ cwd = process.cwd(), env = process.env } =
     }
     const section = isPlainObject(parsed) ? parsed.omomeow : undefined
     if (section === undefined) continue
-    if (!isPlainObject(section)) {
-      diagnostics.push(`${layer.path}: omomeow must be an object`)
-      continue
-    }
+    const checked = validateSection(section, layer.path)
+    diagnostics.push(...checked.diagnostics)
+    if (checked.value === null) continue
     sources.push(layer.path)
-    if (section.language !== undefined) merged.language = section.language
-    if (isPlainObject(section.nudge)) Object.assign(merged.nudge, section.nudge)
-  }
-
-  const settings = {
-    language: DEFAULT_SETTINGS.language,
-    nudge: { ...DEFAULT_SETTINGS.nudge },
-  }
-  if (merged.language !== undefined) {
-    if (LANGUAGES.includes(merged.language)) settings.language = merged.language
-    else diagnostics.push(`omomeow.language must be one of ${LANGUAGES.join(", ")}; using "${settings.language}"`)
-  }
-  if (merged.nudge.enabled !== undefined) {
-    if (typeof merged.nudge.enabled === "boolean") settings.nudge.enabled = merged.nudge.enabled
-    else diagnostics.push("omomeow.nudge.enabled must be a boolean; using true")
-  }
-  if (merged.nudge.interval_minutes !== undefined) {
-    const minutes = merged.nudge.interval_minutes
-    if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440) settings.nudge.interval_minutes = minutes
-    else diagnostics.push("omomeow.nudge.interval_minutes must be an integer from 1 to 1440; using 30")
+    if (checked.value.language !== undefined) settings.language = checked.value.language
+    Object.assign(settings.nudge, checked.value.nudge ?? {})
   }
   return { settings, sources, diagnostics }
 }

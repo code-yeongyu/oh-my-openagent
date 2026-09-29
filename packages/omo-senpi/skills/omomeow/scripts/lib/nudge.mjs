@@ -100,10 +100,13 @@ export function recipientKey(recipient) {
   return `${recipient.platform}:${recipient.bot ?? ""}:${recipient.target}`
 }
 
-/** Elapsed times are left out on purpose: a nudge that differs only by clock time is a repeat. */
+/**
+ * Everything the message shows except times: a nudge that differs only by clock time is a repeat, while a
+ * renamed tab or a newly attached thread link is news.
+ */
 export function fingerprintItems(items) {
   const material = items
-    .map((item) => [item.tabId, item.kind, item.title ?? "", item.progress ?? ""])
+    .map((item) => [item.tabId, item.kind, item.label, item.title ?? "", item.progress ?? "", item.thread ?? ""])
     .sort((left, right) => left[0].localeCompare(right[0]))
   return createHash("sha256").update(JSON.stringify(material)).digest("hex")
 }

@@ -149,6 +149,17 @@ function launchdTarget(uid) {
   return { domain: `gui/${uid}`, service: `gui/${uid}/${SERVICE_LABEL}` }
 }
 
+// `launchctl print` exits 113 ("Could not find service") for a job that is not loaded.
+const LAUNCHD_NOT_FOUND = 113
+
+/** Loaded, absent, or unknown; only a positive "not found" counts as absent. */
+function launchdState(spawn, uid) {
+  const step = run(spawn, "launchctl", ["print", launchdTarget(uid).service], false)
+  if (step.error === null && step.status === 0) return { state: "loaded", step }
+  if (step.error === null && step.status === LAUNCHD_NOT_FOUND) return { state: "absent", step }
+  return { state: "unknown", step: { ...step, required: true } }
+}
+
 /** Write the service files and (re)load them; `ok` is false when a required step failed. */
 export function installNudgeService({ spec, platform = process.platform, env = process.env, spawn = spawnSync, uid = process.getuid?.() }) {
   const rendered = renderNudgeService(spec, { platform, env })
@@ -163,10 +174,10 @@ export function installNudgeService({ spec, platform = process.platform, env = p
   const steps = []
   if (rendered.kind === "launchd") {
     const target = launchdTarget(uid)
-    const loaded = run(spawn, "launchctl", ["print", target.service], false)
-    steps.push(loaded)
-    // A loaded job keeps its old interval until it is booted out; only a job that is not loaded may skip that.
-    if (loaded.error === null && loaded.status === 0) steps.push(run(spawn, "launchctl", ["bootout", target.service]))
+    const current = launchdState(spawn, uid)
+    steps.push(current.step)
+    // A loaded job keeps its old interval until it is booted out; only a job known to be absent skips that.
+    if (current.state === "loaded") steps.push(run(spawn, "launchctl", ["bootout", target.service]))
     if (!steps.some(stepFailed)) steps.push(run(spawn, "launchctl", ["bootstrap", target.domain, rendered.files[0].path]))
   } else {
     for (const args of [["daemon-reload"], ["enable", "--now", SYSTEMD_TIMER], ["restart", SYSTEMD_TIMER]]) {
@@ -179,8 +190,9 @@ export function installNudgeService({ spec, platform = process.platform, env = p
 }
 
 /**
- * Stop the timer, then delete its files. When stopping fails the files stay and `ok` is false, so a
- * service that is still running never loses the definition that would let the user remove it.
+ * Stop the timer, then delete its files. When stopping fails, or launchd cannot say whether the job is
+ * loaded, the files stay and `ok` is false, so a service that may still run never loses the definition
+ * that would let the user remove it.
  */
 export function uninstallNudgeService({ platform = process.platform, env = process.env, spawn = spawnSync, uid = process.getuid?.() }) {
   const kind = serviceKind(platform)
@@ -188,11 +200,9 @@ export function uninstallNudgeService({ platform = process.platform, env = proce
   if (kind === "manual") return { kind, ok: true, removed: [], kept: [], steps: [] }
   const steps = []
   if (kind === "launchd") {
-    const target = launchdTarget(uid)
-    const loaded = run(spawn, "launchctl", ["print", target.service], false)
-    steps.push(loaded)
-    if (loaded.error !== null) steps.push({ ...loaded, required: true })
-    else if (loaded.status === 0) steps.push(run(spawn, "launchctl", ["bootout", target.service]))
+    const current = launchdState(spawn, uid)
+    steps.push(current.step)
+    if (current.state === "loaded") steps.push(run(spawn, "launchctl", ["bootout", launchdTarget(uid).service]))
   } else if (paths.some((path) => existsSync(path))) {
     steps.push(run(spawn, "systemctl", ["--user", "disable", "--now", SYSTEMD_TIMER]))
   }
@@ -208,8 +218,8 @@ export function nudgeServiceStatus({ platform = process.platform, env = process.
   const files = serviceFiles(platform, env).map((path) => ({ path, exists: existsSync(path) }))
   let loaded = null
   if (kind === "launchd") {
-    const step = run(spawn, "launchctl", ["print", launchdTarget(uid).service], false)
-    loaded = step.error === null ? step.status === 0 : null
+    const { state } = launchdState(spawn, uid)
+    loaded = state === "unknown" ? null : state === "loaded"
   } else if (kind === "systemd") {
     const step = run(spawn, "systemctl", ["--user", "is-active", SYSTEMD_TIMER], false)
     loaded = step.error === null ? step.stdout === "active" : null

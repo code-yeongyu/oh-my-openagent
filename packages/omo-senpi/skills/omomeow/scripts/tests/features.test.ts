@@ -25,7 +25,7 @@ describe("shipped manifest", () => {
   test("#given the shipped manifest #when its config paths are read #then each one names a real setting", () => {
     for (const feature of shippedManifest.features) {
       for (const path of [feature.enabledBy, ...(feature.configKeys ?? [])].filter(Boolean)) {
-        const value = path.split(".").reduce((node: any, key: string) => node?.[key], DEFAULT_SETTINGS)
+        const value = path.split(".").reduce<unknown>((node, key) => (typeof node === "object" && node !== null ? (node as Record<string, unknown>)[key] : undefined), DEFAULT_SETTINGS)
         expect(value, `${feature.id} references ${path}`).not.toBeUndefined()
       }
     }
