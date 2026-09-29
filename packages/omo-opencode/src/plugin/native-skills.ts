@@ -45,6 +45,19 @@ export function createNativeSkills(input: { readonly client: PluginContext["clie
   const load = async () => {
     const generatedClient = getGeneratedClientFromPluginClient(input.client)
     if (!isV2GeneratedClient(generatedClient)) {
+      const skills = getObjectProperty(getObjectProperty(input.client, "app"), "skills")
+      if (typeof skills === "function") {
+        try {
+          const result = await skills.call(getObjectProperty(input.client, "app"))
+          const parsed = NativeSkillEntriesSchema.safeParse(getObjectProperty(result, "data"))
+          return parsed.success ? parsed.data : []
+        } catch (error) {
+          log("[native-skills] v2 sdk nativeSkills load failed", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return []
+        }
+      }
       log("[native-skills] v2 sdk nativeSkills unavailable", {
         hasGeneratedClient: generatedClient !== undefined,
       })

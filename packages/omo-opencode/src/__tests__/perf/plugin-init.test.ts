@@ -34,9 +34,9 @@ function createPluginInput(directory: string): PluginInput {
   }
 }
 
-async function importFreshPluginModule(): Promise<(typeof import("../../index"))["default"]> {
+async function importFreshPluginModule(): Promise<(typeof import("../../index"))["omoPlugin"]> {
   const token = `${Date.now()}-${Math.random()}`
-  return (await import(`../../index?perf=${token}`)).default
+  return (await import(`../../index?perf=${token}`)).omoPlugin
 }
 
 async function measureInitMetrics(directory: string): Promise<InitMetrics> {
@@ -46,7 +46,7 @@ async function measureInitMetrics(directory: string): Promise<InitMetrics> {
   for (let index = 0; index < 3; index += 1) {
     const input = createPluginInput(directory)
     const start = performance.now()
-    await pluginModule.server(input, {})
+    await pluginModule(input, {})
     measurements.push(performance.now() - start)
   }
 

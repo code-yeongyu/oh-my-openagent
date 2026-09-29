@@ -7,7 +7,7 @@ import { join } from "node:path"
 
 import type { TuiPluginApi, TuiPluginMeta, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
 
-import tuiModule, { handleTuiPollError, registerSidebarContentSlot } from "./tui"
+import tuiModule, { handleTuiPollError, legacyTuiModule, registerSidebarContentSlot, registerV2Sidebar } from "./tui"
 
 type SolidNode = {
   readonly tag: string
@@ -159,7 +159,10 @@ describe("TUI sidebar polling", () => {
     } satisfies SidebarApiForTest
 
     // when
-    await tuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
+    await legacyTuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
+    expect(tuiModule.id).toBe("oh-my-openagent")
+    expect(typeof tuiModule.setup).toBe("function")
+    expect(typeof tuiModule.tui).toBe("function")
 
     // then
     expect(calls).toEqual(["register", "register", "render"])
@@ -227,5 +230,20 @@ describe("TUI sidebar polling", () => {
     const thrownValue = "bad poll state"
 
     expect(() => handleTuiPollError(thrownValue)).toThrow(thrownValue)
+  })
+
+  it("registers the V2 sidebar from the session list", () => {
+    const shown: string[] = []
+    let render: (() => unknown) | undefined
+    const lines = registerV2Sidebar({
+      data: { session: { list: () => [{ id: "ses_1", title: "Demo" }] } },
+      ui: {
+        toast: { show: (options) => { shown.push(options.message) } },
+        slot: (claim) => { render = () => claim.render({ sessionID: "ses_1" }) },
+      },
+    })
+    expect(shown).toEqual(["Sidebar ready"])
+    expect(render?.()).toEqual(["Demo"])
+    expect(lines()).toEqual(["Demo"])
   })
 })

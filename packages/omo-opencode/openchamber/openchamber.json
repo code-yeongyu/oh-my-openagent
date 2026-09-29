@@ -1,0 +1,4 @@
+{
+  "name": "oh-my-openagent",
+  "capabilities": ["files", "sessions"]
+}

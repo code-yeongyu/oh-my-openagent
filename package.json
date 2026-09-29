@@ -50,6 +50,7 @@
   },
   "files": [
     "THIRD-PARTY-NOTICES.md",
+    "index.js",
     "dist",
     "bin",
     "postinstall.mjs",
@@ -175,6 +176,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@opencode-ai/plugin": "1.18.31",
     "@opencode-ai/sdk": "1.18.31",
+    "@opencode/plugin": "2.0.16",
     "@opentui/core": "^0.5.11",
     "@opentui/keymap": "^0.5.11",
     "@opentui/solid": "^0.5.11",
