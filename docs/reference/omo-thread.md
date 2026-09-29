@@ -23,6 +23,7 @@ omo thread unbind <binding-id> --revision <n>
 omo thread rebind <binding-id> <session> --revision <n>
 omo thread bindings [--session <s>] [--platform <p>] [--account <id>] [--chat <id>] [--thread <id>] [--status <s>]
 omo thread report <session> <milestone|report|question|completion> <text> [--binding <id>] [--request-id <id>]
+                  [--request-kind question|select|confirm|input|editor]
 omo thread answer --binding <answering-binding-id> --token <reply-token> <text>
 omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
 omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
@@ -92,10 +93,31 @@ omo thread outbox "$id" --ack --json    # the same read, then ack through the ne
 ```
 
 A question row carries a `reply_token`. The answer must arrive through the binding that asked:
-another binding is `binding_mismatch` (the question stays pending), a token minted before a
-rebind, expiry or session restart is `stale_token`, and a second answer is `already_answered`.
-Only a match marks the question answered and hands the answer to the session's own endpoint; if
-the session cannot take it, the answer is `host_unavailable` and the question stays pending.
+another binding is `binding_mismatch` (the question stays pending), and a token minted before a
+rebind, expiry or session restart is `stale_token`. While another answer to the same question is
+still being handed to the session, a second answer is `answer_in_progress` (exit 1): retry after a
+moment, because the first attempt may still fail and leave the question pending. An answer
+abandoned mid-hand-off for more than 120 s is taken over by the next one. `already_answered`
+(exit 1) means the answer reached the session: stop retrying.
+
+The answer text takes the form of the request the session reported (`--request-kind`, default
+`question`):
+
+| request kind | accepted answer | reaches the session as |
+| --- | --- | --- |
+| `question` | any non-blank text | a comment (`answers: {}`, `comment: <text>`) |
+| `select` | the option label, non-blank | `value: <text>` |
+| `confirm` | `yes` or `no` (also `y`/`n`, `true`/`false`, any case) | `confirmed: true` / `false` |
+| `input`, `editor` | any text, empty included | `value: <text>` |
+
+Blank means only whitespace or invisible characters (a zero-width space counts as blank). An
+answer the request cannot take is `invalid_arguments` (exit 1) and claims nothing. Only a match
+marks the question answered and hands the answer to the session's own endpoint. If the session
+cannot be reached or no reply comes back, the answer is `host_unavailable` (exit 3). If the session
+refuses it (it no longer waits on that question, or cannot read the answer), the answer is
+`stale_token`, or `invalid_arguments` for an unreadable answer, with the session's code in
+`error.details.reason` (exit 1). Either way the question stays pending; a delivered answer is never
+released.
 
 ## Bindings
 
@@ -129,8 +151,10 @@ Nothing is ever copied to the session's other bindings.
 - `milestone` and `report` rows are written at once. The first `--provider-message-id` acked for
   a milestone becomes the binding's `progress_message_id`, and later milestone rows carry it as
   `edit_message_id`, so a connector can edit one progress message in place.
-- `question` needs `--request-id`, the session's pending question id, and returns the
-  `reply_token` the answer must carry.
+- `question` needs `--request-id`, the session's pending request id, and returns the
+  `reply_token` the answer must carry. `--request-kind` says which request that id is (`question`,
+  `select`, `confirm`, `input` or `editor`; default `question`); it decides the answer forms above.
+  Another kind name is `invalid_arguments`, and so is `--request-kind` on a non-question report.
 - `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
   row appears when the session settles.
 
@@ -196,7 +220,7 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | Code | Meaning |
 | --- | --- |
 | 0 | done |
-| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, ...) |
+| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), ...) |
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up`, a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text (the SDK is not loaded) |
 | 3 | `host_unavailable`: no endpoint answered where one was needed |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
