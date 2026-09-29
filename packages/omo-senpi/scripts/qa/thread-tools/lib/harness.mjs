@@ -35,6 +35,11 @@ const THREAD_COMPONENTS = join(OMO_ROOT, "packages", "omo-senpi", "src", "compon
 
 const qaEnv = await import(join(SENPI_QA_LIB, "env.mjs"))
 const qaCleanup = await import(join(SENPI_QA_LIB, "cleanup.mjs"))
+// The capability profile the engine pins on every host it ensures, read from the same checkout
+// the host runs, so the harness host is shaped like a real one without restating the list here.
+const SENPI_RPC = join(SENPI_ROOT, "packages", "coding-agent", "src", "modes", "rpc")
+const { PINNED_HOST_CLIENT_CAPABILITIES } = await import(join(SENPI_RPC, "host-launch.ts"))
+const { RPC_CLIENT_CAPABILITIES_ENV } = await import(join(SENPI_RPC, "custom-capability.ts"))
 
 export const { startFakeModelServer, writeMockModelsJson, hermeticEnv } = qaEnv
 export const { installCleanupHooks, cleanupAllAndWait, trackChild, trackCloser, shouldDetachChildren } = qaCleanup
@@ -45,8 +50,10 @@ export const { installCleanupHooks, cleanupAllAndWait, trackChild, trackCloser, 
  * A QA host that inherits them treats the caller's supervisor as its own - with `WATCH_FD` naming
  * an fd this child never received, the 2026.9.x watchdog stalls before it answers a single frame -
  * and the components under test would resolve the caller's live socket instead of the scratch one.
+ * The caller's `*_RPC_CLIENT_CAPABILITIES` is its own host's profile too; inheriting it made a
+ * harness host's capabilities depend on the shell the run was started from.
  */
-const CALLER_HOST_ENV = /^(?:OMO|SENPI|PI)_RPC_(?:HOST_|SOCKET)/
+const CALLER_HOST_ENV = /^(?:OMO|SENPI|PI)_RPC_(?:HOST_|SOCKET|CLIENT_CAPABILITIES)/
 
 /** Senpi's scratch, minus the caller's host identity, so the run is hermetic from inside a live session too. */
 export function makeScratch(label) {
@@ -133,7 +140,14 @@ export async function startRealHost(scratch, { socketPath, extraArgs = [] } = {}
     [SENPI_CLI, "--mode", "rpc", "--multi-session", "--listen", `unix://${socket}`, ...extraArgs],
     // detached matches spawnCli: the cleanup hooks signal the whole process GROUP, which is
     // the only way a host that re-execs under another runtime is guaranteed to die with us.
-    { cwd: scratch.cwd, detached: shouldDetachChildren(), env: scratch.env, stdio: ["pipe", "pipe", "pipe"] },
+    // The host gets the engine's pinned client capabilities, exactly as `host ensure` spawns one
+    // (senpi `host-spawn-environment.ts`); without `extension_events` the desktop refuses it.
+    {
+      cwd: scratch.cwd,
+      detached: shouldDetachChildren(),
+      env: { ...scratch.env, [RPC_CLIENT_CAPABILITIES_ENV]: PINNED_HOST_CLIENT_CAPABILITIES.join(",") },
+      stdio: ["pipe", "pipe", "pipe"],
+    },
   )
   trackChild(child)
   const stderr = []
@@ -524,6 +538,26 @@ export function stopOwnedShardHosts(scratchDir) {
       }
     }
     if (owned) rmSync(root, { recursive: true, force: true })
+  }
+  // A short scratch path (a bare `/tmp` run, no TMPDIR) keeps the shard in its PRIMARY root,
+  // `<agentDir>/rpc/shards`, inside the scratch dir. That tree and its meta are gone once the run
+  // cleans up, so the supervisor is found by its argv: a `--socket` inside this run's scratch dir
+  // belongs to this run and to nothing else. `[-]` keeps pgrep from reading the pattern as a flag.
+  const inTree = `[-]-socket ${scratchDir}/`
+  for (const signal of ["SIGTERM", "SIGKILL"]) {
+    const pids = pgrepPids(inTree)
+    if (pids.length === 0) break
+    for (const pid of pids) {
+      const socket = /--socket (\S+)/.exec(runCapture("ps", ["-o", "command=", "-p", pid]))?.[1]
+      if (socket !== undefined && !sockets.includes(socket)) sockets.push(socket)
+      try {
+        process.kill(Number(pid), signal)
+      } catch {
+        // Already gone.
+      }
+    }
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline && pgrepPids(inTree).length > 0) Bun.sleepSync(50)
   }
   return sockets
 }

@@ -112,7 +112,12 @@ try {
       ).pipe(Effect.timeout("30 seconds")),
     )
     yield* Effect.forkScoped(
-      mirror.refresh.pipe(Effect.repeat(Schedule.spaced("200 millis")), Effect.ignore),
+      mirror.refresh.pipe(
+        Effect.repeat(Schedule.spaced("200 millis")),
+        // A failed refresh ends the loop and would surface only as the 30 s timeout above; name it.
+        Effect.tapError((error) => Effect.sync(() => report.log(`mirror-refresh-failed ${error?._tag ?? "error"} ${JSON.stringify(error)}`))),
+        Effect.ignore,
+      ),
     )
     const createdEvent = yield* Fiber.join(created)
     report.log(`terminal durable=${durableId} derived_thread=${expectedThreadId}`)

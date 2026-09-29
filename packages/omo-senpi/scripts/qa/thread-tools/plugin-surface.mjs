@@ -22,7 +22,8 @@ report.log(`host-stderr=${host.stderrText().split("\\n").filter((line) => line.i
 const client = await HostClient.connect(host.socket, "plugin")
 const caller = await client.openSession({ cwd: scratch.cwd })
 const surfaces = await client.request({ type: "get_loaded_surfaces", sessionId: caller.routingId })
-await Bun.sleep(1500)
+// No settle delay before the first prompt: the engine orders it itself. `bindExtensions` holds the
+// session-work barrier while session_start runs, and `prompt()` waits for that barrier to settle.
 await client.promptAndSettle(caller.routingId, "Call tool_search for threads, then call thread_list.", { streamingBehavior: "followUp" })
 await client.promptAndSettle(caller.routingId, "Call thread_list now.", { streamingBehavior: "followUp" })
 const messages = await client.messages(caller.routingId)
@@ -53,28 +54,10 @@ try { parsedResult = JSON.parse(resultPayload) } catch { parsedResult = undefine
 report.assert("spawn-with-built-extension", JSON.stringify(surfaces).includes("omo.js"), `spawn=senpi --mode rpc --multi-session --listen unix://${host.socket} --extension ${extension}`)
 report.assert("agent-called-thread-list", threadListCalls.length > 0, `thread_list_calls=${JSON.stringify(threadListCalls)} transcript=${transcript.slice(0, 1000)}`)
 
-// Precondition: the search-exposed thread tools reach the model only when the host's tool-search
-// surface offers `tool_search` (or activates the tool directly). The multi-session RPC host does
-// NOT expose search-deferred EXTENSION tools to a non-native mock provider - reproduced with a
-// minimal one-tool probe extension, so it is a host limitation, not a thread-tools defect - and
-// the native Anthropic tool-search path (the real desktop surface) is what carries them in
-// production. When the mock provider never sees `tool_search`, the delivery assertion below is
-// unsatisfiable through no fault of this bundle, so it is SKIPPED. Set
-// THREAD_QA_REQUIRE_PLUGIN_SURFACE=1 to turn that skip into a hard failure for a host build that
-// is expected to expose the tool.
-const toolSearchOffered = fake.requests.some((request) =>
-  (request.tools ?? []).some((tool) => (tool.function?.name ?? tool.name) === "tool_search"),
-)
+// The delivery check is unconditional: a wrong or missing `thread_list` result is a FAIL. The
+// real result arrives on every run, so there is no host limitation left to skip for.
 const deliveryOk = toolResult !== undefined && parsedResult?.kind === "ok" && Array.isArray(parsedResult.threads) && parsedResult.scope === "all"
-const requireDelivery = process.env.THREAD_QA_REQUIRE_PLUGIN_SURFACE === "1"
-if (deliveryOk || toolSearchOffered || requireDelivery) {
-  report.assert("thread-list-tool-result", deliveryOk, `tool_result=${resultText} tool_search_offered=${toolSearchOffered} model_requests=${JSON.stringify(fake.requests)}`)
-} else {
-  report.skip(
-    "thread-list-tool-result",
-    `multi-session host never offered tool_search to the mock provider (upstream host limitation); set THREAD_QA_REQUIRE_PLUGIN_SURFACE=1 to require it. tool_result=${resultText}`,
-  )
-}
+report.assert("thread-list-tool-result", deliveryOk, `tool_result=${resultText}`)
 await cleanupAllAndWait()
 // The plugin's task component pre-warms a detached `p-*` shard for this session; stop it and prove
 // it gone, so a green run leaves nothing behind for the engine's idle window.
