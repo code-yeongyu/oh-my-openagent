@@ -13,6 +13,7 @@ import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegist
 import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadSessionPort } from "./tools/ports"
+import { answerUiRequest } from "./ui-answer"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorData?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
@@ -73,7 +74,8 @@ type RequestOptions = { readonly timeoutMs?: number; readonly secret?: Uint8Arra
  * id never takes it for the reply) and connection-wide broadcasts (`agent_start`,
  * `session_opened`, ...). Only the frame whose `id` equals the request id settles the call;
  * every other line is skipped. A terminal control endpoint authenticates the connection with its
- * 32-byte secret, which is written before the request.
+ * 32-byte secret, which is written before the request. The correlation id is written last: no
+ * command field can overwrite it.
  */
 async function requestFrame(socketPath: string, command: Record<string, unknown>, connect: ThreadSocketConnect, options: RequestOptions = {}): Promise<RpcFrame> {
   const id = randomUUID()
@@ -86,7 +88,7 @@ async function requestFrame(socketPath: string, command: Record<string, unknown>
     socket.once("close", () => finish(new Error(`thread RPC connection closed before the ${String(command.type)} response arrived`)))
     socket.once("connect", () => {
       if (options.secret !== undefined) socket.write(Buffer.from(options.secret))
-      socket.write(`${JSON.stringify({ id, ...command })}\n`)
+      socket.write(`${JSON.stringify({ ...command, id })}\n`)
     })
     socket.on("data", (chunk) => {
       buffer += chunk.toString("utf8")
@@ -390,10 +392,9 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThr
       return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, ...request }))
     },
     classifyLiveness: liveness,
-    respondUi: async (endpoint, response) => {
+    respondUi: async (endpoint, answer) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
-      const target = endpoint.kind === "rpc_host" && endpoint.routing_id !== null ? { sessionId: endpoint.routing_id } : {}
-      await callOn(endpoint.socket, "extension_ui_response", { ...target, id: response.id, value: response.value })
+      return await answerUiRequest(callFrame, endpoint, answer)
     },
   }
 

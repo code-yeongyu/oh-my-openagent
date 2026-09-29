@@ -6,7 +6,7 @@
  * `{ kind: "error", error }` with a taxonomy code and a `next_action`.
  */
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
-import type { GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
+import type { GatewayEndpointPort, GatewayEndpointRef, UiAnswerReply } from "./adapter"
 import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
 import type { GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
@@ -138,11 +138,18 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         await release(request.reply_token)
         return failure(respond === undefined ? "unsupported" : "host_unavailable", "The session that asked is not reachable to take the answer.", { session: claim.session_durable_id })
       }
+      let reply: UiAnswerReply
       try {
-        await respond(endpoint, { id: claim.ui_request_id, value: request.answer })
+        reply = await respond(endpoint, { ui_request_id: claim.ui_request_id, text: request.answer })
       } catch (error) {
         await release(request.reply_token)
         return failure("host_unavailable", `The answer could not be handed to the session: ${error instanceof Error ? error.message : String(error)}`, { session: claim.session_durable_id })
+      }
+      if (!reply.delivered) {
+        // The session answered and refused: it no longer waits on that request, or cannot read the answer.
+        await release(request.reply_token)
+        const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"
+        return failure(malformed ? "invalid_arguments" : "stale_token", `The session refused the answer: ${reply.error}`, { session: claim.session_durable_id, reason: reply.error })
       }
       return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }
     },

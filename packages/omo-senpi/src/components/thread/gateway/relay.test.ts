@@ -20,7 +20,7 @@ afterEach(async () => {
   harness = undefined
 })
 
-type UiResponse = { readonly session: string; readonly id: string; readonly value: string }
+type UiResponse = { readonly session: string; readonly ui_request_id: string; readonly text: string }
 
 function relayOn(h: GatewayHarness, store: GatewayStore = h.store()) {
   const responses: UiResponse[] = []
@@ -29,8 +29,9 @@ function relayOn(h: GatewayHarness, store: GatewayStore = h.store()) {
     engine: h.engineFor(store),
     endpoints: {
       wake: async () => ({ admitted: [] }),
-      respondUi: async (endpoint, response) => {
-        responses.push({ session: endpoint.socket.slice("fake:".length), ...response })
+      respondUi: async (endpoint, answer) => {
+        responses.push({ session: endpoint.socket.slice("fake:".length), ...answer })
+        return { delivered: true }
       },
     },
     locate: async (durableId) => {
@@ -142,7 +143,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
     expect(responses).toEqual([])
     expect(ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toMatchObject({ binding_id: x, session_durable_id: "B", cursor: asked.cursor })
-    expect(responses).toEqual([{ session: "B", id: "ui-7", value: "yes" }])
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-7", text: "yes" }])
     expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toBe("already_answered")
     expect(code(await relay.answer({ binding_id: x, reply_token: `${token.slice(0, -2)}xx`, answer: "forged" }))).toBe("invalid_arguments")
     expect(responses).toHaveLength(1)
@@ -167,7 +168,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(ok(await relay.outbox({ binding_id: y })).rows.find((row) => row.reply_token === offline)?.question_state).toBe("pending")
     b.online = true
     ok(await relay.answer({ binding_id: y, reply_token: offline, answer: "later" }))
-    expect(responses).toEqual([{ session: "B", id: "ui-3", value: "later" }])
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-3", text: "later" }])
   })
 
   test("#given a completion armed through a binding #when agent_end fires, a retry ends again, and the session settles #then no row appears at any agent_end and exactly one appears at the settle, with the final run's real outcome", async () => {
@@ -250,9 +251,10 @@ describe("answer_release_retry_past_the_lock_wait_bound", () => {
       engine: h.engineFor(store),
       endpoints: {
         wake: async () => ({ admitted: [] }),
-        respondUi: async (_endpoint, response) => {
+        respondUi: async (_endpoint, answer) => {
           if (failHandOff) throw new Error("the session hung up")
-          responses.push(response.value)
+          responses.push(answer.text)
+          return { delivered: true }
         },
       },
       locate: async () => ({ kind: "tui", socket: "fake:B", routing_id: null }),
