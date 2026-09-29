@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-// End-to-end through the real CLI with fake `herdr`, `agent-discordbot`, and `senpi` executables on
+// End-to-end through the real CLI with fake `herdr`, `agent-discordbot`, and service-manager executables on
 // PATH. The fakes are POSIX shell scripts and herdr itself is POSIX-only, hence the platform gate.
 const cli = join(import.meta.dir, "..", "omomeow.mjs")
 
@@ -12,17 +12,14 @@ let root: string
 let binDir: string
 let tabsFile: string
 let sentLog: string
-let senpiLog: string
 
-function run(args: string[], input?: string) {
+function run(args: string[], input?: string, path = `${binDir}:${process.env.PATH ?? ""}`) {
   const env = {
-    PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    PATH: path,
     HOME: join(root, "home"),
     OMOMEOW_HOME: join(root, "state"),
-    OMOMEOW_SENPI_BIN: join(binDir, "senpi"),
     FAKE_TABS: tabsFile,
     FAKE_SENT: sentLog,
-    FAKE_SENPI: senpiLog,
   }
   const result = spawnSync(process.execPath, [cli, ...args], { cwd: join(root, "home"), env, encoding: "utf8", input })
   const lastLine = result.stdout.trim().split("\n").at(-1) ?? ""
@@ -51,10 +48,8 @@ beforeEach(() => {
   mkdirSync(join(root, "home"))
   tabsFile = join(root, "tabs.json")
   sentLog = join(root, "sent.jsonl")
-  senpiLog = join(root, "senpi.jsonl")
   writeFake("herdr", `[ "$1 $2" = "tab list" ] && cat "$FAKE_TABS"`)
   writeFake("agent-discordbot", `${JSON.stringify(process.execPath)} -e 'require("fs").appendFileSync(process.env.FAKE_SENT, JSON.stringify(process.argv.slice(1)) + "\\n")' -- "$@"\necho '{"id":"m-1"}'`)
-  writeFake("senpi", `${JSON.stringify(process.execPath)} -e 'require("fs").appendFileSync(process.env.FAKE_SENPI, JSON.stringify(process.argv.slice(1)) + "\\n")' -- "$@"`)
 })
 
 afterEach(() => {
@@ -110,30 +105,17 @@ describe.skipIf(process.platform === "win32")("omomeow CLI", () => {
     expect(sentMessages()).toEqual([])
   })
 
-  test("#given a scheduled nudge job on stdin #when the hook runs #then it sends the nudge without resuming any session", () => {
+  test("#given a scheduled run #when the timer fires the nudge #then it sends and leaves one log line per run", () => {
     run(["owner", "set", "--platform", "discordbot", "--target", "dm-1"])
     setTabs([["w1:t1", "blocked", "needs-answer"]])
-    const prompt = run(["nudge-prompt"]).json.prompt
-    const job = { type: "scheduled_prompt", id: "sch_1", sessionId: "s", cwd: join(root, "home"), prompt, message: `[header]\n${prompt}`, fireCount: 1 }
 
-    const result = run(["schedule-hook"], JSON.stringify(job))
+    const first = run(["nudge", "--scheduled"])
+    const second = run(["nudge", "--scheduled"])
 
-    expect(result.status).toBe(0)
-    expect(result.json).toMatchObject({ event: "nudge", job: "sch_1" })
+    expect([first.status, second.status]).toEqual([0, 0])
     expect(sentMessages()).toHaveLength(1)
-    expect(existsSync(senpiLog)).toBe(false)
     const logged = readFileSync(join(root, "state", "logs", "nudge.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line))
-    expect(logged.map((line: { job: string; sent: unknown[] }) => [line.job, line.sent.length])).toEqual([["sch_1", 1]])
-  })
-
-  test("#given any other scheduled prompt #when the hook runs #then it resumes that session headlessly like default delivery", () => {
-    const job = { type: "scheduled_prompt", id: "sch_2", sessionId: "s-2", sessionFile: "/x/s-2.jsonl", cwd: join(root, "home"), prompt: "remind me", message: "[Scheduled prompt sch_2]\nremind me" }
-
-    const result = run(["schedule-hook"], JSON.stringify(job))
-
-    expect(result.status).toBe(0)
-    expect(JSON.parse(readFileSync(senpiLog, "utf8").trim())).toEqual(["-p", "--session", "/x/s-2.jsonl", "[Scheduled prompt sch_2]\nremind me"])
-    expect(sentMessages()).toEqual([])
+    expect(logged.map((line: { sent: unknown[]; reason: string | null }) => [line.sent.length, line.reason])).toEqual([[1, null], [0, "unchanged"]])
   })
 
   test("#given an old install and the new manifest #when reconciled through the CLI #then only the new feature is pending", () => {
@@ -148,12 +130,41 @@ describe.skipIf(process.platform === "win32")("omomeow CLI", () => {
     expect(plan.current).toEqual(["setup"])
   })
 
-  test("#given a runner render #when inspected #then the service runs senpi schedule with the omomeow hook from the runtime copy", () => {
-    const result = run(["runner", "render", "--senpi-bin", "/opt/bin/senpi", "--agent-dir", join(root, "agent")])
+  test("#given Herdr and a bot CLI on PATH but no state #when reconciled #then setup is new and reported as adoptable", () => {
+    const adoptable = run(["reconcile"], undefined, binDir).json.install.find((entry: { id: string }) => entry.id === "setup")
+    const emptyBin = join(root, "empty-bin")
+    mkdirSync(emptyBin)
+    const bare = run(["reconcile"], undefined, emptyBin).json.install.find((entry: { id: string }) => entry.id === "setup")
 
-    expect(result.json.spec.programArgs.slice(0, 5)).toEqual(["/opt/bin/senpi", "schedule", "run", "--watch", "--exec"])
-    expect(result.json.spec.programArgs[5]).toContain(join(root, "state", "runtime", "scripts", "omomeow.mjs"))
-    expect(result.json.spec.programArgs[5].endsWith(" schedule-hook")).toBe(true)
-    expect(result.json.spec.env.SENPI_CODING_AGENT_DIR).toBe(join(root, "agent"))
+    expect(adoptable.existing).toEqual({ herdr: true, bots: ["discordbot"], adoptable: true })
+    expect(bare.existing).toEqual({ herdr: false, bots: [], adoptable: false })
+  })
+
+  test("#given a service render #when inspected #then the timer runs nudge --scheduled from the runtime copy at the configured interval", () => {
+    mkdirSync(join(root, "home", ".omo"))
+    writeFileSync(join(root, "home", ".omo", "omo.json"), JSON.stringify({ omomeow: { nudge: { interval_minutes: 5 } } }))
+
+    const result = run(["service", "render"])
+
+    expect(result.status).toBe(0)
+    expect(result.json.spec.programArgs.slice(1)).toEqual([join(root, "state", "runtime", "scripts", "omomeow.mjs"), "nudge", "--scheduled"])
+    expect(result.json.spec.intervalSeconds).toBe(300)
+    expect(existsSync(join(root, "state", "runtime", "scripts", "omomeow.mjs"))).toBe(true)
+    expect(existsSync(join(root, "state", "runtime", "scripts", "tests"))).toBe(false)
+  })
+
+  test("#given the service manager cannot stop the timer #when uninstalled #then the CLI fails and keeps the service file", () => {
+    const manager = process.platform === "darwin" ? "launchctl" : "systemctl"
+    writeFake(manager, "exit 0")
+    expect(run(["service", "install"]).status).toBe(0)
+    if (manager === "launchctl") writeFake(manager, `[ "$1" = "bootout" ] && { echo "Boot-out failed: 5" >&2; exit 5; }\nexit 0`)
+    else writeFake(manager, `case "$*" in *disable*) echo "Failed to connect to bus" >&2; exit 1;; esac\nexit 0`)
+
+    const result = run(["service", "uninstall"])
+
+    expect(result.status).toBe(1)
+    expect(result.json.ok).toBe(false)
+    expect(result.json.kept.length).toBeGreaterThan(0)
+    for (const path of result.json.kept) expect(existsSync(path)).toBe(true)
   })
 })

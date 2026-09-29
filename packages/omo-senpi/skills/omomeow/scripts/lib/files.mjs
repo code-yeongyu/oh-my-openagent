@@ -1,12 +1,11 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { dirname, join, resolve, sep } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /** `scripts/` of the copy that is running (the skill itself, or the runtime copy under the state dir). */
 export const SCRIPTS_DIR = dirname(dirname(fileURLToPath(import.meta.url)))
 export const SKILL_DIR = dirname(SCRIPTS_DIR)
-export const CLI_PATH = join(SCRIPTS_DIR, "omomeow.mjs")
 
 export function resolveHomeDir(env = process.env) {
   return env.HOME ?? env.USERPROFILE ?? homedir()
@@ -16,24 +15,6 @@ export function resolveHomeDir(env = process.env) {
 export function resolveStateDir(env = process.env) {
   if (env.OMOMEOW_HOME) return resolve(env.OMOMEOW_HOME)
   return join(resolveHomeDir(env), ".omo", "omomeow")
-}
-
-/**
- * The senpi agent directory whose `schedule/` the runner watches. An explicit override wins; inside a
- * session the session file path names it (`<agent dir>/sessions/...`), which covers both `~/.omo/agent`
- * (OmO Native) and `~/.senpi/agent` (plain senpi) without guessing.
- */
-export function resolveAgentDir(env = process.env) {
-  for (const key of ["SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"]) {
-    if (env[key]) return resolve(env[key])
-  }
-  const sessionFile = env.PI_SESSION_FILE
-  if (sessionFile) {
-    const marker = `${sep}sessions${sep}`
-    const index = sessionFile.lastIndexOf(marker)
-    if (index > 0) return sessionFile.slice(0, index)
-  }
-  return join(resolveHomeDir(env), ".senpi", "agent")
 }
 
 export function readJson(path, fallback) {

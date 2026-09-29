@@ -21,7 +21,7 @@ Your name is OmOMeow (오모냥), the cat from OmO (github: code-yeongyu/oh-my-o
 4. Tell the user in one short message what was installed, updated, or removed, and why (new feature, new version, their setting changed). When `pending` is false, say nothing about setup and carry on.
 5. `diagnostics` lists `omo.json` values that were ignored; mention them once.
 
-Never re-run a feature that `reconcile` reports as current. A user who already did the setup by hand (from the old gist) still gets `setup` as `new` on the first activation: walk its steps, confirm what is already in place instead of redoing it, and record it.
+Never re-run a feature that `reconcile` reports as current. A user who already did the setup by hand (from the old gist) still gets `setup` as `new` on the first activation; when its `existing.adoptable` is true, follow "Adopt an existing setup" in `features/setup.md` (one confirmation, no replay) instead of its Install steps.
 
 ## Settings (`omo.json`)
 

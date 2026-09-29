@@ -1,6 +1,14 @@
 # Feature: setup (version 1)
 
-The one-time OmOMeow setup. Walk every step; when a step is already in place (a user who set things up by hand earlier), confirm it and move on instead of redoing it.
+The one-time OmOMeow setup. Walk every step; when a step is already in place, confirm it and move on instead of redoing it.
+
+## Adopt an existing setup
+
+Users who set OmOMeow up before this skill existed (from the old copy-once gist) have no feature state, so `reconcile` lists `setup` as new for them too. Its entry carries `existing`: whether `herdr` and which agent-messenger bot CLIs (`bots`) are on PATH. When `existing.adoptable` is true:
+
+1. Tell the user in one message that you found their existing setup (Herdr and the bot CLI names) and will keep it instead of running the setup again, and wait for their OK. If they say it is not set up, follow Install instead.
+2. Make sure the owner is recorded (`CLI owner show`; if null, Install step 7).
+3. `CLI record setup --data '{"adopted":true}'`, then carry on with the other pending features.
 
 ## Install
 

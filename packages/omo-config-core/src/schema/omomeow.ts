@@ -7,7 +7,7 @@ export const OMOMEOW_LANGUAGES = ["en", "ko"] as const
 const OmoMeowNudgeShape = {
   /** Send the periodic "what is running" DM (default: true). */
   enabled: z.boolean(),
-  /** Minutes between nudges (default: 30). The senpi scheduler fires at most once per minute. */
+  /** Minutes between nudges (default: 30), the interval of the nudge timer service. */
   interval_minutes: z.number().int().min(1).max(1440),
 }
 

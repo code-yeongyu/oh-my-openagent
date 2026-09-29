@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto"
 
-export const NUDGE_MARKER = "[omomeow:nudge]"
 export const MESSAGE_LIMIT = 1900
 
 const KIND_ORDER = { blocked: 0, waiting: 1, working: 2, done: 3 }

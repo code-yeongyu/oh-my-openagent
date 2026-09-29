@@ -4,11 +4,15 @@
   setup prompt; `manifest.json` lists versioned features (`setup`, `nudge`) documented in `features/<id>.md`.
   `scripts/omomeow.mjs reconcile` compares the manifest with `~/.omo/omomeow/state.json` and returns only what to
   install, update (version bump or changed setting), or remove, so an existing user never re-runs the whole setup.
-- nudge: a recurring `schedule_prompt` job (`[omomeow:nudge]` marker) delivered by a `senpi schedule run --watch
-  --exec '... omomeow.mjs schedule-hook'` runner (launchd/systemd user service rendered by `runner install`, pointing at a
-  runtime copy of the scripts under the state dir). The hook reads `herdr tab list`, joins the thread/tab/session map,
-  and DMs each requester through the agent-messenger bot CLI only when something is working or blocked and the
-  task/state/title/progress fingerprint changed; other scheduled prompts fall back to `senpi -p --session`.
+- nudge: a user timer service (`service install`: a launchd agent with `StartInterval` on macOS, a systemd user timer on
+  Linux, the command to schedule elsewhere) runs `omomeow.mjs nudge --scheduled` from a runtime copy of the scripts under
+  the state dir every `interval_minutes`. It reads `herdr tab list`, joins the thread/tab/session map, and DMs each
+  requester through the agent-messenger bot CLI only when something is working or blocked and the
+  task/state/title/progress fingerprint changed. It does not use `schedule_prompt`, so scheduled prompts keep senpi's
+  own delivery and busy-session guard. `service uninstall` keeps the service file and fails when the timer cannot be
+  stopped.
+- A setup done by hand before the skill (the old gist) is reported by `reconcile` (`existing`: Herdr and bot CLIs on
+  PATH) and adopted after one confirmation instead of replayed.
 - `native-skill-sources.mjs`, `BUILTIN_SKILL_NAMES`, and the skill-sync expectations list `omomeow`.
 
 ## model-profile, task: builtin lanes and the category notice never route to an unlisted gateway (#9146)

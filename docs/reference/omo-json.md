@@ -164,8 +164,8 @@ Settings for the `omomeow` skill (OmOMeow mode, the always-on messenger agent; `
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `language` | `"en"` \| `"ko"` | `"en"` | Language of the fixed labels in messages the skill's scripts compose (the nudge). |
-| `nudge.enabled` | boolean | `true` | The periodic "what is running" DM. Turning it off makes the next activation cancel the scheduled job. |
-| `nudge.interval_minutes` | integer 1-1440 | `30` | Minutes between nudges. A change is picked up the next time OmOMeow mode is turned on (the job is recreated). |
+| `nudge.enabled` | boolean | `true` | The periodic "what is running" DM. Turning it off makes the next activation remove the nudge timer service. |
+| `nudge.interval_minutes` | integer 1-1440 | `30` | Minutes between nudges. A change is picked up the next time OmOMeow mode is turned on (the timer service is reinstalled with the new interval). |
 
 ```jsonc
 {
