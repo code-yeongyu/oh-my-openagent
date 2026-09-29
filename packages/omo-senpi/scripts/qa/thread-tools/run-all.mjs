@@ -6,7 +6,7 @@
  *
  * Two suites:
  * - `gateway` (todo 16): real pty OmO TUIs, shard hosts and the `omo` CLI on the RELEASED engine
- *   (`lib/gateway.mjs`; `THREAD_QA_SENPI_VERSION`, default 2026.9.29-4). Needs only bun, node and the
+ *   (`lib/gateway.mjs`; `THREAD_QA_SENPI_VERSION`, default 2026.9.29-5). Needs only bun, node and the
  *   network for the first kit install.
  * - `legacy` (task 13/14): the thread components driven from source against a senpi SOURCE checkout
  *   and a desktop checkout (`lib/harness.mjs`). A legacy scenario whose checkouts are absent is
