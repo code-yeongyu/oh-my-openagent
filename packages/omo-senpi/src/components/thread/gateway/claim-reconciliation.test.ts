@@ -121,6 +121,31 @@ describe("claim_reconciliation", () => {
     expect(next.runtime.enqueueCount(id)).toBe(1)
   })
 
+  test("#given a live host released the session after admitting two deliveries, one written and one not #when the next owner drains #then the written one is applied, the unwritten one re-admitted once, and neither reads dual_runtime", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("A")
+    const b = crashedTarget(h)
+    const host = createInboxDrain({ store: h.store(), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now })
+    const written = await sendToB(h, "written before release")
+    const unwritten = await sendToB(h, "queued behind the turn")
+    const firstEmitted = new Promise<string>((resolve) => b.runtime.onEmitted(resolve))
+    expect((await host.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: written, kind: "started" }, { delivery_id: unwritten, kind: "queued" }])
+    expect(await firstEmitted).toBe(written)
+    expect({ written: (await b.view(written))?.state, unwritten: (await b.view(unwritten))?.state }).toEqual({ written: "admitted", unwritten: "admitted" })
+
+    h.clock.now += 1_000
+    b.runtime.release(h.clock.now)
+    const next = freshProcess(h, b.runtime.sessionPath)
+    const result = await next.drain.drain({ reason: "start" })
+    expect({
+      admitted: result.admitted,
+      written: (await b.view(written))?.state,
+      readmittedWritten: next.runtime.enqueueCount(written),
+      entries: next.runtime.transcriptEntries(written),
+      dual: next.log.filter((line) => line.startsWith("dual_runtime")),
+    }).toEqual({ admitted: [{ delivery_id: unwritten, kind: "started" }], written: "applied", readmittedWritten: 0, entries: 1, dual: [] })
+  })
+
   test("#given a row claimed by another live process #when this process drains #then it is left alone and logged dual_runtime until that process is gone", async () => {
     const h = (harness = createGatewayHarness())
     h.session("A")

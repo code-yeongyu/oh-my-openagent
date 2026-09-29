@@ -1,7 +1,7 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 
 import type { AdmitExternalMessageInput, ExternalAdmissionKind, RuntimePhase, SessionAdmissionGate, SessionRuntimePort } from "../adapter"
-import { SESSION_CONTROL_DELIVERY_TYPE } from "../constants"
+import { SESSION_CONTROL_DELIVERY_TYPE, SESSION_RELEASED_ENTRY_TYPE } from "../constants"
 
 type Lane = "start" | "steer" | "followUp"
 
@@ -138,6 +138,16 @@ export class FakeSessionRuntime implements SessionRuntimePort {
 
   textOf(deliveryId: string): string | undefined {
     return this.texts.get(deliveryId)
+  }
+
+  /** senpi `release_session`: admission closes and the file records `session_released` before teardown. */
+  release(releasedAt: number): void {
+    this.closedReason = "session released"
+    appendFileSync(this.sessionPath, `${JSON.stringify({
+      type: "custom",
+      customType: SESSION_RELEASED_ENTRY_TYPE,
+      data: { reason: "takeover", interrupted: false, attachments: 0, host_instance: null, released_at: new Date(releasedAt).toISOString() },
+    })}\n`)
   }
 
   dropQueues(): readonly string[] {

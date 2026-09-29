@@ -25,6 +25,7 @@ import {
   QUEUED_TTL_MS,
   ROOT_LIFETIME_MS,
   SESSION_CONTROL_DELIVERY_TYPE,
+  SESSION_RELEASED_ENTRY_TYPE,
   TARGET_MAX_BYTES,
   TARGET_MAX_MESSAGES,
 } from "./constants"
@@ -479,8 +480,8 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
   }
 }
 
-function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: Map<string, string>): boolean {
-  if (sessionPath === null) return false
+function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {
+  if (sessionPath === null) return ""
   let text = cache.get(sessionPath)
   if (text === undefined) {
     try {
@@ -491,7 +492,35 @@ function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: 
     }
     cache.set(sessionPath, text)
   }
-  for (const line of text.split("\n")) {
+  return text
+}
+
+/**
+ * When the session file was last handed to another runtime: senpi's `release_session` appends a
+ * `custom` entry `session_released { released_at }` before it tears the runtime down, and nothing
+ * is written by that runtime afterwards. A claim made at or before it cannot be written any more,
+ * even though the host process that made it is still alive.
+ */
+function lastReleaseAt(sessionPath: string | null, cache: Map<string, string>): number | null {
+  let latest: number | null = null
+  for (const line of transcriptText(sessionPath, cache).split("\n")) {
+    if (!line.includes(SESSION_RELEASED_ENTRY_TYPE)) continue
+    let entry: unknown
+    try {
+      entry = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const record = entry as { type?: unknown; customType?: unknown; data?: { released_at?: unknown } }
+    if (record.type !== "custom" || record.customType !== SESSION_RELEASED_ENTRY_TYPE || typeof record.data?.released_at !== "string") continue
+    const at = Date.parse(record.data.released_at)
+    if (Number.isFinite(at) && (latest === null || at > latest)) latest = at
+  }
+  return latest
+}
+
+function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: Map<string, string>): boolean {
+  for (const line of transcriptText(sessionPath, cache).split("\n")) {
     if (!line.includes(deliveryId)) continue
     let entry: unknown
     try {
@@ -545,7 +574,9 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
       dead = await isClaimantDead(row.admitted_by)
       deadClaimants.set(key, dead)
     }
-    const to = !dead ? "dual" : sessionHasToken(request.session_path, row.delivery_id, transcripts) ? "applied" : "queued"
+    const released = lastReleaseAt(request.session_path, transcripts)
+    const letGo = dead || (released !== null && row.claimed_at !== null && row.claimed_at <= released)
+    const to = !letGo ? "dual" : sessionHasToken(request.session_path, row.delivery_id, transcripts) ? "applied" : "queued"
     verdicts.set(row.delivery_id, { fingerprint: claimFingerprint(row), to })
   }
 
