@@ -187,7 +187,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         return { success: false, error: failure.error.code, errorData: { hint: failure.error.message } }
       }
     },
-    dispose: () => store.dispose(),
+    dispose: () => {
+      relay.dispose()
+      return store.dispose()
+    },
   }
 }
 

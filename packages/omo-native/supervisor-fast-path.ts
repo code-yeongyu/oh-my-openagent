@@ -4,11 +4,13 @@
 // relative literals: the files are outside senpi's exports map, and bun only traces literal
 // import() arguments into the compiled binary.
 
+import { launchOptions } from "./compile-args"
+
 /** Must equal the engine's `INTERNAL_SUPERVISOR_ROUTE_FLAG` (`modes/rpc/supervisor-route.ts`). */
 export const INTERNAL_SUPERVISOR_FLAG = "--internal-rpc-host-supervisor"
 
 export function isInternalSupervisorLaunch(args: readonly string[]): boolean {
-  return args.includes(INTERNAL_SUPERVISOR_FLAG)
+  return launchOptions(args).includes(INTERNAL_SUPERVISOR_FLAG)
 }
 
 /**

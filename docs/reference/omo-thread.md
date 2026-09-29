@@ -89,6 +89,12 @@ lease_started_at, ttl_seconds, expires_at}`.
 
 A failure is `{kind:"error", error: {code, message, next_action, details?}}`; the code is one of
 the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`, "Error taxonomy").
+The failures the CLI answers itself use the same shape: a usage error is `invalid_arguments`
+(exit 2), and win32 or a runtime without `node:sqlite` is `unsupported` (exit 4).
+
+`report <session> completion` arms the completion in the gateway store. A session writes an armed
+completion when it settles, but a running session only learns of arms made by its own
+`thread_report`; an arm made from the CLI is picked up when the session's runtime next starts.
 
 ## Exit codes
 
@@ -96,7 +102,7 @@ the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`,
 | --- | --- |
 | 0 | done |
 | 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, ...) |
-| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes (the SDK is not loaded) |
+| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up`, a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text (the SDK is not loaded) |
 | 3 | `host_unavailable`: no endpoint answered where one was needed |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
 | 5 | `internal_error` |

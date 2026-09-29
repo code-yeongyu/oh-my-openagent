@@ -166,6 +166,8 @@
   task engine (the full barrel made `bun build --outfile` emit assets and fail).
 - Build: new entry `src/extension/thread-sdk.ts` -> `plugin/runtime/thread-sdk/sdk.js` (node builtins only external),
   in `--check`, the installer's required artifacts and the omo-ai payload verifier.
+- `sdk.dispose()` cancels the relay's background answer-release retries before closing the store, as the component's
+  `session_shutdown` does.
 
 ## thread: chat-thread bindings, report/outbox/answer relay tools, SQLite tool receipts, gateway send path behind a switch
 

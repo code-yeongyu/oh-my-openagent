@@ -19,9 +19,9 @@ function refusalMessage(code, errorData, interrupt) {
   const busy = errorData?.busy?.length ? ` (${errorData.busy.join(", ")})` : ""
   switch (code) {
     case "turn_active":
-      return errorData?.retry_with?.interrupt === true || !interrupt
-        ? `turn_active: the session is running a turn or owes one${busy}; pass --interrupt to stop it and take the session`
-        : `turn_active: the session is still busy after the interrupt${busy}`
+      return interrupt
+        ? `turn_active: the session is still busy after the interrupt${busy}`
+        : `turn_active: the session is running a turn or owes one${busy}; pass --interrupt to stop it and take the session`
     case "session_busy":
       return `session_busy: the host is still working on the session${busy}; retry when it is done`
     case "attached":
@@ -53,7 +53,7 @@ function dropped(...replies) {
   for (const reply of replies) {
     const value = reply?.success === true ? reply.data.dropped : reply?.errorData?.dropped
     deliveries.push(...(value?.deliveries ?? []))
-    userMessages.push(...(value?.user_messages ?? []))
+    userMessages.push(...(value?.user_messages ?? []).filter((message) => message.trim() !== ""))
   }
   return { deliveries, user_messages: userMessages }
 }

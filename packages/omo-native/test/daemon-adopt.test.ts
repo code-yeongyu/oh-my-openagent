@@ -57,7 +57,7 @@ describe("omo daemon adopt", () => {
   })
 
   test("#given --interrupt took queued input out #when released #then the messages become the terminal's first prompts, and one starting with @ is printed instead", async () => {
-    const released = { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: ["d-1"], user_messages: ["first ask", "@notes.md please", "second ask"] } } }
+    const released = { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: ["d-1"], user_messages: ["first ask", "", "@notes.md please", "   ", "second ask"] } } }
     const result = await adopt(["dur-host", "--interrupt", "--json"], { replies: [released] })
     expect(result.releases).toEqual([{ interrupt: true }])
     expect(result.outcome).toEqual({ launch: ["--session", "/sessions/dur-host.jsonl", "--", "first ask", "second ask"], cwd: "/work/repo" })
@@ -79,6 +79,14 @@ describe("omo daemon adopt", () => {
     expect(result.outcome).toBe(DAEMON_EXIT.unsupported)
     expect(result.stderr).toContain("turn_active")
     expect(result.stderr).toContain("pass --interrupt")
+  })
+
+  test("#given --interrupt was passed #when the host still answers turn_active with retry_with #then the message never asks for --interrupt again", async () => {
+    const refused = { success: false, error: "turn_active", errorData: { attachments: 0, busy: ["turn"], retry_with: { interrupt: true }, interrupted: true } }
+    const result = await adopt(["dur-host", "--interrupt"], { replies: [refused] })
+    expect(result.outcome).toBe(DAEMON_EXIT.unsupported)
+    expect(result.stderr).toContain("still busy after the interrupt")
+    expect(result.stderr).not.toContain("pass --interrupt")
   })
 
   test("#given a client attached #when adopted without then with --force #then the first exits 4 attached with the count and the second forces the release", async () => {

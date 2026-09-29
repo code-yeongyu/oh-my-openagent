@@ -79,6 +79,7 @@ const COMMANDS = {
 
 const REQUIRED = { unbind: ["--revision"], rebind: ["--revision"], bind: ["--platform", "--account", "--chat"], answer: ["--binding", "--token"] }
 const INTEGER_FLAGS = ["--expected-turn", "--limit", "--max-bytes", "--revision", "--after"]
+const CHOICE_FLAGS = { "--mode": ["auto", "steer", "follow_up"], "--direction": ["in", "out", "both"] }
 
 function sendTarget(positionals, options) {
   if (positionals.length === 2) return { thread: positionals[0], text: positionals[1] }
@@ -124,23 +125,30 @@ function validate(name, parsed) {
   if (count < min || count > max) return `expects ${min === max ? min : `${min}-${max}`} argument(s), got ${count}`
   for (const flag of REQUIRED[name] ?? []) if (parsed.options[flag] === undefined) return `${flag} is required`
   for (const flag of INTEGER_FLAGS) if (Number.isNaN(integerOption(parsed.options, flag) ?? 0)) return `${flag} must be a non-negative integer`
+  for (const [flag, choices] of Object.entries(CHOICE_FLAGS)) {
+    const value = parsed.options[flag]
+    if (value !== undefined && !choices.includes(value)) return `${flag} must be one of ${choices.join(", ")}, got '${value}'`
+  }
   if (name === "send") {
     const binding = parsed.options["--binding"] !== undefined
     if (!binding && count !== 2) return "needs <target> <text> (or --binding <id>)"
+    if (parsed.positionals.at(-1).trim() === "") return "<text> is empty"
     if (binding && (parsed.options["--mode"] !== undefined || parsed.options["--expected-turn"] !== undefined)) return "--binding delivers with the binding's inbound mode; drop --mode/--expected-turn"
   }
   if (name === "ack" && !/^\d+$/.test(parsed.positionals[1])) return "<cursor> must be a non-negative integer"
   return undefined
 }
 
-function defined(value) {
-  if (Array.isArray(value) || value === null || typeof value !== "object") return value
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined).map(([key, entry]) => [key, defined(entry)]))
+/** With `--json`, a failure the CLI answers itself is printed in the SDK's error shape, so stdout is always one JSON value. */
+function refuse({ stdout, stderr }, json, code, line, nextAction) {
+  if (json) stdout.write(`${JSON.stringify({ kind: "error", error: { code, message: line, next_action: nextAction } })}\n`)
+  stderr.write(`${line}\n`)
 }
 
-/** Every SDK call gets its request with absent flags removed, never as explicit `undefined` fields. */
-function cleaned(sdk) {
-  return Object.fromEntries(Object.entries(sdk).map(([key, member]) => [key, typeof member === "function" ? (request, ...rest) => member(defined(request), ...rest) : member]))
+/** `--json` among the options, before `--`: a usage error is still answered in JSON when the parse itself failed. */
+function launchJson(args) {
+  const end = args.indexOf("--")
+  return (end === -1 ? args : args.slice(0, end)).includes("--json")
 }
 
 export function threadExitCode(result) {
@@ -170,35 +178,36 @@ export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, lo
 export async function runThreadCommand(args, options) {
   const { stdout, stderr, platform } = options
   const name = args[0]
+  const json = launchJson(args)
   if (name === "--help" || name === "-h") {
     stdout.write(`${USAGE}\n`)
     return THREAD_EXIT.ok
   }
   if (name === undefined || !Object.hasOwn(COMMANDS, name)) {
-    stderr.write(`${name === undefined ? "" : `omo thread: unknown subcommand '${name}'\n`}${USAGE}\n`)
+    refuse(options, json, "invalid_arguments", `omo thread: ${name === undefined ? "expects a subcommand" : `unknown subcommand '${name}'`}`, "Run omo thread --help.")
+    stderr.write(`${USAGE}\n`)
     return THREAD_EXIT.usage
   }
   // Same refusal as `omo daemon` on win32: the gateway's endpoints are unix sockets.
   if (platform === "win32") {
-    stderr.write("omo thread: a task host needs a unix socket, which win32 does not provide\n")
+    refuse(options, json, "unsupported", "omo thread: a task host needs a unix socket, which win32 does not provide", "Run omo thread on macOS or Linux.")
     return THREAD_EXIT.unsupported
   }
   const command = COMMANDS[name]
   const parsed = parseArgs(args.slice(1), { booleans: [...COMMON, ...command.booleans], values: command.values })
   const problem = parsed.error ?? validate(name, parsed)
   if (problem !== undefined) {
-    stderr.write(`omo thread ${name}: ${problem}\n`)
+    refuse(options, json, "invalid_arguments", `omo thread ${name}: ${problem}`, `Run omo thread --help for the ${name} options.`)
     return THREAD_EXIT.usage
   }
   const loaded = await loadThreadSdk(options)
   if (loaded.error !== undefined) {
-    stderr.write(`omo thread: ${loaded.error}\n`)
+    refuse(options, json, "unsupported", `omo thread: ${loaded.error}`, "Run omo thread under bun, or a node with node:sqlite.")
     return THREAD_EXIT.unsupported
   }
   try {
     const scope = parsed.flags.has("--all-scope") ? { all_scope: true } : {}
-    const result = await command.call(cleaned(loaded.sdk), parsed.positionals, parsed.options, scope, parsed.flags)
-    const json = parsed.flags.has("--json")
+    const result = await command.call(loaded.sdk, parsed.positionals, parsed.options, scope, parsed.flags)
     const exitCode = threadExitCode(result)
     if (result.kind !== "ok") {
       if (json) stdout.write(`${JSON.stringify(result)}\n`)

@@ -114,6 +114,7 @@ aggregate. `omo doctor` prints the same rows as `INFO` lines and a dead row as a
   ],
   "aggregate": {
     "live": 1,
+    "terminals": 0,
     "shards": 1,
     "threads": 0,
     "sessions": 2,
@@ -123,6 +124,10 @@ aggregate. `omo doctor` prints the same rows as `INFO` lines and a dead row as a
   }
 }
 ```
+
+`aggregate.live` counts reachable hosts only. `aggregate.terminals` counts reachable terminal
+(`endpoint_kind: "tui"`) endpoints; they are listed in `endpoints` but never counted in `live`,
+`shards`, `threads`, `sessions` or the RSS totals, because a terminal is not a host.
 
 `status` never prunes, signals, unlinks, or refreshes an idle host. A dead row is kept
 until `omo daemon gc` asks the engine (`senpi host gc`) to remove it. The engine removes
@@ -460,7 +465,8 @@ thread address book (`omo thread list --all-scope`), asks its host to hand it ov
 - A quiet session is handed over as is. A session that is running a turn, or owes one to queued
   input, is refused `turn_active` (exit 4); `--interrupt` stops the turn first. Input the
   interrupt took out of the host's queue becomes this terminal's first prompts, in their queued
-  order (a message starting with `@` is printed instead, since the launch would read it as a file).
+  order, after `--`, so none is read as a launch option (a message starting with `@` is printed
+  instead, since the launch would read it as a file; an empty or whitespace-only one is dropped).
   When the release is refused after the interrupt, that input is printed so it can be sent again.
 - A session another client is attached to (a Desktop thread window) is refused `attached` with
   the client count (exit 4); `--force` takes it anyway, and those clients are told the session was

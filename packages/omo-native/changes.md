@@ -273,6 +273,14 @@ on every run. `~/.pi/agent` is only read.
   `--wait` never act on a terminal endpoint; handoff lists them as skipped.
 - Tests: `thread.test.ts`, `daemon-adopt.test.ts`, `daemon-operations.test.ts` (mixed host/live tui/dead tui fixture),
   `sqlite-import-discipline.test.ts` covers `thread.js`.
+- `compile-args.ts` (moved out of `compile-entry.ts`): `buildSenpiArgs`, the banner gate and `isInternalSupervisorLaunch`
+  read only the options before `--`. A queued message replayed by adopt that reads `--no-extensions` no longer starts
+  the compiled binary's adopted session without the plugin. Blank queued messages are not replayed.
+- `omo thread`: `--mode` outside `auto|steer|follow_up`, `--direction` outside `in|out|both` (a typo used to bind both
+  directions) and an empty `send` text exit 2; with `--json`, usage, win32 and no-`node:sqlite` failures print the
+  error JSON on stdout. Adopt no longer tells a user who passed `--interrupt` to pass it.
+- Tests: `compile-entry-adopt.test.ts` (the compiled adopt branch: argv, cwd, flag-shaped messages) and
+  `launcher-adopt.test.ts` (the real `bin/omo.js` adopt launch: plugin, `--session`, cwd).
 
 ## 2026-09-28 - The compiled binary enters a shard supervisor without the engine CLI graph
 

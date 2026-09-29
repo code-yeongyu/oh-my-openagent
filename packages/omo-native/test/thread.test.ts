@@ -4,8 +4,8 @@ import { loadThreadSdk, runThreadCommand, THREAD_EXIT } from "../bin/lib/thread.
 
 /**
  * `omo thread` is a thin wrapper over the plugin's thread SDK: these tests pin which SDK call each
- * argv makes (absent flags never reach it), the exit code of each outcome class, and the `--json`
- * shapes a connector scripts against. The SDK's own behavior is covered in omo-senpi `sdk.test.ts`.
+ * argv makes (the fake SDK answers with the request it got, so the assertion reads what the CLI
+ * printed), the exit code of each outcome class, and the `--json` shapes a connector scripts against. The SDK's own behavior is covered in omo-senpi `sdk.test.ts`.
  */
 
 type Call = { readonly method: string; readonly request: unknown }
@@ -20,7 +20,7 @@ function fakeSdk(answers: Record<string, unknown> = {}) {
   let disposed = 0
   const method = (name: string) => async (request: unknown) => {
     calls.push({ method: name, request })
-    return answers[name] ?? { kind: "ok" }
+    return answers[name] ?? { kind: "ok", method: name, request }
   }
   const sdk = Object.fromEntries(["list", "read", "send", "bind", "unbind", "rebind", "bindings", "report", "outbox", "ack", "answer"].map((name) => [name, method(name)]))
   return {
@@ -58,25 +58,33 @@ describe("omo thread: argv to SDK calls", () => {
   test("#given list --json #when run #then the SDK lists in the workspace scope and stdout is the threads array", async () => {
     const fake = fakeSdk({ list: { kind: "ok", scope: "workspace", threads: [{ thread_id: "dur-tui", surface: "tui" }] } })
     const result = await run(["list", "--json"], fake)
-    expect(result.calls).toStrictEqual([{ method: "list", request: {} }])
+    expect(result.calls.map((call) => call.method)).toEqual(["list"])
     expect(JSON.parse(result.stdout)).toEqual([{ thread_id: "dur-tui", surface: "tui" }])
     expect({ exitCode: result.exitCode, disposed: result.disposed }).toEqual({ exitCode: THREAD_EXIT.ok, disposed: 1 })
   })
 
   test("#given send with every addressing flag #when run #then the request carries exactly them, the turn as a number", async () => {
     const result = await run(["send", "my-tui", "ping", "--mode", "steer", "--expected-turn", "3", "--idempotency-key", "k-1", "--all-scope", "--json"])
-    expect(result.calls).toStrictEqual([{ method: "send", request: { all_scope: true, thread: "my-tui", text: "ping", mode: "steer", expected_turn_id: 3, idempotency_key: "k-1" } }])
-    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok" })
+    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "send", request: { all_scope: true, thread: "my-tui", text: "ping", mode: "steer", expected_turn_id: 3, idempotency_key: "k-1" } })
   })
 
   test("#given send --binding with only a text #when run #then it is the inbound path with no target and the key as the event id", async () => {
     const result = await run(["send", "--binding", "b-1", "--idempotency-key", "evt-9", "hello from outside", "--json"])
-    expect(result.calls).toStrictEqual([{ method: "send", request: { text: "hello from outside", binding_id: "b-1", idempotency_key: "evt-9" } }])
+    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "send", request: { text: "hello from outside", binding_id: "b-1", idempotency_key: "evt-9" } })
   })
 
   test("#given bind flags #when run #then direction, events and a ttl of none map to the binding record's fields", async () => {
     const result = await run(["bind", "my-tui", "--platform", "custom", "--account", "qa", "--chat", "c1", "--direction", "in", "--events", "milestone,report", "--ttl", "none", "--json"])
-    expect(result.calls).toStrictEqual([{ method: "bind", request: { session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1", direction: { inbound: true, outbound: false }, outbound_events: ["milestone", "report"], ttl_seconds: null } } }])
+    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "bind", request: { session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1", direction: { inbound: true, outbound: false }, outbound_events: ["milestone", "report"], ttl_seconds: null } } })
+  })
+
+  test.each([
+    ["in", { inbound: true, outbound: false }],
+    ["out", { inbound: false, outbound: true }],
+    ["both", { inbound: true, outbound: true }],
+  ])("#given --direction %s #when bound #then the binding carries exactly that direction", async (direction, expected) => {
+    const result = await run(["bind", "my-tui", "--platform", "custom", "--account", "qa", "--chat", "c1", "--direction", direction, "--json"])
+    expect(JSON.parse(result.stdout).request.binding.direction).toEqual(expected)
   })
 
   test("#given read --limit #when the transcript has more items #then only the newest ones are printed", async () => {
@@ -86,13 +94,13 @@ describe("omo thread: argv to SDK calls", () => {
   })
 
   test("#given unbind, rebind, report and answer #when run #then each maps its positionals and flags", async () => {
-    const calls = [
-      ...(await run(["unbind", "b-1", "--revision", "2", "--json"])).calls,
-      ...(await run(["rebind", "b-1", "other", "--revision", "2", "--json"])).calls,
-      ...(await run(["report", "my-tui", "question", "proceed?", "--binding", "b-1", "--request-id", "ui-1", "--json"])).calls,
-      ...(await run(["answer", "--binding", "b-1", "--token", "rt1.x.y", "yes", "--json"])).calls,
+    const printed = [
+      JSON.parse((await run(["unbind", "b-1", "--revision", "2", "--json"])).stdout),
+      JSON.parse((await run(["rebind", "b-1", "other", "--revision", "2", "--json"])).stdout),
+      JSON.parse((await run(["report", "my-tui", "question", "proceed?", "--binding", "b-1", "--request-id", "ui-1", "--json"])).stdout),
+      JSON.parse((await run(["answer", "--binding", "b-1", "--token", "rt1.x.y", "yes", "--json"])).stdout),
     ]
-    expect(calls).toStrictEqual([
+    expect(printed.map(({ method, request }) => ({ method, request }))).toEqual([
       { method: "unbind", request: { binding_id: "b-1", expected_revision: 2 } },
       { method: "rebind", request: { binding_id: "b-1", session: "other", expected_revision: 2 } },
       { method: "report", request: { session: "my-tui", kind: "question", text: "proceed?", binding_id: "b-1", request_id: "ui-1" } },
@@ -108,10 +116,8 @@ describe("omo thread: the connector outbox", () => {
       ack: { kind: "ok", binding_id: "b-1", acked_cursor: 7, changed: true },
     })
     const result = await run(["outbox", "b-1", "--after", "3", "--ack", "--json"], fake)
-    expect(result.calls).toStrictEqual([
-      { method: "outbox", request: { binding_id: "b-1", after_cursor: 3 } },
-      { method: "ack", request: { binding_id: "b-1", cursor: 7 } },
-    ])
+    expect(result.calls.map((call) => call.method)).toEqual(["outbox", "ack"])
+    expect(result.calls[1]?.request).toEqual({ binding_id: "b-1", cursor: 7 })
     expect(JSON.parse(result.stdout)).toMatchObject({ rows: [{ cursor: 4 }, { cursor: 7 }], acked: { acked_cursor: 7, changed: true } })
   })
 
@@ -124,7 +130,7 @@ describe("omo thread: the connector outbox", () => {
 
   test("#given ack with a provider message id #when run #then the cursor is a number", async () => {
     const result = await run(["ack", "b-1", "12", "--provider-message-id", "m-1", "--json"])
-    expect(result.calls).toStrictEqual([{ method: "ack", request: { binding_id: "b-1", cursor: 12, provider_message_id: "m-1" } }])
+    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "ack", request: { binding_id: "b-1", cursor: 12, provider_message_id: "m-1" } })
   })
 })
 
@@ -148,10 +154,29 @@ describe("omo thread: exit codes", () => {
     [["unbind", "b-1", "--revision", "x"], "--revision must be a non-negative integer"],
     [["list", "--bogus"], "unknown option '--bogus'"],
     [["nope"], "unknown subcommand 'nope'"],
+    [["send", "my-tui", "ping", "--mode", "bogus"], "--mode must be one of auto, steer, follow_up"],
+    [["bind", "my-tui", "--platform", "p", "--account", "a", "--chat", "c", "--direction", "sideways"], "--direction must be one of in, out, both"],
+    [["bind", "my-tui", "--platform", "p", "--account", "a", "--chat", "c", "--direction", "inbound"], "--direction must be one of in, out, both"],
+    [["send", "my-tui", "   "], "<text> is empty"],
+    [["send", "--binding", "b-1", ""], "<text> is empty"],
   ])("#given %p #when run #then it is a usage error and the SDK is never loaded", async (args, message) => {
     const result = await run(args)
     expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
     expect(result.stderr).toContain(message)
+    expect(result.stdout).toBe("")
+  })
+
+  test.each([
+    ["a usage error", ["send", "my-tui", "ping", "--mode", "bogus", "--json"], {}, THREAD_EXIT.usage, "invalid_arguments"],
+    ["an unknown option", ["list", "--bogus", "--json"], {}, THREAD_EXIT.usage, "invalid_arguments"],
+    ["win32", ["list", "--json"], { platform: "win32" }, THREAD_EXIT.unsupported, "unsupported"],
+    ["no node:sqlite", ["list", "--json"], { loadSqlite: async () => { throw new Error("No such built-in module: node:sqlite") } }, THREAD_EXIT.unsupported, "unsupported"],
+  ])("#given %s with --json #when run #then stdout is still one error JSON value", async (_label, args, extra, exitCode, code) => {
+    const result = await run(args, fakeSdk(), extra)
+    expect(result.exitCode).toBe(exitCode)
+    const printed = JSON.parse(result.stdout)
+    expect({ kind: printed.kind, code: printed.error.code }).toEqual({ kind: "error", code })
+    expect(typeof printed.error.next_action).toBe("string")
   })
 
   test("#given win32 #when any subcommand runs #then it is refused as unsupported like omo daemon", async () => {
