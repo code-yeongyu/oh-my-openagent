@@ -88,6 +88,8 @@
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.ts: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/tools.ts: omo doctor",
     "packages/omo-senpi/plugin/README.md: omo install",
+    "packages/omo-senpi/scripts/qa/thread-tools/lib/gateway.mjs: /bin/omo",
+    "packages/omo-senpi/scripts/qa/thread-tools/lib/gateway.mjs: omo install",
     "packages/senpi-task/changes.md: omo doctor",
     "script/build-omo-native.ts: omo doctor",
     "script/install-codex-dev.ts: omo get-local-version",
