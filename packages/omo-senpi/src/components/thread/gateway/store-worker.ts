@@ -124,13 +124,20 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   const sql = new Sql(connection)
   sql.exec(`PRAGMA busy_timeout = ${Math.trunc(config.busy_timeout_ms)}`)
   // Two processes opening a brand-new store race for the WAL switch, which does not wait on
-  // busy_timeout; the loser retries until the winner's switch is published.
+  // busy_timeout; the loser retries until the winner's switch is published, for at most the
+  // store's lock-wait bound.
+  const walStarted = Date.now()
   for (;;) {
     try {
       sql.exec("PRAGMA journal_mode = WAL")
       break
     } catch (error) {
       if (!isBusyError(error)) throw error
+      const waited = Date.now() - walStarted
+      if (waited >= config.lock_wait_max_ms) {
+        emit({ kind: "lock_wait_exceeded", op: "open", waited_ms: waited })
+        throw ops.lockWaitExceeded("open", waited, config.lock_wait_max_ms)
+      }
       await delay(WAL_SWITCH_RETRY_MS)
     }
   }

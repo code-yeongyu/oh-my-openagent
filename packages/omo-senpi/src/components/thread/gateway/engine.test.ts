@@ -304,7 +304,9 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     }
     expect(outcomes.filter((outcome) => outcome === "queued_offline")).toHaveLength(63)
     expect(outcomes[63]).toBe("error:loop_detected")
-  })
+    // 65 sequential fsync'd (`synchronous=FULL`) transactions: measured 5.2-5.3 s at load ~370 and
+    // 8.8-13.7 s at load ~450 on the 14-core Mac mini, so bun's 5 s default cannot hold it.
+  }, 60_000)
 })
 
 describe("workspace_scope", () => {

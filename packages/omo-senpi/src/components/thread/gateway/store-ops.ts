@@ -128,7 +128,13 @@ function queuePosition(ctx: StoreContext, row: DeliveryRow): number {
   return Number(found?.n ?? 1)
 }
 
+/** The error an operation fails with once it has waited `lock_wait_max_ms` for the write lock. */
+export function lockWaitExceeded(op: string, waitedMs: number, limitMs: number): Error {
+  return new Error(`gateway store lock wait exceeded: ${op} waited ${waitedMs} ms for the write lock (limit ${limitMs} ms); another process holds it`)
+}
+
 async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: boolean): Promise<boolean> {
+  const started = Date.now()
   for (;;) {
     try {
       ctx.sql.exec("BEGIN IMMEDIATE")
@@ -139,7 +145,14 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
       ctx.emit({ kind: "busy", op })
       if (!retryUntilLocked) return false
       // The protocol's only timer: a writer suspended while holding the lock (SIGSTOP, ^Z) makes
-      // BEGIN IMMEDIATE time out; retry once per busy_timeout until it continues or dies.
+      // BEGIN IMMEDIATE time out; retry once per busy_timeout until it continues, dies, or the
+      // operation has waited `lock_wait_max_ms` in total - then it fails instead of stalling the
+      // worker and every call queued behind it.
+      const waited = Date.now() - started
+      if (waited >= ctx.config.lock_wait_max_ms) {
+        ctx.emit({ kind: "lock_wait_exceeded", op, waited_ms: waited })
+        throw lockWaitExceeded(op, waited, ctx.config.lock_wait_max_ms)
+      }
       await ctx.delay(ctx.config.busy_timeout_ms)
     }
   }

@@ -17,7 +17,24 @@ import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-sur
  */
 export const THREAD_SENDS_THROUGH_GATEWAY: boolean = false
 
-export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "callerSessionId" | "callerWorkspaceRoot" | "store">> & {
+/**
+ * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
+ * for `agent_settled` handlers before the session goes idle, so the store (whose write lock another
+ * process may hold) never holds the settle: past this bound the write continues in the background,
+ * and a write that fails is logged.
+ */
+export const COMPLETION_SETTLE_WAIT_MS = 250
+
+async function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([work, new Promise<void>((resolve) => { timer = setTimeout(resolve, ms) })])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "callerSessionId" | "callerWorkspaceRoot" | "store" | "onCompletionArmed">> & {
   readonly callerSessionId?: () => string
   readonly callerWorkspaceRoot?: () => string
   /** Absent: `pi.session` when the engine has it. `null`: no control endpoint. */
@@ -72,7 +89,8 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
  * Component registration follows task's factory/register pattern. Production constructs a client
  * for the existing Senpi multi-session socket; an injected host remains available as a test seam.
  * One gateway store serves the tools (receipts, bindings, outbox) and the control endpoint; a
- * bound thread's completion is written when the session settles, never at an `agent_end`.
+ * completion armed through `thread_report` is written when the session settles, never at an
+ * `agent_end`, and a session that armed nothing never touches the store when it settles.
  */
 export function createThreadComponent(options: ThreadComponentOptions = {}): OmoSenpiComponent {
   return {
@@ -84,6 +102,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const runtimeInstance = hostInstanceOf(pi)
       const store = options.store ?? createGatewayStore({ agentDir: agentDir(), ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       const run: RunContext = { turn: 0, cause: undefined }
+      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: Date.now(), session_durable_id: durableId, outcome }))
       registerThreadTools(pi, {
         host,
         stateDirectory,
@@ -95,9 +114,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         sendThroughGateway: options.sendThroughGateway ?? THREAD_SENDS_THROUGH_GATEWAY,
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerCause: () => run.cause,
+        onCompletionArmed: (durableId) => completions.arm(durableId),
       })
       const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, run)
-      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: Date.now(), session_durable_id: durableId, outcome }))
       pi.on("agent_start", () => {
         run.turn++
       })
@@ -109,7 +128,11 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
         if (durableId === undefined) return
-        await completions.settled(durableId).catch((error: unknown) => ctx.logger.warn(`thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`))
+        const written = completions.settled(durableId).then(
+          () => undefined,
+          (error: unknown) => ctx.logger.warn(`thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
+        )
+        await waitAtMost(written, COMPLETION_SETTLE_WAIT_MS)
       })
       pi.on("session_shutdown", async () => {
         await registrant?.stop().catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`))

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import type { BindInput } from "./bindings"
+import { parseThreadParams, threadToolParamSchemas } from "../contracts"
+import { type BindInput, RELAY_TEXT_MAX_BYTES } from "./bindings"
 import { createCompletionTracker } from "./completion"
 import { createInboxDrain } from "./drain"
 import { createGatewayRelay, type GatewayRelay } from "./relay"
@@ -52,6 +53,24 @@ function code(result: { kind: string; error?: { code: string } }): string {
 async function bindAs(relay: GatewayRelay, input: BindInput): Promise<string> {
   return ok(await relay.bind({ principal: "session:A", binding: input })).binding.binding_id
 }
+
+describe("relay_text_byte_cap", () => {
+  test("#given relay text measured in UTF-8 bytes #when multibyte text sits at and just past the cap #then the cap passes, one more character is message_too_large (never invalid_arguments), and the tool schema carries no character cap", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const atCap = "한".repeat(Math.floor(RELAY_TEXT_MAX_BYTES / 3)) + "ab"
+    expect(Buffer.byteLength(atCap)).toBe(RELAY_TEXT_MAX_BYTES)
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text: atCap }))).toBe("ok")
+    const over = `${atCap}한`
+    expect({ chars: over.length < RELAY_TEXT_MAX_BYTES, bytes: Buffer.byteLength(over) > RELAY_TEXT_MAX_BYTES }).toEqual({ chars: true, bytes: true })
+    expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text: over }))).toBe("message_too_large")
+    expect(code(await relay.answer({ binding_id: x, reply_token: "rt1.x.y", answer: over }))).toBe("message_too_large")
+    const longAscii = "a".repeat(RELAY_TEXT_MAX_BYTES + 1)
+    expect(parseThreadParams(threadToolParamSchemas.thread_report, { kind: "report", text: longAscii }).kind).toBe("ok")
+  })
+})
 
 describe("relay_direction_question_authority_and_completion", () => {
   test("#given a connector message #when the same inbound event id arrives twice #then it is admitted once, and the target sees an external provenance header naming the binding", async () => {
@@ -154,6 +173,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     const tracker = createCompletionTracker((durableId, outcome) => relay.settle({ session_durable_id: durableId, outcome }))
     const armed = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "job finished" }))
     expect({ armed: armed.armed, cursor: armed.cursor }).toEqual({ armed: true, cursor: null })
+    tracker.arm("B")
     tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "error" }] })
     expect(ok(await relay.outbox({ binding_id: x })).rows).toEqual([])
     tracker.agentEnd("B", { aborted: true, messages: [] })

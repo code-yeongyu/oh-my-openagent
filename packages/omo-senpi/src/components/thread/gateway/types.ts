@@ -176,6 +176,7 @@ export type GatewayDeliveryResult = GatewayDeliverySuccess | { readonly kind: "e
 
 export type GatewayStoreEvent =
   | { readonly kind: "busy"; readonly op: string }
+  | { readonly kind: "lock_wait_exceeded"; readonly op: string; readonly waited_ms: number }
   | { readonly kind: "paused"; readonly hook: string }
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }
@@ -191,6 +192,8 @@ export type GatewayStoreTestHooks = {
 export type GatewayStoreConfig = {
   readonly agent_dir: string
   readonly busy_timeout_ms: number
+  /** Total lock wait of one operation before it fails (`GATEWAY_LOCK_WAIT_MAX_MS`). */
+  readonly lock_wait_max_ms: number
   readonly instance_id: string
   readonly runtime_instance: string | null
   readonly legacy_mailbox_directories: readonly string[]

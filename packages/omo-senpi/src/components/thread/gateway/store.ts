@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
 import type { BindingRecord, CompletionOutcome, OutboxRow, RelayOutcome } from "./bindings"
-import { GATEWAY_BUSY_TIMEOUT_MS } from "./constants"
+import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS } from "./constants"
 import type {
   AnswerClaim,
   BindOpRequest,
@@ -38,8 +38,8 @@ export type GatewayStoreOptions = {
   readonly runtimeInstance?: string
   readonly legacyMailboxDirectories?: readonly string[]
   readonly now?: () => number
-  /** Test seams only: a shorter busy timeout, commit-boundary hooks, and the module location the worker is resolved from. */
-  readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly moduleUrl?: string | URL }
+  /** Test seams only: a shorter busy timeout and lock-wait bound, commit-boundary hooks, and the module location the worker is resolved from. */
+  readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly lockWaitMaxMs?: number; readonly moduleUrl?: string | URL }
 }
 
 /** The store worker's file name beside the built extension bundle (`plugin/extensions/`). */
@@ -117,6 +117,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   const config: GatewayStoreConfig = {
     agent_dir: options.agentDir,
     busy_timeout_ms: options._test?.busyTimeoutMs ?? GATEWAY_BUSY_TIMEOUT_MS,
+    lock_wait_max_ms: options._test?.lockWaitMaxMs ?? GATEWAY_LOCK_WAIT_MAX_MS,
     instance_id: options.instanceId ?? randomUUID(),
     runtime_instance: options.runtimeInstance ?? null,
     legacy_mailbox_directories: options.legacyMailboxDirectories ?? [],

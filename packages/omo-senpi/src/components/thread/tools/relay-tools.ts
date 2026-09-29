@@ -134,7 +134,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
     tool("thread_report", async ({ value, callerId, key }) => {
       const input = value as ThreadReportInput
       if (callerId === UNKNOWN_CALLER) return failure("caller_context_missing", "A report comes from the calling session, whose durable id is unknown.", "Retry from a session that passes its execution context.")
-      return (await relay.report({
+      const reported = await relay.report({
         principal: principal(callerId),
         idempotency_key: key,
         session_durable_id: callerId,
@@ -142,7 +142,9 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         event: input.kind,
         text: input.text,
         ...(input.request_id === undefined ? {} : { request_id: input.request_id }),
-      })) as ThreadToolResult
+      })
+      if (reported.kind === "ok" && reported.armed) options.onCompletionArmed?.(callerId)
+      return reported as ThreadToolResult
     }),
     tool("thread_outbox", async ({ value }) => {
       const input = value as ThreadOutboxInput

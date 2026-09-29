@@ -1,5 +1,7 @@
 import { Type } from "typebox"
 
+import { RELAY_TEXT_MAX_BYTES } from "../gateway/bindings"
+
 export const THREAD_MESSAGE_MAX_BYTES = 32768
 export const THREAD_SUMMARY_MAX_LENGTH = 200
 export const THREAD_READ_DEFAULT_BYTES = 131072
@@ -43,8 +45,6 @@ export const Message = Type.String({
   description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
-export const RELAY_TEXT_MAX_BYTES = 32768
-
 export const BindingId = Type.String({ minLength: 1, description: "Binding id as returned by thread_bind or thread_bindings." })
 
 export const ExpectedRevision = Type.Integer({
@@ -52,8 +52,9 @@ export const ExpectedRevision = Type.Integer({
   description: "Revision the caller last saw for this binding; a binding that moved since returns stale_revision.",
 })
 
+// No schema maxLength: the cap is in UTF-8 bytes, and the relay enforces it as message_too_large
+// (a character cap here would answer invalid_arguments instead, and cannot count bytes).
 export const RelayText = Type.String({
-  maxLength: RELAY_TEXT_MAX_BYTES,
   description: `Text relayed to or from the external thread; longer than ${RELAY_TEXT_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 

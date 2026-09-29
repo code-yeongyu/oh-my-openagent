@@ -29,6 +29,7 @@ export const BINDINGS_PAGE_DEFAULT = 50
 export const BINDINGS_PAGE_MAX = 200
 export const OUTBOX_PAGE_DEFAULT = 100
 export const OUTBOX_PAGE_MAX = 500
+/** The one relay text cap, in UTF-8 bytes (report text and answers); `relay.ts` enforces it as `message_too_large`. */
 export const RELAY_TEXT_MAX_BYTES = 32_768
 const IDENTIFIER_MAX_LENGTH = 256
 

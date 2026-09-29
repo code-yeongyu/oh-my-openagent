@@ -7,6 +7,13 @@ export const GATEWAY_SCHEMA_VERSION = 1
 
 export const GATEWAY_BUSY_TIMEOUT_MS = 5_000
 
+/**
+ * The longest any store operation waits for the write lock in total. A writer suspended while it
+ * holds the lock (SIGSTOP, ^Z) would otherwise stall the worker, and every call queued behind it,
+ * for as long as it stays stopped; past this bound the operation fails with a lock-wait error.
+ */
+export const GATEWAY_LOCK_WAIT_MAX_MS = 30_000
+
 export const MAX_HOPS = 4
 
 export const PAIR_BUCKET_BURST = 8

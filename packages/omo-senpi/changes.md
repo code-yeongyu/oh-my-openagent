@@ -160,7 +160,10 @@
   `thread_report` writes only through the calling session's own binding (the originating one by default); a question
   returns an HMAC reply token, and `thread_answer` is refused `binding_mismatch` unless the answer arrives through the
   binding that asked, `stale_token` after a rebind, expiry or session restart, `already_answered` on a replay.
-  Completions are armed by `thread_report` and written only when the session settles, with the real outcome.
+  Completions are armed by `thread_report` and written only when the session settles, with the real outcome. A
+  session that armed nothing never opens the gateway store when it settles, and an armed write never holds the settle
+  for more than 250 ms (it finishes in the background, or its failure is logged). Relay text is capped at 32 KiB of
+  UTF-8 bytes and refused as `message_too_large`.
 - `components/thread/errors.ts`: six new codes (`binding_conflict`, `binding_mismatch`, `binding_inactive`,
   `stale_revision`, `stale_token`, `already_answered`); `loop_detected` now tells the model to answer through
   `thread_read` / `thread_report` / `thread_answer` instead of replying directly.
@@ -176,7 +179,8 @@
 - `components/thread/gateway/schema.ts`, `store-ops.ts`, `store-worker.ts`: schema v2 (additive: session
   incarnation, outbox question/answer/outcome columns, per-binding ack cursors, completion arms). Opening a current
   store takes no write lock, and two processes opening a brand-new store at once no longer fail on the WAL switch or
-  apply a migration twice.
+  apply a migration twice. A store operation waits at most 30 s in total for the write lock, so a suspended process
+  holding it can no longer stall every store call indefinitely.
 
 ## thread: address book over terminal endpoints with real names/timestamps; sessions drain their gateway inbox
 

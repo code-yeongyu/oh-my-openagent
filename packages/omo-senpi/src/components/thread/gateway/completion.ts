@@ -16,7 +16,10 @@ export function completionOutcome(event: AgentEndFacts): CompletionOutcome {
 }
 
 export type CompletionTracker = {
+  /** This runtime armed a completion for the session (`thread_report {kind: "completion"}` answered `armed`). */
+  readonly arm: (durableId: string) => void
   readonly agentEnd: (durableId: string, event: AgentEndFacts) => void
+  /** Writes the armed completions; a session this runtime never armed resolves `[]` without calling the store. */
   readonly settled: (durableId: string) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
 }
 
@@ -24,10 +27,16 @@ export type CompletionTracker = {
  * A completion is written only when the session SETTLES (`agent_settled`: no retry, compaction or
  * queued continuation will run), with the outcome of the last `agent_end` before it. An
  * `agent_end` alone never writes one, because a retry or a queued follow-up turn may still run.
+ * Only a session this runtime armed reaches the store at all: every other settle - the ordinary
+ * case, with nothing bound - costs no store call and never creates the gateway database.
  */
 export function createCompletionTracker(settle: (durableId: string, outcome: CompletionOutcome) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>): CompletionTracker {
   const lastOutcome = new Map<string, CompletionOutcome>()
+  const armed = new Set<string>()
   return {
+    arm: (durableId) => {
+      armed.add(durableId)
+    },
     agentEnd: (durableId, event) => {
       lastOutcome.set(durableId, completionOutcome(event))
     },
@@ -35,6 +44,7 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
       const outcome = lastOutcome.get(durableId)
       if (outcome === undefined) return []
       lastOutcome.delete(durableId)
+      if (!armed.delete(durableId)) return []
       return await settle(durableId, outcome)
     },
   }
