@@ -65,6 +65,8 @@ export type OutboxPage = { readonly binding_id: string; readonly revision: numbe
 export type Deduplicated = { readonly deduplicated?: boolean }
 
 export type GatewayStore = {
+  /** The store's busy timeout: the delay before a caller re-arms an operation that failed with a lock-wait error. */
+  readonly busyTimeoutMs: number
   readonly identity: () => Promise<ProcessIdentity>
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
   readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
@@ -90,6 +92,8 @@ export type GatewayStore = {
   readonly registerIncarnation: (request: { readonly durable_id: string; readonly incarnation: string }) => Promise<void>
   readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
   readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  /** Completion arms waiting for the session's settle; a plain read that takes no write lock. */
+  readonly pendingCompletionArms: (durableId: string) => Promise<number>
   readonly readOutbox: (request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayOutcome<OutboxPage>>
   readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayOutcome<AnswerClaim>>
@@ -104,7 +108,7 @@ type Pending = { readonly resolve: (value: unknown) => void; readonly reject: (e
 
 type WorkerMessage =
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
-  | { readonly type: "response"; readonly id: number; readonly ok: false; readonly error: { readonly message: string; readonly stack?: string } }
+  | { readonly type: "response"; readonly id: number; readonly ok: false; readonly error: { readonly message: string; readonly stack?: string; readonly code?: string } }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
 /**
@@ -166,7 +170,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       pending.delete(message.id)
       if (pending.size === 0) spawned.unref()
       if (message.ok) entry.resolve(message.value)
-      else entry.reject(Object.assign(new Error(message.error.message), { workerStack: message.error.stack }))
+      else entry.reject(Object.assign(new Error(message.error.message), { workerStack: message.error.stack, ...(message.error.code === undefined ? {} : { code: message.error.code }) }))
     })
     spawned.on("error", (error: unknown) => failAll(error instanceof Error ? error : new Error(String(error))))
     spawned.on("exit", (code) => {
@@ -183,6 +187,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   }
 
   return {
+    busyTimeoutMs: config.busy_timeout_ms,
     identity: async () => (await start()).self,
     enqueue: (request) => call("enqueue", request),
     reconcile: (request) => call("reconcile", request),
@@ -208,6 +213,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     registerIncarnation: (request) => call("register_incarnation", request),
     report: (request) => call("report", request),
     emitCompletions: (request) => call("emit_completions", request),
+    pendingCompletionArms: (durableId) => call("pending_completion_arms", durableId),
     readOutbox: (request) => call("read_outbox", request),
     ackOutbox: (request) => call("ack_outbox", request),
     claimAnswer: (request) => call("claim_answer", request),

@@ -81,6 +81,11 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     if (found === undefined) throw new Error(`thread ${id} is not live`)
     return found
   }
+  // Receipts this process began but could not settle (the store gave up at its lock-wait bound):
+  // the row stays `prepared` under this instance, which would answer `idempotency_in_progress`
+  // forever. A retry of such a key is `idempotency_uncertain` with the note instead.
+  const unsettled = new Map<string, string>()
+  const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
   async function execute<T extends ThreadToolName>(name: T, callId: string, args: unknown, ectx: unknown, sideEffect: (view: ThreadHostView, value: Static<(typeof threadToolParamSchemas)[T]>, operationId: string, callerId: string) => Promise<ThreadToolResult>): Promise<ToolOutput> {
     const callerId = (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ?? options.callerSessionId()
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
@@ -95,16 +100,22 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
       if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
       if (admission.kind === "conflict") return output(failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key."))
-      if (admission.kind === "in_progress") return output(failure("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry."))
+      if (admission.kind === "in_progress") {
+        const note = unsettled.get(receiptKey(scope))
+        if (note !== undefined) return output(failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.", { error_note: note }))
+        return output(failure("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry."))
+      }
       if (admission.kind === "uncertain") return output(failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.", admission.error_note === null ? undefined : { error_note: admission.error_note }))
     }
+    const unrecorded = (what: string) => (settleError: unknown) => {
+      unsettled.set(receiptKey(scope), `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`)
+    }
+    let result: ThreadToolResult
     try {
-      const result = await sideEffect(await view(), value, scope.idempotency_key, callerId)
-      if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result })
-      return output(result)
+      result = await sideEffect(await view(), value, scope.idempotency_key, callerId)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(() => false)
+      if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the call failed (${message})`))
       if (message.startsWith("host_unavailable:")) {
         return output(failure("host_unavailable", `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`, "Retry when the shared Senpi host is running."))
       }
@@ -113,6 +124,8 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       }
       return output(failure("internal_error", `Thread operation failed: ${message}`, "Call thread_list and retry after checking the target."))
     }
+    if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the call ran"))
+    return output(result)
   }
 
   const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value) => {

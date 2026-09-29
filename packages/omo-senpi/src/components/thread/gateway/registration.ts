@@ -191,28 +191,27 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       durableId: session.durableId,
       sessionPath: session.sessionPath,
       log,
+      onAdmitted: (deliveryId) => options.onAdmitted?.(session.durableId, deliveryId),
       ...(session.notify === undefined ? {} : { notify: session.notify }),
       ...options._test?.drain,
     })
     let retired = false
-    const drainOnce = async (event: SenpiWakeEvent) => {
-      const result = await drain.drain(drainEvent(event))
-      for (const entry of result.admitted) {
-        if (entry.kind === "started" || entry.kind === "steered" || entry.kind === "queued") options.onAdmitted?.(session.durableId, entry.delivery_id)
-      }
-      return toSessionControlDrainResult(result)
+    const retire = () => {
+      retired = true
+      drain.stop()
     }
+    const drainOnce = async (event: SenpiWakeEvent) => toSessionControlDrainResult(await drain.drain(drainEvent(event)))
     const reply = await control.registerControlEndpoint({
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
       drain: async (event) => (retired ? { admitted: [] } : await drainOnce(event)),
       isSessionReferenced: () => drain.isSessionReferenced(),
     })
     if (reply.status !== "registered") {
-      retired = true
+      retire()
       if (reply.status === "failed") log(`thread gateway: the control endpoint for ${session.durableId} failed to register: ${reply.reason}`)
       return reply
     }
-    active = { durableId: session.durableId, drain, retire: () => { retired = true }, dispose: reply.dispose }
+    active = { durableId: session.durableId, drain, retire, dispose: reply.dispose }
     // A reply token names the runtime that held the session when it asked; registering is what
     // makes this runtime the holder, so a restart turns earlier tokens stale.
     try {

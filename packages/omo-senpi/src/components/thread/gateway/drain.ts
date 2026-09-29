@@ -1,5 +1,6 @@
 import type { DrainWakeEvent, GatewayAdmissionKind, SessionRuntimePort, WakeReason } from "./adapter"
 import { decideDelivery } from "./decision"
+import { isLockWaitExceeded } from "./lock-wait"
 import { renderDeliveryText } from "./provenance"
 import type { GatewayStore } from "./store"
 import type { DeliveryRow, ProcessIdentity } from "./types"
@@ -17,6 +18,8 @@ export type InboxDrainOptions = {
   readonly log?: (line: string) => void
   /** Shows the queued notice in the session's own UI (the extension UI `notify`). */
   readonly notify?: (text: string) => void
+  /** A delivery this drain started, steered or queued into the session; runs on every pass, including a busy retry. */
+  readonly onAdmitted?: (deliveryId: string) => void
   /** Test seams: act as another process, or stop between the two phases of an admission. */
   readonly _test?: {
     readonly identity?: ProcessIdentity
@@ -29,6 +32,8 @@ export type InboxDrain = {
   readonly drain: (event: DrainWakeEvent) => Promise<InboxDrainResult>
   readonly isSessionReferenced: () => Promise<boolean>
   readonly heldDeliveries: () => ReadonlyMap<string, number>
+  /** Cancels a pending busy retry; the drain is being retired. */
+  readonly stop: () => void
 }
 
 /** The notice a session shows when a delivery waits behind its running turn or the user's draft. */
@@ -131,17 +136,46 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         })
       }
       admitted.push({ delivery_id: row.delivery_id, kind: result.kind })
+      if (result.kind === "started" || result.kind === "steered" || result.kind === "queued") options.onAdmitted?.(row.delivery_id)
     }
     return { admitted }
   }
 
+  // The protocol's single busy timer: a pass that gave up at the store's lock-wait bound (a writer
+  // suspended while holding the lock) re-arms exactly one retry of the same wake after busy_timeout,
+  // until a pass gets through. Nothing holds the store worker between attempts.
+  let retry: ReturnType<typeof setTimeout> | undefined
+  let stopped = false
+
+  function run(event: DrainWakeEvent): Promise<InboxDrainResult> {
+    const next = chain.then(() => pass(event))
+    chain = next.catch(() => undefined)
+    next.then(
+      () => {
+        clearTimeout(retry)
+        retry = undefined
+      },
+      (error: unknown) => {
+        if (!isLockWaitExceeded(error) || stopped || retry !== undefined) return
+        options.log?.(`drain for ${options.durableId} is waiting on the store's write lock; retrying in ${options.store.busyTimeoutMs} ms`)
+        retry = setTimeout(() => {
+          retry = undefined
+          if (!stopped) void run(event).catch(() => undefined)
+        }, options.store.busyTimeoutMs)
+        retry.unref?.()
+      },
+    )
+    return next
+  }
+
   return {
-    drain: (event) => {
-      const next = chain.then(() => pass(event))
-      chain = next.catch(() => undefined)
-      return next
-    },
+    drain: run,
     isSessionReferenced: () => options.store.isReferenced(options.durableId),
     heldDeliveries: () => held,
+    stop: () => {
+      stopped = true
+      clearTimeout(retry)
+      retry = undefined
+    },
   }
 }

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, watch } from "node:fs"
 import { connect, createServer } from "node:net"
 import { join } from "node:path"
 
+import { createInboxDrain } from "./drain"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayHarness, type GatewayHarness, type HarnessSession } from "./testing/harness"
 import type { GatewayStoreEvent, GatewayStoreTestHooks } from "./types"
@@ -156,6 +157,37 @@ describe("notification_before_publication_barrier", () => {
     await h.quiesce()
     expect({ state: (await b.store.deliveryView(deliveryId))?.row.state, entries: b.runtime.transcriptEntries(deliveryId) }).toEqual({ state: "applied", entries: 1 })
   })
+})
+
+describe("drain_busy_retry_past_the_lock_wait_bound", () => {
+  test("#given a sender SIGSTOPped holding the write lock past the store's lock-wait bound #when the drain gives up and the sender continues #then the drain's own busy retry admits the row with no other trigger, and it ends applied exactly once", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 100, lockWaitMaxMs: 600 } } })
+    const marker = firstInboxEvent(h, "B")
+    const sender = spawnSender(h, { beforeDbCommit: "pause" })
+    await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
+    sender.child.kill("SIGSTOP")
+    const deliveryId = await within(marker, "the inbox marker event")
+    let admittedBy!: (id: string) => void
+    const admitted = new Promise<string>((resolve) => { admittedBy = resolve })
+    const logs: string[] = []
+    const drain = createInboxDrain({ store: b.store, runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now, log: (line) => logs.push(line), onAdmitted: admittedBy })
+    try {
+      const exceeded = nextStoreEvent(b, "lock_wait_exceeded")
+      const failed = await within(drain.drain({ reason: "inbox" }).then(() => null, (error: unknown) => error), "the first drain pass to give up at the lock-wait bound")
+      expect(String(failed)).toContain("lock wait exceeded")
+      await within(exceeded, "the lock_wait_exceeded store event")
+      sender.child.kill("SIGCONT")
+      sender.send("RESUME beforeDbCommit")
+      expect(await within(sender.line("DONE "), "the sender to commit")).toContain("\"queued_offline\"")
+      expect(await within(admitted, "the drain's busy retry to admit the row with no other trigger")).toBe(deliveryId)
+      await h.quiesce()
+      expect({ state: (await b.store.deliveryView(deliveryId))?.row.state, enqueued: b.runtime.enqueueCount(deliveryId), entries: b.runtime.transcriptEntries(deliveryId) }).toEqual({ state: "applied", enqueued: 1, entries: 1 })
+      expect(logs.some((line) => line.includes("retrying"))).toBe(true)
+    } finally {
+      drain.stop()
+    }
+  }, 60_000)
 })
 
 describe("suspended_writer_busy_retry", () => {

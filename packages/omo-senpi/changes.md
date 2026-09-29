@@ -162,7 +162,8 @@
   binding that asked, `stale_token` after a rebind, expiry or session restart, `already_answered` on a replay.
   Completions are armed by `thread_report` and written only when the session settles, with the real outcome. A
   session that armed nothing never opens the gateway store when it settles, and an armed write never holds the settle
-  for more than 250 ms (it finishes in the background, or its failure is logged). Relay text is capped at 32 KiB of
+  for more than 250 ms: it finishes in the background, retried with the run's own outcome while another process holds
+  the store's lock, and an arm made before a restart is written at the session's next settle. Relay text is capped at 32 KiB of
   UTF-8 bytes and refused as `message_too_large`.
 - `components/thread/errors.ts`: six new codes (`binding_conflict`, `binding_mismatch`, `binding_inactive`,
   `stale_revision`, `stale_token`, `already_answered`); `loop_detected` now tells the model to answer through
@@ -180,7 +181,9 @@
   incarnation, outbox question/answer/outcome columns, per-binding ack cursors, completion arms). Opening a current
   store takes no write lock, and two processes opening a brand-new store at once no longer fail on the WAL switch or
   apply a migration twice. A store operation waits at most 30 s in total for the write lock, so a suspended process
-  holding it can no longer stall every store call indefinitely.
+  holding it can no longer stall every store call indefinitely; a session's inbox drain that gives up there retries on
+  its own every 5 s until the delivery gets through, and a failed answer hand-off is always returned to pending. A tool
+  call whose receipt could not be recorded answers `idempotency_uncertain` on retry instead of `idempotency_in_progress`.
 
 ## thread: address book over terminal endpoints with real names/timestamps; sessions drain their gateway inbox
 

@@ -456,7 +456,15 @@ export async function emitCompletions(ctx: StoreContext, request: { readonly now
       emitted.push({ binding_id: binding.binding_id, cursor: insertOutbox(ctx, { binding, event: "completion", text: String(arm.text), now: request.now, outcome: request.outcome }) })
     }
     return emitted
+  }).then((emitted) => {
+    ctx.emit({ kind: "completions_emitted", session_durable_id: request.session_durable_id, cursors: emitted.map((row) => row.cursor) })
+    return emitted
   })
+}
+
+/** How many completion arms wait for the session's settle: a plain read that takes no write lock, so it never waits on another writer. */
+export function pendingCompletionArms(ctx: StoreContext, durableId: string): number {
+  return Number(ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM completion_arms WHERE session_durable_id = ?", [durableId])?.n ?? 0)
 }
 
 function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {

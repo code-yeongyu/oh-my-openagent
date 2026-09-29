@@ -388,3 +388,24 @@ describe("relay tools over the gateway store", () => {
     expect(await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-3")).toMatchObject({ kind: "ok", rows: [] })
   })
 })
+
+describe("tool receipts the store could not settle", () => {
+  test("#given a side effect that ran while the store gave up recording its receipt #when the same key is retried #then the first call still returns its result and the retry is idempotency_uncertain, never in_progress and never a second side effect", async () => {
+    const f = fixture()
+    const real = f.store
+    let failSettle = true
+    const store: GatewayStore = {
+      ...real,
+      toolReceiptSettle: async (request) => {
+        if (!failSettle) return await real.toolReceiptSettle(request)
+        failSettle = false
+        throw Object.assign(new Error("gateway store lock wait exceeded: tool_receipt_settle waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+      },
+    }
+    const run = runner({ ...f, store }, "caller")
+    expect(await run("thread_rename", { thread: "peer", name: "Renamed", idempotency_key: "rename-1" }, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    const retried = await run("thread_rename", { thread: "peer", name: "Renamed", idempotency_key: "rename-1" }, "caller")
+    expect(retried).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain", details: { error_note: expect.stringContaining("could not be recorded") } } })
+    expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
+})

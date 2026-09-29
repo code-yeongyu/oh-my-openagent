@@ -10,6 +10,11 @@ import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
 let harness: GatewayHarness | undefined
 
+function within<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms) })]).finally(() => clearTimeout(timer))
+}
+
 afterEach(async () => {
   await harness?.dispose()
   harness = undefined
@@ -170,7 +175,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     h.session("B")
     const { relay } = relayOn(h)
     const x = await bindAs(relay, binding("B"))
-    const tracker = createCompletionTracker((durableId, outcome) => relay.settle({ session_durable_id: durableId, outcome }))
+    const tracker = createCompletionTracker((durableId, outcome) => relay.settle({ session_durable_id: durableId, outcome }), { retryAfterMs: () => 50 })
     const armed = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "job finished" }))
     expect({ armed: armed.armed, cursor: armed.cursor }).toEqual({ armed: true, cursor: null })
     tracker.arm("B")
@@ -217,5 +222,49 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(code(await relay.ack({ binding_id: x, cursor: cursors[2] + 10 }))).toBe("cursor_invalid")
     ok(await relay.ack({ binding_id: x, cursor: cursors[2] }))
     expect(ok(await relay.outbox({ binding_id: x })).rows).toEqual([])
+  })
+})
+
+describe("answer_release_retry_past_the_lock_wait_bound", () => {
+  test("#given an answer whose hand-off failed #when releasing the question gives up at the store's lock-wait bound #then the release is retried in the background, the question returns to pending, and a later answer resolves it", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const real = h.store({ _test: { busyTimeoutMs: 50 } })
+    let releases = 0
+    let released!: () => void
+    const retried = new Promise<void>((resolve) => { released = resolve })
+    const store: GatewayStore = {
+      ...real,
+      releaseAnswer: async (request) => {
+        releases++
+        if (releases === 1) throw Object.assign(new Error("gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+        const done = await real.releaseAnswer(request)
+        released()
+        return done
+      },
+    }
+    const responses: string[] = []
+    let failHandOff = true
+    const relay = createGatewayRelay({
+      store,
+      engine: h.engineFor(store),
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: async (_endpoint, response) => {
+          if (failHandOff) throw new Error("the session hung up")
+          responses.push(response.value)
+        },
+      },
+      locate: async () => ({ kind: "tui", socket: "fake:B", routing_id: null }),
+      now: () => h.clock.now,
+    })
+    const x = await bindAs(relay, binding("B"))
+    const token = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy?", request_id: "ui-1" })).reply_token as string
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toBe("host_unavailable")
+    await within(retried, "the background release retry")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    failHandOff = false
+    ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))
+    expect({ responses, releases }).toEqual({ responses: ["yes"], releases: 2 })
   })
 })

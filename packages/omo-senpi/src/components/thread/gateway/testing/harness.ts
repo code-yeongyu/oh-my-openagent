@@ -133,6 +133,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       while (background.size > 0) await Promise.allSettled([...background])
     },
     dispose: async () => {
+      for (const created of sessions.values()) created.drain.stop()
       while (background.size > 0) await Promise.allSettled([...background])
       await Promise.all(stores.map((created) => created.dispose()))
       rmSync(agentDir, { recursive: true, force: true })

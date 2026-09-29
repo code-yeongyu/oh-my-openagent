@@ -8,6 +8,7 @@ import { join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
 
+import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory } from "./paths"
 import { processStartTime } from "./process-identity"
 import { isBusyError, Sql, type SqliteConnection } from "./sql"
@@ -52,7 +53,11 @@ async function pump(): Promise<void> {
           type: "response",
           id: request.id,
           ok: false,
-          error: { message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined },
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            code: typeof (error as { code?: unknown } | null)?.code === "string" ? (error as { code: string }).code : undefined,
+          },
         })
       }
     }
@@ -103,6 +108,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "register_incarnation": return await relay.registerIncarnation(ctx, args as Parameters<typeof relay.registerIncarnation>[1])
     case "report": return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
     case "emit_completions": return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
+    case "pending_completion_arms": return relay.pendingCompletionArms(ctx, args as string)
     case "read_outbox": return await relay.readOutbox(ctx, args as Parameters<typeof relay.readOutbox>[1])
     case "ack_outbox": return await relay.ackOutbox(ctx, args as Parameters<typeof relay.ackOutbox>[1])
     case "claim_answer": return await relay.claimAnswer(ctx, args as Parameters<typeof relay.claimAnswer>[1])
@@ -134,9 +140,9 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
     } catch (error) {
       if (!isBusyError(error)) throw error
       const waited = Date.now() - walStarted
-      if (waited >= config.lock_wait_max_ms) {
+      if (waited + WAL_SWITCH_RETRY_MS > config.lock_wait_max_ms) {
         emit({ kind: "lock_wait_exceeded", op: "open", waited_ms: waited })
-        throw ops.lockWaitExceeded("open", waited, config.lock_wait_max_ms)
+        throw lockWaitExceeded("open", waited, config.lock_wait_max_ms)
       }
       await delay(WAL_SWITCH_RETRY_MS)
     }

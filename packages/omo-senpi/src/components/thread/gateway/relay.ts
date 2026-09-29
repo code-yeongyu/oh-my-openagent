@@ -9,6 +9,7 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
 import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
 import type { GatewayEngine } from "./engine"
+import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
 import type { BindingsFilter, ReportOpResult } from "./store-relay-ops"
 import type { GatewayDeliveryResult, StoreRefusal } from "./types"
@@ -81,6 +82,19 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
   const now = options.now ?? Date.now
   const store = options.store
 
+  // A claimed answer whose hand-off failed goes back to pending. A release that gives up at the
+  // store's lock-wait bound is retried in the background after the busy timeout until it lands, so
+  // the question never stays `answered` without having reached the session.
+  async function release(replyToken: string): Promise<void> {
+    const attempt = () => store.releaseAnswer({ reply_token: replyToken })
+    try {
+      await attempt()
+    } catch (error) {
+      if (!isLockWaitExceeded(error)) throw error
+      retryAfterLockWait(attempt, () => store.busyTimeoutMs, () => undefined)
+    }
+  }
+
   return {
     bind: async (request) => {
       const binding = normalizeBindInput(request.binding)
@@ -112,13 +126,13 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       const respond = options.endpoints.respondUi
       const endpoint = respond === undefined ? null : await options.locate(claim.session_durable_id)
       if (respond === undefined || endpoint === null) {
-        await store.releaseAnswer({ reply_token: request.reply_token })
+        await release(request.reply_token)
         return failure(respond === undefined ? "unsupported" : "host_unavailable", "The session that asked is not reachable to take the answer.", { session: claim.session_durable_id })
       }
       try {
         await respond(endpoint, { id: claim.ui_request_id, value: request.answer })
       } catch (error) {
-        await store.releaseAnswer({ reply_token: request.reply_token })
+        await release(request.reply_token)
         return failure("host_unavailable", `The answer could not be handed to the session: ${error instanceof Error ? error.message : String(error)}`, { session: claim.session_durable_id })
       }
       return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }

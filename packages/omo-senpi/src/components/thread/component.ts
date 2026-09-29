@@ -1,6 +1,9 @@
+import { existsSync } from "node:fs"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
+import { gatewayDatabasePath } from "./gateway/paths"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
@@ -21,7 +24,7 @@ export const THREAD_SENDS_THROUGH_GATEWAY: boolean = false
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
  * for `agent_settled` handlers before the session goes idle, so the store (whose write lock another
  * process may hold) never holds the settle: past this bound the write continues in the background,
- * and a write that fails is logged.
+ * retried after the store's busy timeout while another process keeps the lock, and logged.
  */
 export const COMPLETION_SETTLE_WAIT_MS = 250
 
@@ -102,7 +105,13 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const runtimeInstance = hostInstanceOf(pi)
       const store = options.store ?? createGatewayStore({ agentDir: agentDir(), ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       const run: RunContext = { turn: 0, cause: undefined }
-      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: Date.now(), session_durable_id: durableId, outcome }))
+      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: Date.now(), session_durable_id: durableId, outcome }), {
+        retryAfterMs: () => store.busyTimeoutMs,
+        onWriteFailed: (error, retrying) =>
+          ctx.logger.warn(retrying
+            ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
+            : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
+      })
       registerThreadTools(pi, {
         host,
         stateDirectory,
@@ -117,6 +126,19 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         onCompletionArmed: (durableId) => completions.arm(durableId),
       })
       const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, run)
+      // An arm left by an earlier runtime (a restart, or a crash before its write) is the durable
+      // row's; it is picked up here and written at this session's next settle. Only a store that
+      // already exists is read, and the read takes no write lock.
+      pi.on("session_start", (_event, eventCtx) => {
+        const durableId = durableIdOf(eventCtx)
+        if (durableId === undefined || !existsSync(gatewayDatabasePath(agentDir()))) return
+        void store.pendingCompletionArms(durableId).then(
+          (count) => {
+            if (count > 0) completions.arm(durableId)
+          },
+          (error: unknown) => ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`),
+        )
+      })
       pi.on("agent_start", () => {
         run.turn++
       })
@@ -128,13 +150,11 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
         if (durableId === undefined) return
-        const written = completions.settled(durableId).then(
-          () => undefined,
-          (error: unknown) => ctx.logger.warn(`thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
-        )
-        await waitAtMost(written, COMPLETION_SETTLE_WAIT_MS)
+        // A failed write is reported (and retried) by the tracker's onWriteFailed.
+        await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)
       })
       pi.on("session_shutdown", async () => {
+        completions.dispose()
         await registrant?.stop().catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`))
         if (options.store === undefined) await store.dispose().catch(() => undefined)
       })

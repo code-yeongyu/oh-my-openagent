@@ -81,10 +81,10 @@ async function holdWriteLock(databasePath: string) {
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, startup-arm and shutdown hooks exist", () => {
     const f = eventApi()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state", agentDir: () => "/tmp/thread-test-agent" }).register(f.pi as never, context([]) as never)
-    expect([...f.handlers.keys()].sort()).toEqual(["agent_end", "agent_settled", "agent_start", "session_shutdown"])
+    expect([...f.handlers.keys()].sort()).toEqual(["agent_end", "agent_settled", "agent_start", "session_shutdown", "session_start"])
   })
 
   test("#given a completion armed through thread_report #when agent_end fires and then the session settles #then exactly one completion row appears, only after the settle", async () => {
@@ -192,32 +192,82 @@ describe("thread component settle never waits on the gateway store", () => {
     }
   }, 30_000)
 
-  test("#given an armed completion and a SIGSTOPped process holding the write lock #when the session settles #then the settle returns within its bound, and the write fails after the store's lock-wait bound and is reported", async () => {
+  test("#given an armed settle whose write outlasts the lock-wait bound behind a SIGSTOPped holder #when the holder resumes #then exactly one completion row lands in the background with the original run's outcome, and later settles add none", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-stopped-"))
     const store = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 100, lockWaitMaxMs: 1_000 } })
     let holder: Awaited<ReturnType<typeof holdWriteLock>> | undefined
     try {
+      const warnings: string[] = []
       let reported!: (message: string) => void
-      const warning = new Promise<string>((resolve) => { reported = resolve })
-      const logger = { logger: { info() {}, error() {}, warn(message: string) { reported(message) } }, config: { getFlag: () => undefined } }
+      const firstWarning = new Promise<string>((resolve) => { reported = resolve })
+      const logger = { logger: { info() {}, error() {}, warn(message: string) { warnings.push(message); reported(message) } }, config: { getFlag: () => undefined } }
       const f = eventApi()
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, logger as never)
       const bindingId = await bindAndArm(f, store, "dur-1")
-      await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
+      await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "error" }] })
       holder = await holdWriteLock(gatewayDatabasePath(agentDir))
       holder.child.kill("SIGSTOP")
       const started = performance.now()
       await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "agent_settled to return while a stopped process holds the write lock")
       expect(performance.now() - started).toBeLessThan(COMPLETION_SETTLE_WAIT_MS + 2_750)
-      expect(await within(warning, 15_000, "the failed completion write to be reported")).toContain("lock wait exceeded")
-      await holder.kill()
-      expect(await within(outboxRows(store, bindingId), 10_000, "the store to answer after the holder died")).toEqual([])
+      const warning = await within(firstWarning, 15_000, "the delayed completion write to be reported")
+      expect(warning).toContain("retrying")
+      const waited = Number(/waited (\d+) ms/.exec(warning)?.[1])
+      expect(waited).toBeLessThan(1_000)
+      await f.dispatch("agent_start", sessionCtx("dur-1"))
+      await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
+      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "a later settle to return while the first write is still outstanding")
+      const emitted = new Promise<void>((resolve) => {
+        const stop = store.onEvent((event) => {
+          if (event.kind !== "completions_emitted" || event.cursors.length === 0) return
+          stop()
+          resolve()
+        })
+      })
+      holder.child.kill("SIGCONT")
+      await holder.release()
+      await within(emitted, 15_000, "the background retry to write the completion once the lock frees")
+      expect(await outboxRows(store, bindingId)).toEqual([{ event: "completion", outcome: "failed", text: "all done" }])
+      await f.dispatch("agent_start", sessionCtx("dur-1"))
+      await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
+      await f.dispatch("agent_settled", sessionCtx("dur-1"))
+      expect(await outboxRows(store, bindingId)).toHaveLength(1)
+      expect(warnings.every((line) => line.includes("retrying"))).toBe(true)
     } finally {
       await holder?.kill()
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })
     }
-  }, 30_000)
+  }, 60_000)
+
+  test("#given a completion armed by a runtime that shut down before any settle #when a new runtime starts the same session and it settles #then the durable arm is picked up and written once", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-restart-"))
+    const first = createGatewayStore({ agentDir, instanceId: "runtime-1" })
+    const second = createGatewayStore({ agentDir, instanceId: "runtime-2" })
+    try {
+      const before = eventApi()
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store: first }).register(before.pi as never, context([]) as never)
+      const bindingId = await bindAndArm(before, first, "dur-1")
+      await before.dispatch("session_shutdown")
+      await first.dispose()
+      const warnings: string[] = []
+      const after = eventApi()
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store: second }).register(after.pi as never, context(warnings) as never)
+      await after.dispatch("session_start", sessionCtx("dur-1"))
+      expect(await second.pendingCompletionArms("dur-1")).toBe(1)
+      await after.dispatch("agent_start", sessionCtx("dur-1"))
+      await after.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
+      await within(after.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "the settle after the restart")
+      expect(await outboxRows(second, bindingId)).toEqual([{ event: "completion", outcome: "completed", text: "all done" }])
+      await after.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
+      await after.dispatch("agent_settled", sessionCtx("dur-1"))
+      expect({ rows: (await outboxRows(second, bindingId)).length, arms: await second.pendingCompletionArms("dur-1"), warnings }).toEqual({ rows: 1, arms: 0, warnings: [] })
+    } finally {
+      await first.dispose()
+      await second.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
 })
 
 const SEVENTEEN = [
