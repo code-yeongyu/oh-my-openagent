@@ -54,14 +54,14 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-5.6-sol", variant: "max" }
   ],
   "deep-low": [
-    // The Fast (priority) tier exists only on the ChatGPT subscription lane; Copilot and OpenCode Zen
-    // serve plain gpt-5.6-sol, so the next rung keeps the lane open there at the same effort.
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" },
+    // Plain gpt-5.6-sol leads on every lane that serves it. The Fast (priority) tier exists only on
+    // the ChatGPT subscription and OpenAI lanes, so it is the fallback there at the same effort.
     {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
       variant: "medium",
-    }
+    },
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" }
   ],
   "deep-high": [
     {
@@ -105,6 +105,11 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     }
   ],
   "unspecified-low": [
+    {
+      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-sonnet-5-5",
+      variant: "medium",
+    },
     { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.6-pro", variant: "max" },
     { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
     {

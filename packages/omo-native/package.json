@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@babel/parser": "8.0.4",
-    "@code-yeongyu/senpi": "2026.9.28-7"
+    "@code-yeongyu/senpi": "2026.9.29"
   },
   "repository": {
     "type": "git",

@@ -17,9 +17,11 @@ export const KNOWN_MODELS = Object.freeze({
   "alibaba-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
   anthropic: Object.freeze([
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
+    "claude-sonnet-5-5",
   ]),
   "anthropic-api": Object.freeze([
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
+    "claude-sonnet-5-5",
   ]),
   // senpi's Claude subscription lane serves the anthropic ids verbatim (#8051).
   // Its pre-rename id `claude-sdk-oauth` is KEPT below: a binary pinned to an
@@ -27,6 +29,7 @@ export const KNOWN_MODELS = Object.freeze({
   // rather than migrate it. Same for `openai-codex` / `chatgpt-subscription`.
   "anthropic-subscription": Object.freeze([
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
+    "claude-sonnet-5-5",
   ]),
   "bailian-coding-plan": Object.freeze(["qwen3.6-flash"]),
   "chatgpt-subscription": Object.freeze([
@@ -35,13 +38,14 @@ export const KNOWN_MODELS = Object.freeze({
   ]),
   "claude-sdk-oauth": Object.freeze([
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
+    "claude-sonnet-5-5",
   ]),
   // `deepseek-flash` is DeepSeek V4.1 Flash; the retired `deepseek-v4-flash` alias stays readable for older sessions.
   deepseek: Object.freeze(["deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro"]),
   google: Object.freeze(["gemini-3.1-pro", "gemini-3.6-flash"]),
   "github-copilot": Object.freeze([
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
-    "gemini-3.1-pro", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "grok-4.6", "grok-4.7",
+    "claude-sonnet-5-5", "gemini-3.1-pro", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "grok-4.6", "grok-4.7",
   ]),
   "kimi-coding": Object.freeze(["k3", "kimi-for-coding-highspeed", "kimi-k3"]),
   "kimi-for-coding": Object.freeze(["k3", "kimi-for-coding-highspeed", "kimi-k3"]),
@@ -55,7 +59,7 @@ export const KNOWN_MODELS = Object.freeze({
     "gpt-6-sol-fast",
   ]),
   opencode: Object.freeze([
-    "claude-fable-5", "claude-fable-5-1", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "gemini-3.1-pro",
+    "claude-fable-5", "claude-fable-5-1", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claude-sonnet-5-5", "gemini-3.1-pro",
     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "grok-4.6", "kimi-k3",
   ]),
   "opencode-go": Object.freeze([
@@ -64,7 +68,7 @@ export const KNOWN_MODELS = Object.freeze({
   "qwen-token-plan": Object.freeze(["qwen3.6-flash", "qwen3.8-max-preview"]),
   "qwen-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
   vercel: Object.freeze([
-    "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "deepseek-v4-flash",
+    "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claude-sonnet-5-5", "deepseek-v4-flash",
     "deepseek-v4-pro", "gemini-3.1-pro", "gemini-3.6-flash", "glm-5.2", "gpt-5.6-sol",
     "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "grok-4.6", "kimi-k3", "mimo-v2.5-pro", "minimax-m2.7",
     "minimax-m3", "qwen3.6-flash",

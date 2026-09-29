@@ -188,8 +188,8 @@ Override specific categories or curated agents in `omo.json`:
     // Quick tasks: fast and cheap
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
-    // Low-effort fallback: MiMo V2.6 Pro max
-    "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
+    // Low-effort fallback: Claude Sonnet 5.5 medium, then MiMo V2.6 Pro and Grok 4.7
+    "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
     // High-effort fallback: Opus 5, then GLM 5.3 and Kimi K3
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
@@ -204,21 +204,21 @@ Override specific categories or curated agents in `omo.json`:
 
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5, Claude Haiku 4.5
+- Claude Fable 5, Claude Opus 5.5, Claude Sonnet 5.5, Claude Sonnet 5, Claude Haiku 4.5
 - Kimi K3: behaves very similarly to Claude
 - GLM 5.2 / 5.3: Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
 
 - GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (xhigh), with `gpt-6-astra-fast` as the Fast-mode variant
-- GPT-5.6 Sol: `deep-low` runs it at medium, on the Fast (priority) tier `gpt-5.6-sol-fast` where the OpenAI lanes serve it
+- GPT-5.6 Sol: `deep-low` runs it at medium, falling back to the Fast (priority) tier `gpt-5.6-sol-fast` on the OpenAI lanes
 - GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
-- GPT-5.6 Terra: balanced mid-tier; second rung in `unspecified-low`
+- GPT-5.6 Terra: balanced mid-tier; fourth rung in `unspecified-low`
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`
 
 **Other families**:
 
-- Grok 4.6: default for the `unspecified-low` category (xhigh)
+- Grok 4.7: third rung in the `unspecified-low` category (xhigh)
 - DeepSeek V4.1 Flash (`deepseek-flash`) / V4 Pro: utility rungs in `explore`, `librarian`, `quick`, and `unspecified-low`
 
 See the [Agent-Model Matching Guide](./agent-model-matching.md) for the full chains, safe vs risky overrides, and the tuned-preset list.

@@ -298,6 +298,36 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 32768,
 		},
 	},
+	"claude-sonnet-5-5": {
+		id: "claude-sonnet-5-5",
+		family: "claude-sonnet",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	"anthropic/claude-sonnet-5-5": {
+		id: "anthropic/claude-sonnet-5-5",
+		family: "claude-sonnet",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
 	"grok-4.7": {
 		id: "grok-4.7",
 		family: "grok",

@@ -138,7 +138,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
       // unspecified-low - moderate tasks
-      "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
+      "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
       // unspecified-high - complex work
       "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
@@ -342,11 +342,11 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | -------------------- | ------------------------------- | ---------------------------------------------- |
 | `visual-engineering` | `anthropic/claude-fable-5-1` (max) | Visual design, UI/UX, frontend, styling, animation, design systems |
 | `ultrabrain`         | `openai/gpt-6-astra` (max)      | Deep logical reasoning, complex architecture. Falls back to `gpt-5.6-sol` (max). |
-| `deep-low`           | `openai/gpt-5.6-sol-fast` (medium) | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research whose decisions the child can settle from evidence. Falls back to `gpt-5.6-sol` (medium) where the Fast tier is not served (GitHub Copilot, OpenCode Zen); unavailable without a GPT-5.6 Sol tier. |
+| `deep-low`           | `openai/gpt-5.6-sol` (medium) | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research whose decisions the child can settle from evidence. Falls back to the Fast tier `gpt-5.6-sol-fast` (medium) on the OpenAI lanes; unavailable without a GPT-5.6 Sol tier. |
 | `deep-high`          | `openai/gpt-6-astra` (xhigh)    | Escalation deep lane for a goal whose central decision cannot be settled from evidence. Single rung, no model fallback. |
 | `artistry`           | `anthropic/claude-fable-5-1` (max) | Creative/unconventional approaches             |
 | `quick`              | `openai/gpt-6-luna-fast` (low) | Trivial tasks, typo fixes, single-file changes |
-| `unspecified-low`    | `xiaomi/mimo-v2.6-pro` (max)     | General tasks, low effort                      |
+| `unspecified-low`    | `anthropic/claude-sonnet-5-5` (medium) | General tasks, low effort                      |
 | `unspecified-high`   | `anthropic/claude-opus-5-5` (medium) | General tasks, high effort                     |
 | `writing`            | `anthropic/claude-opus-5-5` (low)      | Documentation, prose, technical writing. Unavailable when none of its Claude models (`claude-opus-5-5`, `claude-opus-4-6`) is connected; it never falls back to another family, and the installer leaves it out. |
 
@@ -437,11 +437,11 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 | --- | --- | --- |
 | **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
 | **Ultrabrain** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (max)` → `openai\|chatgpt-subscription/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (max)` |
-| **Deep Low** | `gpt-5.6-sol-fast` | `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
+| **Deep Low** | `gpt-5.6-sol` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` |
 | **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (xhigh)` |
 | **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
 | **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-4-5 (off)` |
-| **Unspecified Low** | `mimo-v2.6-pro` | `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
 | **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 

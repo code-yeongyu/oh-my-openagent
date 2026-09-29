@@ -1,3 +1,13 @@
+## unspecified-low opens on Claude Sonnet 5.5; deep-low opens on plain GPT-5.6 Sol
+
+`CATEGORY_FALLBACK_CHAINS["unspecified-low"]` and the builtin category config now lead with
+`anthropic-subscription|anthropic|anthropic-api|github-copilot|opencode/claude-sonnet-5-5 (medium)`; every earlier rung
+follows in its previous order, so the chain is 8 rungs. `CATEGORY_FALLBACK_CHAINS["deep-low"]` swaps its two rungs: plain
+`gpt-5.6-sol (medium)` on `chatgpt-subscription|openai|github-copilot|opencode` first, `gpt-5.6-sol-fast (medium)` on
+`chatgpt-subscription|openai` second, and the builtin config is `chatgpt-subscription/gpt-5.6-sol`. `DEEP_LOW_GATE_MODELS`
+is unchanged (either tier opens the lane). `unspecified-low-chain.test.ts` proves order against a registry that serves every
+rung at once: sonnet-5-5 wins, then mimo-v2.6-pro once it is removed, then grok-4.7. omo#9144.
+
 ## category, agents: builtin chains resolve only on the providers they list (#9146)
 
 - A machine whose only provider was a gateway (OpenRouter, opengateway, a Vercel gateway) ran builtin categories and agents

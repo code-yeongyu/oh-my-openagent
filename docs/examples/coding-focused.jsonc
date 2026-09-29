@@ -28,7 +28,7 @@
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
 
     // Standard coding tasks: good quality, fast
-    "unspecified-low": { "model": "xiaomi/mimo-v2.6-pro", "reasoning": "max" },
+    "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
     // Complex refactors: best quality
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },

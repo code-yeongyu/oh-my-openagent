@@ -122,7 +122,7 @@ requireCondition(deepGated.kind === "model_unavailable", "deep did not gate on a
 if (deepGated.kind !== "model_unavailable") {
   throw new Error("deep did not gate on a registry without gpt-5.6-sol")
 }
-requireCondition(deepGated.attemptedModel === "chatgpt-subscription/gpt-5.6-sol-fast", "deep gate attempted model mismatch")
+requireCondition(deepGated.attemptedModel === "chatgpt-subscription/gpt-5.6-sol", "deep gate attempted model mismatch")
 requireCondition(!deepGated.availableCategories.includes("deep-low"), "deep stayed listed without gpt-5.6-sol")
 
 const disabled = resolveCategory(

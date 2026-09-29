@@ -125,10 +125,10 @@ describe("category prompt append resolvers", () => {
 })
 
 describe("GPT builtin defaults and gates", () => {
-  it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra xhigh, deep-low GPT-5.6 Sol Fast medium, all on the chatgpt-subscription lane", () => {
+  it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra xhigh, deep-low GPT-5.6 Sol medium, all on the chatgpt-subscription lane", () => {
     expect(definition("ultrabrain").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "max" })
     expect(definition("deep-high").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "xhigh" })
-    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-5.6-sol-fast", variant: "medium" })
+    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-5.6-sol", variant: "medium" })
   })
 
   it("#given unspecified-high #then its default is the Opus 5.5 rung its chain now leads with, not Astra", () => {
@@ -169,14 +169,14 @@ describe("resolveCategory on GPT registries", () => {
     })
   }
 
-  it("#given the subscription lane serves both Sol tiers #when deep-low resolves #then gpt-5.6-sol-fast wins at medium", () => {
+  it("#given the subscription lane serves both Sol tiers #when deep-low resolves #then plain gpt-5.6-sol wins at medium", () => {
     const result = resolveCategory("deep-low", {}, registry([
       { provider: "chatgpt-subscription", id: "gpt-5.6-sol" },
       { provider: "chatgpt-subscription", id: "gpt-5.6-sol-fast" },
     ]))
     expect(result.kind).toBe("resolved")
     if (result.kind !== "resolved") throw new Error("Expected resolved")
-    expect(result.spec).toMatchObject({ provider: "chatgpt-subscription", modelId: "gpt-5.6-sol-fast", variant: "medium", prompt_append: DEEP_LOW_CATEGORY_PROMPT_APPEND_GPT })
+    expect(result.spec).toMatchObject({ provider: "chatgpt-subscription", modelId: "gpt-5.6-sol", variant: "medium", prompt_append: DEEP_LOW_CATEGORY_PROMPT_APPEND_GPT })
   })
 
   it("#given only Copilot's plain gpt-5.6-sol #when deep-low resolves #then the lane stays open on it at medium", () => {

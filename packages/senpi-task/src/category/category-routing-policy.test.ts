@@ -18,17 +18,22 @@ describe("Senpi category routing policy", () => {
       visualEngineering: { model: "anthropic/claude-fable-5-1", variant: "max" },
       quick: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
       unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
-      unspecifiedLow: { model: "xiaomi/mimo-v2.6-pro", variant: "max" },
+      unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
     })
   })
 
-  test("unspecified-low fallback chain is mimo-v2.6-pro max first and excludes luna", () => {
+  test("unspecified-low fallback chain is claude-sonnet-5-5 medium first and excludes luna", () => {
     // given / when
     const chain = CATEGORY_FALLBACK_CHAINS["unspecified-low"]
 
     // then
     expect(chain.map((entry) => entry.model)).not.toContain("gpt-5.6-luna")
     expect(chain).toEqual([
+      {
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-sonnet-5-5",
+        variant: "medium",
+      },
       {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.6-pro",

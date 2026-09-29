@@ -15,11 +15,11 @@ function registryOf(provider: string, ids: readonly string[]): SenpiModelRegistr
   }
 }
 
-// The pinned engine's catalog for each provider (senpi 2026.9.28-7, ModelRuntime.getAvailable()).
+// The pinned engine's catalog for each provider (senpi 2026.9.29, ModelRuntime.getAvailable()).
 const ZAI_MODELS = ["glm-4.7", "glm-5-turbo", "glm-5.2", "glm-5.2-highspeed", "glm-5.3", "glm-5.3-flash", "glm-5.3-highspeed"]
 const ANTHROPIC_MODELS = [
   "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-opus-4-8", "claude-opus-5", "claude-opus-5-5",
-  "claude-sonnet-4-6", "claude-sonnet-5",
+  "claude-sonnet-4-6", "claude-sonnet-5", "claude-sonnet-5-5",
 ]
 const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"]
 

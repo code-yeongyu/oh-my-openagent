@@ -164,7 +164,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "deep-low",
-    config: { model: "openai/gpt-5.6-sol-fast", variant: "medium" },
+    config: { model: "openai/gpt-5.6-sol", variant: "medium" },
     description: "Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads. **3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work is routed here.** Multiple goals fan out as parallel calls.",
     callerGuidance: DEEP_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_LOW_CATEGORY_PROMPT_APPEND,
@@ -189,7 +189,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "unspecified-low",
-    config: { model: "xiaomi/mimo-v2.6-pro", variant: "max" },
+    config: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
     description: "Tasks that don't fit other categories, low effort required",
     callerGuidance: UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,

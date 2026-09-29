@@ -92,6 +92,26 @@ jobs:
           arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
           arch -x86_64 "target/${{ matrix.rust_target }}/release/${{ matrix.binary }}" --selftest
 
+      - name: Sign and notarize Darwin desktop engine
+        if: startsWith(matrix.host, 'darwin-')
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          HOST: ${{ matrix.host }}
+        run: |
+          set -euo pipefail
+          ASSET=".omo/desktop-engine-assets/senpi-desktop-engine-${HOST}"
+          bash .github/scripts/macos-sign-and-notarize.sh --identifier ai.sisyphuslabs.senpi-desktop-engine "$ASSET"
+          if [ "$HOST" = darwin-x64 ]; then
+            arch -x86_64 "$ASSET" --selftest
+          else
+            "$ASSET" --selftest
+          fi
+
       - name: Upload desktop engine artifact
         uses: actions/upload-artifact@v7
         with:
@@ -353,6 +373,26 @@ jobs:
           echo "Built release binary:"
           ls -lh .omo/release-binaries/
         timeout-minutes: 45
+
+      - name: Sign and notarize Darwin release binary
+        if: steps.release-assets.outputs.binary_exists != 'true' && startsWith(matrix.platform, 'darwin-')
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          BINARY: omo-${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/macos-sign-and-notarize.sh \
+            --identifier ai.sisyphuslabs.omo \
+            --entitlements .github/scripts/omo-bun-executable.entitlements \
+            ".omo/release-binaries/${BINARY}"
+          # Signing rewrites the bytes the build step digested.
+          (cd .omo/release-binaries && shasum -a 256 "$BINARY" > SHA256SUMS)
 
       - name: Smoke test release binary
         if: steps.release-assets.outputs.binary_exists != 'true'
