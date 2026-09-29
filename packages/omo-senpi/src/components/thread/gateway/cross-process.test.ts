@@ -1,0 +1,203 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, watch } from "node:fs"
+import { connect, createServer } from "node:net"
+import { join } from "node:path"
+
+import { gatewayInboxDirectory } from "./paths"
+import { createGatewayHarness, type GatewayHarness, type HarnessSession } from "./testing/harness"
+import type { GatewayStoreEvent, GatewayStoreTestHooks } from "./types"
+
+const SENDER = new URL("./testing/sender-process.ts", import.meta.url).pathname
+const STEP_TIMEOUT_MS = 20_000
+
+let harness: GatewayHarness | undefined
+const children: ReturnType<typeof Bun.spawn>[] = []
+
+afterEach(async () => {
+  for (const child of children.splice(0)) {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGCONT")
+      child.kill("SIGKILL")
+      await child.exited
+    }
+  }
+  await harness?.dispose()
+  harness = undefined
+})
+
+function within<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`waited ${STEP_TIMEOUT_MS} ms for ${label}, it never happened`)), STEP_TIMEOUT_MS)
+  })
+  return Promise.race([promise, expired]).finally(() => clearTimeout(timer))
+}
+
+function firstInboxEvent(h: GatewayHarness, target: string): Promise<string> {
+  const directory = gatewayInboxDirectory(h.agentDir, target)
+  mkdirSync(directory, { recursive: true, mode: 0o700 })
+  return new Promise((resolve) => {
+    const watcher = watch(directory, (_event, name) => {
+      if (name === null || name.startsWith(".")) return
+      watcher.close()
+      resolve(name)
+    })
+  })
+}
+
+function nextStoreEvent(session: HarnessSession, kind: GatewayStoreEvent["kind"]): Promise<GatewayStoreEvent> {
+  return new Promise((resolve) => {
+    const stop = session.store.onEvent((event) => {
+      if (event.kind !== kind) return
+      stop()
+      resolve(event)
+    })
+  })
+}
+
+type SenderHandle = {
+  readonly child: ReturnType<typeof Bun.spawn>
+  readonly line: (prefix: string) => Promise<string>
+  readonly send: (line: string) => void
+}
+
+function spawnSender(h: GatewayHarness, hooks: GatewayStoreTestHooks): SenderHandle {
+  const child = Bun.spawn([process.execPath, SENDER, JSON.stringify({ agentDir: h.agentDir, sender: "A", target: "B", text: "from another process", hooks })], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "inherit",
+  })
+  children.push(child)
+  const seen: string[] = []
+  const waiters: { readonly prefix: string; readonly resolve: (line: string) => void }[] = []
+  void (async () => {
+    let buffered = ""
+    for await (const chunk of child.stdout as ReadableStream<Uint8Array>) {
+      buffered += new TextDecoder().decode(chunk)
+      let newline = buffered.indexOf("\n")
+      while (newline >= 0) {
+        const line = buffered.slice(0, newline)
+        buffered = buffered.slice(newline + 1)
+        seen.push(line)
+        for (const waiter of waiters.splice(0)) {
+          if (line.startsWith(waiter.prefix)) waiter.resolve(line)
+          else waiters.push(waiter)
+        }
+        newline = buffered.indexOf("\n")
+      }
+    }
+  })()
+  return {
+    child,
+    line: (prefix) => {
+      const found = seen.find((line) => line.startsWith(prefix))
+      if (found !== undefined) return Promise.resolve(found)
+      return new Promise((resolve) => waiters.push({ prefix, resolve }))
+    },
+    send: (line) => {
+      const stdin = child.stdin as { write(text: string): unknown; flush(): unknown }
+      stdin.write(`${line}\n`)
+      stdin.flush()
+    },
+  }
+}
+
+describe("sender_death_before_wake", () => {
+  test("#given the sender is SIGKILLed the instant COMMIT returns #when the idle receiver's inbox watch fires #then its barrier pass applies the row exactly once with no other trigger", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const marker = firstInboxEvent(h, "B")
+    const sender = spawnSender(h, { afterDbCommit: "sigkill" })
+    const deliveryId = await within(marker, "the inbox marker event")
+    const drained = b.drain.drain({ reason: "inbox" })
+    expect(await within(sender.child.exited, "the sender to die")).not.toBe(0)
+    expect(sender.child.signalCode).toBe("SIGKILL")
+    expect((await within(drained, "the receiver drain")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])
+    await h.quiesce()
+    const rows = await b.store.list({ target_durable_id: "B" })
+    expect({ rows: rows.map((row) => [row.delivery_id, row.state]), entries: b.runtime.transcriptEntries(deliveryId) }).toEqual({ rows: [[deliveryId, "applied"]], entries: 1 })
+  })
+
+  test("#given the sender is SIGKILLed one statement earlier, with its marker written and COMMIT not run #when the receiver drains #then the row is absent, the dead writer's marker is removed, and nothing is delivered", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const marker = firstInboxEvent(h, "B")
+    const sender = spawnSender(h, { beforeDbCommit: "sigkill" })
+    const deliveryId = await within(marker, "the inbox marker event")
+    await within(sender.child.exited, "the sender to die")
+    await within(b.drain.drain({ reason: "inbox" }), "the receiver drain")
+    expect({
+      rows: await b.store.list({ target_durable_id: "B" }),
+      marker: existsSync(join(gatewayInboxDirectory(h.agentDir, "B"), deliveryId)),
+      enqueued: b.runtime.enqueueCalls.length,
+    }).toEqual({ rows: [], marker: false, enqueued: 0 })
+  })
+})
+
+describe("notification_before_publication_barrier", () => {
+  test("#given the sender is paused inside its write transaction after the INSERT and marker #when the receiver's drain reaches its barrier and the sender commits then dies #then the drain sees the row only after the commit and applies it once", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B", { storeOptions: { _test: { announceBarrier: true } } })
+    const marker = firstInboxEvent(h, "B")
+    const sender = spawnSender(h, { beforeDbCommit: "pause", afterDbCommit: "sigkill" })
+    await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
+    const deliveryId = await within(marker, "the inbox marker event")
+    const barrier = nextStoreEvent(b, "barrier")
+    let settled = false
+    const drained = b.drain.drain({ reason: "inbox" }).finally(() => {
+      settled = true
+    })
+    await within(barrier, "the receiver to reach BEGIN IMMEDIATE")
+    expect(settled).toBe(false)
+    sender.send("RESUME beforeDbCommit")
+    await within(sender.child.exited, "the sender to commit and die")
+    expect(sender.child.signalCode).toBe("SIGKILL")
+    expect((await within(drained, "the receiver drain")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])
+    await h.quiesce()
+    expect({ state: (await b.store.deliveryView(deliveryId))?.row.state, entries: b.runtime.transcriptEntries(deliveryId) }).toEqual({ state: "applied", entries: 1 })
+  })
+})
+
+describe("suspended_writer_busy_retry", () => {
+  test("#given the sender is SIGSTOPped holding the write lock #when the receiver's drain hits BUSY #then the receiver's loop keeps answering, and after SIGCONT the single retry applies the row once", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 200 } } })
+    const marker = firstInboxEvent(h, "B")
+    const sender = spawnSender(h, { beforeDbCommit: "pause" })
+    await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
+    sender.child.kill("SIGSTOP")
+    const deliveryId = await within(marker, "the inbox marker event")
+    const busy = nextStoreEvent(b, "busy")
+    let settled = false
+    const drained = b.drain.drain({ reason: "inbox" }).finally(() => {
+      settled = true
+    })
+    await within(busy, "the receiver's BEGIN IMMEDIATE to report BUSY")
+
+    const socket = join(h.agentDir, "t.sock")
+    const server = createServer((connection) => connection.end(`${JSON.stringify({ type: "response", command: "get_state", success: true })}\n`))
+    await new Promise<void>((resolve) => server.listen(socket, resolve))
+    try {
+      const reply = await within(new Promise<string>((resolve, reject) => {
+        let text = ""
+        const client = connect(socket)
+        client.on("data", (chunk) => {
+          text += chunk.toString()
+        })
+        client.on("end", () => resolve(text))
+        client.on("error", reject)
+      }), "a get_state answer while the lock is held")
+      expect(JSON.parse(reply).success).toBe(true)
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+    expect(settled).toBe(false)
+
+    sender.child.kill("SIGCONT")
+    sender.send("RESUME beforeDbCommit")
+    expect(await within(sender.line("DONE "), "the sender to commit")).toContain("\"queued_offline\"")
+    expect((await within(drained, "the receiver's retry")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])
+    await h.quiesce()
+    expect({ state: (await b.store.deliveryView(deliveryId))?.row.state, entries: b.runtime.transcriptEntries(deliveryId) }).toEqual({ state: "applied", entries: 1 })
+  })
+})

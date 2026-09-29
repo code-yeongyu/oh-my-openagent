@@ -149,6 +149,20 @@
 - `components/x-search/index.ts`: the conditional `x-search` skill goes through it. Both tools stay registered.
 - `extension/types.ts`: `getCommands()` entries carry the optional `sourceInfo.path` senpi already reports.
 
+## thread: gateway store and delivery engine (SQLite, receipts, causal loop guard)
+
+- `components/thread/gateway/`: new, not wired into the tools yet. One SQLite store at `<agentDir>/gateway/gateway.sqlite`,
+  owned by a worker thread so no store call blocks a session loop, holds every cross-session delivery (`deliveries`),
+  its idempotency receipt, the causal graph and the rate buckets, plus the `bindings`/`outbox` tables the binding
+  tools use. A send writes its row and the target's inbox marker in one `BEGIN IMMEDIATE` transaction; the target's
+  own drain is the only path out of `queued` and marks a row `applied` only after the runtime wrote its transcript
+  entry. Loop guards (cycle refusal per causal root, 4 hops, 8-burst/5 s pair bucket, 16 targets per turn, 64
+  deliveries per root, 7-day roots, 24 h queue TTL) and a lost-ACK rule (`idempotency_uncertain`, never a resend)
+  are enforced in that transaction. The first open migrates a legacy `<cwd>/.omo/thread-tools/mailbox` journal once.
+- `components/thread/errors.ts`: new code `loop_detected`.
+- `omo-native/test/sqlite-import-discipline.test.ts`: covers the gateway; only `store-worker.ts` imports `node:sqlite`,
+  lazily.
+
 ## memory: a late Kibitzer verdict no longer steers an extra turn after the final answer
 
 - `components/memory/kibitzer/delivery.ts`: an accepted verdict steers at once only while the running session has a
