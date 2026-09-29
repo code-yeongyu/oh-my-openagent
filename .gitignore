@@ -75,5 +75,8 @@ plans/
 !.omo/fixtures/**
 !.omo/init-deep.json
 
+# Local orchestration cockpit (bigpowers specs/ — session tracking only, never committed).
+specs/
+
 # Rust workspace (crates/senpi-desktop-*)
 /target

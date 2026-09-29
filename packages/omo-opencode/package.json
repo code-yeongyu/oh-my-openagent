@@ -41,10 +41,12 @@
     "@oh-my-opencode/utils": "workspace:*",
     "@opencode-ai/plugin": "1.18.31",
     "@opencode-ai/sdk": "1.18.31",
+    "@opencode/plugin": "2.0.18",
     "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.7",
+    "yaml": "2.9.1",
     "zod": "^4.6.5"
   }
 }

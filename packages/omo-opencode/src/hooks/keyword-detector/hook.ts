@@ -50,13 +50,13 @@ function clearAllDefaultModeUltraworkInjectedSessions(): void {
   defaultModeUltraworkInjectedSessions.clear()
 }
 
-function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
+export function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
   if (!hasCombo) return detected
   return detected.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
 }
 
-function filterAlreadyInjectedKeywords(
+export function filterAlreadyInjectedKeywords(
   detected: DetectedKeyword[],
   text: string,
 ): DetectedKeyword[] {
