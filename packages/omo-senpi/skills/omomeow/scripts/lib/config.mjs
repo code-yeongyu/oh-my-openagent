@@ -162,7 +162,8 @@ export function loadOmoMeowSettings({ cwd = process.cwd(), env = process.env } =
   for (const layer of configLayerPaths({ cwd, env })) {
     let parsed
     try {
-      parsed = JSON.parse(stripJsonc(readFileSync(layer.path, "utf8")))
+      // A leading UTF-8 BOM is dropped, as the omo loader does.
+      parsed = JSON.parse(stripJsonc(readFileSync(layer.path, "utf8").replace(/^\uFEFF/, "")))
     } catch (error) {
       diagnostics.push(`${layer.path}: ${error.message}`)
       continue

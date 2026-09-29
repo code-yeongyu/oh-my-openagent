@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
-import { delimiter, join } from "node:path"
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync } from "node:fs"
+import { delimiter, dirname, join } from "node:path"
 
 import { parseHerdrTabs } from "./nudge.mjs"
 import { SCRIPTS_DIR } from "./files.mjs"
@@ -69,19 +69,61 @@ function digestTree(root) {
   return hash.digest("hex")
 }
 
+const VERSION_PREFIX = "scripts-"
+
+function linkTarget(path) {
+  try {
+    return lstatSync(path).isSymbolicLink() ? realpathSync(path) : null
+  } catch {
+    return null
+  }
+}
+
+/** Point `link` at `target` in one step: a new link renamed over the old one (a junction on Windows). */
+function swapLink(link, target) {
+  const temp = `${link}.${process.pid}.tmp`
+  rmSync(temp, { force: true })
+  symlinkSync(target, temp, process.platform === "win32" ? "junction" : "dir")
+  const current = lstatSync(link, { throwIfNoEntry: false })
+  // A plain directory (a copy made before versioned runtimes) cannot be renamed over; move it aside first.
+  if (current?.isDirectory()) renameSync(link, join(dirname(link), `${VERSION_PREFIX}legacy-${Date.now()}`))
+  try {
+    renameSync(temp, link)
+  } catch (error) {
+    if (process.platform !== "win32") throw error
+    unlinkSync(link)
+    renameSync(temp, link)
+  }
+}
+
 /**
- * The nudge service points at a copy of these scripts under the state dir, so a skill path that moves
- * with every omo update never breaks it. Refresh the copy whenever the shipped scripts differ.
+ * The nudge service runs `runtime/scripts/omomeow.mjs`, a link to a versioned copy of these scripts under
+ * the state dir, so a skill path that moves with every omo update never breaks it. A refresh copies and
+ * verifies a complete new version first and only then swaps the link, so a failed or interrupted refresh
+ * leaves the service on the previous copy. The previous version is kept for a run that started on it.
  */
-export function syncRuntime(stateDir, { source = SCRIPTS_DIR } = {}) {
-  const target = runtimeScriptsDir(stateDir)
+export function syncRuntime(stateDir, { source = SCRIPTS_DIR, copy = cpSync } = {}) {
+  const link = runtimeScriptsDir(stateDir)
+  const root = dirname(link)
   const sourceDigest = digestTree(source)
-  const currentDigest = existsSync(target) ? digestTree(target) : null
-  if (currentDigest === sourceDigest) return { path: target, changed: false }
-  rmSync(target, { recursive: true, force: true })
-  mkdirSync(target, { recursive: true, mode: 0o700 })
-  cpSync(source, target, { recursive: true, filter: (path) => !path.slice(source.length).split(/[\\/]/).includes("tests") })
-  return { path: target, changed: true }
+  if (existsSync(link) && digestTree(link) === sourceDigest) return { path: link, changed: false }
+  mkdirSync(root, { recursive: true, mode: 0o700 })
+  const version = join(root, `${VERSION_PREFIX}${sourceDigest.slice(0, 16)}-${Date.now().toString(36)}`)
+  try {
+    copy(source, version, { recursive: true, filter: (path) => !path.slice(source.length).split(/[\\/]/).includes("tests") })
+    if (digestTree(version) !== sourceDigest) throw new Error("runtime copy does not match the shipped scripts")
+  } catch (error) {
+    rmSync(version, { recursive: true, force: true })
+    throw error
+  }
+  const previous = linkTarget(link)
+  swapLink(link, version)
+  const keep = new Set([realpathSync(version), previous].filter(Boolean))
+  for (const name of readdirSync(root)) {
+    const path = join(root, name)
+    if (name.startsWith(VERSION_PREFIX) && !keep.has(realpathSync(path))) rmSync(path, { recursive: true, force: true })
+  }
+  return { path: link, changed: true, version }
 }
 
 const BOT_CLI = /^agent-([a-z][a-z0-9]*bot)(?:\.(?:cmd|exe))?$/i

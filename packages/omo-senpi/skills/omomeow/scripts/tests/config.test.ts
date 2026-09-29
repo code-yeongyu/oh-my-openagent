@@ -82,6 +82,15 @@ describe("loadOmoMeowSettings", () => {
     expect(result.diagnostics).toHaveLength(2)
   })
 
+  test("#given a BOM-prefixed layer that disables the nudge #when loaded #then it is read and the nudge stays off", () => {
+    writeLayer(home, "omo.json", `\uFEFF{ "omomeow": { "nudge": { "enabled": false } } }`)
+
+    const result = loadOmoMeowSettings({ cwd: home, env: { HOME: home } })
+
+    expect(result.settings.nudge.enabled).toBe(false)
+    expect(result.diagnostics).toEqual([])
+  })
+
   test("#given an unparseable layer #when loaded #then it is skipped with a diagnostic", () => {
     writeLayer(home, "omo.json", `{ "omomeow": `)
 
