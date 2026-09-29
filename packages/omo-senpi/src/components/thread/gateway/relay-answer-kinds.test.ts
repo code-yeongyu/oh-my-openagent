@@ -15,7 +15,7 @@ afterEach(async () => {
   harness = undefined
 })
 
-type HandOff = (fields: AnswerFields) => Promise<UiAnswerReply>
+type HandOff = (fields: AnswerFields, uiRequestId: string) => Promise<UiAnswerReply>
 
 function relayFor(handOff: HandOff) {
   const h = (harness = createGatewayHarness())
@@ -30,7 +30,7 @@ function relayFor(handOff: HandOff) {
         wake: async () => ({ admitted: [] }),
         respondUi: async (_endpoint, answer) => {
           sent.push(answer.fields)
-          return await handOff(answer.fields)
+          return await handOff(answer.fields, answer.ui_request_id)
         },
       },
       locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
@@ -199,7 +199,7 @@ describe("answer_while_another_answer_is_in_flight", () => {
   }
 
   for (const refusal of ["question_already_resolved", "unknown_extension_ui_request"] as const) {
-    test(`#given a claimant stalled past the in-flight bound and a second answer that took over #when the session accepts the stalled answer and then refuses the second (${refusal}) #then the question ends delivered with the stalled answer, and a later answer is already_answered`, async () => {
+    test(`#given a claimant stalled past the in-flight bound and a second answer that took over #when the session accepts the stalled answer and then refuses the second (${refusal}) #then the question ends delivered with the stalled answer, the second answer and a later one are already_answered`, async () => {
       // given
       const second = deferred<UiAnswerReply>()
       const secondReached = deferred<void>()
@@ -227,12 +227,47 @@ describe("answer_while_another_answer_is_in_flight", () => {
       second.resolve({ delivered: false, error: refusal })
 
       // then
-      expect(code(await within(takeover, "the second answer"))).toBe("stale_token")
+      expect(code(await within(takeover, "the second answer"))).toBe("already_answered")
       expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from A" })
       expect(code(await q.answer("from C"))).toBe("already_answered")
     })
   }
 
+})
+
+describe("a_late_confirmation_is_the_fact_that_the_session_took_that_answer", () => {
+  test("#given a claimant stalled past the in-flight bound and a second answer that took over #when the session accepts the stalled answer and the second hand-off then fails with no reply #then the question stays delivered with the stalled answer", async () => {
+    // given
+    let failSecond!: (error: Error) => void
+    const secondReached = deferred<void>()
+    const { h, ask } = relayFor(() => { secondReached.resolve(); return new Promise<UiAnswerReply>((_, reject) => { failSecond = reject }) })
+    const q = await ask("select")
+    const reached = deferred<void>()
+    const late = deferred<UiAnswerReply>()
+    const stalledStore = h.store()
+    const stalled = createGatewayRelay({
+      store: stalledStore,
+      engine: h.engineFor(stalledStore),
+      endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      now: () => h.clock.now,
+    })
+    const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
+    await within(reached.promise, "the stalled hand-off")
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
+    const takeover = q.answer("from B")
+    await within(secondReached.promise, "the second hand-off")
+
+    // when
+    late.resolve({ delivered: true })
+    expect(code(await within(first, "the stalled answer"))).toBe("ok")
+    failSecond(new Error("rpc deadline"))
+
+    // then
+    expect(code(await within(takeover, "the second answer"))).toBe("host_unavailable")
+    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from A" })
+    expect(code(await q.answer("from C"))).toBe("already_answered")
+  })
 })
 
 describe("answer_shape_follows_the_request_kind", () => {
@@ -262,6 +297,16 @@ describe("answer_shape_follows_the_request_kind", () => {
     const { ask, sent } = relayFor(async () => ({ delivered: true }))
     expect(code(await (await ask()).answer("X"))).toBe("ok")
     expect(sent).toEqual([{ value: "X", answers: {}, comment: "X" }])
+  })
+
+  test("#given questions reported with no request_kind #when they are answered with yes/no words and with other text #then a yes/no word also goes out as confirmed, beside the value a select reads", async () => {
+    const { ask, sent } = relayFor(async () => ({ delivered: true }))
+    for (const text of ["yes", " No ", "maybe"]) expect(code(await (await ask()).answer(text))).toBe("ok")
+    expect(sent).toEqual([
+      { value: "yes", answers: {}, comment: "yes", confirmed: true },
+      { value: " No ", answers: {}, comment: " No ", confirmed: false },
+      { value: "maybe", answers: {}, comment: "maybe" },
+    ])
   })
 
   test("#given a question with no request_kind #when the answer is blank #then it is invalid_arguments and nothing is claimed or sent", async () => {
@@ -330,23 +375,6 @@ describe("a_question_claimed_before_v3", () => {
     expect(sent).toEqual([{ value: "again", answers: {}, comment: "again" }])
   })
 
-  test("#given a row the v2 code answered and delivered #when a second answer arrives after the bound #then the session's refusal is reported and the session takes nothing twice", async () => {
-    // given
-    const { h, ask, relayOver, sent } = relayFor(async () => ({ delivered: false, error: "question_already_resolved" }))
-    const q = await ask()
-    downgradeToV2(h.agentDir, (db) => {
-      db.run("UPDATE outbox SET question_state = 'answered', answer = 'first', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
-    })
-    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS
-    const upgraded = relayOver()
-
-    // when
-    const again = await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "second" })
-
-    // then
-    expect(again).toMatchObject({ kind: "error", error: { code: "stale_token", details: { reason: "question_already_resolved" } } })
-    expect(sent).toHaveLength(1)
-  })
 })
 
 describe("settling_a_claim_in_the_store", () => {
@@ -367,5 +395,93 @@ describe("settling_a_claim_in_the_store", () => {
     // then
     expect({ released, confirmedAgain }).toEqual({ released: false, confirmedAgain: false })
     expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "first" })
+  })
+})
+
+/** A session that resolves each request once, as senpi does: a late answer is question_already_resolved. */
+function dedupingSession(alreadyResolved: readonly string[] = []) {
+  const resolved = new Set(alreadyResolved)
+  const handOff: HandOff = async (_fields, uiRequestId) => {
+    if (resolved.has(uiRequestId)) return { delivered: false, error: "question_already_resolved" }
+    resolved.add(uiRequestId)
+    return { delivered: true }
+  }
+  return { resolved, handOff }
+}
+
+describe("an_answer_that_took_over_a_question_the_session_already_resolved", () => {
+  test("#given a row the v2 code answered and delivered, and the clock past the in-flight bound #when it is answered twice #then exactly one frame is sent, both answers are already_answered, and the row keeps the old answer, delivered", async () => {
+    // given
+    const session = dedupingSession(["ui-1"])
+    const { h, ask, relayOver, sent } = relayFor(session.handOff)
+    const q = await ask()
+    downgradeToV2(h.agentDir, (db) => {
+      db.run("UPDATE outbox SET question_state = 'answered', answer = 'old answer', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+    })
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
+    const upgraded = relayOver()
+    const answer = () => upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "new answer" })
+
+    // when
+    const first = await answer()
+    const second = await answer()
+
+    // then
+    expect(first).toMatchObject({ kind: "error", error: { code: "already_answered", details: { reason: "question_already_resolved" } } })
+    expect(code(second)).toBe("already_answered")
+    expect(sent).toHaveLength(1)
+    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "old answer" })
+  })
+
+  test("#given a claimant whose frame the session took before the claimant died #when another answer takes the claim over after the bound #then it is already_answered, the row is delivered with the dead claimant's answer, and no later answer sends a frame", async () => {
+    // given
+    const session = dedupingSession()
+    const { h, ask, sent } = relayFor(session.handOff)
+    const q = await ask("select")
+    const reached = deferred<void>()
+    const deadStore = h.store()
+    const dead = createGatewayRelay({
+      store: deadStore,
+      engine: h.engineFor(deadStore),
+      endpoints: { wake: async () => ({ admitted: [] }), respondUi: (_endpoint, answer) => { session.resolved.add(answer.ui_request_id); reached.resolve(); return new Promise<UiAnswerReply>(() => {}) } },
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      now: () => h.clock.now,
+    })
+    void dead.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from the dead claimant" })
+    await within(reached.promise, "the dead claimant's hand-off")
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS
+
+    // when
+    const takeover = await q.answer("from B")
+
+    // then
+    expect(code(takeover)).toBe("already_answered")
+    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from the dead claimant" })
+    expect(code(await q.answer("from C"))).toBe("already_answered")
+    expect(sent).toEqual([{ value: "from B" }])
+  })
+
+  test("#given a row the v2 code left answered mid-claim #when the taking-over answer is refused as unreadable #then the question goes back to pending, as any refusal that does not mean the session already has an answer", async () => {
+    const { h, ask, relayOver } = relayFor(async () => ({ delivered: false, error: "question_incomplete" }))
+    const q = await ask()
+    downgradeToV2(h.agentDir, (db) => {
+      db.run("UPDATE outbox SET question_state = 'answered', answer = 'lost', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+    })
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS
+    const upgraded = relayOver()
+
+    expect(code(await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "again" }))).toBe("invalid_arguments")
+    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "pending", answer_state: null, answer: null })
+  })
+
+  test("#given a taking-over claim #when the prior answer is marked delivered under a claim that is not the caller's #then nothing changes", async () => {
+    const { h, ask } = relayFor(async () => ({ delivered: true }))
+    const q = await ask()
+    const store = h.store()
+    const claim = await store.claimAnswer({ now: h.clock.now, binding_id: q.bindingId, reply_token: q.token, answer: "mine" })
+    if (claim.kind !== "ok") throw new Error(JSON.stringify(claim))
+
+    expect(await store.markPriorDelivered({ reply_token: q.token, claimed_at: claim.claimed_at - 1, prior: { answer: "old", answered_at: 1 } })).toBe(false)
+    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "in_flight", answer: "mine" })
   })
 })

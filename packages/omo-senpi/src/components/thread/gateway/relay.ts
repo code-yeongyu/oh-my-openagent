@@ -64,6 +64,9 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   invalid_arguments: "Fix the arguments and call again.",
 }
 
+/** Endpoint refusals meaning the session no longer waits on the request (senpi host dialog/question, terminal). */
+const SESSION_NO_LONGER_WAITS: ReadonlySet<string> = new Set(["question_already_resolved", "unknown_extension_ui_request", "unknown_request"])
+
 function failure(code: ThreadErrorCode, message: string, details?: Readonly<Record<string, unknown>>, nextAction?: string): { readonly kind: "error"; readonly error: ThreadToolFailure } {
   return { kind: "error", error: threadToolFailure(code, message, nextAction ?? NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.", details) }
 }
@@ -172,6 +175,13 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       }
       if (!reply.delivered) {
         // The session answered and refused: it no longer waits on that request, or cannot read the answer.
+        // An answer that took over an expired claim and hears "no longer waits" means the session took
+        // the expired claim's answer: the question is delivered with that one, not pending again.
+        const priorAnswer = claim.taken_over
+        if (priorAnswer !== null && SESSION_NO_LONGER_WAITS.has(reply.error)) {
+          await settleClaim(() => store.markPriorDelivered({ ...own, prior: priorAnswer }))
+          return failure("already_answered", `The session already took an earlier answer to this question (${reply.error}).`, { session: claim.session_durable_id, reason: reply.error })
+        }
         await release(own)
         const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"
         return failure(

@@ -144,7 +144,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
     expect(responses).toEqual([])
     expect(ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toMatchObject({ binding_id: x, session_durable_id: "B", cursor: asked.cursor })
-    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-7", fields: { value: "yes", answers: {}, comment: "yes" } }])
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-7", fields: { value: "yes", answers: {}, comment: "yes", confirmed: true } }])
     expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toBe("already_answered")
     expect(code(await relay.answer({ binding_id: x, reply_token: `${token.slice(0, -2)}xx`, answer: "forged" }))).toBe("invalid_arguments")
     expect(responses).toHaveLength(1)
@@ -270,7 +270,7 @@ describe("answer_when_the_session_cannot_be_located", () => {
     // then
     expect(retried).toMatchObject({ kind: "ok", binding_id: x, session_durable_id: "B" })
     expect(code(replay)).toBe("already_answered")
-    expect(delivered).toEqual([{ value: "yes", answers: {}, comment: "yes" }])
+    expect(delivered).toEqual([{ value: "yes", answers: {}, comment: "yes", confirmed: true }])
   })
 
   test("#given a pending question #when the answer text is empty or whitespace #then it is invalid_arguments, nothing is claimed and nothing is sent", async () => {
@@ -327,6 +327,6 @@ describe("answer_release_retry_past_the_lock_wait_bound", () => {
     expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
     failHandOff = false
     ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))
-    expect({ responses, releases }).toEqual({ responses: [{ value: "yes", answers: {}, comment: "yes" }], releases: 2 })
+    expect({ responses, releases }).toEqual({ responses: [{ value: "yes", answers: {}, comment: "yes", confirmed: true }], releases: 2 })
   })
 })

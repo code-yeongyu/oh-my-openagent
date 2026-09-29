@@ -556,7 +556,9 @@ export async function ackOutbox(
  * taken over releases nothing. `confirmAnswer` records a fact, not a claim: the session took this
  * claimant's answer, so it lands for whichever claimant that was.
  */
-export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind | null; readonly cursor: number; readonly claimed_at: number }
+export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind | null; readonly cursor: number; readonly claimed_at: number; readonly taken_over: PriorAnswer | null }
+/** The answer an expired claim held when a new answer took it over (a pre-v3 row's may have been delivered). */
+export type PriorAnswer = { readonly answer: string | null; readonly answered_at: number | null }
 export type AnswerClaimRef = { readonly reply_token: string; readonly claimed_at: number }
 export type AnswerDelivered = AnswerClaimRef & { readonly answer: string }
 
@@ -587,7 +589,7 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
     const token = readReplyToken(meta(ctx, "token_secret"), request.reply_token)
     if (token === null) return refused("invalid_arguments", "This is not a reply token this gateway issued.")
     if (token.binding_id !== request.binding_id) return refused("binding_mismatch", "The answer arrived through a different binding than the one that asked the question.", { binding_id: request.binding_id })
-    const row = ctx.sql.one(["cursor", "question_state", "answer_state", "answered_at", "ui_request_id", "ui_request_kind", "session"], "SELECT cursor, question_state, answer_state, answered_at, ui_request_id, ui_request_kind, session_durable_id AS session FROM outbox WHERE reply_token = ? AND binding_id = ?", [request.reply_token, token.binding_id])
+    const row = ctx.sql.one(["cursor", "question_state", "answer_state", "answer", "answered_at", "ui_request_id", "ui_request_kind", "session"], "SELECT cursor, question_state, answer_state, answer, answered_at, ui_request_id, ui_request_kind, session_durable_id AS session FROM outbox WHERE reply_token = ? AND binding_id = ?", [request.reply_token, token.binding_id])
     if (row === undefined) return refused("not_found", "The question this token belongs to is no longer in the outbox.")
     const inFlight = row.question_state === "answered" && row.answer_state !== "delivered"
     const abandoned = inFlight && Number(row.answered_at) + ANSWER_IN_FLIGHT_MAX_MS <= request.now
@@ -602,12 +604,22 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
       return refused("stale_token", "The binding or the session changed since the question was asked.", { binding_id: token.binding_id })
     }
     write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'in_flight', answer = ?, answered_at = ? WHERE reply_token = ?", [request.answer, request.now, request.reply_token])
-    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, ui_request_kind: kind, cursor: Number(row.cursor), claimed_at: request.now }
+    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, ui_request_kind: kind, cursor: Number(row.cursor), claimed_at: request.now, taken_over: abandoned ? { answer: nullableString(row.answer), answered_at: row.answered_at === null || row.answered_at === undefined ? null : Number(row.answered_at) } : null }
   })
 }
 
 export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef): Promise<boolean> {
   return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
+}
+
+/**
+ * A claim that took over an expired one was refused because the session no longer waits on the request:
+ * it already took an answer, the one the expired claim held. The question goes back to that answer,
+ * delivered, instead of to pending, so no later answer sends another frame. Bound to the caller's own
+ * in-flight claim like a release.
+ */
+export async function markPriorDelivered(ctx: StoreContext, request: AnswerClaimRef & { readonly prior: PriorAnswer }): Promise<boolean> {
+  return await transaction(ctx, "mark_prior_delivered", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered', answer = ?, answered_at = ? WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.prior.answer, request.prior.answered_at, request.reply_token, request.claimed_at]) === 1)
 }
 
 /**

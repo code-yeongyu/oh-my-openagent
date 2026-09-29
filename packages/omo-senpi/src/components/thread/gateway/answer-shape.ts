@@ -4,7 +4,8 @@
  * fields that kind reads. The session declares the kind when it reports the question. A question
  * reported without one (`null`, also every row written before kinds were recorded) gets the text in
  * every text shape at once (`value` + `answers: {}` + `comment`), so a question, select, input or
- * editor each reads its own field; a confirm reads only `confirmed`, so a confirm must be declared.
+ * editor each reads its own field; a yes/no word also goes out as `confirmed`, the one field a confirm
+ * reads and every other kind ignores, so an undeclared confirm answered yes is not resolved as no.
  */
 export const UI_REQUEST_KINDS = ["question", "select", "confirm", "input", "editor"] as const
 export type UiRequestKind = (typeof UI_REQUEST_KINDS)[number]
@@ -17,7 +18,7 @@ export type AnswerFields =
   | { readonly value: string }
   | { readonly confirmed: boolean }
   | { readonly answers: Readonly<Record<string, never>>; readonly comment: string }
-  | { readonly value: string; readonly answers: Readonly<Record<string, never>>; readonly comment: string }
+  | { readonly value: string; readonly answers: Readonly<Record<string, never>>; readonly comment: string; readonly confirmed?: boolean }
 
 export type AnswerShape = { readonly ok: true; readonly fields: AnswerFields } | { readonly ok: false; readonly reason: string }
 
@@ -31,12 +32,17 @@ export function isBlankAnswer(text: string): boolean {
   return text.replace(/[\s\p{Cf}]/gu, "") === ""
 }
 
+function undeclaredFields(text: string): AnswerFields {
+  const confirmed = CONFIRM_ANSWERS.get(text.trim().toLowerCase())
+  return confirmed === undefined ? { value: text, answers: {}, comment: text } : { value: text, answers: {}, comment: text, confirmed }
+}
+
 export function answerShape(kind: UiRequestKind | null, text: string): AnswerShape {
   switch (kind) {
     case null:
       return isBlankAnswer(text)
         ? { ok: false, reason: "The question declared no request kind, so the answer needs text; this one is blank. An input or editor that takes an empty answer must be reported with its request kind." }
-        : { ok: true, fields: { value: text, answers: {}, comment: text } }
+        : { ok: true, fields: undeclaredFields(text) }
     case "input":
     case "editor":
       return { ok: true, fields: { value: text } }

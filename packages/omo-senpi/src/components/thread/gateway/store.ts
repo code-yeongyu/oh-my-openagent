@@ -10,6 +10,7 @@ import type {
   AnswerClaimRef,
   AnswerDelivered,
   BindOpRequest,
+  PriorAnswer,
   BindingsFilter,
   CasRequest,
   ReportOpRequest,
@@ -101,6 +102,7 @@ export type GatewayStore = {
   readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayOutcome<AnswerClaim>>
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
   readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
+  readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
@@ -222,6 +224,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     claimAnswer: (request) => call("claim_answer", request),
     releaseAnswer: (request) => call("release_answer", request),
     confirmAnswer: (request) => call("confirm_answer", request),
+    markPriorDelivered: (request) => call("mark_prior_delivered", request),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
