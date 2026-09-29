@@ -27,6 +27,7 @@ const PACKED_ARTIFACTS = [
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
+  "plugin/extensions/gateway-store-worker.mjs",
   "plugin/skills-conditional/x-search/SKILL.md",
   "plugin/runtime/lsp-daemon/dist/cli.js",
   "plugin/runtime/ast-grep-mcp/cli.js",

@@ -16,6 +16,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
+  // The session gateway's SQLite store runs as a worker thread started from this sidecar beside omo.js.
+  "plugin/extensions/gateway-store-worker.mjs",
   // Credential-gated skill: not under plugin/skills (never eager-loaded) but the bundled x-search
   // component resolves ../skills-conditional/x-search/SKILL.md, so the payload must ship it.
   "plugin/skills-conditional/x-search/SKILL.md",
