@@ -219,6 +219,9 @@
     "packages/omo-gateway": {
       "name": "@oh-my-opencode/omo-gateway",
       "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/memory-core": "workspace:*",
+      },
     },
     "packages/omo-native": {
       "name": "omo-ai",

@@ -16,5 +16,8 @@
     "build:conformance": "bun scripts/build-conformance.ts",
     "test": "bun test src/**/*.test.ts",
     "typecheck": "tsgo --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@oh-my-opencode/memory-core": "workspace:*"
   }
 }
