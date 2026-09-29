@@ -107,8 +107,8 @@ function rowFrom(record: SqlRow): DeliveryRow {
   }
 }
 
-function selectRows(ctx: StoreContext, where: string, params: readonly SqlValue[]): DeliveryRow[] {
-  return ctx.sql.all(DELIVERY_COLUMNS, `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE ${where}`, params).map(rowFrom)
+function selectRows(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): DeliveryRow[] {
+  return ctx.sql.all(DELIVERY_COLUMNS, `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE ${where}`, params, orderBy).map(rowFrom)
 }
 
 function selectRow(ctx: StoreContext, deliveryId: string): DeliveryRow | undefined {
@@ -555,7 +555,7 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
     const emitted = new Set(request.ledger.emitted)
     const transitions: { delivery_id: string; from: DeliveryState; to: DeliveryState }[] = []
     const dual: string[] = []
-    for (const row of selectRows(ctx, `target_durable_id = ? AND state IN ${OPEN_STATES} ORDER BY seq`, [target])) {
+    for (const row of selectRows(ctx, `target_durable_id = ? AND state IN ${OPEN_STATES}`, [target], "seq")) {
       let to: DeliveryState = row.state
       if (row.state === "queued") {
         if (row.expires_at <= request.now) {
@@ -584,7 +584,7 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
       const state = ctx.sql.one(["state"], "SELECT state FROM deliveries WHERE delivery_id = ?", [name])?.state
       if (state !== "queued") unlinkMarker(ctx, target, name)
     }
-    const queued = selectRows(ctx, "target_durable_id = ? AND state = 'queued' ORDER BY seq", [target])
+    const queued = selectRows(ctx, "target_durable_id = ? AND state = 'queued'", [target], "seq")
     return { queued, transitions, dual_runtime: dual }
   })
 }
@@ -674,9 +674,9 @@ export function deliveryView(ctx: StoreContext, deliveryId: string): { readonly 
 }
 
 export function listDeliveries(ctx: StoreContext, filter: { readonly target_durable_id?: string; readonly root_id?: string }): DeliveryRow[] {
-  if (filter.target_durable_id !== undefined) return selectRows(ctx, "target_durable_id = ? ORDER BY seq", [filter.target_durable_id])
-  if (filter.root_id !== undefined) return selectRows(ctx, "root_id = ? ORDER BY created_at, seq", [filter.root_id])
-  return selectRows(ctx, "1 = 1 ORDER BY created_at, seq", [])
+  if (filter.target_durable_id !== undefined) return selectRows(ctx, "target_durable_id = ?", [filter.target_durable_id], "seq")
+  if (filter.root_id !== undefined) return selectRows(ctx, "root_id = ?", [filter.root_id], "created_at, seq")
+  return selectRows(ctx, "1 = 1", [], "created_at, seq")
 }
 
 export function isReferenced(ctx: StoreContext, durableId: string): boolean {
