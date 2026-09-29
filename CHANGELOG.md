@@ -209,6 +209,10 @@ OmO Native moves from senpi 2026.9.29-4 to senpi 2026.9.29-5, and the engine cha
 
 **The engine installs smaller and faster.** ([senpi#2360](https://github.com/code-yeongyu/senpi/issues/2360), [senpi#2362](https://github.com/code-yeongyu/senpi/issues/2362)) senpi now declares its real dependencies instead of shipping its whole dependency tree inside the tarball, and it no longer ships sourcemaps.
 
+### Removed
+
+**`omo daemon attach` and the shared-host opt-in env (`OMO_ENABLE_SHARED_HOST`) are removed; interactive sessions always run standalone.** ([#9143](https://github.com/code-yeongyu/oh-my-openagent/issues/9143)) The engine no longer lets a terminal join a shared host, so the environment `attach` printed had nothing left to reach. `omo daemon attach` now stops with the unknown-subcommand usage and prints nothing on stdout, and setting `OMO_ENABLE_SHARED_HOST=1` changes nothing. `omo daemon run`, `status`, `stop`, `handoff`, `gc` and `rollback-prepare` are unchanged.
+
 ### Fixed
 
 **Memory recall works on a machine whose quick-category pin names only providers you are not logged into.** ([#9216](https://github.com/code-yeongyu/oh-my-openagent/issues/9216)) With `categories.quick.models` pinned to, say, OpenAI while only another provider is connected, Kibitzer started its recall judge on the pinned model, which failed at once with "No API key found", so recalled-memory nudges never arrived. Kibitzer now starts on the first connected model, your pins first and then the category's built-in chain, and when nothing is connected it shows the "Kibitzer unavailable" notice naming the providers to connect. The `task` tool still uses your pin as written.
