@@ -95,7 +95,8 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 `report <session> completion` arms the completion (`armed: true`) and wakes the session's
 endpoint, so a running session writes it when it next settles, with that run's outcome. The arm is
 durable: when no endpoint answers the wake, the session writes it at the first settle after it
-next starts.
+next starts. An arm that lands while a run is settling is written at the next run, with that
+run's outcome.
 
 ## Exit codes
 

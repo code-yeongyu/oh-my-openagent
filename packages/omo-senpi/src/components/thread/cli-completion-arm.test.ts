@@ -58,7 +58,10 @@ function runtime(agentDir: string, store: GatewayStore) {
   return { dispatch, registered, run }
 }
 
-function sdkHost(onWake: () => Drain | undefined): ThreadHost {
+type WakeEdge = { readonly reason: "command" | "idle"; readonly reasons: readonly ("command" | "idle")[] }
+const COMMAND_WAKE: WakeEdge = { reason: "command", reasons: ["command"] }
+
+function sdkHost(onWake: () => Drain | undefined, edge: WakeEdge = COMMAND_WAKE): ThreadHost {
   const session: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-1", cwd: process.cwd(), name: "lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
   const unused = async (): Promise<never> => {
     throw new Error("not used")
@@ -81,20 +84,20 @@ function sdkHost(onWake: () => Drain | undefined): ThreadHost {
       wake: async (_endpoint, ids) => {
         const drain = onWake()
         if (drain === undefined) throw new Error("host_unavailable:/tmp/i-0123456789abcdef.sock")
-        return (await drain({ type: "session_control_wake", reason: "command", reasons: ["command"], ...(ids.length > 0 ? { delivery_ids: ids } : {}) })) ?? { admitted: [] }
+        return (await drain({ type: "session_control_wake", ...edge, ...(ids.length > 0 ? { delivery_ids: ids } : {}) })) ?? { admitted: [] }
       },
     },
   }
 }
 
-async function setup(options: { readonly wakeReachesSession: boolean }) {
+async function setup(options: { readonly wakeReachesSession: boolean; readonly edge?: WakeEdge }) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-cli-arm-"))
   directories.push(agentDir)
   const runtimeStore = createGatewayStore({ agentDir, instanceId: "runtime-1" })
   const cliStore = createGatewayStore({ agentDir, instanceId: "cli-1" })
   cleanups.push(() => runtimeStore.dispose(), () => cliStore.dispose())
   const target = runtime(agentDir, runtimeStore)
-  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: sdkHost(() => (options.wakeReachesSession ? target.registered() : undefined)), store: cliStore })
+  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: sdkHost(() => (options.wakeReachesSession ? target.registered() : undefined), options.edge), store: cliStore })
   cleanups.push(() => sdk.dispose())
   const bound = await sdk.bind({ session: "dur-1", binding: { platform: "custom", account_id: "bot", chat_id: "c1", thread_id: "t1", outbound_events: ["completion"] } })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
@@ -123,6 +126,16 @@ describe("a completion armed from the CLI reaches the running session", () => {
     expect(await pending()).toBe(0)
     await target.run("stop")
     expect(await rows()).toHaveLength(1)
+  })
+
+  test("#given the CLI's wake coalesced with an idle edge #when senpi reports reason idle with command only in reasons #then the arm is still picked up and the next settle writes it", async () => {
+    // given
+    const { sdk, target, bindingId, rows } = await setup({ wakeReachesSession: true, edge: { reason: "idle", reasons: ["idle", "command"] } })
+    // when
+    await sdk.report({ session: "dur-1", kind: "completion", text: "cli done", binding_id: bindingId })
+    await target.run("stop")
+    // then
+    expect(await rows()).toEqual([{ event: "completion", outcome: "completed", text: "cli done" }])
   })
 
   test("#given a wake that does not reach the session #when the CLI arms a completion #then the report still answers armed and the durable arm waits for the session's next start", async () => {
