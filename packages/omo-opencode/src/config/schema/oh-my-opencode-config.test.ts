@@ -39,6 +39,44 @@ describe("OhMyOpenCodeConfigSchema team_mode", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema runtime_fallback", () => {
+  it("accepts a positive integer first-prompt watchdog window", () => {
+    // given
+    const rawConfig = {
+      runtime_fallback: {
+        first_prompt_watchdog_seconds: 120,
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.runtime_fallback).toMatchObject({
+        first_prompt_watchdog_seconds: 120,
+      })
+    }
+  })
+
+  it("rejects a non-positive or fractional first-prompt watchdog window", () => {
+    // given
+    const invalidConfigs = [
+      { first_prompt_watchdog_seconds: 0 },
+      { first_prompt_watchdog_seconds: -1 },
+      { first_prompt_watchdog_seconds: 1.5 },
+    ]
+
+    // when
+    const results = invalidConfigs.map((runtimeFallback) =>
+      OhMyOpenCodeConfigSchema.safeParse({ runtime_fallback: runtimeFallback }))
+
+    // then
+    expect(results.every((result) => !result.success)).toBe(true)
+  })
+})
+
 describe("OhMyOpenCodeConfigSchema telemetry", () => {
   it("allows telemetry omission", () => {
     // given

@@ -2,7 +2,6 @@ import type { HookDeps, RuntimeFallbackTimeout } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { log } from "../../shared/logger"
-import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isRecord } from "../../shared/record-type-guard"
 import { normalizeModelToCanonicalString } from "./normalize-model"
@@ -19,6 +18,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string): void
+  onFallbackAccepted(sessionID: string, model: string, agent?: string): void
   onAssistantProgress(sessionID: string): void
   onSessionTerminal(sessionID: string): void
   dispose(): void
@@ -133,20 +133,26 @@ export function createFirstPromptWatchdog(
     armed.delete(sessionID)
   }
 
+  const arm = (sessionID: string, model: string | undefined, agent: string | undefined, reason: string): void => {
+    cancel(sessionID)
+    armed.add(sessionID)
+    const timer = setTimeout(async () => {
+      await fire(sessionID, model, agent)
+    }, watchdogMs)
+    timers.set(sessionID, timer)
+
+    log(`[${HOOK_NAME}] ${SOURCE}: armed (${reason})`, { sessionID, model, agent, watchdogMs })
+  }
+
   const fire = async (sessionID: string, model: string | undefined, agent: string | undefined): Promise<void> => {
     timers.delete(sessionID)
     armed.delete(sessionID)
-
-    if (!subagentSessions.has(sessionID)) {
-      log(`[${HOOK_NAME}] ${SOURCE}: session no longer a subagent at fire time, skipping`, { sessionID })
-      return
-    }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
     if (fallbackModels.length === 0) {
-      log(`[${HOOK_NAME}] ${SOURCE}: subagent silent past ${watchdogMs}ms with no fallback configured`, {
+      log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms with no fallback configured`, {
         sessionID,
         model,
         agent: resolvedAgent,
@@ -172,7 +178,7 @@ export function createFirstPromptWatchdog(
       deps.sessionLastAccess.set(sessionID, Date.now())
     }
 
-    log(`[${HOOK_NAME}] ${SOURCE}: subagent silent past ${watchdogMs}ms, dispatching fallback`, {
+    log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms, dispatching fallback`, {
       sessionID,
       model: state.currentModel,
       fallbackCount: fallbackModels.length,
@@ -196,16 +202,12 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent) {
       if (!sessionID) return
-      if (!subagentSessions.has(sessionID)) return
       if (armed.has(sessionID)) return
-
-      armed.add(sessionID)
-      const timer = setTimeout(async () => {
-        await fire(sessionID, model, agent)
-      }, watchdogMs)
-      timers.set(sessionID, timer)
-
-      log(`[${HOOK_NAME}] ${SOURCE}: armed for subagent`, { sessionID, model, agent, watchdogMs })
+      arm(sessionID, model, agent, "user message")
+    },
+    onFallbackAccepted(sessionID, model, agent) {
+      if (!sessionID || !model) return
+      arm(sessionID, model, agent, "accepted fallback")
     },
     onAssistantProgress(sessionID) {
       if (!sessionID || !armed.has(sessionID)) return

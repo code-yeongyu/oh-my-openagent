@@ -60,6 +60,7 @@ export async function dispatchFallbackRetry(
       })
       return
     }
+    deps.onFallbackAccepted?.(options.sessionID, result.newModel, options.resolvedAgent)
     if (deps.config.notify_on_fallback) {
       await deps.ctx.client.tui
         .showToast({

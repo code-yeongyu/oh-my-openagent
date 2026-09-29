@@ -41,6 +41,7 @@ export function createRuntimeFallbackHook(
     max_fallback_attempts: options?.config?.max_fallback_attempts ?? DEFAULT_CONFIG.max_fallback_attempts,
     cooldown_seconds: options?.config?.cooldown_seconds ?? DEFAULT_CONFIG.cooldown_seconds,
     timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,
+    first_prompt_watchdog_seconds: options?.config?.first_prompt_watchdog_seconds ?? DEFAULT_CONFIG.first_prompt_watchdog_seconds,
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
     restore_primary_after_cooldown: options?.config?.restore_primary_after_cooldown ?? DEFAULT_CONFIG.restore_primary_after_cooldown,
   }
@@ -63,7 +64,14 @@ export function createRuntimeFallbackHook(
   const baseEventHandler = factories.createEventHandler(deps, helpers)
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(
+    deps,
+    helpers,
+    config.first_prompt_watchdog_seconds * 1000,
+  )
+  deps.onFallbackAccepted = (sessionID, model, agent) => {
+    firstPromptWatchdog.onFallbackAccepted(sessionID, model, agent)
+  }
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -113,6 +121,7 @@ export function createRuntimeFallbackHook(
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
     deps.internallyAbortedSessions.clear()
+    deps.onFallbackAccepted = undefined
   }
 
   return {
