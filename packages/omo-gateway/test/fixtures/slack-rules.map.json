@@ -1,0 +1,119 @@
+{
+  "gateway": "demo",
+  "set_by": "u_000IMPORTER",
+  "entries": [
+    {
+      "anchor": "English only, always",
+      "kind": "mechanical",
+      "gate": "language",
+      "params": {
+        "allow": [
+          "en"
+        ]
+      }
+    },
+    {
+      "anchor": "Team work only",
+      "kind": "mechanical",
+      "gate": "topic_scope",
+      "params": {
+        "deny": [
+          "Othercorp"
+        ],
+        "redirect": "the owner in a private message"
+      },
+      "also_behavioral": true
+    },
+    {
+      "anchor": "One request is one thread",
+      "kind": "mechanical",
+      "gate": "one_request_one_thread",
+      "params": {},
+      "scope": {
+        "chat": "C000WORK"
+      }
+    },
+    {
+      "anchor": "Thread header format",
+      "kind": "mechanical",
+      "gate": "work_item_header",
+      "params": {},
+      "scope": {
+        "chat": "C000WORK"
+      }
+    },
+    {
+      "anchor": "Every status change",
+      "kind": "mechanical",
+      "gate": "status_sync",
+      "params": {}
+    },
+    {
+      "anchor": "Questions offer numbered options",
+      "kind": "mechanical",
+      "gate": "numbered_options",
+      "params": {}
+    },
+    {
+      "anchor": "When a decision is needed",
+      "kind": "mechanical",
+      "gate": "decision_nag",
+      "params": {
+        "every": "30m"
+      },
+      "scope": {
+        "user": "u_000OWNER"
+      },
+      "also_behavioral": true
+    },
+    {
+      "anchor": "Never post a bare URL",
+      "kind": "mechanical",
+      "gate": "link_label",
+      "params": {}
+    },
+    {
+      "anchor": "The requester is a real mention",
+      "kind": "mechanical",
+      "gate": "mention_requester",
+      "params": {}
+    },
+    {
+      "anchor": "Images must be readable on a phone",
+      "kind": "mechanical",
+      "gate": "image_viewport",
+      "params": {
+        "max_ratio": 2.2,
+        "max_height": 2400
+      }
+    },
+    {
+      "anchor": "Show the typing indicator",
+      "kind": "mechanical",
+      "gate": "typing_while_writing",
+      "params": {}
+    },
+    {
+      "anchor": "Bot messages never start work",
+      "kind": "mechanical",
+      "gate": "bot_ignore",
+      "params": {
+        "agent_accounts": [
+          "slack:U000OTHERBOT"
+        ],
+        "honor_gateway_marker": true
+      }
+    },
+    {
+      "anchor": "The agent work sharing channel",
+      "kind": "behavioral",
+      "scope": {
+        "chat": "C000SHARE"
+      }
+    },
+    {
+      "anchor": "The agent's own operations",
+      "kind": "behavioral"
+    }
+  ]
+}
