@@ -35,6 +35,7 @@ export class HuddlePage {
   private readonly pageWaiters = new Set<() => void>()
   private readonly waiters = new Map<string, Set<(event: PageEvent) => void>>()
   private main: string | null = null
+  private userAgent: string | null = null
   private callWindow: string | null = null
 
   constructor(input: {
@@ -82,6 +83,12 @@ export class HuddlePage {
       const decoded = decodeSignalFrame(base64Bytes(payload))
       if (decoded !== null) this.onSignal(decoded)
     })
+    // A headless build announces itself in its user agent, and the chat client gates calling on
+    // browser support - so the call window opens and then renders nothing at all. Taking the marker
+    // out of the browser's OWN string keeps this correct across browser versions.
+    const version = recordOf(await this.connection.send("Browser.getVersion").catch(() => ({})))
+    const announced = version.userAgent
+    if (typeof announced === "string" && announced !== "") this.userAgent = announced.replace(/Headless/g, "")
     await this.connection.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true })
   }
 
@@ -157,6 +164,17 @@ export class HuddlePage {
     return recordOf(result.result).value
   }
 
+  /** A picture of every window, for diagnosing a join that never reached a live call. */
+  async screenshots(): Promise<readonly string[]> {
+    const out: string[] = []
+    for (const sessionId of this.pages) {
+      const shot = await this.connection.send("Page.captureScreenshot", { format: "png" }, { sessionId, timeoutMs: 20_000 }).catch(() => null)
+      const data = shot === null ? null : shot.data
+      if (typeof data === "string") out.push(data)
+    }
+    return out
+  }
+
   /** Wait for one page event. Arm this BEFORE the action that triggers it; never poll for it. */
   waitFor(type: string, match: (event: PageEvent) => boolean, timeoutMs: number, signal?: AbortSignal): Promise<PageEvent> {
     return new Promise((resolve, reject) => {
@@ -229,13 +247,18 @@ export class HuddlePage {
     const options = { sessionId }
     // a page we cannot instrument is still a page the client may use; it must not fail the join
     const quiet = (method: string, params: Record<string, unknown> = {}): Promise<unknown> => this.connection.send(method, params, options).catch(() => undefined)
+    // ORDER IS LOAD-BEARING. A target attaches PAUSED, and the client opens its call window with
+    // window.open: a window left paused renders nothing, so the call never starts. Only the two
+    // calls that must precede any script run first; the page is released immediately after, and the
+    // remaining domains are enabled on a page that is already running.
     await quiet("Runtime.addBinding", { name: BRIDGE_BINDING })
     await quiet("Page.addScriptToEvaluateOnNewDocument", { source: PAGE_BRIDGE_SOURCE })
+    if (this.userAgent !== null) await quiet("Network.setUserAgentOverride", { userAgent: this.userAgent })
+    await quiet("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true })
+    await quiet("Runtime.runIfWaitingForDebugger")
     await quiet("Page.enable")
     await quiet("Network.enable")
     await quiet("Runtime.enable")
-    await quiet("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true })
-    await quiet("Runtime.runIfWaitingForDebugger")
   }
 
   /** Wait for a control to exist, then press it. The page owns the waiting; the host awaits one promise. */

@@ -48,7 +48,7 @@ async function serve(flags: Flags): Promise<number> {
   const token = loadOrCreateToken(tokenPathFor(agentDir))
   const driver = new HuddleDriver({
     account_id: required(flags, "account"),
-    session: await sessionFrom(flags),
+    session: await sessionFrom(flags, agentDir),
     profilesRoot: join(agentDir, "gateway", "huddle", "profiles"),
     ...(flags["capture-humans"] === true ? { onHumanJoin: "continue" as const } : {}),
     ...(text(flags, "control-ready-ms") === null ? {} : { controlReadyMs: Number(text(flags, "control-ready-ms")) }),
@@ -73,11 +73,18 @@ async function serve(flags: Flags): Promise<number> {
  * Credentials come from the connector's own custody-checked store, never from a flag: the same
  * refusal applies here as for a text surface if other local users could read them.
  */
-async function sessionFrom(flags: Flags): Promise<{ token: string; cookie: string }> {
+async function sessionFrom(flags: Flags, agentDir: string): Promise<{ token: string; cookie: string }> {
   const { loadSlackSecrets } = await import("../slack/connect")
   const { resolveCredentials } = await import("../../connector/credentials")
   const surface = { platform: "slack" as const, account_id: required(flags, "account"), credentials_dir: required(flags, "credentials-dir") }
-  const secrets = await loadSlackSecrets({ scope: "huddle", surface, credentials: await resolveCredentials(surface, { env: process.env, home: homedir() }) })
+  const secrets = await loadSlackSecrets({
+    scope: "huddle",
+    surface,
+    credentials: await resolveCredentials(surface, { env: process.env, home: homedir() }),
+    agentDir,
+    // credentials are resolved before anything can be logged, so this sink is never used for a secret
+    log: () => undefined,
+  })
   if (secrets.cookie === undefined) throw new Error("a huddle needs a member session (token and cookie), not an app token")
   return { token: secrets.token, cookie: secrets.cookie }
 }

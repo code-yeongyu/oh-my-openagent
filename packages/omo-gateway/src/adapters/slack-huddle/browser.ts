@@ -131,6 +131,9 @@ export function launchChrome(options: LaunchOptions): ChromeSession {
     "--disable-sync",
     "--disable-extensions",
     "--disable-crash-reporter",
+    // the client opens its call window with window.open; headless blocks that by default, and a
+    // blocked popup leaves an empty window the client never renders into
+    "--disable-popup-blocking",
     "--disable-component-update",
     "--disk-cache-size=1",
     "--use-fake-ui-for-media-stream",
