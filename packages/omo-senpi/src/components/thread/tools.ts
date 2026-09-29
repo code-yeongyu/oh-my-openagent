@@ -16,7 +16,6 @@ import {
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
-import { createOrderedDeliveryMailbox, type MailboxTargetPort } from "./mailbox"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -26,7 +25,7 @@ import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
-import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
+import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
 import {
   addressBook,
   degradedSummary,
@@ -51,21 +50,7 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
 function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: readonly AnyTool[]; readonly dispose: () => void } {
   const now = options.now ?? Date.now
   const { store, engine, relay } = createGatewayServices(options, view)
-  const mailbox = createOrderedDeliveryMailbox({
-    directory: `${options.stateDirectory}/mailbox`,
-    portFor: (target): MailboxTargetPort | undefined => ({
-      snapshot: async () => { const session = await findSession(target); const state = await sessionPort(options, session).getState(session.sessionId); return { active: state.isStreaming === true, ...(state.activeTurnId === undefined ? {} : { turn_id: state.activeTurnId }) } },
-      steer: async (message, expected) => { const session = await findSession(target); await sessionPort(options, session).prompt(session.sessionId, message, { streamingBehavior: "steer" }); void expected },
-      start: async (message) => { const session = await findSession(target); const result = await sessionPort(options, session).prompt(session.sessionId, message, { streamingBehavior: "followUp" }); return { turn_id: result.turnId ?? `turn-${Date.now()}` } },
-    }),
-  })
-
   async function view(): Promise<ThreadHostView> { await options.ensureHost?.(); return hostView(options) }
-  async function findSession(id: string): Promise<ThreadHostSession> {
-    const found = targetSession(await view(), id)
-    if (found === undefined) throw new Error(`thread ${id} is not live`)
-    return found
-  }
   // Receipts this process began but could not settle (the store gave up at its lock-wait bound):
   // the row stays `prepared` under this instance, which would answer `idempotency_in_progress`
   // forever. A retry of such a key is `idempotency_uncertain` with the note instead.
@@ -78,9 +63,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
     const explicitKey = "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key?.trim() : undefined
     const scope = { principal: `session:${callerId}`, operation: name, idempotency_key: explicitKey !== undefined && explicitKey.length > 0 ? explicitKey : `call:${callId}` }
-    // A gateway send owns its idempotency: the engine's receipt is written in the delivery's own
+    // A send owns its idempotency: the gateway engine's receipt is written in the delivery's own
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
-    const receipted = !((name === "thread_send" || name === "thread_handoff") && options.sendThroughGateway === true)
+    const receipted = !(name === "thread_send" || name === "thread_handoff")
     if (receipted) {
       const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
       if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
@@ -188,38 +173,22 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const relayTools = createRelayTools({ options, relay, view, failure })
   return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose: relay.dispose }
 
-  function deliverThroughGateway(current: ThreadHostView, threadId: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
-    return deliverThroughGatewayImpl(options, engine, current, threadId, value, idempotencyKey, callerId, resolvedBy)
-  }
-
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
     const resolved = resolution(options, resolveEntries(options, current), address, callerId, value.all_scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
-    if (options.sendThroughGateway === true) return await deliverThroughGateway(current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
-    const session = targetSession(current, resolved.entry.thread_id)
-    if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-    // A terminal is never prompted: it takes messages only through the gateway inbox its own
-    // extension drains, which this mailbox path does not write.
-    if (session.endpoint_kind === "tui") return failure("unsupported", `Thread ${resolved.entry.thread_id} is a terminal session, which takes messages only through the session gateway.`, "Use thread_read to follow it; delivery to terminal sessions arrives with the gateway send path.", { endpoint_kind: "tui" })
-    const result = await mailbox.accept(resolved.entry.thread_id, value.message, { delivery: value.delivery, expected_turn_id: value.expected_turn_id })
-    if (result.kind === "error") return { kind: "error", error: result.error }
-    const delivery = result.delivery === "queued"
-      ? { kind: "queued" as const, queue_position: result.queue_position }
-      : { kind: result.delivery, turn_id: result.turn_id }
-    const base = { kind: "ok" as const, thread_id: resolved.entry.thread_id, delivery, message_seq: result.message_seq, deduplicated: false }
-    return resolvedBy === undefined ? base : { kind: "ok", thread: summary(session), resolved_by: resolvedBy, delivery, message_seq: result.message_seq, deduplicated: false }
+    return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
   }
 }
 
 /**
- * The gateway send path, behind the component's send switch: resolution already applied the
+ * The send path: resolution already applied the
  * caller's scope, so the engine is handed the durable id. The result keeps the send contract and
  * adds `delivery_id`, `effective_mode` and `endpoint.kind`; an unreachable target is
  * `queued_offline` (the row is durable). A direct reply to the session that messaged this one
  * under the same causal root is refused `loop_detected`: answers travel through thread_read,
  * thread_report and thread_answer.
  */
-async function deliverThroughGatewayImpl(
+async function deliverThroughGateway(
   options: ThreadToolSurfaceOptions,
   engine: GatewayEngine,
   current: ThreadHostView,

@@ -10,15 +10,6 @@ import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } fr
 import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
 
 /**
- * SESSION GATEWAY SEND SWITCH (todo 13 -> todo 10). True since omo adopted senpi 2026.9.29-4, which
- * ships `wake`, `admitExternalMessage` and the terminal control endpoint: `thread_send` /
- * `thread_handoff` go through `gateway/engine.deliver`. The next commit deletes this constant, the
- * `sendThroughGateway` option, the mailbox branch of `tools.ts` `deliver`, `mailbox.ts`,
- * `mailbox-journal*.ts` and the file receipts in `receipts.ts`.
- */
-export const THREAD_SENDS_THROUGH_GATEWAY: boolean = true
-
-/**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
  * for `agent_settled` handlers before the session goes idle, so the store (whose write lock another
  * process may hold) never holds the settle: past this bound the write continues in the background,
@@ -119,7 +110,6 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         ensureHost: options.ensureHost,
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
-        sendThroughGateway: options.sendThroughGateway ?? THREAD_SENDS_THROUGH_GATEWAY,
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerCause: () => run.cause,
         onCompletionArmed: (durableId) => completions.arm(durableId),

@@ -232,14 +232,21 @@ describe("thread session controls", () => {
     { name: "thread_set_model", args: { thread: "self", model: "gpt-x" } },
     { name: "thread_set_reasoning", args: { thread: "self", level: "high" } },
     { name: "thread_read", args: { thread: "self" } },
-    { name: "thread_send", args: { thread: "self", message: "hello" } },
     { name: "thread_interrupt", args: { thread: "self" } },
-    { name: "thread_handoff", args: { thread: "self", message: "hello" } },
   ] as const)("$name resolves self from the fifth-argument caller durable id", async ({ name, args }) => {
     const f = fixture()
     const result = await runner(f)(name, args, "dur-peer")
-    expect(result).toMatchObject(name === "thread_handoff" ? { kind: "ok", thread: { thread_id: "dur-peer" } } : { kind: "ok", thread_id: "dur-peer" })
+    expect(result).toMatchObject({ kind: "ok", thread_id: "dur-peer" })
     if (name === "thread_rename") expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name"]])
+  })
+
+  test.each([
+    { name: "thread_send", args: { thread: "self", message: "hello" } },
+    { name: "thread_handoff", args: { thread: "self", message: "hello" } },
+  ] as const)("$name to self resolves the caller, and the gateway refuses a session delivering to itself", async ({ name, args }) => {
+    const f = fixture()
+    expect(await runner(f)(name, args, "dur-peer")).toMatchObject({ kind: "error", error: { code: "loop_detected", details: { guard: "self_send" } } })
+    expect(f.prompt).not.toHaveBeenCalled()
   })
 
   test("self without a known caller fails closed instead of matching a thread named self", async () => {
@@ -283,7 +290,7 @@ describe("thread session controls", () => {
     f.sessions[0] = { ...f.sessions[0], name: "payments worker" }
     f.sessions.push({ sessionId: "route-self", durableSessionId: "dur-self", cwd: process.cwd(), name: "payments work" })
     expect(await runner(f)("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self")).toMatchObject({ kind: "ok", thread: { thread_id: "dur-peer" }, resolved_by: "fuzzy" })
-    expect(f.prompt.mock.calls[0]?.[0]).toBe("route-peer")
+    expect(f.prompt).not.toHaveBeenCalled()
   })
 
   test("fuzzy handoff cannot select the caller when it is the only candidate", async () => {
@@ -326,7 +333,7 @@ function gatewayFixture() {
     },
   }
   const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string): Promise<ThreadToolResult> => {
-    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, store: f.store, sendThroughGateway: true, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
     const tool = tools.find((candidate) => candidate.name === name)
     const result = await tool!.execute(callId, args, undefined, undefined, { sessionManager: { getSessionId: () => callerId } } as never)
     return result.details.result as ThreadToolResult

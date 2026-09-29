@@ -388,7 +388,31 @@ export async function liveAddressBook(client, socketPath, sessionsDir) {
 }
 
 /** Mailbox port bound to one live host session, used for ordered delivery + steering. */
-export function mailboxPortFor(client, routingId) {
+/**
+ * The auto delivery a thread send used to make before the session gateway: steer the target's
+ * active turn, otherwise start one. The cross-surface drivers use it to prove a message crosses
+ * a transport exactly once; the gateway path itself is covered by the thread suite and the real
+ * TUI QA. A host still finishing the previous turn answers "already processing" for a moment, so
+ * that one refusal is retried (bounded, 50 ms apart, the retry the mailbox used); anything else throws.
+ */
+export async function deliverAuto(port, message, attempts = 40) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const state = await port.snapshot()
+      if (state.active) {
+        await port.steer(message, state.turn_id)
+        return { kind: "ok", delivery: "steered", ...(state.turn_id === undefined ? {} : { turn_id: state.turn_id }) }
+      }
+      const started = await port.start(message)
+      return { kind: "ok", delivery: "started", turn_id: started.turn_id }
+    } catch (error) {
+      if (attempt >= attempts || !/already processing/i.test(error instanceof Error ? error.message : String(error))) throw error
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+}
+
+export function deliveryPortFor(client, routingId) {
   return {
     snapshot: async () => {
       const state = await client.request({ type: "get_state", sessionId: routingId })

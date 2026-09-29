@@ -144,9 +144,9 @@ describe("thread tools across host endpoints", () => {
     const read = await w.run("thread_read", { thread: "dur-desktop" })
 
     // then
-    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "started", turn_id: "turn-dur-desktop" } })
+    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
     expect(read).toMatchObject({ kind: "ok", source: "live_host", items: [{ role: "assistant", content: JSON.stringify("from dur-desktop") }] })
-    const perSession = new Set(["get_state", "prompt", "get_messages"])
+    const perSession = new Set(["wake", "get_messages"])
     const shardPerSession = shardHost.frames.filter((frame) => perSession.has(String(frame.type)))
     expect(new Set(shardPerSession.map((frame) => frame.type))).toEqual(perSession)
     expect(shardPerSession.every((frame) => frame.sessionId === "rpc-1")).toBe(true)
@@ -199,7 +199,7 @@ describe("thread tools across host endpoints", () => {
       { seq: 3, role: "tool", content: JSON.stringify([{ type: "text", text: "file body" }]) },
     ])
     expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-terminal" })
-    expect(legacyHost.frames.some((frame) => frame.type === "prompt")).toBe(true)
+    expect(legacyHost.frames.some((frame) => frame.type === "wake")).toBe(true)
     expect(w.dialed).not.toContain(shard)
   })
 
@@ -223,7 +223,7 @@ describe("thread tools across host endpoints", () => {
     const acting = frames.filter((frame) => frame.type !== "list_sessions")
     expect(listings.length).toBeGreaterThanOrEqual(4)
     expect(listings.every((frame) => frame.observe === true)).toBe(true)
-    expect(acting.map((frame) => frame.type)).toEqual(expect.arrayContaining(["get_state", "prompt", "open_session", "set_session_name"]))
+    expect(acting.map((frame) => frame.type)).toEqual(expect.arrayContaining(["wake", "open_session", "set_session_name"]))
     expect(acting.some((frame) => "observe" in frame)).toBe(false)
   })
 

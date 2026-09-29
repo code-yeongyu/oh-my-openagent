@@ -27,7 +27,8 @@ import {
   flag,
   installCleanupHooks,
   liveAddressBook,
-  mailboxPortFor,
+  deliverAuto,
+  deliveryPortFor,
   makeScratch,
   startFakeModelServer,
   threadComponent,
@@ -52,7 +53,6 @@ const Stream = await desktopDependency("effect/Stream")
 let scratchDir
 let socketPath
 let shell
-let mailbox
 try {
   const scratch = makeScratch("t13-desktop-to-cli")
   scratchDir = scratch.dir
@@ -71,7 +71,6 @@ try {
   const { makeOmoSharedProcess } = await desktopModule("apps/server/src/provider/Layers/OmoSharedProcess.ts")
   const { OrchestrationEngineService } = shell
   const { resolveTarget } = await threadComponent("addressing")
-  const { createOrderedDeliveryMailbox } = await threadComponent("mailbox")
 
   const scenario = Effect.gen(function* () {
     // ---- the desktop side owns the host and creates the session ----
@@ -136,13 +135,7 @@ try {
     )
 
     // ---- the CLI addresses it for real: a send that lands in the transcript ----
-    mailbox = createOrderedDeliveryMailbox({
-      directory: join(scratch.dir, "mailbox"),
-      portFor: (target) => (target === routingId ? mailboxPortFor(cli, routingId) : undefined),
-    })
-    const sendResult = yield* Effect.promise(() =>
-      mailbox.accept(routingId, SEND_NEEDLE, { delivery: "auto" }),
-    )
+    const sendResult = yield* Effect.promise(() => deliverAuto(deliveryPortFor(cli, routingId), SEND_NEEDLE))
     // Read the transcript back through the DESKTOP client: one session, both surfaces.
     const desktopView = (yield* shared.request({ type: "get_messages", sessionId: routingId })).data.messages
     report.assert(
@@ -185,7 +178,6 @@ try {
   )
   process.exitCode = 1
 } finally {
-  mailbox?.close()
   await shell?.dispose()
   await cleanupAllAndWait()
   verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })

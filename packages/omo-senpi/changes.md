@@ -97,6 +97,10 @@
   the chain, profile and vocabulary changes; `omo-member.js`, `memory-run-supervisor.mjs` and `omo-computer-use.js` rebuilt
   byte-identical, so they are unchanged.
 
+## 2026-09-30 - thread_send and thread_handoff always deliver through the session gateway; the mailbox and file receipts are gone (#9143)
+
+With senpi 2026.9.29-4 adopted (wake, admitExternalMessage, terminal control endpoints), the send switch flipped and then went away: `THREAD_SENDS_THROUGH_GATEWAY`, the `sendThroughGateway` option, the mailbox branch and the terminal-unsupported guard in `tools.ts` `deliver` are deleted, and so are `mailbox.ts`, `mailbox-journal.ts`, `mailbox-journal-codec.ts`, the mailbox-era file receipts in `receipts.ts` and their tests. A send is now always a durable gateway row with its own receipt: a terminal target is queued for its own inbox and woken instead of answering `unsupported`, and a send to the caller itself is refused `loop_detected` (`self_send`). The endpoint, terminal and self-resolution tests assert that (queued row, a `wake` to the owning endpoint, no `prompt`/`get_state`). The task-14 QA drivers that exercised only the deleted modules (`queued-resume`, `uncertain-operation` and its child) are retired, and the three cross-surface drivers deliver with the QA-only `deliverAuto` in `scripts/qa/thread-tools/lib/harness.mjs`. `gateway/legacy-mailbox.ts`, which reads a pre-gateway mailbox for the store's import, stays.
+
 ## 2026-09-29 - plugin bundles carry the typed launch_spec_insecure start failure (#9208)
 
 - `plugin/extensions/omo-task.js`, `omo-member.js`, `omo.js` (source-digest marker only) and `plugin/runtime/rollback-migrate.js`

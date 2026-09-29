@@ -22,6 +22,7 @@ import {
   cleanupAllAndWait,
   countUserTurns,
   createReport,
+  deliverAuto,
   desktopDependency,
   desktopModule,
   flag,
@@ -78,7 +79,6 @@ const awaitRecords = (shared, predicate, count = 1, timeoutMs = 120_000) =>
 
 let scratchDir
 let socketPath
-let mailbox
 try {
   const scratch = makeScratch("t13-desktop-client")
   scratchDir = scratch.dir
@@ -99,7 +99,6 @@ try {
   const { makeOmoSharedProcess } = await desktopModule("apps/server/src/provider/Layers/OmoSharedProcess.ts")
   const { resolveTarget } = await threadComponent("addressing")
   const { assembleAddressBook, scanDiskSessions, toThreadAddressEntries } = await threadComponent("address-book")
-  const { createOrderedDeliveryMailbox } = await threadComponent("mailbox")
 
   const program = Effect.gen(function* () {
     const shared = yield* makeOmoSharedProcess({
@@ -149,14 +148,9 @@ try {
     yield* shared.request({ type: "set_session_name", sessionId: routingId, name: "desktop-peer" })
     report.log(`peer routing=${routingId} durable=${durableId}`)
 
-    // Mailbox port over the DESKTOP transport: snapshot/steer/start all go through
+    // Delivery port over the DESKTOP transport: snapshot/steer/start all go through
     // makeOmoSharedProcess, and the settle is awaited on its record stream.
-    mailbox = createOrderedDeliveryMailbox({
-      directory: join(scratch.dir, "mailbox"),
-      portFor: (target) =>
-        target !== routingId
-          ? undefined
-          : {
+    const desktopPort = {
               snapshot: () =>
                 Effect.runPromise(
                   shared.request({ type: "get_state", sessionId: routingId }).pipe(
@@ -179,8 +173,7 @@ try {
                     return { turn_id: `${routingId}-turn` }
                   }),
                 ),
-            },
-    })
+    }
 
     yield* promptAndSettle(routingId, CREATE_NEEDLE)
     const afterCreate = yield* messages(routingId)
@@ -207,13 +200,9 @@ try {
       `resolution=${resolved.kind === "ok" ? resolved.resolution : JSON.stringify(resolved)} entries=${entries.length}`,
     )
 
-    // ---- thread_send through the shipped ordered-delivery mailbox ----
-    // The mailbox's port is bound to the DESKTOP client, so the same component that serves
-    // the CLI surface drives the desktop transport; its retry loop is also what absorbs the
-    // host's "already processing" window instead of a sleep.
-    const sendResult = yield* Effect.promise(() =>
-      mailbox.accept(routingId, SEND_NEEDLE, { delivery: "auto" }),
-    )
+    // ---- one auto delivery over the DESKTOP transport ----
+    // deliverAuto retries only the host's brief "already processing" answer after a settle.
+    const sendResult = yield* Effect.promise(() => deliverAuto(desktopPort, SEND_NEEDLE))
     const afterSend = yield* messages(routingId)
     report.assert(
       "send-transcript",
@@ -270,7 +259,6 @@ try {
   )
   process.exitCode = 1
 } finally {
-  mailbox?.close()
   await cleanupAllAndWait()
   verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })
   const verdict = report.failures === 0 && process.exitCode !== 1

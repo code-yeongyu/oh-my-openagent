@@ -149,7 +149,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(host.frames.every((frame) => frame.type !== "list_sessions" || frame.observe === true)).toBe(true)
   })
 
-  test("#given a terminal target #when thread_send, thread_interrupt, thread_set_model and thread_set_reasoning run #then each answers unsupported as data and the terminal never receives prompt, steer, follow_up, open_session or any host-only command", async () => {
+  test("#given a terminal target #when thread_send runs #then it is queued for the terminal's own inbox and woken; thread_interrupt, thread_set_model and thread_set_reasoning answer unsupported as data; the terminal never receives prompt, steer, follow_up, open_session or any host-only command", async () => {
     // given
     const dir = tempDir("thr-tui-")
     const legacy = join(dir, "rpc.sock")
@@ -159,8 +159,8 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const w = surfaceFor(legacy, [{ socket: tui, reachable: true, session_paths: [], endpoint_kind: "tui", alive: true, reason: null }])
 
     // when
+    const sentMessage = await w.run("thread_send", { thread: "dur-tui", message: "hello", all_scope: true })
     const results = [
-      await w.run("thread_send", { thread: "dur-tui", message: "hello", all_scope: true }),
       await w.run("thread_interrupt", { thread: "dur-tui", all_scope: true }),
       await w.run("thread_set_model", { thread: "dur-tui", model: "anything", all_scope: true }),
       await w.run("thread_set_reasoning", { thread: "dur-tui", level: "high", all_scope: true }),
@@ -169,11 +169,13 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const read = await w.run("thread_read", { thread: "dur-tui", all_scope: true })
 
     // then
+    expect(sentMessage).toMatchObject({ kind: "ok", thread_id: "dur-tui", delivery: { kind: "queued" }, endpoint: { kind: "tui" } })
     for (const result of results) expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
     expect(renamed).toMatchObject({ kind: "ok", name: "renamed-tui" })
     expect(read).toMatchObject({ kind: "ok", source: "live_host" })
     const sent = new Set(terminal.frames.map((frame) => String(frame.type)))
     for (const type of sent) expect(TUI_ENDPOINT_COMMANDS.has(type)).toBe(true)
+    expect(sent.has("wake")).toBe(true)
     for (const forbidden of ["prompt", "steer", "follow_up", "open_session", "interrupt", "set_model", "get_available_models", "set_thinking_level", "release_session"]) expect(sent.has(forbidden)).toBe(false)
   })
 

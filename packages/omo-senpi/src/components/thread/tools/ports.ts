@@ -84,11 +84,6 @@ export type ThreadToolSurfaceOptions = {
    * under `stateDirectory` (QA harnesses and tests).
    */
   readonly store?: GatewayStore
-  /**
-   * `thread_send` / `thread_handoff` deliver through the gateway engine instead of the mailbox's
-   * `prompt`. Set only by the component's send switch (`THREAD_SENDS_THROUGH_GATEWAY`) and by tests.
-   */
-  readonly sendThroughGateway?: boolean
   /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
   /**

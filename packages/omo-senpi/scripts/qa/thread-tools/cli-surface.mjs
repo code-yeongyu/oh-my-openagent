@@ -22,7 +22,8 @@ import {
   flag,
   installCleanupHooks,
   liveAddressBook,
-  mailboxPortFor,
+  deliverAuto,
+  deliveryPortFor,
   makeScratch,
   messageText,
   startFakeModelServer,
@@ -40,7 +41,6 @@ const STEER_NEEDLE = "t13a-steer-needle"
 const report = createReport("cli-surface")
 installCleanupHooks()
 
-let mailbox
 let scratchDir
 let socketPath
 try {
@@ -147,13 +147,8 @@ try {
     `resolution=${resolved.kind === "ok" ? resolved.resolution : JSON.stringify(resolved)} entries=${entries.length}`,
   )
 
-  // ---- thread_send: ordered delivery through the mailbox, asserted in the transcript ----
-  const { createOrderedDeliveryMailbox } = await threadComponent("mailbox")
-  mailbox = createOrderedDeliveryMailbox({
-    directory: join(scratch.dir, "mailbox"),
-    portFor: (target) => (target === peer.routingId ? mailboxPortFor(tools, peer.routingId) : undefined),
-  })
-  const sendResult = await mailbox.accept(peer.routingId, SEND_NEEDLE, { delivery: "auto" })
+  // ---- thread_send: one auto delivery over the CLI transport, asserted in the transcript ----
+  const sendResult = await deliverAuto(deliveryPortFor(tools, peer.routingId), SEND_NEEDLE)
   const afterSend = await tools.messages(peer.routingId)
   report.assert(
     "send-transcript",
@@ -219,7 +214,6 @@ try {
   report.log(`FAIL cli-surface harness error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`)
   process.exitCode = 1
 } finally {
-  mailbox?.close()
   await cleanupAllAndWait()
   verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })
   const verdict = report.failures === 0 && process.exitCode !== 1
