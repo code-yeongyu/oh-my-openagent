@@ -22,6 +22,8 @@ import type {
 export type GatewayStoreOptions = {
   readonly agentDir: string
   readonly instanceId?: string
+  /** The senpi host generation this process's sessions run in (`pi.sessionContext.host_instance`); omitted in a terminal. */
+  readonly runtimeInstance?: string
   readonly legacyMailboxDirectories?: readonly string[]
   readonly now?: () => number
   /** Test seams only: a shorter busy timeout and commit-boundary hooks. */
@@ -70,6 +72,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     agent_dir: options.agentDir,
     busy_timeout_ms: options._test?.busyTimeoutMs ?? GATEWAY_BUSY_TIMEOUT_MS,
     instance_id: options.instanceId ?? randomUUID(),
+    runtime_instance: options.runtimeInstance ?? null,
     legacy_mailbox_directories: options.legacyMailboxDirectories ?? [],
     test_hooks: {
       ...(options._test?.beforeDbCommit === undefined ? {} : { beforeDbCommit: options._test.beforeDbCommit }),

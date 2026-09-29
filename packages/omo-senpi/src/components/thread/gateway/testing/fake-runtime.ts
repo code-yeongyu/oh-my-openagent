@@ -141,12 +141,12 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   }
 
   /** senpi `release_session`: admission closes and the file records `session_released` before teardown. */
-  release(releasedAt: number): void {
+  release(releasedAt: number, hostInstance: string): void {
     this.closedReason = "session released"
     appendFileSync(this.sessionPath, `${JSON.stringify({
       type: "custom",
       customType: SESSION_RELEASED_ENTRY_TYPE,
-      data: { reason: "takeover", interrupted: false, attachments: 0, host_instance: null, released_at: new Date(releasedAt).toISOString() },
+      data: { reason: "takeover", interrupted: false, attachments: 0, host_instance: hostInstance, released_at: new Date(releasedAt).toISOString() },
     })}\n`)
   }
 

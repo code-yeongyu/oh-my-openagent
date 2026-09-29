@@ -161,8 +161,9 @@
   are enforced in that transaction. The first open migrates a legacy `<cwd>/.omo/thread-tools/mailbox` journal once.
 - `components/thread/errors.ts`: new code `loop_detected`.
 - `components/thread/gateway/store-ops.ts`: a row claimed by a live host that since released the session
-  (`session_released` in the transcript, claimed at or before `released_at`) is settled by the disk-token rule like a
-  dead claimant's, instead of reading `dual_runtime` forever.
+  (`session_released { host_instance, released_at }` in the transcript, naming the claim's own host generation, claimed
+  at or before `released_at`) is settled by the disk-token rule like a dead claimant's, instead of reading
+  `dual_runtime` forever. A claim by any other runtime, or made after the release, stays `dual_runtime`.
 - `components/thread/gateway/adapter.ts`: provisional senpi types aligned with the branches (registration union,
   `release_session` request/refusal shape, drain result mapping).
 - `omo-native/test/sqlite-import-discipline.test.ts`: covers the gateway; only `store-worker.ts` imports `node:sqlite`,

@@ -12,6 +12,8 @@ export type ProcessIdentity = {
   readonly pid: number
   readonly process_start_time: string | null
   readonly instance_id: string
+  /** The senpi host generation the claiming runtime runs in (`pi.sessionContext.host_instance`); null in a terminal. */
+  readonly runtime_instance: string | null
 }
 
 export type ExternalOrigin = {
@@ -190,6 +192,7 @@ export type GatewayStoreConfig = {
   readonly agent_dir: string
   readonly busy_timeout_ms: number
   readonly instance_id: string
+  readonly runtime_instance: string | null
   readonly legacy_mailbox_directories: readonly string[]
   readonly test_hooks: GatewayStoreTestHooks
 }

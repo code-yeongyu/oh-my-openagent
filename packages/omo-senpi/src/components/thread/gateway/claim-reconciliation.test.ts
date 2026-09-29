@@ -15,13 +15,13 @@ afterEach(async () => {
   harness = undefined
 })
 
-async function spawnHolder(): Promise<{ readonly identity: ProcessIdentity; readonly stop: () => Promise<void> }> {
+async function spawnHolder(runtimeInstance: string | null = null): Promise<{ readonly identity: ProcessIdentity; readonly stop: () => Promise<void> }> {
   const child = Bun.spawn(["cat"], { stdin: "pipe", stdout: "ignore", stderr: "ignore" })
   const startTime = await processStartTime(child.pid)
   if (startTime === null) throw new Error("could not read the start time of the holder process")
   let stopped: Promise<void> | undefined
   return {
-    identity: { pid: child.pid, process_start_time: startTime, instance_id: randomUUID() },
+    identity: { pid: child.pid, process_start_time: startTime, instance_id: randomUUID(), runtime_instance: runtimeInstance },
     stop: () => {
       stopped ??= (async () => {
         child.stdin.end()
@@ -52,6 +52,7 @@ async function crashingPass(h: GatewayHarness, runtime: FakeSessionRuntime, iden
     runtime,
     durableId: "B",
     sessionPath: () => runtime.sessionPath,
+    now: () => h.clock.now,
     _test: { identity, ...(stage === "afterClaim" ? { afterClaim: (_row: DeliveryRow) => crash() } : { afterAdmit: (_row: DeliveryRow, _kind: string) => crash() }) },
   })
   await expect(drain.drain({ reason: "start" })).rejects.toThrow(`simulated crash ${stage}`)
@@ -75,8 +76,27 @@ async function sendToB(h: GatewayHarness, text: string): Promise<string> {
 function freshProcess(h: GatewayHarness, sessionPath: string): { readonly runtime: FakeSessionRuntime; readonly drain: ReturnType<typeof createInboxDrain>; readonly log: string[] } {
   const runtime = new FakeSessionRuntime(sessionPath, "B", h.agentDir, { reopen: true })
   const log: string[] = []
-  const drain = createInboxDrain({ store: h.store(), runtime, durableId: "B", sessionPath: () => sessionPath, log: (line) => log.push(line) })
+  const drain = createInboxDrain({ store: h.store(), runtime, durableId: "B", sessionPath: () => sessionPath, now: () => h.clock.now, log: (line) => log.push(line) })
   return { runtime, drain, log }
+}
+
+async function claimedByLiveHolder(h: GatewayHarness, runtimeInstance: string, release: { readonly by: string; readonly beforeClaim: boolean }): Promise<{ readonly id: string; readonly state: string | undefined; readonly dual: readonly string[]; readonly stop: () => Promise<void> }> {
+  h.session("A")
+  const b = crashedTarget(h)
+  const id = await sendToB(h, "claimed by a live runtime")
+  const holder = await spawnHolder(runtimeInstance)
+  if (release.beforeClaim) {
+    b.runtime.release(h.clock.now, release.by)
+    h.clock.now += 1_000
+    await crashingPass(h, b.runtime, holder.identity, "afterClaim")
+  } else {
+    await crashingPass(h, b.runtime, holder.identity, "afterClaim")
+    h.clock.now += 1_000
+    b.runtime.release(h.clock.now, release.by)
+  }
+  const next = freshProcess(h, b.runtime.sessionPath)
+  await next.drain.drain({ reason: "start" })
+  return { id, state: (await b.view(id))?.state, dual: next.log.filter((line) => line.startsWith("dual_runtime")), stop: holder.stop }
 }
 
 describe("claim_reconciliation", () => {
@@ -141,7 +161,7 @@ describe("claim_reconciliation", () => {
     const h = (harness = createGatewayHarness())
     h.session("A")
     const b = crashedTarget(h)
-    const host = createInboxDrain({ store: h.store(), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now })
+    const host = createInboxDrain({ store: h.store({ runtimeInstance: "host-1" }), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now })
     const written = await sendToB(h, "written before release")
     const unwritten = await sendToB(h, "queued behind the turn")
     const firstEmitted = new Promise<string>((resolve) => b.runtime.onEmitted(resolve))
@@ -150,7 +170,7 @@ describe("claim_reconciliation", () => {
     expect({ written: (await b.view(written))?.state, unwritten: (await b.view(unwritten))?.state }).toEqual({ written: "admitted", unwritten: "admitted" })
 
     h.clock.now += 1_000
-    b.runtime.release(h.clock.now)
+    b.runtime.release(h.clock.now, "host-1")
     const next = freshProcess(h, b.runtime.sessionPath)
     const result = await next.drain.drain({ reason: "start" })
     expect({
@@ -160,6 +180,26 @@ describe("claim_reconciliation", () => {
       entries: next.runtime.transcriptEntries(written),
       dual: next.log.filter((line) => line.startsWith("dual_runtime")),
     }).toEqual({ admitted: [{ delivery_id: unwritten, kind: "started" }], written: "applied", readmittedWritten: 0, entries: 1, dual: [] })
+  })
+
+  test("#given a live runtime that claimed a row AFTER the session_released entry #when the next owner drains #then that claim is not the released one and stays dual_runtime", async () => {
+    const h = (harness = createGatewayHarness())
+    const outcome = await claimedByLiveHolder(h, "host-1", { by: "host-1", beforeClaim: true })
+    try {
+      expect({ state: outcome.state, dual: outcome.dual.length }).toEqual({ state: "admitting", dual: 1 })
+    } finally {
+      await outcome.stop()
+    }
+  })
+
+  test("#given a live runtime of another host generation claimed a row before this session was released #when the next owner drains #then only the releasing runtime's claims are let go and this one stays dual_runtime", async () => {
+    const h = (harness = createGatewayHarness())
+    const outcome = await claimedByLiveHolder(h, "other-host", { by: "host-1", beforeClaim: false })
+    try {
+      expect({ state: outcome.state, dual: outcome.dual.length }).toEqual({ state: "admitting", dual: 1 })
+    } finally {
+      await outcome.stop()
+    }
   })
 
   test("#given a row claimed by another live process #when this process drains #then it is left alone and logged dual_runtime until that process is gone", async () => {

@@ -109,7 +109,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   sql.exec("PRAGMA journal_mode = WAL")
   sql.exec("PRAGMA synchronous = FULL")
   for (const suffix of ["-wal", "-shm"]) if (existsSync(`${path}${suffix}`)) chmodSync(`${path}${suffix}`, 0o600)
-  const self = { pid: process.pid, process_start_time: await processStartTime(process.pid), instance_id: config.instance_id }
+  const self = { pid: process.pid, process_start_time: await processStartTime(process.pid), instance_id: config.instance_id, runtime_instance: config.runtime_instance }
   context = {
     sql,
     config,

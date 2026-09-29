@@ -496,13 +496,14 @@ function transcriptText(sessionPath: string | null, cache: Map<string, string>):
 }
 
 /**
- * When the session file was last handed to another runtime: senpi's `release_session` appends a
- * `custom` entry `session_released { released_at }` before it tears the runtime down, and nothing
- * is written by that runtime afterwards. A claim made at or before it cannot be written any more,
- * even though the host process that made it is still alive.
+ * When each host generation last handed this session file to another runtime: senpi's
+ * `release_session` appends a `custom` entry `session_released { host_instance, released_at }`
+ * before it tears the runtime down, and that runtime writes nothing afterwards. Keyed by
+ * `host_instance` (the same id the host stamps into every session's `pi.sessionContext`), so a
+ * release lets go only the claims of the runtime that released, never a concurrent one's.
  */
-function lastReleaseAt(sessionPath: string | null, cache: Map<string, string>): number | null {
-  let latest: number | null = null
+function releasesByRuntime(sessionPath: string | null, cache: Map<string, string>): ReadonlyMap<string, number> {
+  const latest = new Map<string, number>()
   for (const line of transcriptText(sessionPath, cache).split("\n")) {
     if (!line.includes(SESSION_RELEASED_ENTRY_TYPE)) continue
     let entry: unknown
@@ -511,12 +512,20 @@ function lastReleaseAt(sessionPath: string | null, cache: Map<string, string>): 
     } catch {
       continue
     }
-    const record = entry as { type?: unknown; customType?: unknown; data?: { released_at?: unknown } }
-    if (record.type !== "custom" || record.customType !== SESSION_RELEASED_ENTRY_TYPE || typeof record.data?.released_at !== "string") continue
-    const at = Date.parse(record.data.released_at)
-    if (Number.isFinite(at) && (latest === null || at > latest)) latest = at
+    const record = entry as { type?: unknown; customType?: unknown; data?: { host_instance?: unknown; released_at?: unknown } }
+    if (record.type !== "custom" || record.customType !== SESSION_RELEASED_ENTRY_TYPE) continue
+    const instance = record.data?.host_instance
+    const at = typeof record.data?.released_at === "string" ? Date.parse(record.data.released_at) : Number.NaN
+    if (typeof instance !== "string" || instance.length === 0 || !Number.isFinite(at)) continue
+    latest.set(instance, Math.max(at, latest.get(instance) ?? at))
   }
   return latest
+}
+
+function releasedByClaimant(claimant: ProcessIdentity, claimedAt: number | null, releases: () => ReadonlyMap<string, number>): boolean {
+  if (claimant.runtime_instance === null || claimedAt === null) return false
+  const releasedAt = releases().get(claimant.runtime_instance)
+  return releasedAt !== undefined && claimedAt <= releasedAt
 }
 
 function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: Map<string, string>): boolean {
@@ -566,6 +575,11 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
   const verdicts = new Map<string, { readonly fingerprint: string; readonly to: DeliveryState | "dual" }>()
   const transcripts = new Map<string, string>()
   const deadClaimants = new Map<string, boolean>()
+  let releases: ReadonlyMap<string, number> | undefined
+  const releaseIndex = (): ReadonlyMap<string, number> => {
+    releases ??= releasesByRuntime(request.session_path, transcripts)
+    return releases
+  }
   for (const row of selectRows(ctx, "target_durable_id = ? AND state IN ('admitting', 'admitted')", [target])) {
     if (row.admitted_by === null || sameProcess(row.admitted_by, request.self)) continue
     const key = JSON.stringify(row.admitted_by)
@@ -574,8 +588,7 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
       dead = await isClaimantDead(row.admitted_by)
       deadClaimants.set(key, dead)
     }
-    const released = lastReleaseAt(request.session_path, transcripts)
-    const letGo = dead || (released !== null && row.claimed_at !== null && row.claimed_at <= released)
+    const letGo = dead || releasedByClaimant(row.admitted_by, row.claimed_at, releaseIndex)
     const to = !letGo ? "dual" : sessionHasToken(request.session_path, row.delivery_id, transcripts) ? "applied" : "queued"
     verdicts.set(row.delivery_id, { fingerprint: claimFingerprint(row), to })
   }
