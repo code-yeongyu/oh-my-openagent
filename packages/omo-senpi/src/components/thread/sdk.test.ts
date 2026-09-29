@@ -18,10 +18,10 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never> } = {}) {
+function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore } = {}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
   directories.push(agentDir)
-  const store: GatewayStore = createGatewayStore({ agentDir })
+  const store: GatewayStore = options.store?.(agentDir) ?? createGatewayStore({ agentDir })
   const hostSession: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
   const tuiSession: ThreadHostSession = { sessionId: "dur-tui", durableSessionId: "dur-tui", cwd: process.cwd(), name: "my-tui", status: "open", socket: TUI_SOCKET, endpoint_kind: "tui" }
   const wakes: { readonly endpoint: GatewayEndpointRef; readonly ids: readonly string[] }[] = []
@@ -126,6 +126,45 @@ describe("thread SDK: bindings and the connector surface", () => {
     expect(await sdk.ack({ binding_id: bindingId, cursor, provider_message_id: "m-1" })).toEqual({ kind: "ok", binding_id: bindingId, acked_cursor: cursor, changed: true })
     expect(await sdk.outbox({ binding_id: bindingId })).toMatchObject({ kind: "ok", rows: [] })
     expect(await sdk.outbox({ binding_id: bindingId, after_cursor: cursor - 1 })).toMatchObject({ kind: "ok", rows: [{ cursor }] })
+  })
+
+  test("#given a running session #when the CLI arms a completion and reports a milestone #then only the arm wakes the session's endpoint, with no delivery ids", async () => {
+    const { sdk, wakes } = fixture()
+    const bound = await sdk.bind({ session: "host lane", binding: { platform: "custom", account_id: "qa", chat_id: "c1", outbound_events: ["milestone", "completion"] } })
+    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    expect(await sdk.report({ session: "host lane", binding_id: bindingId, kind: "milestone", text: "step 1" })).toMatchObject({ kind: "ok", armed: false })
+    expect(wakes).toEqual([])
+    expect(await sdk.report({ session: "host lane", binding_id: bindingId, kind: "completion", text: "done" })).toMatchObject({ kind: "ok", armed: true })
+    expect(wakes).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1" }, ids: [] }])
+  })
+
+  test("#given an answer release that gave up at the store's lock-wait bound #when the SDK is disposed #then the background release retry makes no further attempt", async () => {
+    let releases = 0
+    let real: GatewayStore | undefined
+    const { sdk } = fixture({
+      store: (agentDir) => {
+        real = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 50 } })
+        const base = real
+        return {
+          ...base,
+          releaseAnswer: async (request) => {
+            releases++
+            if (releases === 1) throw Object.assign(new Error("gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+            return await base.releaseAnswer(request)
+          },
+        }
+      },
+    })
+    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
+    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    const asked = await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "deploy?", request_id: "ui-1" })
+    // The fixture's host has no respondUi, so the claimed answer cannot be handed off and its release hits the bound.
+    await sdk.answer({ binding_id: bindingId, reply_token: (asked as { reply_token: string }).reply_token, answer: "yes" })
+    expect(releases).toBe(1)
+    await sdk.dispose()
+    // Timers fire in expiry order: one due at 4x the retry delay runs after the (cancelled) retry would have.
+    await new Promise((resolve) => setTimeout(resolve, (real?.busyTimeoutMs ?? 50) * 4))
+    expect(releases).toBe(1)
   })
 
   test("#given a question asked through binding X #when the answer arrives through binding Y #then it is binding_mismatch and the question stays pending", async () => {

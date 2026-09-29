@@ -103,6 +103,12 @@ export type ControlEndpointRegistrantOptions = {
   readonly store?: GatewayStore
   /** Called for each delivery this session's runtime took (started, steered or queued): the cause of the run that follows. */
   readonly onAdmitted?: (durableId: string, deliveryId: string) => void
+  /**
+   * Awaited before the drain pass of a wake another process asked for (a `wake` command): the edge
+   * on which the session learns of work written outside it, such as a completion armed from the CLI.
+   * Ordinary edges (idle, submission, the inbox watcher) never call it.
+   */
+  readonly onCommandWake?: (durableId: string) => Promise<void>
   readonly log?: (line: string) => void
   /** Test seams: the store to use, and drain options (clock, crash hooks, a foreign identity). */
   readonly _test?: {
@@ -203,7 +209,11 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     const drainOnce = async (event: SenpiWakeEvent) => toSessionControlDrainResult(await drain.drain(drainEvent(event)))
     const reply = await control.registerControlEndpoint({
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
-      drain: async (event) => (retired ? { admitted: [] } : await drainOnce(event)),
+      drain: async (event) => {
+        if (retired) return { admitted: [] }
+        if (event.reason === "command" || event.reasons.includes("command")) await options.onCommandWake?.(session.durableId)
+        return await drainOnce(event)
+      },
       isSessionReferenced: () => drain.isSessionReferenced(),
     })
     if (reply.status !== "registered") {

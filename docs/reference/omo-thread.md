@@ -92,9 +92,10 @@ the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`,
 The failures the CLI answers itself use the same shape: a usage error is `invalid_arguments`
 (exit 2), and win32 or a runtime without `node:sqlite` is `unsupported` (exit 4).
 
-`report <session> completion` arms the completion in the gateway store. A session writes an armed
-completion when it settles, but a running session only learns of arms made by its own
-`thread_report`; an arm made from the CLI is picked up when the session's runtime next starts.
+`report <session> completion` arms the completion (`armed: true`) and wakes the session's
+endpoint, so a running session writes it when it next settles, with that run's outcome. The arm is
+durable: when no endpoint answers the wake, the session writes it at the first settle after it
+next starts.
 
 ## Exit codes
 

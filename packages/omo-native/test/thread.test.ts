@@ -68,6 +68,12 @@ describe("omo thread: argv to SDK calls", () => {
     expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "send", request: { all_scope: true, thread: "my-tui", text: "ping", mode: "steer", expected_turn_id: 3, idempotency_key: "k-1" } })
   })
 
+  test("#given send text that reads --json after -- #when run #then it is sent as text and the output stays human", async () => {
+    const result = await run(["send", "my-tui", "--", "--json"])
+    expect({ exitCode: result.exitCode, text: (result.calls[0]?.request as { text?: string }).text }).toEqual({ exitCode: THREAD_EXIT.ok, text: "--json" })
+    expect(result.stdout.startsWith("sent: ")).toBe(true)
+  })
+
   test("#given send --binding with only a text #when run #then it is the inbound path with no target and the key as the event id", async () => {
     const result = await run(["send", "--binding", "b-1", "--idempotency-key", "evt-9", "hello from outside", "--json"])
     expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "send", request: { text: "hello from outside", binding_id: "b-1", idempotency_key: "evt-9" } })

@@ -168,6 +168,10 @@
   in `--check`, the installer's required artifacts and the omo-ai payload verifier.
 - `sdk.dispose()` cancels the relay's background answer-release retries before closing the store, as the component's
   `session_shutdown` does.
+- A completion armed from outside the session reaches a running session: after `report` answers `armed: true`, the
+  SDK wakes the session's endpoint (`wake` with no delivery ids, best effort), and the component reads the durable arm
+  on that `wake` command edge (`registration.ts` `onCommandWake`, the same lock-free `pendingCompletionArms` read as
+  the `session_start` pickup) and writes it at the next settle. An ordinary settle still makes no store call.
 
 ## thread: chat-thread bindings, report/outbox/answer relay tools, SQLite tool receipts, gateway send path behind a switch
 

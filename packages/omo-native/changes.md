@@ -281,6 +281,11 @@ on every run. `~/.pi/agent` is only read.
   error JSON on stdout. Adopt no longer tells a user who passed `--interrupt` to pass it.
 - Tests: `compile-entry-adopt.test.ts` (the compiled adopt branch: argv, cwd, flag-shaped messages) and
   `launcher-adopt.test.ts` (the real `bin/omo.js` adopt launch: plugin, `--session`, cwd).
+- Behavior change for every compiled launch: a flag after `--` is no longer read as a launch option. `--no-extensions`,
+  `-p`, `--print`, `--mode` and `--internal-rpc-host-supervisor` after `--` are message text (as senpi's own parser
+  reads them), so they no longer drop the plugin, silence the banner or take the supervisor route; `app-server` included.
+- `omo thread report <s> completion` reaches a running session: the SDK wakes the session after arming, instead of the
+  arm waiting for the session's next start.
 
 ## 2026-09-28 - The compiled binary enters a shard supervisor without the engine CLI graph
 

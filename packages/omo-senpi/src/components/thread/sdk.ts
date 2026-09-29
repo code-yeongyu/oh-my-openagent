@@ -96,7 +96,14 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
   const view = () => hostView(surface)
-  const { engine, relay } = createGatewayServices(surface, view)
+  const { engine, relay, endpoints, locate } = createGatewayServices(surface, view)
+
+  // A running session writes a completion only once it knows of the arm; the arm is durable, so a
+  // wake that does not get through leaves it to the session's next start instead.
+  async function wakeForArm(durableId: string): Promise<void> {
+    const endpoint = await locate(durableId).catch(() => null)
+    if (endpoint !== null) await endpoints.wake(endpoint, []).catch(() => undefined)
+  }
 
   async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
     const resolved = resolution(surface, resolveEntries(surface, await view()), address, UNKNOWN_CALLER, allScope)
@@ -154,7 +161,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       if (event === undefined) return fail("invalid_arguments", `The report kind must be one of ${OUTBOUND_EVENTS.join(", ")}.`, "Pass milestone, report, question or completion.")
       const session = await sessionId(request.session, request.all_scope)
       if ("kind" in session) return session
-      return await relay.report({
+      const reported = await relay.report({
         principal,
         ...keyed(request),
         session_durable_id: session.id,
@@ -163,6 +170,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         ...(request.binding_id === undefined ? {} : { binding_id: request.binding_id }),
         ...(request.request_id === undefined ? {} : { request_id: request.request_id }),
       })
+      if (reported.kind === "ok" && reported.armed) await wakeForArm(session.id)
+      return reported
     }),
     outbox: (request) => guarded(() => relay.outbox(request)),
     ack: (request) => guarded(() => relay.ack(request)),

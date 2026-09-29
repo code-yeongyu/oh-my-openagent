@@ -63,6 +63,8 @@ describe("compiled omo daemon adopt", () => {
 
   test("#given the launch's own flags before -- #when scanned #then they still decide the extension list, the banner and the supervisor route", () => {
     expect(buildSenpiArgs(["--no-extensions", "--", "hi"], "/provisioned")).toEqual(["--no-extensions", "--", "hi"])
+    expect(buildSenpiArgs(["app-server", "--no-extensions", "--", "x"], "/provisioned")).toEqual(["app-server", "--no-extensions", "--", "x"])
+    expect(buildSenpiArgs(["app-server", "daemon", "--", "--no-extensions"], "/provisioned")).toEqual(["app-server", "daemon", "--", "--no-extensions", "--extension", join("/provisioned", "plugin")])
     expect(shouldPrintCompiledBanner(["--mode", "rpc", "--", "hi"], true)).toBe(false)
     expect(isInternalSupervisorLaunch(["--extension", "/p", INTERNAL_SUPERVISOR_FLAG, "--", "hi"])).toBe(true)
   })

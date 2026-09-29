@@ -63,7 +63,7 @@ function durableIdOf(eventCtx: unknown): string | undefined {
  * `session_start` path (the inbox watch arms asynchronously); shutdown waits for it and disposes
  * the endpoint before the store, because senpi's clean exit asks `isSessionReferenced` then.
  */
-function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, run: RunContext) {
+function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, run: RunContext, onCommandWake: (durableId: string) => Promise<void>) {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
   if (control === undefined) return undefined
   const runtimeInstance = hostInstanceOf(pi)
@@ -74,6 +74,7 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     onAdmitted: (_durableId, deliveryId) => {
       run.cause = deliveryId
     },
+    onCommandWake,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
     log: (line) => ctx.logger.warn(line),
     ...(options.controlEndpointTest === undefined ? {} : { _test: options.controlEndpointTest }),
@@ -125,19 +126,22 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerCause: () => run.cause,
         onCompletionArmed: (durableId) => completions.arm(durableId),
       })
-      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, run)
-      // An arm left by an earlier runtime (a restart, or a crash before its write) is the durable
-      // row's; it is picked up here and written at this session's next settle. Only a store that
-      // already exists is read, and the read takes no write lock.
+      // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
+      // crash before its write), or made by another process (`omo thread report ... completion`) - is
+      // picked up at session_start and on a `wake` command, and written at this session's next settle.
+      // Only a store that already exists is read, and the read takes no write lock.
+      const pickUpArms = async (durableId: string): Promise<void> => {
+        if (!existsSync(gatewayDatabasePath(agentDir()))) return
+        try {
+          if (await store.pendingCompletionArms(durableId) > 0) completions.arm(durableId)
+        } catch (error) {
+          ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
+      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, run, pickUpArms)
       pi.on("session_start", (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
-        if (durableId === undefined || !existsSync(gatewayDatabasePath(agentDir()))) return
-        void store.pendingCompletionArms(durableId).then(
-          (count) => {
-            if (count > 0) completions.arm(durableId)
-          },
-          (error: unknown) => ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`),
-        )
+        if (durableId !== undefined) void pickUpArms(durableId)
       })
       pi.on("agent_start", () => {
         run.turn++
