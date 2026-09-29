@@ -247,7 +247,7 @@ export const ThreadReportParams = Type.Object({
   ),
   request_kind: Type.Optional(
     Type.Union([Type.Literal("question"), Type.Literal("select"), Type.Literal("confirm"), Type.Literal("input"), Type.Literal("editor")], {
-      description: "For kind question: which extension UI request request_id is (default question). It decides the answer forms thread_answer accepts: confirm takes yes/no, input and editor take any text including empty, question and select take non-blank text.",
+      description: "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a confirm reads only yes/no, so a confirm must name request_kind confirm.",
     }),
   ),
   idempotency_key: IdempotencyKey,

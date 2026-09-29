@@ -12,7 +12,7 @@ import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, n
 import type { GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
-import type { BindingsFilter, ReportOpResult } from "./store-relay-ops"
+import type { AnswerClaimRef, BindingsFilter, ReportOpResult } from "./store-relay-ops"
 import type { GatewayDeliveryResult, StoreRefusal } from "./types"
 
 export type RelayResult<T> = ({ readonly kind: "ok" } & T) | { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -90,14 +90,15 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
   // confirmed, so a later answer reads `already_answered` instead of `answer_in_progress`. A release
   // or confirmation that gives up at the store's lock-wait bound is retried in the background after
   // the busy timeout until it lands, so the question never stays `answered` without having reached
-  // the session.
+  // the session. Both settle only this caller's own claim: once another answer took it over, a late
+  // release or confirmation changes nothing.
   const retries = new Set<{ readonly cancel: () => void }>()
   let disposed = false
-  async function release(replyToken: string): Promise<void> {
-    await settleClaim(() => store.releaseAnswer({ reply_token: replyToken }))
+  async function release(claim: AnswerClaimRef): Promise<void> {
+    await settleClaim(() => store.releaseAnswer(claim))
   }
-  async function confirm(replyToken: string): Promise<void> {
-    await settleClaim(() => store.confirmAnswer({ reply_token: replyToken }))
+  async function confirm(claim: AnswerClaimRef): Promise<void> {
+    await settleClaim(() => store.confirmAnswer(claim))
   }
   async function settleClaim(attempt: () => Promise<boolean>): Promise<void> {
     try {
@@ -141,6 +142,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       if (tooLarge !== undefined) return tooLarge
       const claim = await store.claimAnswer({ now: now(), ...request })
       if (claim.kind !== "ok") return fromStore(claim)
+      const own: AnswerClaimRef = { reply_token: request.reply_token, claimed_at: claim.claimed_at }
       const respond = options.endpoints.respondUi
       let endpoint: GatewayEndpointRef | null = null
       let unreachable = ""
@@ -152,24 +154,24 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         }
       }
       if (respond === undefined || endpoint === null) {
-        await release(request.reply_token)
+        await release(own)
         return failure(respond === undefined ? "unsupported" : "host_unavailable", `The session that asked is not reachable to take the answer${unreachable}.`, { session: claim.session_durable_id })
       }
       const shape = answerShape(claim.ui_request_kind, request.answer)
       if (!shape.ok) {
-        await release(request.reply_token)
+        await release(own)
         return failure("invalid_arguments", shape.reason, { session: claim.session_durable_id, ui_request_kind: claim.ui_request_kind })
       }
       let reply: UiAnswerReply
       try {
         reply = await respond(endpoint, { ui_request_id: claim.ui_request_id, fields: shape.fields })
       } catch (error) {
-        await release(request.reply_token)
+        await release(own)
         return failure("host_unavailable", `The answer could not be handed to the session: ${error instanceof Error ? error.message : String(error)}`, { session: claim.session_durable_id })
       }
       if (!reply.delivered) {
         // The session answered and refused: it no longer waits on that request, or cannot read the answer.
-        await release(request.reply_token)
+        await release(own)
         const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"
         return failure(
           malformed ? "invalid_arguments" : "stale_token",
@@ -180,7 +182,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
             : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
         )
       }
-      await confirm(request.reply_token)
+      await confirm(own)
       return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }
     },
     inbound: async (request) => {

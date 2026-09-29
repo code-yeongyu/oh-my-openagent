@@ -1,7 +1,9 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { UiAnswerReply } from "./adapter"
 import type { AnswerFields, UiRequestKind } from "./answer-shape"
+import { gatewayDatabasePath } from "./paths"
 import { createGatewayRelay } from "./relay"
 import { ANSWER_IN_FLIGHT_MAX_MS } from "./store-relay-ops"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -18,21 +20,24 @@ type HandOff = (fields: AnswerFields) => Promise<UiAnswerReply>
 function relayFor(handOff: HandOff) {
   const h = (harness = createGatewayHarness())
   h.session("B")
-  const store = h.store()
   const sent: AnswerFields[] = []
-  const relay = createGatewayRelay({
-    store,
-    engine: h.engineFor(store),
-    endpoints: {
-      wake: async () => ({ admitted: [] }),
-      respondUi: async (_endpoint, answer) => {
-        sent.push(answer.fields)
-        return await handOff(answer.fields)
+  const relayOver = () => {
+    const store = h.store()
+    return createGatewayRelay({
+      store,
+      engine: h.engineFor(store),
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: async (_endpoint, answer) => {
+          sent.push(answer.fields)
+          return await handOff(answer.fields)
+        },
       },
-    },
-    locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
-    now: () => h.clock.now,
-  })
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      now: () => h.clock.now,
+    })
+  }
+  const relay = relayOver()
   let asks = 0
   const ask = async (kind?: UiRequestKind) => {
     asks += 1
@@ -50,7 +55,30 @@ function relayFor(handOff: HandOff) {
     }
     return { bindingId, token, answer, state }
   }
-  return { h, relay, sent, ask }
+  return { h, relay, relayOver, sent, ask }
+}
+
+/**
+ * Turns the store back into what the v2 code left on disk: the rows keep their data, the v3 columns
+ * go, and the version reads 2. `before` runs first, to put a row into a state only the v2 code wrote.
+ * The next store that opens it migrates it to v3 again.
+ */
+function downgradeToV2(agentDir: string, before: (db: Database) => void = () => {}): void {
+  const db = new Database(gatewayDatabasePath(agentDir))
+  try {
+    before(db)
+    db.run("ALTER TABLE outbox DROP COLUMN ui_request_kind")
+    db.run("ALTER TABLE outbox DROP COLUMN answer_state")
+    db.run("PRAGMA user_version = 2")
+  } finally {
+    db.close()
+  }
+}
+
+async function stateOf(relay: ReturnType<typeof createGatewayRelay>, bindingId: string) {
+  const outbox = await relay.outbox({ binding_id: bindingId })
+  if (outbox.kind !== "ok") throw new Error(`outbox failed: ${JSON.stringify(outbox)}`)
+  return outbox.rows.map((row) => row.question_state)
 }
 
 function code(result: { readonly kind: string; readonly error?: { readonly code: string } }): string {
@@ -122,7 +150,76 @@ describe("answer_while_another_answer_is_in_flight", () => {
 
     // then
     expect(code(await q.answer("second"))).toBe("ok")
-    expect(sent).toEqual([{ answers: {}, comment: "second" }])
+    expect(sent).toEqual([{ value: "second", answers: {}, comment: "second" }])
+  })
+
+  const lateOutcomes: ReadonlyArray<readonly [string, (late: { resolve: (reply: UiAnswerReply) => void; reject: (error: Error) => void }) => void]> = [
+    ["refused by the session", (late) => late.resolve({ delivered: false, error: "question_already_resolved" })],
+    ["failed with no reply", (late) => late.reject(new Error("rpc deadline"))],
+  ]
+  for (const [how, settleLate] of lateOutcomes) {
+    test(`#given a claimant stalled past the in-flight bound and a second answer that took over and was delivered #when the stalled hand-off is finally ${how} #then its late release leaves the delivered answer in place`, async () => {
+      // given
+      const { h, ask, sent } = relayFor(async () => ({ delivered: true }))
+      const q = await ask("select")
+      const reached = deferred<void>()
+      let late!: { resolve: (reply: UiAnswerReply) => void; reject: (error: Error) => void }
+      const pending = new Promise<UiAnswerReply>((resolve, reject) => { late = { resolve, reject } })
+      const stalledStore = h.store()
+      const stalled = createGatewayRelay({
+        store: stalledStore,
+        engine: h.engineFor(stalledStore),
+        endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return pending } },
+        locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+        now: () => h.clock.now,
+      })
+      const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
+      await within(reached.promise, "the stalled hand-off")
+      h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
+      expect(code(await q.answer("from B"))).toBe("ok")
+
+      // when
+      settleLate(late)
+      await within(first, "the stalled answer")
+
+      // then
+      expect(await q.state()).toEqual(["answered"])
+      expect(code(await q.answer("from C"))).toBe("already_answered")
+      expect(sent).toEqual([{ value: "from B" }])
+    })
+  }
+
+  test("#given a claimant stalled past the in-flight bound and a second answer that took over and is still being handed over #when the stalled hand-off finally reports delivered #then its late confirmation leaves the second claim in flight, and only the second claim's own outcome settles it", async () => {
+    // given
+    const second = deferred<UiAnswerReply>()
+    const secondReached = deferred<void>()
+    const { h, ask } = relayFor(async () => { secondReached.resolve(); return await second.promise })
+    const q = await ask("select")
+    const reached = deferred<void>()
+    const late = deferred<UiAnswerReply>()
+    const stalledStore = h.store()
+    const stalled = createGatewayRelay({
+      store: stalledStore,
+      engine: h.engineFor(stalledStore),
+      endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      now: () => h.clock.now,
+    })
+    const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
+    await within(reached.promise, "the stalled hand-off")
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
+    const takeover = q.answer("from B")
+    await within(secondReached.promise, "the second hand-off")
+
+    // when
+    late.resolve({ delivered: true })
+    await within(first, "the stalled answer")
+
+    // then
+    expect(code(await q.answer("from C"))).toBe("answer_in_progress")
+    second.resolve({ delivered: true })
+    expect(code(await within(takeover, "the second answer"))).toBe("ok")
+    expect(code(await q.answer("from C"))).toBe("already_answered")
   })
 })
 
@@ -149,10 +246,29 @@ describe("answer_shape_follows_the_request_kind", () => {
     expect(sent).toEqual([{ confirmed: false }, { confirmed: false }, { confirmed: false }])
   })
 
-  test("#given a question with no request_kind #when it is answered #then it is a question answer", async () => {
+  test("#given a pending select reported with no request_kind #when it is answered X #then the session gets value X, in the frame that also carries answers and comment", async () => {
     const { ask, sent } = relayFor(async () => ({ delivered: true }))
-    expect(code(await (await ask()).answer("ok"))).toBe("ok")
-    expect(sent).toEqual([{ answers: {}, comment: "ok" }])
+    expect(code(await (await ask()).answer("X"))).toBe("ok")
+    expect(sent).toEqual([{ value: "X", answers: {}, comment: "X" }])
+  })
+
+  test("#given a question with no request_kind #when the answer is blank #then it is invalid_arguments and nothing is claimed or sent", async () => {
+    const { ask, sent } = relayFor(async () => ({ delivered: true }))
+    const q = await ask()
+    for (const text of ["", "  ", "\u200b"]) expect(code(await q.answer(text))).toBe("invalid_arguments")
+    expect(await q.state()).toEqual(["pending"])
+    expect(sent).toEqual([])
+  })
+
+  test("#given a question row written by the v2 code, which recorded no kind #when the upgraded store answers it #then the session gets the combined frame", async () => {
+    const { h, ask, relayOver, sent } = relayFor(async () => ({ delivered: true }))
+    const q = await ask("select")
+    downgradeToV2(h.agentDir)
+
+    const upgraded = relayOver()
+    expect(code(await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "Option C" }))).toBe("ok")
+    expect(sent).toEqual([{ value: "Option C", answers: {}, comment: "Option C" }])
+    expect(await stateOf(upgraded, q.bindingId)).toEqual(["answered"])
   })
 
   test("#given a report that is not a question #when it names a request_kind #then it is invalid_arguments", async () => {
@@ -180,5 +296,43 @@ describe("blank_answers_only_where_the_kind_cannot_take_them", () => {
     expect(code(await (await ask("input")).answer("\u200b"))).toBe("ok")
     expect(code(await (await ask("editor")).answer(""))).toBe("ok")
     expect(sent).toEqual([{ value: "\u200b" }, { value: "" }])
+  })
+})
+
+describe("a_question_claimed_before_v3", () => {
+  test("#given a row the v2 code left answered mid-claim #when an answer arrives within the in-flight bound, then after it #then it is answer_in_progress, then taken over and delivered once", async () => {
+    // given
+    const { h, ask, relayOver, sent } = relayFor(async () => ({ delivered: true }))
+    const q = await ask()
+    downgradeToV2(h.agentDir, (db) => {
+      db.run("UPDATE outbox SET question_state = 'answered', answer = 'lost', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+    })
+    const upgraded = relayOver()
+    const answer = () => upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "again" })
+
+    // when / then
+    expect(code(await answer())).toBe("answer_in_progress")
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS
+    expect(code(await answer())).toBe("ok")
+    expect(code(await answer())).toBe("already_answered")
+    expect(sent).toEqual([{ value: "again", answers: {}, comment: "again" }])
+  })
+
+  test("#given a row the v2 code answered and delivered #when a second answer arrives after the bound #then the session's refusal is reported and the session takes nothing twice", async () => {
+    // given
+    const { h, ask, relayOver, sent } = relayFor(async () => ({ delivered: false, error: "question_already_resolved" }))
+    const q = await ask()
+    downgradeToV2(h.agentDir, (db) => {
+      db.run("UPDATE outbox SET question_state = 'answered', answer = 'first', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+    })
+    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS
+    const upgraded = relayOver()
+
+    // when
+    const again = await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "second" })
+
+    // then
+    expect(again).toMatchObject({ kind: "error", error: { code: "stale_token", details: { reason: "question_already_resolved" } } })
+    expect(sent).toHaveLength(1)
   })
 })

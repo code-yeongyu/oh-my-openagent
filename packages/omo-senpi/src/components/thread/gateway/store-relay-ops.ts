@@ -369,7 +369,7 @@ export type ReportOpRequest = {
   readonly event: OutboundEvent
   readonly text: string
   readonly ui_request_id: string | null
-  /** For a question: the kind of the session's pending request; null reads as `question`. */
+  /** For a question: the kind of the session's pending request; null when the session declared none. */
   readonly ui_request_kind: UiRequestKind | null
 }
 
@@ -432,7 +432,7 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
       if (request.ui_request_id === null) return refused("invalid_arguments", "A question names the session's pending extension UI request (request_id).")
       const incarnation = incarnationOf(ctx, request.session_durable_id)
       const token = mintReplyToken(meta(ctx, "token_secret"), { binding_id: bindingId, revision: binding.revision, session_durable_id: request.session_durable_id, incarnation, ui_request_id: request.ui_request_id })
-      const cursor = insertOutbox(ctx, { binding, event: "question", text: request.text, now: request.now, reply_token: token, ui_request_id: request.ui_request_id, ui_request_kind: request.ui_request_kind ?? "question", incarnation })
+      const cursor = insertOutbox(ctx, { binding, event: "question", text: request.text, now: request.now, reply_token: token, ui_request_id: request.ui_request_id, ...(request.ui_request_kind === null ? {} : { ui_request_kind: request.ui_request_kind }), incarnation })
       pruneOutbox(ctx, request.now)
       return { kind: "ok", ...base, cursor, reply_token: token, armed: false }
     }
@@ -550,12 +550,21 @@ export async function ackOutbox(
   })
 }
 
-export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind; readonly cursor: number }
+/**
+ * `ui_request_kind` is null when the question declared none. `claimed_at` is the claim's `answered_at`:
+ * `releaseAnswer` and `confirmAnswer` settle only the claim that still carries it, so a claimant whose
+ * claim was taken over changes nothing.
+ */
+export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind | null; readonly cursor: number; readonly claimed_at: number }
+export type AnswerClaimRef = { readonly reply_token: string; readonly claimed_at: number }
 
 /**
  * How long a claimed answer counts as still being handed over. The relay's hand-off gives up well
  * before this (60 s request timeout), so an older `in_flight` claim belongs to a claimant that died
  * mid-hand-off; a new answer may take it over, and the session itself refuses a second resolution.
+ * A row claimed before v3 (`answered`, NULL `answer_state`) cannot tell a delivered answer from one
+ * whose claimant died mid-hand-off, so it counts as a claim made at its `answered_at`: once the bound
+ * has passed a new answer takes it over, and a session that already has the answer refuses it.
  */
 export const ANSWER_IN_FLIGHT_MAX_MS = 120_000
 
@@ -578,11 +587,11 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
     if (token.binding_id !== request.binding_id) return refused("binding_mismatch", "The answer arrived through a different binding than the one that asked the question.", { binding_id: request.binding_id })
     const row = ctx.sql.one(["cursor", "question_state", "answer_state", "answered_at", "ui_request_id", "ui_request_kind", "session"], "SELECT cursor, question_state, answer_state, answered_at, ui_request_id, ui_request_kind, session_durable_id AS session FROM outbox WHERE reply_token = ? AND binding_id = ?", [request.reply_token, token.binding_id])
     if (row === undefined) return refused("not_found", "The question this token belongs to is no longer in the outbox.")
-    const inFlight = row.question_state === "answered" && row.answer_state === "in_flight"
+    const inFlight = row.question_state === "answered" && row.answer_state !== "delivered"
     const abandoned = inFlight && Number(row.answered_at) + ANSWER_IN_FLIGHT_MAX_MS <= request.now
     if (inFlight && !abandoned) return refused("answer_in_progress", "Another answer to this question is still being handed to the session.", { cursor: Number(row.cursor) })
     if (row.question_state === "answered" && !abandoned) return refused("already_answered", "This question was already answered.", { cursor: Number(row.cursor) })
-    const kind: UiRequestKind = isUiRequestKind(row.ui_request_kind) ? row.ui_request_kind : "question"
+    const kind: UiRequestKind | null = isUiRequestKind(row.ui_request_kind) ? row.ui_request_kind : null
     const shape = answerShape(kind, request.answer)
     if (!shape.ok) return refused("invalid_arguments", shape.reason, { ui_request_kind: kind })
     const binding = selectBinding(ctx, token.binding_id)
@@ -591,15 +600,15 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
       return refused("stale_token", "The binding or the session changed since the question was asked.", { binding_id: token.binding_id })
     }
     write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'in_flight', answer = ?, answered_at = ? WHERE reply_token = ?", [request.answer, request.now, request.reply_token])
-    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, ui_request_kind: kind, cursor: Number(row.cursor) }
+    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, ui_request_kind: kind, cursor: Number(row.cursor), claimed_at: request.now }
   })
 }
 
-export async function releaseAnswer(ctx: StoreContext, request: { readonly reply_token: string }): Promise<boolean> {
-  return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL WHERE reply_token = ? AND question_state = 'answered'", [request.reply_token]) === 1)
+export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef): Promise<boolean> {
+  return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
 }
 
 /** The claimed answer reached the session: from now on a second answer is `already_answered`. */
-export async function confirmAnswer(ctx: StoreContext, request: { readonly reply_token: string }): Promise<boolean> {
-  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered' WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight'", [request.reply_token]) === 1)
+export async function confirmAnswer(ctx: StoreContext, request: AnswerClaimRef): Promise<boolean> {
+  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered' WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
 }
