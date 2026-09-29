@@ -13,7 +13,8 @@ export type LegacyMailboxItem = {
 }
 
 /**
- * Reads the pre-gateway sender-local mailbox (`<cwd>/.omo/thread-tools/mailbox`): the
+ * Reads the pre-gateway sender-local mailbox (`<thread state dir>/mailbox`, where the thread state
+ * dir is `resolveProjectStateDirectory(cwd, "thread-tools")` since #9201): the
  * `mailbox.jsonl` journal (snapshot/enqueue/remove events; a torn last line is ignored) or, when
  * absent, the older `mailbox.json` state. Kept independent of the journal module it replaces so
  * that module can be deleted once the tools route through the gateway.

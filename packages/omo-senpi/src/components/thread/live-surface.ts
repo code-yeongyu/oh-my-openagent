@@ -239,7 +239,7 @@ function wakeReply(data: { readonly admitted?: unknown }): GatewayWakeReply {
 
 /**
  * The thread tools' client for every endpoint this agent dir holds: the legacy socket
- * (`resolveThreadSocket`, where `omo daemon attach` sessions live), every host shard (`i-*`, `p-*`)
+ * (`resolveThreadSocket`, the operator endpoint `thread_create` opens on), every host shard (`i-*`, `p-*`)
  * and every terminal control endpoint (`tui`) the engine enumerates - or, when the engine cannot
  * enumerate, the registry on disk names. It never starts or replaces a host. Each call lists every
  * endpoint live; a session is reached on the endpoint that listed it, because routing ids are
