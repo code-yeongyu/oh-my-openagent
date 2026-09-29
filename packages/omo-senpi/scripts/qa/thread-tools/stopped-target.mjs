@@ -4,9 +4,9 @@
  * does not answer), so the row stays queued; SIGCONT raises the terminal's `continue` edge and the
  * delivery is applied exactly once with no further input.
  *
- * The sender is a second pty TUI that listed the target while it ran. A fresh `omo thread send` to
- * the stopped terminal is probed too: it answers `not_found` today (PD-2, see offline-queue.mjs),
- * recorded as a `DEFECT` line.
+ * The sender is a second pty TUI that listed the target while it ran. A fresh `omo thread send`, from
+ * a process that never saw the terminal answer, reaches it too (once PD-2): `queued_offline` like the
+ * sender's, since a stopped terminal takes nothing until it continues, and SIGCONT applies it once.
  */
 import { assistantTexts, awaitToolResult, awaitTuiEndpoint, callDirective, cliSend, deliveryEntries, deliveryIdOf, deliveryRow, runScenario, waitFor } from "./lib/gateway.mjs"
 
@@ -30,8 +30,8 @@ await runScenario("stopped-target", async ({ report, fake, scratch, install, sta
   const keystrokes = tui.keystrokes
   const deliveries = []
   const fresh = await cliSend(scratch, install, target.durableId, "QA-TOKEN-stopped-cli from a fresh process")
-  report.defect("fresh-cli-send-queued", fresh.json?.kind === "ok" && fresh.json.delivery?.kind === "queued", "PD-2", `exit=${fresh.code} ${fresh.stdout.trim().slice(0, 300)}`)
-  if (fresh.json?.kind === "ok") deliveries.push({ id: fresh.json.delivery_id, token: "QA-TOKEN-stopped-cli" })
+  report.assert("fresh-cli-send-queued-offline", fresh.json?.kind === "ok" && fresh.json.delivery?.kind === "queued_offline" && fresh.json.thread_id === target.durableId, `exit=${fresh.code} ${fresh.stdout.trim().slice(0, 300)}`)
+  deliveries.push({ id: fresh.json?.delivery_id, token: "QA-TOKEN-stopped-cli" })
 
   mark = fake.requests.length
   await sender.submit(callDirective("thread_send", { thread: target.durableId, message: `${TOKEN} sent to a stopped terminal` }))

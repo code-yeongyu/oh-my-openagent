@@ -7,13 +7,12 @@
  * The sender is a second pty TUI that listed the target while it was alive (its `thread_send` tool
  * keeps the address). The target's process is SIGKILLed: it is gone, its session file stays.
  *
- * Two documented behaviors this scenario also probes, recorded as `DEFECT` lines (never as a pass)
- * until the product holds them (`docs/reference/omo-thread.md`, "Sending"):
- * - PD-2: a fresh `omo thread send <durable id>` to that offline session answers `not_found`: the
- *   engine's status row of a dead terminal names no session path and nothing reads the session files,
- *   so a process that never saw the target alive cannot address it (expected `queued_offline`).
- * - PD-1: with NO endpoint of the agent dir alive, `omo thread send` answers `host_unavailable`
- *   (`live-surface.ts` `listView` rethrows the first failure; expected `queued_offline`).
+ * Two more documented behaviors (`docs/reference/omo-thread.md`, "Sending"), once PD-2 and PD-1:
+ * - a fresh `omo thread send <durable id>`, from a process that never saw the target alive, is
+ *   `queued_offline` too: the target is found from its session file, since the engine's status row
+ *   of a dead terminal names no session path; the restart applies that delivery once as well.
+ * - with NO endpoint of the agent dir alive, `omo thread send` is `queued_offline`, never
+ *   `host_unavailable`, and the session's next start applies it once.
  */
 import { assistantTexts, awaitToolResult, awaitTuiEndpoint, callDirective, cliSend, deliveryEntries, deliveryIdOf, deliveryRow, runScenario, waitFor } from "./lib/gateway.mjs"
 
@@ -36,9 +35,8 @@ await runScenario("offline-queue", async ({ report, fake, scratch, install, star
   report.assert("target-process-gone", exitCode !== 0, `exit=${exitCode}`)
 
   const fresh = await cliSend(scratch, install, endpoint.durableId, "QA-TOKEN-offline-cli from a fresh process")
-  report.defect("fresh-cli-send-queued-offline", fresh.json?.kind === "ok" && fresh.json.delivery?.kind === "queued_offline", "PD-2", `exit=${fresh.code} ${fresh.stdout.trim().slice(0, 300)}`)
-  const deliveries = []
-  if (fresh.json?.kind === "ok") deliveries.push({ id: fresh.json.delivery_id, token: "QA-TOKEN-offline-cli" })
+  report.assert("fresh-cli-send-queued-offline", fresh.json?.kind === "ok" && fresh.json.delivery?.kind === "queued_offline" && fresh.json.endpoint_kind === null, `exit=${fresh.code} ${fresh.stdout.trim().slice(0, 300)}`)
+  const deliveries = [{ id: fresh.json?.delivery_id, token: "QA-TOKEN-offline-cli" }]
 
   mark = fake.requests.length
   await sender.submit(callDirective("thread_send", { thread: endpoint.durableId, message: `${TOKEN} kept while the session is offline` }))
@@ -60,12 +58,23 @@ await runScenario("offline-queue", async ({ report, fake, scratch, install, star
     report.assert(`applied-once-at-start-${delivery.token}`, entries === 1 && restarted.keystrokes === 0, `entries=${entries} admission_kind=${row.admission_kind} keystrokes=${restarted.keystrokes}`)
   }
 
-  // PD-1: every terminal of the agent dir gone.
+  // Every terminal of the agent dir gone: nothing live is still the offline case.
   for (const tui of [restarted, sender]) {
     await tui.type("/exit")
     tui.press("enter")
     await tui.exited
   }
   const none = await cliSend(scratch, install, endpoint.durableId, "QA-TOKEN-offline-none with nothing running")
-  report.defect("no-endpoint-send-queued-offline", none.json?.kind === "ok" && none.json.delivery?.kind === "queued_offline", "PD-1", `exit=${none.code} ${none.stdout.trim().slice(0, 300)}`)
+  report.assert("no-endpoint-send-queued-offline", none.code === 0 && none.json?.kind === "ok" && none.json.delivery?.kind === "queued_offline" && none.json.endpoint_kind === null, `exit=${none.code} ${none.stdout.trim().slice(0, 300)}`)
+  report.assert("no-endpoint-row-queued", (await deliveryRow(scratch.agentDir, none.json?.delivery_id))?.state === "queued", "row queued with nothing running")
+  const third = await startTui("tui-third-start", { args: ["--session", endpoint.sessionPath] })
+  const thirdEndpoint = await awaitTuiEndpoint(scratch, third, { exclude: [endpoint.socket, senderEndpoint.socket, again.socket] })
+  await waitFor(() => assistantTexts(endpoint.sessionPath).some((text) => text.includes("QA-ACK QA-TOKEN-offline-none")), { label: "nothing-live delivery answered at start" })
+  await waitFor(async () => ((await deliveryRow(scratch.agentDir, none.json?.delivery_id))?.state === "applied" ? true : undefined), { label: "nothing-live delivery row applied" })
+  const noneEntries = deliveryEntries(endpoint.sessionPath).filter((entry) => deliveryIdOf(entry) === none.json?.delivery_id).length
+  const earlier = deliveries.map((delivery) => deliveryEntries(endpoint.sessionPath).filter((entry) => deliveryIdOf(entry) === delivery.id).length)
+  report.assert("no-endpoint-applied-once-at-start", thirdEndpoint.durableId === endpoint.durableId && noneEntries === 1 && earlier.every((count) => count === 1) && third.keystrokes === 0, `entries=${noneEntries} earlier=${earlier.join(",")} keystrokes=${third.keystrokes}`)
+  await third.type("/exit")
+  third.press("enter")
+  await third.exited
 })
