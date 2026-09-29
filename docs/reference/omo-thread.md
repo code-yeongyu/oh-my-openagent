@@ -41,7 +41,14 @@ A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) starts
 session and otherwise queues behind the running turn, like `follow_up`; only `steer` enters a
 running turn, and it needs `--expected-turn` (the target's turn epoch): a missing epoch is
 `invalid_arguments`, a changed one `turn_conflict`. A target with no live endpoint gets
-`delivery.kind: "queued_offline"`: the row is durable and the session takes it when it runs again.
+`delivery.kind: "queued_offline"`: the row is durable and the session takes it when it runs again,
+exactly once. That holds whether its terminal exited, was killed or is stopped, and when no endpoint
+of the agent dir is running at all: for a send, nothing live is the offline case, never
+`host_unavailable`. A session no endpoint lists is still found by its durable id (the session file
+the engine names after it under `<agent dir>/sessions/`) or by its `/name` (the session files of the
+current workspace, or of every workspace with `--all-scope`), so any process can address it, not
+only one that saw it running. An unknown target is `not_found`; a name two sessions share is
+`ambiguous_target`.
 A terminal session is never prompted directly; the message lands in its inbox and its own
 extension admits it (a held draft in the editor is never overwritten).
 
@@ -246,7 +253,7 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | 0 | done |
 | 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), ...) |
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up`, a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text (the SDK is not loaded) |
-| 3 | `host_unavailable`: no endpoint answered where one was needed |
+| 3 | `host_unavailable`: no endpoint answered where one was needed (never for `send`, which queues offline) |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
 | 5 | `internal_error` |
 
