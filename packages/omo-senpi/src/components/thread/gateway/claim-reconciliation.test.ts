@@ -121,6 +121,22 @@ describe("claim_reconciliation", () => {
     expect(next.runtime.enqueueCount(id)).toBe(1)
   })
 
+  test("#given this process admitted a follow-up and its runtime then dropped it unwritten #when the next pass reconciles #then the row is neither pending nor emitted, so it goes back to queued and is admitted again once", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("A")
+    const b = crashedTarget(h)
+    const drain = createInboxDrain({ store: h.store(), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath })
+    b.runtime.beginUserTurn()
+    const id = await sendToB(h, "dropped by the runtime")
+    expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect(b.runtime.dropQueues()).toEqual([id])
+    expect(b.runtime.listAdmittedDeliveries()).toEqual({ pending: [], emitted: [] })
+    expect((await drain.drain({ reason: "command" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect({ state: (await b.view(id))?.state, attempt: (await b.view(id))?.attempt, enqueued: b.runtime.enqueueCount(id) }).toEqual({ state: "admitted", attempt: 2, enqueued: 2 })
+    b.runtime.endTurn()
+    expect(b.runtime.transcriptEntries(id)).toBe(1)
+  })
+
   test("#given a live host released the session after admitting two deliveries, one written and one not #when the next owner drains #then the written one is applied, the unwritten one re-admitted once, and neither reads dual_runtime", async () => {
     const h = (harness = createGatewayHarness())
     h.session("A")
