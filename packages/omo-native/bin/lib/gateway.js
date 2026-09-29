@@ -1,8 +1,17 @@
+import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
+import { canonicalAgentDir, runtimeHome } from "./agent-dir.js"
 import { packageRoot } from "./package-paths.js"
 
 export const GATEWAY_SCHEMA_RUNTIME = join("plugin", "runtime", "gateway-schema", "index.js")
+
+/**
+ * The connector entry (`runConnectCommand`), imported lazily and only for `omo gateway connect` with
+ * a configured section. It is TypeScript source in the monorepo, so it loads under bun from a source
+ * checkout; an install without it reports that instead of failing obscurely.
+ */
+export const GATEWAY_CONNECTOR_SOURCE = join("..", "omo-gateway", "src", "connector", "cli.ts")
 
 /**
  * `omo gateway` - the operator's handle on the chat-surface gateway. With no `gateway` key in the
@@ -20,7 +29,7 @@ const USAGE = [
   "usage: omo gateway <status|connect|lead|rules|link|service> [options]",
   "",
   "  status   report the configured scopes and their connectors",
-  "  connect  ensure a connector for a scope's surface (not built yet)",
+  "  connect  run or attach the connector for a scope's surface",
   "  lead     claim or start a scope's lead session (not built yet)",
   "  rules    list, show, edit or sync conversation rules (not built yet)",
   "  link     link a chat account to an omo identity (not built yet)",
@@ -104,8 +113,52 @@ export async function runGatewayCommand(args, options = {}) {
     return GATEWAY_EXIT.ok
   }
 
+  if (subcommand === "connect") return runConnect(args.slice(1), resolution, options)
+
   stderr.write(`omo gateway ${subcommand}: not implemented yet\n`)
   return GATEWAY_EXIT.usage
+}
+
+async function runConnect(args, resolution, options) {
+  const { stdout = process.stdout, stderr = process.stderr } = options
+  const section = resolution.section
+  if (!section.validation.ok) {
+    for (const error of section.validation.errors) stderr.write(`omo gateway connect: invalid gateway config: ${error}\n`)
+    return GATEWAY_EXIT.usage
+  }
+  let connector
+  try {
+    connector = await (options.loadConnector ?? loadConnectorModule)()
+  } catch (error) {
+    stderr.write(`omo gateway connect: cannot load the connector: ${error instanceof Error ? error.message : String(error)}\n`)
+    return GATEWAY_EXIT.unreadable
+  }
+  const env = options.env ?? process.env
+  return connector.runConnectCommand(args, {
+    gateway: section.value,
+    agentDir: canonicalAgentDir(env),
+    env,
+    home: runtimeHome(env),
+    stdout,
+    stderr,
+    launch: options.launch ?? [process.execPath, process.argv[1], "gateway", "connect"],
+    configPath: resolution.userPath,
+    reloadGateway: () => reloadGatewaySection(options),
+  })
+}
+
+/** The gateway section read again after the user config changed; throws when it is gone or invalid. */
+async function reloadGatewaySection(options) {
+  const again = (await resolveGateway(options)).section
+  if (!again.present) throw new Error("the gateway section is no longer in the user config")
+  if (!again.validation.ok) throw new Error(`invalid gateway config: ${again.validation.errors.join("; ")}`)
+  return again.value
+}
+
+async function loadConnectorModule() {
+  const source = join(packageRoot, GATEWAY_CONNECTOR_SOURCE)
+  if (!existsSync(source)) throw new Error("the gateway connector is not part of this install yet")
+  return import(pathToFileURL(source).href)
 }
 
 /**

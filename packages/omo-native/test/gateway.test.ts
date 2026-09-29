@@ -4,7 +4,8 @@ import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } f
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { gatewayDoctorLines, runGatewayCommand } from "../bin/lib/gateway.js"
+import { existsSync } from "node:fs"
+import { GATEWAY_CONNECTOR_SOURCE, gatewayDoctorLines, runGatewayCommand } from "../bin/lib/gateway.js"
 import { resolveGatewayConfig, validateGatewayConfig } from "../gateway-schema-entry"
 
 /**
@@ -35,13 +36,25 @@ function place(files: { userJsonc?: string; userJson?: string; agentJson?: strin
   return { home, cwd, env: { HOME: home } }
 }
 
-async function run(args: string[], at: Place, loadRuntime = runtime): Promise<{ exitCode: number; out: string; err: string }> {
+type ConnectCall = {
+  args: string[]
+  context: { gateway: unknown; agentDir: string; home: string; launch: string[]; configPath?: string; reloadGateway?: () => Promise<unknown> }
+}
+
+async function run(
+  args: string[],
+  at: Place,
+  loadRuntime = runtime,
+  loadConnector?: () => Promise<{ runConnectCommand: (args: string[], context: ConnectCall["context"]) => Promise<number> }>,
+): Promise<{ exitCode: number; out: string; err: string }> {
   let out = ""
   let err = ""
   const exitCode = await runGatewayCommand(args, {
     cwd: at.cwd,
     env: at.env,
     loadRuntime,
+    loadConnector,
+    launch: ["omo-under-test", "gateway", "connect"],
     stdout: { write: (text: string) => { out += text } },
     stderr: { write: (text: string) => { err += text } },
   })
@@ -145,11 +158,73 @@ describe("omo gateway dispatcher", () => {
     const at = place({ userJson: JSON.stringify(SAMPLE) })
 
     // when / then
-    for (const subcommand of ["connect", "lead", "rules", "link", "service"]) {
+    for (const subcommand of ["lead", "rules", "link", "service"]) {
       const result = await run([subcommand], at)
       expect(result.exitCode).toBe(2)
       expect(result.err).toContain("not implemented yet")
     }
+  })
+
+  test("#given a configured scope #when connect runs #then the lazily loaded connector gets the args, the section and the canonical agent dir", async () => {
+    // given
+    const at = place({ userJson: JSON.stringify(SAMPLE) })
+    const calls: ConnectCall[] = []
+    const loadConnector = async () => ({
+      runConnectCommand: async (args: string[], context: ConnectCall["context"]) => {
+        calls.push({ args, context })
+        return 0
+      },
+    })
+
+    // when
+    const result = await run(["connect", "--scope", "qa", "--sink", "stdout"], at, runtime, loadConnector)
+
+    // then
+    expect(result.exitCode).toBe(0)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.args).toEqual(["--scope", "qa", "--sink", "stdout"])
+    expect(calls[0]?.context.gateway).toEqual(SAMPLE.gateway)
+    expect(calls[0]?.context.agentDir).toBe(join(at.home, ".omo", "agent"))
+    expect(calls[0]?.context.home).toBe(at.home)
+    expect(calls[0]?.context.launch).toEqual(["omo-under-test", "gateway", "connect"])
+    expect(calls[0]?.context.configPath).toBe(join(at.home, ".omo", "omo.json"))
+    writeFileSync(join(at.home, ".omo", "omo.json"), JSON.stringify({ gateway: { scopes: [{ id: "qa" }, { id: "second" }] } }))
+    expect(await calls[0]?.context.reloadGateway?.()).toEqual({ scopes: [{ id: "qa" }, { id: "second" }] })
+  })
+
+  test("#given an invalid gateway section #when connect runs #then it exits 2 naming the schema path and never loads the connector", async () => {
+    // given
+    const at = place({ userJson: JSON.stringify({ gateway: { scopes: [{ id: "qa", surfaces: [{ platform: "irc" }] }] } }) })
+    let loaded = false
+
+    // when
+    const result = await run(["connect", "--scope", "qa"], at, runtime, async () => {
+      loaded = true
+      return { runConnectCommand: async () => 0 }
+    })
+
+    // then
+    expect(result.exitCode).toBe(2)
+    expect(result.err).toContain("invalid gateway config: gateway.scopes[0].surfaces[0].platform")
+    expect(loaded).toBe(false)
+  })
+
+  test("#given a connector that cannot load #when connect runs #then it exits 1 with the reason", async () => {
+    // given
+    const at = place({ userJson: JSON.stringify(SAMPLE) })
+
+    // when
+    const result = await run(["connect", "--scope", "qa"], at, runtime, async () => {
+      throw new Error("not part of this install")
+    })
+
+    // then
+    expect(result.exitCode).toBe(1)
+    expect(result.err).toContain("cannot load the connector: not part of this install")
+  })
+
+  test("#given the source checkout #when the default connector loader resolves #then its entry file exists", () => {
+    expect(existsSync(join(SOURCE_ROOT, GATEWAY_CONNECTOR_SOURCE))).toBe(true)
   })
 
   test("#given no subcommand or an unknown one #when the dispatcher runs #then it exits 2 with usage", async () => {
