@@ -75,6 +75,15 @@ function downgradeToV2(agentDir: string, before: (db: Database) => void = () => 
   }
 }
 
+function rowOf(agentDir: string, replyToken: string) {
+  const db = new Database(gatewayDatabasePath(agentDir), { readonly: true })
+  try {
+    return db.query("SELECT question_state, answer_state, answer FROM outbox WHERE reply_token = ?").get(replyToken)
+  } finally {
+    db.close()
+  }
+}
+
 async function stateOf(relay: ReturnType<typeof createGatewayRelay>, bindingId: string) {
   const outbox = await relay.outbox({ binding_id: bindingId })
   if (outbox.kind !== "ok") throw new Error(`outbox failed: ${JSON.stringify(outbox)}`)
@@ -189,38 +198,41 @@ describe("answer_while_another_answer_is_in_flight", () => {
     })
   }
 
-  test("#given a claimant stalled past the in-flight bound and a second answer that took over and is still being handed over #when the stalled hand-off finally reports delivered #then its late confirmation leaves the second claim in flight, and only the second claim's own outcome settles it", async () => {
-    // given
-    const second = deferred<UiAnswerReply>()
-    const secondReached = deferred<void>()
-    const { h, ask } = relayFor(async () => { secondReached.resolve(); return await second.promise })
-    const q = await ask("select")
-    const reached = deferred<void>()
-    const late = deferred<UiAnswerReply>()
-    const stalledStore = h.store()
-    const stalled = createGatewayRelay({
-      store: stalledStore,
-      engine: h.engineFor(stalledStore),
-      endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
-      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
-      now: () => h.clock.now,
+  for (const refusal of ["question_already_resolved", "unknown_extension_ui_request"] as const) {
+    test(`#given a claimant stalled past the in-flight bound and a second answer that took over #when the session accepts the stalled answer and then refuses the second (${refusal}) #then the question ends delivered with the stalled answer, and a later answer is already_answered`, async () => {
+      // given
+      const second = deferred<UiAnswerReply>()
+      const secondReached = deferred<void>()
+      const { h, ask } = relayFor(async () => { secondReached.resolve(); return await second.promise })
+      const q = await ask("select")
+      const reached = deferred<void>()
+      const late = deferred<UiAnswerReply>()
+      const stalledStore = h.store()
+      const stalled = createGatewayRelay({
+        store: stalledStore,
+        engine: h.engineFor(stalledStore),
+        endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
+        locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+        now: () => h.clock.now,
+      })
+      const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
+      await within(reached.promise, "the stalled hand-off")
+      h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
+      const takeover = q.answer("from B")
+      await within(secondReached.promise, "the second hand-off")
+
+      // when
+      late.resolve({ delivered: true })
+      expect(code(await within(first, "the stalled answer"))).toBe("ok")
+      second.resolve({ delivered: false, error: refusal })
+
+      // then
+      expect(code(await within(takeover, "the second answer"))).toBe("stale_token")
+      expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from A" })
+      expect(code(await q.answer("from C"))).toBe("already_answered")
     })
-    const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
-    await within(reached.promise, "the stalled hand-off")
-    h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
-    const takeover = q.answer("from B")
-    await within(secondReached.promise, "the second hand-off")
+  }
 
-    // when
-    late.resolve({ delivered: true })
-    await within(first, "the stalled answer")
-
-    // then
-    expect(code(await q.answer("from C"))).toBe("answer_in_progress")
-    second.resolve({ delivered: true })
-    expect(code(await within(takeover, "the second answer"))).toBe("ok")
-    expect(code(await q.answer("from C"))).toBe("already_answered")
-  })
 })
 
 describe("answer_shape_follows_the_request_kind", () => {
@@ -334,5 +346,26 @@ describe("a_question_claimed_before_v3", () => {
     // then
     expect(again).toMatchObject({ kind: "error", error: { code: "stale_token", details: { reason: "question_already_resolved" } } })
     expect(sent).toHaveLength(1)
+  })
+})
+
+describe("settling_a_claim_in_the_store", () => {
+  test("#given a delivered question #when the claim that delivered it is released late, and confirmed again with another answer #then it stays delivered with the first answer", async () => {
+    // given
+    const { h, ask } = relayFor(async () => ({ delivered: true }))
+    const q = await ask("select")
+    const store = h.store()
+    const claim = await store.claimAnswer({ now: h.clock.now, binding_id: q.bindingId, reply_token: q.token, answer: "first" })
+    if (claim.kind !== "ok") throw new Error(JSON.stringify(claim))
+    const own = { reply_token: q.token, claimed_at: claim.claimed_at }
+    expect(await store.confirmAnswer({ ...own, answer: "first" })).toBe(true)
+
+    // when
+    const released = await store.releaseAnswer(own)
+    const confirmedAgain = await store.confirmAnswer({ reply_token: q.token, claimed_at: claim.claimed_at + 1, answer: "second" })
+
+    // then
+    expect({ released, confirmedAgain }).toEqual({ released: false, confirmedAgain: false })
+    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "first" })
   })
 })

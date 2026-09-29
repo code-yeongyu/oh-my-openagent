@@ -552,11 +552,13 @@ export async function ackOutbox(
 
 /**
  * `ui_request_kind` is null when the question declared none. `claimed_at` is the claim's `answered_at`:
- * `releaseAnswer` and `confirmAnswer` settle only the claim that still carries it, so a claimant whose
- * claim was taken over changes nothing.
+ * `releaseAnswer` undoes only the in-flight claim that still carries it, so a claimant whose claim was
+ * taken over releases nothing. `confirmAnswer` records a fact, not a claim: the session took this
+ * claimant's answer, so it lands for whichever claimant that was.
  */
 export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind | null; readonly cursor: number; readonly claimed_at: number }
 export type AnswerClaimRef = { readonly reply_token: string; readonly claimed_at: number }
+export type AnswerDelivered = AnswerClaimRef & { readonly answer: string }
 
 /**
  * How long a claimed answer counts as still being handed over. The relay's hand-off gives up well
@@ -608,7 +610,11 @@ export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef):
   return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
 }
 
-/** The claimed answer reached the session: from now on a second answer is `already_answered`. */
-export async function confirmAnswer(ctx: StoreContext, request: AnswerClaimRef): Promise<boolean> {
-  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered' WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
+/**
+ * The session accepted this claimant's answer: the question is delivered with that answer, whether or
+ * not a later answer took the claim over meanwhile (the session resolves a request once, so at most
+ * one claimant's frame is ever accepted). A question already delivered is left as it is.
+ */
+export async function confirmAnswer(ctx: StoreContext, request: AnswerDelivered): Promise<boolean> {
+  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'delivered', answer = ?, answered_at = ? WHERE reply_token = ? AND answer_state IS NOT 'delivered'", [request.answer, request.claimed_at, request.reply_token]) === 1)
 }

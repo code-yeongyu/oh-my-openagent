@@ -12,7 +12,7 @@ import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, n
 import type { GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
-import type { AnswerClaimRef, BindingsFilter, ReportOpResult } from "./store-relay-ops"
+import type { AnswerClaimRef, AnswerDelivered, BindingsFilter, ReportOpResult } from "./store-relay-ops"
 import type { GatewayDeliveryResult, StoreRefusal } from "./types"
 
 export type RelayResult<T> = ({ readonly kind: "ok" } & T) | { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -90,15 +90,16 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
   // confirmed, so a later answer reads `already_answered` instead of `answer_in_progress`. A release
   // or confirmation that gives up at the store's lock-wait bound is retried in the background after
   // the busy timeout until it lands, so the question never stays `answered` without having reached
-  // the session. Both settle only this caller's own claim: once another answer took it over, a late
-  // release or confirmation changes nothing.
+  // the session. A release undoes only this caller's own in-flight claim: once another answer took it
+  // over, or the question was delivered, a late release changes nothing. A confirmation records that
+  // the session took THIS answer, so it lands even when another answer took the claim over meanwhile.
   const retries = new Set<{ readonly cancel: () => void }>()
   let disposed = false
   async function release(claim: AnswerClaimRef): Promise<void> {
     await settleClaim(() => store.releaseAnswer(claim))
   }
-  async function confirm(claim: AnswerClaimRef): Promise<void> {
-    await settleClaim(() => store.confirmAnswer(claim))
+  async function confirm(delivered: AnswerDelivered): Promise<void> {
+    await settleClaim(() => store.confirmAnswer(delivered))
   }
   async function settleClaim(attempt: () => Promise<boolean>): Promise<void> {
     try {
@@ -182,7 +183,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
             : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
         )
       }
-      await confirm(own)
+      await confirm({ ...own, answer: request.answer })
       return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }
     },
     inbound: async (request) => {

@@ -8,6 +8,7 @@ import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS } from "./constants"
 import type {
   AnswerClaim,
   AnswerClaimRef,
+  AnswerDelivered,
   BindOpRequest,
   BindingsFilter,
   CasRequest,
@@ -99,7 +100,7 @@ export type GatewayStore = {
   readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayOutcome<AnswerClaim>>
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
-  readonly confirmAnswer: (request: AnswerClaimRef) => Promise<boolean>
+  readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
