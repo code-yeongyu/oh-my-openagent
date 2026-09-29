@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { GatewayEndpointPort } from "../adapter"
+import { toSessionControlDrainResult, type GatewayEndpointPort } from "../adapter"
 import { createInboxDrain, type InboxDrain } from "../drain"
 import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry, type GatewayEngine } from "../engine"
 import { createGatewayStore, type GatewayStore, type GatewayStoreOptions } from "../store"
@@ -95,7 +95,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       const target = sessions.get(endpoint.socket.slice("fake:".length))
       if (target === undefined || !target.online) throw new Error(`endpoint ${endpoint.socket} is unreachable`)
       wakes.push({ delivery_ids: deliveryIds, target: target.id })
-      return await track(target.drain.drain({ reason: "command", delivery_ids: deliveryIds }))
+      return toSessionControlDrainResult(await track(target.drain.drain({ reason: "command", delivery_ids: deliveryIds })))
     },
   }
 

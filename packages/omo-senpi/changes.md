@@ -163,6 +163,8 @@
 - `components/thread/gateway/store-ops.ts`: a row claimed by a live host that since released the session
   (`session_released` in the transcript, claimed at or before `released_at`) is settled by the disk-token rule like a
   dead claimant's, instead of reading `dual_runtime` forever.
+- `components/thread/gateway/adapter.ts`: provisional senpi types aligned with the branches (registration union,
+  `release_session` request/refusal shape, drain result mapping).
 - `omo-native/test/sqlite-import-discipline.test.ts`: covers the gateway; only `store-worker.ts` imports `node:sqlite`,
   lazily.
 
