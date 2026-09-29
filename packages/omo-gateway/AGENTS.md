@@ -102,6 +102,37 @@ contract until the adapter/connector todos land.
   member session token and was verified working on 2026-09-29; it depends on Slack keeping RTM for
   session tokens, so the app profile is the migration path if that ever ends.
 
+## Slack huddle voice surface (`src/adapters/slack-huddle/`, plan todo 35)
+
+A huddle has no public API, so this surface joins the way a person does: the Slack web client in an
+isolated headless browser signed in as the workspace's own member account. It ships as a
+`VoiceSurfaceAdapter` for the voice pipeline AND as a loopback service any agent can drive through
+`skills/slack-huddle-voice/SKILL.md`.
+
+- **No debugging port.** The browser is driven over its stdio protocol pipe (`--remote-debugging-pipe`),
+  so no other process on the machine can attach to it or read its session over a socket.
+- **Throwaway profile, always.** Every call gets a fresh `0700` directory that is deleted on every exit
+  path. A watchdog process holds the owner's stdin and cleans up even after `kill -9`; it also notices
+  being reparented, so a leaked pipe descriptor cannot strand a browser. Profiles orphaned by a power
+  cut are swept on the next launch (`sweepStaleProfiles`).
+- **The fake microphone is silence**, not the browser's built-in test tone: a call hears nothing until
+  `speak` injects audio.
+- **The media state is the authority.** Join drives the client's own controls (which are not ours and
+  can change), but "the call is up" means the peer connection reached `connected`. Controls are waited
+  for with an in-page MutationObserver, never polled from the host.
+- **Attribution is `"roster"`, never `"exact"`.** The conferencing SFU mixes every participant into one
+  track; who is talking comes from the signalling frames (`chime.ts`). One audible unmuted participant
+  labels the frame; silence or crosstalk leaves it unattributed rather than guessed.
+- **Consent by default.** `onHumanJoin: "stop_capture"` stops the tap the moment anyone else joins,
+  until the caller has announced the bridge. Audio never touches disk.
+- **One call per account** (~600 MB of browser); a second join is refused, not queued.
+- **Local surface**: `/status`, `/join`, `/leave`, `/capture`, `/speak`, `/stats` and a `/stream`
+  websocket (events as JSON, audio as binary frames), bound to `127.0.0.1` with a `0600` token file.
+- **QA**: `bun packages/omo-gateway/src/adapters/slack-huddle/qa.ts --chat <QA channel> --agent-dir <dir>`
+  against a running surface; synthetic tone only, QA channel only.
+- **Known limits**: capture and playout run on the page main thread (an AudioWorklet is the next step);
+  attribution beyond this account's own stream needs a second human in the call.
+
 ## LAYOUT
 
 ```
