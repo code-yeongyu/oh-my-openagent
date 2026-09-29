@@ -149,6 +149,32 @@
 - `components/x-search/index.ts`: the conditional `x-search` skill goes through it. Both tools stay registered.
 - `extension/types.ts`: `getCommands()` entries carry the optional `sourceInfo.path` senpi already reports.
 
+## thread: address book over terminal endpoints with real names/timestamps; sessions drain their gateway inbox
+
+- `components/thread/endpoint-registry.ts`: new. Reads senpi's endpoint registry
+  (`<agentDir>/rpc-host-daemon/<16hex>/endpoint.json`, layout 2) without writing or connecting: `endpoint_kind`
+  `tui`/`rpc_host` (a record without `registry_version`/`endpoint_kind` reads as `rpc_host`), the directory accepted only
+  when the socket's canonical path hashes to it. Used to classify a socket's kind, and to enumerate when the engine's
+  `host status --all` cannot.
+- `components/thread/live-surface.ts`: `host status --all` rows keep `endpoint_kind`, `alive`/`reason` and a terminal
+  owner's session path. A terminal control endpoint (`t-<16hex>.sock`) is reached with its 32-byte secret first and
+  only with `get_protocol_info`, `list_sessions`, `get_state`, `get_messages`, `set_session_name`, `wake`, `subscribe`,
+  `extension_ui_response`; anything else is refused as `unsupported` before a connection opens, and is answered as
+  data by the tools. A terminal the engine reports not alive is not dialed; it is listed from its session file with
+  `error_note: "live_unresponsive"`. The surface also exposes the gateway's sender port (`wake`, host-only
+  `release_session`, liveness) - a delivery is announced with `wake`, never `prompt`.
+- `components/thread/address-book.ts`, `session-facts.ts`, `tools/internals.ts`: every thread carries `endpoint`
+  (`kind`, `socket`, `routing_id`), `surface` (`tui` | `desktop` | `child` | `daemon`) and `alive`; its name is the
+  session's `/name` (else the first 60 characters of its first user message, never the durable id) and its
+  `created_at`/`updated_at` come from the session header and last entry (read from the first and last 64 KiB of the
+  file) instead of 1970.
+- `components/thread/tools.ts`: `thread_send`/`thread_handoff` to a terminal session answer `unsupported` (a terminal
+  takes messages only through its gateway inbox), as do interrupt, model and reasoning changes.
+- `components/thread/gateway/registration.ts`, `component.ts`: on an engine that exposes `pi.session`
+  (`registerControlEndpoint`, `admissionGate`, `admitExternalMessage`, `listAdmittedDeliveries`, `persistHeaderNow`),
+  the thread component persists the session header and registers the session's control endpoint with the gateway
+  inbox drain; shutdown disposes the endpoint before the store. On today's engine nothing is registered.
+
 ## thread: gateway store and delivery engine (SQLite, receipts, causal loop guard)
 
 - `components/thread/gateway/`: new, not wired into the tools yet. One SQLite store at `<agentDir>/gateway/gateway.sqlite`,

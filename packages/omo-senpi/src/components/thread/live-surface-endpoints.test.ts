@@ -89,6 +89,7 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
   const surface = createLiveThreadSurface({} as never, {
     env: { SENPI_RPC_SOCKET: options.legacy },
     statusAll: async () => { statusCalls.count += 1; return options.reports() },
+    registry: async () => [],
     connect: (path) => { dialed.push(path); return createConnection(path) },
     ...(options.now === undefined ? {} : { now: options.now }),
   })

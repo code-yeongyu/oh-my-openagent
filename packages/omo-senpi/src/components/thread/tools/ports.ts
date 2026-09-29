@@ -1,4 +1,6 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { EndpointKind } from "../endpoint-registry"
+import type { GatewayWakeReply, ReleaseSessionReply } from "../gateway/adapter"
 import type { ThreadTranscriptEntry } from "../reader"
 
 export type ThreadHostSession = {
@@ -6,10 +8,17 @@ export type ThreadHostSession = {
   readonly durableSessionId?: string
   readonly sessionPath?: string
   readonly cwd: string
-  readonly name?: string
+  readonly name?: string | null
   readonly status?: "opening" | "open" | "closing" | "closed"
+  /** senpi session kind (`interactive` | `worker`). */
+  readonly kind?: string
   readonly createdAt?: string
   readonly updatedAt?: string
+  /** A terminal control endpoint reports its timestamps snake-cased. */
+  readonly created_at?: string | null
+  readonly updated_at?: string | null
+  /** What serves the endpoint that listed the session. */
+  readonly endpoint_kind?: EndpointKind
   /**
    * The endpoint that listed this session. Routing ids are per-host counters (`rpc-1` on every
    * host), so a session is only addressable as the pair (socket, sessionId); absent for a host
@@ -21,7 +30,7 @@ export type ThreadHostSession = {
 /** The per-session half of the host surface, bound to the ONE endpoint that holds the session. */
 export type ThreadSessionPort = Pick<
   ThreadHost,
-  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels"
+  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession"
 >
 
 /**
@@ -49,6 +58,10 @@ export type ThreadHost = {
   readonly getAvailableModels: (sessionId: string) => Promise<readonly { provider: string; id: string; name?: string }[]>
   readonly setThinkingLevel: (sessionId: string, level: string, scope?: "session" | "turn") => Promise<void>
   readonly getAvailableThinkingLevels: (sessionId: string) => Promise<readonly string[]>
+  /** Runs the session's registered inbox drain once (`wake`); every endpoint kind answers it. */
+  readonly wake?: (sessionId: string, deliveryIds: readonly string[]) => Promise<GatewayWakeReply>
+  /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
+  readonly releaseSession?: (sessionId: string, options: { readonly interrupt?: boolean; readonly force?: boolean }) => Promise<ReleaseSessionReply>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: () => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */

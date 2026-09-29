@@ -82,6 +82,9 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       if (message.startsWith("host_unavailable:")) {
         return output(failure("host_unavailable", `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`, "Retry when the shared Senpi host is running."))
       }
+      if (message.startsWith("unsupported:")) {
+        return output(failure("unsupported", `The target's endpoint does not accept ${message.slice("unsupported:".length)}: a terminal session only takes messages through its own inbox.`, "Use thread_read to follow the terminal session, or act on a thread served by a host.", { command: message.slice("unsupported:".length) }))
+      }
       return output(failure("internal_error", `Thread operation failed: ${message}`, "Call thread_list and retry after checking the target."))
     }
   }
@@ -101,10 +104,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
       const inScope = (threadId: string) => value.all_scope === true || scoped.some((entry) => entry.thread_id === threadId)
       const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
+      const book = addressBook(options, current)
+      const entryOf = (session: ThreadHostSession) => book.find((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId) && entry.source_host === (session.socket ?? entry.source_host))
       // A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
       // as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
-      const degraded = addressBook(options, current).filter((entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id))
-      return { kind: "ok", threads: [...visible.map(summary), ...degraded.map(degradedSummary)], scope: value.all_scope === true ? "all" : "workspace" }
+      const degraded = book.filter((entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id))
+      return { kind: "ok", threads: [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)], scope: value.all_scope === true ? "all" : "workspace" }
     }),
   }
   const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return readDegraded(current, resolved.entry.thread_id, value); const messages = await sessionPort(options, session).getMessages(routingId(session)); const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); if (live.kind === "error") return { kind: "error", error: live.error }; return { kind: "ok", thread_id: resolved.entry.thread_id, items: live.items.map((item, index) => ({ seq: index + 1, role: transcriptRole(item.role), content: JSON.stringify(item.content ?? item) })), truncated: live.truncated, ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }), source: live.source } }) }
@@ -196,6 +201,9 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
     const session = targetSession(current, resolved.entry.thread_id)
     if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
+    // A terminal is never prompted: it takes messages only through the gateway inbox its own
+    // extension drains, which this mailbox path does not write.
+    if (session.endpoint_kind === "tui") return failure("unsupported", `Thread ${resolved.entry.thread_id} is a terminal session, which takes messages only through the session gateway.`, "Use thread_read to follow it; delivery to terminal sessions arrives with the gateway send path.", { endpoint_kind: "tui" })
     const result = await mailbox.accept(resolved.entry.thread_id, value.message, { delivery: value.delivery, expected_turn_id: value.expected_turn_id })
     if (result.kind === "error") return { kind: "error", error: result.error }
     const delivery = result.delivery === "queued"

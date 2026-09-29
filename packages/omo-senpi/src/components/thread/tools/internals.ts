@@ -1,10 +1,11 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import { assembleAddressBook, toThreadAddressEntries, type AddressEntry } from "../address-book"
+import { assembleAddressBook, toThreadAddressEntries, type AddressEndpoint, type AddressEntry, type ThreadSurface } from "../address-book"
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
 import { createReceiptStore, type ReceiptStore } from "../receipts"
+import { readSessionFacts, threadTitle } from "../session-facts"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
@@ -19,12 +20,15 @@ export function output(result: ThreadToolResult): ToolOutput {
   return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
 }
 
-export type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "createdAt" | "updatedAt"> & {
+export type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at"> & {
   readonly thread_id: string
   readonly name: string
   readonly status: "live" | "resumable"
   readonly created_at: string
   readonly updated_at: string
+  readonly endpoint?: AddressEndpoint | null
+  readonly surface?: ThreadSurface | null
+  readonly alive?: boolean
 }
 
 export type ThreadToolMetadata = {
@@ -48,16 +52,23 @@ export function metadata(name: ThreadToolName): ThreadToolMetadata {
   }
 }
 
-export function summary(session: ThreadHostSession): ThreadToolSummary {
+/**
+ * One thread as the tools report it. The address book entry, when there is one, supplies what the
+ * endpoint may not report: the real name (else the first user message's opening - never the durable
+ * id), the header's creation time and the last entry's time, the endpoint and the surface.
+ */
+export function summary(session: ThreadHostSession, entry?: AddressEntry): ThreadToolSummary {
   const id = session.durableSessionId ?? session.sessionId
-  const created = session.createdAt ?? new Date(0).toISOString()
+  const { name: _name, createdAt: _createdAt, updatedAt: _updatedAt, created_at: _created, updated_at: _updated, ...rest } = session
+  const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
   return {
-    ...session,
+    ...rest,
     thread_id: id,
-    name: session.name ?? id,
+    name: entry?.title ?? threadTitle(session.name, null) ?? "",
     status: session.status === "closed" ? "resumable" : "live",
     created_at: created,
-    updated_at: session.updatedAt ?? created,
+    updated_at: entry?.updated_at ?? session.updated_at ?? session.updatedAt ?? created,
+    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
   }
 }
 
@@ -72,7 +83,7 @@ export async function hostView(options: ThreadToolSurfaceOptions): Promise<Threa
 }
 
 export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView): AddressEntry[] {
-  return assembleAddressBook(view.hosts, [...(options.diskSessions?.() ?? []), ...view.disk])
+  return assembleAddressBook(view.hosts, [...(options.diskSessions?.() ?? []), ...view.disk], { facts: readSessionFacts })
 }
 
 /** A thread listed from disk because its endpoint is dead: resumable, addressed by its durable id. */
@@ -84,10 +95,13 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     ...(entry.source_host === null ? {} : { socket: entry.source_host }),
     cwd: entry.cwd,
     thread_id: entry.thread_id,
-    name: entry.name ?? entry.thread_id,
+    name: entry.title ?? "",
     status: "resumable",
     created_at: entry.created_at,
     updated_at: entry.updated_at,
+    endpoint: entry.endpoint,
+    surface: entry.surface,
+    alive: entry.alive,
     ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
 }

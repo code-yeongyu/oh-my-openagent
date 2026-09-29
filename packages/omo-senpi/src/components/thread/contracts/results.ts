@@ -16,6 +16,11 @@ export type ThreadSummary = {
   readonly updated_at: string
   /** Present only on a thread listed from disk because its endpoint stopped answering. */
   readonly error_note?: string
+  /** The endpoint serving the thread: a host (`rpc_host`, with the session's routing id) or a terminal (`tui`). */
+  readonly endpoint?: { readonly kind: "rpc_host" | "tui"; readonly socket: string; readonly routing_id: string | null } | null
+  readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
+  /** `false` when the endpoint is not answering; the fields then come from the session file. */
+  readonly alive?: boolean
 }
 
 export type ThreadDelivery =
