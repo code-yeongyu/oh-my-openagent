@@ -99,14 +99,16 @@ still being handed to the session, a second answer is `answer_in_progress` (exit
 moment, because the first attempt may still fail and leave the question pending. An answer
 abandoned mid-hand-off for more than 120 s is taken over by the next one. When the abandoned
 attempt finally ends, a failure changes nothing; if the session took its answer after all, the
-question is delivered with that answer and the later attempt is refused (`stale_token`), because
-the session takes one answer per question. `already_answered` (exit 1) means the answer reached the
+question is delivered with that answer and the later attempt is `already_answered`, because the
+session takes one answer per question. `already_answered` (exit 1) means the answer reached the
 session: stop retrying.
 
 A question answered through an omo from before the answer states existed cannot tell a delivered
 answer from one whose attempt died halfway, so it counts as an answer in flight since it was
 answered: after 120 s the next answer takes it over. If the session already has that answer, it
-refuses the new one and the answer is `stale_token` (exit 1); nothing reaches the session twice.
+refuses the new one: the question is marked delivered with the earlier answer, and the new one is
+`already_answered` (exit 1), as is every answer after it. Such a question costs at most one refused
+frame, and nothing reaches the session twice.
 
 The answer text takes the form of the request the session reported (`--request-kind`):
 
@@ -116,12 +118,13 @@ The answer text takes the form of the request the session reported (`--request-k
 | `select` | the option label, non-blank | `value: <text>` |
 | `confirm` | `yes` or `no` (also `y`/`n`, `true`/`false`; any case, surrounding spaces trimmed) | `confirmed: true` / `false` |
 | `input`, `editor` | any text, empty included | `value: <text>` |
-| none reported | any non-blank text | `value`, `answers: {}` and `comment` together |
+| none reported | any non-blank text | `value`, `answers: {}` and `comment` together, plus `confirmed` for a yes/no word |
 
 Without `--request-kind` the answer goes out in every text form at once, so a question, select,
-input or editor each reads its own field. A confirm reads only `confirmed`, so a confirm must be
-reported with `--request-kind confirm`: without it the session's confirm finds no `confirmed` and
-resolves as no. An input or editor that should take an empty answer must name its kind too.
+input or editor each reads its own field. A yes/no word (the confirm words above) also goes out as
+`confirmed`, which only a confirm reads, so an undeclared confirm answered yes or no resolves that
+way; any other text leaves an undeclared confirm resolving as no. An input or editor that should
+take an empty answer must name its kind.
 
 Blank means only whitespace or invisible characters (a zero-width space counts as blank). An
 answer the request cannot take is `invalid_arguments` (exit 1) and claims nothing. Only a match
@@ -129,8 +132,10 @@ marks the question answered and hands the answer to the session's own endpoint. 
 cannot be reached or no reply comes back, the answer is `host_unavailable` (exit 3). If the session
 refuses it (it no longer waits on that question, or cannot read the answer), the answer is
 `stale_token`, or `invalid_arguments` for an unreadable answer, with the session's code in
-`error.details.reason` (exit 1). Either way the question stays pending; a delivered answer is never
-released.
+`error.details.reason` (exit 1). The question then becomes (or stays) pending, so it can be answered
+again. The one exception is an answer that took over an expired claim (above) and is refused because
+the session no longer waits on the request: the question is then delivered with the earlier answer,
+and the answer is `already_answered`. A delivered answer is never released.
 
 ## Bindings
 
@@ -167,7 +172,7 @@ Nothing is ever copied to the session's other bindings.
 - `question` needs `--request-id`, the session's pending request id, and returns the
   `reply_token` the answer must carry. `--request-kind` says which request that id is (`question`,
   `select`, `confirm`, `input` or `editor`); it decides the answer forms above. Without it the answer
-  goes out in every text form, and a confirm resolves as no whatever the answer (see above).
+  goes out in every text form, and as `confirmed` for a yes/no word (see above).
   Another kind name is `invalid_arguments`, and so is `--request-kind` on a non-question report.
 - `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
   row appears when the session settles.
