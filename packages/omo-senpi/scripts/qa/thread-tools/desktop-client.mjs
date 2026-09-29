@@ -5,8 +5,8 @@
  * apps/server/src/provider/Layers/OmoSharedProcess.ts - so the argv, env and ensure
  * behavior are the desktop's, not a hand-rolled imitation.
  *
- * The desktop client starts its own host through `ensureOmoSocketHost` (detached, with a
- * `desktop-host.json` pid file); the harness registers that pid so the run stays leak-free.
+ * The desktop client asks the engine CLI to `host ensure` a detached host; the harness records
+ * the pid the engine reports (through `onHostEnsured`) so the run stays leak-free.
  *
  * Assertions read the target session's transcript through the same client
  * (`get_messages`), and address resolution runs through the shipped components against
@@ -48,6 +48,9 @@ installCleanupHooks()
 const Effect = await desktopDependency("effect/Effect")
 const Fiber = await desktopDependency("effect/Fiber")
 const Stream = await desktopDependency("effect/Stream")
+// makeOmoSharedProcess requires the platform ChildProcessSpawner: the desktop asks the engine CLI to
+// `host ensure` its host instead of spawning one itself, so the scenario runs on the node services.
+const NodeServices = await desktopDependency("@effect/platform-node/NodeServices")
 
 /**
  * Await the Nth matching record on the desktop client's own event stream. Subscribing
@@ -94,7 +97,7 @@ try {
   // The desktop resolves its own binary; point it at this senpi checkout.
   const binaryPath = writeCliShim(scratch)
   socketPath = join(scratch.dir, "rpc", "rpc.sock")
-  const managedHost = trackDesktopManagedHost(scratch.agentDir, socketPath)
+  const managedHost = trackDesktopManagedHost(socketPath)
 
   const { makeOmoSharedProcess } = await desktopModule("apps/server/src/provider/Layers/OmoSharedProcess.ts")
   const { resolveTarget } = await threadComponent("addressing")
@@ -110,6 +113,7 @@ try {
         SENPI_CODING_AGENT_DIR: scratch.agentDir,
         OMO_CODING_AGENT_DIR: scratch.agentDir,
       },
+      onHostEnsured: (host) => Effect.sync(() => managedHost.observe(host)),
     })
 
     const info = yield* shared.request({ type: "get_protocol_info" })
@@ -121,7 +125,7 @@ try {
         info.data.capabilities.includes("extension_events"),
       `serverVersion=${info.data?.serverVersion} capabilities=${JSON.stringify(info.data?.capabilities)}`,
     )
-    report.log(`desktop-managed host pid=${managedHost.pid()} socket=${socketPath}`)
+    report.assert("engine-reported-host-pid", typeof managedHost.pid() === "number", `pid=${managedHost.pid()} socket=${socketPath}`)
 
     const messages = (routingId) =>
       shared
@@ -251,7 +255,7 @@ try {
     yield* shared.request({ type: "close_session", sessionId: routingId })
   })
 
-  await Effect.runPromise(Effect.scoped(program))
+  await Effect.runPromise(Effect.scoped(program).pipe(Effect.provide(NodeServices.layer)))
   await fake.stop()
 } catch (error) {
   report.log(

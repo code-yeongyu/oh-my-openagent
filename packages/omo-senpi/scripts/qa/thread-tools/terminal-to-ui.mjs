@@ -92,6 +92,10 @@ try {
     yield* Effect.promise(() =>
       terminal.request({ type: "set_session_name", sessionId: opened.routingId, name: "terminal-session" }),
     )
+    // The mirror creates a row only for a session that holds a conversation (desktop
+    // `sessionHasConversation`: an empty session is a probe, not a user), so the terminal user
+    // says something first. The turn settles before the mirror starts observing.
+    yield* Effect.promise(() => terminal.promptAndSettle(opened.routingId, "t13c-terminal-first-turn"))
     const durableId = opened.state.sessionId
     const expectedThreadId = deriveMirrorThreadId(durableId)
     const expectedProjectId = deriveMirrorProjectId(terminalCwd)

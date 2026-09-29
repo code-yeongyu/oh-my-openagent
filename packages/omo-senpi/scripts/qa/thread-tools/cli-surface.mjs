@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 /**
- * (a) CLI surface: from an omo pty-shaped session hosted in the shared socket host,
- * the thread tools create, send to, and steer a PEER session.
+ * (a) CLI surface: over the host socket a terminal client speaks, the thread tools create,
+ * send to, and steer a PEER session. (The interactive caller used to be hosted in that same
+ * socket host through `createInteractiveHostRuntime`; senpi e76e4faaf6 removed the shared-host
+ * proxy runtime, so a TUI always owns its local session and the TUI path is covered by the
+ * gateway suite's tui-to-tui instead.)
  *
  * What makes this a real proof rather than a log read: every assertion is taken from
  * the peer's own transcript via the host's `get_messages`, and address resolution runs
@@ -15,7 +18,6 @@ import { join } from "node:path"
 
 import {
   HostClient,
-  SENPI_ROOT,
   cleanupAllAndWait,
   countUserTurns,
   createReport,
@@ -33,7 +35,6 @@ import {
   writeMockModelsJson,
 } from "./lib/harness.mjs"
 
-const SENPI_SRC = join(SENPI_ROOT, "packages", "coding-agent", "src")
 const CREATE_NEEDLE = "t13a-created-peer-needle"
 const SEND_NEEDLE = "t13a-ordered-send-needle"
 const STEER_NEEDLE = "t13a-steer-needle"
@@ -58,67 +59,8 @@ try {
   socketPath = host.socket
   report.log(`host pid=${host.pid} socket=${host.socket}`)
 
-  // ---- the caller: an omo pty-shaped interactive session hosted in the shared host ----
-  const { SettingsManager } = await import(`${SENPI_SRC}/core/settings-manager.ts`)
-  const { SessionManager } = await import(`${SENPI_SRC}/core/session-manager.ts`)
-  const { createAgentSessionRuntime, createAgentSessionServices, createAgentSessionFromServices } = await import(
-    `${SENPI_SRC}/core/agent-session-runtime.ts`
-  )
-  const { createInteractiveHostRuntime } = await import(`${SENPI_SRC}/modes/interactive/interactive-host-runtime.ts`)
-
-  const sessionManager = SessionManager.create(scratch.cwd, scratch.sessionDir)
-  const callerSessionPath = sessionManager.getSessionFile()
-  if (!callerSessionPath) throw new Error("interactive session did not allocate a session path")
-  const createRuntime = async ({ cwd, sessionManager: manager }) => {
-    const services = await createAgentSessionServices({
-      cwd,
-      agentDir: scratch.agentDir,
-      settingsManager: SettingsManager.create(cwd, scratch.agentDir),
-      resourceLoaderOptions: { noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true },
-    })
-    return {
-      ...(await createAgentSessionFromServices({ services, sessionManager: manager })),
-      services,
-      diagnostics: services.diagnostics,
-    }
-  }
-  const localRuntime = await createAgentSessionRuntime(createRuntime, {
-    cwd: scratch.cwd,
-    agentDir: scratch.agentDir,
-    sessionManager,
-  })
-  let fallbackWarning
-  const callerRuntime = await createInteractiveHostRuntime(localRuntime, {
-    socket: host.socket,
-    agentDir: scratch.agentDir,
-    // The host is already listening; ensureHost is exercised by its own QA script.
-    ensureHost: async () => undefined,
-    onWarning: (warning) => {
-      fallbackWarning = warning
-    },
-  })
-  const fallbackCause = fallbackWarning?.cause
-  report.assert(
-    "caller-session-hosted",
-    fallbackWarning === undefined,
-    `fallback=${fallbackWarning?.message ?? "none"} cause=${fallbackCause instanceof Error ? `${fallbackCause.name}: ${fallbackCause.message}` : JSON.stringify(fallbackCause ?? null)}`,
-  )
-
-  // The tool-calling side of the caller session speaks the same wire the tools use.
+  // The tool-calling side speaks the same wire the tools use.
   const tools = await HostClient.connect(host.socket, "tools")
-  const { basename } = await import("node:path")
-  const callerSessionFile = basename(callerSessionPath)
-  const callerSessions = await tools.listSessions()
-  // The host reports the realpath of the session file; compare on the file name, which
-  // carries the durable id and is unique per session.
-  const caller = callerSessions.find(
-    (session) => session.sessionPath !== undefined && basename(session.sessionPath) === callerSessionFile,
-  )
-  report.assert(
-    "caller-visible-in-host",
-    caller !== undefined,
-    `sessions=${callerSessions.length} caller_durable=${caller?.durableSessionId ?? "none"}`,
-  )
 
   // ---- thread_create: the caller opens a peer session in the same host ----
   const peerCwd = join(scratch.dir, "peer-project")
@@ -207,7 +149,6 @@ try {
     `reader_kind=${read.kind} items=${read.kind === "ok" ? read.items.length : 0}`,
   )
 
-  await callerRuntime.dispose?.()
   await tools.request({ type: "close_session", sessionId: peer.routingId })
   await fake.stop()
 } catch (error) {

@@ -9,8 +9,9 @@
  *   (`lib/gateway.mjs`; `THREAD_QA_SENPI_VERSION`, default 2026.9.29-5). Needs only bun, node and the
  *   network for the first kit install.
  * - `legacy` (task 13/14): the thread components driven from source against a senpi SOURCE checkout
- *   and a desktop checkout (`lib/harness.mjs`). A legacy scenario whose checkouts are absent is
- *   reported `SKIP` with the missing path, never silently dropped.
+ *   (`THREAD_QA_SENPI_ROOT`) and a desktop checkout (`THREAD_QA_DESKTOP_ROOT`), via `lib/harness.mjs`.
+ *   A legacy scenario whose checkouts are unset, absent, not installed or not built is reported
+ *   `SKIP` with the missing path, never silently dropped.
  *
  * Usage: bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs [--suite gateway|legacy|all]
  *        [--out-dir <dir>] [--with-mutant] [--keep-kit]
@@ -24,8 +25,9 @@ import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const omoRoot = resolve(here, "..", "..", "..", "..", "..")
-const senpiRoot = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-const desktopRoot = process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
+// The legacy checkouts have no portable default location; the legacy suite is SKIPPED until both are set.
+const senpiRoot = process.env.THREAD_QA_SENPI_ROOT
+const desktopRoot = process.env.THREAD_QA_DESKTOP_ROOT
 const kitDir = process.env.THREAD_QA_KIT_DIR ?? "/tmp/qa-thread-tools-kit"
 
 const gateway = [
@@ -61,10 +63,32 @@ const suite = option("--suite") ?? "all"
 const outDir = option("--out-dir")
 if (outDir !== undefined) mkdirSync(outDir, { recursive: true })
 
-/** What a legacy scenario needs on disk before it can run at all. */
+/**
+ * What a legacy scenario needs on disk before it can run at all. A checkout that exists but was
+ * never installed or built would otherwise fail every scenario at import time, so each unmet
+ * precondition is named with the step that satisfies it.
+ */
 function legacyMissing() {
-  const needed = [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-app-server", "lib", "env.mjs"), desktopRoot, join(omoRoot, "node_modules")]
-  return needed.filter((path) => !existsSync(path))
+  const unset = [
+    ["THREAD_QA_SENPI_ROOT", senpiRoot, "a senpi source checkout"],
+    ["THREAD_QA_DESKTOP_ROOT", desktopRoot, "a desktop checkout"],
+  ].filter(([, value]) => value === undefined)
+  if (unset.length > 0) return unset.map(([name, , what]) => `${name} (unset: the path of ${what})`)
+  const needed = [
+    [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-app-server", "lib", "env.mjs"), "senpi source checkout"],
+    [join(senpiRoot, "node_modules"), "senpi checkout not installed: bun install"],
+    ...["ai", "agent", "tui"].map((pkg) => [join(senpiRoot, "packages", pkg, "dist", "index.js"), "senpi checkout not built: bun run build"]),
+    [desktopRoot, "desktop checkout"],
+    [join(omoRoot, "node_modules"), "omo checkout not installed: bun install"],
+  ]
+  const missing = needed.filter(([path]) => !existsSync(path)).map(([path, why]) => `${path} (${why})`)
+  // Checked on disk rather than through `require.resolve`: bun resolves a missing package from its
+  // global install cache, so resolution succeeds even for a checkout that was never installed.
+  const desktopEffect = [join(desktopRoot, "node_modules", "effect"), join(desktopRoot, "apps", "server", "node_modules", "effect")]
+  if (existsSync(desktopRoot) && !desktopEffect.some((path) => existsSync(join(path, "package.json")))) {
+    missing.push(`${join(desktopRoot, "node_modules")} (desktop checkout not installed: bun install)`)
+  }
+  return missing
 }
 
 const results = []

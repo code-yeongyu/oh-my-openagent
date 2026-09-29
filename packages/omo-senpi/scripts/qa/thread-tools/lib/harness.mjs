@@ -17,7 +17,7 @@
  * this file needs to know where those node_modules live.
  */
 import { spawn } from "node:child_process"
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createConnection } from "node:net"
 import { dirname, join, resolve } from "node:path"
@@ -164,24 +164,17 @@ function waitForOutput(child, needle, stderr, timeoutMs = 60_000) {
 }
 
 /**
- * Register the host that a DESKTOP-shaped client starts for itself. That host is spawned
- * detached by `ensureOmoSocketHost`, so the QA cleanup hooks never see it; the pid file the
- * desktop writes is the only handle, and this closer is what keeps the run leak-free.
+ * Register the host that a DESKTOP-shaped client gets for itself. The desktop asks the engine
+ * CLI to `host ensure` one, and that host runs detached, so the QA cleanup hooks never see it.
+ * The desktop no longer writes a pid file; the engine reports the serving pid in its ensure
+ * answer, which `makeOmoSharedProcess` hands to its `onHostEnsured` option. Pass
+ * `observe` there. This closer is what keeps the run leak-free.
  */
-export function trackDesktopManagedHost(agentDir, socketPath) {
-  const pidFile = join(agentDir, "rpc-host-daemon", "desktop-host.json")
-  // The pid is cached as soon as it is first observed: the scratch tree (pid file included)
-  // is removed by an earlier-registered closer, so reading the file at cleanup time is a race
-  // this closer must not depend on.
-  let cachedPid
-  const readPid = () => {
-    try {
-      const pid = JSON.parse(readFileSync(pidFile, "utf8")).pid
-      if (typeof pid === "number") cachedPid = pid
-    } catch {
-      // Absent or malformed pid file: the desktop client has not started a host yet.
-    }
-    return cachedPid
+export function trackDesktopManagedHost(socketPath) {
+  let observedPid
+  /** `onHostEnsured` payload: the engine's `host` record for the socket it ensured. */
+  const observe = (host) => {
+    if (typeof host?.pid === "number") observedPid = host.pid
   }
   const terminate = (pid) => {
     for (const signal of ["SIGTERM", "SIGKILL"]) {
@@ -202,17 +195,17 @@ export function trackDesktopManagedHost(agentDir, socketPath) {
     }
   }
   const stop = () => {
-    const pid = readPid()
-    if (typeof pid === "number") terminate(pid)
+    if (typeof observedPid === "number") terminate(observedPid)
     // Second, independent handle on the same host: its argv carries this run's socket path,
-    // which is unique to this scratch dir. This keeps the closer correct even when the pid
-    // file was never observed, and it can never match a host from another run or checkout.
+    // which is unique to this scratch dir. This also stops the supervisor the engine keeps
+    // around the host, keeps the closer correct when no ensure answer was observed, and can
+    // never match a host from another run or checkout.
     if (socketPath !== undefined) {
       for (const survivor of pgrepPids(socketPath)) terminate(Number(survivor))
     }
   }
   trackCloser(stop)
-  return { stop, pid: readPid }
+  return { stop, observe, pid: () => observedPid }
 }
 
 /**
@@ -476,6 +469,63 @@ export function verifyCleanup(report, { scratchDir, socketPaths = [] }) {
     `survivor_pids=${JSON.stringify(survivors)} socket_holders=${JSON.stringify(holders)} scratch_present=${scratchLeft}`,
   )
   return { survivors, holders, scratchLeft }
+}
+
+/**
+ * Stop the per-parent shard hosts a session of this run started for itself. A host that loads the
+ * omo plugin pre-warms a `p-*` task shard at session start; the engine detaches its supervisor
+ * (ppid 1) under an alt root `/tmp/omo-rpc-<hash>/`, so neither the tracked children nor a pgrep on
+ * the scratch dir can see it, and it would outlive the run for the engine's 15-minute idle window.
+ * The shard's `meta.json` names the owning session file, which lives under this run's scratch dir:
+ * that is the only handle, and it can never match a shard of another run. Returns the swept sockets
+ * so the cleanup receipt can prove them released.
+ */
+export function stopOwnedShardHosts(scratchDir) {
+  const sockets = []
+  let roots
+  try {
+    roots = readdirSync("/tmp").filter((name) => name.startsWith("omo-rpc-"))
+  } catch {
+    return sockets
+  }
+  for (const name of roots) {
+    const root = join("/tmp", name)
+    let files
+    try {
+      files = readdirSync(root).filter((file) => file.endsWith(".meta.json"))
+    } catch {
+      continue
+    }
+    let owned = false
+    for (const file of files) {
+      let meta
+      try {
+        meta = JSON.parse(readFileSync(join(root, file), "utf8"))
+      } catch {
+        continue
+      }
+      if (typeof meta.owner_session_file !== "string" || !meta.owner_session_file.startsWith(scratchDir)) continue
+      owned = true
+      if (typeof meta.socket !== "string") continue
+      sockets.push(meta.socket)
+      // SIGTERM to the supervisor ends its host child too; SIGKILL only if it ignores that.
+      for (const signal of ["SIGTERM", "SIGKILL"]) {
+        const pids = pgrepPids(meta.socket)
+        if (pids.length === 0) break
+        for (const pid of pids) {
+          try {
+            process.kill(Number(pid), signal)
+          } catch {
+            // Already gone.
+          }
+        }
+        const deadline = Date.now() + 5000
+        while (Date.now() < deadline && pgrepPids(meta.socket).length > 0) Bun.sleepSync(50)
+      }
+    }
+    if (owned) rmSync(root, { recursive: true, force: true })
+  }
+  return sockets
 }
 
 export function readTextIfPresent(path) {

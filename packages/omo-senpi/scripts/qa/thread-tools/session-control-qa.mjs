@@ -17,7 +17,7 @@
  * happens to support all seven levels).
  */
 import { spawn } from "node:child_process"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -106,6 +106,8 @@ const errorCode = (result) => (result.kind === "error" ? result.error.code : `ok
 
 let scratchDir
 let socketPath
+// Part A's thread-tool state dir lives outside the scratch tree, so it is removed on its own.
+const liveStateDirectory = join(process.env.TMPDIR ?? "/tmp", `thread-qa-live-${STAMP}`)
 try {
   const { createThreadTools } = await threadComponent("tools")
   const { createLiveThreadSurface, resolveThreadSocket } = await threadComponent("live-surface")
@@ -114,7 +116,7 @@ try {
   const defaultSocket = resolveThreadSocket(process.env)
   const liveTools = createThreadTools({
     host: createLiveThreadSurface({}, {}),
-    stateDirectory: join(process.env.TMPDIR ?? "/tmp", `thread-qa-live-${STAMP}`),
+    stateDirectory: liveStateDirectory,
     callerSessionId: () => "unknown-caller",
     callerWorkspaceRoot: () => process.cwd(),
   })
@@ -289,6 +291,7 @@ try {
 } finally {
   // 12. teardown: host process, socket and scratch dir all gone
   await cleanupAllAndWait()
+  rmSync(liveStateDirectory, { recursive: true, force: true })
   const cleanup = verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })
   steps.push({ step: 12, name: "cleanup", status: cleanup.survivors.length === 0 && cleanup.holders.length === 0 && !cleanup.scratchLeft ? "pass" : "fail", detail: JSON.stringify(cleanup) })
   if (cleanup.survivors.length === 0 && cleanup.holders.length === 0 && !cleanup.scratchLeft) report.log(`CLEANUP OK ${scratchDir ?? "(no scratch)"}`)
