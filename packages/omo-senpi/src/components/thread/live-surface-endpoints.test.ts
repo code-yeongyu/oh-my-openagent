@@ -227,7 +227,7 @@ describe("thread tools across host endpoints", () => {
     expect(acting.some((frame) => "observe" in frame)).toBe(false)
   })
 
-  test("#given an engine that cannot enumerate and no legacy socket #when any tool runs #then it answers host_unavailable as data", async () => {
+  test("#given an engine that cannot enumerate and no legacy socket #when any tool runs #then it answers host_unavailable as data, except a send, for which nothing live is the offline case and an unknown target is not_found", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -238,11 +238,12 @@ describe("thread tools across host endpoints", () => {
       await w.run("thread_list", {}),
       await w.run("thread_create", {}),
       await w.run("thread_read", { thread: "anything" }),
-      await w.run("thread_send", { thread: "anything", message: "x" }),
     ]
+    const sent = await w.run("thread_send", { thread: "anything", message: "x" })
 
     // then
     for (const result of results) expect(result).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(sent).toMatchObject({ kind: "error", error: { code: "not_found" } })
     expect(w.dialed).toEqual([])
   })
 

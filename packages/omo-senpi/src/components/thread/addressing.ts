@@ -199,6 +199,19 @@ function sameWorkspace(entryCwd: string, callerRoot: string, rootOf: (dir: strin
 }
 
 /**
+ * Every path the caller's workspace can be spelled as: the root, its git top level (a session in any
+ * directory under it shares the workspace), and the realpath of each. A session directory named
+ * after one of them may hold a thread `resolveTarget` would judge in scope.
+ */
+export function workspaceDirectories(callerWorkspaceRoot: string): string[] {
+  const root = callerWorkspaceRoot.trim()
+  if (root.length === 0) return []
+  const top = gitWorktreeRoot(root)
+  const spelled = top === null ? [root] : [root, top]
+  return [...new Set(spelled.flatMap((path) => [path, canonicalPath(path)]))]
+}
+
+/**
  * Resolve a thread address (durable id or unique name) against the entries
  * the daemon knows, restricted to the caller's workspace unless `all_scope`
  * widens it. Errors come back as data, never throws.

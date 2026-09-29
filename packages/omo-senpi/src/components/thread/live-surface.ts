@@ -12,7 +12,7 @@ import { readDiskSession, type AddressBookHost, type DiskSession } from "./addre
 import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
 import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
-import type { ThreadHostView, ThreadSessionPort } from "./tools/ports"
+import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
 import { answerUiRequest } from "./ui-answer"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorData?: unknown }
@@ -337,12 +337,13 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     }
   }
 
-  const listView = async (): Promise<ThreadHostView> => {
+  const listView = async (request: ThreadHostViewRequest = {}): Promise<ThreadHostView> => {
     const found = await endpoints()
     const listed = await Promise.all(found.map((endpoint) => listEndpoint(endpoint)))
     for (const socket of [...lastListed.keys()]) if (!found.some((endpoint) => endpoint.socket === socket)) lastListed.delete(socket)
-    // Nothing answered: the same failure a single-endpoint client has always raised, legacy first.
-    if (listed.every((endpoint) => endpoint.failure !== undefined)) throw listed[0]?.failure
+    // Nothing answered: the same failure a single-endpoint client has always raised, legacy first -
+    // unless the caller takes nothing live as the offline case (a send), which reads the disk instead.
+    if (request.offline !== true && listed.every((endpoint) => endpoint.failure !== undefined)) throw listed[0]?.failure
     return { sessions: listed.flatMap((endpoint) => endpoint.sessions), hosts: listed.map((endpoint) => endpoint.host), disk: listed.flatMap((endpoint) => endpoint.disk) }
   }
 

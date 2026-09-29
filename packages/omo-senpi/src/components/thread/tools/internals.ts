@@ -1,11 +1,11 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import { assembleAddressBook, toThreadAddressEntries, type AddressEndpoint, type AddressEntry, type ThreadSurface } from "../address-book"
-import { resolveTarget, type ThreadAddressEntry } from "../addressing"
+import { assembleAddressBook, findDiskSessions, toThreadAddressEntries, type AddressEndpoint, type AddressEntry, type DiskSession, type ThreadSurface } from "../address-book"
+import { resolveTarget, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
-import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
+import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadHostViewRequest, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -74,15 +74,41 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
 /**
  * One call's view of the host. A multi-endpoint surface answers it whole (`listView`); a host that
  * reaches one endpoint is that endpoint's listing, exactly as before endpoints were enumerated.
+ * With `offline`, an endpoint that does not answer is a host without sessions, never a throw.
  */
-export async function hostView(options: ThreadToolSurfaceOptions): Promise<ThreadHostView> {
-  if (options.host.listView !== undefined) return await options.host.listView()
-  const sessions = await options.host.listSessions()
+export async function hostView(options: ThreadToolSurfaceOptions, request: ThreadHostViewRequest = {}): Promise<ThreadHostView> {
+  if (options.host.listView !== undefined) return await options.host.listView(request)
+  let sessions: readonly ThreadHostSession[]
+  try {
+    sessions = await options.host.listSessions()
+  } catch (error) {
+    if (request.offline !== true) throw error
+    return { sessions: [], hosts: [{ socket: options.host.socket, error }], disk: [] }
+  }
   return { sessions, hosts: [{ socket: options.host.socket, list_sessions: { sessions } }], disk: [] }
 }
 
-export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView): AddressEntry[] {
-  return assembleAddressBook(view.hosts, [...(options.diskSessions?.() ?? []), ...view.disk], { facts: readSessionFacts })
+export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView, extra: readonly DiskSession[] = []): AddressEntry[] {
+  return assembleAddressBook(view.hosts, [...(options.diskSessions?.() ?? []), ...view.disk, ...extra], { facts: readSessionFacts })
+}
+
+/**
+ * The address book a send resolves `address` against: the endpoints' entries, plus - only when the
+ * address names none of them - the session files on disk it names. A session no endpoint lists (its
+ * terminal exited, was killed or stopped before this process saw it) is then still found by id or
+ * name; its entry has no endpoint, so the gateway queues the send offline. Ambiguity and scope are
+ * judged over the same entries as always.
+ */
+export function sendAddressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView, address: string, allScope?: boolean): AddressEntry[] {
+  const book = addressBook(options, view)
+  const sessionsDirectory = options.sessionsDirectory?.()
+  if (sessionsDirectory === undefined || address === "self") return book
+  const root = options.callerWorkspaceRoot()
+  const resolved = resolveTarget(toThreadAddressEntries(book), address, { all_scope: allScope, callerWorkspaceRoot: root })
+  if (resolved.kind !== "error" || resolved.code !== "not_found") return book
+  const known = new Set(book.map((entry) => entry.durable_id))
+  const found = findDiskSessions(sessionsDirectory, address, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) }).filter((session) => !known.has(session.durable_id))
+  return found.length === 0 ? book : addressBook(options, view, found)
 }
 
 /** A thread listed from disk because its endpoint is dead: resumable, addressed by its durable id. */

@@ -1,5 +1,6 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static } from "typebox"
+import { toThreadAddressEntries } from "./address-book"
 import { fuzzyMatch, workspaceEntries } from "./addressing"
 import {
   parseThreadParams,
@@ -25,9 +26,8 @@ import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
-import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
+import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostView, type ThreadHostViewRequest, type ThreadToolSurfaceOptions } from "./tools/ports"
 import {
-  addressBook,
   degradedSummary,
   failure,
   hostView,
@@ -36,6 +36,7 @@ import {
   resolution,
   resolveEntries,
   routingId,
+  sendAddressBook,
   sessionPort,
   summary,
   targetSession,
@@ -49,8 +50,8 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
 
 function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: readonly AnyTool[]; readonly dispose: () => void } {
   const now = options.now ?? Date.now
-  const { store, engine, relay } = createGatewayServices(options, view)
-  async function view(): Promise<ThreadHostView> { await options.ensureHost?.(); return hostView(options) }
+  const { store, engine, relay } = createGatewayServices(options, () => view({ offline: true }))
+  async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> { await options.ensureHost?.(); return hostView(options, request) }
   // Receipts this process began but could not settle (the store gave up at its lock-wait bound):
   // the row stays `prepared` under this instance, which would answer `idempotency_in_progress`
   // forever. A retry of such a key is `idempotency_uncertain` with the note instead.
@@ -82,7 +83,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     }
     let result: ThreadToolResult
     try {
-      result = await sideEffect(await view(), value, scope.idempotency_key, callerId)
+      // A send takes nothing live as the offline case: its view never raises host_unavailable.
+      result = await sideEffect(await view(receipted ? undefined : { offline: true }), value, scope.idempotency_key, callerId)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the call failed (${message})`))
@@ -112,7 +114,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => readThread(options, current, value, callerId)) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
   const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
-  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { const entries = resolveEntries(options, current); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
+  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { const entries = value.match === "fuzzy" ? resolveEntries(options, current) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
     parameters: threadToolParamSchemas.thread_rename,
@@ -174,7 +176,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose: relay.dispose }
 
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
-    const resolved = resolution(options, resolveEntries(options, current), address, callerId, value.all_scope)
+    const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, value.all_scope)), address, callerId, value.all_scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
     return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
   }
@@ -219,7 +221,7 @@ async function deliverThroughGateway(
   const facts = { delivery_id: sent.delivery_id, effective_mode: sent.effective_mode, endpoint: sent.endpoint_kind === null ? null : { kind: sent.endpoint_kind } }
   if (resolvedBy === undefined) return { kind: "ok", thread_id: threadId, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
   const session = targetSession(current, threadId)
-  const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
+  const entry = sendAddressBook(options, current, threadId, true).find((candidate) => candidate.thread_id === threadId)
   const thread = session !== undefined ? summary(session, entry) : entry !== undefined ? degradedSummary(entry) : undefined
   if (thread === undefined) return failure("not_found", `Thread ${threadId} is not in the address book.`, "Call thread_list and retry.")
   return { kind: "ok", thread, resolved_by: resolvedBy, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }

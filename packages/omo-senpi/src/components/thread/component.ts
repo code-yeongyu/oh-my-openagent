@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -107,6 +108,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         stateDirectory,
         store,
         diskSessions: options.diskSessions,
+        sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
         ensureHost: options.ensureHost,
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),

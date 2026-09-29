@@ -1,11 +1,11 @@
 import { readdirSync, readFileSync, statSync } from "node:fs"
-import { basename, join } from "node:path"
+import { basename, join, resolve } from "node:path"
 
-import type { ThreadAddressEntry } from "./addressing"
+import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
-import { parseSessionLines, summarizeSessionEntries, threadTitle, type SessionFacts } from "./session-facts"
+import { parseSessionLines, readSessionFacts, summarizeSessionEntries, threadTitle, type SessionFacts } from "./session-facts"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -302,6 +302,83 @@ export function readDiskSession(path: string, sourceHost: string | null): DiskSe
     source_host: sourceHost,
     ...(firstUserText === null ? {} : { first_user_text: firstUserText }),
   }
+}
+
+export type FindDiskSessionsOptions = {
+  /** Match a name in every workspace; otherwise only the session directories of `workspaceRoots` are read. */
+  readonly all_scope?: boolean
+  /** The caller's workspace as paths (its root, the git top level, their realpaths); a session directory under one of them is read for names. */
+  readonly workspaceRoots?: readonly string[]
+}
+
+/** senpi's session directory name for a cwd (`getDefaultSessionDirPath`), without the closing `--`: every cwd under `root` starts with it. */
+function sessionDirectoryPrefix(root: string): string {
+  return `--${resolve(root).replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}-`
+}
+
+function diskSessionFromFacts(path: string): DiskSession | null {
+  const facts = readSessionFacts(path)
+  if (facts === null) return null
+  return {
+    durable_id: facts.durable_id,
+    name: facts.name,
+    cwd: facts.cwd,
+    created_at: facts.created_at,
+    updated_at: facts.updated_at,
+    session_path: path,
+    source_host: null,
+    ...(facts.first_user_text === null ? {} : { first_user_text: facts.first_user_text }),
+  }
+}
+
+/**
+ * The session files an address names, for a session no endpoint lists (its terminal exited, was
+ * killed, or stopped before the caller ever saw it). A durable id is found by the file name senpi
+ * gives every session (`<timestamp>_<id>.jsonl`): a directory listing, no transcript is read. Any
+ * other address is matched against each file's last `/name`, read through `readSessionFacts` (two
+ * bounded windows per file) and, unless `all_scope`, only in the session directories of the caller's
+ * workspace; `resolveTarget` still judges the scope of what is returned. `source_host` is null: no
+ * endpoint serves these sessions.
+ */
+export function findDiskSessions(sessionsDir: string, address: string, opts: FindDiskSessionsOptions = {}): DiskSession[] {
+  let projectDirs: string[]
+  try {
+    projectDirs = readdirSync(sessionsDir, { withFileTypes: true })
+      .filter((entry) => (entry.isDirectory() || entry.isSymbolicLink()) && /^--.*--$/.test(entry.name))
+      .map((entry) => entry.name)
+  } catch {
+    return []
+  }
+  const files = new Map<string, readonly string[]>()
+  const filesOf = (dir: string): readonly string[] => {
+    let listed = files.get(dir)
+    if (listed === undefined) {
+      try {
+        listed = readdirSync(join(sessionsDir, dir)).filter((name) => name.endsWith(".jsonl"))
+      } catch {
+        listed = []
+      }
+      files.set(dir, listed)
+    }
+    return listed
+  }
+
+  const idSuffix = `_${address}.jsonl`
+  const byId = projectDirs.flatMap((dir) => filesOf(dir).flatMap((name) => {
+    if (!name.endsWith(idSuffix)) return []
+    const session = diskSessionFromFacts(join(sessionsDir, dir, name))
+    return session !== null && session.durable_id === address ? [session] : []
+  }))
+  if (byId.length > 0) return byId
+
+  const wanted = normalizeThreadName(address)
+  if (wanted.length === 0) return []
+  const prefixes = opts.all_scope === true ? undefined : (opts.workspaceRoots ?? []).map(sessionDirectoryPrefix)
+  const readable = prefixes === undefined ? projectDirs : projectDirs.filter((dir) => prefixes.some((prefix) => dir.startsWith(prefix)))
+  return readable.flatMap((dir) => filesOf(dir).flatMap((name) => {
+    const session = diskSessionFromFacts(join(sessionsDir, dir, name))
+    return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
+  }))
 }
 
 /**

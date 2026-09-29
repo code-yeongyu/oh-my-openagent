@@ -45,6 +45,14 @@ export type ThreadHostView = {
   readonly disk: readonly DiskSession[]
 }
 
+export type ThreadHostViewRequest = {
+  /**
+   * Answer the view even when no endpoint answered, instead of raising that failure: for a send,
+   * nothing live is the offline case (`queued_offline`), not an error.
+   */
+  readonly offline?: boolean
+}
+
 /** The already-running senpi multi-session host, expressed as its public command surface. */
 export type ThreadHost = {
   readonly socket: string
@@ -64,7 +72,7 @@ export type ThreadHost = {
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
   readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
-  readonly listView?: () => Promise<ThreadHostView>
+  readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */
   readonly endpoint?: (socket: string) => ThreadSessionPort
   /** The session gateway's sender port over the same endpoints (`wake`, `release_session`, `extension_ui_response`). */
@@ -77,6 +85,12 @@ export type ThreadToolSurfaceOptions = {
   readonly callerWorkspaceRoot: () => string
   readonly stateDirectory: string
   readonly diskSessions?: () => readonly DiskSession[]
+  /**
+   * Where the engine writes session files (`<agentDir>/sessions`). A send whose target no endpoint
+   * lists is resolved from them (`findDiskSessions`), so a session is addressable by id or name
+   * whether or not this process ever saw it alive.
+   */
+  readonly sessionsDirectory?: () => string
   readonly ensureHost?: () => Promise<void>
   /**
    * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
