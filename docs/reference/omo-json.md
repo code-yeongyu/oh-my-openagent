@@ -105,6 +105,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "memory": {},         // MemorySettings (Native harness)
   "git_master": { "commit_footer": false }, // opt-in commit footer (Native harness); no Co-authored-by trailer is ever emitted
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
+  "omomeow": { "nudge": { "enabled": true, "interval_minutes": 30 } }, // omomeow skill settings, top level only
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[native]": {},       // OmO Native-only overrides, typed base keys
@@ -155,6 +156,25 @@ The block may also appear at the shared top level or in profile layers and follo
 ### `memory` (Native harness)
 
 The optional `memory` block configures the Senpi memory subsystem (`schema/memory.ts` `OmoMemorySettingsSchema`). Keys: `enabled` (default `true`), `agent` (default `"auto"`), the sub-blocks `reflection`, `nudge`, `recall` (the resident, read-only Kibitzer sidecar behind `recalled memory:` notices - one per main session, prompt and tool-call triggered, nudge-only output, no memory writes: `enabled` as the only off switch, `max_items` per wake, `category` defaulting to `quick`, `event_caps` defaulting to `{ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }` for its redacted event feed, `sidecar_max_tokens` defaulting to `48000` with a proactive reseed at 60%, `max_concurrent_wakes` defaulting to `2` as the machine-wide wake lease, and `tool_budget` defaulting to `8` read-only tool calls per wake), `facts`, `dream`, `people`, `soul`, `write_notice`, `sync`, `search`, plus `compile_warn_tokens` and per-agent overrides under `agents`. These recall keys can be set at the shared root, harness/profile layer, or per-agent override; layer values are deep-partial and later layers win.
+
+### `omomeow` (omomeow skill, top level only)
+
+Settings for the `omomeow` skill (OmOMeow mode, the always-on messenger agent; `schema/omomeow.ts`). The skill's scripts read this section themselves from the user layer and the project layers, so it is accepted only at the top level of a file, not inside `[native]`/`[codex]` blocks or profiles.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `language` | `"en"` \| `"ko"` | `"en"` | Language of the fixed labels in messages the skill's scripts compose (the nudge). |
+| `nudge.enabled` | boolean | `true` | The periodic "what is running" DM. Turning it off makes the next activation cancel the scheduled job. |
+| `nudge.interval_minutes` | integer 1-1440 | `30` | Minutes between nudges. A change is picked up the next time OmOMeow mode is turned on (the job is recreated). |
+
+```jsonc
+{
+  "omomeow": {
+    "language": "ko",
+    "nudge": { "interval_minutes": 60 }
+  }
+}
+```
 
 ### `git_master` (Native harness)
 

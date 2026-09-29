@@ -2320,6 +2320,48 @@
       "additionalProperties": false,
       "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
     },
+    "omomeow": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "default": "en",
+          "type": "string",
+          "enum": [
+            "en",
+            "ko"
+          ]
+        },
+        "nudge": {
+          "default": {
+            "enabled": true,
+            "interval_minutes": 30
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "interval_minutes": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
+            }
+          },
+          "required": [
+            "enabled",
+            "interval_minutes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "language",
+        "nudge"
+      ],
+      "additionalProperties": false
+    },
     "disabled_skills": {
       "type": "array",
       "items": {
