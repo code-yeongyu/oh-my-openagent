@@ -97,18 +97,29 @@ another binding is `binding_mismatch` (the question stays pending), and a token 
 rebind, expiry or session restart is `stale_token`. While another answer to the same question is
 still being handed to the session, a second answer is `answer_in_progress` (exit 1): retry after a
 moment, because the first attempt may still fail and leave the question pending. An answer
-abandoned mid-hand-off for more than 120 s is taken over by the next one. `already_answered`
-(exit 1) means the answer reached the session: stop retrying.
+abandoned mid-hand-off for more than 120 s is taken over by the next one, and the abandoned attempt
+can no longer change the question when it finally ends. `already_answered` (exit 1) means the
+answer reached the session: stop retrying.
 
-The answer text takes the form of the request the session reported (`--request-kind`, default
-`question`):
+A question answered through an omo from before the answer states existed cannot tell a delivered
+answer from one whose attempt died halfway, so it counts as an answer in flight since it was
+answered: after 120 s the next answer takes it over. If the session already has that answer, it
+refuses the new one and the answer is `stale_token` (exit 1); nothing reaches the session twice.
+
+The answer text takes the form of the request the session reported (`--request-kind`):
 
 | request kind | accepted answer | reaches the session as |
 | --- | --- | --- |
 | `question` | any non-blank text | a comment (`answers: {}`, `comment: <text>`) |
 | `select` | the option label, non-blank | `value: <text>` |
-| `confirm` | `yes` or `no` (also `y`/`n`, `true`/`false`, any case) | `confirmed: true` / `false` |
+| `confirm` | `yes` or `no` (also `y`/`n`, `true`/`false`; any case, surrounding spaces trimmed) | `confirmed: true` / `false` |
 | `input`, `editor` | any text, empty included | `value: <text>` |
+| none reported | any non-blank text | `value`, `answers: {}` and `comment` together |
+
+Without `--request-kind` the answer goes out in every text form at once, so a question, select,
+input or editor each reads its own field. A confirm reads only `confirmed`, so a confirm must be
+reported with `--request-kind confirm`: without it the session's confirm finds no `confirmed` and
+resolves as no. An input or editor that should take an empty answer must name its kind too.
 
 Blank means only whitespace or invisible characters (a zero-width space counts as blank). An
 answer the request cannot take is `invalid_arguments` (exit 1) and claims nothing. Only a match
@@ -153,7 +164,8 @@ Nothing is ever copied to the session's other bindings.
   `edit_message_id`, so a connector can edit one progress message in place.
 - `question` needs `--request-id`, the session's pending request id, and returns the
   `reply_token` the answer must carry. `--request-kind` says which request that id is (`question`,
-  `select`, `confirm`, `input` or `editor`; default `question`); it decides the answer forms above.
+  `select`, `confirm`, `input` or `editor`); it decides the answer forms above. Without it the answer
+  goes out in every text form, and a confirm resolves as no whatever the answer (see above).
   Another kind name is `invalid_arguments`, and so is `--request-kind` on a non-question report.
 - `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
   row appears when the session settles.
