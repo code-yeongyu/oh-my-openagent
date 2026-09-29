@@ -1,6 +1,7 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
 import type { EndpointKind } from "../endpoint-registry"
-import type { GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
+import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
+import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
 
 export type ThreadHostSession = {
@@ -66,6 +67,8 @@ export type ThreadHost = {
   readonly listView?: () => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */
   readonly endpoint?: (socket: string) => ThreadSessionPort
+  /** The session gateway's sender port over the same endpoints (`wake`, `release_session`, `extension_ui_response`). */
+  readonly gateway?: GatewayEndpointPort
 }
 
 export type ThreadToolSurfaceOptions = {
@@ -75,6 +78,25 @@ export type ThreadToolSurfaceOptions = {
   readonly stateDirectory: string
   readonly diskSessions?: () => readonly DiskSession[]
   readonly ensureHost?: () => Promise<void>
+  /**
+   * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
+   * the one store it shares with the session's control endpoint; without one, a store is opened
+   * under `stateDirectory` (QA harnesses and tests).
+   */
+  readonly store?: GatewayStore
+  /**
+   * `thread_send` / `thread_handoff` deliver through the gateway engine instead of the mailbox's
+   * `prompt`. Set only by the component's send switch (`THREAD_SENDS_THROUGH_GATEWAY`) and by tests.
+   */
+  readonly sendThroughGateway?: boolean
+  /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
+  readonly callerTurnId?: () => string | undefined
+  /**
+   * The delivery that caused the caller's current run, when one did: a send continues that causal
+   * root (hop, cycle and budget guards), and a send with none starts a new root.
+   */
+  readonly callerCause?: () => string | undefined
+  readonly now?: () => number
 }
 
 

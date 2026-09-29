@@ -3,10 +3,24 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
+import type { GatewayEndpointRef } from "./gateway/adapter"
+import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { createThreadTools, registerThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
 const directories: string[] = []
-afterEach(() => { for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true }) })
+const stores: GatewayStore[] = []
+afterEach(async () => {
+  await Promise.all(stores.splice(0).map((store) => store.dispose()))
+  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+})
+
+function tempStore(): GatewayStore {
+  const agentDir = mkdtempSync(join(tmpdir(), "thread-tools-gateway-"))
+  directories.push(agentDir)
+  const store = createGatewayStore({ agentDir })
+  stores.push(store)
+  return store
+}
 
 function fixture() {
   const session = { sessionId: "route-peer", durableSessionId: "dur-peer", cwd: process.cwd(), name: "peer", status: "open" as const }
@@ -40,7 +54,7 @@ function fixture() {
   }
   const stateDirectory = mkdtempSync(join(tmpdir(), "thread-tools-registration-"))
   directories.push(stateDirectory)
-  return { host, stateDirectory, sessions, models, setSessionName, setModel, getAvailableModels, setThinkingLevel, getAvailableThinkingLevels, prompt }
+  return { host, stateDirectory, store: tempStore(), sessions, models, setSessionName, setModel, getAvailableModels, setThinkingLevel, getAvailableThinkingLevels, prompt }
 }
 
 function runner(f: ReturnType<typeof fixture>, callerSessionId = "unknown-caller", callerWorkspaceRoot = process.cwd()) {
@@ -55,11 +69,14 @@ function runner(f: ReturnType<typeof fixture>, callerSessionId = "unknown-caller
 }
 
 describe("thread tool registration", () => {
-  test("registers exactly the nine contract tools with search metadata", () => {
+  test("registers exactly the seventeen contract tools with search metadata", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools({ registerTool: (tool) => tools.push(tool) }, { ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
-    expect(tools.map((tool) => tool.name)).toEqual(["thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning"])
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
+      "thread_bind", "thread_unbind", "thread_rebind", "thread_bindings", "thread_report", "thread_outbox", "thread_outbox_ack", "thread_answer",
+    ])
     expect(tools.every((tool) => tool.exposure === "search" && tool.searchGroup === "threads")).toBe(true)
   })
 
@@ -71,7 +88,7 @@ describe("thread tool registration", () => {
     const inB = { sessionId: "route-b", durableSessionId: "dur-b", cwd: workspaceB, name: "beta", status: "open" as const }
     const f = fixture()
     const host: ThreadHost = { ...f.host, listSessions: async () => [inA, inB] }
-    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, callerSessionId: () => "route-a", callerWorkspaceRoot: () => workspaceA })
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, store: f.store, callerSessionId: () => "route-a", callerWorkspaceRoot: () => workspaceA })
     const list = tools[1]
     const threadsOf = (result: Awaited<ReturnType<typeof list.execute>>) =>
       (result.details as { result: { threads: Array<{ thread_id: string }>; scope: string } }).result
@@ -279,5 +296,95 @@ describe("thread session controls", () => {
     const f = fixture()
     f.host = { ...f.host, listSessions: async () => { throw new Error("host_unavailable:/missing.sock") } }
     expect(await runner(f)("thread_list", {})).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+  })
+})
+
+const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
+const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
+
+/** A host session (the caller) and a terminal session, each on its own endpoint, with a recording gateway port. */
+function gatewayFixture() {
+  const f = fixture()
+  const hostSession: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
+  const tuiSession: ThreadHostSession = { sessionId: "dur-tui", durableSessionId: "dur-tui", cwd: process.cwd(), name: "my-tui", status: "open", socket: TUI_SOCKET, endpoint_kind: "tui" }
+  const wakes: { endpoint: GatewayEndpointRef; ids: readonly string[] }[] = []
+  const host: ThreadHost = {
+    ...f.host,
+    listView: async () => ({
+      sessions: [hostSession, tuiSession],
+      hosts: [
+        { socket: HOST_SOCKET, list_sessions: { sessions: [hostSession] }, endpoint_kind: "rpc_host", alive: true },
+        { socket: TUI_SOCKET, list_sessions: { sessions: [tuiSession] }, endpoint_kind: "tui", alive: true },
+      ],
+      disk: [],
+    }),
+    gateway: {
+      wake: async (endpoint, ids) => {
+        wakes.push({ endpoint, ids })
+        return { admitted: [] }
+      },
+    },
+  }
+  const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string): Promise<ThreadToolResult> => {
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, store: f.store, sendThroughGateway: true, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
+    const tool = tools.find((candidate) => candidate.name === name)
+    const result = await tool!.execute(callId, args, undefined, undefined, { sessionManager: { getSessionId: () => callerId } } as never)
+    return result.details.result as ThreadToolResult
+  }
+  return { f, wakes, run }
+}
+
+describe("thread_send through the session gateway", () => {
+  test("#given a host session and a terminal endpoint #when the host session sends to the terminal #then the result carries delivery_id and endpoint.kind tui and only a wake reached the terminal", async () => {
+    const g = gatewayFixture()
+    const result = await g.run("thread_send", { thread: "my-tui", message: "hello terminal" }, "dur-host", "call-1")
+    expect(result).toMatchObject({ kind: "ok", thread_id: "dur-tui", endpoint: { kind: "tui" }, effective_mode: "auto", delivery: { kind: "queued" }, deduplicated: false })
+    const deliveryId = (result as { delivery_id?: string }).delivery_id
+    expect(typeof deliveryId).toBe("string")
+    expect(g.wakes).toEqual([{ endpoint: { kind: "tui", socket: TUI_SOCKET, routing_id: "dur-tui" }, ids: [deliveryId as string] }])
+    expect(g.f.prompt).not.toHaveBeenCalled()
+    const rows = await g.f.store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => ({ id: row.delivery_id, state: row.state, sender: row.sender }))).toEqual([{ id: deliveryId as string, state: "queued", sender: "session:dur-host" }])
+  })
+
+  test("#given a gateway send #when the caller retries it with the same idempotency key #then the same delivery is replayed and nothing is sent twice", async () => {
+    const g = gatewayFixture()
+    const args = { thread: "dur-tui", message: "once", idempotency_key: "k-1" }
+    const first = await g.run("thread_send", args, "dur-host", "call-1")
+    const second = await g.run("thread_send", args, "dur-host", "call-2")
+    expect((second as { delivery_id?: string }).delivery_id).toBe((first as { delivery_id?: string }).delivery_id)
+    expect(second).toMatchObject({ kind: "ok", deduplicated: true })
+    expect(await g.f.store.list({ target_durable_id: "dur-tui" })).toHaveLength(1)
+    expect(g.wakes).toHaveLength(1)
+  })
+
+  test("#given the gateway send path #when a session sends to itself #then it is refused loop_detected before any row is written", async () => {
+    const g = gatewayFixture()
+    expect(await g.run("thread_send", { thread: "self", message: "echo" }, "dur-tui", "call-1")).toMatchObject({ kind: "error", error: { code: "loop_detected" } })
+    expect(await g.f.store.list({ target_durable_id: "dur-tui" })).toEqual([])
+  })
+})
+
+describe("relay tools over the gateway store", () => {
+  test("#given session A binds a chat thread for session B #when B reports a milestone #then a connector reads it with the binding revision and a cursor, acks it, and a second bind of the thread is binding_conflict", async () => {
+    const g = gatewayFixture()
+    const bound = await g.run("thread_bind", { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "my-tui" }, "dur-host", "call-1")
+    expect(bound).toMatchObject({ kind: "ok", binding: { status: "active", revision: 1, session_durable_id: "dur-tui", thread_id: "t1", ttl_seconds: 604800 } })
+    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    const reported = await g.run("thread_report", { binding_id: bindingId, kind: "milestone", text: "done step 1" }, "dur-tui", "call-2")
+    expect(reported).toMatchObject({ kind: "ok", binding_id: bindingId, revision: 1, event: "milestone" })
+    const read = await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-3")
+    expect(read).toMatchObject({ kind: "ok", rows: [{ event: "milestone", text: "done step 1", revision: 1, cursor: (reported as { cursor: number }).cursor }] })
+    expect(await g.run("thread_outbox_ack", { binding_id: bindingId, cursor: (reported as { cursor: number }).cursor }, "connector", "call-4")).toMatchObject({ kind: "ok", changed: true })
+    expect(await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-5")).toMatchObject({ kind: "ok", rows: [] })
+    expect(await g.run("thread_bind", { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "dur-host" }, "dur-host", "call-6")).toMatchObject({ kind: "error", error: { code: "binding_conflict", details: { binding_id: bindingId } } })
+  })
+
+  test("#given a binding of session B #when another session reports through it #then it is scope_denied and the outbox stays empty", async () => {
+    const g = gatewayFixture()
+    const bound = await g.run("thread_bind", { platform: "discord", account_id: "bot", chat_id: "c9", session: "my-tui" }, "dur-host", "call-1")
+    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    expect(await g.run("thread_report", { binding_id: bindingId, kind: "report", text: "not mine" }, "dur-host", "call-2")).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+    expect(await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-3")).toMatchObject({ kind: "ok", rows: [] })
   })
 })

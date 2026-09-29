@@ -3,7 +3,17 @@ import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
+import type { BindingRecord, CompletionOutcome, OutboxRow, RelayOutcome } from "./bindings"
 import { GATEWAY_BUSY_TIMEOUT_MS } from "./constants"
+import type {
+  AnswerClaim,
+  BindOpRequest,
+  BindingsFilter,
+  CasRequest,
+  ReportOpRequest,
+  ReportOpResult,
+  ToolReceiptBegin,
+} from "./store-relay-ops"
 import type {
   ClaimOutcome,
   ClaimRequest,
@@ -47,6 +57,13 @@ export function gatewayStoreWorkerUrl(moduleUrl: string | URL = import.meta.url)
 
 export type DeliveryView = { readonly row: DeliveryRow; readonly queue_position: number }
 
+export type ReceiptScope = { readonly principal: string; readonly operation: string; readonly idempotency_key: string }
+
+export type OutboxPage = { readonly binding_id: string; readonly revision: number; readonly status: BindingRecord["status"]; readonly rows: readonly OutboxRow[]; readonly next_cursor: number; readonly acked_cursor: number }
+
+/** Relay results carry `deduplicated`: true when an idempotency key replayed an earlier success. */
+export type Deduplicated = { readonly deduplicated?: boolean }
+
 export type GatewayStore = {
   readonly identity: () => Promise<ProcessIdentity>
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
@@ -63,6 +80,20 @@ export type GatewayStore = {
   readonly journalMode: () => Promise<string>
   readonly stats: () => Promise<GatewayStoreStats>
   readonly legacyMigrated: () => Promise<number>
+  readonly toolReceiptBegin: (request: ReceiptScope & { readonly now: number; readonly args_hash: string }) => Promise<ToolReceiptBegin>
+  readonly toolReceiptSettle: (request: ReceiptScope & { readonly now: number } & ({ readonly result: unknown } | { readonly error_note: string })) => Promise<boolean>
+  readonly bind: (request: BindOpRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord } & Deduplicated>>
+  readonly unbind: (request: CasRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly already_closed: boolean; readonly in_flight: readonly string[] } & Deduplicated>>
+  readonly rebind: (request: CasRequest & { readonly session_durable_id: string }) => Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly closed: readonly string[] } & Deduplicated>>
+  readonly listBindings: (request: { readonly now: number; readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number }) => Promise<RelayOutcome<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
+  readonly bindingView: (request: { readonly now: number; readonly binding_id: string }) => Promise<BindingRecord | null>
+  readonly registerIncarnation: (request: { readonly durable_id: string; readonly incarnation: string }) => Promise<void>
+  readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
+  readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  readonly readOutbox: (request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayOutcome<OutboxPage>>
+  readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
+  readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayOutcome<AnswerClaim>>
+  readonly releaseAnswer: (request: { readonly reply_token: string }) => Promise<boolean>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
@@ -166,6 +197,20 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     journalMode: () => call("journal_mode"),
     stats: () => call("stats"),
     legacyMigrated: async () => (await start()).legacy_migrated,
+    toolReceiptBegin: (request) => call("tool_receipt_begin", request),
+    toolReceiptSettle: (request) => call("tool_receipt_settle", request),
+    bind: (request) => call("bind", request),
+    unbind: (request) => call("unbind", request),
+    rebind: (request) => call("rebind", request),
+    listBindings: (request) => call("list_bindings", request),
+    bindingView: (request) => call("binding_view", request),
+    registerIncarnation: (request) => call("register_incarnation", request),
+    report: (request) => call("report", request),
+    emitCompletions: (request) => call("emit_completions", request),
+    readOutbox: (request) => call("read_outbox", request),
+    ackOutbox: (request) => call("ack_outbox", request),
+    claimAnswer: (request) => call("claim_answer", request),
+    releaseAnswer: (request) => call("release_answer", request),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

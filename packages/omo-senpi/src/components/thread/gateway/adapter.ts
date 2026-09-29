@@ -71,6 +71,13 @@ export type GatewayEndpointPort = {
   readonly wake: (endpoint: GatewayEndpointRef, deliveryIds: readonly string[]) => Promise<GatewayWakeReply>
   readonly releaseSession?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
   readonly classifyLiveness?: (endpoint: GatewayEndpointRef) => Promise<EndpointLiveness>
+  /**
+   * Answers the session's pending extension UI request (`extension_ui_response { id, value }`,
+   * senpi rpc-types `RpcExtensionUIResponse`) on its own endpoint; `thread_answer` calls it only
+   * after the reply token matched. PROVISIONAL like the rest of this file: the reply frame a
+   * control endpoint sends back for it is confirmed at wiring time.
+   */
+  readonly respondUi?: (endpoint: GatewayEndpointRef, response: { readonly id: string; readonly value: string }) => Promise<void>
 }
 
 export type RuntimePhase = "idle" | "mid_turn" | "waiting_question" | "compacting"

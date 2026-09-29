@@ -1,9 +1,11 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { createInboxDrain } from "./drain"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
+import { GATEWAY_MIGRATIONS } from "./schema"
 import { FakeSessionRuntime } from "./testing/fake-runtime"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
@@ -23,6 +25,33 @@ describe("gateway store file", () => {
       database: statSync(gatewayDatabasePath(h.agentDir)).mode & 0o777,
       directory: statSync(gatewayRootDirectory(h.agentDir)).mode & 0o777,
     }).toEqual({ database: 0o600, directory: 0o700 })
+  })
+})
+
+describe("schema migration v1 -> v2", () => {
+  test("#given a store written by the todo-11 schema #when the current store opens it #then its deliveries survive, the relay tables exist, and a question can be asked and answered", async () => {
+    const h = (harness = createGatewayHarness())
+    mkdirSync(gatewayRootDirectory(h.agentDir), { recursive: true, mode: 0o700 })
+    const v1 = new Database(gatewayDatabasePath(h.agentDir))
+    for (const statement of GATEWAY_MIGRATIONS[0]) v1.run(statement)
+    v1.run("PRAGMA user_version = 1")
+    v1.run("INSERT INTO session_meta (durable_id, next_seq, applied_seq) VALUES ('B', 8, 7)")
+    v1.close()
+    const store = h.store()
+    const bound = await store.bind({ now: h.clock.now, receipt: null, binding: { platform: "telegram", account_id: "bot", chat_id: "c", thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "B", direction: { inbound: true, outbound: true }, inbound_mode: "follow_up", outbound_events: ["question"], policy_id: "default", ttl_seconds: null } })
+    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+    expect(bound.binding.session_realm_id).toMatch(/^realm-[0-9a-f]{32}$/)
+    const asked = await store.report({ now: h.clock.now, receipt: null, session_durable_id: "B", binding_id: bound.binding.binding_id, event: "question", text: "ok?", ui_request_id: "ui-1" })
+    if (asked.kind !== "ok") throw new Error(JSON.stringify(asked))
+    expect(await store.claimAnswer({ now: h.clock.now, binding_id: bound.binding.binding_id, reply_token: asked.reply_token as string, answer: "yes" })).toMatchObject({ kind: "ok", ui_request_id: "ui-1", session_durable_id: "B" })
+    await store.registerIncarnation({ durable_id: "B", incarnation: "runtime-1" })
+    const upgraded = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      expect(upgraded.query("SELECT user_version AS v FROM pragma_user_version()").get()).toEqual({ v: GATEWAY_MIGRATIONS.length })
+      expect(upgraded.query("SELECT next_seq, applied_seq, incarnation FROM session_meta WHERE durable_id = 'B'").get()).toEqual({ next_seq: 8, applied_seq: 7, incarnation: "runtime-1" })
+    } finally {
+      upgraded.close()
+    }
   })
 })
 

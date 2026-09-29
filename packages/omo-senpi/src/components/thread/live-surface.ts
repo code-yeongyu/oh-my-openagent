@@ -390,6 +390,11 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThr
       return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, ...request }))
     },
     classifyLiveness: liveness,
+    respondUi: async (endpoint, response) => {
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      const target = endpoint.kind === "rpc_host" && endpoint.routing_id !== null ? { sessionId: endpoint.routing_id } : {}
+      await callOn(endpoint.socket, "extension_ui_response", { ...target, id: response.id, value: response.value })
+    },
   }
 
   return {

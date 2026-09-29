@@ -21,6 +21,7 @@ export function renderDeliveryText(row: DeliveryRow): string {
     `effective=${effective}`,
     `root=${headerValue(envelope.root_id)}`,
     `hop=${envelope.hop}`,
+    ...(row.binding_id === null ? [] : [`binding=${headerValue(row.binding_id)}@${row.binding_revision ?? 0}`]),
   ].join(" ")
   return `[${header}]\n${GATEWAY_PROVENANCE_SENTENCE}\n${JSON.stringify(row.body)}`
 }

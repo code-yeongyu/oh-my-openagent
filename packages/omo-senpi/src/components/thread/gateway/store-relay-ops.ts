@@ -1,0 +1,572 @@
+/**
+ * The relay half of the store: tool receipts, bindings, the outbox and reply tokens. Loaded only in
+ * the store worker, like `store-ops.ts`. Every operation is one `BEGIN IMMEDIATE` transaction that
+ * first moves due bindings to `expired`, so an expiry is decided in the same transaction as the
+ * call or dispatch that observes it. Relay operations that carry an idempotency key record their
+ * receipt in that same transaction: a replay returns the stored result, a different payload under
+ * the same key is `idempotency_conflict`, and a refusal writes no receipt.
+ */
+import {
+  type BindingRecord,
+  type BindRequest,
+  BINDINGS_PAGE_DEFAULT,
+  BINDINGS_PAGE_MAX,
+  type CompletionOutcome,
+  decodeBindingsCursor,
+  encodeBindingsCursor,
+  mintReplyToken,
+  newBindingId,
+  OUTBOX_PAGE_DEFAULT,
+  OUTBOX_PAGE_MAX,
+  OUTBOX_RETENTION_MS,
+  type OutboundEvent,
+  type OutboxRow,
+  readReplyToken,
+  type RelayOutcome,
+  rfc3339,
+} from "./bindings"
+import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
+import type { SqlRow, SqlValue } from "./sql"
+import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
+import type { StoreRefusal } from "./types"
+
+const BINDING_COLUMNS = [
+  "binding_id", "schema_version", "revision", "status", "platform", "account_id", "chat_id", "thread_id", "root_message_id",
+  "progress_message_id", "session_realm_id", "session_durable_id", "direction_inbound", "direction_outbound", "inbound_mode",
+  "outbound_events", "policy_id", "created_at", "updated_at", "lease_started_at", "ttl_seconds", "expires_at",
+] as const
+
+const OUTBOX_COLUMNS = [
+  "cursor", "binding_id", "revision", "event_kind", "payload", "state", "provider_message_id", "created_at", "reply_token",
+  "question_state", "outcome",
+] as const
+
+function refused(code: StoreRefusal["code"], message: string, details?: Readonly<Record<string, unknown>>): StoreRefusal {
+  return { kind: "refused", code, message, ...(details === undefined ? {} : { details }) }
+}
+
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value)
+}
+
+function bindingFrom(record: SqlRow): BindingRecord {
+  return {
+    schema_version: 1,
+    binding_id: String(record.binding_id),
+    revision: Number(record.revision),
+    status: record.status as BindingRecord["status"],
+    platform: record.platform as BindingRecord["platform"],
+    account_id: String(record.account_id),
+    chat_id: String(record.chat_id),
+    thread_id: String(record.thread_id),
+    root_message_id: nullableString(record.root_message_id),
+    progress_message_id: nullableString(record.progress_message_id),
+    session_realm_id: String(record.session_realm_id),
+    session_durable_id: String(record.session_durable_id),
+    direction: { inbound: Number(record.direction_inbound) === 1, outbound: Number(record.direction_outbound) === 1 },
+    inbound_mode: record.inbound_mode as BindingRecord["inbound_mode"],
+    outbound_events: JSON.parse(String(record.outbound_events)) as OutboundEvent[],
+    policy_id: String(record.policy_id),
+    created_at: String(record.created_at),
+    updated_at: String(record.updated_at),
+    lease_started_at: String(record.lease_started_at),
+    ttl_seconds: record.ttl_seconds === null || record.ttl_seconds === undefined ? null : Number(record.ttl_seconds),
+    expires_at: nullableString(record.expires_at),
+  }
+}
+
+function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): BindingRecord[] {
+  return ctx.sql.all(BINDING_COLUMNS, `SELECT ${BINDING_COLUMNS.join(", ")} FROM bindings WHERE ${where}`, params, orderBy).map(bindingFrom)
+}
+
+function selectBinding(ctx: StoreContext, bindingId: string): BindingRecord | undefined {
+  return selectBindings(ctx, "binding_id = ?", [bindingId])[0]
+}
+
+function meta(ctx: StoreContext, key: string): string {
+  const found = ctx.sql.one(["value"], "SELECT value FROM gateway_meta WHERE key = ?", [key])
+  if (found === undefined) throw new Error(`gateway_meta ${key} is missing`)
+  return String(found.value)
+}
+
+function expireDue(ctx: StoreContext, now: number): void {
+  const at = rfc3339(now)
+  write(ctx, "UPDATE bindings SET status = 'expired', updated_at = ? WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= ?", [at, at])
+}
+
+function pruneOutbox(ctx: StoreContext, now: number): void {
+  write(ctx, "DELETE FROM outbox WHERE state = 'acked' AND acked_at IS NOT NULL AND acked_at <= ?", [now - OUTBOX_RETENTION_MS])
+  write(
+    ctx,
+    "DELETE FROM outbox WHERE state = 'pending' AND binding_id IN (SELECT binding_id FROM bindings WHERE status != 'active' AND updated_at <= ?)",
+    [rfc3339(now - OUTBOX_RETENTION_MS)],
+  )
+}
+
+type ReceiptKey = { readonly principal: string; readonly operation: string; readonly idempotency_key: string; readonly args_hash: string }
+
+type StoredReceipt = { readonly args_hash: string; readonly status: string; readonly owner_instance: string; readonly result: string | null }
+
+function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): StoredReceipt | undefined {
+  const found = ctx.sql.one(
+    ["args_hash", "status", "owner_instance", "result"],
+    "SELECT args_hash, status, owner_instance, result FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+    [key.principal, key.operation, key.idempotency_key],
+  )
+  if (found === undefined) return undefined
+  return { args_hash: String(found.args_hash), status: String(found.status), owner_instance: String(found.owner_instance), result: nullableString(found.result) }
+}
+
+function priorOutcome<T>(ctx: StoreContext, key: ReceiptKey | null, now: number): RelayOutcome<T> | undefined {
+  if (key === null) return undefined
+  write(ctx, "DELETE FROM receipts WHERE expires_at <= ?", [now])
+  const receipt = selectReceipt(ctx, key)
+  if (receipt === undefined) return undefined
+  if (receipt.args_hash !== key.args_hash) return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
+  if (receipt.status === "completed" && receipt.result !== null) return { ...(JSON.parse(receipt.result) as object), kind: "ok", deduplicated: true } as unknown as RelayOutcome<T>
+  return refused("idempotency_uncertain", "An earlier call under this key did not record its outcome.")
+}
+
+function recordOutcome(ctx: StoreContext, key: ReceiptKey | null, now: number, result: unknown): void {
+  if (key === null) return
+  write(
+    ctx,
+    "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 'completed', NULL, ?, ?, ?, ?, ?)",
+    [key.principal, key.operation, key.idempotency_key, key.args_hash, ctx.config.instance_id, JSON.stringify(result), now, now, now + GATEWAY_RECEIPT_RETENTION_MS],
+  )
+}
+
+/** A relay mutation: expiry, the receipt check, the body, and the receipt of a success, all in one transaction. */
+async function relayMutation<T extends object>(ctx: StoreContext, op: string, now: number, key: ReceiptKey | null, body: () => RelayOutcome<T>): Promise<RelayOutcome<T>> {
+  return await transaction(ctx, op, () => {
+    expireDue(ctx, now)
+    const prior = priorOutcome<T>(ctx, key, now)
+    if (prior !== undefined) return prior
+    const outcome = body()
+    if (outcome.kind === "ok") recordOutcome(ctx, key, now, { ...outcome, deduplicated: false })
+    return outcome.kind === "ok" ? ({ ...outcome, deduplicated: false } as RelayOutcome<T>) : outcome
+  })
+}
+
+export type ToolReceiptBegin =
+  | { readonly kind: "accepted" }
+  | { readonly kind: "replay"; readonly result: unknown }
+  | { readonly kind: "conflict" }
+  | { readonly kind: "in_progress" }
+  | { readonly kind: "uncertain"; readonly error_note: string | null }
+
+/**
+ * `prepared` before the side effect, `completed` with its result after, `uncertain` when it threw.
+ * A prepared receipt of ANOTHER instance means that process died mid-call: the effect may have
+ * landed, so the receipt becomes `uncertain` and is never retried (the mailbox-era file receipts'
+ * semantics, now in the gateway's `receipts` table).
+ */
+export async function toolReceiptBegin(ctx: StoreContext, request: ReceiptKey & { readonly now: number }): Promise<ToolReceiptBegin> {
+  return await transaction(ctx, "tool_receipt_begin", (): ToolReceiptBegin => {
+    write(ctx, "DELETE FROM receipts WHERE expires_at <= ?", [request.now])
+    const receipt = selectReceipt(ctx, request)
+    if (receipt === undefined) {
+      write(
+        ctx,
+        "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, 'prepared', NULL, ?, ?, ?, ?)",
+        [request.principal, request.operation, request.idempotency_key, request.args_hash, ctx.config.instance_id, request.now, request.now, request.now + GATEWAY_RECEIPT_RETENTION_MS],
+      )
+      return { kind: "accepted" }
+    }
+    if (receipt.args_hash !== request.args_hash) return { kind: "conflict" }
+    if (receipt.status === "completed") return { kind: "replay", result: receipt.result === null ? null : JSON.parse(receipt.result) }
+    if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id) return { kind: "in_progress" }
+    if (receipt.status === "prepared") {
+      write(ctx, "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ?", [
+        "the process that began this call ended before recording its outcome", request.now, request.principal, request.operation, request.idempotency_key,
+      ])
+    }
+    const note = ctx.sql.one(["error_note"], "SELECT error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?", [request.principal, request.operation, request.idempotency_key])
+    return { kind: "uncertain", error_note: nullableString(note?.error_note) }
+  })
+}
+
+export async function toolReceiptSettle(
+  ctx: StoreContext,
+  request: Omit<ReceiptKey, "args_hash"> & { readonly now: number } & ({ readonly result: unknown } | { readonly error_note: string }),
+): Promise<boolean> {
+  return await transaction(ctx, "tool_receipt_settle", () => {
+    const completed = "result" in request
+    return write(
+      ctx,
+      `UPDATE receipts SET status = ?, ${completed ? "result" : "error_note"} = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?`,
+      [completed ? "completed" : "uncertain", completed ? JSON.stringify(request.result) : request.error_note, request.now, request.principal, request.operation, request.idempotency_key, ctx.config.instance_id],
+    ) === 1
+  })
+}
+
+export type BindOpRequest = { readonly now: number; readonly receipt: ReceiptKey | null; readonly binding: BindRequest }
+
+export async function bindThread(ctx: StoreContext, request: BindOpRequest): Promise<RelayOutcome<{ readonly binding: BindingRecord }>> {
+  const wanted = request.binding
+  return await relayMutation(ctx, "bind", request.now, request.receipt, () => {
+    const holder = selectBindings(ctx, "platform = ? AND account_id = ? AND chat_id = ? AND thread_id = ? AND status = 'active'", [wanted.platform, wanted.account_id, wanted.chat_id, wanted.thread_id])[0]
+    if (holder !== undefined) {
+      const same = holder.session_durable_id === wanted.session_durable_id
+      return refused(
+        "binding_conflict",
+        same ? "This thread is already bound to that session." : "This thread is bound to another session; rebind it explicitly to move it.",
+        { binding_id: holder.binding_id, revision: holder.revision, session: holder.session_durable_id },
+      )
+    }
+    const at = rfc3339(request.now)
+    const binding: BindingRecord = {
+      schema_version: 1,
+      binding_id: newBindingId(),
+      revision: 1,
+      status: "active",
+      platform: wanted.platform,
+      account_id: wanted.account_id,
+      chat_id: wanted.chat_id,
+      thread_id: wanted.thread_id,
+      root_message_id: wanted.root_message_id,
+      progress_message_id: wanted.progress_message_id,
+      session_realm_id: meta(ctx, "realm_id"),
+      session_durable_id: wanted.session_durable_id,
+      direction: wanted.direction,
+      inbound_mode: wanted.inbound_mode,
+      outbound_events: wanted.outbound_events,
+      policy_id: wanted.policy_id,
+      created_at: at,
+      updated_at: at,
+      lease_started_at: at,
+      ttl_seconds: wanted.ttl_seconds,
+      expires_at: wanted.ttl_seconds === null ? null : rfc3339(request.now + wanted.ttl_seconds * 1000),
+    }
+    write(ctx, `INSERT INTO bindings (${BINDING_COLUMNS.join(", ")}) VALUES (${BINDING_COLUMNS.map(() => "?").join(", ")})`, [
+      binding.binding_id, binding.schema_version, binding.revision, binding.status, binding.platform, binding.account_id, binding.chat_id,
+      binding.thread_id, binding.root_message_id, binding.progress_message_id, binding.session_realm_id, binding.session_durable_id,
+      binding.direction.inbound ? 1 : 0, binding.direction.outbound ? 1 : 0, binding.inbound_mode, JSON.stringify(binding.outbound_events),
+      binding.policy_id, binding.created_at, binding.updated_at, binding.lease_started_at, binding.ttl_seconds, binding.expires_at,
+    ])
+    return { kind: "ok", binding }
+  })
+}
+
+function inFlight(ctx: StoreContext, bindingId: string): string[] {
+  return ctx.sql.all(["delivery_id"], `SELECT delivery_id, seq FROM deliveries WHERE binding_id = ? AND state IN ${OPEN_STATES}`, [bindingId], "seq").map((row) => String(row.delivery_id))
+}
+
+export type CasRequest = { readonly now: number; readonly receipt: ReceiptKey | null; readonly binding_id: string; readonly expected_revision: number }
+
+/** CAS detach. A binding that is already closed answers success again, with its current state. */
+export async function unbindThread(ctx: StoreContext, request: CasRequest): Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly already_closed: boolean; readonly in_flight: readonly string[] }>> {
+  return await relayMutation(ctx, "unbind", request.now, request.receipt, () => {
+    const current = selectBinding(ctx, request.binding_id)
+    if (current === undefined) return refused("not_found", "No binding has this id.", { binding_id: request.binding_id })
+    if (current.status !== "active") return { kind: "ok", binding: current, already_closed: true, in_flight: inFlight(ctx, current.binding_id) }
+    if (current.revision !== request.expected_revision) return refused("stale_revision", "The binding changed since that revision.", { binding_id: current.binding_id, revision: current.revision })
+    const at = rfc3339(request.now)
+    write(ctx, "UPDATE bindings SET status = 'detached', revision = revision + 1, updated_at = ? WHERE binding_id = ? AND revision = ?", [at, current.binding_id, current.revision])
+    write(ctx, "DELETE FROM completion_arms WHERE binding_id = ?", [current.binding_id])
+    return { kind: "ok", binding: selectBinding(ctx, current.binding_id) as BindingRecord, already_closed: false, in_flight: inFlight(ctx, current.binding_id) }
+  })
+}
+
+/**
+ * CAS move to another session. Work queued under the old revision is closed with a refusal
+ * (`binding_closed`, its inbox marker removed) and never moved: the new session starts clean, and
+ * the connector sees the refusal on the sender's result.
+ */
+export async function rebindThread(ctx: StoreContext, request: CasRequest & { readonly session_durable_id: string }): Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly closed: readonly string[] }>> {
+  return await relayMutation(ctx, "rebind", request.now, request.receipt, () => {
+    const current = selectBinding(ctx, request.binding_id)
+    if (current === undefined) return refused("not_found", "No binding has this id.", { binding_id: request.binding_id })
+    if (current.status !== "active") return refused("binding_inactive", `The binding is ${current.status}.`, { binding_id: current.binding_id, status: current.status })
+    if (current.revision !== request.expected_revision) return refused("stale_revision", "The binding changed since that revision.", { binding_id: current.binding_id, revision: current.revision })
+    if (current.session_durable_id === request.session_durable_id) return refused("invalid_arguments", "The binding is already attached to that session.", { binding_id: current.binding_id })
+    const at = rfc3339(request.now)
+    const closed = ctx.sql
+      .all(["delivery_id", "target"], "SELECT delivery_id, target_durable_id AS target, seq FROM deliveries WHERE binding_id = ? AND binding_revision = ? AND state = 'queued'", [current.binding_id, current.revision], "seq")
+      .map((row) => ({ delivery_id: String(row.delivery_id), target: String(row.target) }))
+    for (const row of closed) {
+      write(ctx, "UPDATE deliveries SET state = 'refused', reason = 'binding_closed', updated_at = ? WHERE delivery_id = ? AND state = 'queued'", [request.now, row.delivery_id])
+      unlinkMarker(ctx, row.target, row.delivery_id)
+    }
+    write(ctx, "UPDATE bindings SET session_durable_id = ?, revision = revision + 1, lease_started_at = ?, updated_at = ? WHERE binding_id = ? AND revision = ?", [
+      request.session_durable_id, at, at, current.binding_id, current.revision,
+    ])
+    write(ctx, "DELETE FROM completion_arms WHERE binding_id = ?", [current.binding_id])
+    return { kind: "ok", binding: selectBinding(ctx, current.binding_id) as BindingRecord, closed: closed.map((row) => row.delivery_id) }
+  })
+}
+
+export type BindingsFilter = {
+  readonly session_durable_id?: string
+  readonly platform?: string
+  readonly account_id?: string
+  readonly chat_id?: string
+  readonly thread_id?: string
+  readonly status?: string
+}
+
+export async function listBindings(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number },
+): Promise<RelayOutcome<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>> {
+  const decoded = request.cursor === undefined ? null : decodeBindingsCursor(request.cursor)
+  if (request.cursor !== undefined && decoded === null) return refused("cursor_invalid", "The bindings cursor is not one this gateway issued.")
+  const limit = Math.min(Math.max(request.limit ?? BINDINGS_PAGE_DEFAULT, 1), BINDINGS_PAGE_MAX)
+  return await transaction(ctx, "list_bindings", () => {
+    expireDue(ctx, request.now)
+    const asOf = decoded?.as_of ?? Number(ctx.sql.one(["m"], "SELECT COALESCE(MAX(rowid), 0) AS m FROM bindings")?.m ?? 0)
+    const clauses = ["rowid <= ?"]
+    const params: SqlValue[] = [asOf]
+    const columns: readonly (readonly [keyof BindingsFilter, string])[] = [
+      ["session_durable_id", "session_durable_id"], ["platform", "platform"], ["account_id", "account_id"], ["chat_id", "chat_id"], ["thread_id", "thread_id"], ["status", "status"],
+    ]
+    for (const [field, column] of columns) {
+      const value = request.filter[field]
+      if (value === undefined) continue
+      clauses.push(`${column} = ?`)
+      params.push(value)
+    }
+    if (decoded?.after != null) {
+      clauses.push("(created_at > ? OR (created_at = ? AND binding_id > ?))")
+      params.push(decoded.after[0], decoded.after[0], decoded.after[1])
+    }
+    const page = selectBindings(ctx, clauses.join(" AND "), params, "created_at, binding_id")
+    const bindings = page.slice(0, limit)
+    const last = bindings.at(-1)
+    return { kind: "ok", bindings, next_cursor: page.length > limit && last !== undefined ? encodeBindingsCursor(asOf, [last.created_at, last.binding_id]) : null }
+  })
+}
+
+export async function bindingView(ctx: StoreContext, request: { readonly now: number; readonly binding_id: string }): Promise<BindingRecord | null> {
+  return await transaction(ctx, "binding_view", () => {
+    expireDue(ctx, request.now)
+    return selectBinding(ctx, request.binding_id) ?? null
+  })
+}
+
+/** Records which runtime holds a session now; a reply token minted under an earlier incarnation goes stale. */
+export async function registerIncarnation(ctx: StoreContext, request: { readonly durable_id: string; readonly incarnation: string }): Promise<void> {
+  await transaction(ctx, "register_incarnation", () => {
+    write(
+      ctx,
+      "INSERT INTO session_meta (durable_id, next_seq, incarnation) VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM deliveries WHERE target_durable_id = ?), ?) ON CONFLICT(durable_id) DO UPDATE SET incarnation = excluded.incarnation",
+      [request.durable_id, request.durable_id, request.incarnation],
+    )
+  })
+}
+
+function incarnationOf(ctx: StoreContext, durableId: string): string | null {
+  return nullableString(ctx.sql.one(["incarnation"], "SELECT incarnation FROM session_meta WHERE durable_id = ?", [durableId])?.incarnation)
+}
+
+export type ReportOpRequest = {
+  readonly now: number
+  readonly receipt: ReceiptKey | null
+  readonly session_durable_id: string
+  /** null: the originating binding, i.e. the binding of the newest delivery this session took. */
+  readonly binding_id: string | null
+  readonly event: OutboundEvent
+  readonly text: string
+  readonly ui_request_id: string | null
+}
+
+export type ReportOpResult = {
+  readonly binding_id: string
+  readonly revision: number
+  readonly event: OutboundEvent
+  /** The outbox row written; null for a completion, which is only armed here. */
+  readonly cursor: number | null
+  readonly reply_token: string | null
+  readonly armed: boolean
+}
+
+function originatingBinding(ctx: StoreContext, sessionDurableId: string): string | null {
+  const found = ctx.sql.one(
+    ["binding_id"],
+    "SELECT binding_id FROM deliveries WHERE target_durable_id = ? AND seq = (SELECT MAX(seq) FROM deliveries WHERE target_durable_id = ? AND binding_id IS NOT NULL AND state IN ('admitted', 'applied'))",
+    [sessionDurableId, sessionDurableId],
+  )
+  return nullableString(found?.binding_id)
+}
+
+function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome }): number {
+  write(
+    ctx,
+    "INSERT INTO outbox (binding_id, revision, event_kind, payload, state, provider_message_id, created_at, acked_at, session_durable_id, reply_token, ui_request_id, incarnation, question_state, answer, answered_at, outcome) VALUES (?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+    [
+      row.binding.binding_id, row.binding.revision, row.event, JSON.stringify({ text: row.text }), row.now, row.binding.session_durable_id,
+      row.reply_token ?? null, row.ui_request_id ?? null, row.incarnation ?? null, row.reply_token === undefined ? null : "pending", row.outcome ?? null,
+    ],
+  )
+  return Number(ctx.sql.one(["c"], "SELECT last_insert_rowid() AS c")?.c)
+}
+
+/**
+ * The only way a session writes to a binding's outbox. The binding must be attached to the calling
+ * session, active, outbound, and subscribed to the event; nothing is ever copied to the session's
+ * other bindings. A `question` mints a reply token; a `completion` is only armed, and the session's
+ * next settle writes it with the real outcome.
+ */
+export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): Promise<RelayOutcome<ReportOpResult>> {
+  return await relayMutation(ctx, "report", request.now, request.receipt, () => {
+    const bindingId = request.binding_id ?? originatingBinding(ctx, request.session_durable_id)
+    if (bindingId === null) return refused("invalid_arguments", "This session took no message through a binding, so there is no originating binding; name binding_id.")
+    const binding = selectBinding(ctx, bindingId)
+    if (binding === undefined) return refused("not_found", "No binding has this id.", { binding_id: bindingId })
+    if (binding.session_durable_id !== request.session_durable_id) return refused("scope_denied", "The binding is attached to another session.", { binding_id: bindingId })
+    if (binding.status !== "active") return refused("binding_inactive", `The binding is ${binding.status}.`, { binding_id: bindingId, status: binding.status })
+    if (!binding.direction.outbound) return refused("unsupported", "The binding carries no outbound direction.", { binding_id: bindingId, direction: binding.direction })
+    if (!binding.outbound_events.includes(request.event)) return refused("unsupported", `The binding is not subscribed to ${request.event} events.`, { binding_id: bindingId, outbound_events: binding.outbound_events })
+    const base = { binding_id: bindingId, revision: binding.revision, event: request.event }
+    if (request.event === "completion") {
+      write(ctx, "INSERT OR REPLACE INTO completion_arms (session_durable_id, binding_id, revision, text, armed_at) VALUES (?, ?, ?, ?, ?)", [
+        request.session_durable_id, bindingId, binding.revision, request.text, request.now,
+      ])
+      return { kind: "ok", ...base, cursor: null, reply_token: null, armed: true }
+    }
+    if (request.event === "question") {
+      if (request.ui_request_id === null) return refused("invalid_arguments", "A question names the session's pending extension UI request (request_id).")
+      const incarnation = incarnationOf(ctx, request.session_durable_id)
+      const token = mintReplyToken(meta(ctx, "token_secret"), { binding_id: bindingId, revision: binding.revision, session_durable_id: request.session_durable_id, incarnation, ui_request_id: request.ui_request_id })
+      const cursor = insertOutbox(ctx, { binding, event: "question", text: request.text, now: request.now, reply_token: token, ui_request_id: request.ui_request_id, incarnation })
+      pruneOutbox(ctx, request.now)
+      return { kind: "ok", ...base, cursor, reply_token: token, armed: false }
+    }
+    const cursor = insertOutbox(ctx, { binding, event: request.event, text: request.text, now: request.now })
+    pruneOutbox(ctx, request.now)
+    return { kind: "ok", ...base, cursor, reply_token: null, armed: false }
+  })
+}
+
+/**
+ * Called when the session settles (no retry, compaction or queued continuation will run): every
+ * completion armed for it becomes one outbox row with the run's outcome, on a binding still active
+ * at the revision it was armed under. Arms are consumed, so a later settle emits nothing.
+ */
+export async function emitCompletions(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome }): Promise<readonly { readonly binding_id: string; readonly cursor: number }[]> {
+  return await transaction(ctx, "emit_completions", () => {
+    expireDue(ctx, request.now)
+    const arms = ctx.sql.all(["binding_id", "revision", "text"], "SELECT binding_id, revision, text FROM completion_arms WHERE session_durable_id = ?", [request.session_durable_id], "binding_id")
+    const emitted: { binding_id: string; cursor: number }[] = []
+    for (const arm of arms) {
+      const binding = selectBinding(ctx, String(arm.binding_id))
+      write(ctx, "DELETE FROM completion_arms WHERE session_durable_id = ? AND binding_id = ?", [request.session_durable_id, String(arm.binding_id)])
+      if (binding === undefined || binding.status !== "active" || binding.revision !== Number(arm.revision) || binding.session_durable_id !== request.session_durable_id) continue
+      if (!binding.direction.outbound || !binding.outbound_events.includes("completion")) continue
+      emitted.push({ binding_id: binding.binding_id, cursor: insertOutbox(ctx, { binding, event: "completion", text: String(arm.text), now: request.now, outcome: request.outcome }) })
+    }
+    return emitted
+  })
+}
+
+function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {
+  const event = record.event_kind as OutboundEvent
+  return {
+    cursor: Number(record.cursor),
+    binding_id: String(record.binding_id),
+    revision: Number(record.revision),
+    event,
+    text: String((JSON.parse(String(record.payload)) as { text?: unknown }).text ?? ""),
+    state: record.state as OutboxRow["state"],
+    created_at: rfc3339(Number(record.created_at)),
+    edit_message_id: event === "milestone" ? binding.progress_message_id : null,
+    provider_message_id: nullableString(record.provider_message_id),
+    reply_token: nullableString(record.reply_token),
+    question_state: (record.question_state ?? null) as OutboxRow["question_state"],
+    outcome: (record.outcome ?? null) as OutboxRow["outcome"],
+  }
+}
+
+function ackedCursor(ctx: StoreContext, bindingId: string): number {
+  return Number(ctx.sql.one(["acked_cursor"], "SELECT acked_cursor FROM outbox_cursors WHERE binding_id = ?", [bindingId])?.acked_cursor ?? 0)
+}
+
+/**
+ * The connector's read. Without `after_cursor` it continues after the binding's acknowledged
+ * cursor, so rows already acked are not handed out again; with an older cursor it re-reads from
+ * there (rows are kept 30 days after their ack). Rows come in cursor order.
+ */
+export async function readOutbox(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number },
+): Promise<RelayOutcome<{ readonly binding_id: string; readonly revision: number; readonly status: BindingRecord["status"]; readonly rows: readonly OutboxRow[]; readonly next_cursor: number; readonly acked_cursor: number }>> {
+  const limit = Math.min(Math.max(request.limit ?? OUTBOX_PAGE_DEFAULT, 1), OUTBOX_PAGE_MAX)
+  return await transaction(ctx, "read_outbox", () => {
+    expireDue(ctx, request.now)
+    pruneOutbox(ctx, request.now)
+    const binding = selectBinding(ctx, request.binding_id)
+    if (binding === undefined) return refused("not_found", "No binding has this id.", { binding_id: request.binding_id })
+    const acked = ackedCursor(ctx, binding.binding_id)
+    const after = request.after_cursor ?? acked
+    const rows = ctx.sql
+      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ?`, [binding.binding_id, after], "cursor")
+      .slice(0, limit)
+      .map((row) => outboxRowFrom(row, binding))
+    return { kind: "ok", binding_id: binding.binding_id, revision: binding.revision, status: binding.status, rows, next_cursor: rows.at(-1)?.cursor ?? after, acked_cursor: acked }
+  })
+}
+
+/**
+ * Marks every row up to `cursor` consumed. Idempotent: an older or equal cursor changes nothing. A
+ * `provider_message_id` names the message the connector posted for the row at `cursor`; the first
+ * one reported for a milestone becomes the binding's progress message, which later milestones edit.
+ */
+export async function ackOutbox(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string },
+): Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>> {
+  return await transaction(ctx, "ack_outbox", () => {
+    expireDue(ctx, request.now)
+    const binding = selectBinding(ctx, request.binding_id)
+    if (binding === undefined) return refused("not_found", "No binding has this id.", { binding_id: request.binding_id })
+    const acked = ackedCursor(ctx, binding.binding_id)
+    if (request.cursor <= acked) return { kind: "ok", binding_id: binding.binding_id, acked_cursor: acked, changed: false }
+    const newest = Number(ctx.sql.one(["m"], "SELECT COALESCE(MAX(cursor), 0) AS m FROM outbox WHERE binding_id = ?", [binding.binding_id])?.m ?? 0)
+    if (request.cursor > newest) return refused("cursor_invalid", "The cursor is past the newest outbox row of this binding.", { newest })
+    write(ctx, "UPDATE outbox SET state = 'acked', acked_at = ? WHERE binding_id = ? AND cursor <= ? AND state = 'pending'", [request.now, binding.binding_id, request.cursor])
+    write(ctx, "INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES (?, ?, ?) ON CONFLICT(binding_id) DO UPDATE SET acked_cursor = excluded.acked_cursor, updated_at = excluded.updated_at", [
+      binding.binding_id, request.cursor, request.now,
+    ])
+    if (request.provider_message_id !== undefined) {
+      write(ctx, "UPDATE outbox SET provider_message_id = ? WHERE binding_id = ? AND cursor = ?", [request.provider_message_id, binding.binding_id, request.cursor])
+      const event = ctx.sql.one(["event_kind"], "SELECT event_kind FROM outbox WHERE binding_id = ? AND cursor = ?", [binding.binding_id, request.cursor])?.event_kind
+      if (event === "milestone" && binding.progress_message_id === null) {
+        write(ctx, "UPDATE bindings SET progress_message_id = ?, updated_at = ? WHERE binding_id = ?", [request.provider_message_id, rfc3339(request.now), binding.binding_id])
+      }
+    }
+    return { kind: "ok", binding_id: binding.binding_id, acked_cursor: request.cursor, changed: true }
+  })
+}
+
+export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly cursor: number }
+
+/**
+ * First phase of `thread_answer`. `binding_id` is the binding the answer ARRIVED through; the token
+ * names the binding that emitted the question. A mismatch is refused before anything is written, so
+ * the question stays pending. Then: a question already answered is `already_answered`; a binding
+ * that moved (detached, expired, rebound) or a session that restarted since is `stale_token`.
+ * Only a match marks the question answered; the caller then delivers the `extension_ui_response`
+ * and releases the claim if that delivery fails.
+ */
+export async function claimAnswer(ctx: StoreContext, request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }): Promise<RelayOutcome<AnswerClaim>> {
+  return await transaction(ctx, "claim_answer", () => {
+    expireDue(ctx, request.now)
+    const token = readReplyToken(meta(ctx, "token_secret"), request.reply_token)
+    if (token === null) return refused("invalid_arguments", "This is not a reply token this gateway issued.")
+    if (token.binding_id !== request.binding_id) return refused("binding_mismatch", "The answer arrived through a different binding than the one that asked the question.", { binding_id: request.binding_id })
+    const row = ctx.sql.one(["cursor", "question_state", "ui_request_id", "session"], "SELECT cursor, question_state, ui_request_id, session_durable_id AS session FROM outbox WHERE reply_token = ? AND binding_id = ?", [request.reply_token, token.binding_id])
+    if (row === undefined) return refused("not_found", "The question this token belongs to is no longer in the outbox.")
+    if (row.question_state === "answered") return refused("already_answered", "This question was already answered.", { cursor: Number(row.cursor) })
+    const binding = selectBinding(ctx, token.binding_id)
+    const moved = binding === undefined || binding.status !== "active" || binding.revision !== token.revision || binding.session_durable_id !== token.session_durable_id
+    if (moved || incarnationOf(ctx, token.session_durable_id) !== token.incarnation || nullableString(row.ui_request_id) !== token.ui_request_id) {
+      return refused("stale_token", "The binding or the session changed since the question was asked.", { binding_id: token.binding_id })
+    }
+    write(ctx, "UPDATE outbox SET question_state = 'answered', answer = ?, answered_at = ? WHERE reply_token = ? AND question_state = 'pending'", [request.answer, request.now, request.reply_token])
+    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, cursor: Number(row.cursor) }
+  })
+}
+
+export async function releaseAnswer(ctx: StoreContext, request: { readonly reply_token: string }): Promise<boolean> {
+  return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer = NULL, answered_at = NULL WHERE reply_token = ? AND question_state = 'answered'", [request.reply_token]) === 1)
+}

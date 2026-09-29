@@ -24,6 +24,14 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
   thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
   thread_set_reasoning: { thread: "019233a1-7c2e-7bbb", level: "high" },
+  thread_bind: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "019233a1-7c2e-7bbb", ttl_seconds: null },
+  thread_unbind: { binding_id: "bnd-1", expected_revision: 1 },
+  thread_rebind: { binding_id: "bnd-1", expected_revision: 1, session: "019233a1-7c2e-7bbc" },
+  thread_bindings: { platform: "discord", status: "active", limit: 10 },
+  thread_report: { kind: "milestone", text: "done step 1" },
+  thread_outbox: { binding_id: "bnd-1", after_cursor: 0 },
+  thread_outbox_ack: { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" },
+  thread_answer: { binding_id: "bnd-1", reply_token: "rt1.x.y", answer: "yes" },
 }
 
 const NEGATED_USE = /do not use|don't use|never use/i
@@ -54,6 +62,14 @@ describe("thread tool param schemas", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
+      "thread_bind",
+      "thread_unbind",
+      "thread_rebind",
+      "thread_bindings",
+      "thread_report",
+      "thread_outbox",
+      "thread_outbox_ack",
+      "thread_answer",
     ])
 
     const verbs = Object.keys(threadToolParamSchemas).map((name) => name.replace(/^thread_/, ""))
@@ -165,6 +181,28 @@ describe("thread_set_reasoning params", () => {
   })
 })
 
+describe("relay tool params", () => {
+  test("#given a bind with an off-catalog platform #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_bind, { platform: "irc", account_id: "a", chat_id: "c" })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  test("#given an unbind without the revision it last saw #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_unbind, { binding_id: "bnd-1" })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  test("#given a report of an unknown kind #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_report, { kind: "broadcast", text: "hi" })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  test("#given an answer with no binding it arrived through #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_answer, { reply_token: "rt1.x.y", answer: "yes" })
+    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+})
+
 describe("parseThreadParams data-error contract", () => {
   test("#given a thread_send payload missing thread #when parsed #then it returns a DATA error object, never a throw", () => {
     let thrown: unknown
@@ -229,6 +267,12 @@ describe("thread error taxonomy", () => {
       "model_ambiguous",
       "thinking_level_unsupported",
       "loop_detected",
+      "binding_conflict",
+      "binding_mismatch",
+      "binding_inactive",
+      "stale_revision",
+      "stale_token",
+      "already_answered",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

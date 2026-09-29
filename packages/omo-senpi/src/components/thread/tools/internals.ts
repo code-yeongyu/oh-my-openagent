@@ -4,7 +4,6 @@ import { resolveTarget, type ThreadAddressEntry } from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
-import { createReceiptStore, type ReceiptStore } from "../receipts"
 import { readSessionFacts, threadTitle } from "../session-facts"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
 
@@ -139,4 +138,3 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
   return view.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === durableId)
 }
 
-export function makeReceipts(options: ThreadToolSurfaceOptions): ReceiptStore { return createReceiptStore({ directory: options.stateDirectory }) }

@@ -15,6 +15,8 @@ export type InboxDrainOptions = {
   readonly sessionPath: () => string | null
   readonly now?: () => number
   readonly log?: (line: string) => void
+  /** Shows the queued notice in the session's own UI (the extension UI `notify`). */
+  readonly notify?: (text: string) => void
   /** Test seams: act as another process, or stop between the two phases of an admission. */
   readonly _test?: {
     readonly identity?: ProcessIdentity
@@ -27,6 +29,11 @@ export type InboxDrain = {
   readonly drain: (event: DrainWakeEvent) => Promise<InboxDrainResult>
   readonly isSessionReferenced: () => Promise<boolean>
   readonly heldDeliveries: () => ReadonlyMap<string, number>
+}
+
+/** The notice a session shows when a delivery waits behind its running turn or the user's draft. */
+export function queuedNotice(row: Pick<DeliveryRow, "delivery_id" | "envelope">): string {
+  return `remote message from ${row.envelope.actor} queued (${row.delivery_id})`
 }
 
 const RELEASING_REASONS: ReadonlySet<WakeReason> = new Set(["submission", "draft_cleared", "idle", "start", "continue"])
@@ -43,7 +50,14 @@ const RELEASING_REASONS: ReadonlySet<WakeReason> = new Set(["submission", "draft
 export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
   const now = options.now ?? Date.now
   const held = new Map<string, number>()
+  const noticed = new Set<string>()
   let chain: Promise<unknown> = Promise.resolve()
+
+  function noticeQueued(row: DeliveryRow): void {
+    if (options.notify === undefined || noticed.has(row.delivery_id)) return
+    noticed.add(row.delivery_id)
+    options.notify(queuedNotice(row))
+  }
 
   async function identity(): Promise<ProcessIdentity> {
     return options._test?.identity ?? (await options.store.identity())
@@ -68,6 +82,7 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) break
       if (!gate.can_admit) {
         held.set(row.delivery_id, gate.editor_revision)
+        noticeQueued(row)
         admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
         break
       }
@@ -99,9 +114,11 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       if (result.kind === "held_draft") {
         await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "requeue" } })
         held.set(row.delivery_id, runtime.admissionGate().editor_revision)
+        noticeQueued(row)
         admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
         break
       }
+      if (result.kind === "queued") noticeQueued(claimed.row)
       if (result.kind === "turn_conflict") {
         await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "refused", reason: "turn_conflict" } })
       } else {

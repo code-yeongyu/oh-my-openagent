@@ -149,6 +149,35 @@
 - `components/x-search/index.ts`: the conditional `x-search` skill goes through it. Both tools stay registered.
 - `extension/types.ts`: `getCommands()` entries carry the optional `sourceInfo.path` senpi already reports.
 
+## thread: chat-thread bindings, report/outbox/answer relay tools, SQLite tool receipts, gateway send path behind a switch
+
+- `components/thread/tools/relay-tools.ts`, `contracts/`, `metadata.ts`: eight new tools - `thread_bind`,
+  `thread_unbind`, `thread_rebind`, `thread_bindings`, `thread_report`, `thread_outbox`, `thread_outbox_ack`,
+  `thread_answer` - over the gateway store. A binding attaches a session to one external conversation thread
+  (`platform` discord|telegram|slack|herdr|custom, `account_id`, `chat_id`, `thread_id`); one thread has at most one
+  active binding (`binding_conflict` names the holder), unbind/rebind are CAS on the revision (`stale_revision`), a
+  rebind never extends the TTL (default one week) and refuses work queued under the old revision (`binding_closed`).
+  `thread_report` writes only through the calling session's own binding (the originating one by default); a question
+  returns an HMAC reply token, and `thread_answer` is refused `binding_mismatch` unless the answer arrives through the
+  binding that asked, `stale_token` after a rebind, expiry or session restart, `already_answered` on a replay.
+  Completions are armed by `thread_report` and written only when the session settles, with the real outcome.
+- `components/thread/errors.ts`: six new codes (`binding_conflict`, `binding_mismatch`, `binding_inactive`,
+  `stale_revision`, `stale_token`, `already_answered`); `loop_detected` now tells the model to answer through
+  `thread_read` / `thread_report` / `thread_answer` instead of replying directly.
+- `components/thread/tools.ts`: the tools' idempotency receipts move from files under the thread state directory to
+  the gateway store's `receipts` table, with the same replay / conflict / in-progress / uncertain behavior.
+  `thread_send` / `thread_handoff` can deliver through the gateway engine (results add `delivery_id`,
+  `effective_mode`, `endpoint.kind`; new outcome `queued_offline`); that path stays off
+  (`THREAD_SENDS_THROUGH_GATEWAY = false` in `component.ts`) until the senpi release with `wake` and
+  `admitExternalMessage` is adopted.
+- `components/thread/gateway/drain.ts`, `provenance.ts`: a delivery waiting behind the running turn or the user's
+  draft shows one notice in the session ("remote message from <actor> queued (<delivery_id>)"); the provenance header
+  names the binding and its revision for a delivery that came through one.
+- `components/thread/gateway/schema.ts`, `store-ops.ts`, `store-worker.ts`: schema v2 (additive: session
+  incarnation, outbox question/answer/outcome columns, per-binding ack cursors, completion arms). Opening a current
+  store takes no write lock, and two processes opening a brand-new store at once no longer fail on the WAL switch or
+  apply a migration twice.
+
 ## thread: address book over terminal endpoints with real names/timestamps; sessions drain their gateway inbox
 
 - `components/thread/endpoint-registry.ts`: new. Reads senpi's endpoint registry

@@ -1,6 +1,6 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static } from "typebox"
-import { assembleAddressBook, toThreadAddressEntries, type AddressBookHost, type DiskSession } from "./address-book"
+import { toGatewayAddressEntries } from "./address-book"
 import { fuzzyMatch, resolveTarget, workspaceEntries, type ThreadAddressEntry } from "./addressing"
 import {
   parseThreadParams,
@@ -17,12 +17,16 @@ import {
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
-import { threadToolFailure, type ThreadErrorCode } from "./errors"
 import { createOrderedDeliveryMailbox, type MailboxTargetPort } from "./mailbox"
 import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_SEARCH_METADATA } from "./metadata"
-import { readTranscript, type ThreadTranscriptEntry } from "./reader"
+import { readTranscript } from "./reader"
 export type { ThreadTranscriptEntry } from "./reader"
-import { createReceiptStore, type ReceiptStore } from "./receipts"
+import type { GatewayEndpointPort, GatewayEndpointRef } from "./gateway/adapter"
+import { hashArgs } from "./gateway/bindings"
+import { createGatewayEngine, resolveFromEntries } from "./gateway/engine"
+import { createGatewayRelay } from "./gateway/relay"
+import { createGatewayStore } from "./gateway/store"
+import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
@@ -31,7 +35,6 @@ import {
   degradedSummary,
   failure,
   hostView,
-  makeReceipts,
   metadata,
   output,
   resolution,
@@ -45,8 +48,24 @@ import {
   type ToolOutput,
 } from "./tools/internals"
 
+/** A host without the gateway port reaches no endpoint: every gateway send lands `queued_offline`. */
+const UNREACHABLE: GatewayEndpointPort = {
+  wake: async (endpoint) => {
+    throw new Error(`host_unavailable:${endpoint.socket}`)
+  },
+}
+
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
-  const receipts = makeReceipts(options)
+  const now = options.now ?? Date.now
+  const store = options.store ?? createGatewayStore({ agentDir: options.stateDirectory })
+  const endpoints = options.host.gateway ?? UNREACHABLE
+  const gatewayEntries = async () => toGatewayAddressEntries(addressBook(options, await view()))
+  const engine = createGatewayEngine({ store, endpoints, resolve: resolveFromEntries(gatewayEntries, options.callerWorkspaceRoot), now })
+  const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
+    const entry = (await gatewayEntries()).find((candidate) => candidate.thread_id === durableId)
+    return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint
+  }
+  const relay = createGatewayRelay({ store, engine, endpoints, locate, now })
   const mailbox = createOrderedDeliveryMailbox({
     directory: `${options.stateDirectory}/mailbox`,
     portFor: (target): MailboxTargetPort | undefined => ({
@@ -67,18 +86,25 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
-    const admission = receipts.begin({ caller_session_id: callerId, tool: name, args: value, idempotency_key: "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key : undefined, tool_call_id: callId })
-    if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
-    if (admission.kind === "conflict") return output(failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key."))
-    if (admission.kind === "in_progress") return output(failure("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry."))
-    if (admission.kind === "uncertain") return output(failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry."))
+    const explicitKey = "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key?.trim() : undefined
+    const scope = { principal: `session:${callerId}`, operation: name, idempotency_key: explicitKey !== undefined && explicitKey.length > 0 ? explicitKey : `call:${callId}` }
+    // A gateway send owns its idempotency: the engine's receipt is written in the delivery's own
+    // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
+    const receipted = !((name === "thread_send" || name === "thread_handoff") && options.sendThroughGateway === true)
+    if (receipted) {
+      const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
+      if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
+      if (admission.kind === "conflict") return output(failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key."))
+      if (admission.kind === "in_progress") return output(failure("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry."))
+      if (admission.kind === "uncertain") return output(failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.", admission.error_note === null ? undefined : { error_note: admission.error_note }))
+    }
     try {
-      const result = await sideEffect(await view(), value, admission.operation_id, callerId)
-      receipts.complete(admission, result)
+      const result = await sideEffect(await view(), value, scope.idempotency_key, callerId)
+      if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result })
       return output(result)
     } catch (error) {
-      receipts.abandon(admission, error instanceof Error ? error.message : String(error))
       const message = error instanceof Error ? error.message : String(error)
+      if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(() => false)
       if (message.startsWith("host_unavailable:")) {
         return output(failure("host_unavailable", `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`, "Retry when the shared Senpi host is running."))
       }
@@ -173,7 +199,8 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       return { kind: "ok", thread_id: resolved.entry.thread_id, level: value.level, scope: value.scope ?? "session" }
     }),
   }
-  return [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning]
+  const relayTools = createRelayTools({ options, relay, view, failure })
+  return [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools]
 
   /**
    * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
@@ -196,9 +223,14 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     return { kind: "ok", thread_id: threadId, items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
   }
 
-  async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, operationId: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
+  function deliverThroughGateway(current: ThreadHostView, threadId: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
+    return deliverThroughGatewayImpl(options, engine, current, threadId, value, idempotencyKey, callerId, resolvedBy)
+  }
+
+  async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
     const resolved = resolution(options, resolveEntries(options, current), address, callerId, value.all_scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
+    if (options.sendThroughGateway === true) return await deliverThroughGateway(current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
     const session = targetSession(current, resolved.entry.thread_id)
     if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
     // A terminal is never prompted: it takes messages only through the gateway inbox its own
@@ -212,6 +244,51 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     const base = { kind: "ok" as const, thread_id: resolved.entry.thread_id, delivery, message_seq: result.message_seq, deduplicated: false }
     return resolvedBy === undefined ? base : { kind: "ok", thread: summary(session), resolved_by: resolvedBy, delivery, message_seq: result.message_seq, deduplicated: false }
   }
+}
+
+/**
+ * The gateway send path, behind the component's send switch: resolution already applied the
+ * caller's scope, so the engine is handed the durable id. The result keeps the send contract and
+ * adds `delivery_id`, `effective_mode` and `endpoint.kind`; an unreachable target is
+ * `queued_offline` (the row is durable). A direct reply to the session that messaged this one
+ * under the same causal root is refused `loop_detected`: answers travel through thread_read,
+ * thread_report and thread_answer.
+ */
+async function deliverThroughGatewayImpl(
+  options: ThreadToolSurfaceOptions,
+  engine: ReturnType<typeof createGatewayEngine>,
+  current: ThreadHostView,
+  threadId: string,
+  value: ThreadSendInput | ThreadHandoffInput,
+  idempotencyKey: string,
+  callerId: string,
+  resolvedBy: "exact_name" | "fuzzy" | undefined,
+): Promise<ThreadToolResult> {
+  if (callerId === UNKNOWN_CALLER) return failure("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
+  let expected: number | undefined
+  if (value.expected_turn_id !== undefined) {
+    if (!/^\d+$/.test(value.expected_turn_id)) return failure("turn_conflict", `Turn ${value.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
+    expected = Number(value.expected_turn_id)
+  }
+  const turn = options.callerTurnId?.()
+  const cause = options.callerCause?.()
+  const sent = await engine.deliver({
+    sender: { kind: "session", durable_id: callerId, ...(turn === undefined ? {} : { turn_id: turn }), ...(cause === undefined ? {} : { cause_delivery_id: cause }) },
+    target: threadId,
+    text: value.message,
+    mode: value.delivery ?? "auto",
+    ...(expected === undefined ? {} : { expected_turn_id: expected }),
+    all_scope: true,
+    idempotency_key: idempotencyKey,
+  })
+  if (sent.kind === "error") return { kind: "error", error: sent.error }
+  const facts = { delivery_id: sent.delivery_id, effective_mode: sent.effective_mode, endpoint: sent.endpoint_kind === null ? null : { kind: sent.endpoint_kind } }
+  if (resolvedBy === undefined) return { kind: "ok", thread_id: threadId, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
+  const session = targetSession(current, threadId)
+  const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
+  const thread = session !== undefined ? summary(session, entry) : entry !== undefined ? degradedSummary(entry) : undefined
+  if (thread === undefined) return failure("not_found", `Thread ${threadId} is not in the address book.`, "Call thread_list and retry.")
+  return { kind: "ok", thread, resolved_by: resolvedBy, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
 }
 
 export function registerThreadTools(pi: { registerTool(tool: Record<string, unknown>): void }, options: ThreadToolSurfaceOptions): void {

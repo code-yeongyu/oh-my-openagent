@@ -52,18 +52,23 @@ export type ControlSession = {
   readonly durableId: string
   readonly sessionPath: () => string | null
   readonly isIdle: () => boolean
+  /** The session's own extension UI `notify`, where the queued notice appears. */
+  readonly notify?: (text: string) => void
 }
 
 export function controlSessionOf(eventCtx: unknown): ControlSession | undefined {
   if (typeof eventCtx !== "object" || eventCtx === null) return undefined
-  const context = eventCtx as { readonly sessionManager?: unknown; readonly isIdle?: unknown }
+  const context = eventCtx as { readonly sessionManager?: unknown; readonly isIdle?: unknown; readonly ui?: unknown }
   const manager = context.sessionManager as { readonly getSessionId?: unknown; readonly getSessionFile?: unknown } | undefined
   if (typeof manager?.getSessionId !== "function") return undefined
   const durableId: unknown = manager.getSessionId.call(manager)
   if (typeof durableId !== "string" || durableId.length === 0) return undefined
   const getFile = manager.getSessionFile
   const isIdle = context.isIdle
+  const ui = context.ui as { readonly notify?: unknown } | undefined
+  const notify = typeof ui?.notify === "function" ? (ui.notify as (message: string, type?: string) => void) : undefined
   return {
+    ...(notify === undefined ? {} : { notify: (text: string) => notify.call(ui, text, "info") }),
     durableId,
     sessionPath: () => {
       if (typeof getFile !== "function") return null
@@ -94,6 +99,10 @@ export type ControlEndpointRegistrantOptions = {
   readonly agentDir: () => string
   /** Stamped on this process's claims so a host `release_session` settles only its own runtime's rows. */
   readonly runtimeInstance?: string
+  /** The component's store, shared with the thread tools; the registrant then neither opens nor disposes one. */
+  readonly store?: GatewayStore
+  /** Called for each delivery this session's runtime took (started, steered or queued): the cause of the run that follows. */
+  readonly onAdmitted?: (durableId: string, deliveryId: string) => void
   readonly log?: (line: string) => void
   /** Test seams: the store to use, and drain options (clock, crash hooks, a foreign identity). */
   readonly _test?: {
@@ -134,7 +143,8 @@ type Active = {
  */
 export function createControlEndpointRegistrant(options: ControlEndpointRegistrantOptions): ControlEndpointRegistrant {
   const log = options.log ?? (() => undefined)
-  let store: GatewayStore | undefined = options._test?.store
+  const shared = options.store ?? options._test?.store
+  let store: GatewayStore | undefined = shared
   let active: Active | undefined
   let compacting = false
   let queue: Promise<unknown> = Promise.resolve()
@@ -175,11 +185,26 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       admitExternalMessage: (input) => control.admitExternalMessage(input),
       listAdmittedDeliveries: () => control.listAdmittedDeliveries(),
     }
-    const drain = createInboxDrain({ store, runtime, durableId: session.durableId, sessionPath: session.sessionPath, log, ...options._test?.drain })
+    const drain = createInboxDrain({
+      store,
+      runtime,
+      durableId: session.durableId,
+      sessionPath: session.sessionPath,
+      log,
+      ...(session.notify === undefined ? {} : { notify: session.notify }),
+      ...options._test?.drain,
+    })
     let retired = false
+    const drainOnce = async (event: SenpiWakeEvent) => {
+      const result = await drain.drain(drainEvent(event))
+      for (const entry of result.admitted) {
+        if (entry.kind === "started" || entry.kind === "steered" || entry.kind === "queued") options.onAdmitted?.(session.durableId, entry.delivery_id)
+      }
+      return toSessionControlDrainResult(result)
+    }
     const reply = await control.registerControlEndpoint({
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
-      drain: async (event) => (retired ? { admitted: [] } : toSessionControlDrainResult(await drain.drain(drainEvent(event)))),
+      drain: async (event) => (retired ? { admitted: [] } : await drainOnce(event)),
       isSessionReferenced: () => drain.isSessionReferenced(),
     })
     if (reply.status !== "registered") {
@@ -188,6 +213,13 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       return reply
     }
     active = { durableId: session.durableId, drain, retire: () => { retired = true }, dispose: reply.dispose }
+    // A reply token names the runtime that held the session when it asked; registering is what
+    // makes this runtime the holder, so a restart turns earlier tokens stale.
+    try {
+      await store.registerIncarnation({ durable_id: session.durableId, incarnation: (await store.identity()).instance_id })
+    } catch (error) {
+      log(`thread gateway: the session incarnation for ${session.durableId} was not recorded: ${error instanceof Error ? error.message : String(error)}`)
+    }
     return { status: "registered", socket: reply.socket }
   }
 
@@ -201,8 +233,8 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
         try {
           await release()
         } finally {
-          const owned = options._test?.store === undefined ? store : undefined
-          store = options._test?.store
+          const owned = shared === undefined ? store : undefined
+          store = shared
           await owned?.dispose()
         }
       }),

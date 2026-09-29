@@ -70,7 +70,7 @@ const DELIVERY_COLUMNS = [
   "turn_epoch", "root_id", "hop", "created_at", "updated_at", "expires_at", "binding_id", "binding_revision",
 ] as const
 
-const OPEN_STATES = "('queued', 'admitting', 'admitted')"
+export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
 const DURABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/
 
 function refused(code: StoreRefusal["code"], message: string, details?: Readonly<Record<string, unknown>>): StoreRefusal {
@@ -116,7 +116,7 @@ function selectRow(ctx: StoreContext, deliveryId: string): DeliveryRow | undefin
   return selectRows(ctx, "delivery_id = ?", [deliveryId])[0]
 }
 
-function write(ctx: StoreContext, sql: string, params: readonly SqlValue[] = []): number {
+export function write(ctx: StoreContext, sql: string, params: readonly SqlValue[] = []): number {
   const changed = ctx.sql.run(sql, params)
   ctx.stats.writes += changed
   return changed
@@ -153,7 +153,7 @@ function rollbackQuietly(ctx: StoreContext): void {
   }
 }
 
-async function transaction<T>(ctx: StoreContext, op: string, body: () => T): Promise<T> {
+export async function transaction<T>(ctx: StoreContext, op: string, body: () => T): Promise<T> {
   await beginImmediate(ctx, op, true)
   try {
     const value = body()
@@ -184,7 +184,7 @@ function createMarker(ctx: StoreContext, targetDurableId: string, deliveryId: st
   return path
 }
 
-function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
+export function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
   const path = join(gatewayInboxDirectory(ctx.config.agent_dir, targetDurableId), deliveryId)
   try {
     rmSync(path)

@@ -12,6 +12,7 @@ import { gatewayDatabasePath, gatewayRootDirectory } from "./paths"
 import { processStartTime } from "./process-identity"
 import { isBusyError, Sql, type SqliteConnection } from "./sql"
 import * as ops from "./store-ops"
+import * as relay from "./store-relay-ops"
 import type { GatewayStoreConfig, GatewayStoreEvent } from "./types"
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
@@ -92,6 +93,20 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "is_referenced": return ops.isReferenced(ctx, args as string)
     case "journal_mode": return ops.journalMode(ctx)
     case "stats": return ops.stats(ctx)
+    case "tool_receipt_begin": return await relay.toolReceiptBegin(ctx, args as Parameters<typeof relay.toolReceiptBegin>[1])
+    case "tool_receipt_settle": return await relay.toolReceiptSettle(ctx, args as Parameters<typeof relay.toolReceiptSettle>[1])
+    case "bind": return await relay.bindThread(ctx, args as Parameters<typeof relay.bindThread>[1])
+    case "unbind": return await relay.unbindThread(ctx, args as Parameters<typeof relay.unbindThread>[1])
+    case "rebind": return await relay.rebindThread(ctx, args as Parameters<typeof relay.rebindThread>[1])
+    case "list_bindings": return await relay.listBindings(ctx, args as Parameters<typeof relay.listBindings>[1])
+    case "binding_view": return await relay.bindingView(ctx, args as Parameters<typeof relay.bindingView>[1])
+    case "register_incarnation": return await relay.registerIncarnation(ctx, args as Parameters<typeof relay.registerIncarnation>[1])
+    case "report": return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
+    case "emit_completions": return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
+    case "read_outbox": return await relay.readOutbox(ctx, args as Parameters<typeof relay.readOutbox>[1])
+    case "ack_outbox": return await relay.ackOutbox(ctx, args as Parameters<typeof relay.ackOutbox>[1])
+    case "claim_answer": return await relay.claimAnswer(ctx, args as Parameters<typeof relay.claimAnswer>[1])
+    case "release_answer": return await relay.releaseAnswer(ctx, args as Parameters<typeof relay.releaseAnswer>[1])
     default: throw new Error(`unknown gateway store op: ${op}`)
   }
 }

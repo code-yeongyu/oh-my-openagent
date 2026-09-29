@@ -60,7 +60,7 @@ export function resolveFromEntries(entries: () => readonly GatewayAddressEntry[]
 }
 
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
-  loop_detected: "Do not relay this message further; answer in your own session instead.",
+  loop_detected: "Stop relaying here: a direct reply to the session that messaged you is a cycle. That session reads your answer with thread_read; a bound external thread gets it through thread_report, and its questions come back through thread_answer.",
   overloaded: "Wait before sending to this session again.",
   queue_full: "Wait for the target to take its queued messages, then send again.",
   idempotency_conflict: "Retry with a new idempotency_key.",
