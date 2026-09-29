@@ -103,13 +103,13 @@ describe("omo thread: argv to SDK calls", () => {
     const printed = [
       JSON.parse((await run(["unbind", "b-1", "--revision", "2", "--json"])).stdout),
       JSON.parse((await run(["rebind", "b-1", "other", "--revision", "2", "--json"])).stdout),
-      JSON.parse((await run(["report", "my-tui", "question", "proceed?", "--binding", "b-1", "--request-id", "ui-1", "--json"])).stdout),
+      JSON.parse((await run(["report", "my-tui", "question", "proceed?", "--binding", "b-1", "--request-id", "ui-1", "--request-kind", "confirm", "--json"])).stdout),
       JSON.parse((await run(["answer", "--binding", "b-1", "--token", "rt1.x.y", "yes", "--json"])).stdout),
     ]
     expect(printed.map(({ method, request }) => ({ method, request }))).toEqual([
       { method: "unbind", request: { binding_id: "b-1", expected_revision: 2 } },
       { method: "rebind", request: { binding_id: "b-1", session: "other", expected_revision: 2 } },
-      { method: "report", request: { session: "my-tui", kind: "question", text: "proceed?", binding_id: "b-1", request_id: "ui-1" } },
+      { method: "report", request: { session: "my-tui", kind: "question", text: "proceed?", binding_id: "b-1", request_id: "ui-1", request_kind: "confirm" } },
       { method: "answer", request: { binding_id: "b-1", reply_token: "rt1.x.y", answer: "yes" } },
     ])
   })

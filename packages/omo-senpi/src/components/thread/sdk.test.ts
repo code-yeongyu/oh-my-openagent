@@ -180,6 +180,19 @@ describe("thread SDK: bindings and the connector surface", () => {
   })
 })
 
+describe("thread SDK: request kinds", () => {
+  test("#given a confirm question reported with request_kind #when an unknown kind is named, and when the question is answered no #then the unknown kind is invalid_arguments and the answer is not refused as blank or unreadable", async () => {
+    const { sdk } = fixture()
+    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c-kind" } })
+    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    expect(await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "ok?", request_id: "ui-k", request_kind: "radio" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    const asked = await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "ok?", request_id: "ui-k", request_kind: "confirm" })
+    const token = (asked as { reply_token: string }).reply_token
+    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "maybe" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "no" })).not.toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+})
+
 describe("thread SDK: takeover", () => {
   test("#given a host session #when located and released #then the release carries reason takeover and the flags on the serving endpoint", async () => {
     const { sdk, releases } = fixture()

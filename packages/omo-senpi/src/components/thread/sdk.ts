@@ -4,6 +4,7 @@ import type { AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
+import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
 import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
 import type { GatewayRelay } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -49,7 +50,7 @@ export type ThreadSdk = {
   readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Relayed<"unbind">
   readonly rebind: (request: Scoped & Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session: string }) => Relayed<"rebind">
   readonly bindings: (request: Scoped & { readonly session?: string; readonly platform?: string; readonly account_id?: string; readonly chat_id?: string; readonly thread_id?: string; readonly status?: string; readonly cursor?: string; readonly limit?: number }) => Relayed<"bindings">
-  readonly report: (request: Scoped & Keyed & { readonly session: string; readonly kind: string; readonly text: string; readonly binding_id?: string; readonly request_id?: string }) => Relayed<"report">
+  readonly report: (request: Scoped & Keyed & { readonly session: string; readonly kind: string; readonly text: string; readonly binding_id?: string; readonly request_id?: string; readonly request_kind?: string }) => Relayed<"report">
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Relayed<"outbox">
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Relayed<"ack">
   readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Relayed<"answer">
@@ -159,6 +160,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     report: (request) => guarded(async () => {
       const event = OUTBOUND_EVENTS.find((candidate): candidate is OutboundEvent => candidate === request.kind)
       if (event === undefined) return fail("invalid_arguments", `The report kind must be one of ${OUTBOUND_EVENTS.join(", ")}.`, "Pass milestone, report, question or completion.")
+      const requestKind = request.request_kind
+      if (requestKind !== undefined && !isUiRequestKind(requestKind)) return fail("invalid_arguments", `The request kind must be one of ${UI_REQUEST_KINDS.join(", ")}.`, "Pass question, select, confirm, input or editor.")
       const session = await sessionId(request.session, request.all_scope)
       if ("kind" in session) return session
       const reported = await relay.report({
@@ -169,6 +172,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         text: request.text,
         ...(request.binding_id === undefined ? {} : { binding_id: request.binding_id }),
         ...(request.request_id === undefined ? {} : { request_id: request.request_id }),
+        ...(requestKind === undefined ? {} : { request_kind: requestKind }),
       })
       if (reported.kind === "ok" && reported.armed) await wakeForArm(session.id)
       return reported
