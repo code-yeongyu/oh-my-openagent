@@ -5,6 +5,7 @@ import type { Platform } from "../adapter/contract"
 import type { AdapterFactory } from "./cli"
 
 const BUILTIN = new Map<Platform, () => Promise<AdapterFactory>>([
+  ["slack", async () => (await import("../adapters/slack/connect")).createAdapter],
   ["discord", async () => (await import("../adapters/discord/connect")).createAdapter],
   ["telegram", async () => (await import("../adapters/telegram/connect")).createAdapter],
 ])
