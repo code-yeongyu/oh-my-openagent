@@ -150,6 +150,13 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "INSERT OR IGNORE INTO gateway_meta (key, value) VALUES ('realm_id', 'realm-' || lower(hex(randomblob(16))))",
     "INSERT OR IGNORE INTO gateway_meta (key, value) VALUES ('token_secret', lower(hex(randomblob(32))))",
   ],
+  // v3: which extension UI request a question row answers (the answer's wire shape depends on it;
+  // NULL reads as `question`), and whether a claimed answer is still being handed over (`in_flight`)
+  // or reached the session (`delivered`; NULL on rows answered before v3).
+  [
+    "ALTER TABLE outbox ADD COLUMN ui_request_kind TEXT CHECK (ui_request_kind IS NULL OR ui_request_kind IN ('question', 'select', 'confirm', 'input', 'editor'))",
+    "ALTER TABLE outbox ADD COLUMN answer_state TEXT CHECK (answer_state IS NULL OR answer_state IN ('in_flight', 'delivered'))",
+  ],
 ]
 
 export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms"] as const

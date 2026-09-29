@@ -1,3 +1,5 @@
+import type { AnswerFields } from "./answer-shape"
+
 /**
  * The narrow seam between the gateway and senpi. Every senpi interaction the store, engine and
  * drain need goes through these two ports, typed against the senpi `feat/tui-control-endpoint`
@@ -80,7 +82,8 @@ export type GatewayEndpointPort = {
   readonly respondUi?: (endpoint: GatewayEndpointRef, answer: UiAnswer) => Promise<UiAnswerReply>
 }
 
-export type UiAnswer = { readonly ui_request_id: string; readonly text: string }
+/** `fields` is the answer in the shape its request kind reads (`answer-shape.ts`). */
+export type UiAnswer = { readonly ui_request_id: string; readonly fields: AnswerFields }
 /** `error` is the endpoint's own refusal code (`unknown_request`, `question_already_resolved`, ...). */
 export type UiAnswerReply = { readonly delivered: true } | { readonly delivered: false; readonly error: string }
 

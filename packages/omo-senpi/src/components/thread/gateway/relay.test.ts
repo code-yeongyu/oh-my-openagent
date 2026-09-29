@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { parseThreadParams, threadToolParamSchemas } from "../contracts"
+import type { AnswerFields } from "./answer-shape"
 import { type BindInput, RELAY_TEXT_MAX_BYTES } from "./bindings"
 import { createCompletionTracker } from "./completion"
 import { createInboxDrain } from "./drain"
@@ -20,7 +21,7 @@ afterEach(async () => {
   harness = undefined
 })
 
-type UiResponse = { readonly session: string; readonly ui_request_id: string; readonly text: string }
+type UiResponse = { readonly session: string; readonly ui_request_id: string; readonly fields: AnswerFields }
 
 function relayOn(h: GatewayHarness, store: GatewayStore = h.store()) {
   const responses: UiResponse[] = []
@@ -143,7 +144,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
     expect(responses).toEqual([])
     expect(ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toMatchObject({ binding_id: x, session_durable_id: "B", cursor: asked.cursor })
-    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-7", text: "yes" }])
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-7", fields: { answers: {}, comment: "yes" } }])
     expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))).toBe("already_answered")
     expect(code(await relay.answer({ binding_id: x, reply_token: `${token.slice(0, -2)}xx`, answer: "forged" }))).toBe("invalid_arguments")
     expect(responses).toHaveLength(1)
@@ -168,7 +169,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(ok(await relay.outbox({ binding_id: y })).rows.find((row) => row.reply_token === offline)?.question_state).toBe("pending")
     b.online = true
     ok(await relay.answer({ binding_id: y, reply_token: offline, answer: "later" }))
-    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-3", text: "later" }])
+    expect(responses).toEqual([{ session: "B", ui_request_id: "ui-3", fields: { answers: {}, comment: "later" } }])
   })
 
   test("#given a completion armed through a binding #when agent_end fires, a retry ends again, and the session settles #then no row appears at any agent_end and exactly one appears at the settle, with the final run's real outcome", async () => {
@@ -232,7 +233,7 @@ describe("answer_when_the_session_cannot_be_located", () => {
     const h = (harness = createGatewayHarness())
     h.session("B")
     const store = h.store()
-    const delivered: string[] = []
+    const delivered: AnswerFields[] = []
     let hostGone = true
     const relay = createGatewayRelay({
       store,
@@ -240,7 +241,7 @@ describe("answer_when_the_session_cannot_be_located", () => {
       endpoints: {
         wake: async () => ({ admitted: [] }),
         respondUi: async (_endpoint, answer) => {
-          delivered.push(answer.text)
+          delivered.push(answer.fields)
           return { delivered: true }
         },
       },
@@ -269,7 +270,7 @@ describe("answer_when_the_session_cannot_be_located", () => {
     // then
     expect(retried).toMatchObject({ kind: "ok", binding_id: x, session_durable_id: "B" })
     expect(code(replay)).toBe("already_answered")
-    expect(delivered).toEqual(["yes"])
+    expect(delivered).toEqual([{ answers: {}, comment: "yes" }])
   })
 
   test("#given a pending question #when the answer text is empty or whitespace #then it is invalid_arguments, nothing is claimed and nothing is sent", async () => {
@@ -303,7 +304,7 @@ describe("answer_release_retry_past_the_lock_wait_bound", () => {
         return done
       },
     }
-    const responses: string[] = []
+    const responses: AnswerFields[] = []
     let failHandOff = true
     const relay = createGatewayRelay({
       store,
@@ -312,7 +313,7 @@ describe("answer_release_retry_past_the_lock_wait_bound", () => {
         wake: async () => ({ admitted: [] }),
         respondUi: async (_endpoint, answer) => {
           if (failHandOff) throw new Error("the session hung up")
-          responses.push(answer.text)
+          responses.push(answer.fields)
           return { delivered: true }
         },
       },
@@ -326,6 +327,6 @@ describe("answer_release_retry_past_the_lock_wait_bound", () => {
     expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
     failHandOff = false
     ok(await relay.answer({ binding_id: x, reply_token: token, answer: "yes" }))
-    expect({ responses, releases }).toEqual({ responses: ["yes"], releases: 2 })
+    expect({ responses, releases }).toEqual({ responses: [{ answers: {}, comment: "yes" }], releases: 2 })
   })
 })

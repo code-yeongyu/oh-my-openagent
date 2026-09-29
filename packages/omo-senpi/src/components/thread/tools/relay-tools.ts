@@ -142,6 +142,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         event: input.kind,
         text: input.text,
         ...(input.request_id === undefined ? {} : { request_id: input.request_id }),
+        ...(input.request_kind === undefined ? {} : { request_kind: input.request_kind }),
       })
       if (reported.kind === "ok" && reported.armed) options.onCompletionArmed?.(callerId)
       return reported as ThreadToolResult

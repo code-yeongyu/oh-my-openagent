@@ -41,7 +41,7 @@ describe("schema migration v1 -> v2", () => {
     const bound = await store.bind({ now: h.clock.now, receipt: null, binding: { platform: "telegram", account_id: "bot", chat_id: "c", thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "B", direction: { inbound: true, outbound: true }, inbound_mode: "follow_up", outbound_events: ["question"], policy_id: "default", ttl_seconds: null } })
     if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
     expect(bound.binding.session_realm_id).toMatch(/^realm-[0-9a-f]{32}$/)
-    const asked = await store.report({ now: h.clock.now, receipt: null, session_durable_id: "B", binding_id: bound.binding.binding_id, event: "question", text: "ok?", ui_request_id: "ui-1" })
+    const asked = await store.report({ now: h.clock.now, receipt: null, session_durable_id: "B", binding_id: bound.binding.binding_id, event: "question", text: "ok?", ui_request_id: "ui-1", ui_request_kind: null })
     if (asked.kind !== "ok") throw new Error(JSON.stringify(asked))
     expect(await store.claimAnswer({ now: h.clock.now, binding_id: bound.binding.binding_id, reply_token: asked.reply_token as string, answer: "yes" })).toMatchObject({ kind: "ok", ui_request_id: "ui-1", session_durable_id: "B" })
     await store.registerIncarnation({ durable_id: "B", incarnation: "runtime-1" })

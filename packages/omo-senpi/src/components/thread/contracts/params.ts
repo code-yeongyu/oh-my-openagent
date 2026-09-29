@@ -245,6 +245,11 @@ export const ThreadReportParams = Type.Object({
   request_id: Type.Optional(
     Type.String({ minLength: 1, description: "For kind question: the id of this session's pending extension UI request the answer resolves." }),
   ),
+  request_kind: Type.Optional(
+    Type.Union([Type.Literal("question"), Type.Literal("select"), Type.Literal("confirm"), Type.Literal("input"), Type.Literal("editor")], {
+      description: "For kind question: which extension UI request request_id is (default question). It decides the answer forms thread_answer accepts: confirm takes yes/no, input and editor take any text including empty, question and select take non-blank text.",
+    }),
+  ),
   idempotency_key: IdempotencyKey,
 })
 

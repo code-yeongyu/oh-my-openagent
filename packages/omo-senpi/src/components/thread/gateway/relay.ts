@@ -7,6 +7,7 @@
  */
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { GatewayEndpointPort, GatewayEndpointRef, UiAnswerReply } from "./adapter"
+import { answerShape, type UiRequestKind } from "./answer-shape"
 import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
 import type { GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
@@ -23,7 +24,7 @@ export type GatewayRelay = {
   readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly already_closed: boolean; readonly in_flight: readonly string[]; readonly deduplicated: boolean }>>
   readonly rebind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session_durable_id: string }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly closed: readonly string[]; readonly deduplicated: boolean }>>
   readonly bindings: (request: { readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number }) => Promise<RelayResult<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
-  readonly report: (request: Keyed & { readonly session_durable_id: string; readonly binding_id?: string; readonly event: OutboundEvent; readonly text: string; readonly request_id?: string }) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
+  readonly report: (request: Keyed & { readonly session_durable_id: string; readonly binding_id?: string; readonly event: OutboundEvent; readonly text: string; readonly request_id?: string; readonly request_kind?: UiRequestKind }) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayResult<OutboxPage>>
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayResult<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   /** `binding_id` is the binding the answer arrived THROUGH (the connector's authenticated context), never read from the token. */
@@ -52,6 +53,7 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   stale_revision: "Call thread_bindings for the current revision and retry with it.",
   stale_token: "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
   already_answered: "Nothing to do: the question has its answer.",
+  answer_in_progress: "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain: "Call thread_bindings or thread_outbox to see the current state before retrying with a new key.",
   scope_denied: "Report through a binding attached to this session; thread_bindings lists them.",
@@ -84,13 +86,20 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
   const now = options.now ?? Date.now
   const store = options.store
 
-  // A claimed answer whose hand-off failed goes back to pending. A release that gives up at the
-  // store's lock-wait bound is retried in the background after the busy timeout until it lands, so
-  // the question never stays `answered` without having reached the session.
+  // A claimed answer whose hand-off failed goes back to pending; one that reached the session is
+  // confirmed, so a later answer reads `already_answered` instead of `answer_in_progress`. A release
+  // or confirmation that gives up at the store's lock-wait bound is retried in the background after
+  // the busy timeout until it lands, so the question never stays `answered` without having reached
+  // the session.
   const retries = new Set<{ readonly cancel: () => void }>()
   let disposed = false
   async function release(replyToken: string): Promise<void> {
-    const attempt = () => store.releaseAnswer({ reply_token: replyToken })
+    await settleClaim(() => store.releaseAnswer({ reply_token: replyToken }))
+  }
+  async function confirm(replyToken: string): Promise<void> {
+    await settleClaim(() => store.confirmAnswer({ reply_token: replyToken }))
+  }
+  async function settleClaim(attempt: () => Promise<boolean>): Promise<void> {
     try {
       await attempt()
     } catch (error) {
@@ -122,7 +131,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     report: async (request) => {
       const tooLarge = textTooLarge(request.text)
       if (tooLarge !== undefined) return tooLarge
-      const args = { session_durable_id: request.session_durable_id, binding_id: request.binding_id ?? null, event: request.event, text: request.text, ui_request_id: request.request_id ?? null }
+      const args = { session_durable_id: request.session_durable_id, binding_id: request.binding_id ?? null, event: request.event, text: request.text, ui_request_id: request.request_id ?? null, ui_request_kind: request.request_kind ?? null }
       return fromStore(await store.report({ now: now(), receipt: receipt(request, "thread_report", args), ...args })) as RelayResult<ReportOpResult & { deduplicated: boolean }>
     },
     outbox: async (request) => fromStore(await store.readOutbox({ now: now(), ...request })),
@@ -130,8 +139,6 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     answer: async (request) => {
       const tooLarge = textTooLarge(request.answer)
       if (tooLarge !== undefined) return tooLarge
-      // The relay cannot tell which dialog asked; a blank text is no decision on a question (a host refuses it).
-      if (request.answer.trim() === "") return failure("invalid_arguments", "The answer text is empty.", undefined, "Answer with non-empty text.")
       const claim = await store.claimAnswer({ now: now(), ...request })
       if (claim.kind !== "ok") return fromStore(claim)
       const respond = options.endpoints.respondUi
@@ -148,9 +155,14 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         await release(request.reply_token)
         return failure(respond === undefined ? "unsupported" : "host_unavailable", `The session that asked is not reachable to take the answer${unreachable}.`, { session: claim.session_durable_id })
       }
+      const shape = answerShape(claim.ui_request_kind, request.answer)
+      if (!shape.ok) {
+        await release(request.reply_token)
+        return failure("invalid_arguments", shape.reason, { session: claim.session_durable_id, ui_request_kind: claim.ui_request_kind })
+      }
       let reply: UiAnswerReply
       try {
-        reply = await respond(endpoint, { ui_request_id: claim.ui_request_id, text: request.answer })
+        reply = await respond(endpoint, { ui_request_id: claim.ui_request_id, fields: shape.fields })
       } catch (error) {
         await release(request.reply_token)
         return failure("host_unavailable", `The answer could not be handed to the session: ${error instanceof Error ? error.message : String(error)}`, { session: claim.session_durable_id })
@@ -168,6 +180,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
             : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
         )
       }
+      await confirm(request.reply_token)
       return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }
     },
     inbound: async (request) => {

@@ -98,6 +98,7 @@ export type GatewayStore = {
   readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayOutcome<AnswerClaim>>
   readonly releaseAnswer: (request: { readonly reply_token: string }) => Promise<boolean>
+  readonly confirmAnswer: (request: { readonly reply_token: string }) => Promise<boolean>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
@@ -218,6 +219,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     ackOutbox: (request) => call("ack_outbox", request),
     claimAnswer: (request) => call("claim_answer", request),
     releaseAnswer: (request) => call("release_answer", request),
+    confirmAnswer: (request) => call("confirm_answer", request),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

@@ -273,6 +273,7 @@ describe("thread error taxonomy", () => {
       "stale_revision",
       "stale_token",
       "already_answered",
+      "answer_in_progress",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })
