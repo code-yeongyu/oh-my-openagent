@@ -32,7 +32,7 @@ export function resolveUserOmoConfigDirectory(env: OmoConfigEnv = process.env): 
   return join(resolveHomeDir(env), ".omo")
 }
 
-function detectUserOmoJsonPath(env: OmoConfigEnv, fileSystem: OmoConfigReadFileSystem): string {
+export function detectUserOmoJsonPath(env: OmoConfigEnv, fileSystem: OmoConfigReadFileSystem): string {
   const configDir = resolveUserOmoConfigDirectory(env)
   const jsoncPath = join(configDir, "omo.jsonc")
   if (fileSystem.existsSync(jsoncPath)) return jsoncPath

@@ -12,6 +12,7 @@ import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
+import { OmoGatewayConfigSchema } from "./gateway"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -26,6 +27,7 @@ export const OmoDisabledSkillsSchema = z.array(z.string())
 
 export const OmoTypedHarnessConfigSchema = z.object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -42,6 +44,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
 
 export const OmoConfigProfileSchema = z.object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -62,6 +65,7 @@ export const OmoConfigProfileSchema = z.object({
 
 export const OmoConfigSchema = z.object({
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -86,6 +90,7 @@ export const OmoConfigSchema = z.object({
 
 export const OmoConfigLayerSchema = z.object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),

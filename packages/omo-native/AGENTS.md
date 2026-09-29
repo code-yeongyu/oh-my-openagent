@@ -10,6 +10,7 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
 - brand: the launcher injects a `SENPI_BRAND` profile (name, `~/.omo/agent` home, `OMO_*` env prefix, wire identity, omo-ai update channel of the running version) so the pinned engine presents as omo; `--version` and every self-update spelling are answered by the launcher. See `docs/reference/omo-ai-publishing.md`.
 - `bin/lib/` - launcher modules:
   - `launcher.js` — `runLauncher()` dispatch, senpi environment/brand/update routing
+  - `doctor-command.js` — `omo doctor` entry: gathers the category-coverage, computer-use and gateway rows, then runs `doctor.js`
   - `agent-dir.js` — `canonicalAgentDir()`, `adoptLegacyFlatState()`, legacy flat-dir migration
   - `setup-detect.js` / `setup-import.js` / `setup-models.js` / `setup-report.js` — harness detection, SQLite read-only import, provider mapping, report rendering
   - `setup-detect-cache.js` / `setup-detect-refresh.js` — the interactive launch's setup-suggestion cache: a

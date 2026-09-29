@@ -46,6 +46,178 @@
       ],
       "additionalProperties": false
     },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "stt": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "minLength": 1
+            },
+            "credentials_env": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "provider",
+            "credentials_env"
+          ],
+          "additionalProperties": false
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "memory_identity": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lead": {
+                "type": "object",
+                "properties": {
+                  "cwd": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model_profile": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "agent_accounts": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "rule_sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "playbook"
+                    },
+                    "repo": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ref": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "include": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "repo"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "surfaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "platform": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "telegram",
+                        "notion",
+                        "feishu"
+                      ]
+                    },
+                    "account_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "credentials_dir": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "credentials_file": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "credentials_env": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "token_kind": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "bot"
+                      ]
+                    },
+                    "domain": {
+                      "type": "string",
+                      "enum": [
+                        "feishu",
+                        "lark"
+                      ]
+                    },
+                    "listen": {
+                      "type": "object",
+                      "properties": {
+                        "dm": {
+                          "type": "boolean"
+                        },
+                        "mention": {
+                          "type": "boolean"
+                        },
+                        "bound_threads": {
+                          "type": "boolean"
+                        },
+                        "owned_chats": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "platform"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
+    },
     "$schema": {
       "type": "string"
     },
@@ -12266,6 +12438,178 @@
           },
           "additionalProperties": false
         },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "stt": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "credentials_env": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "provider",
+                "credentials_env"
+              ],
+              "additionalProperties": false
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "memory_identity": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "lead": {
+                    "type": "object",
+                    "properties": {
+                      "cwd": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "model_profile": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agent_accounts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "rule_sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "playbook"
+                        },
+                        "repo": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "include": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "repo"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "surfaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "slack",
+                            "discord",
+                            "telegram",
+                            "notion",
+                            "feishu"
+                          ]
+                        },
+                        "account_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_dir": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_file": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_env": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "token_kind": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "bot"
+                          ]
+                        },
+                        "domain": {
+                          "type": "string",
+                          "enum": [
+                            "feishu",
+                            "lark"
+                          ]
+                        },
+                        "listen": {
+                          "type": "object",
+                          "properties": {
+                            "dm": {
+                              "type": "boolean"
+                            },
+                            "mention": {
+                              "type": "boolean"
+                            },
+                            "bound_threads": {
+                              "type": "boolean"
+                            },
+                            "owned_chats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "platform"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false,
+          "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -14285,6 +14629,178 @@
           },
           "additionalProperties": false
         },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "stt": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "credentials_env": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "provider",
+                "credentials_env"
+              ],
+              "additionalProperties": false
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "memory_identity": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "lead": {
+                    "type": "object",
+                    "properties": {
+                      "cwd": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "model_profile": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agent_accounts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "rule_sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "playbook"
+                        },
+                        "repo": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "include": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "repo"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "surfaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "slack",
+                            "discord",
+                            "telegram",
+                            "notion",
+                            "feishu"
+                          ]
+                        },
+                        "account_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_dir": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_file": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_env": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "token_kind": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "bot"
+                          ]
+                        },
+                        "domain": {
+                          "type": "string",
+                          "enum": [
+                            "feishu",
+                            "lark"
+                          ]
+                        },
+                        "listen": {
+                          "type": "object",
+                          "properties": {
+                            "dm": {
+                              "type": "boolean"
+                            },
+                            "mention": {
+                              "type": "boolean"
+                            },
+                            "bound_threads": {
+                              "type": "boolean"
+                            },
+                            "owned_chats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "platform"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false,
+          "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -16303,6 +16819,178 @@
             }
           },
           "additionalProperties": false
+        },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "stt": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "credentials_env": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "provider",
+                "credentials_env"
+              ],
+              "additionalProperties": false
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "memory_identity": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "lead": {
+                    "type": "object",
+                    "properties": {
+                      "cwd": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "model_profile": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agent_accounts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "rule_sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "playbook"
+                        },
+                        "repo": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "include": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "repo"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "surfaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "slack",
+                            "discord",
+                            "telegram",
+                            "notion",
+                            "feishu"
+                          ]
+                        },
+                        "account_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_dir": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_file": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "credentials_env": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "token_kind": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "bot"
+                          ]
+                        },
+                        "domain": {
+                          "type": "string",
+                          "enum": [
+                            "feishu",
+                            "lark"
+                          ]
+                        },
+                        "listen": {
+                          "type": "object",
+                          "properties": {
+                            "dm": {
+                              "type": "boolean"
+                            },
+                            "mention": {
+                              "type": "boolean"
+                            },
+                            "bound_threads": {
+                              "type": "boolean"
+                            },
+                            "owned_chats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "platform"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false,
+          "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
         },
         "categories": {
           "type": "object",
@@ -18328,6 +19016,178 @@
               }
             },
             "additionalProperties": false
+          },
+          "gateway": {
+            "type": "object",
+            "properties": {
+              "stt": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "credentials_env": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "provider",
+                  "credentials_env"
+                ],
+                "additionalProperties": false
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "memory_identity": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "lead": {
+                      "type": "object",
+                      "properties": {
+                        "cwd": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "model_profile": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "agent_accounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "rule_sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "playbook"
+                          },
+                          "repo": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "ref": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "include": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "repo"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "surfaces": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "platform": {
+                            "type": "string",
+                            "enum": [
+                              "slack",
+                              "discord",
+                              "telegram",
+                              "notion",
+                              "feishu"
+                            ]
+                          },
+                          "account_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "credentials_dir": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "credentials_file": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "credentials_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "token_kind": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "bot"
+                            ]
+                          },
+                          "domain": {
+                            "type": "string",
+                            "enum": [
+                              "feishu",
+                              "lark"
+                            ]
+                          },
+                          "listen": {
+                            "type": "object",
+                            "properties": {
+                              "dm": {
+                                "type": "boolean"
+                              },
+                              "mention": {
+                                "type": "boolean"
+                              },
+                              "bound_threads": {
+                                "type": "boolean"
+                              },
+                              "owned_chats": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "platform"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false,
+            "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
           },
           "categories": {
             "type": "object",
@@ -30249,6 +31109,178 @@
                 },
                 "additionalProperties": false
               },
+              "gateway": {
+                "type": "object",
+                "properties": {
+                  "stt": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "credentials_env": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "credentials_env"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "memory_identity": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "lead": {
+                          "type": "object",
+                          "properties": {
+                            "cwd": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "model_profile": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agent_accounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "rule_sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "playbook"
+                              },
+                              "repo": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "ref": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "include": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "repo"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "surfaces": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "slack",
+                                  "discord",
+                                  "telegram",
+                                  "notion",
+                                  "feishu"
+                                ]
+                              },
+                              "account_id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_dir": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_file": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_env": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "token_kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "domain": {
+                                "type": "string",
+                                "enum": [
+                                  "feishu",
+                                  "lark"
+                                ]
+                              },
+                              "listen": {
+                                "type": "object",
+                                "properties": {
+                                  "dm": {
+                                    "type": "boolean"
+                                  },
+                                  "mention": {
+                                    "type": "boolean"
+                                  },
+                                  "bound_threads": {
+                                    "type": "boolean"
+                                  },
+                                  "owned_chats": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "platform"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -32268,6 +33300,178 @@
                 },
                 "additionalProperties": false
               },
+              "gateway": {
+                "type": "object",
+                "properties": {
+                  "stt": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "credentials_env": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "credentials_env"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "memory_identity": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "lead": {
+                          "type": "object",
+                          "properties": {
+                            "cwd": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "model_profile": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agent_accounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "rule_sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "playbook"
+                              },
+                              "repo": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "ref": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "include": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "repo"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "surfaces": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "slack",
+                                  "discord",
+                                  "telegram",
+                                  "notion",
+                                  "feishu"
+                                ]
+                              },
+                              "account_id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_dir": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_file": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_env": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "token_kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "domain": {
+                                "type": "string",
+                                "enum": [
+                                  "feishu",
+                                  "lark"
+                                ]
+                              },
+                              "listen": {
+                                "type": "object",
+                                "properties": {
+                                  "dm": {
+                                    "type": "boolean"
+                                  },
+                                  "mention": {
+                                    "type": "boolean"
+                                  },
+                                  "bound_threads": {
+                                    "type": "boolean"
+                                  },
+                                  "owned_chats": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "platform"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -34286,6 +35490,178 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "gateway": {
+                "type": "object",
+                "properties": {
+                  "stt": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "credentials_env": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "credentials_env"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "memory_identity": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "lead": {
+                          "type": "object",
+                          "properties": {
+                            "cwd": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "model_profile": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agent_accounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "rule_sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "playbook"
+                              },
+                              "repo": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "ref": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "include": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "repo"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "surfaces": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "slack",
+                                  "discord",
+                                  "telegram",
+                                  "notion",
+                                  "feishu"
+                                ]
+                              },
+                              "account_id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_dir": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_file": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentials_env": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "token_kind": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "bot"
+                                ]
+                              },
+                              "domain": {
+                                "type": "string",
+                                "enum": [
+                                  "feishu",
+                                  "lark"
+                                ]
+                              },
+                              "listen": {
+                                "type": "object",
+                                "properties": {
+                                  "dm": {
+                                    "type": "boolean"
+                                  },
+                                  "mention": {
+                                    "type": "boolean"
+                                  },
+                                  "bound_threads": {
+                                    "type": "boolean"
+                                  },
+                                  "owned_chats": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "platform"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning."
               },
               "categories": {
                 "type": "object",

@@ -1,3 +1,20 @@
+## 2026-09-29 - `omo gateway` answers with the gateway config surface
+
+`bin/lib/gateway.js` gives the launcher an `omo gateway <status|connect|lead|rules|link|service>` dispatcher in the
+`omo daemon` style: with no `gateway` key in the user config (`~/.omo/omo.jsonc`, else `~/.omo/omo.json`, JSONC, top level
+or `[native]` block) every subcommand prints `not configured` and exits 0, `status --json` reports the configured scope ids
+with empty connector lists, and the not-yet-built subcommands refuse with exit 2 instead of pretending. Chat credentials and
+listener scopes are per-person, so a project `.omo` layer or a profile never sets `gateway`: omo-config-core's loader drops it
+there with an `ignored-keys` diagnostic, `omo gateway` names the ignored file on stderr, and `omo doctor` prints a WARN row for
+it. The section is resolved and validated through a new staged runtime (`plugin/runtime/gateway-schema/index.js`, bundled
+from `gateway-schema-entry.ts` by build:omo-native) that reuses the loader's user-file lookup; the doctor row names the file
+and the `gateway.` schema path of every error, fails the run on an invalid section, and is fail-open and silent when the
+runtime is missing or no gateway section exists. A missing runtime makes `omo gateway` exit 1 rather than claim
+`not configured`. The `@oh-my-opencode/omo-gateway`
+package itself lands as a registered scaffold and is never imported on the startup path. The `gateway` config section (scopes,
+surfaces across slack/discord/telegram/notion/feishu, rule_sources, stt; strict unknown-key rejection; one scope per surface account)
+lives in omo-config-core and in the regenerated assets/omo.schema.json.
+
 ## 2026-09-29 - `omo doctor` names the active config dir and flags edits left in ~/.pi/agent (#9173)
 
 `bin/lib/doctor-pi-config.js` adds two kinds of lines to both doctor paths (`bin/lib/doctor.js` and the compiled

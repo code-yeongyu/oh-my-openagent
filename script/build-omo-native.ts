@@ -39,7 +39,12 @@ export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 // plain JS, so this bundle is its route to the TypeScript resolver; omo-senpi installs never load it.
 export const CATEGORY_COVERAGE_ENTRY = join(packageDir, "category-coverage-entry.ts")
 export const CATEGORY_COVERAGE_ARTIFACT = join("runtime", "category-coverage", "index.js")
-export const NATIVE_REQUIRED_ARTIFACTS = [...REQUIRED_PLUGIN_ARTIFACTS, CATEGORY_COVERAGE_ARTIFACT] as const
+// Native-only runtime: `omo doctor` validates the omo.json `gateway` section through it
+// (bin/lib/gateway.js). Same route as category-coverage: the launcher is plain JS, so the bundle
+// is its only way to the owning schema in omo-config-core.
+export const GATEWAY_SCHEMA_ENTRY = join(packageDir, "gateway-schema-entry.ts")
+export const GATEWAY_SCHEMA_ARTIFACT = join("runtime", "gateway-schema", "index.js")
+export const NATIVE_REQUIRED_ARTIFACTS = [...REQUIRED_PLUGIN_ARTIFACTS, CATEGORY_COVERAGE_ARTIFACT, GATEWAY_SCHEMA_ARTIFACT] as const
 
 interface BuildOptions {
   readonly outputDir: string
@@ -133,6 +138,7 @@ function runSenpiPluginBuild(outputDir: string): void {
     }
     copyFileSync(join(repoRoot, "CHANGELOG.md"), join(stagedPluginDir, "CHANGELOG.md"))
     buildCategoryCoverageRuntime(join(stagedPluginDir, CATEGORY_COVERAGE_ARTIFACT))
+    buildGatewaySchemaRuntime(join(stagedPluginDir, GATEWAY_SCHEMA_ARTIFACT))
     copyPluginPayload(outputDir, stagedPluginDir)
   } finally {
     rmSync(buildRoot, { recursive: true, force: true })
@@ -147,6 +153,16 @@ function buildCategoryCoverageRuntime(outfile: string): void {
   )
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) throw new Error(`category-coverage runtime build failed with exit code ${result.status ?? 1}`)
+}
+
+function buildGatewaySchemaRuntime(outfile: string): void {
+  const result = spawnSync(
+    "bun",
+    ["build", GATEWAY_SCHEMA_ENTRY, "--target", "node", "--format", "esm", "--minify-syntax", "--minify-whitespace", "--outfile", outfile],
+    { cwd: repoRoot, stdio: "inherit" },
+  )
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`gateway-schema runtime build failed with exit code ${result.status ?? 1}`)
 }
 
 function copyTree(sourceDir: string, outputDir: string): void {

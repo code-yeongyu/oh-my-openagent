@@ -435,8 +435,14 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...staleEngineReport(options))
   lines.push(...retiredPayloadReport(options))
   lines.push(...transientMemoryReport(options))
-  lines.push(...daemonReport(options), ...(options.computerUse ?? []), ...(options.categoryCoverage ?? []))
+  lines.push(
+    ...daemonReport(options),
+    ...(options.computerUse ?? []),
+    ...(options.categoryCoverage ?? []),
+    ...(options.gatewayConfig ?? []),
+  )
   if ((options.computerUse ?? []).some((line) => line.startsWith("FAIL "))) failed = true
+  if ((options.gatewayConfig ?? []).some((line) => line.startsWith("FAIL "))) failed = true
   if (needsSetupSuggestion(inventory)) {
     lines.push("INFO no credentials found; run omo setup to review sibling stores")
   }

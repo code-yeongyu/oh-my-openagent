@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
 import type { OmoConfig, OmoHarnessId, OmoLegacyHarnessId } from "../schema"
 
-export type OmoConfigDiagnosticKind = "deprecated-keys" | "parse" | "profile" | "read" | "unknown-keys" | "validation"
+export type OmoConfigDiagnosticKind = "deprecated-keys" | "ignored-keys" | "parse" | "profile" | "read" | "unknown-keys" | "validation"
 
 export type OmoConfigDiagnostic = {
   readonly kind: OmoConfigDiagnosticKind

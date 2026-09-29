@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ba8ed54e8ac9380e75626d4495e9965d235b52031e1bff77ca815bacd1f6c42b:122f9ce68e7cd9d26b672a9fafae5d9177c8e96036e5626cbe012efaa8901965
+// omo-codex-install:38054fb49b824cb830913795dcec614e2940bb774bbb809752ecd08d48b1efc7:e9a2639b447894a2aba7beff64ad4dd9ba9c0da50d993ada9835da2a8695ed51
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -316,7 +316,7 @@ function shouldRetainLine(line, cutoffMs) {
 function parseDiagnosticLine(line) {
   try {
     const parsed = JSON.parse(line);
-    if (!isRecord10(parsed)) {
+    if (!isRecord11(parsed)) {
       return null;
     }
     return parsed;
@@ -327,7 +327,7 @@ function parseDiagnosticLine(line) {
     throw error;
   }
 }
-function isRecord10(value) {
+function isRecord11(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function trimToMaxBytes(lines) {
@@ -7817,7 +7817,7 @@ function coerceBool(value) {
 function coerceString(value) {
   return typeof value == "string" ? value : undefined;
 }
-function isRecord11(value) {
+function isRecord12(value) {
   return typeof value == "object" && value !== null && !Array.isArray(value);
 }
 function toRfc3339(timestamp) {
@@ -7839,7 +7839,7 @@ function relocateInto(properties, key, value) {
     properties[key] = value;
 }
 function buildV1Event(message) {
-  const sourceProperties = isRecord11(message.properties) ? message.properties : {};
+  const sourceProperties = isRecord12(message.properties) ? message.properties : {};
   const properties = {
     ...sourceProperties
   };
@@ -19820,11 +19820,99 @@ var OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
   timeoutMs: number2().int().positive().default(3000)
 }).strict();
 
+// packages/omo-config-core/src/schema/gateway.ts
+var OMO_GATEWAY_PLATFORMS = ["slack", "discord", "telegram", "notion", "feishu"];
+var OmoGatewayPlatformSchema = _enum(OMO_GATEWAY_PLATFORMS);
+var absoluteOrHomePath = string2().min(1).refine((value) => value.startsWith("/") || value === "~" || value.startsWith("~/"), {
+  message: "must be an absolute path or start with ~"
+});
+function isAbsoluteHomeOrGitUrl(value) {
+  return value.startsWith("/") || value === "~" || value.startsWith("~/") || value.startsWith("https://") || value.startsWith("http://") || value.startsWith("git@") || value.startsWith("ssh://");
+}
+var OmoGatewayRuleSourceSchema = object({
+  kind: literal("playbook"),
+  repo: string2().min(1).refine(isAbsoluteHomeOrGitUrl, { message: "must be an absolute path, a ~/ path, or a git URL" }),
+  ref: string2().min(1).optional(),
+  include: array(string2().min(1)).optional()
+}).strict();
+var OmoGatewaySttSchema = object({
+  provider: string2().min(1),
+  credentials_env: string2().min(1)
+}).strict();
+var OmoGatewayListenSchema = object({
+  dm: boolean2().optional(),
+  mention: boolean2().optional(),
+  bound_threads: boolean2().optional(),
+  owned_chats: array(string2().min(1)).optional()
+}).strict();
+var OMO_GATEWAY_CREDENTIAL_FIELDS = ["credentials_dir", "credentials_file", "credentials_env"];
+var OmoGatewaySurfaceSchema = object({
+  platform: OmoGatewayPlatformSchema,
+  account_id: string2().min(1).optional(),
+  credentials_dir: absoluteOrHomePath.optional(),
+  credentials_file: absoluteOrHomePath.optional(),
+  credentials_env: string2().min(1).optional(),
+  token_kind: _enum(["user", "bot"]).optional(),
+  domain: _enum(["feishu", "lark"]).optional(),
+  listen: OmoGatewayListenSchema.optional()
+}).strict().superRefine((surface, ctx) => {
+  const present = OMO_GATEWAY_CREDENTIAL_FIELDS.filter((field) => surface[field] !== undefined);
+  if (present.length > 1) {
+    ctx.addIssue({
+      code: "custom",
+      path: [present[1]],
+      message: `a surface takes one of ${OMO_GATEWAY_CREDENTIAL_FIELDS.join(", ")}, not several`
+    });
+  }
+  if (surface.token_kind !== undefined && surface.platform !== "slack") {
+    ctx.addIssue({ code: "custom", path: ["token_kind"], message: "token_kind is a slack surface field" });
+  }
+  if (surface.domain !== undefined && surface.platform !== "feishu") {
+    ctx.addIssue({ code: "custom", path: ["domain"], message: "domain is a feishu surface field" });
+  }
+});
+var OmoGatewayLeadSchema = object({
+  cwd: string2().min(1).optional(),
+  model_profile: string2().min(1).optional()
+}).strict();
+var OmoGatewayScopeSchema = object({
+  id: string2().min(1),
+  memory_identity: string2().min(1).optional(),
+  lead: OmoGatewayLeadSchema.optional(),
+  agent_accounts: array(string2().min(1)).optional(),
+  rule_sources: array(OmoGatewayRuleSourceSchema).optional(),
+  surfaces: array(OmoGatewaySurfaceSchema).optional()
+}).strict();
+var OmoGatewayConfigSchema = object({
+  stt: OmoGatewaySttSchema.optional(),
+  scopes: array(OmoGatewayScopeSchema).optional()
+}).strict().superRefine((gateway, ctx) => {
+  const ownerByAccount = new Map;
+  gateway.scopes?.forEach((scope, scopeIndex) => {
+    scope.surfaces?.forEach((surface, surfaceIndex) => {
+      if (surface.account_id === undefined)
+        return;
+      const account = `${surface.platform}:${surface.account_id}`;
+      const ownerIndex = ownerByAccount.get(account);
+      if (ownerIndex === undefined) {
+        ownerByAccount.set(account, scopeIndex);
+        return;
+      }
+      ctx.addIssue({
+        code: "custom",
+        path: ["scopes", scopeIndex, "surfaces", surfaceIndex, "account_id"],
+        message: `surface account ${account} already belongs to scope ${gateway.scopes?.[ownerIndex]?.id ?? ownerIndex}`
+      });
+    });
+  });
+}).describe("Chat-surface gateway for OmO Native. Read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block; a project .omo layer or a profile that sets it is ignored with an omo doctor warning.");
+
 // packages/omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoDisabledSkillsSchema = array(string2());
 var OmoTypedHarnessConfigSchema = object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -19840,6 +19928,7 @@ var OmoTypedHarnessConfigSchema = object({
 }).strict();
 var OmoConfigProfileSchema = object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -19859,6 +19948,7 @@ var OmoConfigProfileSchema = object({
 }).strict();
 var OmoConfigSchema = object({
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -19882,6 +19972,7 @@ var OmoConfigSchema = object({
 }).strict();
 var OmoConfigLayerSchema = object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  gateway: OmoGatewayConfigSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -20849,39 +20940,6 @@ function printParseErrorCode(code) {
   return "<unknown ParseErrorCode>";
 }
 
-// packages/omo-config-core/src/loader/merge.ts
-var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-function isUnsafeObjectKey(key) {
-  return DANGEROUS_KEYS.has(key);
-}
-function isPlainObject2(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
-}
-function sanitizeOmoConfigValue(value) {
-  if (Array.isArray(value))
-    return value.map((entry) => sanitizeOmoConfigValue(entry));
-  if (!isPlainObject2(value))
-    return value;
-  const sanitized = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (isUnsafeObjectKey(key))
-      continue;
-    sanitized[key] = sanitizeOmoConfigValue(entry);
-  }
-  return sanitized;
-}
-function mergeOmoConfigRecords(base, override) {
-  const result = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    if (isUnsafeObjectKey(key))
-      continue;
-    const safeValue = sanitizeOmoConfigValue(value);
-    const baseValue = result[key];
-    result[key] = isPlainObject2(baseValue) && isPlainObject2(safeValue) ? mergeOmoConfigRecords(baseValue, safeValue) : safeValue;
-  }
-  return result;
-}
-
 // packages/omo-config-core/src/loader/paths.ts
 import { userInfo } from "node:os";
 import { dirname as dirname8, join as join18, posix, resolve as resolve7 } from "node:path";
@@ -20982,6 +21040,39 @@ function resolveOmoConfigPaths(options) {
   ];
 }
 
+// packages/omo-config-core/src/loader/merge.ts
+var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+function isUnsafeObjectKey(key) {
+  return DANGEROUS_KEYS.has(key);
+}
+function isPlainObject2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
+}
+function sanitizeOmoConfigValue(value) {
+  if (Array.isArray(value))
+    return value.map((entry) => sanitizeOmoConfigValue(entry));
+  if (!isPlainObject2(value))
+    return value;
+  const sanitized = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (isUnsafeObjectKey(key))
+      continue;
+    sanitized[key] = sanitizeOmoConfigValue(entry);
+  }
+  return sanitized;
+}
+function mergeOmoConfigRecords(base, override) {
+  const result = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (isUnsafeObjectKey(key))
+      continue;
+    const safeValue = sanitizeOmoConfigValue(value);
+    const baseValue = result[key];
+    result[key] = isPlainObject2(baseValue) && isPlainObject2(safeValue) ? mergeOmoConfigRecords(baseValue, safeValue) : safeValue;
+  }
+  return result;
+}
+
 // packages/omo-config-core/src/loader/resolution.ts
 var HARNESS_KEYS = [...new Set([...HARNESS_IDS, ...OMO_CONFIG_HARNESS_IDS, ...OMO_CONFIG_LEGACY_HARNESS_IDS])].map((harness) => harnessBlockKey(harness));
 function profileName(value) {
@@ -21045,7 +21136,70 @@ function resolveOmoConfigView(options) {
   };
 }
 
-// packages/omo-config-core/src/loader/loader.ts
+// packages/omo-config-core/src/loader/gateway.ts
+var GATEWAY_KEY = "gateway";
+var NATIVE_BLOCK_KEYS = new Set([
+  harnessBlockKey("native"),
+  ...Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES).filter(([, target]) => target === "native").map(([legacy]) => harnessBlockKey(legacy))
+]);
+function isRecord9(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isHarnessBlockKey(key) {
+  return key.startsWith("[") && key.endsWith("]");
+}
+function ignoredGatewayPlacements(document, scope) {
+  const placements = [];
+  if (scope === "project" && Object.hasOwn(document, GATEWAY_KEY))
+    placements.push([GATEWAY_KEY]);
+  for (const [key, block] of Object.entries(document)) {
+    if (!isHarnessBlockKey(key) || !isRecord9(block) || !Object.hasOwn(block, GATEWAY_KEY))
+      continue;
+    if (scope === "project" || !NATIVE_BLOCK_KEYS.has(key))
+      placements.push([key, GATEWAY_KEY]);
+  }
+  const profiles = document["profiles"];
+  if (isRecord9(profiles)) {
+    for (const [name, profile] of Object.entries(profiles)) {
+      if (!isRecord9(profile))
+        continue;
+      if (Object.hasOwn(profile, GATEWAY_KEY))
+        placements.push(["profiles", name, GATEWAY_KEY]);
+      for (const [key, block] of Object.entries(profile)) {
+        if (isHarnessBlockKey(key) && isRecord9(block) && Object.hasOwn(block, GATEWAY_KEY)) {
+          placements.push(["profiles", name, key, GATEWAY_KEY]);
+        }
+      }
+    }
+  }
+  return placements;
+}
+function dropIgnoredGatewayPlacements(document, scope) {
+  if (!isRecord9(document))
+    return { document, ignored: [] };
+  const placements = ignoredGatewayPlacements(document, scope);
+  if (placements.length === 0)
+    return { document, ignored: [] };
+  const pruned = structuredClone(document);
+  for (const placement of placements) {
+    let container = pruned;
+    for (const segment of placement.slice(0, -1))
+      container = isRecord9(container) ? container[segment] : undefined;
+    if (isRecord9(container))
+      delete container[GATEWAY_KEY];
+  }
+  return { document: pruned, ignored: placements.map((placement) => placement.join(".")) };
+}
+function ignoredGatewayDiagnostic(path, ignored) {
+  return {
+    kind: "ignored-keys",
+    message: `Ignored gateway in ${path}: ${ignored.join(", ")}. The gateway section is read only from the user config (~/.omo/omo.jsonc or ~/.omo/omo.json), at its top level or in its [native] block.`,
+    path,
+    issuePaths: ignored
+  };
+}
+
+// packages/omo-config-core/src/loader/layer-source.ts
 function parseJsoncSafe(content) {
   const errors = [];
   const data = parse4(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors, {
@@ -21059,23 +21213,6 @@ function parseJsoncSafe(content) {
       offset: error.offset
     }))
   };
-}
-var DEFAULT_RAW_CONFIG = {
-  agents: {},
-  categories: {},
-  task: resolveOmoTaskSettings({}),
-  teams: {}
-};
-function stripResolutionControlKeys(config) {
-  const {
-    "[codex]": _codex,
-    "[native]": _native,
-    "[opencode]": _opencode,
-    "[senpi]": _senpi,
-    profiles: _profiles,
-    ...resolved
-  } = config;
-  return resolved;
 }
 function validationDiagnostic(path, issues) {
   const issuePaths = issues.map((issue) => issue.path.map((segment) => String(segment)).join("."));
@@ -21095,21 +21232,21 @@ function hasUnsafeUnrecognizedKey(issues) {
 function hasTamperedPrototype(value) {
   if (Array.isArray(value))
     return value.some((entry) => hasTamperedPrototype(entry));
-  if (!isRecord9(value))
+  if (!isRecord10(value))
     return false;
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null)
     return true;
   return Object.values(value).some((entry) => hasTamperedPrototype(entry));
 }
-function isRecord9(value) {
+function isRecord10(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function containerAt(record, path) {
   let container = record;
   for (const segment of path) {
     const next = container[segment];
-    if (!isRecord9(next))
+    if (!isRecord10(next))
       return null;
     container = next;
   }
@@ -21169,8 +21306,13 @@ function readConfigSource(path, scope, fileSystem) {
       source: { exists: true, loaded: false, path, scope }
     };
   }
-  const parsedRecord = toRecord2(parsed.data);
-  const validation = OmoConfigLayerSchema.safeParse(parsed.data);
+  const gateway = dropIgnoredGatewayPlacements(parsed.data, scope);
+  const validated = validateConfigLayer(path, scope, gateway.document);
+  return gateway.ignored.length === 0 ? validated : { ...validated, ignored: ignoredGatewayDiagnostic(path, gateway.ignored) };
+}
+function validateConfigLayer(path, scope, data) {
+  const parsedRecord = toRecord2(data);
+  const validation = OmoConfigLayerSchema.safeParse(data);
   if (!validation.success) {
     const unrecognized = unrecognizedKeyIssues(validation.error.issues);
     if (hasUnsafeUnrecognizedKey(unrecognized)) {
@@ -21211,6 +21353,25 @@ function readConfigSource(path, scope, fileSystem) {
     value: parsedRecord
   };
 }
+
+// packages/omo-config-core/src/loader/loader.ts
+var DEFAULT_RAW_CONFIG = {
+  agents: {},
+  categories: {},
+  task: resolveOmoTaskSettings({}),
+  teams: {}
+};
+function stripResolutionControlKeys(config) {
+  const {
+    "[codex]": _codex,
+    "[native]": _native,
+    "[opencode]": _opencode,
+    "[senpi]": _senpi,
+    profiles: _profiles,
+    ...resolved
+  } = config;
+  return resolved;
+}
 function legacyCategoryDiagnostic(path, renames) {
   const detail = renames.map((rename) => rename.dropped ? `${rename.path} ignored because ${rename.canonical} is also configured` : `${rename.path} renamed to ${rename.canonical}`).join(", ");
   return {
@@ -21246,6 +21407,8 @@ function loadOmoConfig(options = {}) {
     sources.push(loaded.source);
     if (loaded.diagnostic !== undefined)
       diagnostics.push(loaded.diagnostic);
+    if (loaded.ignored !== undefined)
+      diagnostics.push(loaded.ignored);
     if (loaded.value !== undefined) {
       const canonicalized = canonicalizeLegacyCategoryNames(loaded.value);
       if (canonicalized.renames.length > 0) {

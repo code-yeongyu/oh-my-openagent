@@ -1,0 +1,16 @@
+{
+  "name": "@oh-my-opencode/omo-gateway",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Chat-surface gateway for oh-my-openagent: Slack, Discord, Telegram and Notion adapters, connector host, admission, dispatch and conversation rules on the session-gateway library.",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test src/**/*.test.ts",
+    "typecheck": "tsgo --noEmit -p tsconfig.json"
+  }
+}

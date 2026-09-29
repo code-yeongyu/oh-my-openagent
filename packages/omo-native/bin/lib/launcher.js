@@ -2,11 +2,10 @@ import { spawnSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { delimiter, isAbsolute, join, relative, sep } from "node:path"
 import { spawnNode } from "./child-process.js"
-import { doctorCoverageLines } from "./category-coverage.js"
-import { doctorComputerUseLines } from "./computer-use-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
-import { runDoctor } from "./doctor.js"
+import { runDoctorCommand } from "./doctor-command.js"
 import { ensureEnginePrepared } from "./engine-prepare.js"
+import { runGatewayCommand } from "./gateway.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseBanner, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
@@ -260,18 +259,12 @@ export async function runLauncher(args = process.argv.slice(2)) {
     process.exitCode = outcome
     return
   }
+  if (command === "gateway") {
+    process.exitCode = await runGatewayCommand(args.slice(1), { stdout: process.stdout, stderr: process.stderr })
+    return
+  }
   if (command === "doctor") {
-    const [categoryCoverage, computerUse] = args[1] === "--reap"
-      ? [[], []]
-      : await Promise.all([
-          doctorCoverageLines({ agentDir: canonicalAgentDir() }),
-          doctorComputerUseLines(),
-        ])
-    runDoctor(await detectHarnesses(), args.slice(1), {
-      daemonEngine: { run: engineHostCall },
-      categoryCoverage,
-      computerUse,
-    })
+    await runDoctorCommand(args.slice(1), { engineHostCall })
     return
   }
   if (command === "setup") {

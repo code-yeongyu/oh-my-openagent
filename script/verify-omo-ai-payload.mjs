@@ -25,6 +25,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
   // omo doctor / omo setup classify task-category coverage through it (bin/lib/category-coverage.js).
   "plugin/runtime/category-coverage/index.js",
+  // omo doctor validates the omo.json gateway section through it (bin/lib/gateway.js).
+  "plugin/runtime/gateway-schema/index.js",
 ]
 
 const MIN_SKILL_COUNT = 18
