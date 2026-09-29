@@ -226,6 +226,65 @@ describe("relay_direction_question_authority_and_completion", () => {
   })
 })
 
+describe("answer_when_the_session_cannot_be_located", () => {
+  test("#given a pending question whose host is gone #when thread_answer cannot locate the session #then it is host_unavailable with the question pending and no frame sent, and once the host is back a retry delivers exactly once", async () => {
+    // given
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const store = h.store()
+    const delivered: string[] = []
+    let hostGone = true
+    const relay = createGatewayRelay({
+      store,
+      engine: h.engineFor(store),
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: async (_endpoint, answer) => {
+          delivered.push(answer.text)
+          return { delivered: true }
+        },
+      },
+      locate: async () => {
+        if (hostGone) throw new Error("host_unavailable:/gone/rpc.sock")
+        return { kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }
+      },
+      now: () => h.clock.now,
+    })
+    const x = await bindAs(relay, binding("B"))
+    const token = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy?", request_id: "ui-9" })).reply_token as string
+
+    // when
+    const whileGone = await relay.answer({ binding_id: x, reply_token: token, answer: "yes" })
+
+    // then
+    expect(code(whileGone)).toBe("host_unavailable")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    expect(delivered).toEqual([])
+
+    // when
+    hostGone = false
+    const retried = await relay.answer({ binding_id: x, reply_token: token, answer: "yes" })
+    const replay = await relay.answer({ binding_id: x, reply_token: token, answer: "yes" })
+
+    // then
+    expect(retried).toMatchObject({ kind: "ok", binding_id: x, session_durable_id: "B" })
+    expect(code(replay)).toBe("already_answered")
+    expect(delivered).toEqual(["yes"])
+  })
+
+  test("#given a pending question #when the answer text is empty or whitespace #then it is invalid_arguments, nothing is claimed and nothing is sent", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, responses } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const token = ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "question", text: "deploy?", request_id: "ui-10" })).reply_token as string
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: "" }))).toBe("invalid_arguments")
+    expect(code(await relay.answer({ binding_id: x, reply_token: token, answer: " \n\t " }))).toBe("invalid_arguments")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.question_state)).toEqual(["pending"])
+    expect(responses).toEqual([])
+  })
+})
+
 describe("answer_release_retry_past_the_lock_wait_bound", () => {
   test("#given an answer whose hand-off failed #when releasing the question gives up at the store's lock-wait bound #then the release is retried in the background, the question returns to pending, and a later answer resolves it", async () => {
     const h = (harness = createGatewayHarness())

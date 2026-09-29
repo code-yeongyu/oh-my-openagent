@@ -62,8 +62,8 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   invalid_arguments: "Fix the arguments and call again.",
 }
 
-function failure(code: ThreadErrorCode, message: string, details?: Readonly<Record<string, unknown>>): { readonly kind: "error"; readonly error: ThreadToolFailure } {
-  return { kind: "error", error: threadToolFailure(code, message, NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.", details) }
+function failure(code: ThreadErrorCode, message: string, details?: Readonly<Record<string, unknown>>, nextAction?: string): { readonly kind: "error"; readonly error: ThreadToolFailure } {
+  return { kind: "error", error: threadToolFailure(code, message, nextAction ?? NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.", details) }
 }
 
 function fromStore<T extends object>(outcome: RelayOutcome<T> | StoreRefusal): RelayResult<T> {
@@ -130,13 +130,23 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     answer: async (request) => {
       const tooLarge = textTooLarge(request.answer)
       if (tooLarge !== undefined) return tooLarge
+      // The relay cannot tell which dialog asked; a blank text is no decision on a question (a host refuses it).
+      if (request.answer.trim() === "") return failure("invalid_arguments", "The answer text is empty.", undefined, "Answer with non-empty text.")
       const claim = await store.claimAnswer({ now: now(), ...request })
       if (claim.kind !== "ok") return fromStore(claim)
       const respond = options.endpoints.respondUi
-      const endpoint = respond === undefined ? null : await options.locate(claim.session_durable_id)
+      let endpoint: GatewayEndpointRef | null = null
+      let unreachable = ""
+      if (respond !== undefined) {
+        try {
+          endpoint = await options.locate(claim.session_durable_id)
+        } catch (error) {
+          unreachable = `: ${error instanceof Error ? error.message : String(error)}`
+        }
+      }
       if (respond === undefined || endpoint === null) {
         await release(request.reply_token)
-        return failure(respond === undefined ? "unsupported" : "host_unavailable", "The session that asked is not reachable to take the answer.", { session: claim.session_durable_id })
+        return failure(respond === undefined ? "unsupported" : "host_unavailable", `The session that asked is not reachable to take the answer${unreachable}.`, { session: claim.session_durable_id })
       }
       let reply: UiAnswerReply
       try {
@@ -149,7 +159,14 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         // The session answered and refused: it no longer waits on that request, or cannot read the answer.
         await release(request.reply_token)
         const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"
-        return failure(malformed ? "invalid_arguments" : "stale_token", `The session refused the answer: ${reply.error}`, { session: claim.session_durable_id, reason: reply.error })
+        return failure(
+          malformed ? "invalid_arguments" : "stale_token",
+          `The session refused the answer: ${reply.error}`,
+          { session: claim.session_durable_id, reason: reply.error },
+          malformed
+            ? `The session could not read this answer (${reply.error}); answer again with text it can take. The question stays pending.`
+            : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
+        )
       }
       return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }
     },
