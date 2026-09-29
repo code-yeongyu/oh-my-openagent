@@ -142,6 +142,56 @@ describe("thread component control endpoint registration", () => {
   })
 })
 
+describe("thread component startup and shutdown touch no store they do not need", () => {
+  test("#given a session with no gateway store on disk #when session_start runs and the session shuts down #then no gateway directory and no database are created", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-startup-"))
+    try {
+      const warnings: string[] = []
+      const f = eventApi()
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir }).register(f.pi as never, context(warnings) as never)
+      await f.dispatch("session_start", sessionCtx("dur-plain"))
+      // Shutdown disposes the store, which waits for any worker the start-up read would have opened.
+      await f.dispatch("session_shutdown")
+      expect({ gatewayDir: existsSync(gatewayRootDirectory(agentDir)), db: existsSync(gatewayDatabasePath(agentDir)), warnings }).toEqual({ gatewayDir: false, db: false, warnings: [] })
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given an answer release that gave up at the store's lock-wait bound #when the session shuts down #then the background release retry makes no further attempt", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-release-"))
+    const real = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 50 } })
+    try {
+      let releases = 0
+      const store: GatewayStore = {
+        ...real,
+        releaseAnswer: async (request) => {
+          releases++
+          if (releases === 1) throw Object.assign(new Error("gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+          return await real.releaseAnswer(request)
+        },
+      }
+      const f = eventApi()
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
+      const bound = await real.bind({ now: Date.now(), receipt: null, binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", root_message_id: null, progress_message_id: null, session_durable_id: "dur-1", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["question"], policy_id: "default", ttl_seconds: null } })
+      if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+      const asked = await real.report({ now: Date.now(), receipt: null, session_durable_id: "dur-1", binding_id: bound.binding.binding_id, event: "question", text: "deploy?", ui_request_id: "ui-1" })
+      if (asked.kind !== "ok" || asked.reply_token === null) throw new Error(JSON.stringify(asked))
+      // No host gateway port: the answer is claimed, cannot be handed off, and its release hits the bound.
+      await f.tool("thread_answer").execute("call-answer", { binding_id: bound.binding.binding_id, reply_token: asked.reply_token, answer: "yes" }, undefined, undefined, sessionCtx("dur-2"))
+      expect(releases).toBe(1)
+      await f.dispatch("session_shutdown")
+      // Timers fire in expiry order: one due at 4x the retry delay runs after the (cancelled) retry
+      // would have, and a release attempt counts itself synchronously when it starts.
+      await new Promise((resolve) => setTimeout(resolve, real.busyTimeoutMs * 4))
+      expect(releases).toBe(1)
+    } finally {
+      await real.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("thread component settle never waits on the gateway store", () => {
   test("#given a session that armed no completion #when turns end and it settles #then the settle makes no store call and no gateway database is created", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-unbound-"))

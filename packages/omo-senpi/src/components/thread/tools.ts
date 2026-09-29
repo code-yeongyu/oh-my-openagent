@@ -56,6 +56,10 @@ const UNREACHABLE: GatewayEndpointPort = {
 }
 
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
+  return buildThreadTools(options).tools
+}
+
+function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: readonly AnyTool[]; readonly dispose: () => void } {
   const now = options.now ?? Date.now
   const store = options.store ?? createGatewayStore({ agentDir: options.stateDirectory })
   const endpoints = options.host.gateway ?? UNREACHABLE
@@ -213,7 +217,7 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     }),
   }
   const relayTools = createRelayTools({ options, relay, view, failure })
-  return [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools]
+  return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose: relay.dispose }
 
   /**
    * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
@@ -304,7 +308,10 @@ async function deliverThroughGatewayImpl(
   return { kind: "ok", thread, resolved_by: resolvedBy, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
 }
 
-export function registerThreadTools(pi: { registerTool(tool: Record<string, unknown>): void }, options: ThreadToolSurfaceOptions): void {
-  for (const tool of createThreadTools(options)) pi.registerTool({ ...tool })
+/** Registers the seventeen tools; `dispose` (shutdown) cancels the relay's background retries. */
+export function registerThreadTools(pi: { registerTool(tool: Record<string, unknown>): void }, options: ThreadToolSurfaceOptions): { readonly dispose: () => void } {
+  const built = buildThreadTools(options)
+  for (const tool of built.tools) pi.registerTool({ ...tool })
+  return { dispose: built.dispose }
 }
 

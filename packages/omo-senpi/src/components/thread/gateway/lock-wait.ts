@@ -16,14 +16,29 @@ export function isLockWaitExceeded(error: unknown): boolean {
 
 /**
  * Runs `attempt` again after `delayMs` for as long as it fails with a lock-wait error, one timer at
- * a time; any other failure ends the retries and goes to `onFailure`. Nothing waits on it.
+ * a time; any other failure ends the retries and goes to `onFailure`. Nothing waits on it, and
+ * `cancel` (shutdown) stops it before the next attempt.
  */
-export function retryAfterLockWait(attempt: () => Promise<unknown>, delayMs: () => number, onFailure: (error: unknown) => void): void {
-  const timer = setTimeout(() => {
-    attempt().catch((error: unknown) => {
-      if (isLockWaitExceeded(error)) retryAfterLockWait(attempt, delayMs, onFailure)
-      else onFailure(error)
-    })
-  }, delayMs())
-  timer.unref?.()
+export function retryAfterLockWait(attempt: () => Promise<unknown>, delayMs: () => number, onFailure: (error: unknown) => void): { readonly cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let cancelled = false
+  const schedule = (): void => {
+    timer = setTimeout(() => {
+      timer = undefined
+      if (cancelled) return
+      attempt().catch((error: unknown) => {
+        if (cancelled) return
+        if (isLockWaitExceeded(error)) schedule()
+        else onFailure(error)
+      })
+    }, delayMs())
+    timer.unref?.()
+  }
+  schedule()
+  return {
+    cancel: () => {
+      cancelled = true
+      clearTimeout(timer)
+    },
+  }
 }

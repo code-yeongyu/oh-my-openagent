@@ -112,7 +112,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
             : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
       })
-      registerThreadTools(pi, {
+      const tools = registerThreadTools(pi, {
         host,
         stateDirectory,
         store,
@@ -155,6 +155,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       })
       pi.on("session_shutdown", async () => {
         completions.dispose()
+        tools.dispose()
         await registrant?.stop().catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`))
         if (options.store === undefined) await store.dispose().catch(() => undefined)
       })

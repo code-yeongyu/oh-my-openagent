@@ -32,6 +32,8 @@ export type GatewayRelay = {
   readonly inbound: (request: { readonly binding_id: string; readonly event_id: string; readonly text: string }) => Promise<GatewayDeliveryResult>
   /** The session settled: armed completions become outbox rows with this outcome. */
   readonly settle: (request: { readonly session_durable_id: string; readonly outcome: CompletionOutcome }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  /** Shutdown: cancels background answer-release retries. */
+  readonly dispose: () => void
 }
 
 export type GatewayRelayOptions = {
@@ -85,13 +87,20 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
   // A claimed answer whose hand-off failed goes back to pending. A release that gives up at the
   // store's lock-wait bound is retried in the background after the busy timeout until it lands, so
   // the question never stays `answered` without having reached the session.
+  const retries = new Set<{ readonly cancel: () => void }>()
+  let disposed = false
   async function release(replyToken: string): Promise<void> {
     const attempt = () => store.releaseAnswer({ reply_token: replyToken })
     try {
       await attempt()
     } catch (error) {
-      if (!isLockWaitExceeded(error)) throw error
-      retryAfterLockWait(attempt, () => store.busyTimeoutMs, () => undefined)
+      if (!isLockWaitExceeded(error) || disposed) throw error
+      const retry = retryAfterLockWait(
+        () => attempt().then(() => { retries.delete(retry) }),
+        () => store.busyTimeoutMs,
+        () => { retries.delete(retry) },
+      )
+      retries.add(retry)
     }
   }
 
@@ -157,5 +166,10 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       })
     },
     settle: (request) => store.emitCompletions({ now: now(), ...request }),
+    dispose: () => {
+      disposed = true
+      for (const retry of retries) retry.cancel()
+      retries.clear()
+    },
   }
 }
