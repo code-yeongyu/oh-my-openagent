@@ -55,4 +55,4 @@ await runScenario("lost-ack", async ({ report, scratch, install, startTui }) => 
     entries === 1 && answers === 1 && finalRows.length === 1 && again.json?.kind === "error" && again.json.error?.code === "idempotency_uncertain",
     `entries=${entries} answers=${answers} rows=${finalRows.length} admission_kind=${row.admission_kind} retry_after_apply=${again.stdout.trim().slice(0, 200)}`,
   )
-}, { patches: ["gateway_send", "sender_kill_after_commit"] })
+}, { patches: ["sender_kill_after_commit"] })

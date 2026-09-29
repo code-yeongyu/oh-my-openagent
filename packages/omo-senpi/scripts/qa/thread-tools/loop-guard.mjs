@@ -90,4 +90,4 @@ await runScenario("loop-guard", async ({ report, fake, scratch, install, startTu
   await new Promise((resolvePromise) => setTimeout(resolvePromise, REFILL_WAIT_MS))
   const refilled = await cliSend(scratch, install, burstTarget, "QA-TOKEN-burst-after-refill")
   report.assert("burst-refills-after-5s", refilled.json?.kind === "ok", refilled.stdout.trim().slice(0, 200))
-}, MUTANT ? { patches: ["gateway_send", "cycle_check_off"], installName: "omo-ai-loop-guard-mutant" } : {})
+}, MUTANT ? { patches: ["cycle_check_off"], installName: "omo-ai-loop-guard-mutant" } : {})

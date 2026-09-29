@@ -58,7 +58,7 @@ await runScenario("receiver-crash", async ({ report, fake, scratch, install, sta
     restarted.press("enter")
     await restarted.exited
   }
-}, { patches: ["gateway_send", "crash_after_admit"] })
+}, { patches: ["crash_after_admit"] })
 
 function registrySockets(scratch) {
   return Bun.spawnSync(["sh", "-c", `cat ${scratch.agentDir}/rpc-host-daemon/*/endpoint.json 2>/dev/null`]).stdout.toString().match(/"socket":"[^"]+"/g)?.map((match) => match.slice(10, -1)) ?? []

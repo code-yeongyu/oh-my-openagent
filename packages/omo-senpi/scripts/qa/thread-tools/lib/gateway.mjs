@@ -13,9 +13,9 @@
  *   `@xterm/headless`, and every assertion reads target state: the endpoint's own answers, the
  *   gateway store and the session file.
  *
- * Scratch copies are patched, never the checkout. `gateway_send` flips the one send switch
- * (`THREAD_SENDS_THROUGH_GATEWAY`) in the copy; the other patches re-open test seams the bundle
- * compiled out (see `PATCHES`). Every patch must hit exactly one site, or the kit refuses to build.
+ * Scratch copies are patched, never the checkout, and only to re-open test seams the bundle
+ * compiled out (see `PATCHES`); the gateway is the only send path, so no scenario patches how it
+ * sends. Every patch must hit exactly one site, or the kit refuses to build.
  *
  * Waits are event-driven: a predicate is re-checked on pty output, file-system events under the
  * scratch dir, endpoint feed records and fake-model requests, under one bounded deadline. Nothing
@@ -331,12 +331,6 @@ export async function ensureKit() {
  * bundle can never silently skip one.
  */
 export const PATCHES = {
-  /** The send switch, flipped in the copy only (todo 10 flips it in source). */
-  gateway_send: {
-    file: "extensions/omo.js",
-    from: "sendThroughGateway:e.sendThroughGateway??false",
-    to: "sendThroughGateway:e.sendThroughGateway??true",
-  },
   /**
    * `receiver-crash`: the drain's `_test.afterAdmit` seam, reachable from the environment. With
    * `THREAD_QA_CRASH_AFTER_ADMIT=<kind>` the receiver SIGKILLs itself right after
@@ -370,7 +364,7 @@ export const PATCHES = {
  * A runnable omo install in the kit: `<kit>/<name>/{bin,package.json,plugin}`, resolving the engine
  * from `<kit>/node_modules`. Rebuilt from this checkout on every call.
  */
-export async function buildOmoInstall(name, patchNames = ["gateway_send"]) {
+export async function buildOmoInstall(name, patchNames = []) {
   await ensureKit()
   const root = join(KIT_DIR, name)
   rmSync(root, { recursive: true, force: true })
@@ -1065,7 +1059,7 @@ export async function awaitToolResult(fake, tool, from, { timeoutMs = 60_000, la
  * teardown with a proven cleanup receipt, whatever happened in between. Exits 0 only when every
  * assertion (the receipt included) passed.
  */
-export async function runScenario(label, body, { patches = ["gateway_send"], installName } = {}) {
+export async function runScenario(label, body, { patches = [], installName } = {}) {
   installCleanupHooks()
   const report = createReport(label)
   const evidence = evidenceDir(label)
