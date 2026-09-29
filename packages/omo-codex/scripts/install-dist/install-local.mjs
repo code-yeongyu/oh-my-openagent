@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:fbb0c7a531e8a18f9642479bda05170cb6494c853144c544241853d57ef30685:90ac923dc4279d9f95c1a293c1aa5e2d1b455e5e89e889f5fa1c40ca9469d0dd
+// omo-codex-install:3396f3fa443daaf9113095d0a8a0f4de2638cf1e99d863fdc941c81323a4ab19:ad525f07f46a0ac28d3ab4c62ddca7ed278398e85d923aa71797c0004101dd53
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19615,6 +19615,26 @@ var OmoModelProfileLayerInputSchema = OmoModelProfileInputSchema.partial();
 var OmoModelProfileLayerSchema = preprocess((value) => isRecord6(value) ? normalizeLegacyModelFields(value) : value, OmoModelProfileLayerInputSchema);
 var OmoModelProfilesLayerSchema = record(string2(), OmoModelProfileLayerSchema);
 
+// packages/omo-config-core/src/schema/omomeow.ts
+var OMOMEOW_LANGUAGES = ["en", "ko"];
+var OmoMeowNudgeShape = {
+  enabled: boolean2(),
+  interval_minutes: number2().int().min(1).max(1440)
+};
+var OmoMeowNudgeLayerSchema = object(OmoMeowNudgeShape).partial().strict();
+var OmoMeowNudgeSchema = OmoMeowNudgeLayerSchema.extend({
+  enabled: boolean2().default(true),
+  interval_minutes: number2().int().min(1).max(1440).default(30)
+}).strict();
+var OmoMeowSettingsLayerSchema = object({
+  language: _enum(OMOMEOW_LANGUAGES),
+  nudge: OmoMeowNudgeLayerSchema
+}).partial().strict();
+var OmoMeowSettingsSchema = object({
+  language: _enum(OMOMEOW_LANGUAGES).default("en"),
+  nudge: OmoMeowNudgeSchema.default({ enabled: true, interval_minutes: 30 })
+}).strict();
+
 // packages/omo-config-core/src/schema/task.ts
 import { availableParallelism } from "node:os";
 var DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited";
@@ -19871,6 +19891,7 @@ var OmoConfigSchema = object({
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
+  omomeow: OmoMeowSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -19894,6 +19915,7 @@ var OmoConfigLayerSchema = object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
+  omomeow: OmoMeowSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),

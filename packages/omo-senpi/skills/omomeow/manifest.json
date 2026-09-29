@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "setup",
+      "version": 1,
+      "doc": "features/setup.md",
+      "summary": "Runtime, messenger bot, inbound monitor, wiring, and onboarding: the one-time OmOMeow setup."
+    },
+    {
+      "id": "nudge",
+      "version": 1,
+      "doc": "features/nudge.md",
+      "summary": "Periodic DM with what is running, blocked first; silent when nothing runs or nothing changed.",
+      "enabledBy": "nudge.enabled",
+      "configKeys": ["nudge.interval_minutes"]
+    }
+  ]
+}

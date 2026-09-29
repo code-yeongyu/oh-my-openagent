@@ -1,3 +1,16 @@
+## skills/omomeow: OmOMeow mode as an updatable skill, first feature the periodic status nudge
+
+- `skills/omomeow/`: new native skill. `SKILL.md` carries the OmOMeow-mode behavior that used to live in a copy-once
+  setup prompt; `manifest.json` lists versioned features (`setup`, `nudge`) documented in `features/<id>.md`.
+  `scripts/omomeow.mjs reconcile` compares the manifest with `~/.omo/omomeow/state.json` and returns only what to
+  install, update (version bump or changed setting), or remove, so an existing user never re-runs the whole setup.
+- nudge: a recurring `schedule_prompt` job (`[omomeow:nudge]` marker) delivered by a `senpi schedule run --watch
+  --exec '... omomeow.mjs schedule-hook'` runner (launchd/systemd user service rendered by `runner install`, pointing at a
+  runtime copy of the scripts under the state dir). The hook reads `herdr tab list`, joins the thread/tab/session map,
+  and DMs each requester through the agent-messenger bot CLI only when something is working or blocked and the
+  task/state/title/progress fingerprint changed; other scheduled prompts fall back to `senpi -p --session`.
+- `native-skill-sources.mjs`, `BUILTIN_SKILL_NAMES`, and the skill-sync expectations list `omomeow`.
+
 ## model-profile, task: builtin lanes and the category notice never route to an unlisted gateway (#9146)
 
 - `components/model-profile/resolve.ts`: every builtin rung, in `recommended` and in the `daily-*`/`geeky-*` lanes, is

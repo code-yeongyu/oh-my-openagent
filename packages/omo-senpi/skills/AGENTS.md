@@ -1,6 +1,6 @@
 # skills
 
-Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 10 skill dirs with their own authoring contract.
+Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 11 skill dirs with their own authoring contract.
 
 ## WHERE TO LOOK
 
@@ -15,6 +15,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |
 | `dag-library/` | Store a dag definition once and re-run it by name; loads through `plugin/runtime/dag/library.js`. |
 | `onboarding/` | First-run onboarding; `qa-validator.sh` pins the skill contract (front matter `name: onboarding`), `qa-savings-fixture.sh` expects `qa-savings-fixture: OK`. |
+| `omomeow/` | OmOMeow mode (always-on messenger agent over Herdr + agent-messenger) as an updatable skill: `manifest.json` lists versioned features (`features/<id>.md`), `scripts/omomeow.mjs reconcile` diffs them against per-user state in `~/.omo/omomeow/state.json` so activation installs only new or changed features; the nudge feature is a recurring `schedule_prompt` delivered by `senpi schedule run --exec ... schedule-hook` with snapshot + dedupe in `scripts/lib/nudge.mjs`. Settings: `omomeow` in `omo.json`. |
 | `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip and the kibitzer `Aha moment!` recall notice); queries the product's tip list first (`omo --list-tips` on OmO Native, `senpi --list-tips` on a plain senpi install), checks what THIS user can see, verifies feature code before explaining. |
 
 ## CONVENTIONS
@@ -37,5 +38,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 ```bash
 bash skills/onboarding/qa-validator.sh
 bash skills/onboarding/qa-savings-fixture.sh
+node skills/omomeow/scripts/omomeow.mjs reconcile | status | snapshot | nudge --dry-run
+bun test skills/omomeow/scripts/tests
 node skills/ulw-plan/scripts/scaffold-plan.mjs <slug> [--clear|--unclear] [--draft-only] [--review-required] [--reset [--force]]
 ```

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**OmOMeow mode ships as the `omomeow` skill and keeps itself up to date.** The always-on messenger agent setup used to be a prompt each agent read once and interpreted its own way, so new behavior never reached existing installs. Saying "OmOMeow mode" (or "오모냥 모드") now loads the bundled `omomeow` skill, which compares its feature list with what you already have and installs only what is new or changed.
+
+**A periodic "here's what we're running" DM.** The first OmOMeow feature sends you one short overview of the Herdr sessions in flight every 30 minutes, blocked ones first, with each task's thread, elapsed time and latest progress. It stays quiet when nothing is running or nothing changed. Set `omomeow.nudge.enabled` or `omomeow.nudge.interval_minutes` in `~/.omo/omo.jsonc`.
+
 ### Changed
 
 **Each session's task children now run on their own host.** ([#9003](https://github.com/code-yeongyu/oh-my-openagent/issues/9003)) On macOS and Linux, background task children used to run as sessions of one engine host shared by every session on the machine, so one crash or one stuck host hit everybody's children. Now every session gets its own host (the Desktop app moves each thread onto its own host in its own release). A crash, idle exit or upgrade of one host leaves the others alone, and a finished session's host exits 15 minutes after its last client leaves. Isolation costs memory. With 4 parent sessions of 4 children each we measured 2.7 GB RSS and 0.8 GB physical footprint, against 0.78 GB and 0.24 GB for one shared host. An idle host costs 126 MB of physical footprint, about what the old shared host cost idle (137 MB). A session's host now starts in the background on its first prompt (`task.host_shard_prewarm`, default `first-turn`; `session-start` and `off` are also available), so the first child no longer waits for a host to boot: 1116 ms p50 / 1678 ms p95 from the `task` call to the child's first model request, against 1666 / 3280 ms without the pre-warm and 979 / 1593 ms on the old shared host when it was already running. Nothing caps the number of hosts. Children started by the previous release stay on the shared host until they finish. Before you downgrade, read the rollback steps in [docs/reference/omo-daemon.md](docs/reference/omo-daemon.md). Skipping them can leave a retained child stuck.

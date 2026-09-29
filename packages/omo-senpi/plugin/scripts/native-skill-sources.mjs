@@ -48,6 +48,11 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "mass-ulw"),
     },
     {
+      // Scripts under omomeow/scripts/ ship with the skill (tests under scripts/tests/ are filtered out).
+      name: "omomeow",
+      source: join(nativeSkillsRoot, "omomeow"),
+    },
+    {
       name: "onboarding",
       source: join(nativeSkillsRoot, "onboarding"),
     },
