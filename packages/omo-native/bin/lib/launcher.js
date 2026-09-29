@@ -234,7 +234,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // The daemon is the engine's to run; omo only supplies the launch spec, the task settings from
   // the omo config (daemon-config.js), and an exit code the caller can branch on.
   if (command === "daemon") {
-    const outcome = runDaemonCommand(args.slice(1), {
+    process.exitCode = runDaemonCommand(args.slice(1), {
       engine: { run: engineHostCall },
       migration: { run: rollbackMigrateCall },
       pluginRoot: join(packageRoot, "plugin"),
@@ -244,16 +244,6 @@ export async function runLauncher(args = process.argv.slice(2)) {
       stderr: process.stderr,
       platform: process.platform,
     })
-    // `omo daemon attach <launch args>`: the daemon is reachable, so this becomes a normal launch
-    // whose environment points the engine at the shared socket instead of starting its own.
-    if (typeof outcome === "object") {
-      const senpi = preparedSenpi()
-      await spawnNode(senpi.cliPath, ["--extension", join(packageRoot, "plugin"), ...outcome.args], {
-        env: { ...senpiEnvironment(senpi.packageRoot), ...outcome.env },
-      })
-      return
-    }
-    process.exitCode = outcome
     return
   }
   if (command === "doctor") {

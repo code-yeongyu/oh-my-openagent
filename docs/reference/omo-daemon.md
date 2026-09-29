@@ -4,8 +4,9 @@ Every OmO session that runs task children as host sessions gets its own senpi RP
 A terminal session's `process` children run on a task host keyed by that session
 (`p-*`), and each Desktop interactive thread runs on its own thread host (`i-*`).
 A crash, an idle exit, or a handoff on one of those hosts does not touch the others.
-The machine-wide socket `rpc.sock` stays as the operator endpoint: `omo daemon run`
-and `attach` ensure it, and the thread tools create their sessions there.
+The socket `rpc.sock` stays as the operator endpoint: `omo daemon run` ensures it, and
+the thread tools create their sessions there. A terminal session runs its own session in
+its own process and never joins a host.
 `omo daemon` is the operator's view of every one of these hosts in one agent directory.
 Everything that decides *who serves a socket* lives in the engine (`senpi host`);
 this command supplies omo's launch spec, reads the policy out of the omo config, and
@@ -14,8 +15,6 @@ turns the engine's answer into an exit code a script can branch on.
 ```bash
 omo daemon run                 # ensure the operator daemon on rpc.sock: start, reuse, or hand off
 omo daemon run --json          # the engine's JSON line verbatim
-omo daemon attach              # print the env a child needs to reach the operator daemon
-omo daemon attach --model x    # run omo with that env (a normal launch)
 omo daemon status [--json] [--include-workers]   # every endpoint, then a machine aggregate
 omo daemon gc [--json] [--prune-store-index]     # remove dead endpoint state and its owner sidecars
 omo daemon stop [--drain]      # the operator endpoint only
@@ -25,12 +24,13 @@ omo daemon handoff             # upgrade-gated handoff across every live endpoin
 omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index] [--dry-run] [--json]
 ```
 
-Bare `omo` never ensures the operator daemon on `rpc.sock`. Only `run`, `attach` and
-`handoff` can bring it into existence (per-session hosts are started by the task
+Bare `omo` never ensures the operator daemon on `rpc.sock`. Only `run` and `handoff` can
+bring it into existence (per-session hosts are started by the task
 engine ahead of a session's first child: on its first prompt by default, at session start or
 only at the first spawn per `task.host_shard_prewarm`, never by bare `omo` itself); `status`, `gc` and `stop` work on an install whose plugin payload was
 never built. `--persistent` is still accepted and does nothing; `--foreground` exits 2,
-because the engine host always detaches.
+because the engine host always detaches. There is no `attach` subcommand any more: a terminal
+no longer runs its session on a host, so there is no host environment to print.
 
 ## Per-session hosts
 
@@ -58,9 +58,9 @@ routing time the spawn fails with `shard_identity_missing`.
 
 **`OMO_RPC_SOCKET*` never route task children.** `OMO_RPC_SOCKET`, `SENPI_RPC_SOCKET`,
 `PI_RPC_SOCKET` and `OMO_RPC_SOCKET_PATH` name the operator endpoint only. `omo daemon`
-and the thread tools read them; the task host resolver does not. A process launched
-through `omo daemon attach` therefore still puts its own task children on its own
-`p-*` host, keyed by its own session id, not on the socket `attach` printed.
+and the thread tools read them; the task host resolver does not. A process whose
+environment names another operator socket therefore still puts its own task children on
+its own `p-*` host, keyed by its own session id, not on that socket.
 
 **Owner sidecar.** Starting a `p-*` or `i-*` host writes `<kind>-<key>.meta.json` beside
 the socket: `{ socket, kind, root, owner_session_id?, owner_session_file?, created_at,
@@ -222,7 +222,7 @@ node packages/omo-senpi/scripts/qa/task-host-e2e-shard-cost.mjs \
 | Endpoint log | `<host-state>/stderr.log` |
 | Crash records | `<host-state>/crashes.jsonl` (newest 50 counted by status) |
 | Launch spec | `<pluginRoot>/daemon-launch-spec.json`, shipped inside the omo plugin payload |
-| Operator env | `OMO_ENABLE_SHARED_HOST=1` and `OMO_RPC_SOCKET=<socket>` (what `attach` prints; task children ignore it) |
+| Operator endpoint override | `OMO_RPC_SOCKET=<socket>` (read by `omo daemon` and the thread tools; task children ignore it) |
 
 ## Launch spec
 
@@ -261,7 +261,7 @@ line per key with the move to make. A legacy `"never"` policy is told to use
 | `task.default_execution_mode` | `auto` · `in-process` · `process` | see *Execution mode* below |
 | `task.process_runner` | `host` · `child-process` | which runner a `process` child gets |
 
-`--no-upgrade` on the command line forces `never` (attach or start, never hand off)
+`--no-upgrade` on the command line forces `never` (reuse or start, never hand off)
 for that call; `never` is a command-line policy only, not an `omo.json` value. A flag
 beats config; config beats the default.
 

@@ -243,6 +243,10 @@ Model capabilities: `model-capabilities/supplemental-entries.ts` adds `gpt-6.1-s
 
 Tests: the chain pins in `model-requirements-categories.test.ts`, `gpt-6-family-routing.test.ts` and `category-routing-policy.test.ts` carry the four-rung chain; the guardrail and fast-alias tests list both 6.1 ids; the new `gpt-6.1-sol.test.ts` covers the effort ladder, the 128K output cap, and deep-low resolving 6.1 Sol over 5.6 Sol, the 6.1 Fast tier before 5.6, and Copilot's 5.6 Sol without 6.1. On the OpenCode side `openai-categories.test.ts`, `tools.test.ts` (the gate opens on each of the four ids) and `generate-omo-config.test.ts` follow. Docs: the deep-low rows in `agent-model-matching.md`, `installation.md` (plus a GPT-6.1 Sol model row), `overview.md`, `configuration.md`, `features.md`, the three `docs/examples` configs and `packages/omo-opencode/src/tools/AGENTS.md`.
 
+## 2026-09-30 - Remove `omo daemon attach` and the shared-host opt-in (#9143)
+
+senpi 2026.9.29-4 (adopted in the entry below) removed the interactive shared-host join, so omo drops its consumers: `omo daemon attach` now exits 2 as an unknown subcommand with nothing on stdout, and nothing in omo sets or reads `OMO_ENABLE_SHARED_HOST` any more. Details in `packages/omo-native/changes.md`; the user-facing note is the `### Removed` entry in `CHANGELOG.md`.
+
 ## 2026-09-30 - The RPC serializer test recovers upstream code from the installed engine, not its source map
 
 `packages/omo-native/test/rpc-stream-errors.test.mjs` read the unprepared RPC serializer from `dist/modes/rpc/rpc-mode.js.map`, and senpi 2026.9.29-4 publishes no sourcemaps (senpi #2362), so the file failed at import with `ENOENT ... rpc-mode.js.map`. `bin/lib/rpc-stream-errors.js` now exports `serialization` and `guardedSerialization`, and the test reads the installed `rpc-mode.js` and reverses the one replacement the preparation makes, failing loud if the installed file carries neither shape. Disabling the preparation's write turns 4 of the 13 tests red.

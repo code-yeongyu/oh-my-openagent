@@ -10,7 +10,7 @@ import {
   runStopAll,
 } from "./daemon-operations.js"
 import { runRollbackPrepare } from "./daemon-rollback.js"
-import { attachLaunchArgs, blockingPause, DAEMON_EXIT, readTimeoutSeconds } from "./daemon-args.js"
+import { blockingPause, DAEMON_EXIT, readTimeoutSeconds } from "./daemon-args.js"
 import { readDaemonConfig } from "./daemon-config.js"
 
 export { DAEMON_EXIT } from "./daemon-args.js"
@@ -18,7 +18,7 @@ export { daemonReportLines } from "./daemon-doctor-report.js"
 
 /**
  * `omo daemon` - the operator's view of every engine host in one agent dir: the operator daemon on
- * `rpc.sock` (the only endpoint `run` and `attach` ensure), each session's task host (`p-*`), each
+ * `rpc.sock` (the only endpoint `run` ensures), each session's task host (`p-*`), each
  * Desktop thread host (`i-*`), and any other endpoint the engine enumerates. `status`, `gc`,
  * `handoff`, `stop --all` and `rollback-prepare` cover all of them.
  *
@@ -29,15 +29,14 @@ export { daemonReportLines } from "./daemon-doctor-report.js"
  * gets an exit code it can branch on without reading prose.
  */
 
-const SUBCOMMANDS = new Set(["run", "attach", "status", "stop", "handoff", "gc", "rollback-prepare"])
+const SUBCOMMANDS = new Set(["run", "status", "stop", "handoff", "gc", "rollback-prepare"])
 /** The subcommands that can bring a host into existence, and therefore need omo's argv source. */
-const NEEDS_SPEC = new Set(["run", "attach", "handoff"])
+const NEEDS_SPEC = new Set(["run", "handoff"])
 
 const USAGE = [
-  "usage: omo daemon <run|attach|status|stop|handoff|gc|rollback-prepare> [options]",
+  "usage: omo daemon <run|status|stop|handoff|gc|rollback-prepare> [options]",
   "",
   "  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)",
-  "  attach    print the environment a child needs to reach the daemon",
   "  status    report who is serving and which sessions exist",
   "  stop      end the daemon; --drain lets in-flight work finish first",
   "  handoff   hand the socket to this build, keeping live sessions",
@@ -63,28 +62,19 @@ function resolvePolicy(args, config) {
 }
 
 /**
- * The engine owns four subcommands - ensure, status, stop, handoff. `run` and `attach` are omo's
- * words for the same ensure: one asks for a daemon, the other asks for a daemon plus the
- * environment to reach it. Mapping them here is what keeps this file from inventing a fifth.
+ * The engine owns four subcommands - ensure, status, stop, handoff. `run` is omo's word for the
+ * ensure. Mapping them here is what keeps this file from inventing a fifth.
  */
-const ENGINE_SUBCOMMAND = { run: "ensure", attach: "ensure", status: "status", stop: "stop", handoff: "handoff" }
+const ENGINE_SUBCOMMAND = { run: "ensure", status: "status", stop: "stop", handoff: "handoff" }
 
 function buildArgs(subcommand, args, { specPath, policy }) {
   const engineArgs = ["host", ENGINE_SUBCOMMAND[subcommand], "--json"]
-  if (subcommand === "run" || subcommand === "attach" || subcommand === "handoff") {
+  if (subcommand === "run" || subcommand === "handoff") {
     engineArgs.push("--launch-spec", specPath, "--policy", policy)
   }
   if (subcommand === "stop" && args.includes("--drain")) engineArgs.push("--drain")
   if (subcommand === "status" && args.includes("--include-workers")) engineArgs.push("--include-workers")
   return engineArgs
-}
-
-/** What a child process needs in its environment to reach this daemon rather than start its own. */
-function attachEnv(parsed, agentDir) {
-  return {
-    OMO_ENABLE_SHARED_HOST: "1",
-    OMO_RPC_SOCKET: parsed?.socket ?? join(agentDir, "rpc", "rpc.sock"),
-  }
 }
 
 function summarize(subcommand, parsed, exitCode) {
@@ -218,19 +208,6 @@ export function runDaemonCommand(args, options) {
   const parsed = parseEngineLine(result.stdout ?? "")
 
   if (result.stderr) stderr.write(result.stderr)
-
-  if (subcommand === "attach") {
-    if (result.exitCode !== DAEMON_EXIT.ok) return result.exitCode
-    const daemonEnv = attachEnv(parsed, agentDir)
-    // `omo daemon attach --model x`: the trailing args are a normal omo launch that should run
-    // against the daemon, so the caller gets the merged environment back and continues with them.
-    const launchArgs = attachLaunchArgs(args)
-    if (launchArgs.length > 0) return { passthrough: true, args: launchArgs, env: { ...env, ...daemonEnv } }
-    const payload = { ...(parsed ?? {}), env: daemonEnv }
-    if (args.includes("--json")) stdout.write(`${JSON.stringify(payload)}\n`)
-    else for (const [key, value] of Object.entries(daemonEnv)) stdout.write(`${key}=${value}\n`)
-    return DAEMON_EXIT.ok
-  }
 
   if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
   else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
