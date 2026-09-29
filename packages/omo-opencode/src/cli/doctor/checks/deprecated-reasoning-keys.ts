@@ -7,19 +7,31 @@ import { REASONING_UNIFICATION_MIGRATION_ID } from "../../../config-migration"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 
-const CANONICAL_REPLACEMENT = new Map([
-  ["variant", "reasoning"],
-  ["reasoningEffort", "reasoning"],
-  ["thinking", 'reasoning: "off" or provider_options.thinking'],
-  ["textVerbosity", "provider_options.textVerbosity"],
-  // `models` is an ordered chain whose head is the primary, so a literal rename of a
-  // `fallback_models` list would promote the first fallback; the hint must say so.
-  ["fallback_models", "models: [<primary>, ...fallbacks] (the first entry becomes the primary model)"],
-])
+type TuningContainer = "agents" | "categories" | "models"
+type HarnessBlock = "[codex]" | "[senpi]" | "[native]" | "[opencode]"
+
+export const DEPRECATED_CONFIG_KEY_REPLACEMENTS: readonly {
+  readonly key: string
+  readonly replacement: string
+}[] = [
+  { key: "variant", replacement: "reasoning" },
+  { key: "reasoningEffort", replacement: "reasoning" },
+  { key: "thinking", replacement: 'reasoning: "off" or provider_options.thinking' },
+  { key: "textVerbosity", replacement: "provider_options.textVerbosity" },
+  {
+    key: "fallback_models",
+    replacement: "models: [<primary>, ...fallbacks] (the first entry becomes the primary model)",
+  },
+]
+
+const CANONICAL_REPLACEMENT = new Map(
+  DEPRECATED_CONFIG_KEY_REPLACEMENTS.map((rule) => [rule.key, rule.replacement] as const),
+)
 
 const MIGRATE_SUFFIX = ", or run: oh-my-openagent config migrate"
 
 const TUNING_CONTAINERS = new Set(["agents", "categories", "models"])
+const TYPED_HARNESS_BLOCKS = new Set<HarnessBlock>(["[codex]", "[senpi]", "[native]"])
 // Canonical migration output nests provider-native keys (thinking, textVerbosity) under these
 // containers; their children must never be re-flagged as deprecated top-level keys.
 const PASSTHROUGH_CONTAINERS = new Set(["provider_options", "providerOptions"])
@@ -32,6 +44,28 @@ function isHarnessBlock(key: string): boolean {
   return key.startsWith("[") && key.endsWith("]")
 }
 
+function containerForPath(path: string): TuningContainer | undefined {
+  return path.split(".").find((part): part is TuningContainer => TUNING_CONTAINERS.has(part))
+}
+
+function harnessForPath(path: string): HarnessBlock | undefined {
+  return path
+    .split(".")
+    .find((part): part is HarnessBlock =>
+      part === "[codex]" || part === "[senpi]" || part === "[native]" || part === "[opencode]"
+    )
+}
+
+function isDeprecatedKeyPath(key: string, path: string): boolean {
+  const container = containerForPath(path)
+  if (container === undefined) return false
+  if (key !== "fallback_models") return true
+  if (container === "categories") return true
+  if (container !== "agents") return false
+  const harness = harnessForPath(path)
+  return harness !== undefined && TYPED_HARNESS_BLOCKS.has(harness)
+}
+
 function collectIssues(configPath: string, value: unknown, prefix: string, fixSuffix: string): DoctorIssue[] {
   if (!isRecord(value)) return []
   const issues: DoctorIssue[] = []
@@ -39,7 +73,7 @@ function collectIssues(configPath: string, value: unknown, prefix: string, fixSu
   for (const [key, child] of Object.entries(value)) {
     const path = prefix.length > 0 ? `${prefix}.${key}` : key
     const replacement = CANONICAL_REPLACEMENT.get(key)
-    if (replacement !== undefined) {
+    if (replacement !== undefined && isDeprecatedKeyPath(key, path)) {
       issues.push({
         title: "Deprecated config key",
         description: `${configPath}: ${path}`,
@@ -58,7 +92,6 @@ function collectIssues(configPath: string, value: unknown, prefix: string, fixSu
       }
       continue
     }
-    if (key === "[opencode]") continue
     if (TUNING_CONTAINERS.has(key) || isHarnessBlock(key) || prefix.length > 0) {
       issues.push(...collectIssues(configPath, child, path, fixSuffix))
     }
