@@ -822,9 +822,53 @@ LSP tools are served by the built-in `lsp` MCP server (see [MCPs](#mcps)). The
 previous top-level `"lsp"` block in the plugin config is no longer read; the
 unified config migration strips it when importing a legacy file.
 
-To configure custom language servers, create `.opencode/lsp.json`, `.omo/lsp.json`, or `.omo/lsp-client.json` at the project root. The MCP server launches with `LSP_TOOLS_MCP_PROJECT_CONFIG` set to a platform-delimiter-separated search list of those three paths and reads the first applicable server maps. The schema lives in the
-`packages/lsp-tools-mcp` vendored package (upstream:
-[code-yeongyu/lsp-tools-mcp](https://github.com/code-yeongyu/lsp-tools-mcp)).
+LSP configuration uses separate project and user files. Both use a top-level
+`"lsp"` map keyed by server ID and require strict JSON (no comments or trailing
+commas), even though the plugin config supports JSONC.
+
+| Scope | Location | Supported customization |
+| --- | --- | --- |
+| Project | `.opencode/lsp.json`, then `.omo/lsp.json`, then `.omo/lsp-client.json` at the project root | Built-in servers only: extensions, priority, initialization options, and disabling a server. Project entries cannot override the launch command or environment. |
+| User | `~/.config/opencode/lsp.json` by default | Override built-in server commands and environment, or define custom servers with both `command` and `extensions`. |
+
+The user file is resolved from OpenCode's config directory: `OPENCODE_CONFIG_DIR`
+takes precedence; otherwise it uses `$XDG_CONFIG_HOME/opencode` when set, or
+`~/.config/opencode`. Under WSL, an `XDG_CONFIG_HOME` pointing into a Windows user
+profile is ignored in favor of the Linux home config directory. The plugin passes
+this file as `LSP_TOOLS_MCP_USER_CONFIG` to the built-in MCP server, so OpenCode
+users do not need to configure the standalone daemon's default
+`~/.codex/lsp-client.json`.
+
+Project files are searched in the table's order. The first valid config object
+is used, even if its `"lsp"` map is empty; the three files are not merged. For a
+matching server ID, a project server entry takes precedence over the entire user
+entry, then the built-in default. Fields are not merged across those entries.
+
+For example, to pass a non-default compiler path to clangd, put this in your
+**user** `lsp.json` and replace the compiler path with one installed on your
+machine:
+
+```json
+{
+  "lsp": {
+    "clangd": {
+      "command": [
+        "clangd",
+        "--background-index",
+        "--clang-tidy",
+        "--query-driver=/opt/rh/devtoolset-11/root/usr/bin/*"
+      ]
+    }
+  }
+}
+```
+
+The command array replaces the full built-in command, so the example retains
+clangd's default `--background-index` and `--clang-tidy` flags. Its built-in file
+extensions are retained automatically. Remove any `"clangd"` entry from the
+selected project config when using this user override; a project entry would
+select the built-in command instead. For a new server ID, also provide an
+`"extensions"` array such as `[".foo"]` in the user entry.
 
 To disable the LSP MCP entirely:
 
