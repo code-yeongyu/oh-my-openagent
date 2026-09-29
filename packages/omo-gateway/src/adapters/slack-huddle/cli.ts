@@ -51,6 +51,8 @@ async function serve(flags: Flags): Promise<number> {
     session: await sessionFrom(flags),
     profilesRoot: join(agentDir, "gateway", "huddle", "profiles"),
     ...(flags["capture-humans"] === true ? { onHumanJoin: "continue" as const } : {}),
+    ...(text(flags, "control-ready-ms") === null ? {} : { controlReadyMs: Number(text(flags, "control-ready-ms")) }),
+    ...(text(flags, "join-timeout-ms") === null ? {} : { joinTimeoutMs: Number(text(flags, "join-timeout-ms")) }),
   })
   const port = text(flags, "port")
   const server = serveHuddle({ driver, token, ...(port === null ? {} : { port: Number(port) }) })

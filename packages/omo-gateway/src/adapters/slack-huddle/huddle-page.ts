@@ -16,15 +16,17 @@ import { VoiceFatal } from "./voice-contract"
 export type PageEvent = Record<string, unknown>
 
 const CHILD_WINDOW_MS = 20_000
-// the client's own boot: its markup appears well after the page reports itself loaded
+// The client's own boot: its markup appears well after the page reports itself loaded, and on a
+// loaded host that boot is slow rather than broken - so this is a budget the caller can raise.
 const CONTROL_READY_MS = 60_000
-const CONFIRM_READY_MS = 15_000
+const CONFIRM_READY_MS = 20_000
 const LOAD_MS = 60_000
 
 export class HuddlePage {
   private readonly connection: CdpConnection
   private readonly session: SlackSession
   private readonly clientBaseUrl: string
+  private readonly controlReadyMs: number
   private readonly onSignal: (signal: ChimeSignal) => void
   private readonly onPageEvent: (event: PageEvent) => void
   private readonly sockets = new Map<string, string>()
@@ -39,12 +41,14 @@ export class HuddlePage {
     readonly connection: CdpConnection
     readonly session: SlackSession
     readonly clientBaseUrl: string
+    readonly controlReadyMs?: number
     readonly onSignal: (signal: ChimeSignal) => void
     readonly onPageEvent: (event: PageEvent) => void
   }) {
     this.connection = input.connection
     this.session = input.session
     this.clientBaseUrl = input.clientBaseUrl
+    this.controlReadyMs = input.controlReadyMs ?? CONTROL_READY_MS
     this.onSignal = input.onSignal
     this.onPageEvent = input.onPageEvent
   }
@@ -114,7 +118,7 @@ export class HuddlePage {
   async start(): Promise<void> {
     const sessionId = this.requireMain()
     const known = this.pages.length
-    const opened = await this.click(sessionId, START_SELECTORS, CONFIRM_TEXT, CONTROL_READY_MS)
+    const opened = await this.click(sessionId, START_SELECTORS, CONFIRM_TEXT, this.controlReadyMs)
     if (!opened.clicked) {
       throw new VoiceFatal(`the client showed no huddle control in this chat within ${CONTROL_READY_MS} ms (page "${opened.title ?? ""}", ${opened.buttons ?? 0} controls: ${opened.candidates.slice(0, 8).join(", ")})`)
     }

@@ -27,6 +27,8 @@ export type HuddleDriverOptions = {
   readonly launch?: (options: LaunchOptions) => ChromeSession
   readonly fetchImpl?: typeof fetch
   readonly joinTimeoutMs?: number
+  /** how long to wait for the client to render its huddle control; raise it on a loaded host */
+  readonly controlReadyMs?: number
   /**
    * What to do when someone other than this account joins. The default stops the tap: a bridge must
    * not capture a person who has not been told it is there. The pipeline relaxes this once the call
@@ -123,6 +125,7 @@ export class HuddleDriver implements HuddleControl {
         connection: chrome.connection,
         session: this.options.session,
         clientBaseUrl: this.options.clientBaseUrl ?? DEFAULT_CLIENT,
+        ...(this.options.controlReadyMs === undefined ? {} : { controlReadyMs: this.options.controlReadyMs }),
         onSignal: (signalFrame) => this.onSignal(signalFrame),
         onPageEvent: (event) => this.onPageEvent(event),
       })
