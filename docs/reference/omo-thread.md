@@ -97,9 +97,11 @@ another binding is `binding_mismatch` (the question stays pending), and a token 
 rebind, expiry or session restart is `stale_token`. While another answer to the same question is
 still being handed to the session, a second answer is `answer_in_progress` (exit 1): retry after a
 moment, because the first attempt may still fail and leave the question pending. An answer
-abandoned mid-hand-off for more than 120 s is taken over by the next one, and the abandoned attempt
-can no longer change the question when it finally ends. `already_answered` (exit 1) means the
-answer reached the session: stop retrying.
+abandoned mid-hand-off for more than 120 s is taken over by the next one. When the abandoned
+attempt finally ends, a failure changes nothing; if the session took its answer after all, the
+question is delivered with that answer and the later attempt is refused (`stale_token`), because
+the session takes one answer per question. `already_answered` (exit 1) means the answer reached the
+session: stop retrying.
 
 A question answered through an omo from before the answer states existed cannot tell a delivered
 answer from one whose attempt died halfway, so it counts as an answer in flight since it was
