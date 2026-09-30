@@ -158,6 +158,9 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE outbox ADD COLUMN ui_request_kind TEXT CHECK (ui_request_kind IS NULL OR ui_request_kind IN ('question', 'select', 'confirm', 'input', 'editor'))",
     "ALTER TABLE outbox ADD COLUMN answer_state TEXT CHECK (answer_state IS NULL OR answer_state IN ('in_flight', 'delivered'))",
   ],
+  // v4: who answered a question (`answered_by`, the connector's author record as JSON). NULL on a
+  // question answered without an author, and on every row answered before v4.
+  ["ALTER TABLE outbox ADD COLUMN answered_by TEXT"],
 ]
 
 export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms"] as const

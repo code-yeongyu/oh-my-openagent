@@ -371,7 +371,8 @@ function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal |
 }
 
 function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
-  const bucket = ctx.sql.one(["tokens", "updated_at"], "SELECT tokens, updated_at FROM rate_buckets WHERE sender = ? AND target_durable_id = ?", [request.sender_principal, request.target_durable_id])
+  const sender = request.rate_principal ?? request.sender_principal
+  const bucket = ctx.sql.one(["tokens", "updated_at"], "SELECT tokens, updated_at FROM rate_buckets WHERE sender = ? AND target_durable_id = ?", [sender, request.target_durable_id])
   const tokens = bucket === undefined
     ? PAIR_BUCKET_BURST
     : Math.min(PAIR_BUCKET_BURST, Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS)
@@ -382,7 +383,7 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
     })
   }
   write(ctx, "INSERT INTO rate_buckets (sender, target_durable_id, tokens, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(sender, target_durable_id) DO UPDATE SET tokens = excluded.tokens, updated_at = excluded.updated_at", [
-    request.sender_principal, request.target_durable_id, tokens - 1, request.now,
+    sender, request.target_durable_id, tokens - 1, request.now,
   ])
   return undefined
 }

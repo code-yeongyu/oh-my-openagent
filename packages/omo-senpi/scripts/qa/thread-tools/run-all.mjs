@@ -43,6 +43,7 @@ const gateway = [
   ["lost-ack", "lost-ack.mjs"],
   ["adopt", "adopt.mjs"],
   ["draft-preservation", "draft-preservation.mjs"],
+  ["binding-author", "binding-author.mjs"],
 ]
 
 const legacy = [

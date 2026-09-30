@@ -19,6 +19,7 @@ import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { nearestNodeBin, readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
+import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
 import { runDoctor } from "./bin/lib/doctor.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
@@ -241,6 +242,17 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
       stdout: process.stdout,
       stderr: process.stderr,
       platform: process.platform,
+    })
+    return true
+  }
+  // The engine call below re-runs this binary with the raw marker set, so it reaches the engine untouched.
+  if (isHostStatusAll(args, process.env)) {
+    process.exitCode = await runHostStatusAll(args, {
+      engine,
+      env: process.env,
+      stdout: process.stdout,
+      stderr: process.stderr,
+      readActivity: await sessionActivityReader(join(execDir, "plugin")),
     })
     return true
   }

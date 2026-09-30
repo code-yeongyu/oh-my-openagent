@@ -79,6 +79,16 @@ describe("omo thread: argv to SDK calls", () => {
     expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "send", request: { text: "hello from outside", binding_id: "b-1", idempotency_key: "evt-9" } })
   })
 
+  test("#given send --binding with an author and a per-message mode #when run #then the request carries the author record and the mode", async () => {
+    const result = await run(["send", "--binding", "b-1", "--author-id", "U123", "--author-name", "Jane Doe", "--author-user-id", "u-jane", "--mode", "follow_up", "--idempotency-key", "evt-9", "hi", "--json"])
+    expect(JSON.parse(result.stdout).request).toEqual({ text: "hi", binding_id: "b-1", idempotency_key: "evt-9", mode: "follow_up", author: { platform_user_id: "U123", display: "Jane Doe", user_id: "u-jane" } })
+  })
+
+  test("#given answer with an author #when run #then the answering human goes to the SDK", async () => {
+    const result = await run(["answer", "--binding", "b-1", "--token", "rt1.x.y", "--author-id", "U123", "--author-name", "Jane", "yes", "--json"])
+    expect(JSON.parse(result.stdout).request).toEqual({ binding_id: "b-1", reply_token: "rt1.x.y", answer: "yes", author: { platform_user_id: "U123", display: "Jane" } })
+  })
+
   test("#given bind flags #when run #then direction, events and a ttl of none map to the binding record's fields", async () => {
     const result = await run(["bind", "my-tui", "--platform", "custom", "--account", "qa", "--chat", "c1", "--direction", "in", "--events", "milestone,report", "--ttl", "none", "--json"])
     expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "bind", request: { session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1", direction: { inbound: true, outbound: false }, outbound_events: ["milestone", "report"], ttl_seconds: null } } })
@@ -155,7 +165,12 @@ describe("omo thread: exit codes", () => {
 
   test.each([
     [["answer", "--token", "rt1.x", "yes"], "--binding is required"],
-    [["send", "--binding", "b-1", "--mode", "steer", "hi"], "--binding delivers with the binding's inbound mode"],
+    [["send", "--binding", "b-1", "--mode", "steer", "hi"], "--binding takes --mode auto or follow_up"],
+    [["send", "--binding", "b-1", "--expected-turn", "3", "hi"], "--binding takes no --expected-turn"],
+    [["send", "my-tui", "ping", "--author-id", "U1", "--author-name", "Jane"], "--author-id/--author-name/--author-user-id need --binding"],
+    [["send", "--binding", "b-1", "--author-id", "U1", "hi"], "--author-id and --author-name go together"],
+    [["send", "--binding", "b-1", "--author-user-id", "u1", "hi"], "--author-id and --author-name go together"],
+    [["answer", "--binding", "b-1", "--token", "rt", "--author-name", "Jane", "yes"], "--author-id and --author-name go together"],
     [["send", "only-target"], "needs <target> <text>"],
     [["unbind", "b-1", "--revision", "x"], "--revision must be a non-negative integer"],
     [["list", "--bogus"], "unknown option '--bogus'"],

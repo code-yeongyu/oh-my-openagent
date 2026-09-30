@@ -8,7 +8,7 @@
  */
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 
-import type { StoreRefusal } from "./types"
+import type { ExternalAuthor, StoreRefusal } from "./types"
 
 export const BINDING_SCHEMA_VERSION = 1
 export const BINDING_PLATFORMS = ["discord", "telegram", "slack", "herdr", "custom"] as const
@@ -111,6 +111,8 @@ export type OutboxRow = {
   readonly reply_token: string | null
   readonly question_state: "pending" | "answered" | null
   readonly outcome: CompletionOutcome | null
+  /** For an answered `question`: the human the connector named with the answer; null without one. */
+  readonly answered_by: ExternalAuthor | null
 }
 
 export function rfc3339(ms: number): string {

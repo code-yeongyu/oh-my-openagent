@@ -7,6 +7,7 @@ import { doctorComputerUseLines } from "./computer-use-doctor.js"
 import { doctorConfigLines } from "./config-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
+import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
@@ -312,6 +313,17 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // engine's app-server dispatch. It loads into every thread, including the daemon's.
   if (command === "app-server") {
     await spawnSenpi(args.includes("--no-extensions") ? args : [...args, "--extension", join(packageRoot, "plugin")], false)
+    return
+  }
+  // `host status --all` stays the engine's answer; omo only adds each terminal row's last activity.
+  if (isHostStatusAll(args, process.env)) {
+    process.exitCode = await runHostStatusAll(args, {
+      engine: { run: engineHostCall },
+      env: process.env,
+      stdout: process.stdout,
+      stderr: process.stderr,
+      readActivity: await sessionActivityReader(join(packageRoot, "plugin")),
+    })
     return
   }
   if (earlyCommands.has(command) || command === "update") {

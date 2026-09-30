@@ -23,6 +23,7 @@ import type {
   DeliveryRow,
   EnqueueOutcome,
   EnqueueRequest,
+  ExternalAuthor,
   GatewayStoreConfig,
   GatewayStoreEvent,
   GatewayStoreStats,
@@ -103,7 +104,7 @@ export type GatewayStore = {
   readonly pendingCompletionArms: (durableId: string) => Promise<number>
   readonly readOutbox: (request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayOutcome<OutboxPage>>
   readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
-  readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayOutcome<AnswerClaim>>
+  readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly answered_by?: ExternalAuthor | null }) => Promise<RelayOutcome<AnswerClaim>>
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
   readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
   readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>

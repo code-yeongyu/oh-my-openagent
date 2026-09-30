@@ -8,12 +8,13 @@
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { GatewayEndpointPort, GatewayEndpointRef, UiAnswerReply } from "./adapter"
 import { answerShape, type UiRequestKind } from "./answer-shape"
-import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
+import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, INBOUND_MODES, type InboundMode, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
 import type { GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
 import { CLOSED_ELSEWHERE, type AnswerClaimRef, type AnswerDelivered, type BindingsFilter, type ReportOpResult } from "./store-relay-ops"
-import type { GatewayDeliveryResult, StoreRefusal } from "./types"
+import { normalizeAuthor } from "./author"
+import type { ExternalAuthor, GatewayDeliveryResult, StoreRefusal } from "./types"
 
 export type RelayResult<T> = ({ readonly kind: "ok" } & T) | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
@@ -27,10 +28,18 @@ export type GatewayRelay = {
   readonly report: (request: Keyed & { readonly session_durable_id: string; readonly binding_id?: string; readonly event: OutboundEvent; readonly text: string; readonly request_id?: string; readonly request_kind?: UiRequestKind }) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayResult<OutboxPage>>
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayResult<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
-  /** `binding_id` is the binding the answer arrived THROUGH (the connector's authenticated context), never read from the token. */
-  readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Promise<RelayResult<{ readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string }>>
-  /** A connector's inbound message: delivered to the bound session with the binding's `inbound_mode`; one `event_id` is admitted once. */
-  readonly inbound: (request: { readonly binding_id: string; readonly event_id: string; readonly text: string }) => Promise<GatewayDeliveryResult>
+  /**
+   * `binding_id` is the binding the answer arrived THROUGH (the connector's authenticated context), never read from the token.
+   * `author` is the human who answered, recorded on the question's outbox row as `answered_by`.
+   */
+  readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly author?: ExternalAuthor }) => Promise<RelayResult<{ readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string; readonly answered_by: ExternalAuthor | null }>>
+  /**
+   * A connector's inbound message; one `event_id` is admitted once. `author` is the human who wrote it,
+   * rendered in the provenance header outside the body. `mode` defaults to the binding's `inbound_mode`
+   * and may never exceed it: `follow_up` is allowed on an `auto` binding, `auto` on a `follow_up` binding
+   * is `invalid_arguments`, and `steer` is refused on every binding.
+   */
+  readonly inbound: (request: { readonly binding_id: string; readonly event_id: string; readonly text: string; readonly author?: ExternalAuthor; readonly mode?: InboundMode }) => Promise<GatewayDeliveryResult>
   /** The session settled: armed completions become outbox rows with this outcome. */
   readonly settle: (request: { readonly session_durable_id: string; readonly outcome: CompletionOutcome }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Shutdown: cancels background answer-release retries. */
@@ -74,6 +83,12 @@ function failure(code: ThreadErrorCode, message: string, details?: Readonly<Reco
 function fromStore<T extends object>(outcome: RelayOutcome<T> | StoreRefusal): RelayResult<T> {
   if (outcome.kind === "refused") return failure(outcome.code, outcome.message, outcome.details)
   return outcome as RelayResult<T>
+}
+
+function checkedAuthor(author: ExternalAuthor | undefined): ExternalAuthor | undefined | { readonly kind: "error"; readonly error: ThreadToolFailure } {
+  if (author === undefined) return undefined
+  const normalized = normalizeAuthor(author)
+  return "kind" in normalized ? failure("invalid_arguments", normalized.message) : normalized
 }
 
 function textTooLarge(text: string): { readonly kind: "error"; readonly error: ThreadToolFailure } | undefined {
@@ -144,7 +159,10 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     answer: async (request) => {
       const tooLarge = textTooLarge(request.answer)
       if (tooLarge !== undefined) return tooLarge
-      const claim = await store.claimAnswer({ now: now(), ...request })
+      const author = checkedAuthor(request.author)
+      if (author !== undefined && "kind" in author) return author
+      const answeredBy = author ?? null
+      const claim = await store.claimAnswer({ now: now(), binding_id: request.binding_id, reply_token: request.reply_token, answer: request.answer, answered_by: answeredBy })
       if (claim.kind !== "ok") return fromStore(claim)
       const own: AnswerClaimRef = { reply_token: request.reply_token, claimed_at: claim.claimed_at }
       const respond = options.endpoints.respondUi
@@ -199,24 +217,33 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
             : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
         )
       }
-      await confirm({ ...own, answer: request.answer })
-      return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id }
+      await confirm({ ...own, answer: request.answer, answered_by: answeredBy })
+      return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id, answered_by: answeredBy }
     },
     inbound: async (request) => {
+      if (request.mode !== undefined && !(INBOUND_MODES as readonly string[]).includes(request.mode)) {
+        return failure("invalid_arguments", `A binding message is delivered as ${INBOUND_MODES.join(" or ")}, never ${String(request.mode)}.`, { mode: request.mode }, "Send with mode auto or follow_up, or omit it for the binding's inbound_mode.")
+      }
+      const author = checkedAuthor(request.author)
+      if (author !== undefined && "kind" in author) return author
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
       if (binding === null) return failure("not_found", "No binding has this id.", { binding_id: request.binding_id })
       if (binding.status !== "active") return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
       if (!binding.direction.inbound) return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
+      const mode = request.mode ?? binding.inbound_mode
+      if (mode === "auto" && binding.inbound_mode === "follow_up") {
+        return failure("invalid_arguments", "The binding delivers at most follow_up; a message cannot ask for more than its binding's inbound_mode.", { binding_id: binding.binding_id, mode, inbound_mode: binding.inbound_mode }, "Send with mode follow_up (or omit it), or rebind the thread with inbound_mode auto.")
+      }
       return await options.engine.deliver({
         sender: {
           kind: "external",
-          origin: { platform: binding.platform, account_id: binding.account_id, chat_id: binding.chat_id, thread_id: binding.thread_id, message_id: request.event_id },
+          origin: { platform: binding.platform, account_id: binding.account_id, chat_id: binding.chat_id, thread_id: binding.thread_id, message_id: request.event_id, ...(author === undefined ? {} : { author }) },
           binding_id: binding.binding_id,
           binding_revision: binding.revision,
         },
         target: binding.session_durable_id,
         text: request.text,
-        mode: binding.inbound_mode,
+        mode,
         all_scope: true,
         idempotency_key: `event:${request.event_id}`,
       })

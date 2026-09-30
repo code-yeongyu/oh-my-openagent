@@ -22,6 +22,18 @@ postinstall, on bun itself when node is missing, so the shim is back before anyt
 read a node launch already pays. Outside a POSIX bun-global install the call is the same no-op as at launch. A blocked
 (untrusted) postinstall still leaves the stock link until the next launch under node or bun.
 
+## 2026-09-30 - `omo thread` author and mode flags; `omo host status --all` stamps terminal rows with `last_activity_at` (#9143, review of #9222)
+
+`thread.js`: `send --binding` accepts `--mode auto|follow_up` (the SDK caps it by the binding's inbound mode) and
+`--author-id`/`--author-name`/`--author-user-id`. `answer` accepts the same author flags. Author flags without
+`--binding`, or without both `--author-id` and `--author-name`, and `--mode steer` or `--expected-turn` with
+`--binding`, are usage errors (exit 2). The usage text and the `docs/reference/omo-thread.md` synopsis list the same
+flags. New `host-status.js`: `omo host status --all` (npm launcher and compiled entry) runs the engine's inventory,
+passes every row and the exit code through, and adds `last_activity_at` to each `tui` row. That is
+`readSessionFacts(owner.session.path).updated_at` from the plugin's thread SDK, else `null`. The compiled entry reaches
+the engine by re-running itself, so it marks that call with `OMO_HOST_STATUS_RAW=1`, which skips the enrichment.
+Tests: `test/host-status.test.ts` and new cases in `test/thread.test.ts`.
+
 ## 2026-09-30 - `omo daemon attach` is removed with the engine's shared-host join (#9143)
 
 senpi 2026.9.29-4 removed the interactive shared-host join, so the environment `omo daemon attach` printed (`OMO_ENABLE_SHARED_HOST=1` plus `OMO_RPC_SOCKET`) and its `attach <launch args>` passthrough no longer put a terminal on a host. `attach` is gone from `daemon.js` (subcommand set, usage, engine mapping, `attachEnv`), from `daemon-args.js` (`attachLaunchArgs` and the flag sets only it read) and from the launcher's passthrough branch; `omo daemon attach` now exits 2 with the unknown-subcommand usage on stderr, prints nothing on stdout and never calls the engine. `omo daemon run` still ensures the operator daemon on `rpc.sock`, and `status`, `stop`, `handoff`, `gc` and `rollback-prepare` are unchanged. `docs/reference/omo-daemon.md` and the package AGENTS.md drop the attach rows, and the dependency-audit sandbox stops setting the two shared-host variables. `test/daemon.test.ts` replaces the four attach cases with one that pins the usage exit, the empty stdout and the untouched engine.

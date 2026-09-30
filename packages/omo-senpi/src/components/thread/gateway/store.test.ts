@@ -55,6 +55,30 @@ describe("schema migration v1 -> v2", () => {
   })
 })
 
+describe("schema migration v3 -> v4", () => {
+  test("#given a v3 store holding an answered question #when the current store opens it #then the row keeps its answer and state, and reads answered_by null", async () => {
+    const h = (harness = createGatewayHarness())
+    mkdirSync(gatewayRootDirectory(h.agentDir), { recursive: true, mode: 0o700 })
+    const v3 = new Database(gatewayDatabasePath(h.agentDir))
+    for (const step of GATEWAY_MIGRATIONS.slice(0, 3)) for (const statement of step) v3.run(statement)
+    v3.run("PRAGMA user_version = 3")
+    v3.run("INSERT INTO bindings (binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at) VALUES ('bnd-1', 1, 'active', 'slack', 'bot', 'c', '@chat', 'realm-x', 'B', 1, 1, 'auto', '[\"question\"]', 'default', '2026-09-30T00:00:00.000Z', '2026-09-30T00:00:00.000Z', '2026-09-30T00:00:00.000Z')")
+    v3.run("INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at, session_durable_id, reply_token, ui_request_id, question_state, answer, answered_at, answer_state) VALUES ('bnd-1', 1, 'question', '{\"text\":\"ok?\"}', 'pending', 1, 'B', 'rt-old', 'ui-0', 'answered', 'yes', 2, 'delivered')")
+    v3.close()
+    const store = h.store()
+    const page = await store.readOutbox({ now: h.clock.now, binding_id: "bnd-1" })
+    if (page.kind !== "ok") throw new Error(JSON.stringify(page))
+    expect(page.rows.map((row) => ({ text: row.text, question_state: row.question_state, answered_by: row.answered_by }))).toEqual([{ text: "ok?", question_state: "answered", answered_by: null }])
+    const upgraded = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      expect(upgraded.query("SELECT user_version AS v FROM pragma_user_version()").get()).toEqual({ v: GATEWAY_MIGRATIONS.length })
+      expect(upgraded.query("SELECT answer, answered_at, answer_state, answered_by FROM outbox WHERE reply_token = 'rt-old'").get()).toEqual({ answer: "yes", answered_at: 2, answer_state: "delivered", answered_by: null })
+    } finally {
+      upgraded.close()
+    }
+  })
+})
+
 describe("legacy mailbox migration", () => {
   test("#given a legacy sender-local mailbox journal #when the store opens twice #then its pending items become queued rows once, in order, and the directory is left in place", async () => {
     const h = (harness = createGatewayHarness())

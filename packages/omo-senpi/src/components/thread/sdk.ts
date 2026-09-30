@@ -9,7 +9,7 @@ import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
 import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
 import type { GatewayRelay } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import type { GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
+import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, resolution, resolveEntries } from "./tools/internals"
@@ -45,8 +45,11 @@ export type ThreadSdk = {
   readonly principal: string
   readonly list: (request: Scoped) => Promise<ThreadToolResult>
   readonly read: (request: Scoped & { readonly thread: string; readonly max_bytes?: number; readonly cursor?: string }) => Promise<ThreadToolResult>
-  /** Bindingless: the `cli` sender. With `binding_id`: the connector inbound path (the binding's mode, `event:<key>` admitted once). */
-  readonly send: (request: Scoped & Keyed & { readonly thread?: string; readonly text: string; readonly mode?: GatewayDeliveryMode; readonly expected_turn_id?: number; readonly binding_id?: string }) => Promise<GatewayDeliveryResult>
+  /**
+   * Bindingless: the `cli` sender. With `binding_id`: the connector inbound path (`event:<key>` admitted once), with an
+   * optional `author` and a `mode` capped by the binding's `inbound_mode`; `author` without `binding_id` is `invalid_arguments`.
+   */
+  readonly send: (request: Scoped & Keyed & { readonly thread?: string; readonly text: string; readonly mode?: GatewayDeliveryMode; readonly expected_turn_id?: number; readonly binding_id?: string; readonly author?: ExternalAuthor }) => Promise<GatewayDeliveryResult>
   readonly bind: (request: Scoped & Keyed & { readonly session: string; readonly binding: Omit<BindInput, "session_durable_id"> }) => Relayed<"bind">
   readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Relayed<"unbind">
   readonly rebind: (request: Scoped & Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session: string }) => Relayed<"rebind">
@@ -54,7 +57,7 @@ export type ThreadSdk = {
   readonly report: (request: Scoped & Keyed & { readonly session: string; readonly kind: string; readonly text: string; readonly binding_id?: string; readonly request_id?: string; readonly request_kind?: string }) => Relayed<"report">
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Relayed<"outbox">
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Relayed<"ack">
-  readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string }) => Relayed<"answer">
+  readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly author?: ExternalAuthor }) => Relayed<"answer">
   readonly locate: (request: Scoped & { readonly thread: string }) => Promise<{ readonly kind: "ok"; readonly thread: LocatedThread } | Failure>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
   readonly release: (thread: LocatedThread, request: Omit<ReleaseSessionRequest, "reason">) => Promise<ReleaseSessionReply>
@@ -121,7 +124,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         return fail("invalid_arguments", `Binding ${binding.binding_id} delivers to session ${binding.session_durable_id}, not ${target.id}.`, "Drop the target (the binding names its session) or pass the binding of that session.", { binding_id: binding.binding_id, session: binding.session_durable_id })
       }
     }
-    return await relay.inbound({ binding_id: request.binding_id, event_id: request.idempotency_key ?? randomUUID(), text: request.text })
+    if (request.expected_turn_id !== undefined) return fail("invalid_arguments", "A binding message never steers, so it takes no expected_turn_id.", "Drop expected_turn_id.")
+    if (request.mode === "steer") return fail("invalid_arguments", "A binding message is delivered as auto or follow_up, never steer.", "Send with mode auto or follow_up, or omit it for the binding's inbound_mode.")
+    return await relay.inbound({
+      binding_id: request.binding_id,
+      event_id: request.idempotency_key ?? randomUUID(),
+      text: request.text,
+      ...(request.author === undefined ? {} : { author: request.author }),
+      ...(request.mode === undefined ? {} : { mode: request.mode }),
+    })
   }
 
   return {
@@ -131,6 +142,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     send: (request) => guarded(async () => {
       if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
       if (request.thread === undefined) return fail("invalid_arguments", "A send without a binding needs a target session.", "Pass the target session, or --binding to deliver through a binding.")
+      if (request.author !== undefined) return fail("invalid_arguments", "An author names a human in a bound external thread; a send without a binding has none.", "Pass binding_id with the author, or drop the author.")
       return await engine.deliver({
         sender: { kind: "cli", uid: options.uid, user: options.user },
         target: request.thread,
@@ -180,7 +192,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     }),
     outbox: (request) => guarded(() => relay.outbox(request)),
     ack: (request) => guarded(() => relay.ack(request)),
-    answer: (request) => guarded(() => relay.answer(request)),
+    answer: (request) => guarded(() => relay.answer({ binding_id: request.binding_id, reply_token: request.reply_token, answer: request.answer, ...(request.author === undefined ? {} : { author: request.author }) })),
     locate: (request) => guarded(async () => {
       const current = await view()
       const resolved = resolution(surface, resolveEntries(surface, current), request.thread, UNKNOWN_CALLER, request.all_scope)

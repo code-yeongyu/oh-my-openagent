@@ -26,6 +26,30 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-09-30 - thread gateway: binding authors, a per-message mode, the outbox wake marker (#9143, review of #9222)
+
+- `gateway/author.ts` (new): `normalizeAuthor` checks an `ExternalAuthor` (`platform_user_id`, `display`, optional
+  `user_id`). Each field must be non-empty and at most 256 characters, and a C0/C1 control, DEL or U+2028/U+2029 is
+  `invalid_arguments`. `ExternalOrigin.author` (optional) keeps it on the delivery's envelope JSON, so the
+  deliveries table did not change.
+- `relay.inbound` takes `author` and `mode`. `mode` defaults to the binding's `inbound_mode`, and `auto` on a
+  `follow_up` binding is refused `invalid_arguments` with `{binding_id, mode, inbound_mode}`, never downgraded;
+  `steer` is refused. `relay.answer` takes `author` and returns `answered_by`.
+- `provenance.ts` renders `author=` / `author_id=` / `author_user_id=` as JSON strings with `[`/`]` escaped, after
+  `actor=`, so the body cannot forge or close header fields.
+- `engine.ts`: a binding sender with an author keys the pair rate bucket by `binding:<id>#author:<platform user id>`
+  (`EnqueueRequest.rate_principal`, read by `store-ops.ts` `takePairToken`); without an author it stays
+  `binding:<id>`. The author joins the receipt's args hash.
+- Schema v4 (additive): `outbox.answered_by TEXT`, NULL on older rows. Claim, confirm and mark-prior-delivered write
+  it, and release clears it. `OutboxRow.answered_by` exposes it.
+- `store-relay-ops.ts` `insertOutbox` rewrites `<agent dir>/gateway/outbox.marker` (temp file + rename, inside the
+  insert's transaction) with `{binding_id, cursor, written_at}`. `paths.ts` `gatewayOutboxMarkerPath`.
+- `sdk.ts`: `send({binding_id, author, mode})`; an author without a binding, a binding `steer` or a binding
+  `expected_turn_id` is `invalid_arguments`. `answer({..., author})`.
+- `extension/thread-sdk.ts` also exports `readSessionFacts`, which `omo host status --all` uses for `last_activity_at`.
+- Tests: `gateway/relay-author-mode.test.ts`, the v3 -> v4 migration in `gateway/store.test.ts`, two `sdk.test.ts`
+  cases. `relay-answer-kinds.test.ts` `downgradeToV2` also drops the v4 column, so its "v2 store" is a real v2 store.
+
 ## 2026-09-30 - thread gateway: one clock per store, and cross-process tests that do not wait on fs.watch (#9143)
 
 - `gateway/store.ts`: `GatewayStore` exposes `now`, the clock its rows are stamped and expired against (the

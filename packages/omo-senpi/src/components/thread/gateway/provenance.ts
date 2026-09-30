@@ -6,6 +6,21 @@ function headerValue(value: string): string {
   return cleaned.length === 0 ? "-" : cleaned
 }
 
+/** A JSON string whose brackets are escaped too, so a quoted value can never close the `[...]` header. */
+function quotedHeaderValue(value: string): string {
+  return JSON.stringify(value).replace(/\[/g, "\\u005b").replace(/\]/g, "\\u005d")
+}
+
+function authorFields(row: DeliveryRow): string[] {
+  const author = "external" in row.envelope.origin ? row.envelope.origin.external.author : undefined
+  if (author === undefined) return []
+  return [
+    `author=${quotedHeaderValue(author.display)}`,
+    `author_id=${quotedHeaderValue(author.platform_user_id)}`,
+    ...(author.user_id === undefined ? [] : [`author_user_id=${quotedHeaderValue(author.user_id)}`]),
+  ]
+}
+
 export function renderDeliveryText(row: DeliveryRow): string {
   const envelope = row.envelope
   const source = "session" in envelope.origin ? "peer_agent" : "external"
@@ -15,6 +30,7 @@ export function renderDeliveryText(row: DeliveryRow): string {
     "OMO_GATEWAY v=1",
     `source=${source}`,
     `actor=${headerValue(envelope.actor)}`,
+    ...authorFields(row),
     `sender_session=${headerValue(senderSession)}`,
     `delivery=${headerValue(row.delivery_id)}`,
     `requested=${row.mode_requested}`,

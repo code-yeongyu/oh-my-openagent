@@ -75,6 +75,7 @@ function fail(code: ThreadErrorCode, message: string, details?: Readonly<Record<
 
 type SenderFacts = {
   readonly principal: string
+  readonly rate_principal: string
   readonly node: string
   readonly turn: string | null
   readonly cause: string | null
@@ -87,6 +88,7 @@ function senderFacts(sender: GatewaySender): SenderFacts {
   if (sender.kind === "session") {
     return {
       principal: `session:${sender.durable_id}`,
+      rate_principal: `session:${sender.durable_id}`,
       node: sender.durable_id,
       turn: sender.turn_id ?? null,
       cause: sender.cause_delivery_id ?? null,
@@ -99,6 +101,7 @@ function senderFacts(sender: GatewaySender): SenderFacts {
     const principal = `cli:${sender.uid}`
     return {
       principal,
+      rate_principal: principal,
       node: principal,
       turn: null,
       cause: null,
@@ -108,8 +111,11 @@ function senderFacts(sender: GatewaySender): SenderFacts {
     }
   }
   const principal = `binding:${sender.binding_id}`
+  const author = sender.origin.author
   return {
     principal,
+    // Each human in a bound thread gets their own pair bucket; a sender with no author shares the binding's.
+    rate_principal: author === undefined ? principal : `${principal}#author:${author.platform_user_id}`,
     node: principal,
     turn: null,
     cause: null,
@@ -153,6 +159,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       delivery_id: deliveryId,
       target_durable_id: target.durable_id,
       sender_principal: facts.principal,
+      rate_principal: facts.rate_principal,
       sender_node: facts.node,
       sender_turn: facts.turn,
       cause_delivery_id: facts.cause,
@@ -165,7 +172,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       binding: facts.binding,
       receipt: {
         idempotency_key: idempotencyKey,
-        args_hash: argsHash({ target: target.durable_id, text: request.text, mode, expected_turn_id: request.expected_turn_id ?? null, binding: facts.binding }),
+        args_hash: argsHash({ target: target.durable_id, text: request.text, mode, expected_turn_id: request.expected_turn_id ?? null, binding: facts.binding, author: request.sender.kind === "external" ? request.sender.origin.author : undefined }),
       },
       endpoint_kind: endpoint?.kind ?? null,
     })

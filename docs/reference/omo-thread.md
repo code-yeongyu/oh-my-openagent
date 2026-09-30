@@ -14,17 +14,21 @@ and bindingless sends are keyed by it, and a delivered message carries the prove
 ```bash
 omo thread list [--all-scope] [--json]
 omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--json]
-omo thread send --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--json]
+omo thread send --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]
+                [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]] [--json]
 omo thread read <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>] [--json]
-omo thread bind <session> --platform <p> --account <id> --chat <id> [--thread <id>] [--direction in|out|both]
-                [--inbound-mode auto|follow_up] [--events milestone,report,question,completion]
-                [--root-message <id>] [--progress-message <id>] [--policy <id>] [--ttl <seconds>|none]
-omo thread unbind <binding-id> --revision <n>
-omo thread rebind <binding-id> <session> --revision <n>
+omo thread bind <session> --platform <p> --account <id> --chat <id> [--thread <id>] [--root-message <id>]
+                [--progress-message <id>] [--direction in|out|both] [--inbound-mode auto|follow_up]
+                [--events milestone,report,question,completion] [--policy <id>] [--ttl <seconds>|none]
+                [--idempotency-key <k>]
+omo thread unbind <binding-id> --revision <n> [--idempotency-key <k>]
+omo thread rebind <binding-id> <session> --revision <n> [--idempotency-key <k>]
 omo thread bindings [--session <s>] [--platform <p>] [--account <id>] [--chat <id>] [--thread <id>] [--status <s>]
+                    [--cursor <c>] [--limit <n>]
 omo thread report <session> <milestone|report|question|completion> <text> [--binding <id>] [--request-id <id>]
-                  [--request-kind question|select|confirm|input|editor]
+                  [--request-kind question|select|confirm|input|editor] [--idempotency-key <k>]
 omo thread answer --binding <answering-binding-id> --token <reply-token> <text>
+                  [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]
 omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
 omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 ```
@@ -53,10 +57,28 @@ A terminal session is never prompted directly; the message lands in its inbox an
 extension admits it (a held draft in the editor is never overwritten).
 
 `send --binding <id>` is the connector inbound path: the message is delivered to the binding's
-session with the binding's `inbound_mode`, as `binding:<id>`, and `--idempotency-key` is the
-platform's event id, so one platform message is admitted once. A target, when given, must be the
-binding's session. `--mode` and `--expected-turn` are usage errors here (exit 2), because the
-binding decides the mode.
+session as `binding:<id>`, and `--idempotency-key` is the platform's event id, so one platform
+message is admitted once. A target, when given, must be the binding's session.
+
+- **Mode.** Without `--mode` the message takes the binding's `inbound_mode`. `--mode` sets it per
+  message, capped by the binding: `follow_up` is allowed on an `auto` binding, but `--mode auto` on
+  a `follow_up` binding is refused `invalid_arguments` (exit 1, `details: {binding_id, mode,
+  inbound_mode}`). It is never silently downgraded. So one binding per thread can deliver the
+  owner's messages as `auto` and everyone else's as `follow_up`. `--mode steer` and
+  `--expected-turn` are usage errors (exit 2): a binding message never steers.
+- **Author.** `--author-id <platform-user-id> --author-name <display>` (plus an optional
+  `--author-user-id <id>`, the omo user the connector mapped them to) names the human who wrote the
+  message, as the connector authenticated them. Author flags are accepted only with `--binding`, and
+  `--author-id` and `--author-name` go together; anything else is a usage error (exit 2). Each field
+  must be non-empty, at most 256 characters, and a single line: a control character, newline or
+  Unicode line separator is `invalid_arguments` (exit 1). The author is stored on the delivery's
+  external origin and rendered in the provenance header, outside the body, as JSON-quoted fields:
+  `author="Jane Doe" author_id="U123"` (and `author_user_id="..."`). Brackets inside a value are
+  escaped as `\u005b`/`\u005d`, so the body or a display name can never add or close a header
+  field; a body that says `author=owner` is still just the body. `actor=` stays the binding's
+  account, the bot the connector speaks as.
+- The SDK takes the same: `send({ binding_id, text, mode, author: { platform_user_id, display, user_id? } })`.
+  An `author` without `binding_id` is `invalid_arguments`.
 
 What the receiving session does with a delivery depends on its state when its drain runs:
 
@@ -80,7 +102,7 @@ Every send is checked against fixed budgets, which no setting raises:
 | --- | --- | --- |
 | Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
 | Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
-| One sender to one target | bursts of 8, then one every 5 s | `overloaded` with `retry_after_ms` |
+| One sender to one target | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `overloaded` with `retry_after_ms` |
 | One turn | reaches at most 16 sessions | `overloaded` |
 | One causal chain (a message and the messages it caused) | 4 hops, 64 deliveries, 7 days | `loop_detected` |
 | Replies | a direct reply to the session that messaged this one, or a send to itself | `loop_detected` |
@@ -88,18 +110,31 @@ Every send is checked against fixed budgets, which no setting raises:
 
 Answers to another session flow back through `read`, `report` and `answer`, not through a reply.
 
+A connector treats `overloaded` as back-pressure, not as a lost message: nothing was written, so
+it queues the message and retries the same `send` (same `--idempotency-key`) after
+`error.details.retry_after_ms`. It passes `--author-*` on every message it can attribute, so one
+busy human in a thread spends only their own budget; without an author every human in the thread
+shares the binding's one bucket.
+
 ## Connector loop
 
 ```bash
 id=$(omo thread bind my-session --platform custom --account bot --chat c1 --thread t1 --json | jq -r .binding.binding_id)
-omo thread send --binding "$id" --idempotency-key evt-1 "hello from outside"
-omo thread outbox "$id" --json          # rows the session reported, oldest first
-token=$(omo thread outbox "$id" --json | jq -r '[.rows[] | select(.event == "question" and .question_state == "pending")][0].reply_token')
-omo thread answer --binding "$id" --token "$token" "yes"
-omo thread outbox "$id" --ack --json    # the same read, then ack through the newest row
+omo thread send --binding "$id" --idempotency-key evt-1 --author-id U123 --author-name "Jane Doe" "hello from outside"
+# Post each outbox row, then ack exactly the row that was posted, with the platform's message id.
+omo thread outbox "$id" --json | jq -c '.rows[]' | while read -r row; do
+  cursor=$(jq -r .cursor <<<"$row")
+  posted=$(post_to_platform "$row")     # your connector: returns the platform message id
+  omo thread ack "$id" "$cursor" --provider-message-id "$posted"
+done
+token=$(omo thread outbox "$id" --after 0 --json | jq -r '[.rows[] | select(.event == "question" and .question_state == "pending")][0].reply_token')
+omo thread answer --binding "$id" --token "$token" --author-id U123 --author-name "Jane Doe" "yes"
 ```
 
-A question row carries a `reply_token`. The answer must arrive through the binding that asked:
+A question row carries a `reply_token`. `answer --author-id <id> --author-name <display>
+[--author-user-id <id>]` names the human who answered (validated like a `send` author); it is recorded
+on the question's outbox row as `answered_by` and returned in the answer result, so the outbox keeps
+who answered. The answer must arrive through the binding that asked:
 another binding is `binding_mismatch` (the question stays pending), and a token minted before a
 rebind, expiry or session restart is `stale_token`. While another answer to the same question is
 still being handed to the session, a second answer is `answer_in_progress` (exit 1): retry after a
@@ -190,11 +225,37 @@ Nothing is ever copied to the session's other bindings.
   row appears when the session settles.
 
 `outbox <binding-id>` reads rows in cursor order. Without `--after` it continues after the
-acknowledged cursor; `--after <cursor>` re-reads from an older one. `ack` (or `outbox --ack`,
-which acks through the newest row it read) is idempotent: an older or equal cursor changes
-nothing (`changed: false`), and a cursor past the newest row is `cursor_invalid`. Acked rows are
-kept 30 days after their ack; unacked rows live as long as their binding plus 30 days. A detached
-binding's outbox stays readable.
+acknowledged cursor; `--after <cursor>` re-reads from an older one. `ack` is idempotent: an older
+or equal cursor changes nothing (`changed: false`), and a cursor past the newest row is
+`cursor_invalid`. Acked rows are kept 30 days after their ack; unacked rows live as long as their
+binding plus 30 days. A detached binding's outbox stays readable.
+
+Delivery between the outbox and the platform is **at-least-once**. A row stays unacked until the
+connector acks it, so a connector that dies after the platform accepted a post but before its
+`ack` reads the same row again and posts it again. `(binding_id, cursor)` is the row's stable
+identity: a connector that must not double-post records it with the platform message (or in its
+own store) and skips a row it already posted. The loop is: read, post, then
+`ack <binding-id> <cursor> --provider-message-id <id>` for the row just posted.
+
+`outbox --ack` reads a page and acks through its newest row **before anything was posted**. It is
+a convenience for scripts that only drain or inspect an outbox; a connector that uses it loses
+every row of the page if it crashes before posting them.
+
+### Waking on new rows
+
+`<agent dir>/gateway/outbox.marker` is the outbox wake signal. It is rewritten after every outbox
+row insert (a `report`, a `question`, a settled `completion`), in the same write transaction, as a
+temp file renamed over the marker, so it is never seen half written. Its content is
+`{"binding_id", "cursor", "written_at"}` of the newest insert, across all bindings. It is a wake
+hint only: on a change the connector re-reads its own bindings' outboxes with `outbox`, and it
+never treats the marker's content as the list of new rows (two inserts may land between two
+reads). Watch the `gateway/` directory for events on `outbox.marker`, not the file itself: the
+rename replaces the file, which ends a watch on the old one. The marker does not change on
+deliveries, acks or any other store write. A connector that cannot watch files polls `outbox`.
+
+The SQLite WAL file (`gateway.sqlite-wal`) is not a supported wake signal. It changes on every
+delivery to any session, on checkpoints, and when connections open or close, and it is removed
+when the last connection closes, which silently ends a watch on it.
 
 ### Completion arms
 
@@ -232,8 +293,8 @@ every other subcommand prints the full result.
 | `rebind` | `{kind:"ok", binding, closed: [delivery ids], deduplicated}` |
 | `bindings` | `{kind:"ok", bindings: [<binding>], next_cursor}` |
 | `report` | `{kind:"ok", binding_id, revision, event, cursor, reply_token, armed, deduplicated}` |
-| `answer` | `{kind:"ok", binding_id, cursor, session_durable_id}` |
-| `outbox` | `{kind:"ok", binding_id, revision, status, rows: [{cursor, binding_id, revision, event, text, state, created_at, edit_message_id, provider_message_id, reply_token, question_state, outcome}], next_cursor, acked_cursor, acked?}` |
+| `answer` | `{kind:"ok", binding_id, cursor, session_durable_id, answered_by: {platform_user_id, display, user_id?} \| null}` |
+| `outbox` | `{kind:"ok", binding_id, revision, status, rows: [{cursor, binding_id, revision, event, text, state, created_at, edit_message_id, provider_message_id, reply_token, question_state, outcome, answered_by}], next_cursor, acked_cursor, acked?}`; `answered_by` is the author an answer named (`--author-*` on `answer`), `null` for an answer without one and for every row that is not an answered question |
 | `ack` | `{kind:"ok", binding_id, acked_cursor, changed}` |
 
 `<binding>` is `{schema_version, binding_id, revision, status, platform, account_id, chat_id,
@@ -251,8 +312,8 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | Code | Meaning |
 | --- | --- |
 | 0 | done |
-| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), ...) |
-| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up`, a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text (the SDK is not loaded) |
+| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
+| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
 | 3 | `host_unavailable`: no endpoint answered where one was needed (never for `send`, which queues offline) |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
 | 5 | `internal_error` |

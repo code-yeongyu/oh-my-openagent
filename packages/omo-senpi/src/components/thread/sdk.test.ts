@@ -91,6 +91,12 @@ describe("thread SDK: sessions", () => {
     expect(await sdk.send({ text: "nowhere" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(await store.list()).toEqual([])
   })
+
+  test("#given an author on a send without a binding #when called #then it is invalid_arguments and nothing is written", async () => {
+    const { sdk, store } = fixture()
+    expect(await sdk.send({ thread: "my-tui", text: "ping", author: { platform_user_id: "U1", display: "Jane" } })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(await store.list()).toEqual([])
+  })
 })
 
 describe("thread SDK: bindings and the connector surface", () => {
@@ -105,6 +111,18 @@ describe("thread SDK: bindings and the connector surface", () => {
     expect(second).toMatchObject({ kind: "ok", deduplicated: true })
     const rows = await store.list({ target_durable_id: "dur-tui" })
     expect(rows.map((row) => row.sender)).toEqual([`binding:${bindingId}`])
+  })
+
+  test("#given a binding #when a send carries an author and a per-message mode #then the row keeps the author on its external origin and the requested mode; steer and expected_turn_id are refused", async () => {
+    const { sdk, store } = fixture()
+    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
+    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
+    const author = { platform_user_id: "U123", display: "Jane Doe" }
+    expect(await sdk.send({ binding_id: bindingId, text: "hi", author, mode: "follow_up", idempotency_key: "evt-1" })).toMatchObject({ kind: "ok", effective_mode: "follow_up" })
+    expect(await sdk.send({ binding_id: bindingId, text: "hi", mode: "steer" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(await sdk.send({ binding_id: bindingId, text: "hi", expected_turn_id: 2 })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    const rows = await store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => ({ mode: row.mode_requested, origin: row.envelope.origin }))).toEqual([{ mode: "follow_up", origin: { external: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "@chat", message_id: "evt-1", author } } }])
   })
 
   test("#given a binding of one session #when a send names another session as its target #then it is refused and nothing is written", async () => {

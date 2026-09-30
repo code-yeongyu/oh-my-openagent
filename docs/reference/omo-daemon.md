@@ -485,6 +485,26 @@ Terminal endpoints are listed by `status` as `tui <name> pid <n> cwd <path>`
 skipped, `stop --all [--wait]` neither stops nor waits on them, and `gc` reaps only a terminal whose
 process is gone (the engine's evidence rules).
 
+### `omo host status --all`
+
+`omo host status --all [--json] [--include-workers]` is the engine's machine-wide inventory, one JSON
+line `{"endpoints": [...]}` with the engine's exit code (0 while anything answers, 3 when nothing
+does). OmO passes every row through unchanged and adds one field to each terminal
+(`endpoint_kind: "tui"`) row:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `last_activity_at` | ISO 8601 string or `null` | The newest entry timestamp in the row's session file (`owner.session.path`), or the session header's timestamp when no later entry has one. It is the value `omo thread list` shows as `updated_at` for that session when its endpoint reports none, read the same way (the first and last 64 KiB of the file). `null` when the row names no session (`owner.session` is `null`) or the file is missing, unreadable or has no session header; it is never estimated. |
+
+```json
+{"socket": "/tmp/example/rpc-host-daemon/0123456789abcdef/t-0123456789abcdef.sock", "endpoint_kind": "tui", "alive": true, "reason": null,
+ "owner": {"pid": 4242, "cwd": "/work", "session": {"id": "session-id", "path": "/tmp/example/sessions/--work--/session.jsonl", "name": "my-tui"}},
+ "last_activity_at": "2026-09-30T01:07:30.000Z"}
+```
+
+Rows of any other kind carry no `last_activity_at`. When the engine prints no inventory line (a usage
+error), its output passes through untouched.
+
 ## Exit codes
 
 | Code | Meaning |

@@ -19,7 +19,8 @@ const USAGE = [
   "",
   "  list      [--all-scope]",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
-  "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>]",
+  "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
+  "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
   "  bind      <session> --platform <p> --account <id> --chat <id> [--thread <id>] [--root-message <id>]",
   "            [--progress-message <id>] [--direction in|out|both] [--inbound-mode auto|follow_up]",
@@ -29,6 +30,7 @@ const USAGE = [
   "  bindings  [--session <s>] [--platform <p>] [--account <id>] [--chat <id>] [--thread <id>] [--status <s>] [--cursor <c>] [--limit <n>]",
   "  report    <session> <milestone|report|question|completion> <text> [--binding <id>] [--request-id <id>] [--request-kind question|select|confirm|input|editor] [--idempotency-key <k>]",
   "  answer    --binding <answering-binding-id> --token <reply-token> <text>",
+  "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
   "  outbox    <binding-id> [--after <cursor>] [--limit <n>] [--ack]",
   "  ack       <binding-id> <cursor> [--provider-message-id <id>]",
   "",
@@ -37,14 +39,15 @@ const USAGE = [
 ].join("\n")
 
 const COMMON = ["--json", "--all-scope"]
+const AUTHOR_FLAGS = ["--author-id", "--author-name", "--author-user-id"]
 
 const COMMANDS = {
   list: { values: [], booleans: [], arity: [0, 0], call: (sdk, _p, _o, scope) => sdk.list(scope) },
   send: {
-    values: ["--mode", "--expected-turn", "--binding", "--idempotency-key"],
+    values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", ...AUTHOR_FLAGS],
     booleans: [],
     arity: [1, 2],
-    call: (sdk, p, o, scope) => sdk.send({ ...scope, ...sendTarget(p, o), mode: o["--mode"], expected_turn_id: integerOption(o, "--expected-turn"), binding_id: o["--binding"], idempotency_key: o["--idempotency-key"] }),
+    call: (sdk, p, o, scope) => sdk.send({ ...scope, ...sendTarget(p, o), mode: o["--mode"], expected_turn_id: integerOption(o, "--expected-turn"), binding_id: o["--binding"], idempotency_key: o["--idempotency-key"], author: authorInput(o) }),
   },
   read: {
     values: ["--limit", "--max-bytes", "--cursor"],
@@ -72,7 +75,7 @@ const COMMANDS = {
     arity: [3, 3],
     call: (sdk, p, o, scope) => sdk.report({ ...scope, session: p[0], kind: p[1], text: p[2], binding_id: o["--binding"], request_id: o["--request-id"], request_kind: o["--request-kind"], idempotency_key: o["--idempotency-key"] }),
   },
-  answer: { values: ["--binding", "--token"], booleans: [], arity: [1, 1], call: (sdk, p, o) => sdk.answer({ binding_id: o["--binding"], reply_token: o["--token"], answer: p[0] }) },
+  answer: { values: ["--binding", "--token", ...AUTHOR_FLAGS], booleans: [], arity: [1, 1], call: (sdk, p, o) => sdk.answer({ binding_id: o["--binding"], reply_token: o["--token"], answer: p[0], author: authorInput(o) }) },
   outbox: { values: ["--after", "--limit"], booleans: ["--ack"], arity: [1, 1], call: (sdk, p, o, _scope, flags) => drainOutbox(sdk, p[0], o, flags.has("--ack")) },
   ack: { values: ["--provider-message-id"], booleans: [], arity: [2, 2], call: (sdk, p, o) => sdk.ack({ binding_id: p[0], cursor: Number(p[1]), provider_message_id: o["--provider-message-id"] }) },
 }
@@ -84,6 +87,19 @@ const CHOICE_FLAGS = { "--mode": ["auto", "steer", "follow_up"], "--direction": 
 function sendTarget(positionals, options) {
   if (positionals.length === 2) return { thread: positionals[0], text: positionals[1] }
   return options["--binding"] === undefined ? { thread: positionals[0], text: undefined } : { text: positionals[0] }
+}
+
+function authorInput(o) {
+  if (o["--author-id"] === undefined) return undefined
+  return { platform_user_id: o["--author-id"], display: o["--author-name"], ...(o["--author-user-id"] === undefined ? {} : { user_id: o["--author-user-id"] }) }
+}
+
+function authorProblem(o) {
+  const given = AUTHOR_FLAGS.filter((flag) => o[flag] !== undefined)
+  if (given.length === 0) return undefined
+  if (o["--binding"] === undefined) return "--author-id/--author-name/--author-user-id need --binding: only a bound external thread has authors"
+  if (o["--author-id"] === undefined || o["--author-name"] === undefined) return "--author-id and --author-name go together (--author-user-id needs both)"
+  return undefined
 }
 
 function bindingInput(o) {
@@ -133,7 +149,12 @@ function validate(name, parsed) {
     const binding = parsed.options["--binding"] !== undefined
     if (!binding && count !== 2) return "needs <target> <text> (or --binding <id>)"
     if (parsed.positionals.at(-1).trim() === "") return "<text> is empty"
-    if (binding && (parsed.options["--mode"] !== undefined || parsed.options["--expected-turn"] !== undefined)) return "--binding delivers with the binding's inbound mode; drop --mode/--expected-turn"
+    if (binding && parsed.options["--mode"] === "steer") return "--binding takes --mode auto or follow_up (capped by the binding's inbound mode); a binding message never steers"
+    if (binding && parsed.options["--expected-turn"] !== undefined) return "--binding takes no --expected-turn: a binding message never steers"
+  }
+  if (name === "send" || name === "answer") {
+    const author = authorProblem(parsed.options)
+    if (author !== undefined) return author
   }
   if (name === "ack" && !/^\d+$/.test(parsed.positionals[1])) return "<cursor> must be a non-negative integer"
   return undefined

@@ -16,12 +16,25 @@ export type ProcessIdentity = {
   readonly runtime_instance: string | null
 }
 
+/**
+ * The human who wrote a binding inbound message (or answered a question), as the connector
+ * authenticated them: the platform's user id, their display name, and optionally the omo user
+ * the connector mapped them to. Validated at the relay boundary (`author.ts`).
+ */
+export type ExternalAuthor = {
+  readonly platform_user_id: string
+  readonly display: string
+  readonly user_id?: string
+}
+
 export type ExternalOrigin = {
   readonly platform: string
   readonly account_id: string
   readonly chat_id: string
   readonly thread_id: string
   readonly message_id: string
+  /** Absent on a message sent without an author, and on every row written before authors existed. */
+  readonly author?: ExternalAuthor
 }
 
 export type EnvelopeOrigin = { readonly session: string } | { readonly external: ExternalOrigin }
@@ -89,6 +102,8 @@ export type EnqueueRequest = {
   readonly delivery_id: string
   readonly target_durable_id: string
   readonly sender_principal: string
+  /** The pair rate bucket's sender key; `sender_principal` when absent (a binding sender with an author is `binding:<id>#author:<platform user id>`). */
+  readonly rate_principal?: string
   readonly sender_node: string
   readonly sender_turn: string | null
   readonly cause_delivery_id: string | null

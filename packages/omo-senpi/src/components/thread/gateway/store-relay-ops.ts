@@ -6,6 +6,9 @@
  * receipt in that same transaction: a replay returns the stored result, a different payload under
  * the same key is `idempotency_conflict`, and a refusal writes no receipt.
  */
+import { randomUUID } from "node:crypto"
+import { renameSync, writeFileSync } from "node:fs"
+
 import {
   type BindingRecord,
   type BindRequest,
@@ -28,8 +31,9 @@ import {
 import { answerShape, isUiRequestKind, type UiRequestKind } from "./answer-shape"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
 import type { SqlRow, SqlValue } from "./sql"
+import { gatewayOutboxMarkerPath } from "./paths"
 import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
-import type { StoreRefusal } from "./types"
+import type { ExternalAuthor, StoreRefusal } from "./types"
 
 const BINDING_COLUMNS = [
   "binding_id", "schema_version", "revision", "status", "platform", "account_id", "chat_id", "thread_id", "root_message_id",
@@ -39,7 +43,7 @@ const BINDING_COLUMNS = [
 
 const OUTBOX_COLUMNS = [
   "cursor", "binding_id", "revision", "event_kind", "payload", "state", "provider_message_id", "created_at", "reply_token",
-  "question_state", "outcome",
+  "question_state", "outcome", "answered_by",
 ] as const
 
 function refused(code: StoreRefusal["code"], message: string, details?: Readonly<Record<string, unknown>>): StoreRefusal {
@@ -48,6 +52,27 @@ function refused(code: StoreRefusal["code"], message: string, details?: Readonly
 
 function nullableString(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value)
+}
+
+function authorColumn(author: ExternalAuthor | null | undefined): string | null {
+  return author === null || author === undefined ? null : JSON.stringify(author)
+}
+
+function authorFromColumn(value: unknown): ExternalAuthor | null {
+  return value === null || value === undefined ? null : (JSON.parse(String(value)) as ExternalAuthor)
+}
+
+/**
+ * The outbox wake hint, rewritten after every outbox insert while the insert's write lock is held:
+ * a temp file renamed over `outbox.marker`, so a watcher of the gateway directory never sees it half
+ * written. Like the inbox marker it is only ever early - a reader's own transaction waits for this
+ * one - and a rolled-back insert leaves a spurious wake, never a missed one.
+ */
+function touchOutboxMarker(ctx: StoreContext, bindingId: string, cursor: number, now: number): void {
+  const marker = gatewayOutboxMarkerPath(ctx.config.agent_dir)
+  const temporary = `${marker}.${process.pid}.${randomUUID()}.tmp`
+  writeFileSync(temporary, JSON.stringify({ binding_id: bindingId, cursor, written_at: rfc3339(now) }), { mode: 0o600 })
+  renameSync(temporary, marker)
 }
 
 function bindingFrom(record: SqlRow): BindingRecord {
@@ -401,7 +426,9 @@ function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord;
       row.reply_token ?? null, row.ui_request_id ?? null, row.ui_request_kind ?? null, row.incarnation ?? null, row.reply_token === undefined ? null : "pending", row.outcome ?? null,
     ],
   )
-  return Number(ctx.sql.one(["c"], "SELECT last_insert_rowid() AS c")?.c)
+  const cursor = Number(ctx.sql.one(["c"], "SELECT last_insert_rowid() AS c")?.c)
+  touchOutboxMarker(ctx, row.binding.binding_id, cursor, row.now)
+  return cursor
 }
 
 /**
@@ -486,6 +513,7 @@ function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {
     reply_token: nullableString(record.reply_token),
     question_state: (record.question_state ?? null) as OutboxRow["question_state"],
     outcome: (record.outcome ?? null) as OutboxRow["outcome"],
+    answered_by: authorFromColumn(record.answered_by),
   }
 }
 
@@ -558,9 +586,9 @@ export async function ackOutbox(
  */
 export type AnswerClaim = { readonly session_durable_id: string; readonly ui_request_id: string; readonly ui_request_kind: UiRequestKind | null; readonly cursor: number; readonly claimed_at: number; readonly taken_over: PriorAnswer | null }
 /** The answer an expired claim held when a new answer took it over (a pre-v3 row's may have been delivered). */
-export type PriorAnswer = { readonly answer: string | null; readonly answered_at: number | null }
+export type PriorAnswer = { readonly answer: string | null; readonly answered_at: number | null; readonly answered_by?: ExternalAuthor | null }
 export type AnswerClaimRef = { readonly reply_token: string; readonly claimed_at: number }
-export type AnswerDelivered = AnswerClaimRef & { readonly answer: string }
+export type AnswerDelivered = AnswerClaimRef & { readonly answer: string; readonly answered_by?: ExternalAuthor | null }
 
 /**
  * How long a claimed answer counts as still being handed over. The relay's hand-off gives up well
@@ -586,13 +614,13 @@ export const CLOSED_ELSEWHERE = "The session no longer waits for this question (
  * (`answered`, `in_flight`); the caller then delivers the `extension_ui_response` and confirms the
  * claim, or releases it if that delivery fails.
  */
-export async function claimAnswer(ctx: StoreContext, request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string }): Promise<RelayOutcome<AnswerClaim>> {
+export async function claimAnswer(ctx: StoreContext, request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly answered_by?: ExternalAuthor | null }): Promise<RelayOutcome<AnswerClaim>> {
   return await transaction(ctx, "claim_answer", () => {
     expireDue(ctx, request.now)
     const token = readReplyToken(meta(ctx, "token_secret"), request.reply_token)
     if (token === null) return refused("invalid_arguments", "This is not a reply token this gateway issued.")
     if (token.binding_id !== request.binding_id) return refused("binding_mismatch", "The answer arrived through a different binding than the one that asked the question.", { binding_id: request.binding_id })
-    const row = ctx.sql.one(["cursor", "question_state", "answer_state", "answer", "answered_at", "ui_request_id", "ui_request_kind", "session"], "SELECT cursor, question_state, answer_state, answer, answered_at, ui_request_id, ui_request_kind, session_durable_id AS session FROM outbox WHERE reply_token = ? AND binding_id = ?", [request.reply_token, token.binding_id])
+    const row = ctx.sql.one(["cursor", "question_state", "answer_state", "answer", "answered_at", "answered_by", "ui_request_id", "ui_request_kind", "session"], "SELECT cursor, question_state, answer_state, answer, answered_at, answered_by, ui_request_id, ui_request_kind, session_durable_id AS session FROM outbox WHERE reply_token = ? AND binding_id = ?", [request.reply_token, token.binding_id])
     if (row === undefined) return refused("not_found", "The question this token belongs to is no longer in the outbox.")
     const inFlight = row.question_state === "answered" && row.answer_state !== "delivered"
     const abandoned = inFlight && Number(row.answered_at) + ANSWER_IN_FLIGHT_MAX_MS <= request.now
@@ -606,13 +634,13 @@ export async function claimAnswer(ctx: StoreContext, request: { readonly now: nu
     if (moved || incarnationOf(ctx, token.session_durable_id) !== token.incarnation || nullableString(row.ui_request_id) !== token.ui_request_id) {
       return refused("stale_token", "The binding or the session changed since the question was asked.", { binding_id: token.binding_id })
     }
-    write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'in_flight', answer = ?, answered_at = ? WHERE reply_token = ?", [request.answer, request.now, request.reply_token])
-    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, ui_request_kind: kind, cursor: Number(row.cursor), claimed_at: request.now, taken_over: abandoned ? { answer: nullableString(row.answer), answered_at: row.answered_at === null || row.answered_at === undefined ? null : Number(row.answered_at) } : null }
+    write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'in_flight', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ?", [request.answer, request.now, authorColumn(request.answered_by), request.reply_token])
+    return { kind: "ok", session_durable_id: token.session_durable_id, ui_request_id: token.ui_request_id, ui_request_kind: kind, cursor: Number(row.cursor), claimed_at: request.now, taken_over: abandoned ? { answer: nullableString(row.answer), answered_at: row.answered_at === null || row.answered_at === undefined ? null : Number(row.answered_at), answered_by: authorFromColumn(row.answered_by) } : null }
   })
 }
 
 export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef): Promise<boolean> {
-  return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
+  return await transaction(ctx, "release_answer", () => write(ctx, "UPDATE outbox SET question_state = 'pending', answer_state = NULL, answer = NULL, answered_at = NULL, answered_by = NULL WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.reply_token, request.claimed_at]) === 1)
 }
 
 /**
@@ -622,7 +650,7 @@ export async function releaseAnswer(ctx: StoreContext, request: AnswerClaimRef):
  * in-flight claim like a release.
  */
 export async function markPriorDelivered(ctx: StoreContext, request: AnswerClaimRef & { readonly prior: PriorAnswer }): Promise<boolean> {
-  return await transaction(ctx, "mark_prior_delivered", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered', answer = ?, answered_at = ? WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.prior.answer, request.prior.answered_at, request.reply_token, request.claimed_at]) === 1)
+  return await transaction(ctx, "mark_prior_delivered", () => write(ctx, "UPDATE outbox SET answer_state = 'delivered', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ? AND question_state = 'answered' AND answer_state = 'in_flight' AND answered_at = ?", [request.prior.answer, request.prior.answered_at, authorColumn(request.prior.answered_by), request.reply_token, request.claimed_at]) === 1)
 }
 
 /**
@@ -631,5 +659,5 @@ export async function markPriorDelivered(ctx: StoreContext, request: AnswerClaim
  * one claimant's frame is ever accepted). A question already delivered is left as it is.
  */
 export async function confirmAnswer(ctx: StoreContext, request: AnswerDelivered): Promise<boolean> {
-  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'delivered', answer = ?, answered_at = ? WHERE reply_token = ? AND answer_state IS NOT 'delivered'", [request.answer, request.claimed_at, request.reply_token]) === 1)
+  return await transaction(ctx, "confirm_answer", () => write(ctx, "UPDATE outbox SET question_state = 'answered', answer_state = 'delivered', answer = ?, answered_at = ?, answered_by = ? WHERE reply_token = ? AND answer_state IS NOT 'delivered'", [request.answer, request.claimed_at, authorColumn(request.answered_by), request.reply_token]) === 1)
 }

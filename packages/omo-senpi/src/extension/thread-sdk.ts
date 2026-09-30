@@ -6,6 +6,8 @@ import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../components/thread/gateway/s
 import { createThreadSdk as createSdk, type ThreadSdk, type ThreadSdkOptions } from "../components/thread/sdk"
 
 export type { LocatedThread, ThreadSdk, ThreadSdkOptions } from "../components/thread/sdk"
+// `omo host status --all` stamps each terminal row's `last_activity_at` with the same reader `omo thread list` uses.
+export { readSessionFacts } from "../components/thread/session-facts"
 
 declare const OMO_SENPI_PACKAGE_VERSION: string
 export const SDK_VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "undefined" ? "dev" : OMO_SENPI_PACKAGE_VERSION
