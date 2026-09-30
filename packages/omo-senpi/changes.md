@@ -26,6 +26,24 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-09-30 - thread gateway: one clock per store, and cross-process tests that do not wait on fs.watch (#9143)
+
+- `gateway/store.ts`: `GatewayStore` exposes `now`, the clock its rows are stamped and expired against (the
+  `now` option, else `Date.now`). `createInboxDrain`, `createGatewayEngine`, `createGatewayRelay`,
+  `createGatewayServices`, the thread tools and the thread SDK default to `store.now` instead of reading `Date.now`
+  themselves, and the component's completion writes use `store.now()`. Before, a drain or engine built on a store
+  with an injected clock stamped and expired rows by the wall clock, so the two clocks disagreed: on 2026-09-30 the
+  harness rows (stamped 2026-09-29 by the injected clock) read as expired to a drain built without `now`, and three
+  tests failed on every run (`store.test.ts` release_session requeue, `engine.test.ts`
+  lost_ack_and_durable_recovery, `claim-reconciliation.test.ts` "dropped it unwritten"). Production passes no clock,
+  so `store.now` is `Date.now` there and nothing observable changes. `gateway/store-clock.test.ts` puts the store's
+  clock in 2020 and fails on the old defaults whatever the wall clock reads.
+- `gateway/cross-process.test.ts`: the tests learned the delivery id from an `fs.watch` event on the inbox directory.
+  On macOS that watch drops events under load (a probe missed 9 of 60 creates made right after `watch()` and 27 of 60
+  made by a child process), and the test then waited for an event that never came. The store writes the marker before
+  either commit hook runs, so each test now reads it from the directory once the sender has died or printed `PAUSED`.
+  No retries and no longer timeouts.
+
 ## 2026-09-30 - claude-code: acquire before the auth check, from the provisioned runtime, with progress (#9276)
 
 - `src/components/claude-code/index.ts`: the component now also runs on `input`, which senpi's `prompt()` emits

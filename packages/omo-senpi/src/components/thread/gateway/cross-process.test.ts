@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, watch } from "node:fs"
+import { existsSync, readdirSync } from "node:fs"
 import { connect, createServer } from "node:net"
 import { join } from "node:path"
 
@@ -34,16 +34,11 @@ function within<T>(promise: Promise<T>, label: string): Promise<T> {
   return Promise.race([promise, expired]).finally(() => clearTimeout(timer))
 }
 
-function firstInboxEvent(h: GatewayHarness, target: string): Promise<string> {
-  const directory = gatewayInboxDirectory(h.agentDir, target)
-  mkdirSync(directory, { recursive: true, mode: 0o700 })
-  return new Promise((resolve) => {
-    const watcher = watch(directory, (_event, name) => {
-      if (name === null || name.startsWith(".")) return
-      watcher.close()
-      resolve(name)
-    })
-  })
+/** The one inbox marker the sender wrote for `target`; the store writes it before either commit hook runs. */
+function inboxMarker(h: GatewayHarness, target: string): string {
+  const [only, ...rest] = readdirSync(gatewayInboxDirectory(h.agentDir, target)).filter((name) => !name.startsWith("."))
+  if (only === undefined || rest.length > 0) throw new Error(`expected exactly one inbox marker for ${target}, found ${JSON.stringify(rest.length > 0 ? [only, ...rest] : [])}`)
+  return only
 }
 
 function nextStoreEvent(session: HarnessSession, kind: GatewayStoreEvent["kind"]): Promise<GatewayStoreEvent> {
@@ -107,12 +102,11 @@ describe("sender_death_before_wake", () => {
   test("#given the sender is SIGKILLed the instant COMMIT returns #when the idle receiver's inbox watch fires #then its barrier pass applies the row exactly once with no other trigger", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B")
-    const marker = firstInboxEvent(h, "B")
     const sender = spawnSender(h, { afterDbCommit: "sigkill" })
-    const deliveryId = await within(marker, "the inbox marker event")
-    const drained = b.drain.drain({ reason: "inbox" })
     expect(await within(sender.child.exited, "the sender to die")).not.toBe(0)
     expect(sender.child.signalCode).toBe("SIGKILL")
+    const deliveryId = inboxMarker(h, "B")
+    const drained = b.drain.drain({ reason: "inbox" })
     expect((await within(drained, "the receiver drain")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])
     await h.quiesce()
     const rows = await b.store.list({ target_durable_id: "B" })
@@ -122,10 +116,9 @@ describe("sender_death_before_wake", () => {
   test("#given the sender is SIGKILLed one statement earlier, with its marker written and COMMIT not run #when the receiver drains #then the row is absent, the dead writer's marker is removed, and nothing is delivered", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B")
-    const marker = firstInboxEvent(h, "B")
     const sender = spawnSender(h, { beforeDbCommit: "sigkill" })
-    const deliveryId = await within(marker, "the inbox marker event")
     await within(sender.child.exited, "the sender to die")
+    const deliveryId = inboxMarker(h, "B")
     await within(b.drain.drain({ reason: "inbox" }), "the receiver drain")
     expect({
       rows: await b.store.list({ target_durable_id: "B" }),
@@ -139,10 +132,9 @@ describe("notification_before_publication_barrier", () => {
   test("#given the sender is paused inside its write transaction after the INSERT and marker #when the receiver's drain reaches its barrier and the sender commits then dies #then the drain sees the row only after the commit and applies it once", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { storeOptions: { _test: { announceBarrier: true } } })
-    const marker = firstInboxEvent(h, "B")
     const sender = spawnSender(h, { beforeDbCommit: "pause", afterDbCommit: "sigkill" })
     await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
-    const deliveryId = await within(marker, "the inbox marker event")
+    const deliveryId = inboxMarker(h, "B")
     const barrier = nextStoreEvent(b, "barrier")
     let settled = false
     const drained = b.drain.drain({ reason: "inbox" }).finally(() => {
@@ -163,11 +155,10 @@ describe("drain_busy_retry_past_the_lock_wait_bound", () => {
   test("#given a sender SIGSTOPped holding the write lock past the store's lock-wait bound #when the drain gives up and the sender continues #then the drain's own busy retry admits the row with no other trigger, and it ends applied exactly once", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 100, lockWaitMaxMs: 600 } } })
-    const marker = firstInboxEvent(h, "B")
     const sender = spawnSender(h, { beforeDbCommit: "pause" })
     await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
     sender.child.kill("SIGSTOP")
-    const deliveryId = await within(marker, "the inbox marker event")
+    const deliveryId = inboxMarker(h, "B")
     let admittedBy!: (id: string) => void
     const admitted = new Promise<string>((resolve) => { admittedBy = resolve })
     const logs: string[] = []
@@ -194,11 +185,10 @@ describe("suspended_writer_busy_retry", () => {
   test("#given the sender is SIGSTOPped holding the write lock #when the receiver's drain hits BUSY #then the receiver's loop keeps answering, and after SIGCONT the single retry applies the row once", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 200 } } })
-    const marker = firstInboxEvent(h, "B")
     const sender = spawnSender(h, { beforeDbCommit: "pause" })
     await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
     sender.child.kill("SIGSTOP")
-    const deliveryId = await within(marker, "the inbox marker event")
+    const deliveryId = inboxMarker(h, "B")
     const busy = nextStoreEvent(b, "busy")
     let settled = false
     const drained = b.drain.drain({ reason: "inbox" }).finally(() => {
