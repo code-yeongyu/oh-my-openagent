@@ -1,7 +1,7 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
-import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
+import { getTerminalSessionError, hasRelevantUserMessage, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 
@@ -43,13 +43,31 @@ function hasMessagesAfterAnchor(
   return anchorMessageCount === undefined || messages.length > anchorMessageCount
 }
 
+const MESSAGE_WINDOW_LIMIT = 100
+
+async function requestSessionMessages(
+  client: OpencodeClient,
+  sessionID: string,
+  limit: number | undefined
+): Promise<SessionMessage[]> {
+  const messagesResult = await client.session.messages({
+    path: { id: sessionID },
+    ...(limit === undefined ? {} : { query: { limit } }),
+  })
+  const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
+  return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
+}
+
 async function fetchSessionMessages(
   client: OpencodeClient,
   sessionID: string
 ): Promise<SessionMessage[]> {
-  const messagesResult = await client.session.messages({ path: { id: sessionID }, query: { limit: 100 } })
-  const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
-  return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
+  const windowMessages = await requestSessionMessages(client, sessionID, MESSAGE_WINDOW_LIMIT)
+  if (windowMessages.length < MESSAGE_WINDOW_LIMIT || hasRelevantUserMessage(windowMessages)) {
+    return windowMessages
+  }
+  // The latest-100 window holds only assistant turns, so the originating user message was cut off.
+  return requestSessionMessages(client, sessionID, undefined)
 }
 
 const DEFAULT_MAX_ASSISTANT_TURNS = 300
