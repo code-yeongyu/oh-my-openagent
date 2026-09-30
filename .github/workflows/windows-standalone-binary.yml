@@ -52,3 +52,15 @@ jobs:
 
       - name: Run the binary from an empty download folder
         run: bun script/qa/omo-native-bare-exe-smoke.mjs --binary .omo/bare-exe/omo-windows-x64.exe
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Windows standalone binary
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the windows-x64 standalone binary from this commit.
+            - Runs it from an empty download folder twice, each with a scripted shell command that loads the terminal runtime.
+          JOB_SUMMARY_NEXT: Read the PASS/FAIL lines of the last step; a FAIL names the tool error the binary returned.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
