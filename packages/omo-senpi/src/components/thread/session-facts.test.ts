@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdtempSync, readSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -66,6 +66,24 @@ describe("readSessionFacts newest timestamp", () => {
     expect(facts?.updated_at).toBeNull()
     expect(requestedBytes).toBeGreaterThan(0)
     expect(requestedBytes).toBeLessThanOrEqual(393_217)
+  })
+
+  test("#given a newer entry is appended during the bounded reads #when facts are returned #then updated_at is null instead of the older snapshot timestamp", () => {
+    const path = sessionPath()
+    writeFileSync(path, `${[HEADER, OLD].map(line).join("\n")}\n`)
+    let appended = false
+    const appendDuringRead = (fd: number, buffer: Buffer, offset: number, length: number, position: number): number => {
+      const bytesRead = readSync(fd, buffer, offset, length, position)
+      if (!appended) {
+        appended = true
+        appendFileSync(path, `${line({ type: "message", id: "new", parentId: "old", timestamp: NEW_TIMESTAMP, message: { role: "assistant", content: "new" } })}\n`)
+      }
+      return bytesRead
+    }
+
+    const facts = Reflect.apply(readSessionFacts, undefined, [path, appendDuringRead])
+
+    expect(facts?.updated_at).toBeNull()
   })
 })
 

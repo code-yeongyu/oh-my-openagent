@@ -203,7 +203,8 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
     return null
   }
   try {
-    const size = fstatSync(fd).size
+    const before = fstatSync(fd)
+    const size = before.size
     const headLength = Math.min(size, SESSION_FACTS_WINDOW_BYTES)
     const head = Buffer.alloc(headLength)
     read(fd, head, 0, headLength, 0)
@@ -219,7 +220,11 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
       tailEntries = parseSessionLines(tail.toString("utf8"), true, false)
     }
     const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
-    const updatedAt = topLevelTimestamp(finalCompleteLine(fd, size, read) ?? Buffer.alloc(0))
+    const finalLine = finalCompleteLine(fd, size, read)
+    const after = fstatSync(fd)
+    const updatedAt = after.size === before.size && after.mtimeMs === before.mtimeMs
+      ? topLevelTimestamp(finalLine ?? Buffer.alloc(0))
+      : null
     return {
       durable_id: first.id,
       cwd: first.cwd,
