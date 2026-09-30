@@ -87,7 +87,7 @@ describe("thread SDK runtime", () => {
     expect(outputs.threadSdkInputs.some(input => input.endsWith("src/extension/thread-sdk.ts"))).toBe(true)
     expect(outputs.threadSdkInputs.filter(input => input.includes("node_modules/") && !input.includes("/node_modules/typebox/"))).toEqual([])
     const sdk = await import(outputs.threadSdkOutputPath)
-    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "createThreadSdk"])
+    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "createThreadSdk", "readSessionFacts"])
   })
 
   test("#given the built SDK two levels below the extensions directory #when plain node opens it #then the store runs on the emitted worker sidecar", async () => {
