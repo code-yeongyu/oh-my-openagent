@@ -26,6 +26,16 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-09-30 - thread facts: a bounded final-line timestamp or unknown activity (#9222 gate G1)
+
+- `session-facts.ts`: `readSessionFacts` still reads bounded windows, then scans backwards at most 256 KiB to locate
+  the final complete JSONL entry and extracts its top-level `timestamp` without parsing the entry body. A partial,
+  malformed or larger final line yields `updated_at: null`; it never publishes an older entry as newest.
+- Thread summaries now allow nullable `updated_at`. Address-book ordering keeps known timestamps newest-first and
+  places unknown activity last. Disk summaries no longer substitute file mtime for an entry timestamp.
+- Tests cover the 160 KiB final-entry regression, truncated and over-cap final lines, normal files, bounded read
+  volume, null sorting, and the omo-native host-status path.
+
 ## 2026-09-30 - thread gateway: binding authors, a per-message mode, the outbox wake marker (#9143, review of #9222)
 
 - `gateway/author.ts` (new): `normalizeAuthor` checks an `ExternalAuthor` (`platform_user_id`, `display`, optional

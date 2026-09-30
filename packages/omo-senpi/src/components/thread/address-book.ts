@@ -75,7 +75,7 @@ export type DiskSession = {
   readonly name: string | null
   readonly cwd: string
   readonly created_at: string
-  readonly updated_at: string
+  readonly updated_at: string | null
   readonly session_path: string
   /** Optional ownership hint when disk roots are associated with a host. */
   readonly source_host: string | null
@@ -98,7 +98,7 @@ export type AddressEntry = {
   readonly source_host: string | null
   readonly session_path: string | null
   readonly created_at: string
-  readonly updated_at: string
+  readonly updated_at: string | null
   readonly thread_id: string
   readonly error_note?: string
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
@@ -155,7 +155,7 @@ function hostFailure(host: AddressBookHost): string | null {
   return null
 }
 
-function validTimestamp(value: unknown, fallback: string): string {
+function validTimestamp<T extends string | null>(value: unknown, fallback: T): string | T {
   return typeof value === "string" && value.length > 0 ? value : fallback
 }
 
@@ -221,7 +221,7 @@ export function assembleAddressBook(
       const needsFacts = reported.name === null || typeof reported.created !== "string" || typeof reported.updated !== "string"
       const facts = needsFacts && sessionPath !== null ? (opts.facts?.(sessionPath) ?? null) : null
       const createdAt = validTimestamp(reported.created, facts?.created_at ?? disk?.created_at ?? assembledAt)
-      const updatedAt = validTimestamp(reported.updated, facts?.updated_at ?? disk?.updated_at ?? createdAt)
+      const updatedAt = validTimestamp(reported.updated, facts === null ? (disk?.updated_at ?? null) : facts.updated_at)
       const name = reported.name ?? disk?.name ?? facts?.name ?? null
       byDurableId.set(durableId, {
         durable_id: durableId,
@@ -244,7 +244,7 @@ export function assembleAddressBook(
   }
 
   return [...byDurableId.values()].sort((left, right) => {
-    if (left.updated_at !== right.updated_at) return left.updated_at < right.updated_at ? 1 : -1
+    if (left.updated_at !== right.updated_at) return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
     return left.durable_id.localeCompare(right.durable_id)
   })
 }
@@ -297,7 +297,7 @@ export function readDiskSession(path: string, sourceHost: string | null): DiskSe
     name,
     cwd: header.cwd,
     created_at: validTimestamp(header.timestamp, modified),
-    updated_at: latestTimestamp || modified,
+    updated_at: latestTimestamp || null,
     session_path: path,
     source_host: sourceHost,
     ...(firstUserText === null ? {} : { first_user_text: firstUserText }),
@@ -415,7 +415,7 @@ export function scanDiskSessions(
   }
 
   return found.sort((left, right) => {
-    if (left.updated_at !== right.updated_at) return left.updated_at < right.updated_at ? 1 : -1
+    if (left.updated_at !== right.updated_at) return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
     return left.durable_id.localeCompare(right.durable_id)
   })
 }

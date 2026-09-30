@@ -145,6 +145,8 @@ ultrawork reuses QA and review evidence per target instead of rerunning everythi
 
 ### Fixed
 
+`omo host status --all` and `omo thread list` no longer show an older session entry as the latest activity when the final JSONL entry is large. They read the final complete entry at bounded cost and show `null` when its timestamp cannot be proved. ([#9222](https://github.com/code-yeongyu/oh-my-openagent/pull/9222))
+
 On a Claude subscription, a `write` or `edit` to a file outside the working directory runs once and returns one result. Before, Claude Code's own read check refused the call while the change still went through, so a retry could apply an edit twice. Thanks to @haamsuk-collab. ([senpi#2401](https://github.com/code-yeongyu/senpi/issues/2401))
 
 A running session keeps working through an update that changes how the engine's dependencies are laid out. Bash, monitor and `eval` used to fail with `ENOENT` until you restarted. The first launch after an update takes 2 to 3 seconds longer once while the engine copies its dependencies. ([senpi#2408](https://github.com/code-yeongyu/senpi/issues/2408), [senpi#2409](https://github.com/code-yeongyu/senpi/issues/2409))

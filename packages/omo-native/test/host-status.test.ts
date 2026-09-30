@@ -66,6 +66,18 @@ describe("omo host status --all: last_activity_at on tui rows", () => {
     expect(result.calls).toEqual([{ args: ["host", "status", "--all", "--json", "--include-workers"], env: { KEEP: "1", [HOST_STATUS_RAW_ENV]: "1" } }])
   })
 
+  test("#given a tui row whose final session entry is larger than the facts window #when status runs #then last_activity_at is the final entry timestamp", async () => {
+    const path = sessionFile(scratch(), [
+      { type: "session", id: "dur-tui", cwd: "/work", timestamp: "2026-09-30T01:00:00.000Z" },
+      { type: "message", timestamp: "2026-09-30T01:05:00.000Z", message: { role: "user", content: "hi" } },
+      { type: "message", timestamp: "2026-09-30T02:00:00.000Z", message: { role: "assistant", content: "x".repeat(160 * 1024) } },
+    ])
+
+    const result = await runWith(JSON.stringify({ endpoints: [tuiRow(path)] }))
+
+    expect(JSON.parse(result.stdout).endpoints[0].last_activity_at).toBe("2026-09-30T02:00:00.000Z")
+  })
+
   test.each([
     ["the session file is missing", (dir: string) => tuiRow(join(dir, "gone.jsonl"))],
     ["the row names no session", () => tuiRow(null)],

@@ -24,7 +24,7 @@ export type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "cre
   readonly name: string
   readonly status: "live" | "resumable"
   readonly created_at: string
-  readonly updated_at: string
+  readonly updated_at: string | null
   readonly endpoint?: AddressEndpoint | null
   readonly surface?: ThreadSurface | null
   readonly alive?: boolean

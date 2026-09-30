@@ -39,7 +39,7 @@ export type ThreadCandidate = {
   readonly name: string
   readonly cwd: string
   readonly preview: string
-  readonly updatedAt: string
+  readonly updatedAt: string | null
   readonly state: ThreadStatus
 }
 
@@ -146,7 +146,7 @@ function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
 function toCandidates(matches: readonly ThreadAddressEntry[]): readonly ThreadCandidate[] {
   return [...matches]
     .sort((a, b) =>
-      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at < b.updated_at ? 1 : -1,
+      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
     )
     .slice(0, AMBIGUOUS_CANDIDATE_LIMIT)
     .map(toCandidate)

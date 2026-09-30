@@ -494,7 +494,7 @@ does). OmO passes every row through unchanged and adds one field to each termina
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `last_activity_at` | ISO 8601 string or `null` | The newest entry timestamp in the row's session file (`owner.session.path`), or the session header's timestamp when no later entry has one. It is the value `omo thread list` shows as `updated_at` for that session when its endpoint reports none, read the same way (the first and last 64 KiB of the file). `null` when the row names no session (`owner.session` is `null`) or the file is missing, unreadable or has no session header; it is never estimated. |
+| `last_activity_at` | ISO 8601 string or `null` | The top-level `timestamp` of the final complete JSONL entry in the row's session file (`owner.session.path`). It is the value `omo thread list` shows as `updated_at` for that session when its endpoint reports none. The reader takes the first and last 64 KiB plus at most 256 KiB while locating the final line, so its cost never grows with the transcript. `null` means freshness is unknown: the row names no session, the file is missing/unreadable/headerless, the final line is partial or malformed, or that final entry exceeds 256 KiB. It never substitutes an older entry or the file mtime; copying, restoring or touching a file can change mtime independently of the entry clock. |
 
 ```json
 {"socket": "/tmp/example/rpc-host-daemon/0123456789abcdef/t-0123456789abcdef.sock", "endpoint_kind": "tui", "alive": true, "reason": null,

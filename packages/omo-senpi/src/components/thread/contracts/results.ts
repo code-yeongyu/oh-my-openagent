@@ -14,7 +14,7 @@ export type ThreadSummary = {
   readonly status: ThreadStatus
   readonly cwd: string
   readonly created_at: string
-  readonly updated_at: string
+  readonly updated_at: string | null
   /** Present only on a thread listed from disk because its endpoint stopped answering. */
   readonly error_note?: string
   /** The endpoint serving the thread: a host (`rpc_host`, with the session's routing id) or a terminal (`tui`). */

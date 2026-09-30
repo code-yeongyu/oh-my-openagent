@@ -3,6 +3,9 @@ import { closeSync, fstatSync, openSync, readSync } from "node:fs"
 /** How many bytes each end of a session file is read for its facts: listing never reads a whole transcript. */
 export const SESSION_FACTS_WINDOW_BYTES = 64 * 1024
 
+/** Largest final JSONL entry read to prove the newest timestamp; larger entries make activity unknown. */
+export const SESSION_FACTS_LAST_LINE_MAX_BYTES = SESSION_FACTS_WINDOW_BYTES * 4
+
 /** A thread with no name is shown by the start of its first user message, cut to this many characters. */
 export const THREAD_TITLE_MAX_CHARS = 60
 
@@ -10,13 +13,15 @@ export type SessionFacts = {
   readonly durable_id: string
   readonly cwd: string
   readonly created_at: string
-  readonly updated_at: string
+  readonly updated_at: string | null
   /** The last `session_info` name (`/name`, `set_session_name`), or `null` when none was set or it was cleared. */
   readonly name: string | null
   readonly first_user_text: string | null
 }
 
 export type JsonRecord = Record<string, unknown>
+
+type SessionRead = (fd: number, buffer: Buffer, offset: number, length: number, position: number) => number
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -81,14 +86,116 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
   return { header, name, first_user_text: firstUserText, newest_timestamp: newest }
 }
 
+function jsonString(text: string, start: number): { readonly value: string; readonly end: number } | null {
+  if (text[start] !== '"') return null
+  let escaped = false
+  for (let index = start + 1; index < text.length; index++) {
+    const character = text[index]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (character === "\\") {
+      escaped = true
+      continue
+    }
+    if (character !== '"') continue
+    try {
+      const value: unknown = JSON.parse(text.slice(start, index + 1))
+      return typeof value === "string" ? { value, end: index + 1 } : null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function skipWhitespace(text: string, start: number): number {
+  let index = start
+  while (index < text.length && /\s/.test(text[index] ?? "")) index++
+  return index
+}
+
+function skipJsonValue(text: string, start: number): number | null {
+  let depth = 0
+  let quoted = false
+  let escaped = false
+  for (let index = start; index < text.length; index++) {
+    const character = text[index]
+    if (quoted) {
+      if (escaped) escaped = false
+      else if (character === "\\") escaped = true
+      else if (character === '"') quoted = false
+      continue
+    }
+    if (character === '"') quoted = true
+    else if (character === "{" || character === "[") depth++
+    else if (character === "}" || character === "]") {
+      if (depth === 0) return index
+      depth--
+    } else if (character === "," && depth === 0) return index
+  }
+  return quoted || depth !== 0 ? null : text.length
+}
+
+function topLevelTimestamp(line: Buffer): string | null {
+  const text = line.toString("utf8")
+  let index = skipWhitespace(text, 0)
+  if (text[index] !== "{") return null
+  index++
+  for (;;) {
+    index = skipWhitespace(text, index)
+    if (text[index] === "}") return null
+    const key = jsonString(text, index)
+    if (key === null) return null
+    index = skipWhitespace(text, key.end)
+    if (text[index] !== ":") return null
+    index = skipWhitespace(text, index + 1)
+    if (key.value === "timestamp") {
+      const timestamp = jsonString(text, index)
+      return timestamp !== null && timestamp.value.length > 0 ? timestamp.value : null
+    }
+    const end = skipJsonValue(text, index)
+    if (end === null) return null
+    index = skipWhitespace(text, end)
+    if (text[index] === ",") {
+      index++
+      continue
+    }
+    return null
+  }
+}
+
+function finalCompleteLine(fd: number, size: number, read: SessionRead): Buffer | null {
+  if (size === 0) return null
+  const finalByte = Buffer.allocUnsafe(1)
+  if (read(fd, finalByte, 0, 1, size - 1) !== 1 || finalByte[0] !== 0x0a) return null
+  let remaining = size - 1
+  let scanned = 0
+  const chunks: Buffer[] = []
+  while (remaining > 0 && scanned < SESSION_FACTS_LAST_LINE_MAX_BYTES) {
+    const length = Math.min(SESSION_FACTS_WINDOW_BYTES, remaining, SESSION_FACTS_LAST_LINE_MAX_BYTES - scanned)
+    const start = remaining - length
+    const chunk = Buffer.allocUnsafe(length)
+    if (read(fd, chunk, 0, length, start) !== length) return null
+    const newline = chunk.lastIndexOf(0x0a)
+    chunks.unshift(newline === -1 ? chunk : chunk.subarray(newline + 1))
+    if (newline !== -1 || start === 0) return Buffer.concat(chunks)
+    scanned += length
+    remaining = start
+  }
+  return null
+}
+
 /**
  * Name, timestamps and first user message of one session JSONL, read from its first and last
- * SESSION_FACTS_WINDOW_BYTES only, so a listing costs two bounded reads per session whatever the
- * transcript's size. A rename recorded only in the unread middle of a very long file is missed here;
- * a live endpoint reports the current name itself, and the full disk scan is used when none answers.
+ * SESSION_FACTS_WINDOW_BYTES plus a bounded scan for the final complete line. A rename recorded only
+ * in the unread middle of a very long file is missed here; a live endpoint reports the current name
+ * itself. `updated_at` is null when the final line is partial, malformed, or larger than
+ * SESSION_FACTS_LAST_LINE_MAX_BYTES, because an older timestamp must never be reported as newest.
  * `null` when the file is unreadable or has no session header.
  */
-export function readSessionFacts(path: string): SessionFacts | null {
+export function readSessionFacts(path: string, read: SessionRead = readSync): SessionFacts | null {
   let fd: number
   try {
     fd = openSync(path, "r")
@@ -99,7 +206,7 @@ export function readSessionFacts(path: string): SessionFacts | null {
     const size = fstatSync(fd).size
     const headLength = Math.min(size, SESSION_FACTS_WINDOW_BYTES)
     const head = Buffer.alloc(headLength)
-    readSync(fd, head, 0, headLength, 0)
+    read(fd, head, 0, headLength, 0)
     const whole = size <= SESSION_FACTS_WINDOW_BYTES
     const headEntries = parseSessionLines(head.toString("utf8"), false, !whole)
     const first = headEntries[0]
@@ -108,15 +215,16 @@ export function readSessionFacts(path: string): SessionFacts | null {
     if (!whole) {
       const tailStart = Math.max(headLength, size - SESSION_FACTS_WINDOW_BYTES)
       const tail = Buffer.alloc(size - tailStart)
-      readSync(fd, tail, 0, tail.length, tailStart)
+      read(fd, tail, 0, tail.length, tailStart)
       tailEntries = parseSessionLines(tail.toString("utf8"), true, false)
     }
     const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
+    const updatedAt = topLevelTimestamp(finalCompleteLine(fd, size, read) ?? Buffer.alloc(0))
     return {
       durable_id: first.id,
       cwd: first.cwd,
       created_at: first.timestamp,
-      updated_at: summary.newest_timestamp > first.timestamp ? summary.newest_timestamp : first.timestamp,
+      updated_at: updatedAt,
       name: summary.name,
       first_user_text: summary.first_user_text,
     }

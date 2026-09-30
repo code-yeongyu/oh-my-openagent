@@ -6,7 +6,8 @@ import { pathToFileURL } from "node:url"
  * terminal (`endpoint_kind: "tui"`) row. The value is the newest entry timestamp of the row's session
  * file (`owner.session.path`), read by the thread SDK's `readSessionFacts` - the value `omo thread
  * list` shows as `updated_at` when the endpoint reports none - and `null` when the row names no
- * session or the file cannot be read. Every other field, row and the exit code are the engine's.
+ * session or the bounded reader cannot prove the final complete entry's timestamp. Every other
+ * field, row and the exit code are the engine's.
  */
 
 /** Set on the engine call the compiled binary makes by re-running itself, so that call is not enriched again. */
