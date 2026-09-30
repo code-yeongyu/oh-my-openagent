@@ -246,7 +246,8 @@ async function deadIdentity(): Promise<ProcessIdentity> {
   const startTime = await processStartTime(child.pid)
   child.stdin.end()
   await child.exited
-  if (startTime === null) throw new Error("could not read the holder's start time")
+  // win32 has no `ps`: the store records no start time there and judges a claimant by its pid alone (process-identity.ts)
+  if (startTime === null && process.platform !== "win32") throw new Error("could not read the holder's start time")
   return { pid: child.pid, process_start_time: startTime, instance_id: randomUUID(), runtime_instance: null }
 }
 

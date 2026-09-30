@@ -2,14 +2,18 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 import { connect, createServer } from "node:net"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { createInboxDrain } from "./drain"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayHarness, type GatewayHarness, type HarnessSession } from "./testing/harness"
+import { resumeProcess, suspendProcess } from "./testing/job-control"
 import type { GatewayStoreEvent, GatewayStoreTestHooks } from "./types"
 
-const SENDER = new URL("./testing/sender-process.ts", import.meta.url).pathname
+const SENDER = fileURLToPath(new URL("./testing/sender-process.ts", import.meta.url))
 const STEP_TIMEOUT_MS = 20_000
+// win32 has no job control: nothing there can suspend a process the way SIGSTOP does
+const jobControl = process.platform !== "win32"
 
 let harness: GatewayHarness | undefined
 const children: ReturnType<typeof Bun.spawn>[] = []
@@ -17,7 +21,7 @@ const children: ReturnType<typeof Bun.spawn>[] = []
 afterEach(async () => {
   for (const child of children.splice(0)) {
     if (child.exitCode === null && child.signalCode === null) {
-      child.kill("SIGCONT")
+      process.kill(child.pid, "SIGCONT")
       child.kill("SIGKILL")
       await child.exited
     }
@@ -25,6 +29,11 @@ afterEach(async () => {
   await harness?.dispose()
   harness = undefined
 })
+
+/** SIGKILL is a signal on POSIX; on win32 the kill is a TerminateProcess, seen as a non-zero exit code. */
+function killedBySigkill(child: ReturnType<typeof Bun.spawn>): boolean {
+  return process.platform === "win32" ? child.exitCode !== null && child.exitCode !== 0 : child.signalCode === "SIGKILL"
+}
 
 function within<T>(promise: Promise<T>, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -104,7 +113,7 @@ describe("sender_death_before_wake", () => {
     const b = h.session("B")
     const sender = spawnSender(h, { afterDbCommit: "sigkill" })
     expect(await within(sender.child.exited, "the sender to die")).not.toBe(0)
-    expect(sender.child.signalCode).toBe("SIGKILL")
+    expect(killedBySigkill(sender.child)).toBe(true)
     const deliveryId = inboxMarker(h, "B")
     const drained = b.drain.drain({ reason: "inbox" })
     expect((await within(drained, "the receiver drain")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])
@@ -144,7 +153,7 @@ describe("notification_before_publication_barrier", () => {
     expect(settled).toBe(false)
     sender.send("RESUME beforeDbCommit")
     await within(sender.child.exited, "the sender to commit and die")
-    expect(sender.child.signalCode).toBe("SIGKILL")
+    expect(killedBySigkill(sender.child)).toBe(true)
     expect((await within(drained, "the receiver drain")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])
     await h.quiesce()
     expect({ state: (await b.store.deliveryView(deliveryId))?.row.state, entries: b.runtime.transcriptEntries(deliveryId) }).toEqual({ state: "applied", entries: 1 })
@@ -152,12 +161,12 @@ describe("notification_before_publication_barrier", () => {
 })
 
 describe("drain_busy_retry_past_the_lock_wait_bound", () => {
-  test("#given a sender SIGSTOPped holding the write lock past the store's lock-wait bound #when the drain gives up and the sender continues #then the drain's own busy retry admits the row with no other trigger, and it ends applied exactly once", async () => {
+  test.skipIf(!jobControl)("#given a sender SIGSTOPped holding the write lock past the store's lock-wait bound #when the drain gives up and the sender continues #then the drain's own busy retry admits the row with no other trigger, and it ends applied exactly once", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 100, lockWaitMaxMs: 600 } } })
     const sender = spawnSender(h, { beforeDbCommit: "pause" })
     await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
-    sender.child.kill("SIGSTOP")
+    await suspendProcess(sender.child.pid)
     const deliveryId = inboxMarker(h, "B")
     let admittedBy!: (id: string) => void
     const admitted = new Promise<string>((resolve) => { admittedBy = resolve })
@@ -168,7 +177,7 @@ describe("drain_busy_retry_past_the_lock_wait_bound", () => {
       const failed = await within(drain.drain({ reason: "inbox" }).then(() => null, (error: unknown) => error), "the first drain pass to give up at the lock-wait bound")
       expect(String(failed)).toContain("lock wait exceeded")
       await within(exceeded, "the lock_wait_exceeded store event")
-      sender.child.kill("SIGCONT")
+      await resumeProcess(sender.child.pid)
       sender.send("RESUME beforeDbCommit")
       expect(await within(sender.line("DONE "), "the sender to commit")).toContain("\"queued_offline\"")
       expect(await within(admitted, "the drain's busy retry to admit the row with no other trigger")).toBe(deliveryId)
@@ -182,12 +191,12 @@ describe("drain_busy_retry_past_the_lock_wait_bound", () => {
 })
 
 describe("suspended_writer_busy_retry", () => {
-  test("#given the sender is SIGSTOPped holding the write lock #when the receiver's drain hits BUSY #then the receiver's loop keeps answering, and after SIGCONT the single retry applies the row once", async () => {
+  test.skipIf(!jobControl)("#given the sender is SIGSTOPped holding the write lock #when the receiver's drain hits BUSY #then the receiver's loop keeps answering, and after SIGCONT the single retry applies the row once", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 200 } } })
     const sender = spawnSender(h, { beforeDbCommit: "pause" })
     await within(sender.line("PAUSED beforeDbCommit"), "the sender to pause inside its transaction")
-    sender.child.kill("SIGSTOP")
+    await suspendProcess(sender.child.pid)
     const deliveryId = inboxMarker(h, "B")
     const busy = nextStoreEvent(b, "busy")
     let settled = false
@@ -215,7 +224,7 @@ describe("suspended_writer_busy_retry", () => {
     }
     expect(settled).toBe(false)
 
-    sender.child.kill("SIGCONT")
+    await resumeProcess(sender.child.pid)
     sender.send("RESUME beforeDbCommit")
     expect(await within(sender.line("DONE "), "the sender to commit")).toContain("\"queued_offline\"")
     expect((await within(drained, "the receiver's retry")).admitted).toEqual([{ delivery_id: deliveryId, kind: "started" }])

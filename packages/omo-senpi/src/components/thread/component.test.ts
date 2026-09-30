@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { COMPLETION_SETTLE_WAIT_MS, createThreadComponent } from "./component"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
 import type { ThreadHost } from "./tools"
 
 function host(): ThreadHost {
@@ -73,8 +74,11 @@ async function holdWriteLock(databasePath: string) {
     child.once("exit", (code) => reject(new Error(`the lock holder exited (${code}) before locking`)))
   })
   await within(locked, 10_000, "the lock holder to take BEGIN IMMEDIATE")
+  const pid = child.pid
+  if (pid === undefined) throw new Error("the lock holder has no pid")
   return {
     child,
+    pid,
     release: async () => { child.stdin.write("release\n"); await within(exited, 10_000, "the lock holder to commit and exit") },
     kill: async () => { if (child.exitCode === null && child.signalCode === null) { child.kill("SIGKILL"); await exited } },
   }
@@ -242,7 +246,8 @@ describe("thread component settle never waits on the gateway store", () => {
     }
   }, 30_000)
 
-  test("#given an armed settle whose write outlasts the lock-wait bound behind a SIGSTOPped holder #when the holder resumes #then exactly one completion row lands in the background with the original run's outcome, and later settles add none", async () => {
+  // win32 has no job control: nothing there can suspend the lock holder the way SIGSTOP does
+  test.skipIf(process.platform === "win32")("#given an armed settle whose write outlasts the lock-wait bound behind a SIGSTOPped holder #when the holder resumes #then exactly one completion row lands in the background with the original run's outcome, and later settles add none", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-stopped-"))
     const store = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 100, lockWaitMaxMs: 1_000 } })
     let holder: Awaited<ReturnType<typeof holdWriteLock>> | undefined
@@ -256,7 +261,7 @@ describe("thread component settle never waits on the gateway store", () => {
       const bindingId = await bindAndArm(f, store, "dur-1")
       await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "error" }] })
       holder = await holdWriteLock(gatewayDatabasePath(agentDir))
-      holder.child.kill("SIGSTOP")
+      await suspendProcess(holder.pid)
       const started = performance.now()
       await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "agent_settled to return while a stopped process holds the write lock")
       expect(performance.now() - started).toBeLessThan(COMPLETION_SETTLE_WAIT_MS + 2_750)
@@ -274,7 +279,7 @@ describe("thread component settle never waits on the gateway store", () => {
           resolve()
         })
       })
-      holder.child.kill("SIGCONT")
+      await resumeProcess(holder.pid)
       await holder.release()
       await within(emitted, 15_000, "the background retry to write the completion once the lock frees")
       expect(await outboxRows(store, bindingId)).toEqual([{ event: "completion", outcome: "failed", text: "all done" }])

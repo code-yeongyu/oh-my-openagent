@@ -21,6 +21,8 @@ describe("gateway store file", () => {
     const h = (harness = createGatewayHarness())
     const store = h.store()
     expect(await store.journalMode()).toBe("wal")
+    // win32 has no POSIX permission bits to assert: chmod there only toggles the read-only flag
+    if (process.platform === "win32") return
     expect({
       database: statSync(gatewayDatabasePath(h.agentDir)).mode & 0o777,
       directory: statSync(gatewayRootDirectory(h.agentDir)).mode & 0o777,

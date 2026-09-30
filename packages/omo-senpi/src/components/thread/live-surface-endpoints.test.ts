@@ -5,6 +5,7 @@ import { createConnection, createServer, type Server, type Socket } from "node:n
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAll, type HostEndpointReport } from "./live-surface"
+import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 
 type Frame = Record<string, unknown>
@@ -93,7 +94,11 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
     connect: (path) => { dialed.push(path); return createConnection(path) },
     ...(options.now === undefined ? {} : { now: options.now }),
   })
-  const tools = createThreadTools({ host: surface, stateDirectory: tempDir("thr-state-"), callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+  const stateDirectory = tempDir("thr-state-")
+  // closed before its directory is removed: win32 cannot delete the open database
+  const store = createGatewayStore({ agentDir: stateDirectory })
+  cleanups.push(() => store.dispose())
+  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
   let calls = 0
   return {
     legacy: options.legacy,

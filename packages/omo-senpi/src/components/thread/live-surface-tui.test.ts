@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, parseHostStatusAll, TUI_ENDPOINT_COMMANDS, type HostEndpointReport } from "./live-surface"
+import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 
 type Frame = Record<string, unknown>
@@ -110,7 +111,11 @@ function surfaceFor(legacy: string, reports: readonly HostEndpointReport[], opti
     ...(options.secret === undefined ? {} : { readSecret: () => options.secret as Buffer }),
     connect: (path) => { dialed.push(path); return createConnection(path) },
   })
-  const tools = createThreadTools({ host: surface, stateDirectory: tempDir("thr-tui-state-"), callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+  const stateDirectory = tempDir("thr-tui-state-")
+  // closed before its directory is removed: win32 cannot delete the open database
+  const store = createGatewayStore({ agentDir: stateDirectory })
+  cleanups.push(() => store.dispose())
+  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
   let calls = 0
   const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
     const tool = tools.find((candidate) => candidate.name === name)
