@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { assembleAddressBook, type DiskSession } from "./address-book"
 import { readSessionFacts } from "./session-facts"
+import { summary } from "./tools/internals"
 
 const directories: string[] = []
 
@@ -78,4 +79,13 @@ test("#given one thread has unknown activity #when the address book is assembled
     ["known", NEW_TIMESTAMP],
     ["unknown", null],
   ])
+})
+
+test("#given the bounded reader cannot prove the newest timestamp #when thread list summarizes the row #then updated_at stays null", () => {
+  const [entry] = assembleAddressBook([], [
+    { durable_id: "unknown", name: null, cwd: "/unknown", created_at: "2026-09-30T01:00:00.000Z", updated_at: null, session_path: "/sessions/unknown.jsonl", source_host: null },
+  ])
+  const session = { sessionId: "route-1", durableSessionId: "unknown", cwd: "/unknown", status: "open" as const }
+
+  expect(summary(session, entry).updated_at).toBeNull()
 })

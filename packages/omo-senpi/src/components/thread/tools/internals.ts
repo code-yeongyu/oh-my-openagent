@@ -66,7 +66,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     name: entry?.title ?? threadTitle(session.name, null) ?? "",
     status: session.status === "closed" ? "resumable" : "live",
     created_at: created,
-    updated_at: entry?.updated_at ?? session.updated_at ?? session.updatedAt ?? created,
+    updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
   }
 }
