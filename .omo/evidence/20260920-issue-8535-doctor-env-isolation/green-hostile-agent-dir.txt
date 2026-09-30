@@ -1,0 +1,20 @@
+WHAT WAS TESTED
+The final `doctor.test.ts` was run with a controlled ambient `OMO_CODING_AGENT_DIR`. The focused selection covered both legacy-package shapes, the deterministic ambient-shadow regression, malformed settings, and an explicit `SENPI_CODING_AGENT_DIR` override.
+
+Command shape:
+`OMO_CODING_AGENT_DIR=<decoy> bun --config=NUL test --test-name-pattern "(ambient canonical agent directory|settings contain the legacy package entry|settings JSON is malformed|SENPI_CODING_AGENT_DIR points)" packages/omo-native/test/doctor.test.ts`
+
+The full doctor and stale-engine pair was then run:
+`bun --config=NUL test packages/omo-native/test/doctor.test.ts packages/omo-native/test/doctor-stale-engines.test.ts`
+
+WHAT WAS OBSERVED
+- Focused hostile-environment run: 5 pass, 6 filtered out, 0 fail, 15 assertions.
+- Doctor plus stale-engine regression run: 29 pass, 0 fail, 86 assertions.
+- The new copied-launcher regression emitted the expected duplicate-package warning from fixture settings even though an ambient canonical directory contained valid decoy settings.
+- Explicit test-level `SENPI_CODING_AGENT_DIR` behavior remained covered and passed.
+
+WHY IT IS ENOUGH
+These runs exercise the exact helper that previously copied the host environment, the copied real launcher, all affected assertions named by the issue owner, the explicit override contract, and the neighboring stale-process diagnostics. They distinguish environment ownership from unrelated process output.
+
+WHAT WAS OMITTED
+Absolute local paths, generated temporary names, and complete process output were summarized. No private settings, credentials, environment dump, or process table were retained.

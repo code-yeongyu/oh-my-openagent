@@ -1,0 +1,17 @@
+WHAT WAS TESTED
+The deterministic ambient-shadow case was run alone with an additional controlled parent `OMO_CODING_AGENT_DIR`. The test creates an isolated package fixture, copies the real launcher, gives the ambient directory valid decoy settings, gives the fixture legacy-package settings, and invokes `omo doctor` through the copied launcher.
+
+Command shape:
+`OMO_CODING_AGENT_DIR=<decoy> bun --config=NUL test --test-name-pattern "ambient canonical agent directory" packages/omo-native/test/doctor.test.ts`
+
+WHAT WAS OBSERVED
+- 1 pass, 10 filtered out, 0 fail, 2 assertions.
+- The copied launcher exited with status 0.
+- Its output contained `WARN duplicate @code-yeongyu/omo-senpi`, proving it read the fixture settings rather than the ambient decoy.
+- Cleanup check reported 0 remaining `omo-doctor-*` temporary directories.
+
+WHY IT IS ENOUGH
+The changed surface is the test harness around the real copied launcher. This check drives that exact boundary under the hostile input that caused the original failures and verifies both observable output and cleanup.
+
+WHAT WAS OMITTED
+The randomized fixture directory and absolute workstation paths were not retained. No environment dump, user configuration, credentials, or auth material were captured.

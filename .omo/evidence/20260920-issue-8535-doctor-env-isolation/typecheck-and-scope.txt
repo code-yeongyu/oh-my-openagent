@@ -1,0 +1,19 @@
+WHAT WAS TESTED
+- `tsgo --noEmit -p packages/omo-native/tsconfig.json`
+- `git diff --check`
+- Final source diff and worktree status review.
+- Post-run search for `omo-doctor-*` temporary directories.
+
+WHAT WAS OBSERVED
+- Package TypeScript check: exit 0, no diagnostics.
+- Diff whitespace check: exit 0, no diagnostics.
+- The only source change is `packages/omo-native/test/doctor.test.ts`.
+- No production launcher, doctor implementation, process reporter, or agent-directory precedence changed.
+- The test imports the canonical `AGENT_DIR_ENV_NAMES` list instead of duplicating variable names.
+- Post-run temporary-directory count: 0.
+
+WHY IT IS ENOUGH
+The static checks validate the test's import and helper types, while the scope review proves the fix is limited to fixture environment construction and its regression coverage. Cleanup confirms the copied-launcher run did not leave test fixtures behind.
+
+WHAT WAS OMITTED
+Absolute worktree and dependency paths were summarized. No credentials, environment values, private settings, or user data were recorded.
