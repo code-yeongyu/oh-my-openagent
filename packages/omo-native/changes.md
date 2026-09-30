@@ -22,6 +22,12 @@ postinstall, on bun itself when node is missing, so the shim is back before anyt
 read a node launch already pays. Outside a POSIX bun-global install the call is the same no-op as at launch. A blocked
 (untrusted) postinstall still leaves the stock link until the next launch under node or bun.
 
+## 2026-09-30 - host status and thread list share strict unknown-activity semantics (#9222 gate round 2)
+
+Malformed, partial and over-cap final session records now remain `null` through both `last_activity_at` and degraded
+`updated_at`. The public thread list applies the documented known-newest/null-last/id-ascending order after live and
+resumable rows are combined.
+
 ## 2026-09-30 - `omo host status --all` never labels older activity as newest (#9222 gate G1)
 
 `last_activity_at` now follows the thread SDK's truthful bounded result: the final complete session entry's timestamp,

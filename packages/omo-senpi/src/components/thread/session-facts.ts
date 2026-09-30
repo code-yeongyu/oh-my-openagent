@@ -86,87 +86,13 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
   return { header, name, first_user_text: firstUserText, newest_timestamp: newest }
 }
 
-function jsonString(text: string, start: number): { readonly value: string; readonly end: number } | null {
-  if (text[start] !== '"') return null
-  let escaped = false
-  for (let index = start + 1; index < text.length; index++) {
-    const character = text[index]
-    if (escaped) {
-      escaped = false
-      continue
-    }
-    if (character === "\\") {
-      escaped = true
-      continue
-    }
-    if (character !== '"') continue
-    try {
-      const value: unknown = JSON.parse(text.slice(start, index + 1))
-      return typeof value === "string" ? { value, end: index + 1 } : null
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
-function skipWhitespace(text: string, start: number): number {
-  let index = start
-  while (index < text.length && /\s/.test(text[index] ?? "")) index++
-  return index
-}
-
-function skipJsonValue(text: string, start: number): number | null {
-  const closing: string[] = []
-  let quoted = false
-  let escaped = false
-  for (let index = start; index < text.length; index++) {
-    const character = text[index]
-    if (quoted) {
-      if (escaped) escaped = false
-      else if (character === "\\") escaped = true
-      else if (character === '"') quoted = false
-      continue
-    }
-    if (character === '"') quoted = true
-    else if (character === "{") closing.push("}")
-    else if (character === "[") closing.push("]")
-    else if (character === "}" || character === "]") {
-      if (closing.length === 0) return character === "}" ? index : null
-      if (closing.pop() !== character) return null
-    } else if (character === "," && closing.length === 0) return index
-  }
-  return quoted || closing.length !== 0 ? null : text.length
-}
-
-function topLevelTimestamp(line: Buffer): string | null {
-  const text = line.toString("utf8")
-  let index = skipWhitespace(text, 0)
-  if (text[index] !== "{") return null
-  index++
-  let timestamp: string | null = null
-  for (;;) {
-    index = skipWhitespace(text, index)
-    if (text[index] === "}") return skipWhitespace(text, index + 1) === text.length ? timestamp : null
-    const key = jsonString(text, index)
-    if (key === null) return null
-    index = skipWhitespace(text, key.end)
-    if (text[index] !== ":") return null
-    index = skipWhitespace(text, index + 1)
-    let end: number | null
-    if (key.value === "timestamp") {
-      const value = jsonString(text, index)
-      if (value === null || value.value.length === 0) return null
-      timestamp = value.value
-      end = value.end
-    } else end = skipJsonValue(text, index)
-    if (end === null) return null
-    index = skipWhitespace(text, end)
-    if (text[index] === ",") {
-      index++
-      continue
-    }
-    if (text[index] !== "}") return null
+function finalEntryTimestamp(line: Buffer | null): string | null {
+  if (line === null) return null
+  try {
+    const entry: unknown = JSON.parse(line.toString("utf8"))
+    return isRecord(entry) && typeof entry.timestamp === "string" && entry.timestamp.length > 0 ? entry.timestamp : null
+  } catch {
+    return null
   }
 }
 
@@ -227,7 +153,7 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
     const finalLine = finalCompleteLine(fd, size, read)
     const after = fstatSync(fd)
     const updatedAt = after.size === before.size && after.mtimeMs === before.mtimeMs
-      ? topLevelTimestamp(finalLine ?? Buffer.alloc(0))
+      ? finalEntryTimestamp(finalLine)
       : null
     return {
       durable_id: first.id,

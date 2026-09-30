@@ -51,9 +51,16 @@ describe("readSessionFacts newest timestamp", () => {
     expect(readSessionFacts(path)?.updated_at).toBeNull()
   })
 
-  test("#given the final line has a timestamp but malformed JSON after it #when facts are read #then updated_at is null", () => {
+  test.each([
+    ["mismatched brackets", `{"type":"message","timestamp":"${NEW_TIMESTAMP}","message":[}`],
+    ["a missing value", `{"message":,"timestamp":"${NEW_TIMESTAMP}"}`],
+    ["an invalid literal", `{"message":undefined,"timestamp":"${NEW_TIMESTAMP}"}`],
+    ["an invalid nested value", `{"message":{"bad":},"timestamp":"${NEW_TIMESTAMP}"}`],
+    ["a trailing comma", `{"timestamp":"${NEW_TIMESTAMP}",}`],
+    ["an invalid string escape", `{"message":"\\q","timestamp":"${NEW_TIMESTAMP}"}`],
+  ])("#given the final line has %s #when facts are read #then updated_at is null", (_label, malformed) => {
     const path = sessionPath()
-    writeFileSync(path, `${[HEADER, OLD].map(line).join("\n")}\n{"type":"message","timestamp":"${NEW_TIMESTAMP}","message":[}\n`)
+    writeFileSync(path, `${[HEADER, OLD].map(line).join("\n")}\n${malformed}\n`)
 
     expect(readSessionFacts(path)?.updated_at).toBeNull()
   })

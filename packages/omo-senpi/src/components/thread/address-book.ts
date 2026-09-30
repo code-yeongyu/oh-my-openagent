@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
 import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
@@ -282,22 +282,21 @@ export function toGatewayAddressEntries(entries: readonly AddressEntry[]): Gatew
 /** One session file's durable identity, or null when the file is unreadable or has no header. */
 export function readDiskSession(path: string, sourceHost: string | null): DiskSession | null {
   let content: string
-  let modified: string
   try {
     content = readFileSync(path, "utf8")
-    modified = statSync(path).mtime.toISOString()
   } catch {
     return null
   }
 
-  const { header, name, first_user_text: firstUserText, newest_timestamp: latestTimestamp } = summarizeSessionEntries(parseSessionLines(content))
-  if (header === null || typeof header.id !== "string" || typeof header.cwd !== "string") return null
+  const facts = readSessionFacts(path)
+  if (facts === null) return null
+  const { name, first_user_text: firstUserText } = summarizeSessionEntries(parseSessionLines(content))
   return {
-    durable_id: header.id,
+    durable_id: facts.durable_id,
     name,
-    cwd: header.cwd,
-    created_at: validTimestamp(header.timestamp, modified),
-    updated_at: latestTimestamp || null,
+    cwd: facts.cwd,
+    created_at: facts.created_at,
+    updated_at: facts.updated_at,
     session_path: path,
     source_host: sourceHost,
     ...(firstUserText === null ? {} : { first_user_text: firstUserText }),

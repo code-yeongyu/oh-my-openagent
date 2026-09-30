@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { HOST_STATUS_RAW_ENV, isHostStatusAll, runHostStatusAll, sessionActivityReader } from "../bin/lib/host-status.js"
+import { readDiskSession } from "../../omo-senpi/src/components/thread/address-book"
 import { readSessionFacts } from "../../omo-senpi/src/components/thread/session-facts"
 
 const dirs: string[] = []
@@ -76,6 +77,23 @@ describe("omo host status --all: last_activity_at on tui rows", () => {
     const result = await runWith(JSON.stringify({ endpoints: [tuiRow(path)] }))
 
     expect(JSON.parse(result.stdout).endpoints[0].last_activity_at).toBe("2026-09-30T02:00:00.000Z")
+  })
+
+  test("#given a session whose final line is partial #when status and degraded listing read it #then both report unknown activity", async () => {
+    const dir = scratch()
+    const path = join(dir, "partial.jsonl")
+    writeFileSync(path, `${[
+      { type: "session", id: "dur-tui", cwd: "/work", timestamp: "2026-09-30T01:00:00.000Z" },
+      { type: "message", timestamp: "2026-09-30T01:05:00.000Z", message: { role: "user", content: "hi" } },
+    ].map((entry) => JSON.stringify(entry)).join("\n")}\n{"type":"message","timestamp":"2026-09-30T02:00:00.000Z"`)
+
+    const status = await runWith(JSON.stringify({ endpoints: [tuiRow(path)] }))
+    const disk = readDiskSession(path, "/agent/rpc-host-daemon/x/t-1.sock")
+
+    expect({
+      last_activity_at: JSON.parse(status.stdout).endpoints[0].last_activity_at,
+      updated_at: disk?.updated_at,
+    }).toEqual({ last_activity_at: null, updated_at: null })
   })
 
   test.each([

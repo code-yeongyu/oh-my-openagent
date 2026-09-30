@@ -17,7 +17,10 @@ export function listThreads(options: ThreadToolSurfaceOptions, current: ThreadHo
   const book = addressBook(options, current)
   const entryOf = (session: ThreadHostSession) => book.find((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId) && entry.source_host === (session.socket ?? entry.source_host))
   const degraded = book.filter((entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id))
-  return { kind: "ok", threads: [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)], scope: allScope === true ? "all" : "workspace" }
+  const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
+  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)]
+    .sort((left, right) => (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER))
+  return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
 }
 
 /** `thread_read` over one host view: the live transcript from the session's endpoint, else its JSONL when that endpoint is dead. */

@@ -26,10 +26,23 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
+
+- `session-facts.ts`: the already-capped final record is now validated with `JSON.parse` before its top-level
+  `timestamp` is trusted. Missing values, invalid literals/escapes, malformed nested values and trailing commas all
+  produce unknown activity.
+- `address-book.ts`: degraded/resumable session rows take `updated_at` from `readSessionFacts`, the same bounded
+  freshness policy used by live fallback facts and host-status enrichment. Full-file parsing remains only for
+  name/title metadata.
+- `tools/read-ops.ts`: the final combined public list follows the sorted address book, so known activity is
+  newest-first, unknown activity is last, and equal timestamps use ascending durable ids.
+- Tests cover malformed JSON classes, host-status/degraded-list agreement on one partial file, and mixed live/dead
+  public ordering.
+
 ## 2026-09-30 - thread facts: a bounded final-line timestamp or unknown activity (#9222 gate G1)
 
 - `session-facts.ts`: `readSessionFacts` still reads bounded windows, then scans backwards at most 256 KiB to locate
-  the final complete JSONL entry and extracts its top-level `timestamp` without parsing the entry body. A partial,
+  the final complete JSONL entry and validates that capped record before extracting its top-level `timestamp`. A partial,
   malformed or larger final line yields `updated_at: null`; it never publishes an older entry as newest.
 - Thread summaries now allow nullable `updated_at`. Address-book ordering keeps known timestamps newest-first and
   places unknown activity last. Disk summaries no longer substitute file mtime for an entry timestamp.

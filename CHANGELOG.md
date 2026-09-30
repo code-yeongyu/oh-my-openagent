@@ -145,7 +145,7 @@ ultrawork reuses QA and review evidence per target instead of rerunning everythi
 
 ### Fixed
 
-`omo host status --all` and `omo thread list` no longer show an older session entry as the latest activity when the final JSONL entry is large. They read the final complete entry at bounded cost and show `null` when its timestamp cannot be proved. ([#9222](https://github.com/code-yeongyu/oh-my-openagent/pull/9222))
+`omo host status --all` and `omo thread list` no longer show an older session entry as the latest activity when the final JSONL entry is large, partial or invalid. Both surfaces use the same bounded final-record policy, show `null` when freshness cannot be proved, and list known activity newest-first with unknown activity last. ([#9222](https://github.com/code-yeongyu/oh-my-openagent/pull/9222))
 
 On a Claude subscription, a `write` or `edit` to a file outside the working directory runs once and returns one result. Before, Claude Code's own read check refused the call while the change still went through, so a retry could apply an edit twice. Thanks to @haamsuk-collab. ([senpi#2401](https://github.com/code-yeongyu/senpi/issues/2401))
 
