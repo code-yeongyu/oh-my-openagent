@@ -117,7 +117,7 @@ function skipWhitespace(text: string, start: number): number {
 }
 
 function skipJsonValue(text: string, start: number): number | null {
-  let depth = 0
+  const closing: string[] = []
   let quoted = false
   let escaped = false
   for (let index = start; index < text.length; index++) {
@@ -129,13 +129,14 @@ function skipJsonValue(text: string, start: number): number | null {
       continue
     }
     if (character === '"') quoted = true
-    else if (character === "{" || character === "[") depth++
+    else if (character === "{") closing.push("}")
+    else if (character === "[") closing.push("]")
     else if (character === "}" || character === "]") {
-      if (depth === 0) return index
-      depth--
-    } else if (character === "," && depth === 0) return index
+      if (closing.length === 0) return character === "}" ? index : null
+      if (closing.pop() !== character) return null
+    } else if (character === "," && closing.length === 0) return index
   }
-  return quoted || depth !== 0 ? null : text.length
+  return quoted || closing.length !== 0 ? null : text.length
 }
 
 function topLevelTimestamp(line: Buffer): string | null {
@@ -143,26 +144,29 @@ function topLevelTimestamp(line: Buffer): string | null {
   let index = skipWhitespace(text, 0)
   if (text[index] !== "{") return null
   index++
+  let timestamp: string | null = null
   for (;;) {
     index = skipWhitespace(text, index)
-    if (text[index] === "}") return null
+    if (text[index] === "}") return skipWhitespace(text, index + 1) === text.length ? timestamp : null
     const key = jsonString(text, index)
     if (key === null) return null
     index = skipWhitespace(text, key.end)
     if (text[index] !== ":") return null
     index = skipWhitespace(text, index + 1)
+    let end: number | null
     if (key.value === "timestamp") {
-      const timestamp = jsonString(text, index)
-      return timestamp !== null && timestamp.value.length > 0 ? timestamp.value : null
-    }
-    const end = skipJsonValue(text, index)
+      const value = jsonString(text, index)
+      if (value === null || value.value.length === 0) return null
+      timestamp = value.value
+      end = value.end
+    } else end = skipJsonValue(text, index)
     if (end === null) return null
     index = skipWhitespace(text, end)
     if (text[index] === ",") {
       index++
       continue
     }
-    return null
+    if (text[index] !== "}") return null
   }
 }
 

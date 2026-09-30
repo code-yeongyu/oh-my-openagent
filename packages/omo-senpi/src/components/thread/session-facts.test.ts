@@ -51,6 +51,13 @@ describe("readSessionFacts newest timestamp", () => {
     expect(readSessionFacts(path)?.updated_at).toBeNull()
   })
 
+  test("#given the final line has a timestamp but malformed JSON after it #when facts are read #then updated_at is null", () => {
+    const path = sessionPath()
+    writeFileSync(path, `${[HEADER, OLD].map(line).join("\n")}\n{"type":"message","timestamp":"${NEW_TIMESTAMP}","message":[}\n`)
+
+    expect(readSessionFacts(path)?.updated_at).toBeNull()
+  })
+
   test("#given the final complete entry exceeds the hard scan cap #when facts are read #then activity is unknown and total reads stay bounded", () => {
     const path = sessionPath()
     const newest = { type: "message", id: "new", parentId: "old", timestamp: NEW_TIMESTAMP, message: { role: "assistant", content: [{ type: "text", text: "x".repeat(2 * 1024 * 1024) }] } }
