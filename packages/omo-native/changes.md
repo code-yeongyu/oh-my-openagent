@@ -1,3 +1,16 @@
+## 2026-09-30 - The Windows standalone binary works when run from its download folder (#7485)
+
+On Windows the compiled entry provisions the embedded runtime into `~/.omo/binary-runtime/<version>/` and then keeps
+running in the same process (a re-exec loops through `AssignProcessToJobObject`, f9f483753), so `process.execPath`
+kept naming the downloaded `.exe`. Engine modules that look beside the executable then looked in the download folder:
+senpi's pi-pty reads its version from `dirname(process.execPath)/package.json` when the terminal runtime first loads,
+and every shell tool failed with `@earendil-works/pi-pty package.json is missing a string version`. POSIX re-execs into
+the provisioned copy, which is why only Windows broke. `provisioned-exec-path.ts` `adoptProvisionedExecPath` names the
+provisioned executable as `process.execPath` on the in-process path, which is what a re-exec would have produced; the
+provisioned executable is a byte copy with the payload beside it. The new `windows-standalone-binary.yml` workflow
+builds the windows-x64 binary, copies it alone into an empty folder and runs a scripted shell command twice
+(`script/qa/omo-native-bare-exe-smoke.mjs`).
+
 ## 2026-09-30 - The standalone binary runs the same omo setup import and omo doctor sections as the npm launcher (#9252)
 
 The compiled entry (`compile-entry.ts`) answered `omo setup` with the inventory table only (`printSetupReport`), while

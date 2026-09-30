@@ -28,6 +28,7 @@ import { runCompiledDoctor, type CompiledDoctorOptions } from "./compiled-doctor
 import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
+import { adoptProvisionedExecPath } from "./provisioned-exec-path"
 import { spawnSync } from "node:child_process"
 import { delimiter } from "node:path"
 import {
@@ -371,6 +372,7 @@ async function main(): Promise<void> {
       await reexecProvisionedRuntime(expected)
       return
     }
+    adoptProvisionedExecPath(expected)
     execDir = dirname(expected)
   }
   // Inspector and custom execArgv isolation is unsupported in compiled binaries; the provisioned
