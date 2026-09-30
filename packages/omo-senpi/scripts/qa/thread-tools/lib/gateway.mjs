@@ -346,17 +346,18 @@ export const PATCHES = {
    * `lost-ack`: the store worker's `afterDbCommit` test hook (it runs only right after a delivery's
    * COMMIT), reachable from the environment. `THREAD_QA_AFTER_DB_COMMIT=sigkill` kills the sending
    * process the instant its delivery row committed, before it can reply. Unset, it is a no-op.
+   * The minifier renames identifiers on every rebuild, so the anchor captures them.
    */
   sender_kill_after_commit: {
     file: "extensions/gateway-store-worker.mjs",
-    from: "let t=rt?.config.test_hooks[e];",
-    to: 'let t=rt?.config.test_hooks[e]??("afterDbCommit"===e?process.env.THREAD_QA_AFTER_DB_COMMIT:void 0);',
+    from: /let ([\w$]+)=([\w$]+)\?\.config\.test_hooks\[([\w$]+)\];/,
+    to: 'let $1=$2?.config.test_hooks[$3]??("afterDbCommit"===$3?process.env.THREAD_QA_AFTER_DB_COMMIT:void 0);',
   },
   /** `loop-guard --mutant`: the cycle guard of the store worker answers "no cycle", so the scenario must FAIL. */
   cycle_check_off: {
     file: "extensions/gateway-store-worker.mjs",
-    from: "t.sender_node,t.target_durable_id)?Q(\"loop_detected\",\"The target already leads back to the sender in this causal chain.\"",
-    to: "t.sender_node,t.target_durable_id)&&false?Q(\"loop_detected\",\"The target already leads back to the sender in this causal chain.\"",
+    from: /([\w$]+\.sender_node,[\w$]+\.target_durable_id\))\?([\w$]+\("loop_detected","The target already leads back to the sender in this causal chain.")/,
+    to: "$1&&false?$2",
   },
 }
 
@@ -378,7 +379,7 @@ export async function buildOmoInstall(name, patchNames = []) {
     if (patch === undefined) throw new Error(`unknown patch ${patchName}`)
     const path = join(root, "plugin", patch.file)
     const text = readFileSync(path, "utf8")
-    const hits = text.split(patch.from).length - 1
+    const hits = patch.from instanceof RegExp ? [...text.matchAll(new RegExp(patch.from.source, "g"))].length : text.split(patch.from).length - 1
     if (hits !== 1) throw new Error(`patch ${patchName} matched ${hits} sites in ${patch.file}; expected exactly 1`)
     writeFileSync(path, text.replace(patch.from, patch.to))
     applied.push({ patch: patchName, file: patch.file })
