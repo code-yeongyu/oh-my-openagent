@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -64,6 +64,11 @@ describe("omo daemon adopt through the JS launcher", () => {
     // when
     const result = spawnSync(process.execPath, [join(fixture.packageRoot, "bin", "omo.js"), "daemon", "adopt", "dur-host"], { cwd: fixture.root, encoding: "utf8", env })
     // then
+    if (process.platform === "win32") {
+      // win32 has no task host to adopt from: `omo daemon` answers unsupported (exit 4) and the engine never starts
+      expect({ status: result.status, refusedForWin32: result.stderr.includes("win32"), engineStarted: existsSync(fixture.captureFile) }).toEqual({ status: 4, refusedForWin32: true, engineStarted: false })
+      return
+    }
     expect(result.status).toBe(0)
     const captured = JSON.parse(readFileSync(fixture.captureFile, "utf8")) as { argv: string[]; cwd: string }
     expect(captured.argv).toEqual(["--extension", join(fixture.packageRoot, "plugin"), "--session", "/sessions/dur-host.jsonl", "--", "first ask", "--no-extensions"])

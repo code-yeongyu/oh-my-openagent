@@ -43,12 +43,18 @@ describe("compiled omo daemon adopt", () => {
     const sdk = releasingSdk(sessionCwd, ["--no-extensions", "   ", INTERNAL_SUPERVISOR_FLAG, "--mode", "rpc"])
     const savedArgv = [...process.argv]
     const savedCwd = process.cwd()
+    const savedExitCode = process.exitCode
     try {
       // when
       const handled = await runCompiledLauncher(["daemon", "adopt", "dur-host"], execDir, "2026.9.29", undefined, {}, { threadSdk: async () => ({ sdk }) })
       const launch = process.argv.slice(2)
       const cwd = process.cwd()
       // then
+      if (process.platform === "win32") {
+        // win32 has no task host to adopt from: `omo daemon` answers unsupported (exit 4) and launches nothing
+        expect({ handled, exitCode: process.exitCode, launch, cwd: realpathSync(cwd) }).toEqual({ handled: true, exitCode: 4, launch: savedArgv.slice(2), cwd: realpathSync(savedCwd) })
+        return
+      }
       expect(handled).toBe(false)
       expect(launch).toEqual(["--session", "/sessions/dur-host.jsonl", "--", "--no-extensions", INTERNAL_SUPERVISOR_FLAG, "--mode", "rpc"])
       expect(realpathSync(cwd)).toBe(sessionCwd)
@@ -58,6 +64,7 @@ describe("compiled omo daemon adopt", () => {
     } finally {
       process.argv.splice(0, process.argv.length, ...savedArgv)
       process.chdir(savedCwd)
+      process.exitCode = savedExitCode
     }
   })
 
