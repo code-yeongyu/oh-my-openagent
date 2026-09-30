@@ -49,8 +49,8 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
 }
 
 function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: readonly AnyTool[]; readonly dispose: () => void } {
-  const now = options.now ?? Date.now
   const { store, engine, relay } = createGatewayServices(options, () => view({ offline: true }))
+  const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> { await options.ensureHost?.(); return hostView(options, request) }
   // Receipts this process began but could not settle (the store gave up at its lock-wait bound):
   // the row stays `prepared` under this instance, which would answer `idempotency_in_progress`

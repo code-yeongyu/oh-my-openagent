@@ -72,6 +72,8 @@ export type Deduplicated = { readonly deduplicated?: boolean }
 export type GatewayStore = {
   /** The store's busy timeout: the delay before a caller re-arms an operation that failed with a lock-wait error. */
   readonly busyTimeoutMs: number
+  /** The clock this store's rows are stamped and expired against; drains, engines and relays built on the store default to it. */
+  readonly now: () => number
   readonly identity: () => Promise<ProcessIdentity>
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
   readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
@@ -198,6 +200,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
 
   return {
     busyTimeoutMs: config.busy_timeout_ms,
+    now,
     identity: async () => (await start()).self,
     enqueue: (request) => call("enqueue", request),
     reconcile: (request) => call("reconcile", request),

@@ -130,8 +130,8 @@ function argsHash(value: unknown): string {
  * drain moves out of `queued`; an unreachable target answers `queued_offline`.
  */
 export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngine {
-  const now = options.now ?? Date.now
   const store = options.store
+  const now = options.now ?? store.now
 
   async function deliver(request: GatewayDeliverRequest): Promise<GatewayDeliveryResult> {
     const mode = request.mode ?? "auto"

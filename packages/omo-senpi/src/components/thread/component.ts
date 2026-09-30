@@ -96,7 +96,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const runtimeInstance = hostInstanceOf(pi)
       const store = options.store ?? createGatewayStore({ agentDir: agentDir(), ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       const run: RunContext = { turn: 0, cause: undefined }
-      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: Date.now(), session_durable_id: durableId, outcome }), {
+      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
           ctx.logger.warn(retrying

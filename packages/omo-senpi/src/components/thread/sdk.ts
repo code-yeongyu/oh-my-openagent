@@ -87,7 +87,6 @@ async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
  * the engine enumerates and the gateway store under `agentDir`.
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
-  const now = options.now ?? Date.now
   const principal = `cli:${options.uid}`
   const env = { ...(options.env ?? process.env), OMO_CODING_AGENT_DIR: options.agentDir }
   const engineStatusAll = options.engineStatusAll
@@ -96,6 +95,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
   })
   const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
+  const now = options.now ?? store.now
   const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
   const view = () => hostView(surface)
   const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))

@@ -86,8 +86,8 @@ function receipt(request: Keyed, operation: string, args: unknown) {
 }
 
 export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
-  const now = options.now ?? Date.now
   const store = options.store
+  const now = options.now ?? store.now
 
   // A claimed answer whose hand-off failed goes back to pending; one that reached the session is
   // confirmed, so a later answer reads `already_answered` instead of `answer_in_progress`. A release

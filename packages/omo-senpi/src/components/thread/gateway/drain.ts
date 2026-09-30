@@ -53,7 +53,7 @@ const RELEASING_REASONS: ReadonlySet<WakeReason> = new Set(["submission", "draft
  * can release it, or when the editor revision changed.
  */
 export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
-  const now = options.now ?? Date.now
+  const now = options.now ?? options.store.now
   const held = new Map<string, number>()
   const noticed = new Set<string>()
   let chain: Promise<unknown> = Promise.resolve()

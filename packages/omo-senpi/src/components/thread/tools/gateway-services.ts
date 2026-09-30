@@ -31,8 +31,8 @@ export type GatewayServices = {
  * (`sendAddressBook`) and is queued offline.
  */
 export function createGatewayServices(options: ThreadToolSurfaceOptions, view: () => Promise<ThreadHostView>): GatewayServices {
-  const now = options.now ?? Date.now
   const store = options.store ?? createGatewayStore({ agentDir: options.stateDirectory })
+  const now = options.now ?? store.now
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))
   const resolve: GatewayResolve = async (address, request) => {
