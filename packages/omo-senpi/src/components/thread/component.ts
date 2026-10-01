@@ -95,6 +95,21 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (!run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
 }
 
+/** senpi's ask_user tool per model family (`ask-user/family.js` `TOOL_NAMES`) and the flag that makes it wait for the answer. */
+const ASK_USER_WAIT_FLAGS: Readonly<Record<string, string>> = { ask_user_question: "waitForAnswer", request_user_input: "wait_for_answer" }
+
+/**
+ * The tool call of a question the session waits on: an ask_user call whose wait flag is set holds
+ * the run inside that tool call until the user answers, so a steer has no turn to enter. A question
+ * that does not wait returns at once and blocks nothing.
+ */
+function waitingQuestionCallOf(event: unknown): string | undefined {
+  const { toolCallId, toolName, args } = (event ?? {}) as { readonly toolCallId?: unknown; readonly toolName?: unknown; readonly args?: unknown }
+  if (typeof toolCallId !== "string" || typeof toolName !== "string") return undefined
+  const flag = ASK_USER_WAIT_FLAGS[toolName]
+  return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true ? toolCallId : undefined
+}
+
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
   const id = typeof manager?.getSessionId === "function" ? manager.getSessionId() : undefined
@@ -129,6 +144,16 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
   })
   pi.on("session_before_compact", () => registrant.noteCompaction(true))
   pi.on("session_compact", () => registrant.noteCompaction(false))
+  // A steer into a session waiting on a question is `not_steerable` (`decision.ts`): the answer comes
+  // through the question itself (`thread_answer`), never as a delivery.
+  pi.on("tool_execution_start", (event) => {
+    const id = waitingQuestionCallOf(event)
+    if (id !== undefined) registrant.noteQuestion(id, true)
+  })
+  pi.on("tool_execution_end", (event) => {
+    const id = (event as { readonly toolCallId?: unknown } | undefined)?.toolCallId
+    if (typeof id === "string") registrant.noteQuestion(id, false)
+  })
   return registrant
 }
 

@@ -31,6 +31,11 @@
 - `tools.ts`: a receipted thread tool whose receipt the store cannot admit answers as data instead of throwing:
   `overloaded` when another process holds the store's write lock past the wait bound, `internal_error` for any other
   store failure. Nothing has run at that point, so a retry runs the call once.
+- `component.ts` / `gateway/registration.ts`: a session waiting on a question is in phase `waiting_question`, so a
+  steer into it is refused `not_steerable` as the delivery table says. The phase holds from the `tool_execution_start`
+  of an ask_user call that waits for its answer (`ask_user_question` with `waitForAnswer`, `request_user_input` with
+  `wait_for_answer`) to that call's `tool_execution_end`; `auto` and `follow_up` still queue behind it. The phase was
+  never reported, so such a steer was admitted into the blocked turn. A question that does not wait blocks nothing.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

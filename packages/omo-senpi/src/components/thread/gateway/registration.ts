@@ -118,6 +118,8 @@ export type ControlEndpointRegistrantOptions = {
 export type ControlEndpointRegistrant = {
   readonly start: (session: ControlSession) => Promise<RegistrationOutcome>
   readonly noteCompaction: (active: boolean) => void
+  /** A question the session waits on for its answer opened (`waiting` true) or ended; the session's phase is `waiting_question` while any is open. */
+  readonly noteQuestion: (id: string, waiting: boolean) => void
   /** Disposes the registration first - senpi's clean exit asks `isSessionReferenced` then - and the store last. */
   readonly stop: () => Promise<void>
   readonly currentDrain: () => InboxDrain | undefined
@@ -151,6 +153,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
   let store: GatewayStore | undefined = shared
   let active: Active | undefined
   let compacting = false
+  const openQuestions = new Set<string>()
   let queue: Promise<unknown> = Promise.resolve()
 
   function serialized<T>(work: () => Promise<T>): Promise<T> {
@@ -184,7 +187,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     const agentDir = options.agentDir()
     store ??= createGatewayStore({ agentDir, ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }) })
     const runtime: SessionRuntimePort = {
-      phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : "mid_turn"),
+      phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : openQuestions.size > 0 ? "waiting_question" : "mid_turn"),
       admissionGate: () => control.admissionGate(),
       admitExternalMessage: (input) => control.admitExternalMessage(input),
       listAdmittedDeliveries: () => control.listAdmittedDeliveries(),
@@ -237,6 +240,10 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     start: (session) => serialized(() => register(session)),
     noteCompaction: (value) => {
       compacting = value
+    },
+    noteQuestion: (id, waiting) => {
+      if (waiting) openQuestions.add(id)
+      else openQuestions.delete(id)
     },
     stop: () =>
       serialized(async () => {

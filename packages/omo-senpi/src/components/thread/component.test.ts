@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { COMPLETION_SETTLE_WAIT_MS, createThreadComponent } from "./component"
+import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry } from "./gateway/engine"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
@@ -141,6 +142,81 @@ describe("thread component control endpoint registration", () => {
       expect(calls).toEqual(["persistHeaderNow", "registerControlEndpoint", "dispose"])
       expect(registered?.inboxDir).toBe(gatewayInboxDirectory(agentDir, "dur-1"))
     } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("thread component steer into a session waiting on a question", () => {
+  test("#given a running session blocked on an ask_user question that waits for its answer #when a steer for its turn arrives #then it is refused not_steerable and never reaches the runtime; a question that does not wait blocks nothing, and once the blocking question ends the next steer is steered", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-question-"))
+    const store = createGatewayStore({ agentDir })
+    const socket = "/tmp/t-0123456789abcdef.sock"
+    let drain: ((event: unknown) => Promise<unknown>) | undefined
+    let endpointRegistered!: () => void
+    const endpointReady = new Promise<void>((resolve) => { endpointRegistered = resolve })
+    const admitted: string[] = []
+    const session = {
+      persistHeaderNow: async () => undefined,
+      registerControlEndpoint: async (options: { drain: (event: unknown) => Promise<unknown> }) => {
+        drain = options.drain
+        endpointRegistered()
+        return { status: "registered", socket, dispose: async () => undefined }
+      },
+      admissionGate: () => ({ can_admit: true, editor_revision: 0, turn_epoch: 3 }),
+      admitExternalMessage: (input: { readonly delivery_id: string }) => {
+        admitted.push(input.delivery_id)
+        return { kind: "steered", turn_epoch: 3 }
+      },
+      listAdmittedDeliveries: () => ({ pending: [...admitted], emitted: [] }),
+    }
+    const f = eventApi(session)
+    // A session in a run: senpi reports it busy for the whole run, a blocking question included.
+    const ctx = { sessionManager: { getSessionId: () => "dur-1", getSessionFile: () => join(agentDir, "dur-1.jsonl") }, isIdle: () => false }
+    try {
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
+      await f.dispatch("session_start", ctx)
+      await within(endpointReady, 10_000, "the control endpoint to register")
+      const target: GatewayAddressEntry = { thread_id: "dur-1", name: "lane", status: "live", cwd: agentDir, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), endpoint: { kind: "tui", socket, routing_id: null }, liveness: "routable" }
+      const engine = createGatewayEngine({
+        store,
+        endpoints: {
+          wake: async (_endpoint, ids) => {
+            if (drain === undefined) throw new Error("the component registered no drain")
+            return (await drain({ type: "session_control_wake", reason: "command", reasons: ["command"], delivery_ids: ids })) as never
+          },
+        },
+        resolve: resolveFromEntries(() => [target], () => agentDir),
+      })
+      const steer = async (text: string) => {
+        const sent = await engine.deliver({ sender: { kind: "session", durable_id: "dur-peer" }, target: "dur-1", text, mode: "steer", expected_turn_id: 3 })
+        const id = sent.kind === "ok" ? sent.delivery_id : sent.error.details?.delivery_id
+        if (typeof id !== "string") throw new Error(`the steer was not written: ${JSON.stringify(sent)}`)
+        const row = (await store.deliveryView(id))?.row
+        return { sender: sent.kind === "ok" ? sent.delivery.kind : sent.error.code, state: row?.state, reason: row?.reason ?? null, reached: admitted.includes(id) }
+      }
+      // senpi's ask_user tool (`ask_user_question`, or `request_user_input` for the codex family): a
+      // question that waits for its answer holds the tool call open until the user answers.
+      const ask = (toolCallId: string, toolName: string, args: Record<string, unknown>) => f.dispatch("tool_execution_start", ctx, { toolCallId, toolName, args })
+      const settle = (toolCallId: string, toolName: string) => f.dispatch("tool_execution_end", ctx, { toolCallId, toolName, result: { content: [] }, isError: false })
+      await f.dispatch("agent_start", ctx)
+
+      await ask("ask-1", "ask_user_question", { questions: [], waitForAnswer: true })
+      expect(await steer("while the question waits")).toEqual({ sender: "not_steerable", state: "refused", reason: "not_steerable", reached: false })
+      await settle("ask-1", "ask_user_question")
+
+      await ask("ask-2", "request_user_input", { questions: [], wait_for_answer: true })
+      expect(await steer("while the codex-family question waits")).toEqual({ sender: "not_steerable", state: "refused", reason: "not_steerable", reached: false })
+      await settle("ask-2", "request_user_input")
+
+      await ask("ask-3", "ask_user_question", { questions: [], waitForAnswer: false })
+      expect(await steer("beside a question that does not wait")).toEqual({ sender: "steered", state: "admitted", reason: null, reached: true })
+      await settle("ask-3", "ask_user_question")
+
+      expect(await steer("after the questions ended")).toEqual({ sender: "steered", state: "admitted", reason: null, reached: true })
+    } finally {
+      await f.dispatch("session_shutdown", ctx)
+      await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })
     }
   })
