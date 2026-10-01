@@ -16,8 +16,10 @@ import { awaitTuiEndpoint, cliSend, deliveryEntries, deliveryIdOf, deliveryRow, 
 await runScenario("receiver-crash", async ({ report, fake, scratch, install, startTui }) => {
   for (const kind of ["with-history", "header-only"]) {
     const marker = join(scratch.dir, `crash-${kind}.marker`)
+    // The exclusion snapshot is taken before the TUI starts: one taken after could already hold its own socket.
+    const known = registrySockets(scratch)
     const tui = await startTui(`tui-${kind}`, { env: { THREAD_QA_CRASH_AFTER_ADMIT: "started", THREAD_QA_CRASH_MARKER: marker } })
-    const endpoint = await awaitTuiEndpoint(scratch, tui, { exclude: registrySockets(scratch) })
+    const endpoint = await awaitTuiEndpoint(scratch, tui, { exclude: known })
     if (kind === "with-history") {
       await tui.submit(`prior turn QA-TOKEN-prior-${kind}`)
       await waitFor(() => sessionEntries(endpoint.sessionPath).some((entry) => entry.message?.role === "assistant" && JSON.stringify(entry.message.content).includes("QA-ACK")), { label: "prior turn answered" })
@@ -37,8 +39,9 @@ await runScenario("receiver-crash", async ({ report, fake, scratch, install, sta
     report.assert(`${kind}-not-recorded-before-crash`, afterCrash?.state === "admitting", `state=${afterCrash?.state}`)
 
     const modelTurnsBefore = modelTurnsFor(fake, deliveryId)
+    const knownBeforeRestart = registrySockets(scratch)
     const restarted = await startTui(`tui-${kind}-restarted`, { args: ["--session", endpoint.sessionPath] })
-    const again = await awaitTuiEndpoint(scratch, restarted, { exclude: registrySockets(scratch) })
+    const again = await awaitTuiEndpoint(scratch, restarted, { exclude: knownBeforeRestart })
     report.assert(`${kind}-restart-same-id`, again.durableId === endpoint.durableId, `before=${endpoint.durableId} after=${again.durableId}`)
     const row = await waitFor(async () => {
       const current = await deliveryRow(scratch.agentDir, deliveryId)
