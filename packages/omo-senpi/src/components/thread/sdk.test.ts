@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, jest, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -176,13 +176,19 @@ describe("thread SDK: bindings and the connector surface", () => {
     const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
     const asked = await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "deploy?", request_id: "ui-1" })
-    // The fixture's host has no respondUi, so the claimed answer cannot be handed off and its release hits the bound.
-    await sdk.answer({ binding_id: bindingId, reply_token: (asked as { reply_token: string }).reply_token, answer: "yes" })
-    expect(releases).toBe(1)
-    await sdk.dispose()
-    // Timers fire in expiry order: one due at 4x the retry delay runs after the (cancelled) retry would have.
-    await new Promise((resolve) => setTimeout(resolve, (real?.busyTimeoutMs ?? 50) * 4))
-    expect(releases).toBe(1)
+    // The fixture's host has no respondUi, so the claimed answer cannot be handed off and its release
+    // hits the bound. The retry it arms runs on the fake clock, so the test decides when it would be due.
+    jest.useFakeTimers()
+    try {
+      await sdk.answer({ binding_id: bindingId, reply_token: (asked as { reply_token: string }).reply_token, answer: "yes" })
+      expect(releases).toBe(1)
+      await sdk.dispose()
+      // Well past the retry's due time: a retry that survived dispose would count itself here.
+      jest.advanceTimersByTime((real?.busyTimeoutMs ?? 50) * 4)
+      expect(releases).toBe(1)
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   test("#given a question asked through binding X #when the answer arrives through binding Y #then it is binding_mismatch and the question stays pending", async () => {

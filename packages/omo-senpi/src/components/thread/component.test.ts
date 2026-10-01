@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, jest, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -215,14 +215,19 @@ describe("thread component startup and shutdown touch no store they do not need"
       if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
       const asked = await real.report({ now: Date.now(), receipt: null, origin_delivery_id: null, session_durable_id: "dur-1", binding_id: bound.binding.binding_id, event: "question", text: "deploy?", ui_request_id: "ui-1", ui_request_kind: null })
       if (asked.kind !== "ok" || asked.reply_token === null) throw new Error(JSON.stringify(asked))
-      // No host gateway port: the answer is claimed, cannot be handed off, and its release hits the bound.
-      await f.tool("thread_answer").execute("call-answer", { binding_id: bound.binding.binding_id, reply_token: asked.reply_token, answer: "yes" }, undefined, undefined, sessionCtx("dur-2"))
-      expect(releases).toBe(1)
-      await f.dispatch("session_shutdown")
-      // Timers fire in expiry order: one due at 4x the retry delay runs after the (cancelled) retry
-      // would have, and a release attempt counts itself synchronously when it starts.
-      await new Promise((resolve) => setTimeout(resolve, real.busyTimeoutMs * 4))
-      expect(releases).toBe(1)
+      // No host gateway port: the answer is claimed, cannot be handed off, and its release hits the
+      // bound. The retry it arms runs on the fake clock, so the test decides when it would be due.
+      jest.useFakeTimers()
+      try {
+        await f.tool("thread_answer").execute("call-answer", { binding_id: bound.binding.binding_id, reply_token: asked.reply_token, answer: "yes" }, undefined, undefined, sessionCtx("dur-2"))
+        expect(releases).toBe(1)
+        await f.dispatch("session_shutdown")
+        // Well past the retry's due time: a retry that survived shutdown would count itself here.
+        jest.advanceTimersByTime(real.busyTimeoutMs * 4)
+        expect(releases).toBe(1)
+      } finally {
+        jest.useRealTimers()
+      }
     } finally {
       await real.dispose()
       rmSync(agentDir, { recursive: true, force: true })
