@@ -360,7 +360,7 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
 | 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`. Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
-| 5 | `internal_error` |
+| 5 | `internal_error`, also when the plugin's thread SDK cannot be loaded (a broken install; with `--json` still one JSON error) |
 
 ## For scripts in JavaScript
 

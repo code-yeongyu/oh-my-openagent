@@ -22,6 +22,11 @@ postinstall, on bun itself when node is missing, so the shim is back before anyt
 read a node launch already pays. Outside a POSIX bun-global install the call is the same no-op as at launch. A blocked
 (untrusted) postinstall still leaves the stock link until the next launch under node or bun.
 
+## 2026-10-01 - `omo thread` and `omo daemon` close out the gateway review round 3 nits (#9222)
+
+- `bin/lib/thread.js`: an SDK that cannot be imported is `internal_error` (exit 5), printed as one JSON error with
+  `--json` instead of an uncaught import failure with empty stdout; a `dispose()` that rejects after the command is
+  logged on stderr and changes neither the printed result nor the exit code.
 ## 2026-09-30 - host status and thread list share strict unknown-activity semantics (#9222 gate round 2)
 
 Malformed, partial and over-cap final session records now remain `null` through both `last_activity_at` and degraded

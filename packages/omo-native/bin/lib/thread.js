@@ -183,14 +183,21 @@ export function threadExitCode(result) {
 /**
  * Loads the SDK the plugin ships. `node:sqlite` is probed lazily first (as `setup-detect.js` does):
  * the gateway store needs it, and a runtime without it gets a named refusal, not a worker crash.
+ * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
+ * plugin SDK that cannot be imported (a broken or partial install).
  */
 export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, identity }) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {
-    return { error: `node:sqlite is unavailable in this runtime (${process.versions.bun ? `bun ${process.versions.bun}` : `node ${process.versions.node}`}); the session gateway store needs it` }
+    return { code: "unsupported", error: `node:sqlite is unavailable in this runtime (${process.versions.bun ? `bun ${process.versions.bun}` : `node ${process.versions.node}`}); the session gateway store needs it` }
   }
-  const module = await (importSdk ?? (() => import(pathToFileURL(join(pluginRoot, "runtime", "thread-sdk", "sdk.js")).href)))()
+  let module
+  try {
+    module = await (importSdk ?? (() => import(pathToFileURL(join(pluginRoot, "runtime", "thread-sdk", "sdk.js")).href)))()
+  } catch (error) {
+    return { code: "internal_error", error: `the plugin's thread SDK could not be loaded from ${join(pluginRoot, "runtime", "thread-sdk")}: ${error instanceof Error ? error.message : String(error)}` }
+  }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
   const engineStatusAll = async () => engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } }).stdout
   return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll }) }
@@ -222,6 +229,10 @@ export async function runThreadCommand(args, options) {
     return THREAD_EXIT.usage
   }
   const loaded = await loadThreadSdk(options)
+  if (loaded.error !== undefined && loaded.code === "internal_error") {
+    refuse(options, json, "internal_error", `omo thread: ${loaded.error}`, "Reinstall omo (omo update), then retry.")
+    return THREAD_EXIT.failed
+  }
   if (loaded.error !== undefined) {
     refuse(options, json, "unsupported", `omo thread: ${loaded.error}`, "Run omo thread under bun, or a node with node:sqlite.")
     return THREAD_EXIT.unsupported
@@ -239,7 +250,8 @@ export async function runThreadCommand(args, options) {
     else for (const line of humanLines(name, result)) stdout.write(`${line}\n`)
     return exitCode
   } finally {
-    await loaded.sdk.dispose()
+    // The command's result is already printed; a store that fails to close is logged, never a new outcome.
+    await loaded.sdk.dispose().catch((error) => stderr.write(`omo thread: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`))
   }
 }
 
