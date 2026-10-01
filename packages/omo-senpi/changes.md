@@ -69,6 +69,9 @@
 - `store-ops.ts` `requeueReleased` (with its `store.ts` method and worker op) is deleted: nothing called it. A released
   session's dropped deliveries come back through the `session_released` transcript check in `reconcile` on the next
   owner's side; a second path from `omo daemon adopt` would act from another process without that check.
+- `store-relay-ops.ts`: `readOutbox` and `listBindings` put `ORDER BY ... LIMIT` in the SQL (bindings read one row past
+  the page to know whether another follows) instead of loading every matching row and slicing. `relay.test.ts` pages an
+  outbox; the bindings snapshot-cursor test already pages bindings.
 - Docs (`docs/reference/omo-thread.md`, `thread/AGENTS.md`): `omo thread` creates and resumes no session (a connector
   opens one through the host API and binds it); a completion row carries the armed text, not the model's reply; the
   per-author rate bucket trusts the connector's author id and stays bounded by the target backlog.

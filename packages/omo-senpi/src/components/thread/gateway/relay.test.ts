@@ -119,6 +119,19 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect(code(await relay.report({ principal: "session:D", session_durable_id: "D", binding_id: x, event: "report", text: "not my binding" }))).toBe("scope_denied")
   })
 
+  test("#given more outbox rows than one page #when the connector pages with a limit #then each page holds at most that many rows in cursor order and next_cursor continues exactly after it", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    for (const text of ["one", "two", "three"]) ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "report", text }))
+    const first = ok(await relay.outbox({ binding_id: x, limit: 2 }))
+    expect(first.rows.map((row) => row.text)).toEqual(["one", "two"])
+    expect(first.next_cursor).toBe(first.rows[1]?.cursor)
+    const second = ok(await relay.outbox({ binding_id: x, after_cursor: first.next_cursor, limit: 2 }))
+    expect({ texts: second.rows.map((row) => row.text), next: second.next_cursor }).toEqual({ texts: ["three"], next: second.rows[0]?.cursor })
+  })
+
   test("#given milestones on a binding #when the connector acks the first with its posted message id #then later milestones carry that id to edit and the binding records it", async () => {
     const h = (harness = createGatewayHarness())
     h.session("B")

@@ -102,8 +102,9 @@ function bindingFrom(record: SqlRow): BindingRecord {
   }
 }
 
-function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): BindingRecord[] {
-  return ctx.sql.all(BINDING_COLUMNS, `SELECT ${BINDING_COLUMNS.join(", ")} FROM bindings WHERE ${where}`, params, orderBy).map(bindingFrom)
+function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], page?: { readonly orderBy: string; readonly limit: number }): BindingRecord[] {
+  const sql = `SELECT ${BINDING_COLUMNS.join(", ")} FROM bindings WHERE ${where}${page === undefined ? "" : ` ORDER BY ${page.orderBy} LIMIT ?`}`
+  return ctx.sql.all(BINDING_COLUMNS, sql, page === undefined ? params : [...params, page.limit], page?.orderBy).map(bindingFrom)
 }
 
 function selectBinding(ctx: StoreContext, bindingId: string): BindingRecord | undefined {
@@ -359,7 +360,8 @@ export async function listBindings(
       clauses.push("(created_at > ? OR (created_at = ? AND binding_id > ?))")
       params.push(decoded.after[0], decoded.after[0], decoded.after[1])
     }
-    const page = selectBindings(ctx, clauses.join(" AND "), params, "created_at, binding_id")
+    // One row past the page says whether another page follows.
+    const page = selectBindings(ctx, clauses.join(" AND "), params, { orderBy: "created_at, binding_id", limit: limit + 1 })
     const bindings = page.slice(0, limit)
     const last = bindings.at(-1)
     return { kind: "ok", bindings, next_cursor: page.length > limit && last !== undefined ? encodeBindingsCursor(asOf, [last.created_at, last.binding_id]) : null }
@@ -557,8 +559,7 @@ export async function readOutbox(
     const acked = ackedCursor(ctx, binding.binding_id)
     const after = request.after_cursor ?? acked
     const rows = ctx.sql
-      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ?`, [binding.binding_id, after], "cursor")
-      .slice(0, limit)
+      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ? ORDER BY cursor LIMIT ?`, [binding.binding_id, after, limit], "cursor")
       .map((row) => outboxRowFrom(row, binding))
     sweepRetentionIfDue(ctx, request.now)
     return { kind: "ok", binding_id: binding.binding_id, revision: binding.revision, status: binding.status, rows, next_cursor: rows.at(-1)?.cursor ?? after, acked_cursor: acked }
