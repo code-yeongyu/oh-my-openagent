@@ -26,6 +26,12 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
+
+- `gateway/legacy-mailbox.ts`: a legacy `steer` keeps its `expected_turn_id`. The host's `turn-N` id becomes the
+  gateway turn epoch `N`, so a migrated steer for the turn the target is still running steers into it and one for an
+  earlier turn is refused `turn_conflict`; the import used to store no epoch, which refused every migrated steer.
+
 ## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
 
 - `gateway/store.ts`: a failed open is no longer cached. The worker of a rejected `init` is terminated and the open is

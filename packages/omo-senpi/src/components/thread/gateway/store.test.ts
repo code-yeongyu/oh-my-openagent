@@ -165,4 +165,33 @@ describe("legacy mailbox migration", () => {
       meta.close()
     }
   })
+
+  test("#given legacy steers for the turn the target is running and for an earlier turn #when they are imported and the target drains them #then the current one steers into the running turn and the stale one is a turn_conflict", async () => {
+    // given: B is in its first turn (gateway turn_epoch 1), the legacy host's turn-1
+    const h = (harness = createGatewayHarness())
+    const legacy = join(h.agentDir, "cwd", ".omo", "thread-tools", "mailbox")
+    mkdirSync(legacy, { recursive: true })
+    const steer = (seq: number, message: string, turn: string) => ({ target: "B", message, message_seq: seq, delivery: "steer", expected_turn_id: turn, operation_id: `B-${seq}`, accepted_at: "2026-09-28T00:00:00.000Z" })
+    writeFileSync(join(legacy, "mailbox.jsonl"), `${[
+      JSON.stringify({ version: 1, kind: "snapshot", next_seq: 1, items: [] }),
+      JSON.stringify({ version: 1, kind: "enqueue", item: steer(1, "for this turn", "turn-1") }),
+      JSON.stringify({ version: 1, kind: "enqueue", item: steer(2, "for an old turn", "turn-0") }),
+    ].join("\n")}\n`)
+    const b = h.session("B", { storeOptions: { legacyMailboxDirectories: [legacy] } })
+    b.runtime.beginUserTurn()
+
+    // when
+    expect(await b.store.legacyMigrated()).toBe(2)
+    await b.drain.drain({ reason: "inbox" })
+    b.runtime.toolBoundary()
+    await h.quiesce()
+
+    // then
+    const rows = await b.store.list({ target_durable_id: "B" })
+    expect(rows.map((row) => [row.body, row.state, row.reason])).toEqual([
+      ["for this turn", "applied", null],
+      ["for an old turn", "refused", "turn_conflict"],
+    ])
+    expect(b.runtime.enqueueCalls.map((call) => [call.delivery_id, call.lane])).toEqual([[rows[0]?.delivery_id, "steer"]])
+  })
 })

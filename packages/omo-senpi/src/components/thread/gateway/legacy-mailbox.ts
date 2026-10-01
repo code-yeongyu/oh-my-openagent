@@ -8,6 +8,8 @@ export type LegacyMailboxItem = {
   readonly message: string
   readonly message_seq: number
   readonly delivery: GatewayDeliveryMode
+  /** The gateway turn epoch a steer was meant for, from the legacy `turn-N` id; `null` when the item named none or one that is no turn epoch. */
+  readonly expected_turn_id: number | null
   readonly operation_id: string
   readonly accepted_at: string
 }
@@ -71,6 +73,7 @@ function parseItem(value: unknown): LegacyMailboxItem {
     typeof value.message_seq !== "number" ||
     !Number.isInteger(value.message_seq) ||
     (value.delivery !== "auto" && value.delivery !== "steer" && value.delivery !== "follow_up") ||
+    (value.expected_turn_id !== undefined && typeof value.expected_turn_id !== "string") ||
     typeof value.operation_id !== "string" ||
     typeof value.accepted_at !== "string"
   ) {
@@ -81,9 +84,23 @@ function parseItem(value: unknown): LegacyMailboxItem {
     message: value.message,
     message_seq: value.message_seq,
     delivery: value.delivery,
+    expected_turn_id: value.expected_turn_id === undefined ? null : turnEpochOf(value.expected_turn_id),
     operation_id: value.operation_id,
     accepted_at: value.accepted_at,
   }
+}
+
+/**
+ * The legacy mailbox kept the host's turn id (`turn-N`); the gateway compares a steer's epoch with
+ * the target's current `turn_epoch`, so `N` becomes that epoch and a steer for a turn that is no
+ * longer running is refused `turn_conflict`. An id that names no turn number stays `null`, which the
+ * gateway refuses the same way, so a migrated steer never lands in a turn it was not meant for.
+ */
+function turnEpochOf(turnId: string): number | null {
+  const match = /^(?:turn-)?(\d+)$/.exec(turnId)
+  if (match === null) return null
+  const epoch = Number(match[1])
+  return Number.isSafeInteger(epoch) ? epoch : null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

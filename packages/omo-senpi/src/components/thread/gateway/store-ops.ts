@@ -790,7 +790,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           bytes: Buffer.byteLength(item.message),
           mode_requested: item.delivery,
           mode_effective: null,
-          expected_turn_id: null,
+          expected_turn_id: item.expected_turn_id,
           state: "queued",
           reason: null,
           admitted_by: null,
