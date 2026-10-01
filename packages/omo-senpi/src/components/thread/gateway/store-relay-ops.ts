@@ -33,7 +33,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
 import type { SqlRow, SqlValue } from "./sql"
 import { gatewayOutboxMarkerPath } from "./paths"
 import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
-import { sweepRetentionIfDue } from "./store-retention"
+import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
 const BINDING_COLUMNS = [
@@ -147,7 +147,7 @@ function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): S
 
 function priorOutcome<T>(ctx: StoreContext, key: ReceiptKey | null, now: number): RelayOutcome<T> | undefined {
   if (key === null) return undefined
-  write(ctx, "DELETE FROM receipts WHERE expires_at <= ?", [now])
+  deleteExpiredReceipt(ctx, key, now)
   const receipt = selectReceipt(ctx, key)
   if (receipt === undefined) return undefined
   if (receipt.args_hash !== key.args_hash) return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
@@ -193,7 +193,7 @@ export type ToolReceiptBegin =
  */
 export async function toolReceiptBegin(ctx: StoreContext, request: ReceiptKey & { readonly now: number }): Promise<ToolReceiptBegin> {
   return await transaction(ctx, "tool_receipt_begin", (): ToolReceiptBegin => {
-    write(ctx, "DELETE FROM receipts WHERE expires_at <= ?", [request.now])
+    deleteExpiredReceipt(ctx, request, request.now)
     const receipt = selectReceipt(ctx, request)
     if (receipt === undefined) {
       write(

@@ -32,7 +32,7 @@ import {
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
-import { sweepRetentionIfDue } from "./store-retention"
+import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { GATEWAY_MIGRATIONS } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
@@ -421,7 +421,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
   let marker: string | null = null
   let committed = false
   try {
-    write(ctx, "DELETE FROM receipts WHERE expires_at <= ?", [request.now])
+    deleteExpiredReceipt(ctx, { principal: request.sender_principal, operation: "deliver", idempotency_key: request.receipt.idempotency_key }, request.now)
     const receipt = selectReceipt(ctx, request.sender_principal, request.receipt.idempotency_key)
     if (receipt !== undefined) {
       const outcome = classifyReceipt(ctx, request, receipt)

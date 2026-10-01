@@ -35,8 +35,9 @@ function ids(db: Database, table: string, column: string): string[] {
 }
 
 /** A relay mutation: one write transaction, which runs the retention sweep when one is due. */
-async function bindSomething(store: GatewayStore, now: number, chat: string) {
-  const bound = await store.bind({ now, receipt: null, binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "C", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["report"], policy_id: "default", ttl_seconds: null } })
+async function bindSomething(store: GatewayStore, now: number, chat: string, keyed = false) {
+  const receipt = keyed ? { principal: "session:A", operation: "thread_bind", idempotency_key: `bind-${chat}`, args_hash: "h" } : null
+  const bound = await store.bind({ now, receipt, binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "C", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["report"], policy_id: "default", ttl_seconds: null } })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
 }
 
@@ -109,6 +110,31 @@ describe("gateway store retention", () => {
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(total - RETENTION_SWEEP_BATCH)
       await bindSomething(store, h.clock.now, "second")
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(0)
+    } finally {
+      db.close()
+    }
+  })
+
+  test("#given more expired receipts than one sweep may delete #when two write transactions run on one store #then the first deletes one batch and the second, due at once, deletes the rest", async () => {
+    const h = (harness = createGatewayHarness())
+    const t0 = h.clock.now
+    const store = h.store()
+    expect(await store.journalMode()).toBe("wal")
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    try {
+      db.run("PRAGMA busy_timeout = 5000")
+      const total = RETENTION_SWEEP_BATCH + 44
+      db.transaction(() => {
+        for (let index = 1; index <= total; index++) {
+          db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [`k-${index}`, t0, t0, t0 + DAY])
+        }
+      })()
+      h.clock.now = t0 + 2 * DAY
+      // Keyed binds: the receipt check of a keyed call clears only its own key's expired receipt.
+      await bindSomething(store, h.clock.now, "first", true)
+      expect(ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith("k-"))).toHaveLength(total - RETENTION_SWEEP_BATCH)
+      await bindSomething(store, h.clock.now, "second", true)
+      expect(ids(db, "receipts", "idempotency_key")).toEqual(["bind-first", "bind-second"])
     } finally {
       db.close()
     }

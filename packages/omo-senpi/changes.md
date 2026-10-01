@@ -40,6 +40,11 @@
   replays that outcome and completes the receipt even when this process began the receipt. When both receipt writes
   of the first call failed (for example at the lock-wait bound), the receipt stayed `prepared` under this store, and
   every retry answered `idempotency_in_progress` until the receipt expired; an undecided row is still in progress.
+- `gateway/store-retention.ts`: expired receipts are deleted a batch (`RETENTION_SWEEP_BATCH`) at a time like every
+  other table, and a full batch makes the next sweep due at once. The sweep, and the receipt check of every keyed
+  call (`enqueue`, a relay mutation, `toolReceiptBegin`), used to delete every expired receipt in one statement, so a
+  store reopened after a long idle cleared its whole backlog inside one write transaction; a receipt check now clears
+  only the expired receipt under its own key.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

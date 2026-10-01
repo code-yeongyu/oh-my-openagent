@@ -13,6 +13,7 @@ import { OPEN_STATES, type StoreContext, write } from "./store-ops"
 const nextSweepDue = new WeakMap<StoreContext, number>()
 
 export type RetentionSweep = {
+  readonly receipts: number
   readonly deliveries: number
   readonly causal_edges: number
   readonly causal_roots: number
@@ -20,6 +21,11 @@ export type RetentionSweep = {
   readonly bindings: number
   readonly outbox_cursors: number
   readonly session_meta: number
+}
+
+/** Clears the expired receipt under one key, so a call can reuse a key whose receipt outlived its retention. */
+export function deleteExpiredReceipt(ctx: StoreContext, key: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }, now: number): void {
+  write(ctx, "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND expires_at <= ?", [key.principal, key.operation, key.idempotency_key, now])
 }
 
 /** Runs one bounded sweep when one is due; call it inside an open write transaction. */
@@ -33,7 +39,8 @@ export function sweepRetentionIfDue(ctx: StoreContext, now: number): RetentionSw
 
 export function sweepRetention(ctx: StoreContext, now: number): RetentionSweep {
   const batch = RETENTION_SWEEP_BATCH
-  write(ctx, "DELETE FROM receipts WHERE expires_at <= ?", [now])
+  // A receipt check clears only an expired receipt under its own key; the backlog goes here, a batch at a time.
+  const receipts = write(ctx, "DELETE FROM receipts WHERE rowid IN (SELECT rowid FROM receipts WHERE expires_at <= ? LIMIT ?)", [now, batch])
   // A terminal delivery a live receipt points at stays: the receipt's replay reads it.
   const deliveries = write(
     ctx,
@@ -83,5 +90,5 @@ export function sweepRetention(ctx: StoreContext, now: number): RetentionSweep {
       AND NOT EXISTS (SELECT 1 FROM completion_arms a WHERE a.session_durable_id = m.durable_id) LIMIT ?)`,
     [batch],
   )
-  return { deliveries, causal_edges: causalEdges, causal_roots: causalRoots, rate_buckets: rateBuckets, bindings, outbox_cursors: outboxCursors, session_meta: sessionMeta }
+  return { receipts, deliveries, causal_edges: causalEdges, causal_roots: causalRoots, rate_buckets: rateBuckets, bindings, outbox_cursors: outboxCursors, session_meta: sessionMeta }
 }
