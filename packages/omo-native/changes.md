@@ -1,7 +1,7 @@
-## 2026-10-01 - `omo update` on npm 11+ explains the allowScripts notice and never runs the skipped scripts (#9281)
+## 2026-10-01 - `omo update` on npm 11+ explains the allowScripts notice and never passes `--allow-scripts` (#9281)
 
-npm 11 ends a global install with a notice that esbuild, @google/genai and protobufjs have install scripts not covered by
-`allowScripts`, and its suggested command fails because it has no package name. Those scripts are safe to skip, so the
+npm 11+ ends a global install with a notice that esbuild, @google/genai and protobufjs have install scripts not covered by
+`allowScripts` (npm 12 blocks them, npm 11 runs them), and its suggested command fails because it has no package name. Those scripts are safe to skip, so the
 update argv stays `npm i -g <spec>` on every npm version and never passes `--allow-scripts`. `runChild` gained an optional
 `onOutput` observer (output still passes through unchanged); an npm update that showed the notice now prints that skipping
 the three scripts is safe and the working reinstall command with the package spec. The bun path is untouched.

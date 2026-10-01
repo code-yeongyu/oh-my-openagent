@@ -255,7 +255,7 @@ exit 0
         expect(errors).toEqual([])
         expect(argv).toEqual(["i -g omo-ai@5.1.6"])
         expect(marker).toBe(false)
-        const guidance = lines.filter((line) => line.startsWith("omo: npm skipped") || line.startsWith("omo: if npm suggested"))
+        const guidance = lines.filter((line) => line.startsWith("omo: npm flagged") || line.startsWith("omo: if npm suggested"))
         expect(guidance[0]).toContain("esbuild, @google/genai, protobufjs")
         expect(guidance[0]).toContain("skipping them is safe, omo runs without them")
         expect(lines.join("\n")).not.toContain("--allow-scripts")
