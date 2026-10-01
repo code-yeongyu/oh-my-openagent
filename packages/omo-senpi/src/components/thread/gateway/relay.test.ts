@@ -239,6 +239,25 @@ describe("relay_direction_question_authority_and_completion", () => {
     ok(await relay.ack({ binding_id: x, cursor: cursors[2] }))
     expect(ok(await relay.outbox({ binding_id: x })).rows).toEqual([])
   })
+
+  test("#given two bindings whose outbox rows interleave #when the connector acks one binding with a cursor the other owns #then it is cursor_invalid and neither binding loses a pending row; its own cursor still acks", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B", { chat_id: "chat-x" }))
+    const y = await bindAs(relay, binding("B", { chat_id: "chat-y" }))
+    const report = async (bindingId: string, text: string) => ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: bindingId, event: "report", text })).cursor as number
+    const x1 = await report(x, "x1")
+    const y1 = await report(y, "y1")
+    await report(x, "x2")
+
+    expect(code(await relay.ack({ binding_id: x, cursor: y1 }))).toBe("cursor_invalid")
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["x1", "x2"])
+    expect(ok(await relay.outbox({ binding_id: y })).rows.map((row) => row.text)).toEqual(["y1"])
+
+    expect(ok(await relay.ack({ binding_id: x, cursor: x1 }))).toMatchObject({ changed: true, acked_cursor: x1 })
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["x2"])
+  })
 })
 
 describe("answer_when_the_session_cannot_be_located", () => {

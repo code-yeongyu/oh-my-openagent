@@ -39,6 +39,9 @@
   one admitted. While thread B's message waited behind A's run, a `thread_send` from A's run continued B's causal
   chain, charging B's hop, cycle and budget guards; it now continues A's, and a send after the engine drains B's
   follow-up continues B's. The registrant's `onAdmitted` hook, which only fed the cause, is gone.
+- `store-relay-ops.ts` `ackOutbox`: a newer cursor must name one of the binding's own outbox rows. Cursors are global
+  across bindings, and the check used to compare only with the binding's newest cursor, so acking binding A with
+  binding B's cursor marked A's unread rows below it acked. Such a cursor is now `cursor_invalid` and acks nothing.
 
 ## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
 

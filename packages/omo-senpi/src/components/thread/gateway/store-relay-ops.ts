@@ -578,7 +578,10 @@ export async function readOutbox(
 }
 
 /**
- * Marks every row up to `cursor` consumed. Idempotent: an older or equal cursor changes nothing. A
+ * Marks every row up to `cursor` consumed. Idempotent: an older or equal cursor changes nothing.
+ * Cursors are global across bindings, so a newer cursor must name one of this binding's own rows: a
+ * cursor another binding owns is `cursor_invalid` and acks nothing, because it would otherwise ack
+ * this binding's rows below it that the connector never read for it. A
  * `provider_message_id` names the message the connector posted for the row at `cursor`; the first
  * one reported for a milestone becomes the binding's progress message, which later milestones edit.
  */
@@ -592,8 +595,10 @@ export async function ackOutbox(
     if (binding === undefined) return refused("not_found", "No binding has this id.", { binding_id: request.binding_id })
     const acked = ackedCursor(ctx, binding.binding_id)
     if (request.cursor <= acked) return { kind: "ok", binding_id: binding.binding_id, acked_cursor: acked, changed: false }
-    const newest = Number(ctx.sql.one(["m"], "SELECT COALESCE(MAX(cursor), 0) AS m FROM outbox WHERE binding_id = ?", [binding.binding_id])?.m ?? 0)
-    if (request.cursor > newest) return refused("cursor_invalid", "The cursor is past the newest outbox row of this binding.", { newest })
+    if (ctx.sql.one(["cursor"], "SELECT cursor FROM outbox WHERE binding_id = ? AND cursor = ?", [binding.binding_id, request.cursor]) === undefined) {
+      const newest = Number(ctx.sql.one(["m"], "SELECT COALESCE(MAX(cursor), 0) AS m FROM outbox WHERE binding_id = ?", [binding.binding_id])?.m ?? 0)
+      return refused("cursor_invalid", request.cursor > newest ? "The cursor is past the newest outbox row of this binding." : "The cursor names no outbox row of this binding.", { newest })
+    }
     write(ctx, "UPDATE outbox SET state = 'acked', acked_at = ? WHERE binding_id = ? AND cursor <= ? AND state = 'pending'", [request.now, binding.binding_id, request.cursor])
     write(ctx, "INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES (?, ?, ?) ON CONFLICT(binding_id) DO UPDATE SET acked_cursor = excluded.acked_cursor, updated_at = excluded.updated_at", [
       binding.binding_id, request.cursor, request.now,
