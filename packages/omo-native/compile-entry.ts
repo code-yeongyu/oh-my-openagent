@@ -274,12 +274,6 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
       if (typeof outcome.cwd === "string" && existsSync(outcome.cwd)) process.chdir(outcome.cwd)
       return false
     }
-    if (typeof outcome === "object") {
-      // A reachable daemon: continue as a normal launch pointed at the shared socket.
-      process.argv.splice(2, process.argv.length - 2, ...outcome.args)
-      Object.assign(process.env, outcome.env)
-      return false
-    }
     process.exitCode = outcome
     return true
   }
