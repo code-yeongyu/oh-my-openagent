@@ -242,7 +242,9 @@ binding; a session with none or several must name `--binding` (`invalid_argument
 - `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
   row appears when the session settles.
 
-`outbox <binding-id>` reads rows in cursor order. Without `--after` it continues after the
+`outbox <binding-id>` reads rows in cursor order. Cursors are numbered across all bindings of the
+store, so one binding's cursors increase but skip numbers; a gap is another binding's row, never a
+lost one. Without `--after` it continues after the
 acknowledged cursor; `--after <cursor>` re-reads from an older one. `ack` is idempotent: an older
 or equal cursor changes nothing (`changed: false`), and a cursor past the newest row is
 `cursor_invalid`. Acked rows are kept 30 days after their ack; unacked rows live as long as their
