@@ -66,6 +66,9 @@
 - `schema.ts` v2: the outbox `question_state` CHECK admits `pending|answered|expired|cancelled`. `expired` and
   `cancelled` are reserved for question closure (a follow-up writes them from the session's terminal question
   outcome); nothing writes them here. Widened now because a CHECK change after release needs a table rebuild.
+- `store-ops.ts` `requeueReleased` (with its `store.ts` method and worker op) is deleted: nothing called it. A released
+  session's dropped deliveries come back through the `session_released` transcript check in `reconcile` on the next
+  owner's side; a second path from `omo daemon adopt` would act from another process without that check.
 - Docs (`docs/reference/omo-thread.md`, `thread/AGENTS.md`): `omo thread` creates and resumes no session (a connector
   opens one through the host API and binds it); a completion row carries the armed text, not the model's reply; the
   per-author rate bucket trusts the connector's author id and stays bounded by the target backlog.

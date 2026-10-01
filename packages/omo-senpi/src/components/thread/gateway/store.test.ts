@@ -4,11 +4,9 @@ import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "nod
 import { join } from "node:path"
 import type { Worker } from "node:worker_threads"
 
-import { createInboxDrain } from "./drain"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
 import { GATEWAY_MIGRATIONS } from "./schema"
 import type { GatewayStoreEvent } from "./types"
-import { FakeSessionRuntime } from "./testing/fake-runtime"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
 let harness: GatewayHarness | undefined
@@ -166,28 +164,5 @@ describe("legacy mailbox migration", () => {
     } finally {
       meta.close()
     }
-  })
-})
-
-describe("release_session requeue", () => {
-  test("#given a host dropped an admitted delivery when it released the session #when it is requeued #then the next owner applies it exactly once", async () => {
-    const h = (harness = createGatewayHarness())
-    h.session("A")
-    const b = h.session("B")
-    b.runtime.beginUserTurn()
-    const result = await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "move me" })
-    if (result.kind !== "ok") throw new Error(JSON.stringify(result))
-    const id = result.delivery_id
-    expect((await b.store.deliveryView(id))?.row.state).toBe("admitted")
-    expect(b.runtime.dropQueues()).toEqual([id])
-    expect(await b.store.requeueReleased({ now: h.clock.now, target_durable_id: "B", delivery_ids: [id] })).toEqual([id])
-    expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "B"), id))).toBe(true)
-    const runtime = new FakeSessionRuntime(b.runtime.sessionPath, "B", h.agentDir, { reopen: true })
-    const drain = createInboxDrain({ store: h.store(), runtime, durableId: "B", sessionPath: () => runtime.sessionPath })
-    const emitted = new Promise<string>((resolve) => runtime.onEmitted(resolve))
-    expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "started" }])
-    expect(await emitted).toBe(id)
-    await drain.drain({ reason: "emitted" })
-    expect({ state: (await b.store.deliveryView(id))?.row.state, entries: runtime.transcriptEntries(id) }).toEqual({ state: "applied", entries: 1 })
   })
 })

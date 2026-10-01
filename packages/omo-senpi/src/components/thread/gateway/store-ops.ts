@@ -702,25 +702,6 @@ export async function refuseQueued(ctx: StoreContext, request: { readonly now: n
   })
 }
 
-/**
- * `release_session` hands a session to another runtime and reports the admitted deliveries it
- * dropped unwritten. The releasing host stays alive, so the dead-claimant rule would never free
- * them; they go back to `queued` here and their markers are recreated for the next owner.
- */
-export async function requeueReleased(ctx: StoreContext, request: { readonly now: number; readonly target_durable_id: string; readonly delivery_ids: readonly string[] }): Promise<string[]> {
-  return await transaction(ctx, "requeue_released", () => {
-    const requeued: string[] = []
-    for (const id of request.delivery_ids) {
-      const row = selectRow(ctx, id)
-      if (row === undefined || row.target_durable_id !== request.target_durable_id || (row.state !== "admitting" && row.state !== "admitted")) continue
-      transition(ctx, row, "queued", request.now)
-      createMarker(ctx, row.target_durable_id, row.delivery_id, true)
-      requeued.push(id)
-    }
-    return requeued
-  })
-}
-
 export async function completeReceipt(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly result: unknown }): Promise<boolean> {
   return await transaction(ctx, "complete_receipt", () => write(
     ctx,

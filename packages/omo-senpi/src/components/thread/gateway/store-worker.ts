@@ -90,7 +90,6 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "claim": return await ops.claim(ctx, args as Parameters<typeof ops.claim>[1])
     case "record_outcome": return await ops.recordOutcome(ctx, args as Parameters<typeof ops.recordOutcome>[1])
     case "refuse_queued": return await ops.refuseQueued(ctx, args as Parameters<typeof ops.refuseQueued>[1])
-    case "requeue_released": return await ops.requeueReleased(ctx, args as Parameters<typeof ops.requeueReleased>[1])
     case "complete_receipt": return await ops.completeReceipt(ctx, args as Parameters<typeof ops.completeReceipt>[1])
     case "abandon_receipt": return await ops.abandonReceipt(ctx, args as Parameters<typeof ops.abandonReceipt>[1])
     case "delivery_view": return ops.deliveryView(ctx, args as string)

@@ -81,7 +81,6 @@ export type GatewayStore = {
   readonly claim: (request: ClaimRequest) => Promise<ClaimOutcome>
   readonly recordOutcome: (request: RecordOutcomeRequest) => Promise<ClaimOutcome>
   readonly refuseQueued: (request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason }) => Promise<boolean>
-  readonly requeueReleased: (request: { readonly now: number; readonly target_durable_id: string; readonly delivery_ids: readonly string[] }) => Promise<readonly string[]>
   readonly completeReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly result: unknown }) => Promise<boolean>
   readonly abandonReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly error_note: string }) => Promise<boolean>
   readonly deliveryView: (deliveryId: string) => Promise<DeliveryView | null>
@@ -227,7 +226,6 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),
     refuseQueued: (request) => call("refuse_queued", request),
-    requeueReleased: (request) => call("requeue_released", request),
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
