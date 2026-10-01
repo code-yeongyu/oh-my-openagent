@@ -235,7 +235,7 @@ export const ThreadBindingsParams = Type.Object({
 
 export const ThreadReportParams = Type.Object({
   binding_id: Type.Optional(
-    Type.String({ minLength: 1, description: "Binding to report to; defaults to the originating binding, the one the newest external message of this session arrived through." }),
+    Type.String({ minLength: 1, description: "Binding to report to; defaults to the originating binding, the one the message this session is answering now arrived through; refused when that is ambiguous." }),
   ),
   kind: Type.Union([Type.Literal("milestone"), Type.Literal("report"), Type.Literal("question"), Type.Literal("completion")], {
     description:

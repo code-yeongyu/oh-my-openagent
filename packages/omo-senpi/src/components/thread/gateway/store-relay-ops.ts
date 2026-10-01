@@ -394,10 +394,10 @@ export type ReportOpRequest = {
   readonly now: number
   readonly receipt: ReceiptKey | null
   readonly session_durable_id: string
-  /** null: the binding of `origin_delivery_id`, else the session's only active outbound binding (`reportBindingDefault`). */
+  /** null: the binding of `origin_delivery_ids`, else the session's only active outbound binding (`reportBindingDefault`). */
   readonly binding_id: string | null
-  /** The delivery whose admission started the reporter's current run, when the reporter knows it (the `thread_report` tool does; the CLI does not). */
-  readonly origin_delivery_id: string | null
+  /** The deliveries the reporter's current answer is for, when the reporter knows them (the `thread_report` tool does; the CLI does not): empty when none. */
+  readonly origin_delivery_ids: readonly string[]
   readonly event: OutboundEvent
   readonly text: string
   readonly ui_request_id: string | null
@@ -416,24 +416,28 @@ export type ReportOpResult = {
 }
 
 /**
- * The binding a report without `binding_id` goes to: the binding of the message that started the
- * reporter's current run, so a message from another thread that arrived mid-run never takes it over.
- * Without such a message, the session's one active outbound binding; with several, the caller must
- * name one. Never a guess between bindings.
+ * The binding a report without `binding_id` goes to: the binding of the messages the reporter's
+ * current answer is for, so a message from another thread queued behind the run never takes it over,
+ * and a queued follow-up the session answers next is answered in its own thread. Messages from two
+ * bound threads in one answer refuse. Without a bound message, the session's one active outbound
+ * binding; with several, the caller must name one. Never a guess between bindings.
  */
-function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, originDeliveryId: string | null): { readonly binding_id: string } | StoreRefusal {
-  if (originDeliveryId !== null) {
-    const origin = ctx.sql.one(["binding_id"], "SELECT binding_id FROM deliveries WHERE delivery_id = ? AND target_durable_id = ?", [originDeliveryId, sessionDurableId])
-    const bindingId = nullableString(origin?.binding_id)
-    if (bindingId !== null) return { binding_id: bindingId }
-  }
+function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, originDeliveryIds: readonly string[]): { readonly binding_id: string } | StoreRefusal {
+  const origins = [...new Set(originDeliveryIds.flatMap((deliveryId) => {
+    const row = ctx.sql.one(["binding_id"], "SELECT binding_id FROM deliveries WHERE delivery_id = ? AND target_durable_id = ?", [deliveryId, sessionDurableId])
+    const bindingId = nullableString(row?.binding_id)
+    return bindingId === null ? [] : [bindingId]
+  }))].sort()
+  const [origin, ...otherOrigins] = origins
+  if (origin !== undefined && otherOrigins.length === 0) return { binding_id: origin }
+  if (origin !== undefined) return refused("invalid_arguments", `This session's current run answers messages from ${origins.length} bound threads; name binding_id.`, { binding_ids: origins })
   const outbound = ctx.sql
     .all(["binding_id"], "SELECT binding_id FROM bindings WHERE session_durable_id = ? AND status = 'active' AND direction_outbound = 1", [sessionDurableId], "binding_id")
     .map((row) => String(row.binding_id))
   const [only, ...others] = outbound
   if (only !== undefined && others.length === 0) return { binding_id: only }
-  if (only === undefined) return refused("invalid_arguments", "This session has no active outbound binding and its current run did not start from a bound message; name binding_id.")
-  return refused("invalid_arguments", `This session has ${outbound.length} active outbound bindings and its current run did not start from a bound message; name binding_id.`, { binding_ids: outbound })
+  if (only === undefined) return refused("invalid_arguments", "This session has no active outbound binding and its current run answers no bound message; name binding_id.")
+  return refused("invalid_arguments", `This session has ${outbound.length} active outbound bindings and its current run answers no bound message; name binding_id.`, { binding_ids: outbound })
 }
 
 function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly ui_request_kind?: UiRequestKind; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome }): number {
@@ -458,7 +462,7 @@ function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord;
  */
 export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): Promise<RelayOutcome<ReportOpResult>> {
   return await relayMutation(ctx, "report", request.now, request.receipt, () => {
-    const resolved = request.binding_id === null ? reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_id) : { binding_id: request.binding_id }
+    const resolved = request.binding_id === null ? reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_ids) : { binding_id: request.binding_id }
     if ("kind" in resolved) return resolved
     const bindingId = resolved.binding_id
     const binding = selectBinding(ctx, bindingId)

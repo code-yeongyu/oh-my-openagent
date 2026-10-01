@@ -50,13 +50,18 @@
   delivery, their `outbox_cursors`, and `session_meta` rows nothing references. At most 256 rows per table per sweep,
   hourly unless the last sweep hit the bound; it runs at the end of an enqueue, a relay mutation or an outbox read, so
   opening a current store still takes no write lock. Retention periods: `docs/reference/omo-thread.md` "Retention".
-- `thread_report` without `binding_id`: the default is the binding of the message whose admission STARTED the
-  session's current run (`component.ts` `run.origin`, set by a `started` admission and cleared at `agent_settled`; the
-  drain's `onAdmitted` now reports the admission kind), carried into the report as `origin_delivery_id`. It used to be
-  the binding of the newest admitted delivery, so a message from thread B queued mid-run took thread A's report or
-  completion. Without an origin (a prompt the user typed, `omo thread report`) the session's only active outbound
-  binding is used, and several are `invalid_arguments` naming their `binding_ids`. `report-origin.test.ts` drives two
-  threads through the SDK and the real `thread_report` tool.
+- `thread_report` without `binding_id`: the default is the binding of the messages the session's CURRENT answer is
+  for (`component.ts` `RunContext.consumed`: the deliveries whose `session_control_delivery` message entered the
+  model's context since its last final answer, read from the engine's `message_start`; cleared at `agent_settled`),
+  carried into the report as `origin_delivery_ids`. It used to be the binding of the newest admitted delivery, so a
+  message from thread B queued mid-run took thread A's report or completion; and a run origin fixed at admission
+  would have sent B's own answer to A, because senpi drains a queued follow-up after the final answer and before
+  `agent_settled`. That drain, or a prompt typed in the terminal after the answer, starts a new group. Messages from
+  two bound threads in one answer (a steer at a tool boundary, or `followUpMode: "all"`) are `invalid_arguments`
+  naming both `binding_ids`. Without a bound message (a prompt the user typed, `omo thread report`) the session's only
+  active outbound binding is used, and several are `invalid_arguments` naming their `binding_ids`.
+  `report-origin.test.ts` drives two threads through the SDK and the real `thread_report` tool, with the engine's
+  event order (`agent_end`, then the follow-up's `agent_start` and `message_start`, no `agent_settled` between).
 - `sdk.ts` `bind`/`rebind`/`report`/`bindings --session` and the relay tools that name another session resolve it
   through `tools/internals.ts` `resolveStoredSession` (the offline host view plus `sendAddressBook`), as a send
   does: with nothing running they no longer fail `host_unavailable` (exit 3, or 5 on a stale socket), and a session

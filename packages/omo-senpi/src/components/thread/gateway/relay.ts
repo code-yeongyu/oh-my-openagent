@@ -25,7 +25,7 @@ export type GatewayRelay = {
   readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly already_closed: boolean; readonly in_flight: readonly string[]; readonly deduplicated: boolean }>>
   readonly rebind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session_durable_id: string }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly closed: readonly string[]; readonly deduplicated: boolean }>>
   readonly bindings: (request: { readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number }) => Promise<RelayResult<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
-  readonly report: (request: Keyed & { readonly session_durable_id: string; readonly binding_id?: string; readonly origin_delivery_id?: string; readonly event: OutboundEvent; readonly text: string; readonly request_id?: string; readonly request_kind?: UiRequestKind }) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
+  readonly report: (request: Keyed & { readonly session_durable_id: string; readonly binding_id?: string; readonly origin_delivery_ids?: readonly string[]; readonly event: OutboundEvent; readonly text: string; readonly request_id?: string; readonly request_kind?: UiRequestKind }) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayResult<OutboxPage>>
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayResult<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   /**
@@ -151,7 +151,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     report: async (request) => {
       const tooLarge = textTooLarge(request.text)
       if (tooLarge !== undefined) return tooLarge
-      const args = { session_durable_id: request.session_durable_id, binding_id: request.binding_id ?? null, origin_delivery_id: request.origin_delivery_id ?? null, event: request.event, text: request.text, ui_request_id: request.request_id ?? null, ui_request_kind: request.request_kind ?? null }
+      const args = { session_durable_id: request.session_durable_id, binding_id: request.binding_id ?? null, origin_delivery_ids: request.origin_delivery_ids ?? [], event: request.event, text: request.text, ui_request_id: request.request_id ?? null, ui_request_kind: request.request_kind ?? null }
       return fromStore(await store.report({ now: now(), receipt: receipt(request, "thread_report", args), ...args })) as RelayResult<ReportOpResult & { deduplicated: boolean }>
     },
     outbox: async (request) => fromStore(await store.readOutbox({ now: now(), ...request })),

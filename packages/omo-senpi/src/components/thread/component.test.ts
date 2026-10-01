@@ -85,10 +85,10 @@ async function holdWriteLock(databasePath: string) {
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, startup-arm and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm and shutdown hooks exist", () => {
     const f = eventApi()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state", agentDir: () => "/tmp/thread-test-agent" }).register(f.pi as never, context([]) as never)
-    expect([...f.handlers.keys()].sort()).toEqual(["agent_end", "agent_settled", "agent_start", "session_shutdown", "session_start"])
+    expect([...f.handlers.keys()].sort()).toEqual(["agent_end", "agent_settled", "agent_start", "message_end", "message_start", "session_shutdown", "session_start"])
   })
 
   test("#given a completion armed through thread_report #when agent_end fires and then the session settles #then exactly one completion row appears, only after the settle", async () => {
@@ -213,7 +213,7 @@ describe("thread component startup and shutdown touch no store they do not need"
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
       const bound = await real.bind({ now: Date.now(), receipt: null, binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", root_message_id: null, progress_message_id: null, session_durable_id: "dur-1", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["question"], policy_id: "default", ttl_seconds: null } })
       if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-      const asked = await real.report({ now: Date.now(), receipt: null, origin_delivery_id: null, session_durable_id: "dur-1", binding_id: bound.binding.binding_id, event: "question", text: "deploy?", ui_request_id: "ui-1", ui_request_kind: null })
+      const asked = await real.report({ now: Date.now(), receipt: null, origin_delivery_ids: [], session_durable_id: "dur-1", binding_id: bound.binding.binding_id, event: "question", text: "deploy?", ui_request_id: "ui-1", ui_request_kind: null })
       if (asked.kind !== "ok" || asked.reply_token === null) throw new Error(JSON.stringify(asked))
       // No host gateway port: the answer is claimed, cannot be handed off, and its release hits the
       // bound. The retry it arms runs on the fake clock, so the test decides when it would be due.

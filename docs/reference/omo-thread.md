@@ -221,8 +221,11 @@ a connector drives the binding.
 is attached to reports through it (`scope_denied` otherwise), only while the binding is active
 (`binding_inactive`) and subscribed to that event (`unsupported`). From the session's own
 `thread_report` tool, a report without a binding goes to the ORIGINATING binding: the one whose
-message started the session's current run. A message from another thread that arrives while the run
-is going (queued behind it) does not change that. Otherwise, and always for `omo thread report`, which
+message the session is answering now. A message from another thread that arrives while the run is
+going waits behind it and does not change that; once the session takes that queued message up (after
+its answer to the first, even before the session goes idle), reports answer the new message's thread.
+When one answer covers messages from two bound threads (a steer, or several queued messages taken up
+together), a report without a binding is refused and names both. Otherwise, and always for `omo thread report`, which
 runs outside the session, a report without `--binding` goes to the session's only active outbound
 binding; a session with none or several must name `--binding` (`invalid_arguments`, with the
 `binding_ids` to choose from). Nothing is ever copied to the session's other bindings.

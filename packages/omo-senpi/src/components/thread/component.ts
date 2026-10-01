@@ -4,6 +4,7 @@ import { join } from "node:path"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
+import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -42,10 +43,42 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
 
 /**
  * `cause`: the newest delivery the session took (a send from this run continues its causal root).
- * `origin`: the delivery whose admission STARTED the current run; a message queued or steered into the
- * run does not move it, so a report without `binding_id` goes back to the thread that asked.
+ * `consumed`: the deliveries the model has taken into its context since its last final answer (an
+ * assistant message without a tool call), read from the engine's own `message_start` of each
+ * delivery's custom message. senpi drains a queued follow-up after that answer and before
+ * `agent_settled`, so the follow-up starts a new group: a report without `binding_id` goes to the
+ * binding of the message the current answer is for, never to the thread the session started on.
+ * Any other input after a final answer (a prompt typed in the terminal) also starts a new group.
  */
-type RunContext = { turn: number; cause: string | undefined; origin: string | undefined }
+type RunContext = { turn: number; cause: string | undefined; consumed: string[]; answered: boolean }
+
+type EngineMessage = { readonly role?: unknown; readonly customType?: unknown; readonly details?: unknown; readonly content?: unknown }
+
+function messageOf(event: unknown): EngineMessage | undefined {
+  const message = (event as { readonly message?: unknown } | undefined)?.message
+  return typeof message === "object" && message !== null ? (message as EngineMessage) : undefined
+}
+
+/** senpi `external-admission.js` `deliveryIdOf`: the delivery a `session_control_delivery` message carries. */
+function deliveryIdOf(message: EngineMessage): string | undefined {
+  if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
+  const id = (message.details as { readonly delivery_id?: unknown } | null | undefined)?.delivery_id
+  return typeof id === "string" ? id : undefined
+}
+
+function callsTools(message: EngineMessage): boolean {
+  return Array.isArray(message.content) && message.content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
+}
+
+function noteInput(run: RunContext, message: EngineMessage): void {
+  if (message.role !== "user" && message.role !== "custom") return
+  if (run.answered) {
+    run.consumed = []
+    run.answered = false
+  }
+  const deliveryId = deliveryIdOf(message)
+  if (deliveryId !== undefined && !run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
+}
 
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
@@ -69,9 +102,8 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     control,
     agentDir,
     store,
-    onAdmitted: (_durableId, deliveryId, kind) => {
+    onAdmitted: (_durableId, deliveryId) => {
       run.cause = deliveryId
-      if (kind === "started") run.origin = deliveryId
     },
     onCommandWake,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
@@ -111,7 +143,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         if (event.kind === "legacy_mailbox_invalid") ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (retried at the next start): ${event.error}`)
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
-      const run: RunContext = { turn: 0, cause: undefined, origin: undefined }
+      const run: RunContext = { turn: 0, cause: undefined, consumed: [], answered: true }
       const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
@@ -130,7 +162,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerCause: () => run.cause,
-        callerRunOrigin: () => run.origin,
+        callerRunDeliveries: () => [...run.consumed],
         onCompletionArmed: (durableId) => completions.arm(durableId),
       })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
@@ -165,6 +197,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       pi.on("agent_start", () => {
         run.turn++
       })
+      pi.on("message_start", (event) => {
+        const message = messageOf(event)
+        if (message !== undefined) noteInput(run, message)
+      })
+      pi.on("message_end", (event) => {
+        const message = messageOf(event)
+        if (message?.role === "assistant") run.answered = !callsTools(message)
+      })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) completions.agentEnd(durableId, event as AgentEndFacts)
@@ -172,7 +212,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       pi.on("agent_settled", async (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
-        run.origin = undefined
+        run.consumed = []
+        run.answered = true
         if (durableId === undefined) return
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)

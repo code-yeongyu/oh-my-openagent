@@ -110,7 +110,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     const started = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "start the job" }))
     await h.quiesce()
     expect(code(await relay.report({ principal: "session:B", session_durable_id: "B", event: "milestone", text: "whose run?" }))).toBe("invalid_arguments")
-    const reported = ok(await relay.report({ principal: "session:B", session_durable_id: "B", origin_delivery_id: started.delivery_id, event: "milestone", text: "step 1" }))
+    const reported = ok(await relay.report({ principal: "session:B", session_durable_id: "B", origin_delivery_ids: [started.delivery_id], event: "milestone", text: "step 1" }))
     expect({ binding: reported.binding_id, revision: reported.revision }).toEqual({ binding: x, revision: 1 })
     expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => row.text)).toEqual(["step 1"])
     expect(ok(await relay.outbox({ binding_id: y })).rows).toEqual([])
