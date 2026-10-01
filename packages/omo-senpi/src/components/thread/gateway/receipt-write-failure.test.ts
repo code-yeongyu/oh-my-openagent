@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { DatabaseSync } from "node:sqlite"
+import { Database } from "bun:sqlite"
 
 import { createGatewayEngine, resolveFromEntries, type GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
@@ -63,7 +63,8 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
     const b = h.session("B")
     const sender = h.store({ _test: { busyTimeoutMs: 50, lockWaitMaxMs: 300 } })
     await sender.identity()
-    const holder = new DatabaseSync(gatewayDatabasePath(h.agentDir), { timeout: 0 })
+    const holder = new Database(gatewayDatabasePath(h.agentDir))
+    holder.exec("PRAGMA busy_timeout = 0")
     let holding = false
     const engine = createGatewayEngine({
       store: sender,
