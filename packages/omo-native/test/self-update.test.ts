@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
@@ -60,6 +63,7 @@ describe("updateTarget", () => {
         argv: ["npm", "i", "-g", SPEC],
       })
     })
+
   })
 })
 
@@ -194,6 +198,85 @@ describe("omo self-update", () => {
         expect(code).toBe(1)
         expect(errors).toEqual([`omo: update failed; retry with: npm i -g ${SPEC}`])
       })
+    })
+  })
+
+  describe("#given a fake npm on PATH that records its argv", () => {
+    // The fake behaves like npm 11+: whenever an allow flag would let one of the three install scripts
+    // run it writes a marker, and it ends with npm's allowScripts notice unless that flag was given.
+    const FAKE_NPM = `#!/bin/sh
+echo "$@" >> "$FAKE_NPM_DIR/argv"
+case "$*" in
+  *--allow-scripts*) echo ran > "$FAKE_NPM_DIR/marker" ;;
+  *) if [ "$FAKE_NPM_NOTICE" = 1 ]; then
+       echo "npm warn install-scripts 3 packages had install scripts blocked because they are not covered by allowScripts:" >&2
+       echo "npm warn install-scripts Run npm install -g --allow-scripts=esbuild,@google/genai,protobufjs to allow these scripts once" >&2
+     fi ;;
+esac
+exit 0
+`
+
+    async function updateWithFakeNpm(notice: boolean, spec = SPEC) {
+      const dir = mkdtempSync(join(tmpdir(), "omo-fake-npm-"))
+      const npmPath = join(dir, "npm")
+      writeFileSync(npmPath, FAKE_NPM)
+      chmodSync(npmPath, 0o755)
+      const lines: string[] = []
+      const errors: string[] = []
+      const code = await runSelfUpdate(["update"], {
+        resolveUpdate: () => ({ manager: "npm", command: `npm i -g ${spec}`, argv: ["npm", "i", "-g", spec] }),
+        ...offline,
+        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_NPM_DIR: dir, FAKE_NPM_NOTICE: notice ? "1" : "0" },
+        readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
+        log: (line) => lines.push(line),
+        error: (line) => errors.push(line),
+      })
+      const argv = readFileSync(join(dir, "argv"), "utf8").trim().split("\n")
+      const marker = existsSync(join(dir, "marker"))
+      rmSync(dir, { recursive: true, force: true })
+      return { code, lines, errors, argv, marker }
+    }
+
+    // npm 11 only notices; npm 12 is the same notice here since strict blocking changes nothing omo does.
+    for (const npm of ["11", "12"]) {
+      test(`#then an npm ${npm} update never passes --allow-scripts, runs no install script, and prints a working retry command`, async () => {
+        const { code, lines, errors, argv, marker } = await updateWithFakeNpm(true, "omo-ai@5.1.6")
+        expect(code).toBe(0)
+        expect(errors).toEqual([])
+        expect(argv).toEqual(["i -g omo-ai@5.1.6"])
+        expect(marker).toBe(false)
+        const guidance = lines.filter((line) => line.startsWith("omo: npm skipped") || line.startsWith("omo: to run them anyway"))
+        expect(guidance[0]).toContain("esbuild, @google/genai, protobufjs")
+        expect(guidance[0]).toContain("skipping them is safe, omo runs without them")
+        const printed = guidance[1].slice("omo: to run them anyway: ".length)
+        expect(printed.split(" ").slice(0, 3)).toEqual(["npm", "i", "-g"])
+        expect(printed.split(" ")[3]).toBe("omo-ai@5.1.6")
+      })
+    }
+
+    test("#then an npm without the notice prints no guidance and passes the plain argv", async () => {
+      const { code, lines, argv, marker } = await updateWithFakeNpm(false)
+      expect(code).toBe(0)
+      expect(argv).toEqual([`i -g ${SPEC}`])
+      expect(marker).toBe(false)
+      expect(lines.some((line) => line.includes("skipping them is safe"))).toBe(false)
+    })
+
+    test("#then a bun update does not observe output or print the npm guidance", async () => {
+      const runOptions: Array<Record<string, unknown>> = []
+      const lines: string[] = []
+      await runSelfUpdate(["update"], {
+        resolveUpdate: () => ({ manager: "bun", command: `bun add -g ${SPEC}`, argv: ["bun", "add", "-g", SPEC] }),
+        ...offline,
+        readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
+        run: async (_command, _args, options = {}) => {
+          runOptions.push(options)
+          return { status: 0, signal: null }
+        },
+        log: (line) => lines.push(line),
+      })
+      expect(runOptions[0]).not.toHaveProperty("onOutput")
+      expect(lines.some((line) => line.includes("skipping them is safe"))).toBe(false)
     })
   })
 })

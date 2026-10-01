@@ -10,6 +10,20 @@ export function formatUpdateCommand(update) {
   return `omo is updated via ${update.manager}: ${update.command}`
 }
 
+// npm 11 lists install scripts that no `allowScripts` entry covers. omo's transitive esbuild,
+// @google/genai and protobufjs scripts are safe to skip, so the update never passes `--allow-scripts`
+// itself; it only explains the notice, because npm's own suggested command has no package name (#9281).
+const ALLOW_SCRIPTS_NOTICE = /install scripts blocked|not covered by allowScripts|npm warn install-scripts/i
+const SKIPPABLE_SCRIPTS = ["esbuild", "@google/genai", "protobufjs"]
+
+export function formatAllowScriptsGuidance(update) {
+  const spec = update.argv[update.argv.length - 1]
+  return [
+    `omo: npm skipped install scripts for ${SKIPPABLE_SCRIPTS.join(", ")}; skipping them is safe, omo runs without them`,
+    `omo: to run them anyway: npm i -g ${spec} --allow-scripts=${SKIPPABLE_SCRIPTS.join(",")}`,
+  ]
+}
+
 export function readInstalledVersion() {
   let engine = "unknown"
   try {
@@ -36,7 +50,7 @@ export function formatVersionChange(before, after) {
  *
  * @typedef {{ omo: string, engine: string }} InstalledVersion
  * @typedef {{ status: number | null, signal: string | null }} ChildResult
- * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv }} RunOptions
+ * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, onOutput?: (text: string) => void }} RunOptions
  * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
  *   resolveUpdate?: (targetVersion?: string) => UpdateTarget,
@@ -86,12 +100,17 @@ export async function runSelfUpdate(args, options = {}) {
   log(formatUpdateCommand(update))
 
   const [command, ...argv] = update.argv
+  let npmOutput = ""
   let result
   try {
     result = await run(command, argv, {
       stdio: "inherit",
       windowsHide: true,
       env: { ...env, ...update.env },
+      // Only npm reports the notice, so the bun path keeps inheriting the terminal untouched.
+      ...(update.manager === "npm"
+        ? { onOutput: (text) => { npmOutput += text } }
+        : {}),
     })
   } catch {
     error(`omo: update failed; retry with: ${update.command}`)
@@ -110,5 +129,6 @@ export async function runSelfUpdate(args, options = {}) {
     return 1
   }
   log(formatVersionChange(before, after))
+  if (ALLOW_SCRIPTS_NOTICE.test(npmOutput)) for (const line of formatAllowScriptsGuidance(update)) log(line)
   return 0
 }
