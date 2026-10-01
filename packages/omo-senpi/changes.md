@@ -46,6 +46,10 @@
   failure to record it fails the registration (`{ status: "failed" }`, logged) with no endpoint exposed. The endpoint
   used to go live first, so its first drain could run under the previous runtime's incarnation, and a failed record
   was only logged while the registration still succeeded, which left earlier reply tokens valid after a restart.
+- `gateway/completion.ts`: every settled run's completion is written with that run's outcome. A run that settled while
+  an earlier run's write was outstanding used to be dropped, so only the earlier outcome was recorded; it now waits and
+  is written after it. Each write passes the time its run settled (`emitCompletions` `armed_through`) and consumes only
+  the arms made by then, so a delayed or retried write no longer takes a later run's arm with the earlier outcome.
 
 ## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
 

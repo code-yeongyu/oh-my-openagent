@@ -31,6 +31,8 @@ export type CompletionTracker = {
 export type CompletionTrackerOptions = {
   /** Delay before a write that failed at the store's lock-wait bound is retried (the store's busy timeout). */
   readonly retryAfterMs: () => number
+  /** The store's clock, read when a run settles; arms made after it belong to a later run. Defaults to `Date.now`. */
+  readonly now?: () => number
   /** A write failed; `retrying` tells whether it is retried in the background. */
   readonly onWriteFailed?: (error: unknown, retrying: boolean) => void
 }
@@ -45,23 +47,43 @@ export type CompletionTrackerOptions = {
  * The durable `completion_arms` row is the source of truth, and the in-process arm stays until
  * the row's completion is written. A write that fails at the store's lock-wait bound is retried
  * in the background after the busy timeout, with the outcome of the run that settled, until it
- * lands; a settle while that write is outstanding starts no second write.
+ * lands. Each settled run is written with its own outcome, one write at a time per session: a run
+ * that settles while an earlier run's write is outstanding waits behind it, and every write consumes
+ * only the arms made by the time its run settled (`armedThrough`), so a delayed or retried write never
+ * takes a later run's arm with the earlier outcome.
  */
-export function createCompletionTracker(settle: (durableId: string, outcome: CompletionOutcome) => Promise<Emitted>, options: CompletionTrackerOptions): CompletionTracker {
+export function createCompletionTracker(settle: (durableId: string, outcome: CompletionOutcome, armedThrough: number) => Promise<Emitted>, options: CompletionTrackerOptions): CompletionTracker {
+  type SettledRun = { readonly outcome: CompletionOutcome; readonly armedThrough: number; readonly generation: number | undefined }
+  const now = options.now ?? Date.now
   const lastOutcome = new Map<string, CompletionOutcome>()
   const armed = new Map<string, number>()
   const writing = new Set<string>()
+  // Runs that settled while an earlier run's write was outstanding, oldest first.
+  const waiting = new Map<string, SettledRun[]>()
   const retries = new Map<string, ReturnType<typeof setTimeout>>()
   let generation = 0
   let disposed = false
 
-  async function write(durableId: string, outcome: CompletionOutcome): Promise<Emitted> {
-    const armedAt = armed.get(durableId)
+  /** The write finished (or will not be retried): the next waiting run of the session, if it still has an arm, goes next. */
+  function next(durableId: string): void {
+    const queue = waiting.get(durableId) ?? []
+    let run = queue.shift()
+    while (run !== undefined && !armed.has(durableId)) run = queue.shift()
+    if (queue.length === 0) waiting.delete(durableId)
+    if (run === undefined || disposed) {
+      writing.delete(durableId)
+      return
+    }
+    // A failure is reported (and a lock-wait retried) by write itself.
+    void write(durableId, run).catch(() => undefined)
+  }
+
+  async function write(durableId: string, run: SettledRun): Promise<Emitted> {
     writing.add(durableId)
     try {
-      const emitted = await settle(durableId, outcome)
-      writing.delete(durableId)
-      if (armed.get(durableId) === armedAt) armed.delete(durableId)
+      const emitted = await settle(durableId, run.outcome, run.armedThrough)
+      if (armed.get(durableId) === run.generation) armed.delete(durableId)
+      next(durableId)
       return emitted
     } catch (error) {
       const retrying = isLockWaitExceeded(error) && !disposed
@@ -69,12 +91,12 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
       if (retrying) {
         const timer = setTimeout(() => {
           retries.delete(durableId)
-          void write(durableId, outcome).catch(() => undefined)
+          void write(durableId, run).catch(() => undefined)
         }, options.retryAfterMs())
         timer.unref?.()
         retries.set(durableId, timer)
       } else {
-        writing.delete(durableId)
+        next(durableId)
       }
       throw error
     }
@@ -91,13 +113,19 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
       const outcome = lastOutcome.get(durableId)
       if (outcome === undefined) return []
       lastOutcome.delete(durableId)
-      if (!armed.has(durableId) || writing.has(durableId)) return []
-      return await write(durableId, outcome)
+      if (!armed.has(durableId)) return []
+      const run: SettledRun = { outcome, armedThrough: now(), generation: armed.get(durableId) }
+      if (writing.has(durableId)) {
+        waiting.set(durableId, [...(waiting.get(durableId) ?? []), run])
+        return []
+      }
+      return await write(durableId, run)
     },
     dispose: () => {
       disposed = true
       for (const timer of retries.values()) clearTimeout(timer)
       retries.clear()
+      waiting.clear()
     },
   }
 }

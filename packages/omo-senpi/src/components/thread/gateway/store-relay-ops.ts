@@ -503,12 +503,16 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
 /**
  * Called when the session settles (no retry, compaction or queued continuation will run): every
  * completion armed for it becomes one outbox row with the run's outcome, on a binding still active
- * at the revision it was armed under. Arms are consumed, so a later settle emits nothing.
+ * at the revision it was armed under. Arms are consumed, so a later settle emits nothing. With
+ * `armed_through` (the time the run settled) only arms made by then are consumed: an arm a later run
+ * made waits for that run's own settle, even when this write was delayed or retried past it.
  */
-export async function emitCompletions(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome }): Promise<readonly { readonly binding_id: string; readonly cursor: number }[]> {
+export async function emitCompletions(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly armed_through?: number }): Promise<readonly { readonly binding_id: string; readonly cursor: number }[]> {
   return await transaction(ctx, "emit_completions", () => {
     expireDue(ctx, request.now)
-    const arms = ctx.sql.all(["binding_id", "revision", "text"], "SELECT binding_id, revision, text FROM completion_arms WHERE session_durable_id = ?", [request.session_durable_id], "binding_id")
+    const arms = request.armed_through === undefined
+      ? ctx.sql.all(["binding_id", "revision", "text"], "SELECT binding_id, revision, text FROM completion_arms WHERE session_durable_id = ?", [request.session_durable_id], "binding_id")
+      : ctx.sql.all(["binding_id", "revision", "text"], "SELECT binding_id, revision, text FROM completion_arms WHERE session_durable_id = ? AND armed_at <= ?", [request.session_durable_id, request.armed_through], "binding_id")
     const emitted: { binding_id: string; cursor: number }[] = []
     for (const arm of arms) {
       const binding = selectBinding(ctx, String(arm.binding_id))

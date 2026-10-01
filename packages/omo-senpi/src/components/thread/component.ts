@@ -156,8 +156,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
       const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
-      const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome }), {
+      const completions = createCompletionTracker((durableId, outcome, armedThrough) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, armed_through: armedThrough }), {
         retryAfterMs: () => store.busyTimeoutMs,
+        now: () => store.now(),
         onWriteFailed: (error, retrying) =>
           ctx.logger.warn(retrying
             ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`

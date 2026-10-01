@@ -98,7 +98,7 @@ export type GatewayStore = {
   readonly bindingView: (request: { readonly now: number; readonly binding_id: string }) => Promise<BindingRecord | null>
   readonly registerIncarnation: (request: { readonly durable_id: string; readonly incarnation: string }) => Promise<void>
   readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
-  readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly armed_through?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Completion arms waiting for the session's settle; a plain read that takes no write lock. */
   readonly pendingCompletionArms: (durableId: string) => Promise<number>
   readonly readOutbox: (request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayOutcome<OutboxPage>>
