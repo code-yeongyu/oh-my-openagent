@@ -17,6 +17,24 @@ const { perTestRoots, sharedOutputs, mutableOutputs } = fixture
 
 setDefaultTimeout(90_000)
 
+/**
+ * stderr less the one warning node 24.0.x prints when a module imports `node:sqlite` (later 24.x
+ * releases print none, and the package supports node >= 24.0.0). Everything else stays, so any
+ * other output still fails the round trip.
+ */
+function unexpectedStderr(stderr) {
+  const lines = stderr.split("\n")
+  const kept = []
+  for (let index = 0; index < lines.length; index++) {
+    if (/ExperimentalWarning: SQLite is an experimental feature/.test(lines[index])) {
+      if (/^\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)$/.test(lines[index + 1] ?? "")) index++
+      continue
+    }
+    kept.push(lines[index])
+  }
+  return kept.join("\n")
+}
+
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
 
@@ -68,7 +86,7 @@ describe("gateway store worker sidecar", () => {
     const exitCode = await new Promise((resolve) => child.once("close", resolve))
 
     // then
-    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
+    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
     const replies = JSON.parse(stdout.trim())
     expect(replies.map((reply) => [reply.id, reply.ok])).toEqual([[1, true], [2, true]])
     expect(replies[0].value.self.instance_id).toBe("built-worker-probe")
@@ -118,7 +136,7 @@ describe("thread SDK runtime", () => {
     const exitCode = await new Promise((resolve) => child.once("close", resolve))
 
     // then
-    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
+    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
     expect(JSON.parse(stdout.trim())).toEqual({ listed: "ok", bindings: [], missing: "not_found", principal: "cli:501" })
   })
 
