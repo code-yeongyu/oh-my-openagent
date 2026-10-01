@@ -57,7 +57,13 @@ await runScenario("host-to-tui", async ({ report, fake, scratch, install, startT
   await waitFor(() => assistantTexts(target.sessionPath).some((text) => text.includes("QA-ACK QA-TOKEN-held")), { label: "tui answers the held delivery" })
   const userIndex = transcriptIndex(target.sessionPath, (entry) => entry.message?.role === "user" && JSON.stringify(entry.message.content).includes("QA-TOKEN-draft"))
   const deliveryIndex = transcriptIndex(target.sessionPath, (entry) => deliveryIdOf(entry) === heldId)
-  report.assert("draft-turn-before-delivery", userIndex >= 0 && deliveryIndex > userIndex, `user_entry=${userIndex} delivery_entry=${deliveryIndex}`)
+  // The draft's turn finished first: its answer precedes the delivery, so the delivery was not steered into it.
+  const draftAnswerIndex = transcriptIndex(target.sessionPath, (entry) => entry.message?.role === "assistant" && JSON.stringify(entry.message.content).includes("QA-ACK QA-TOKEN-draft"))
+  report.assert(
+    "draft-turn-before-delivery",
+    userIndex >= 0 && draftAnswerIndex > userIndex && deliveryIndex > draftAnswerIndex,
+    `user_entry=${userIndex} draft_answer_entry=${draftAnswerIndex} delivery_entry=${deliveryIndex}`,
+  )
   const drained = await waitFor(async () => {
     const row = await deliveryRow(scratch.agentDir, heldId)
     return row?.state === "applied" ? row : undefined
