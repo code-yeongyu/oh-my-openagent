@@ -168,6 +168,14 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
   const steerLocal = async (text: string) => {
     await message(userMessage(text))
   }
+  /**
+   * senpi ask_user `deliverAnswer`: an answer to a non-blocking question is `pi.sendUserMessage(text,
+   * { deliverAs: "steer" })` while the run is busy, which `_queueSteer` turns into the same plain `user`
+   * message a typed steer becomes - nothing on the message says an extension sent it.
+   */
+  const steerAskUserAnswer = async (text: string) => {
+    await message(userMessage(text))
+  }
   const runLocalPrompt = async (text: string) => {
     engine.running = true
     await dispatch("agent_start")
@@ -198,7 +206,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     const page = await connectorStore.readOutbox({ now: Date.now(), binding_id: bindingId })
     return page.kind === "ok" ? page.rows.map((row) => `${row.event}:${row.text}`) : []
   }
-  return { bindThread, send, callReport, runStartedDelivery, steerLocal, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
+  return { bindThread, send, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
 }
 
 describe("a report or completion without binding_id goes to the thread whose message the current run consumed", () => {
@@ -284,6 +292,34 @@ describe("a report or completion without binding_id goes to the thread whose mes
     await s.runStartedDelivery()
     expect(await s.callReport("report", "A again")).toMatchObject({ kind: "ok", binding_id: a })
     expect({ a: await s.texts(a), b: await s.texts(b) }).toEqual({ a: ["report:named A", "report:A again"], b: [] })
+  })
+
+  test("#given a session bound only to thread A #when the thread's user answers the session's question mid-run (senpi ask_user steers the answer in as a user message) #then a report and a completion without binding_id land in A", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    expect(await s.send(a, "please do the job")).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+    await s.runStartedDelivery()
+    await s.steerAskUserAnswer("The user responded: yes, ship it")
+    expect(await s.callReport("report", "shipping it")).toMatchObject({ kind: "ok", binding_id: a })
+    expect(await s.callReport("completion", "shipped")).toMatchObject({ kind: "ok", binding_id: a, armed: true })
+    const written = s.written()
+    await s.answerAndSettle()
+    await within(written, "the armed completion to be written at the settle")
+    expect(await s.texts(a)).toEqual(["report:shipping it", "completion:shipped"])
+  })
+
+  test("#given a session bound only to thread A #when a prompt typed in the terminal is steered into A's run #then a report and a completion without binding_id land in A, the only place either input can be answered", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    await s.send(a, "please do the job")
+    await s.runStartedDelivery()
+    await s.steerLocal("also check the tests while you are at it")
+    expect(await s.callReport("report", "tests checked")).toMatchObject({ kind: "ok", binding_id: a })
+    expect(await s.callReport("completion", "job and tests done")).toMatchObject({ kind: "ok", binding_id: a, armed: true })
+    const written = s.written()
+    await s.answerAndSettle()
+    await within(written, "the armed completion to be written at the settle")
+    expect(await s.texts(a)).toEqual(["report:tests checked", "completion:job and tests done"])
   })
 
   test("#given a session with one active outbound binding #when it reports outside a run started by a bound message #then the report goes to that binding", async () => {

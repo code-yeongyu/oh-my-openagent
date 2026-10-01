@@ -398,7 +398,7 @@ export type ReportOpRequest = {
   readonly binding_id: string | null
   /** The deliveries the reporter's current answer is for, when the reporter knows them (the `thread_report` tool does; the CLI does not): empty when none. */
   readonly origin_delivery_ids: readonly string[]
-  /** A prompt typed in the reporter's terminal is part of the same answer: with a bound message there, the origin is ambiguous and refused. */
+  /** A `user` message (typed in the reporter's terminal, or an extension's) is part of the same answer: with a bound message there and another outbound binding, the origin is ambiguous and refused. */
   readonly origin_local_input?: boolean
   readonly event: OutboundEvent
   readonly text: string
@@ -421,9 +421,11 @@ export type ReportOpResult = {
  * The binding a report without `binding_id` goes to: the binding of the messages the reporter's
  * current answer is for, so a message from another thread queued behind the run never takes it over,
  * and a queued follow-up the session answers next is answered in its own thread. Messages from two
- * bound threads in one answer refuse, and so does a bound message answered together with a prompt
- * typed in the terminal (a local steer into a thread's run, or a thread's steer into a local run).
- * Without a bound message, the session's one active outbound binding; with several, the caller must
+ * bound threads in one answer refuse, and so does a bound message answered together with a `user`
+ * message (a prompt typed in the terminal, or an extension's `sendUserMessage` such as an ask_user
+ * answer) when that input could be answered elsewhere: the session has an active outbound binding
+ * other than the bound message's. With the bound message's binding as the only outbound one, both
+ * inputs can only be answered there, so the report goes to it. Without a bound message, the session's one active outbound binding; with several, the caller must
  * name one. Never a guess between bindings.
  */
 function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, originDeliveryIds: readonly string[], localInput: boolean): { readonly binding_id: string } | StoreRefusal {
@@ -437,7 +439,7 @@ function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, origi
     .map((row) => String(row.binding_id))
   const [origin, ...otherOrigins] = origins
   if (origin !== undefined && otherOrigins.length > 0) return refused("invalid_arguments", `This session's current run answers messages from ${origins.length} bound threads; name binding_id.`, { binding_ids: origins })
-  if (origin !== undefined && localInput) return refused("invalid_arguments", "This session's current run answers a bound thread's message and a prompt typed in its terminal together; name binding_id.", { binding_ids: outbound })
+  if (origin !== undefined && localInput && outbound.some((id) => id !== origin)) return refused("invalid_arguments", "This session's current run answers a bound thread's message and a user message (typed in its terminal or sent by an extension) together; name binding_id.", { binding_ids: outbound })
   if (origin !== undefined) return { binding_id: origin }
   const [only, ...others] = outbound
   if (only !== undefined && others.length === 0) return { binding_id: only }

@@ -108,7 +108,7 @@ export type ThreadToolSurfaceOptions = {
   readonly callerCause?: () => string | undefined
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
   readonly callerRunDeliveries?: () => readonly string[]
-  /** A prompt typed in the caller's terminal is part of that same answer (`RunContext.local`); with a bound delivery there, a report without `binding_id` is refused. */
+  /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string) => void

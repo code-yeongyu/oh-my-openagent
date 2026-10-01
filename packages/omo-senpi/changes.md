@@ -60,7 +60,11 @@
   two bound threads in one answer (a steer at a tool boundary, or `followUpMode: "all"`) are `invalid_arguments`
   naming both `binding_ids`. A bound message answered together with a prompt typed in the terminal (a local steer
   into thread A's run, or the reverse; `RunContext.local`, carried as `origin_local_input`) has two possible origins
-  and is `invalid_arguments` naming the session's active outbound `binding_ids`, where it used to go to A. Without a bound message (a prompt the user typed, `omo thread report`) the session's only
+  and is `invalid_arguments` naming the session's active outbound `binding_ids`, where it used to go to A, but only
+  while the session has an outbound binding other than A. With A as its only outbound binding, both inputs can only be
+  answered in A, so the report and the completion go to A: a thread user who answers a non-blocking ask_user question
+  mid-run (senpi steers the answer in as a `user` message, the same shape as a typed prompt) no longer blocks A's
+  implicit report. Without a bound message (a prompt the user typed, `omo thread report`) the session's only
   active outbound binding is used, and several are `invalid_arguments` naming their `binding_ids`.
   `report-origin.test.ts` drives two threads through the SDK and the real `thread_report` tool, with the engine's
   event order (`agent_end`, then the follow-up's `agent_start` and `message_start`, no `agent_settled` between).
