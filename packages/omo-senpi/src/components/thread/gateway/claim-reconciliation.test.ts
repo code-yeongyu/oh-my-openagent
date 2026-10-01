@@ -6,6 +6,7 @@ import { createInboxDrain } from "./drain"
 import { processStartTime } from "./process-identity"
 import { FakeSessionRuntime } from "./testing/fake-runtime"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { settled } from "./testing/settled"
 import type { DeliveryRow, GatewayDeliveryResult, ProcessIdentity } from "./types"
 
 let harness: GatewayHarness | undefined
@@ -56,7 +57,7 @@ async function crashingPass(h: GatewayHarness, runtime: FakeSessionRuntime, iden
     now: () => h.clock.now,
     _test: { identity, ...(stage === "afterClaim" ? { afterClaim: (_row: DeliveryRow) => crash() } : { afterAdmit: (_row: DeliveryRow, _kind: string) => crash() }) },
   })
-  await expect(drain.drain({ reason: "start" })).rejects.toThrow(`simulated crash ${stage}`)
+  expect((await settled(drain.drain({ reason: "start" }))).error?.message).toContain(`simulated crash ${stage}`)
 }
 
 /**

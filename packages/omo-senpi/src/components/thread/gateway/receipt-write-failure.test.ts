@@ -5,6 +5,7 @@ import { createGatewayEngine, resolveFromEntries, type GatewayDeliverRequest } f
 import { gatewayDatabasePath } from "./paths"
 import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { settled } from "./testing/settled"
 import type { GatewayDeliveryResult } from "./types"
 
 let harness: GatewayHarness | undefined
@@ -13,13 +14,6 @@ afterEach(async () => {
   await harness?.dispose()
   harness = undefined
 })
-
-// Bun 1.4.2 (oven-sh/bun#43819): a promise settled by a worker_threads reply never wakes
-// expect(p).resolves/.rejects once the worker has answered before, so every store-backed promise
-// here is awaited plainly and its settled value is asserted.
-async function settled<T>(promise: Promise<T>): Promise<{ readonly value?: T; readonly error?: Error }> {
-  return await promise.then((value) => ({ value }), (error: unknown) => ({ error: error instanceof Error ? error : new Error(String(error)) }))
-}
 
 function summary(result: GatewayDeliveryResult | undefined): string {
   if (result === undefined) return "none"

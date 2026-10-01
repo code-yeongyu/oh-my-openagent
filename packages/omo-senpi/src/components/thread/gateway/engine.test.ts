@@ -8,6 +8,7 @@ import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { settled } from "./testing/settled"
 import type { GatewayDeliveryResult } from "./types"
 
 let harness: GatewayHarness | undefined
@@ -179,11 +180,11 @@ describe("lost_ack_and_durable_recovery", () => {
     const retrying = h.engineFor(h.store())
     const request = (key: string): GatewayDeliverRequest => ({ sender: { kind: "session", durable_id: "A" }, target: "B", text: `lost ${key}`, idempotency_key: key })
 
-    await expect(crashing.deliver(request("unadmitted"))).rejects.toThrow("gateway test hook afterDbCommit")
+    expect((await settled(crashing.deliver(request("unadmitted")))).error?.message).toContain("gateway test hook afterDbCommit")
     const uncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(uncertain)).toBe("error:idempotency_uncertain")
 
-    await expect(crashing.deliver(request("admitted"))).rejects.toThrow("gateway test hook afterDbCommit")
+    expect((await settled(crashing.deliver(request("admitted")))).error?.message).toContain("gateway test hook afterDbCommit")
     b.online = true
     await b.drain.drain({ reason: "start" })
     await h.quiesce()

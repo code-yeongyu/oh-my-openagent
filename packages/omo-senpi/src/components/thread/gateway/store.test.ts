@@ -8,6 +8,7 @@ import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from
 import { GATEWAY_MIGRATIONS } from "./schema"
 import type { GatewayStoreEvent } from "./types"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { settled } from "./testing/settled"
 
 let harness: GatewayHarness | undefined
 
@@ -38,7 +39,7 @@ describe("store open recovery", () => {
     holder.run("BEGIN IMMEDIATE")
     const store = h.store({ _test: { busyTimeoutMs: 20, lockWaitMaxMs: 150 } })
     try {
-      await expect(store.journalMode()).rejects.toMatchObject({ code: "gateway_lock_wait_exceeded" })
+      expect((await settled(store.journalMode())).error).toMatchObject({ code: "gateway_lock_wait_exceeded" })
     } finally {
       holder.run("COMMIT")
       holder.close()
