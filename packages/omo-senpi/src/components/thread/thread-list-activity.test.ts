@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { readDiskSession } from "./address-book"
+import { createGatewayStore } from "./gateway/store"
 import { listThreads } from "./tools/read-ops"
 import type { ThreadHost, ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
 
@@ -52,6 +53,8 @@ function options(directory: string): ThreadToolSurfaceOptions {
     callerSessionId: () => "caller",
     callerWorkspaceRoot: () => directory,
     stateDirectory: directory,
+    // The list never touches the store; a store opens no worker until its first call.
+    store: createGatewayStore({ agentDir: directory }),
   }
 }
 

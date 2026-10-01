@@ -92,7 +92,8 @@ async function hostEndpoint(socketPath: string, replies: Readonly<Record<string,
       const frame = JSON.parse(buffer.slice(0, newline)) as Frame
       buffer = buffer.slice(newline + 1)
       frames.push(frame)
-      const data = frame.type in replies ? replies[frame.type] : frame.type === "list_sessions"
+      const type = String(frame.type)
+      const data = Object.hasOwn(replies, type) ? replies[type] : type === "list_sessions"
         ? { sessions: [{ sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host-thread", status: "open", kind: "interactive" }] }
         : frame.type === "wake" ? { admitted: [] } : {}
       socket.end(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data })}\n`)
