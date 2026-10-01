@@ -19,7 +19,7 @@ type TestPart = {
   content?: string
   text?: string
   synthetic?: boolean
-  metadata?: { compaction_continue?: boolean }
+  metadata?: { compaction_continue?: boolean; providerExecuted?: boolean }
 }
 
 type TestMessage = {
@@ -805,7 +805,125 @@ describe("createMessagesTransformHandler", () => {
       synthetic: true,
     })
   })
+
+  it("#given a compaction continuation whose assistant tail ends in a tool call #when messages transform runs #then it does not append a recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      createCompactionContinuationTurn({ providerID: "openai", modelID: "gpt-5.4" }),
+      createAssistantTail([
+        { type: "step-start" },
+        { type: "text", text: "reading the file" },
+        createToolPart("call_read", "completed"),
+        { type: "step-finish" },
+      ]),
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(2)
+    expect(messages.at(-1)?.info.role).toBe("assistant")
+  })
+
+  it("#given a prefill-rejecting model whose assistant tail ends in a tool call in any state #when messages transform runs #then it does not append a recovery turn", async () => {
+    for (const status of ["completed", "error", "pending", "running"]) {
+      //#given
+      const messages: TestMessage[] = [
+        {
+          info: { role: "user", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+          parts: [{ type: "text", text: "run the tests" }],
+        },
+        createAssistantTail([
+          { type: "step-start" },
+          createToolPart("call_bash", status),
+          { type: "step-finish" },
+        ]),
+      ]
+
+      //#when
+      await runHandler(makeHooks({}), messages)
+
+      //#then
+      expect(messages, status).toHaveLength(2)
+      expect(messages.at(-1)?.info.role, status).toBe("assistant")
+    }
+  })
+
+  it("#given a compaction continuation whose last assistant step is text after an earlier tool step #when messages transform runs #then it still appends a recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      createCompactionContinuationTurn({ providerID: "anthropic", modelID: "claude-opus-4-7" }),
+      createAssistantTail([
+        { type: "step-start" },
+        createToolPart("call_read", "completed"),
+        { type: "step-finish" },
+        { type: "step-start" },
+        { type: "text", text: "partial assistant tail" },
+        { type: "step-finish" },
+      ]),
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given a prefill-rejecting model whose assistant tail ends in a provider-executed tool #when messages transform runs #then it still appends a recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: { role: "user", model: { providerID: "anthropic", modelID: "claude-opus-4-7" } },
+        parts: [{ type: "text", text: "search the web" }],
+      },
+      createAssistantTail([
+        { type: "step-start" },
+        { ...createToolPart("call_search", "completed"), metadata: { providerExecuted: true } },
+        { type: "step-finish" },
+      ]),
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info.role).toBe("user")
+  })
 })
+
+function createCompactionContinuationTurn(model: { providerID: string; modelID: string }): TestMessage {
+  return {
+    info: { role: "user", model },
+    parts: [{
+      type: "text",
+      text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+      synthetic: true,
+      metadata: { compaction_continue: true },
+    }],
+  }
+}
+
+function createAssistantTail(parts: TestPart[]): TestMessage {
+  return { info: { role: "assistant", id: "msg_assistant_tail" }, parts }
+}
+
+function createToolPart(callID: string, status: string): TestPart {
+  return {
+    id: `prt_${callID}`,
+    type: "tool",
+    callID,
+    tool: "bash",
+    state: { status, input: {}, time: { start: 1_700_000_000_000, end: 1_700_000_000_500 } },
+  }
+}
 
 function createRealToolPairValidator(): TransformHook {
   const validator = createToolPairValidatorHook()
