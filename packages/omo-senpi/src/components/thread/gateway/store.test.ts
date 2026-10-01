@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import type { Worker } from "node:worker_threads"
 
 import { createInboxDrain } from "./drain"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
@@ -27,6 +28,37 @@ describe("gateway store file", () => {
       database: statSync(gatewayDatabasePath(h.agentDir)).mode & 0o777,
       directory: statSync(gatewayRootDirectory(h.agentDir)).mode & 0o777,
     }).toEqual({ database: 0o600, directory: 0o700 })
+  })
+})
+
+describe("store open recovery", () => {
+  test("#given another connection holds the write lock through the first open #when the lock is released #then the next call opens the store instead of replaying the cached failure", async () => {
+    const h = (harness = createGatewayHarness())
+    mkdirSync(gatewayRootDirectory(h.agentDir), { recursive: true, mode: 0o700 })
+    const holder = new Database(gatewayDatabasePath(h.agentDir))
+    holder.run("BEGIN IMMEDIATE")
+    const store = h.store({ _test: { busyTimeoutMs: 20, lockWaitMaxMs: 150 } })
+    try {
+      await expect(store.journalMode()).rejects.toMatchObject({ code: "gateway_lock_wait_exceeded" })
+    } finally {
+      holder.run("COMMIT")
+      holder.close()
+    }
+    expect(await store.journalMode()).toBe("wal")
+  })
+
+  test("#given an open store whose worker died #when the next call runs #then a fresh worker serves it", async () => {
+    const h = (harness = createGatewayHarness())
+    const workers: Worker[] = []
+    const store = h.store({ _test: { onWorkerStarted: (worker) => workers.push(worker) } })
+    expect(await store.journalMode()).toBe("wal")
+    const first = workers[0]
+    if (first === undefined) throw new Error("no worker started")
+    const exited = new Promise<number>((resolve) => first.once("exit", resolve))
+    await first.terminate()
+    await exited
+    expect(await store.journalMode()).toBe("wal")
+    expect(workers.length).toBe(2)
   })
 })
 

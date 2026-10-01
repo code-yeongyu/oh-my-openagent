@@ -45,7 +45,7 @@ export type GatewayStoreOptions = {
   /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
   readonly workerModuleUrl?: string | URL
   /** Test seams only: a shorter busy timeout and lock-wait bound, commit-boundary hooks, and the module location the worker is resolved from. */
-  readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly lockWaitMaxMs?: number; readonly moduleUrl?: string | URL }
+  readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly lockWaitMaxMs?: number; readonly moduleUrl?: string | URL; readonly onWorkerStarted?: (worker: Worker) => void }
 }
 
 /** The store worker's file name beside the built extension bundle (`plugin/extensions/`). */
@@ -114,7 +114,7 @@ export type GatewayStore = {
   readonly dispose: () => Promise<void>
 }
 
-type Pending = { readonly resolve: (value: unknown) => void; readonly reject: (error: Error) => void }
+type Pending = { readonly worker: Worker; readonly resolve: (value: unknown) => void; readonly reject: (error: Error) => void }
 
 type WorkerMessage =
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
@@ -149,16 +149,20 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   let nextId = 1
   let disposed = false
 
-  function failAll(error: Error): void {
-    for (const entry of pending.values()) entry.reject(error)
-    pending.clear()
+  /** Fails the requests posted to one worker; a successor's requests are not its to fail. */
+  function failAll(owner: Worker, error: Error): void {
+    for (const [id, entry] of pending) {
+      if (entry.worker !== owner) continue
+      pending.delete(id)
+      entry.reject(error)
+    }
   }
 
   function post(op: string, args: unknown): Promise<unknown> {
     const active = worker
     if (active === undefined) return Promise.reject(new Error("the gateway store is closed"))
     const id = nextId++
-    const reply = new Promise<unknown>((resolve, reject) => pending.set(id, { resolve, reject }))
+    const reply = new Promise<unknown>((resolve, reject) => pending.set(id, { worker: active, resolve, reject }))
     active.ref()
     active.postMessage({ type: "request", id, op, args })
     return reply
@@ -185,13 +189,28 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       if (message.ok) entry.resolve(message.value)
       else entry.reject(Object.assign(new Error(message.error.message), { workerStack: message.error.stack, ...(message.error.code === undefined ? {} : { code: message.error.code }) }))
     })
-    spawned.on("error", (error: unknown) => failAll(error instanceof Error ? error : new Error(String(error))))
+    spawned.on("error", (error: unknown) => failAll(spawned, error instanceof Error ? error : new Error(String(error))))
+    // A worker that exits (a crash, or the termination after a failed open) takes its open with it:
+    // the next call starts a fresh worker. Requests in flight fail and are never replayed.
     spawned.on("exit", (code) => {
-      if (worker === spawned) worker = undefined
-      failAll(new Error(`the gateway store worker exited (${code})`))
+      if (worker === spawned) {
+        worker = undefined
+        opened = undefined
+      }
+      failAll(spawned, new Error(`the gateway store worker exited (${code})`))
     })
-    opened = post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>
-    return opened
+    options._test?.onWorkerStarted?.(spawned)
+    const attempt = post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>
+    opened = attempt
+    // A failed open is not cached: every caller of this attempt sees its error, and the next call
+    // opens again (a lock held during the first open, a migration that hit the lock-wait bound).
+    attempt.catch(() => {
+      if (opened !== attempt) return
+      opened = undefined
+      if (worker === spawned) worker = undefined
+      void spawned.terminate()
+    })
+    return attempt
   }
 
   async function call<T>(op: string, args?: unknown): Promise<T> {
