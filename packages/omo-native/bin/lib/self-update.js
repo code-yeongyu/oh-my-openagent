@@ -21,7 +21,7 @@ const SKIPPABLE_SCRIPTS = ["esbuild", "@google/genai", "protobufjs"]
 export function formatAllowScriptsGuidance(update) {
   const spec = update.argv[update.argv.length - 1]
   return [
-    `omo: npm skipped install scripts for ${SKIPPABLE_SCRIPTS.join(", ")}; skipping them is safe, omo runs without them`,
+    `omo: npm flagged install scripts for ${SKIPPABLE_SCRIPTS.join(", ")}; omo does not need them, so skipping them is safe, omo runs without them`,
     `omo: if npm suggested a command without a package name, ignore it; to reinstall use: npm i -g ${spec}`,
   ]
 }
