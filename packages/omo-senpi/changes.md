@@ -38,6 +38,12 @@
   durable id (`legacy_mailbox_skipped`, logged, and recorded in the directory's `gateway_meta` row) and still marks the
   directory migrated, because no later open can deliver it; a mailbox that cannot be read is logged and left unmarked,
   so the next start retries.
+- `gateway/process-identity.ts`: a claimant's start time is recorded as `epoch:<seconds>`, read from `ps -o lstart=`
+  run with `LC_ALL=C` and `TZ=UTC`, so a host started without a locale and a terminal in `fr_FR.UTF-8` (or another
+  time zone) agree on a live process instead of judging it dead and re-queueing its admitted rows. A start time
+  without the prefix (written by a pre-release build of the gateway, in that process's locale) cannot be compared,
+  so it counts as live while its pid exists, like an unreadable one. `process-identity.test.ts` records and checks
+  in two processes with different locales and time zones.
 
 ## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
 
