@@ -61,6 +61,9 @@
   through `tools/internals.ts` `resolveStoredSession` (the offline host view plus `sendAddressBook`), as a send
   does: with nothing running they no longer fail `host_unavailable` (exit 3, or 5 on a stale socket), and a session
   known only from its session file resolves by id or name. `offline-address.test.ts` covers the SDK and the tool.
+- Docs (`docs/reference/omo-thread.md`, `thread/AGENTS.md`): `omo thread` creates and resumes no session (a connector
+  opens one through the host API and binds it); a completion row carries the armed text, not the model's reply; the
+  per-author rate bucket trusts the connector's author id and stays bounded by the target backlog.
 
 ## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
 

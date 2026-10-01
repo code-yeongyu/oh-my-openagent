@@ -33,6 +33,14 @@ omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
 omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 ```
 
+`omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
+API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
+give a new chat thread its own session, a connector opens one on the operator endpoint
+(`omo daemon run` ensures it on `<agent dir>/rpc/rpc.sock`; its `open_session` command is what the
+agent tool `thread_create` calls) or launches `omo` itself, then binds that session's durable id with
+`omo thread bind`. A session that is not running is still bound, sent to (`queued_offline`) and
+reported for; it takes its messages when it next starts.
+
 A target or session is a durable session id, or an exact name. Without `--all-scope` only
 sessions in the current directory's workspace resolve (the same rule the agent tools apply);
 an id outside it is `scope_denied`. `--idempotency-key` on a mutation replays the first result
@@ -112,7 +120,9 @@ Answers to another session flow back through `read`, `report` and `answer`, not 
 
 A connector treats `overloaded` as back-pressure, not as a lost message: nothing was written, so
 it queues the message and retries the same `send` (same `--idempotency-key`) after
-`error.details.retry_after_ms`. It passes `--author-*` on every message it can attribute, so one
+`error.details.retry_after_ms`. The author id that keys a bucket is whatever the connector passes:
+the gateway trusts the local connector to authenticate its humans, and a connector that varied it
+per message would still be bounded by the target's 128-message backlog. It passes `--author-*` on every message it can attribute, so one
 busy human in a thread spends only their own budget; without an author every human in the thread
 shares the binding's one bucket.
 
@@ -267,6 +277,11 @@ its `thread_report` tool) writes one; every other session settles without touchi
 store. The arm is durable: the store row is the source of truth, and it is kept until its
 completion is written, with the outcome of the run that settled (`completed`, `failed` or
 `cancelled`), never at an intermediate turn end.
+
+A completion row's `text` is the text given when the completion was armed (`report ... completion
+<text>`), not the model's reply, and its `outcome` is how the run ended. A connector that needs the
+answer itself has the session post it with `report` (`thread_report` from inside the session), or
+reads the transcript with `omo thread read`.
 
 `report <session> completion` arms the completion (`armed: true`) and wakes the session's
 endpoint, so a running session writes it when it next settles, with that run's outcome. The arm is
