@@ -248,6 +248,61 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect({ x: await rows(x), y: await rows(y) }).toEqual({ x: [["completion", "completed", "first job"]], y: [["completion", "cancelled", "second job"]] })
   })
 
+  test("#given a run's completion write still in flight #when the next run arms the SAME binding again and settles cancelled #then the binding gets both completions, in run order, each with its own text and outcome", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay, store } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let writes = 0
+    const tracker = createCompletionTracker(async (durableId, outcome, armedThrough) => {
+      // The first write is held before it reaches the store, as a store busy with another process holds it.
+      if (++writes === 1) await gate
+      return await relay.settle({ session_durable_id: durableId, outcome, armed_through: armedThrough })
+    }, { retryAfterMs: () => 50, now: () => h.clock.now })
+    let bothWritten: () => void = () => undefined
+    const written = new Promise<void>((resolve) => { bothWritten = resolve })
+    let emissions = 0
+    store.onEvent((event) => {
+      if (event.kind === "completions_emitted" && ++emissions === 2) bothWritten()
+    })
+
+    // run 1 arms x and settles completed; its write is held
+    ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "first job" }))
+    tracker.arm("B")
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    const first = tracker.settled("B")
+    // run 2 arms the same binding and settles cancelled while run 1's write is outstanding
+    h.clock.now += 1_000
+    ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text: "second job" }))
+    tracker.arm("B")
+    tracker.agentEnd("B", { aborted: true, messages: [] })
+    await tracker.settled("B")
+    release()
+    await first
+    await within(written, "the second run's completion write")
+
+    const rows = ok(await relay.outbox({ binding_id: x })).rows.map((row) => [row.event, row.outcome, row.text])
+    expect(rows).toEqual([["completion", "completed", "first job"], ["completion", "cancelled", "second job"]])
+  })
+
+  test("#given one run that arms the same binding twice #when the run settles #then the binding gets one completion carrying the newest arm's text", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("B")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const tracker = createCompletionTracker((durableId, outcome, armedThrough) => relay.settle({ session_durable_id: durableId, outcome, armed_through: armedThrough }), { retryAfterMs: () => 50, now: () => h.clock.now })
+    for (const text of ["draft summary", "final summary"]) {
+      ok(await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: x, event: "completion", text }))
+      tracker.arm("B")
+      h.clock.now += 10
+    }
+    tracker.agentEnd("B", { messages: [{ role: "assistant", stopReason: "stop" }] })
+    expect(await tracker.settled("B")).toHaveLength(1)
+    expect(ok(await relay.outbox({ binding_id: x })).rows.map((row) => [row.outcome, row.text])).toEqual([["completed", "final summary"]])
+  })
+
   test("#given the user is composing in the bound session #when a connector message waits behind the draft and inbox wakes repeat #then the session shows one queued notice naming the actor and delivery, and the message lands after submit", async () => {
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { online: false })

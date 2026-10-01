@@ -489,7 +489,7 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
     if (request.ui_request_kind !== null && request.event !== "question") return refused("invalid_arguments", "Only a question names a request kind.")
     const base = { binding_id: bindingId, revision: binding.revision, event: request.event }
     if (request.event === "completion") {
-      write(ctx, "INSERT OR REPLACE INTO completion_arms (session_durable_id, binding_id, revision, text, armed_at) VALUES (?, ?, ?, ?, ?)", [
+      write(ctx, "INSERT INTO completion_arms (session_durable_id, binding_id, revision, text, armed_at) VALUES (?, ?, ?, ?, ?)", [
         request.session_durable_id, bindingId, binding.revision, request.text, request.now,
       ])
       return { kind: "ok", ...base, cursor: null, reply_token: null, armed: true }
@@ -513,18 +513,25 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
  * completion armed for it becomes one outbox row with the run's outcome, on a binding still active
  * at the revision it was armed under. Arms are consumed, so a later settle emits nothing. With
  * `armed_through` (the time the run settled) only arms made by then are consumed: an arm a later run
- * made waits for that run's own settle, even when this write was delayed or retried past it.
+ * made waits for that run's own settle, even when this write was delayed or retried past it. Every
+ * arm is its own row, so a later run's arm of the same binding never replaces an earlier run's; the
+ * consumed arms of one binding become one row with the newest arm's text.
  */
 export async function emitCompletions(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly armed_through?: number }): Promise<readonly { readonly binding_id: string; readonly cursor: number }[]> {
   return await transaction(ctx, "emit_completions", () => {
     expireDue(ctx, request.now)
-    const arms = request.armed_through === undefined
-      ? ctx.sql.all(["binding_id", "revision", "text"], "SELECT binding_id, revision, text FROM completion_arms WHERE session_durable_id = ?", [request.session_durable_id], "binding_id")
-      : ctx.sql.all(["binding_id", "revision", "text"], "SELECT binding_id, revision, text FROM completion_arms WHERE session_durable_id = ? AND armed_at <= ?", [request.session_durable_id, request.armed_through], "binding_id")
+    const columns = ["arm_seq", "binding_id", "revision", "text"]
+    const consumed = request.armed_through === undefined
+      ? ctx.sql.all(columns, "SELECT arm_seq, binding_id, revision, text FROM completion_arms WHERE session_durable_id = ?", [request.session_durable_id], "arm_seq")
+      : ctx.sql.all(columns, "SELECT arm_seq, binding_id, revision, text FROM completion_arms WHERE session_durable_id = ? AND armed_at <= ?", [request.session_durable_id, request.armed_through], "arm_seq")
+    const newest = new Map<string, (typeof consumed)[number]>()
+    for (const arm of consumed) {
+      write(ctx, "DELETE FROM completion_arms WHERE arm_seq = ?", [Number(arm.arm_seq)])
+      newest.set(String(arm.binding_id), arm)
+    }
     const emitted: { binding_id: string; cursor: number }[] = []
-    for (const arm of arms) {
+    for (const arm of [...newest.values()].toSorted((left, right) => (String(left.binding_id) < String(right.binding_id) ? -1 : 1))) {
       const binding = selectBinding(ctx, String(arm.binding_id))
-      write(ctx, "DELETE FROM completion_arms WHERE session_durable_id = ? AND binding_id = ?", [request.session_durable_id, String(arm.binding_id)])
       if (binding === undefined || binding.status !== "active" || binding.revision !== Number(arm.revision) || binding.session_durable_id !== request.session_durable_id) continue
       if (!binding.direction.outbound || !binding.outbound_events.includes("completion")) continue
       emitted.push({ binding_id: binding.binding_id, cursor: insertOutbox(ctx, { binding, event: "completion", text: String(arm.text), now: request.now, outcome: request.outcome }) })

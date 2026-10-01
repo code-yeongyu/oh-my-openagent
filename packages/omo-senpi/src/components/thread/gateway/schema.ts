@@ -145,14 +145,17 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
       acked_cursor INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )`,
+    // One row per arm (`arm_seq`), never one per binding: a later run's arm of the same binding must
+    // not replace the arm of a run that settled while its completion write was still outstanding.
     `CREATE TABLE completion_arms (
+      arm_seq INTEGER PRIMARY KEY AUTOINCREMENT,
       session_durable_id TEXT NOT NULL,
       binding_id TEXT NOT NULL,
       revision INTEGER NOT NULL,
       text TEXT NOT NULL,
-      armed_at INTEGER NOT NULL,
-      PRIMARY KEY (session_durable_id, binding_id)
+      armed_at INTEGER NOT NULL
     )`,
+    "CREATE INDEX completion_arms_session ON completion_arms (session_durable_id, armed_at)",
     "INSERT OR IGNORE INTO gateway_meta (key, value) VALUES ('realm_id', 'realm-' || lower(hex(randomblob(16))))",
     "INSERT OR IGNORE INTO gateway_meta (key, value) VALUES ('token_secret', lower(hex(randomblob(32))))",
   ],

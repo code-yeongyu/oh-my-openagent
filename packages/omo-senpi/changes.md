@@ -32,6 +32,11 @@
   sweep when one is due, as an enqueue, relay mutation or outbox read does. Since round 6 narrowed the receipt check
   to its own key, traffic made only of peer tool calls (`thread_list`, `thread_read`, `thread_rename`, ...) never
   swept, so their expired receipts were kept indefinitely; each admission now deletes at most one batch.
+- `gateway/schema.ts` / `store-relay-ops.ts`: every completion arm is its own `completion_arms` row (`arm_seq`). The
+  table kept one row per session and binding, so when a run settled while its completion write was held and the next
+  run armed the same binding again, the replacement destroyed the earlier run's arm and only the later completion was
+  ever written. Each write now consumes the arms made by its run's settle, so both completions land on the binding in
+  run order with their own text and outcome; two arms of one binding within a run still make one row, the newest text.
 
 ## 2026-10-01 - session gateway review round 6: receipts, questions, retention, bindings snapshot, causes, session facts, identifiers (#9222)
 
