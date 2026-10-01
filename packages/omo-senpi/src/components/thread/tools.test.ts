@@ -464,16 +464,34 @@ describe("tool receipts the store could not settle", () => {
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
 
-  /** A registered surface over a store whose receipt admission can fail before writing (`fail`) or after committing (`lost-reply`). */
+  /**
+   * A registered surface over a store whose receipt admission can fail before writing (`fail`), after committing (`lost-reply`),
+   * or after committing and then waiting until `releaseHeld` before its reply is lost (`held`).
+   */
   function recoverySurface(f: ReturnType<typeof fixture>, clock: { now: number }) {
     const real = f.store
-    const admissions = { mode: "real" as "real" | "fail" | "lost-reply" }
+    const admissions = { mode: "real" as "real" | "fail" | "lost-reply" | "held" }
+    const held: Array<() => void> = []
+    const heldWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
+    /** Resolves once `count` held admissions have committed their receipt and are waiting. */
+    const whenHeld = (count: number) => new Promise<void>((resolve) => {
+      if (held.length >= count) resolve()
+      else heldWaiters.push({ count, resolve })
+    })
+    const releaseHeld = () => { for (const release of held.splice(0)) release() }
     const store: GatewayStore = {
       ...real,
       toolReceiptBegin: async (request) => {
-        if (admissions.mode === "fail") throw new Error("the gateway store worker exited (1)")
+        const mode = admissions.mode
+        if (mode === "fail") throw new Error("the gateway store worker exited (1)")
         const admission = await real.toolReceiptBegin(request)
-        if (admissions.mode === "lost-reply") throw new Error("the gateway store worker exited (1)")
+        if (mode === "held") {
+          const { promise, resolve } = Promise.withResolvers<void>()
+          held.push(resolve)
+          for (const waiter of heldWaiters.filter((candidate) => held.length >= candidate.count)) waiter.resolve()
+          await promise
+        }
+        if (mode === "lost-reply" || mode === "held") throw new Error("the gateway store worker exited (1)")
         return admission
       },
     }
@@ -489,8 +507,53 @@ describe("tool receipts the store could not settle", () => {
       for (let index = 0; index < count; index++) expect(await rename(`${prefix}-${index}`)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
       admissions.mode = "real"
     }
-    return { admissions, rename, failMany, dispose: surface.dispose }
+    return { admissions, rename, failMany, whenHeld, releaseHeld, dispose: surface.dispose }
   }
+
+  test("#given one slot left in the recovery bound #when two calls under new keys overlap and both lose their committed admission replies #then exactly one is admitted and kept for recovery, the other is refused overloaded before its admission, and no more than the bound is ever kept", async () => {
+    const f = fixture()
+    const s = recoverySurface(f, { now: Date.now() })
+    await s.failMany("fill", RECEIPT_RECOVERY_MAX_KEYS - 1)
+    s.admissions.mode = "held"
+    const first = s.rename("actual-a")
+    await s.whenHeld(1)
+    const second = s.rename("actual-b")
+    // Either the second call is answered without reaching the store, or its admission commits and waits beside the first.
+    const raced = await Promise.race([second.then((result) => ({ answeredBeforeAdmission: result })), s.whenHeld(2).then(() => ({ answeredBeforeAdmission: undefined }))])
+    s.releaseHeld()
+    s.admissions.mode = "real"
+
+    expect(await first).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(raced.answeredBeforeAdmission).toMatchObject({ kind: "error", error: { code: "overloaded", details: { budget: "receipt_recovery", max_keys: RECEIPT_RECOVERY_MAX_KEYS } } })
+    expect(await second).toEqual(raced.answeredBeforeAdmission as ThreadToolResult)
+    expect(f.setSessionName).not.toHaveBeenCalled()
+    // The bound is full with the fill keys and actual-a: a new key is refused until actual-a recovers, which frees exactly one slot.
+    expect(await s.rename("fresh-1")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
+    expect(await s.rename("actual-a")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("fresh-2")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(2)
+  })
+
+  test("#given one slot left in the recovery bound #when two calls under the same key overlap and both lose their admission replies #then they share that one slot: both reach the store, the key recovers once, and the next new key runs", async () => {
+    const f = fixture()
+    const s = recoverySurface(f, { now: Date.now() })
+    await s.failMany("fill", RECEIPT_RECOVERY_MAX_KEYS - 1)
+    s.admissions.mode = "held"
+    const first = s.rename("shared")
+    await s.whenHeld(1)
+    const second = s.rename("shared")
+    const raced = await Promise.race([second.then((result) => ({ answeredBeforeAdmission: result })), s.whenHeld(2).then(() => ({ answeredBeforeAdmission: undefined }))])
+    expect(raced.answeredBeforeAdmission).toBeUndefined()
+    s.releaseHeld()
+    s.admissions.mode = "real"
+
+    expect(await first).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(await second).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(await s.rename("fresh-1")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
+    expect(await s.rename("shared")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("fresh-2")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(2)
+  })
 
   test("#given as many keys as the recovery bound whose admissions failed without a reply #when a call under a new key arrives #then it is refused overloaded and runs nothing, the oldest key still recovers, and a new key runs once that frees a slot", async () => {
     const f = fixture()

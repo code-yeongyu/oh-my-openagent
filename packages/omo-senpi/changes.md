@@ -26,6 +26,15 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-10-01 - session gateway review round 9: recovery bound across overlapping calls (#9222)
+
+- `tools.ts`: the 4,096-key receipt-recovery bound also holds across calls whose admissions overlap. The capacity check
+  counted only the keys already kept, so with one slot left two calls under new keys both passed it before either
+  admission answered, and when both replies were lost the surface kept 4,097 keys. A call now takes its slot before its
+  admission is awaited: the check counts every distinct key whose admission is in flight together with the kept keys,
+  and the slot is released when the store answers or passes to the key's recovery entry when the reply is lost.
+  Overlapping calls under one key share one slot, and a kept key still recovers at capacity without evicting another.
+
 ## 2026-10-01 - session gateway review round 8: receipt batch per call, completion arms per run, recovery-key bound (#9222)
 
 - `gateway/store-retention.ts` / `store-relay-ops.ts` / `store-ops.ts`: a call that reuses an expired key deletes at

@@ -69,15 +69,29 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   // `RECEIPT_RECOVERY_MAX_KEYS` at once: when full, a call under a new key is refused before its
   // admission, so no key that may still need recovering is ever dropped. Disposal clears them.
   const unanswered = new Map<string, number>()
+  // Keys whose admission is awaiting the store, with how many calls await it: each may become a
+  // recovery key, so it holds a slot from before its admission until the store answers (or the
+  // failure leaves it in `unanswered`). Overlapping calls under one key share one slot.
+  const admitting = new Map<string, number>()
+  const heldSlots = (): number => {
+    let held = unanswered.size
+    for (const key of admitting.keys()) if (!unanswered.has(key)) held++
+    return held
+  }
   const recoverable = (key: string, at: number): boolean => {
     const until = unanswered.get(key)
     if (until !== undefined && until <= at) unanswered.delete(key)
     return unanswered.has(key)
   }
   const recoveryFull = (at: number): boolean => {
-    if (unanswered.size < RECEIPT_RECOVERY_MAX_KEYS) return false
+    if (heldSlots() < RECEIPT_RECOVERY_MAX_KEYS) return false
     for (const [key, until] of unanswered) if (until <= at) unanswered.delete(key)
-    return unanswered.size >= RECEIPT_RECOVERY_MAX_KEYS
+    return heldSlots() >= RECEIPT_RECOVERY_MAX_KEYS
+  }
+  const releaseAdmitting = (key: string): void => {
+    const calls = admitting.get(key) ?? 0
+    if (calls <= 1) admitting.delete(key)
+    else admitting.set(key, calls - 1)
   }
   const running = new Set<string>()
   const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
@@ -96,10 +110,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
       const key = receiptKey(scope)
       const at = now()
-      if (!recoverable(key, at) && recoveryFull(at)) {
+      // The slot is taken before the admission is awaited, so overlapping calls cannot all pass the check.
+      if (!recoverable(key, at) && !admitting.has(key) && recoveryFull(at)) {
         return output(failure("overloaded", `${RECEIPT_RECOVERY_MAX_KEYS} earlier calls on this surface failed before the gateway store answered and may still need recovering; nothing ran.`, "Retry those calls under their own idempotency keys, then retry this one.", { budget: "receipt_recovery", max_keys: RECEIPT_RECOVERY_MAX_KEYS }))
       }
       let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
+      admitting.set(key, (admitting.get(key) ?? 0) + 1)
       try {
         admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
       } catch (error) {
@@ -107,6 +123,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
         if (isLockWaitExceeded(error)) return output(failure("overloaded", `The gateway store is locked by another process; nothing ran: ${message}`, "Wait a few seconds, then retry the call."))
         unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
         return output(failure("internal_error", `The gateway store could not record the call; nothing ran: ${message}`, "Retry the call; if it keeps failing, check the gateway store."))
+      } finally {
+        // The slot passes to the key's recovery entry when the failure left one; otherwise it is free again.
+        releaseAdmitting(key)
       }
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key)) admission = { kind: "accepted" }
       unanswered.delete(key)
