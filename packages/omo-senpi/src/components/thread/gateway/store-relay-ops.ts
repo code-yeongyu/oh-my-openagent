@@ -392,8 +392,10 @@ export type ReportOpRequest = {
   readonly now: number
   readonly receipt: ReceiptKey | null
   readonly session_durable_id: string
-  /** null: the originating binding, i.e. the binding of the newest delivery this session took. */
+  /** null: the binding of `origin_delivery_id`, else the session's only active outbound binding (`reportBindingDefault`). */
   readonly binding_id: string | null
+  /** The delivery whose admission started the reporter's current run, when the reporter knows it (the `thread_report` tool does; the CLI does not). */
+  readonly origin_delivery_id: string | null
   readonly event: OutboundEvent
   readonly text: string
   readonly ui_request_id: string | null
@@ -411,13 +413,25 @@ export type ReportOpResult = {
   readonly armed: boolean
 }
 
-function originatingBinding(ctx: StoreContext, sessionDurableId: string): string | null {
-  const found = ctx.sql.one(
-    ["binding_id"],
-    "SELECT binding_id FROM deliveries WHERE target_durable_id = ? AND seq = (SELECT MAX(seq) FROM deliveries WHERE target_durable_id = ? AND binding_id IS NOT NULL AND state IN ('admitted', 'applied'))",
-    [sessionDurableId, sessionDurableId],
-  )
-  return nullableString(found?.binding_id)
+/**
+ * The binding a report without `binding_id` goes to: the binding of the message that started the
+ * reporter's current run, so a message from another thread that arrived mid-run never takes it over.
+ * Without such a message, the session's one active outbound binding; with several, the caller must
+ * name one. Never a guess between bindings.
+ */
+function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, originDeliveryId: string | null): { readonly binding_id: string } | StoreRefusal {
+  if (originDeliveryId !== null) {
+    const origin = ctx.sql.one(["binding_id"], "SELECT binding_id FROM deliveries WHERE delivery_id = ? AND target_durable_id = ?", [originDeliveryId, sessionDurableId])
+    const bindingId = nullableString(origin?.binding_id)
+    if (bindingId !== null) return { binding_id: bindingId }
+  }
+  const outbound = ctx.sql
+    .all(["binding_id"], "SELECT binding_id FROM bindings WHERE session_durable_id = ? AND status = 'active' AND direction_outbound = 1", [sessionDurableId], "binding_id")
+    .map((row) => String(row.binding_id))
+  const [only, ...others] = outbound
+  if (only !== undefined && others.length === 0) return { binding_id: only }
+  if (only === undefined) return refused("invalid_arguments", "This session has no active outbound binding and its current run did not start from a bound message; name binding_id.")
+  return refused("invalid_arguments", `This session has ${outbound.length} active outbound bindings and its current run did not start from a bound message; name binding_id.`, { binding_ids: outbound })
 }
 
 function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly ui_request_kind?: UiRequestKind; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome }): number {
@@ -442,8 +456,9 @@ function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord;
  */
 export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): Promise<RelayOutcome<ReportOpResult>> {
   return await relayMutation(ctx, "report", request.now, request.receipt, () => {
-    const bindingId = request.binding_id ?? originatingBinding(ctx, request.session_durable_id)
-    if (bindingId === null) return refused("invalid_arguments", "This session took no message through a binding, so there is no originating binding; name binding_id.")
+    const resolved = request.binding_id === null ? reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_id) : { binding_id: request.binding_id }
+    if ("kind" in resolved) return resolved
+    const bindingId = resolved.binding_id
     const binding = selectBinding(ctx, bindingId)
     if (binding === undefined) return refused("not_found", "No binding has this id.", { binding_id: bindingId })
     if (binding.session_durable_id !== request.session_durable_id) return refused("scope_denied", "The binding is attached to another session.", { binding_id: bindingId })

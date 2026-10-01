@@ -40,7 +40,12 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
 }
 
-type RunContext = { turn: number; cause: string | undefined }
+/**
+ * `cause`: the newest delivery the session took (a send from this run continues its causal root).
+ * `origin`: the delivery whose admission STARTED the current run; a message queued or steered into the
+ * run does not move it, so a report without `binding_id` goes back to the thread that asked.
+ */
+type RunContext = { turn: number; cause: string | undefined; origin: string | undefined }
 
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
@@ -64,8 +69,9 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     control,
     agentDir,
     store,
-    onAdmitted: (_durableId, deliveryId) => {
+    onAdmitted: (_durableId, deliveryId, kind) => {
       run.cause = deliveryId
+      if (kind === "started") run.origin = deliveryId
     },
     onCommandWake,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
@@ -105,7 +111,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         if (event.kind === "legacy_mailbox_invalid") ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (retried at the next start): ${event.error}`)
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
-      const run: RunContext = { turn: 0, cause: undefined }
+      const run: RunContext = { turn: 0, cause: undefined, origin: undefined }
       const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
@@ -124,6 +130,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerCause: () => run.cause,
+        callerRunOrigin: () => run.origin,
         onCompletionArmed: (durableId) => completions.arm(durableId),
       })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
@@ -165,6 +172,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       pi.on("agent_settled", async (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
+        run.origin = undefined
         if (durableId === undefined) return
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)

@@ -213,7 +213,7 @@ describe("thread component startup and shutdown touch no store they do not need"
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
       const bound = await real.bind({ now: Date.now(), receipt: null, binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", root_message_id: null, progress_message_id: null, session_durable_id: "dur-1", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["question"], policy_id: "default", ttl_seconds: null } })
       if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-      const asked = await real.report({ now: Date.now(), receipt: null, session_durable_id: "dur-1", binding_id: bound.binding.binding_id, event: "question", text: "deploy?", ui_request_id: "ui-1", ui_request_kind: null })
+      const asked = await real.report({ now: Date.now(), receipt: null, origin_delivery_id: null, session_durable_id: "dur-1", binding_id: bound.binding.binding_id, event: "question", text: "deploy?", ui_request_id: "ui-1", ui_request_kind: null })
       if (asked.kind !== "ok" || asked.reply_token === null) throw new Error(JSON.stringify(asked))
       // No host gateway port: the answer is claimed, cannot be handed off, and its release hits the bound.
       await f.tool("thread_answer").execute("call-answer", { binding_id: bound.binding.binding_id, reply_token: asked.reply_token, answer: "yes" }, undefined, undefined, sessionCtx("dur-2"))

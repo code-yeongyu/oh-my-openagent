@@ -105,6 +105,8 @@ export type ThreadToolSurfaceOptions = {
    * root (hop, cycle and budget guards), and a send with none starts a new root.
    */
   readonly callerCause?: () => string | undefined
+  /** The delivery whose admission started the caller's current run; a report without `binding_id` goes to its binding. */
+  readonly callerRunOrigin?: () => string | undefined
   /** `thread_report {kind: "completion"}` armed a completion for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string) => void
   readonly now?: () => number

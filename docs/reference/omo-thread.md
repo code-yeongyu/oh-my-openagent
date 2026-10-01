@@ -208,10 +208,13 @@ a connector drives the binding.
 
 `report` writes a row to a binding's outbox for the connector to post. Only the session a binding
 is attached to reports through it (`scope_denied` otherwise), only while the binding is active
-(`binding_inactive`) and subscribed to that event (`unsupported`). Without `--binding` the report
-goes to the session's ORIGINATING binding, the one its newest admitted external message came
-through; a session that took no message through a binding must name `--binding` (`invalid_arguments`).
-Nothing is ever copied to the session's other bindings.
+(`binding_inactive`) and subscribed to that event (`unsupported`). From the session's own
+`thread_report` tool, a report without a binding goes to the ORIGINATING binding: the one whose
+message started the session's current run. A message from another thread that arrives while the run
+is going (queued behind it) does not change that. Otherwise, and always for `omo thread report`, which
+runs outside the session, a report without `--binding` goes to the session's only active outbound
+binding; a session with none or several must name `--binding` (`invalid_arguments`, with the
+`binding_ids` to choose from). Nothing is ever copied to the session's other bindings.
 
 - `milestone` and `report` rows are written at once. The first `--provider-message-id` acked for
   a milestone becomes the binding's `progress_message_id`, and later milestone rows carry it as

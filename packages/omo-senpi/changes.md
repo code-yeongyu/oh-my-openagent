@@ -50,6 +50,13 @@
   delivery, their `outbox_cursors`, and `session_meta` rows nothing references. At most 256 rows per table per sweep,
   hourly unless the last sweep hit the bound; it runs at the end of an enqueue, a relay mutation or an outbox read, so
   opening a current store still takes no write lock. Retention periods: `docs/reference/omo-thread.md` "Retention".
+- `thread_report` without `binding_id`: the default is the binding of the message whose admission STARTED the
+  session's current run (`component.ts` `run.origin`, set by a `started` admission and cleared at `agent_settled`; the
+  drain's `onAdmitted` now reports the admission kind), carried into the report as `origin_delivery_id`. It used to be
+  the binding of the newest admitted delivery, so a message from thread B queued mid-run took thread A's report or
+  completion. Without an origin (a prompt the user typed, `omo thread report`) the session's only active outbound
+  binding is used, and several are `invalid_arguments` naming their `binding_ids`. `report-origin.test.ts` drives two
+  threads through the SDK and the real `thread_report` tool.
 
 ## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
 

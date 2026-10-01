@@ -102,7 +102,7 @@ export type ControlEndpointRegistrantOptions = {
   /** The component's store, shared with the thread tools; the registrant then neither opens nor disposes one. */
   readonly store?: GatewayStore
   /** Called for each delivery this session's runtime took (started, steered or queued): the cause of the run that follows. */
-  readonly onAdmitted?: (durableId: string, deliveryId: string) => void
+  readonly onAdmitted?: (durableId: string, deliveryId: string, kind: "started" | "steered" | "queued") => void
   /**
    * Awaited before the drain pass of a wake another process asked for (a `wake` command): the edge
    * on which the session learns of work written outside it, such as a completion armed from the CLI.
@@ -197,7 +197,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       durableId: session.durableId,
       sessionPath: session.sessionPath,
       log,
-      onAdmitted: (deliveryId) => options.onAdmitted?.(session.durableId, deliveryId),
+      onAdmitted: (deliveryId, kind) => options.onAdmitted?.(session.durableId, deliveryId, kind),
       ...(session.notify === undefined ? {} : { notify: session.notify }),
       ...options._test?.drain,
     })

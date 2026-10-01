@@ -18,8 +18,8 @@ export type InboxDrainOptions = {
   readonly log?: (line: string) => void
   /** Shows the queued notice in the session's own UI (the extension UI `notify`). */
   readonly notify?: (text: string) => void
-  /** A delivery this drain started, steered or queued into the session; runs on every pass, including a busy retry. */
-  readonly onAdmitted?: (deliveryId: string) => void
+  /** A delivery this drain started, steered or queued into the session, with how it was admitted; runs on every pass, including a busy retry. */
+  readonly onAdmitted?: (deliveryId: string, kind: "started" | "steered" | "queued") => void
   /** Test seams: act as another process, or stop between the two phases of an admission. */
   readonly _test?: {
     readonly identity?: ProcessIdentity
@@ -136,7 +136,7 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         })
       }
       admitted.push({ delivery_id: row.delivery_id, kind: result.kind })
-      if (result.kind === "started" || result.kind === "steered" || result.kind === "queued") options.onAdmitted?.(row.delivery_id)
+      if (result.kind === "started" || result.kind === "steered" || result.kind === "queued") options.onAdmitted?.(row.delivery_id, result.kind)
     }
     return { admitted }
   }
