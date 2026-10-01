@@ -37,10 +37,15 @@ await runScenario("stopped-target", async ({ report, fake, scratch, install, sta
   await sender.submit(callDirective("thread_send", { thread: target.durableId, message: `${TOKEN} sent to a stopped terminal` }))
   const sent = await awaitToolResult(fake, "thread_send", mark)
   const deliveryId = sent?.delivery_id
-  report.assert("send-accepted-while-stopped", sent?.kind === "ok" && typeof deliveryId === "string", JSON.stringify(sent).slice(0, 300))
+  // A wake the stopped terminal cannot answer leaves the send `queued_offline`; `queued` would claim a reach that never happened.
+  report.assert("send-accepted-while-stopped", sent?.kind === "ok" && typeof deliveryId === "string" && sent.delivery?.kind === "queued_offline", JSON.stringify(sent).slice(0, 300))
   deliveries.push({ id: deliveryId, token: TOKEN })
-  const stoppedRow = await deliveryRow(scratch.agentDir, deliveryId)
-  report.assert("row-queued-while-stopped", stoppedRow?.state === "queued" && deliveryEntries(target.sessionPath).every((entry) => deliveryIdOf(entry) !== deliveryId), `state=${stoppedRow?.state}`)
+  // Every delivery, the fresh CLI one included, is still queued and absent from the transcript before SIGCONT,
+  // so the applications counted below can only come from the continue edge.
+  for (const delivery of deliveries) {
+    const stoppedRow = await deliveryRow(scratch.agentDir, delivery.id)
+    report.assert(`row-queued-while-stopped-${delivery.token}`, stoppedRow?.state === "queued" && deliveryEntries(target.sessionPath).every((entry) => deliveryIdOf(entry) !== delivery.id), `delivery_id=${delivery.id} state=${stoppedRow?.state}`)
+  }
 
   process.kill(tui.pid, "SIGCONT")
   for (const delivery of deliveries) {
