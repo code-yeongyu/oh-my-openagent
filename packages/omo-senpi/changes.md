@@ -205,6 +205,10 @@
 - `schema.ts`: the outbox `event_kind` CHECK also admits `question_closed`, reserved for question closure (a
   follow-up writes it when the session's question ends without an answer through the thread); nothing writes it
   here. The CHECK sits inline in `CREATE TABLE outbox`, so it is widened before release, not rebuilt after.
+- `registration.ts` records the session's incarnation only after senpi registered its control endpoint, and every
+  wake's drain waits for that record. A session senpi answers `unsupported` for (a Windows terminal answers
+  `unsupported_platform`) used to create `gateway/gateway.sqlite`, `gateway/inbox/` and a `session_meta` row first; it
+  now does no gateway I/O. `component.test.ts` and `inbox-drain.test.ts` cover the unsupported start and the wake order.
 - `store-ops.ts` `requeueReleased` (with its `store.ts` method and worker op) is deleted: nothing called it. A released
   session's dropped deliveries come back through the `session_released` transcript check in `reconcile` on the next
   owner's side; a second path from `omo daemon adopt` would act from another process without that check.

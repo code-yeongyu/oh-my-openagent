@@ -185,6 +185,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       return { status: "failed", reason }
     }
     const agentDir = options.agentDir()
+    // Creating the store opens nothing; its file is opened by its first operation, below.
     store ??= createGatewayStore({ agentDir, ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }) })
     const runtime: SessionRuntimePort = {
       phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : openQuestions.size > 0 ? "waiting_question" : "mid_turn"),
@@ -207,21 +208,19 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       drain.stop()
     }
     const drainOnce = async (event: SenpiWakeEvent) => toSessionControlDrainResult(await drain.drain(drainEvent(event)))
-    // A reply token names the runtime that held the session when it asked; this runtime becomes the
-    // holder before its endpoint can take a wake, so a restart turns earlier tokens stale before the
-    // first drain could mint one. A session whose holder cannot be recorded is not registered.
-    try {
-      await store.registerIncarnation({ durable_id: session.durableId, incarnation: (await store.identity()).instance_id })
-    } catch (error) {
-      retire()
-      const reason = error instanceof Error ? error.message : String(error)
-      log(`thread gateway: the session incarnation for ${session.durableId} could not be recorded, so the session is not registered: ${reason}`)
-      return { status: "failed", reason }
-    }
+    // A reply token names the runtime that held the session when it asked. This runtime records itself
+    // as the holder only once senpi registered its endpoint, so a session senpi cannot register (a
+    // terminal on Windows, a mode without a host) starts with no gateway I/O at all. Every wake waits
+    // for that record, so a restart still turns earlier tokens stale before the first drain could mint
+    // one. A session whose holder cannot be recorded is not registered.
+    let recorded: (holder: boolean) => void = () => undefined
+    const holder = new Promise<boolean>((resolve) => {
+      recorded = resolve
+    })
     const reply = await control.registerControlEndpoint({
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
       drain: async (event) => {
-        if (retired) return { admitted: [] }
+        if (retired || !(await holder) || retired) return { admitted: [] }
         if (event.reason === "command" || event.reasons.includes("command")) await options.onCommandWake?.(session.durableId)
         return await drainOnce(event)
       },
@@ -229,9 +228,21 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     })
     if (reply.status !== "registered") {
       retire()
+      recorded(false)
       if (reply.status === "failed") log(`thread gateway: the control endpoint for ${session.durableId} failed to register: ${reply.reason}`)
       return reply
     }
+    try {
+      await store.registerIncarnation({ durable_id: session.durableId, incarnation: (await store.identity()).instance_id })
+    } catch (error) {
+      retire()
+      recorded(false)
+      const reason = error instanceof Error ? error.message : String(error)
+      log(`thread gateway: the session incarnation for ${session.durableId} could not be recorded, so the session is not registered: ${reason}`)
+      await reply.dispose().catch((disposal: unknown) => log(`thread gateway: the control endpoint for ${session.durableId} was not disposed: ${disposal instanceof Error ? disposal.message : String(disposal)}`))
+      return { status: "failed", reason }
+    }
+    recorded(true)
     active = { durableId: session.durableId, drain, retire, dispose: reply.dispose }
     return { status: "registered", socket: reply.socket }
   }

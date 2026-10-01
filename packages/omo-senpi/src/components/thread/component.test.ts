@@ -353,6 +353,39 @@ describe("thread component startup and shutdown touch no store they do not need"
     }
   })
 
+  test("#given a terminal senpi cannot register (Windows answers unsupported_platform) #when session_start runs and the session shuts down #then no gateway database, no inbox and no incarnation row exist, and nothing is logged", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-unsupported-"))
+    try {
+      const warnings: string[] = []
+      const calls: string[] = []
+      let answered!: () => void
+      const registrarAnswered = new Promise<void>((resolve) => { answered = resolve })
+      const session = {
+        persistHeaderNow: async () => { calls.push("persistHeaderNow") },
+        registerControlEndpoint: async () => {
+          calls.push("registerControlEndpoint")
+          answered()
+          return { status: "unsupported", reason: "unsupported_platform" }
+        },
+        admissionGate: () => ({ can_admit: true, editor_revision: 0, turn_epoch: 0 }),
+        admitExternalMessage: () => ({ kind: "started", turn_epoch: 1 }),
+        listAdmittedDeliveries: () => ({ pending: [], emitted: [] }),
+      }
+      const f = eventApi(session)
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir }).register(f.pi as never, context(warnings) as never)
+      const ctx = { sessionManager: { getSessionId: () => "dur-win", getSessionFile: () => join(agentDir, "dur-win.jsonl") }, isIdle: () => true }
+      await f.dispatch("session_start", ctx)
+      await within(registrarAnswered, 10_000, "senpi's registrar to be asked")
+      // Shutdown waits for the registration still in flight, then disposes the store.
+      await f.dispatch("session_shutdown", ctx)
+      const database = gatewayDatabasePath(agentDir)
+      const incarnation = existsSync(database) ? (() => { const db = new Database(database); try { return db.query("SELECT incarnation FROM session_meta WHERE durable_id = 'dur-win'").get() } finally { db.close() } })() : null
+      expect({ calls, database: existsSync(database), inbox: existsSync(join(gatewayRootDirectory(agentDir), "inbox")), incarnation, warnings }).toEqual({ calls: ["persistHeaderNow", "registerControlEndpoint"], database: false, inbox: false, incarnation: null, warnings: [] })
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
   test("#given an answer release that gave up at the store's lock-wait bound #when the session shuts down #then the background release retry makes no further attempt", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-release-"))
     const real = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 50 } })

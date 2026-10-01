@@ -457,20 +457,31 @@ describe("session inbox drain through the control endpoint registrant", () => {
     })
   })
 
-  test("#given a terminal registering its endpoint #when registration runs #then the session's incarnation is recorded before the endpoint can take a wake", async () => {
+  test("#given a delivery waiting for a terminal whose endpoint takes its first wake while it registers #when registration runs #then that wake's drain pass reads the store only after the session's incarnation is recorded, and the delivery is admitted", async () => {
     const w = await world()
+    const id = okId(await send(w, "before registration"))
     const runtime = new FakeSessionRuntime(w.sessionPath, "B", w.agentDir)
     const control = new FakeSessionControl(runtime)
-    const order: string[] = []
-    const store = createGatewayStore({ agentDir: w.agentDir })
+    const store = createGatewayStore({ agentDir: w.agentDir, now: () => w.clock.now })
     disposers.push(() => store.dispose())
-    const recording: GatewayStore = { ...store, registerIncarnation: async (request) => { order.push("incarnation"); await store.registerIncarnation(request) } }
-    const port: SessionControlActionsPort = { ...control, registerControlEndpoint: async (options) => { order.push("endpoint"); return await control.registerControlEndpoint(options) } }
-    const registrant = createControlEndpointRegistrant({ control: port, agentDir: () => w.agentDir, _test: { store: recording } })
+    let entered!: () => void
+    const drainEntered = new Promise<void>((resolve) => { entered = resolve })
+    let incarnationRecorded = false
+    const drainReads: { readonly op: string; readonly incarnationRecorded: boolean }[] = []
+    // Every store operation but the registrant's own (the identity read and the incarnation write) is a drain pass reading the store.
+    const recording = Object.fromEntries(Object.entries(store).map(([name, value]) => [name, typeof value !== "function" ? value : (...args: unknown[]) => {
+      if (name !== "identity" && name !== "registerIncarnation" && name !== "dispose") drainReads.push({ op: name, incarnationRecorded })
+      return (value as (...a: unknown[]) => unknown).apply(store, args)
+    }])) as GatewayStore
+    // The incarnation write starts only once the first wake reached the drain, plus one worker round trip: a drain that did not wait for it would read the store first.
+    const slowIncarnation: GatewayStore = { ...recording, registerIncarnation: async (request) => { await drainEntered; await store.journalMode(); await store.registerIncarnation(request); incarnationRecorded = true } }
+    // The fake asks for its first `inbox` pass inside registerControlEndpoint, as senpi does.
+    const port: SessionControlActionsPort = { ...control, registerControlEndpoint: async (options) => await control.registerControlEndpoint({ ...options, drain: async (event) => { entered(); return await options.drain(event) } }) }
+    const registrant = createControlEndpointRegistrant({ control: port, agentDir: () => w.agentDir, _test: { store: slowIncarnation, drain: { now: () => w.clock.now } } })
     expect(await registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })).toEqual({ status: "registered", socket: "fake:tui" })
     await control.settled()
     await registrant.stop()
-    expect(order).toEqual(["incarnation", "endpoint"])
+    expect({ drained: drainReads.length > 0, beforeIncarnation: drainReads.filter((read) => !read.incarnationRecorded), state: await stateOf(w.senderStore, id) }).toEqual({ drained: true, beforeIncarnation: [], state: "applied" })
   })
 
   test("#given the store cannot record the session's incarnation #when the terminal registers #then registration fails, no endpoint is exposed, and a delivery sent to it stays queued", async () => {
