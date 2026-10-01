@@ -49,7 +49,8 @@ await runScenario("binding-author", async ({ report, scratch, install, startTui 
   const markerBefore = existsSync(marker)
   const reported = await omo(scratch, install, ["thread", "report", target.durableId, "report", "QA report row", "--binding", openId, "--json"])
   const written = existsSync(marker) ? JSON.parse(readFileSync(marker, "utf8")) : undefined
-  report.assert("outbox-marker-written-on-insert", !markerBefore && reported.code === 0 && written?.binding_id === openId && written?.cursor === reported.json?.cursor, `before=${markerBefore} marker=${JSON.stringify(written)} cursor=${reported.json?.cursor}`)
+  const cursorsMatch = Number.isInteger(written?.cursor) && Number.isInteger(reported.json?.cursor) && written.cursor === reported.json.cursor
+  report.assert("outbox-marker-written-on-insert", !markerBefore && reported.code === 0 && written?.binding_id === openId && cursorsMatch, `before=${markerBefore} marker=${JSON.stringify(written)} cursor=${reported.json?.cursor}`)
 
   const status = await omo(scratch, install, ["host", "status", "--all", "--json"])
   const row = status.json?.endpoints?.find((endpoint) => endpoint.endpoint_kind === "tui" && endpoint.owner?.session?.id === target.durableId)
