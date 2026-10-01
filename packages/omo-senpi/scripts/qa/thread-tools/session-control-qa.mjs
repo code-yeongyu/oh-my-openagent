@@ -31,6 +31,7 @@ import {
   startFakeModelServer,
   threadComponent,
   trackChild,
+  trackCloser,
   verifyCleanup,
 } from "./lib/harness.mjs"
 
@@ -110,6 +111,8 @@ let socketPath
 const stores = []
 // Part A's thread-tool state dir lives outside the scratch tree, so it is removed on its own.
 const liveStateDirectory = join(process.env.TMPDIR ?? "/tmp", `thread-qa-live-${STAMP}`)
+// Registered with the signal cleanup too: a SIGINT/SIGTERM run exits without reaching the `finally` below.
+trackCloser(() => rmSync(liveStateDirectory, { recursive: true, force: true }))
 try {
   const { createThreadTools } = await threadComponent("tools")
   const { createLiveThreadSurface, resolveThreadSocket } = await threadComponent("live-surface")
