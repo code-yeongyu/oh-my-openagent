@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, dev]
   pull_request:
-    branches: [master, dev]
+    branches: [master, dev, ci/9245-probe-base]
     # `labeled` lets the ci:full-matrix label retrigger CI; concurrency cancel-in-progress absorbs bot-label churn.
     types: [opened, synchronize, reopened, labeled]
 
