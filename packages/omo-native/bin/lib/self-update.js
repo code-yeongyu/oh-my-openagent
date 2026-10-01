@@ -13,14 +13,16 @@ export function formatUpdateCommand(update) {
 // npm 11 lists install scripts that no `allowScripts` entry covers. omo's transitive esbuild,
 // @google/genai and protobufjs scripts are safe to skip, so the update never passes `--allow-scripts`
 // itself; it only explains the notice, because npm's own suggested command has no package name (#9281).
-const ALLOW_SCRIPTS_NOTICE = /install scripts blocked|not covered by allowScripts|npm warn install-scripts/i
+// npm 11 says "have install scripts not yet covered by allowScripts", npm 12 "had install scripts blocked
+// because they are not covered by allowScripts"; both carry the `install-scripts` warning prefix.
+const ALLOW_SCRIPTS_NOTICE = /^npm warn install-scripts .*covered by allowScripts/im
 const SKIPPABLE_SCRIPTS = ["esbuild", "@google/genai", "protobufjs"]
 
 export function formatAllowScriptsGuidance(update) {
   const spec = update.argv[update.argv.length - 1]
   return [
     `omo: npm skipped install scripts for ${SKIPPABLE_SCRIPTS.join(", ")}; skipping them is safe, omo runs without them`,
-    `omo: to run them anyway: npm i -g ${spec} --allow-scripts=${SKIPPABLE_SCRIPTS.join(",")}`,
+    `omo: if npm suggested a command without a package name, ignore it; to reinstall use: npm i -g ${spec}`,
   ]
 }
 
