@@ -18,6 +18,9 @@ import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-sur
  */
 export const COMPLETION_SETTLE_WAIT_MS = 250
 
+/** The files the pre-gateway mailbox kept its queue in (`gateway/legacy-mailbox.ts`). */
+const LEGACY_MAILBOX_FILES = ["mailbox.jsonl", "mailbox.json"] as const
+
 async function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -94,7 +97,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
       const agentDir = options.agentDir ?? (() => resolveAgentHome({ env: process.env }))
       const runtimeInstance = hostInstanceOf(pi)
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      // The pre-gateway `thread_send` mailbox of this workspace: its undelivered items are imported
+      // into the store once, when this session starts and the mailbox still exists on disk.
+      const legacyMailbox = join(stateDirectory, "mailbox")
+      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      store.onEvent((event) => {
+        if (event.kind === "legacy_mailbox_invalid") ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (retried at the next start): ${event.error}`)
+        if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
+      })
       const run: RunContext = { turn: 0, cause: undefined }
       const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome }), {
         retryAfterMs: () => store.busyTimeoutMs,
@@ -129,7 +139,19 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         }
       }
       const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, run, pickUpArms)
+      let legacyImportStarted = false
+      const importLegacyMailbox = async (): Promise<void> => {
+        if (legacyImportStarted || !LEGACY_MAILBOX_FILES.some((file) => existsSync(join(legacyMailbox, file)))) return
+        legacyImportStarted = true
+        try {
+          const imported = await store.legacyMigrated()
+          if (imported > 0) ctx.logger.info(`thread gateway: imported ${imported} undelivered message(s) from the legacy thread mailbox ${legacyMailbox}`)
+        } catch (error) {
+          ctx.logger.warn(`thread gateway: the legacy thread mailbox was not imported: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
       pi.on("session_start", (_event, eventCtx) => {
+        void importLegacyMailbox()
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) void pickUpArms(durableId)
       })

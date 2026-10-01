@@ -47,6 +47,7 @@ import type {
   GatewayStoreConfig,
   GatewayStoreEvent,
   GatewayStoreStats,
+  LegacyMailboxSkip,
   ProcessIdentity,
   ReconcileOutcome,
   ReconcileRequest,
@@ -774,11 +775,16 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
     }
     if (items === null) continue
     const user = safeUserName()
+    // An item whose target is not a durable id can never be delivered: it is reported and the
+    // directory is still marked migrated, because a later open could do no better. A directory that
+    // cannot be read is not marked, so the next open tries again (`legacy_mailbox_invalid`).
+    const skipped: readonly LegacyMailboxSkip[] = items.filter((item) => !DURABLE_ID_PATTERN.test(item.target)).map((item) => ({ message_seq: item.message_seq, target: item.target, reason: "invalid_target" }))
+    const deliverable = items.filter((item) => DURABLE_ID_PATTERN.test(item.target))
     migrated += await transaction(ctx, "migrate_legacy", () => {
       let count = 0
-      for (const item of items) {
+      for (const item of deliverable) {
         const deliveryId = `legacy-${argsHash([directory, item.message_seq]).slice(0, 32)}`
-        if (!DURABLE_ID_PATTERN.test(item.target) || selectRow(ctx, deliveryId) !== undefined) continue
+        if (selectRow(ctx, deliveryId) !== undefined) continue
         const rootId = `root-${randomUUID()}`
         const sender = `legacy:${directory}`
         write(ctx, "INSERT INTO causal_roots (root_id, origin_principal, created_at, expires_at) VALUES (?, ?, ?, ?)", [rootId, sender, now, now + ROOT_LIFETIME_MS])
@@ -820,9 +826,10 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
         createMarker(ctx, item.target, deliveryId, true)
         count++
       }
-      write(ctx, "INSERT INTO gateway_meta (key, value) VALUES (?, ?)", [key, JSON.stringify({ migrated_at: now, count })])
+      write(ctx, "INSERT INTO gateway_meta (key, value) VALUES (?, ?)", [key, JSON.stringify({ migrated_at: now, count, skipped })])
       return count
     })
+    if (skipped.length > 0) ctx.emit({ kind: "legacy_mailbox_skipped", directory, items: skipped })
   }
   return migrated
 }

@@ -7,6 +7,7 @@ import type { Worker } from "node:worker_threads"
 import { createInboxDrain } from "./drain"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
 import { GATEWAY_MIGRATIONS } from "./schema"
+import type { GatewayStoreEvent } from "./types"
 import { FakeSessionRuntime } from "./testing/fake-runtime"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
@@ -124,11 +125,15 @@ describe("legacy mailbox migration", () => {
       JSON.stringify({ version: 1, kind: "enqueue", item: item(1, "one") }),
       JSON.stringify({ version: 1, kind: "enqueue", item: item(2, "gone") }),
       JSON.stringify({ version: 1, kind: "enqueue", item: item(3, "three") }),
+      JSON.stringify({ version: 1, kind: "enqueue", item: { ...item(4, "nowhere"), target: "../not an id" } }),
       JSON.stringify({ version: 1, kind: "remove", message_seq: 2 }),
       "{\"version\":1,\"kind\":\"enq",
     ].join("\n"))
     const first = h.store({ legacyMailboxDirectories: [legacy] })
+    const events: GatewayStoreEvent[] = []
+    first.onEvent((event) => events.push(event))
     expect(await first.legacyMigrated()).toBe(2)
+    expect(events.filter((event) => event.kind === "legacy_mailbox_skipped")).toEqual([{ kind: "legacy_mailbox_skipped", directory: legacy, items: [{ message_seq: 4, target: "../not an id", reason: "invalid_target" }] }])
     const second = h.store({ legacyMailboxDirectories: [legacy] })
     expect(await second.legacyMigrated()).toBe(0)
     const rows = await second.list({ target_durable_id: "B" })
@@ -138,6 +143,13 @@ describe("legacy mailbox migration", () => {
     ])
     expect(readdirSync(gatewayInboxDirectory(h.agentDir, "B")).toSorted()).toEqual(rows.map((row) => row.delivery_id).toSorted())
     expect(existsSync(join(legacy, "mailbox.jsonl"))).toBe(true)
+    const meta = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      const record = meta.query("SELECT value FROM gateway_meta WHERE key = ?").get(`legacy_mailbox:${legacy}`) as { value: string } | null
+      expect(JSON.parse(record?.value ?? "null")).toMatchObject({ count: 2, skipped: [{ message_seq: 4, target: "../not an id", reason: "invalid_target" }] })
+    } finally {
+      meta.close()
+    }
   })
 })
 

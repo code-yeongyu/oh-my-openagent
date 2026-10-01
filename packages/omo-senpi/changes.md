@@ -26,6 +26,19 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
+
+- `gateway/store.ts`: a failed open is no longer cached. The worker of a rejected `init` is terminated and the open is
+  cleared, and a worker exit clears it too, so the next call starts a fresh worker (in-flight requests fail and are not
+  replayed). Pending requests are tied to the worker they were posted to, so a dying worker never fails its successor's
+  open. `store.test.ts` holds `BEGIN IMMEDIATE` through the first open and terminates a live worker.
+- `component.ts`: production passes `legacyMailboxDirectories: [<thread state dir>/mailbox]`, and `session_start`
+  imports that pre-gateway `thread_send` mailbox once when a `mailbox.jsonl`/`mailbox.json` is on disk (a session
+  without one still creates no database). `store-ops.ts` `migrateLegacyMailboxes` reports an item whose target is not a
+  durable id (`legacy_mailbox_skipped`, logged, and recorded in the directory's `gateway_meta` row) and still marks the
+  directory migrated, because no later open can deliver it; a mailbox that cannot be read is logged and left unmarked,
+  so the next start retries.
+
 ## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
 
 - `session-facts.ts`: the already-capped final record is now validated with `JSON.parse` before its top-level

@@ -196,6 +196,10 @@ export type GatewayStoreEvent =
   | { readonly kind: "paused"; readonly hook: string }
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }
+  | { readonly kind: "legacy_mailbox_skipped"; readonly directory: string; readonly items: readonly LegacyMailboxSkip[] }
+
+/** A legacy mailbox item that can never be delivered (its target is not a durable session id); it is reported, not imported. */
+export type LegacyMailboxSkip = { readonly message_seq: number; readonly target: string; readonly reason: "invalid_target" }
 
 export type GatewayTestHookAction = "pause" | "sigkill" | "throw"
 

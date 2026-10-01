@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { COMPLETION_SETTLE_WAIT_MS, createThreadComponent } from "./component"
@@ -140,6 +140,40 @@ describe("thread component control endpoint registration", () => {
       await disposal
       expect(calls).toEqual(["persistHeaderNow", "registerControlEndpoint", "dispose"])
       expect(registered?.inboxDir).toBe(gatewayInboxDirectory(agentDir, "dur-1"))
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("thread component legacy mailbox import", () => {
+  test("#given the pre-gateway mailbox of this workspace holds undelivered items #when the production component starts a session #then they are queued in the gateway store and the item naming no session is reported", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-legacy-"))
+    try {
+      const stateDirectory = join(agentDir, "state")
+      mkdirSync(join(stateDirectory, "mailbox"), { recursive: true })
+      const item = (seq: number, target: string) => ({ target, message: `m${seq}`, message_seq: seq, delivery: "auto", operation_id: `op-${seq}`, accepted_at: "2026-09-28T00:00:00.000Z" })
+      writeFileSync(join(stateDirectory, "mailbox", "mailbox.jsonl"), `${[
+        { version: 1, kind: "snapshot", next_seq: 1, items: [] },
+        { version: 1, kind: "enqueue", item: item(1, "dur-target") },
+        { version: 1, kind: "enqueue", item: item(2, "no such id/") },
+      ].map((event) => JSON.stringify(event)).join("\n")}\n`)
+      const warnings: string[] = []
+      let reported!: () => void
+      const skippedReport = new Promise<void>((resolve) => { reported = resolve })
+      const logger = { logger: { info() {}, error() {}, warn(message: string) { warnings.push(message); if (message.includes("#2")) reported() } }, config: { getFlag: () => undefined } }
+      const f = eventApi()
+      createThreadComponent({ host: host(), stateDirectory, agentDir: () => agentDir }).register(f.pi as never, logger as never)
+      await f.dispatch("session_start", sessionCtx("dur-sender"))
+      await within(skippedReport, 10_000, "the skipped legacy item to be reported")
+      await f.dispatch("session_shutdown")
+      const store = createGatewayStore({ agentDir })
+      try {
+        expect((await store.list({ target_durable_id: "dur-target" })).map((row) => [row.body, row.state])).toEqual([["m1", "queued"]])
+      } finally {
+        await store.dispose()
+      }
+      expect(warnings.filter((message) => message.includes("legacy"))).toHaveLength(1)
     } finally {
       rmSync(agentDir, { recursive: true, force: true })
     }
