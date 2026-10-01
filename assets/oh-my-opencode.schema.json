@@ -11412,6 +11412,137 @@
       ],
       "additionalProperties": false
     },
+    "manager": {
+      "type": "object",
+      "properties": {
+        "decision_engine": {
+          "default": "jev",
+          "description": "Routing decision engine: jev (TypeSafe System One), heuristic, or llm.",
+          "type": "string",
+          "enum": [
+            "jev",
+            "heuristic",
+            "llm"
+          ]
+        },
+        "jev": {
+          "default": {
+            "model": "jev-1.13",
+            "base_url": "https://opencode.ai/zen/v1",
+            "confidence_threshold": 0.75,
+            "max_attempts": 5,
+            "circuit_breaker": {
+              "failures": 3,
+              "cooldown_ms": 600000
+            },
+            "budget": {
+              "monthly_cap_usd": 2,
+              "warn_at_usd": 1.5
+            }
+          },
+          "type": "object",
+          "properties": {
+            "model": {
+              "default": "jev-1.13",
+              "description": "Jev model identifier.",
+              "type": "string"
+            },
+            "base_url": {
+              "default": "https://opencode.ai/zen/v1",
+              "description": "Jev API base URL.",
+              "type": "string",
+              "format": "uri"
+            },
+            "confidence_threshold": {
+              "default": 0.75,
+              "description": "Minimum confidence required to accept a Jev decision.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "max_attempts": {
+              "default": 5,
+              "description": "Maximum Jev decision attempts before fallback.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "circuit_breaker": {
+              "default": {
+                "failures": 3,
+                "cooldown_ms": 600000
+              },
+              "type": "object",
+              "properties": {
+                "failures": {
+                  "default": 3,
+                  "description": "Consecutive failures that open the circuit.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "cooldown_ms": {
+                  "default": 600000,
+                  "description": "Cooldown before retrying a tripped circuit (ms).",
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "failures",
+                "cooldown_ms"
+              ],
+              "additionalProperties": false,
+              "description": "Jev circuit breaker tuning."
+            },
+            "budget": {
+              "default": {
+                "monthly_cap_usd": 2,
+                "warn_at_usd": 1.5
+              },
+              "type": "object",
+              "properties": {
+                "monthly_cap_usd": {
+                  "default": 2,
+                  "description": "Monthly spend cap for Jev decisions (USD).",
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "warn_at_usd": {
+                  "default": 1.5,
+                  "description": "Spend threshold that triggers a warning (USD).",
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "monthly_cap_usd",
+                "warn_at_usd"
+              ],
+              "additionalProperties": false,
+              "description": "Jev monthly budget guardrails."
+            }
+          },
+          "required": [
+            "model",
+            "base_url",
+            "confidence_threshold",
+            "max_attempts",
+            "circuit_breaker",
+            "budget"
+          ],
+          "additionalProperties": false,
+          "description": "Jev decision-engine tuning."
+        }
+      },
+      "required": [
+        "decision_engine",
+        "jev"
+      ],
+      "additionalProperties": false,
+      "description": "Manager decision-engine configuration (routing/triage)."
+    },
     "delegation": {
       "type": "object",
       "properties": {

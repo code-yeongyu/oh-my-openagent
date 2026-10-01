@@ -10,6 +10,7 @@ import { ClaudeCodeConfigSchema } from "./claude-code"
 import { CodegraphConfigSchema } from "./codegraph"
 import { CatalogConfigSchema } from "./catalog"
 import { Context7ConfigSchema } from "./context7"
+import { ManagerConfigSchema } from "./decision-engine"
 import { DelegationConfigSchema } from "./delegation"
 import { LocalTranslatorConfigSchema } from "./local-translator"
 import { CommentCheckerConfigSchema } from "./comment-checker"
@@ -106,6 +107,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Aider-style repo-map auto-injector: compressed, ranked codebase map from .codegraph into the first user message (default: off). */
   repo_map: RepoMapConfigSchema.optional(),
   catalog: CatalogConfigSchema,
+  /** Manager decision-engine configuration (routing/triage engine selection). */
+  manager: ManagerConfigSchema.optional(),
   /** Nested delegation: planner/executor manager agents for 3-level hierarchy (default: managers on). */
   delegation: DelegationConfigSchema.optional(),
   /** Local prompt translator: translates+compresses user messages via local Ollama model. */
