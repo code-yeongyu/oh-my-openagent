@@ -19,7 +19,8 @@
  *   --keep-kit     keep the released-engine kit dir (default: removed after the gateway suite)
  * Lines starting `DEFECT` are product defects a scenario detected; they are counted in the summary.
  */
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -100,11 +101,11 @@ function legacyMissing() {
 }
 
 const results = []
-function runOne(name, file, extraArgs = []) {
+function runOne(name, file, extraArgs = [], reportDir = outDir) {
   process.stdout.write(`\n===== ${name} =====\n`)
   const args = [process.execPath, join(here, file), ...extraArgs]
-  const outFile = outDir === undefined ? undefined : join(outDir, `${name}.txt`)
-  if (outFile !== undefined) args.push("--out", outFile, "--evidence-dir", join(outDir, name))
+  const outFile = reportDir === undefined ? undefined : join(reportDir, `${name}.txt`)
+  if (outFile !== undefined) args.push("--out", outFile, "--evidence-dir", join(reportDir, name))
   const child = Bun.spawnSync(args, { stdout: "inherit", stderr: "inherit" })
   let text = ""
   if (outFile !== undefined) {
@@ -124,10 +125,20 @@ function runOne(name, file, extraArgs = []) {
 if (suite === "gateway" || suite === "all") {
   for (const [name, file] of gateway) runOne(name, file)
   if (process.argv.includes("--with-mutant")) {
-    const mutant = runOne("loop-guard-mutant", "loop-guard.mjs", ["--mutant"])
-    // The mutant must FAIL: that is what proves loop-guard can fail. A green mutant is the failure.
-    mutant.code = mutant.code === 0 ? 1 : 0
+    // The mutant's report is always kept: its verdict is read from the report, not the exit code.
+    const mutantDir = outDir ?? mkdtempSync(join(tmpdir(), "thread-qa-mutant-"))
+    const mutant = runOne("loop-guard-mutant", "loop-guard.mjs", ["--mutant"], mutantDir)
+    // The mutant must FAIL the cycle check itself: that is what proves loop-guard can fail. A green
+    // mutant is the failure, and so is one that failed for any other reason (a kit install or a
+    // harness crash), because it never reached the check it exists to break.
+    const mutantReport = join(mutantDir, "loop-guard-mutant.txt")
+    const text = existsSync(mutantReport) ? readFileSync(mutantReport, "utf8") : ""
+    const cycleFailed = /^FAIL loop-guard\/cycle-closing-send-refused /m.test(text)
+    const crashed = /^FAIL loop-guard\/scenario-completed /m.test(text)
+    mutant.code = mutant.code !== 0 && cycleFailed && !crashed ? 0 : 1
     mutant.expectedFailure = true
+    if (mutant.code !== 0) process.stdout.write(`FAIL loop-guard-mutant did not fail the cycle check: exit=${mutant.code} cycle_check_failed=${cycleFailed} scenario_crashed=${crashed}\n`)
+    if (outDir === undefined) rmSync(mutantDir, { recursive: true, force: true })
   }
   if (!process.argv.includes("--keep-kit")) rmSync(kitDir, { recursive: true, force: true })
 }
