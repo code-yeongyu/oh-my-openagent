@@ -1,0 +1,36 @@
+name: V2 Dual-Host
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  dual-host-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace deps
+        run: bun install --frozen-lockfile
+
+      - name: Install V2 host deps (exact)
+        run: bun add --dev --exact @opencode/plugin@2.0.20 @opencode/client@2.0.20 --filter @oh-my-opencode/omo-opencode
+
+      - name: V1 entry loads
+        working-directory: packages/omo-opencode
+        run: bun -e 'const m = await import("./src/index.ts"); if (!m.default || typeof m.default.server !== "function") throw new Error("V1 PluginModule.server missing"); console.log("V1 entry OK:", m.default.id)'
+
+      - name: V2 entry loads
+        working-directory: packages/omo-opencode
+        run: bun -e 'const m = await import("./src/v2/index.ts"); if (!m.default || typeof m.default.setup !== "function") throw new Error("V2 setup missing"); console.log("V2 entry OK:", m.default.id)'
+
+      - name: Parity matrix behaviour checks
+        working-directory: packages/omo-opencode
+        run: bun test test/v2-contract/parity-matrix.test.ts --timeout 20000
