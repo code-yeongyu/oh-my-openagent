@@ -66,6 +66,8 @@ function relayFor(handOff: HandOff) {
 function downgradeToV2(agentDir: string, before: (db: Database) => void = () => {}): void {
   const db = new Database(gatewayDatabasePath(agentDir))
   try {
+    // The store that wrote the rows still has the file open: wait for its lock like any other writer.
+    db.run("PRAGMA busy_timeout = 5000")
     before(db)
     db.run("ALTER TABLE outbox DROP COLUMN ui_request_kind")
     db.run("ALTER TABLE outbox DROP COLUMN answer_state")

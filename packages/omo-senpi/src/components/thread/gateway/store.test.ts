@@ -67,6 +67,8 @@ describe("outbox question states", () => {
     const h = (harness = createGatewayHarness())
     expect(await h.store().journalMode()).toBe("wal")
     const db = new Database(gatewayDatabasePath(h.agentDir))
+    // The open store holds the file: wait for its lock like any other writer.
+    db.run("PRAGMA busy_timeout = 5000")
     const insert = (state: string) => db.run("INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at, question_state) VALUES ('bnd-1', 1, 'question', '{}', 'pending', 1, ?)", [state])
     try {
       for (const state of ["pending", "answered", "expired", "cancelled"]) insert(state)
