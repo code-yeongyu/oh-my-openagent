@@ -15,7 +15,7 @@
  * `--mutant`: runs against a build whose store worker answers "no cycle" (patch `cycle_check_off`).
  * Part 1 must then FAIL, which is the proof this scenario can fail. Give it its own `--evidence-dir`.
  */
-import { allToolResults, assistantTexts, awaitTuiEndpoint, cliSend, deliveryEntries, hasFlag, openHostSession, runScenario, startShardHost, storeRows, waitFor } from "./lib/gateway.mjs"
+import { allToolResults, assistantTexts, awaitTuiEndpoint, cliSend, deliveryEntries, hasFlag, openHostSession, runScenario, startShardHost, storeRows, toolCallResults, waitFor } from "./lib/gateway.mjs"
 
 const MUTANT = hasFlag("--mutant")
 const FANOUT_TARGETS = 17
@@ -39,11 +39,13 @@ await runScenario("loop-guard", async ({ report, fake, scratch, install, startTu
   const hop1 = fake.script("cycle-a", [{ name: "thread_send", args: { thread: "tui-b", message: `QA-TOKEN-hop1 ${hop2}` } }])
   const mark = fake.requests.length
   await tuis.a.tui.submit(hop1)
+  // The three TUIs reach the shared fake model in scheduler order, so each hop's result is picked by
+  // the target its call named (A sends to tui-b, B to tui-c, C to tui-a), not by arrival order.
   const sends = await waitFor(() => {
-    const results = allToolResults(fake, "thread_send", mark)
-    return results.length >= 3 ? results : undefined
+    const byTarget = new Map(toolCallResults(fake, "thread_send", mark).map((entry) => [entry.args?.thread, entry.result]))
+    return ["tui-b", "tui-c", "tui-a"].every((thread) => byTarget.has(thread)) ? byTarget : undefined
   }, { label: "three thread_send results (A->B, B->C, C->A)", timeoutMs: 120_000 })
-  const [first, second, third] = sends
+  const [first, second, third] = [sends.get("tui-b"), sends.get("tui-c"), sends.get("tui-a")]
   report.assert("cycle-hop1-and-hop2-delivered", first?.kind === "ok" && second?.kind === "ok", `a->b=${first?.kind} b->c=${second?.kind}`)
   report.assert(
     "cycle-closing-send-refused",

@@ -652,6 +652,39 @@ export function allToolResults(fake, tool, from = 0) {
     })
 }
 
+/**
+ * Every `<tool>` result after request index `from`, paired with the arguments of the call it answers.
+ * Several sessions share the fake model and reach it in scheduler order, so a scenario that needs a
+ * particular hop's result picks it by its call (`args.thread`), never by its position.
+ */
+export function toolCallResults(fake, tool, from = 0) {
+  return fake.requests.slice(from).flatMap((request) => {
+    if (request.answer?.kind !== "tool_result") return []
+    const call = [...request.messages].reverse().find((message) => message.role === "assistant" && Array.isArray(message.tool_calls))
+    return request.messages
+      .slice(request.messages.lastIndexOf(call) + 1)
+      .filter((message) => message.role === "tool")
+      .flatMap((message) => {
+        const toolCall = call?.tool_calls?.find((candidate) => candidate.id === message.tool_call_id)
+        if (toolCall?.function?.name !== tool) return []
+        let args
+        try {
+          args = JSON.parse(toolCall.function.arguments)
+        } catch {
+          args = undefined
+        }
+        let result
+        try {
+          const parsed = JSON.parse(contentText(message))
+          result = parsed?.details?.result ?? parsed?.result ?? parsed
+        } catch {
+          result = { unparsed: contentText(message) }
+        }
+        return [{ args, result }]
+      })
+  })
+}
+
 /* ------------------------------------------------------------------ pty TUI */
 
 let terminalModule
