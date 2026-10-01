@@ -123,6 +123,7 @@ Self-send and a cycle back to the sender under one causal root are `loop_detecte
 - Retention: acked rows 30 days after their ack; unacked rows live as long as their binding plus 30 days. A detached binding's outbox stays readable.
 - The first `provider_message_id` acked for a milestone becomes the binding's `progress_message_id`; later milestone rows carry it as `edit_message_id`.
 - `question_state` also admits `expired` and `cancelled` (schema v2 CHECK), RESERVED for question closure from the session's terminal question outcome; nothing in this release writes them.
+- `event_kind` also admits `question_closed` (the `CREATE TABLE outbox` CHECK), RESERVED for the same question closure; nothing in this release writes it.
 - A `question` row carries the HMAC reply token (realm id and secret seeded in `gateway_meta`); `question_state` is `pending` until `thread_answer` through the SAME binding matches it (`binding_mismatch` leaves it pending; a moved binding or a changed session incarnation is `stale_token`; an answer still being handed over makes a second one `answer_in_progress`; a delivered one makes it `already_answered`). The row records the request kind (`ui_request_kind`) the answer's shape follows. A hand-off that gets no reply releases the claim and answers `host_unavailable`; a refusal from the session releases it and answers `stale_token` (`invalid_arguments` for `invalid_response`/`question_incomplete`); a delivered answer keeps it.
 
 ## Completion arms

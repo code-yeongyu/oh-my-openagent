@@ -80,6 +80,24 @@ describe("outbox question states", () => {
   })
 })
 
+describe("outbox event kinds", () => {
+  test("#given the outbox event_kind column #when a row carries the reserved question_closed kind #then it is stored, and any other unknown kind is refused by the CHECK", async () => {
+    const h = (harness = createGatewayHarness())
+    expect(await h.store().journalMode()).toBe("wal")
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    // The open store holds the file: wait for its lock like any other writer.
+    db.run("PRAGMA busy_timeout = 5000")
+    const insert = (kind: string) => db.run("INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at) VALUES ('bnd-1', 1, ?, '{}', 'pending', 1)", [kind])
+    try {
+      for (const kind of ["milestone", "report", "question", "completion", "question_closed"]) insert(kind)
+      expect(() => insert("question_reopened")).toThrow(/CHECK constraint failed/)
+      expect(db.query("SELECT event_kind AS k FROM outbox ORDER BY cursor").all()).toEqual([{ k: "milestone" }, { k: "report" }, { k: "question" }, { k: "completion" }, { k: "question_closed" }])
+    } finally {
+      db.close()
+    }
+  })
+})
+
 describe("schema migration v1 -> v2", () => {
   test("#given a store written by the todo-11 schema #when the current store opens it #then its deliveries survive, the relay tables exist, and a question can be asked and answered", async () => {
     const h = (harness = createGatewayHarness())

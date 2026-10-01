@@ -104,11 +104,13 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     )`,
     "CREATE UNIQUE INDEX bindings_one_active_thread ON bindings (platform, account_id, chat_id, thread_id) WHERE status = 'active'",
     "CREATE INDEX bindings_session ON bindings (session_durable_id, status)",
+    // `question_closed` is reserved for question closure (a follow-up writes it when the session's
+    // question ends); nothing writes it yet, but a CHECK cannot be widened after release without a rebuild.
     `CREATE TABLE outbox (
       cursor INTEGER PRIMARY KEY AUTOINCREMENT,
       binding_id TEXT NOT NULL,
       revision INTEGER NOT NULL,
-      event_kind TEXT NOT NULL CHECK (event_kind IN ('milestone', 'report', 'question', 'completion')),
+      event_kind TEXT NOT NULL CHECK (event_kind IN ('milestone', 'report', 'question', 'completion', 'question_closed')),
       payload TEXT NOT NULL,
       state TEXT NOT NULL CHECK (state IN ('pending', 'acked')),
       provider_message_id TEXT,

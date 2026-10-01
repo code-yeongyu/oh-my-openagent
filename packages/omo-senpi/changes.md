@@ -202,6 +202,9 @@
 - `schema.ts` v2: the outbox `question_state` CHECK admits `pending|answered|expired|cancelled`. `expired` and
   `cancelled` are reserved for question closure (a follow-up writes them from the session's terminal question
   outcome); nothing writes them here. Widened now because a CHECK change after release needs a table rebuild.
+- `schema.ts`: the outbox `event_kind` CHECK also admits `question_closed`, reserved for question closure (a
+  follow-up writes it when the session's question ends without an answer through the thread); nothing writes it
+  here. The CHECK sits inline in `CREATE TABLE outbox`, so it is widened before release, not rebuilt after.
 - `store-ops.ts` `requeueReleased` (with its `store.ts` method and worker op) is deleted: nothing called it. A released
   session's dropped deliveries come back through the `session_released` transcript check in `reconcile` on the next
   owner's side; a second path from `omo daemon adopt` would act from another process without that check.

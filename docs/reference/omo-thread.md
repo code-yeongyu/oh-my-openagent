@@ -259,6 +259,9 @@ binding; a session with none or several must name `--binding` (`invalid_argument
   not written yet: `expired` (the question timed out in the session) and `cancelled` (it was
   cancelled or closed without an answer). A connector should treat either as a closed question
   that takes no answer.
+  An outbox row's `event` is `milestone`, `report`, `question` or `completion`. One more value is
+  reserved and not written yet: `question_closed` (a question ended in the session without an
+  answer through the thread). A connector should skip a row whose `event` it does not know.
 - `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
   row appears when the session settles.
 
