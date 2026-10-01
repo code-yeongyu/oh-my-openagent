@@ -102,7 +102,8 @@ async function adopt(args, options) {
   try {
     return await runAdoptCommand(args, { sdk: loaded.sdk, stdout: options.stdout, stderr: options.stderr })
   } finally {
-    await loaded.sdk.dispose()
+    // The release already happened; a store that fails to close is logged, never a new outcome.
+    await loaded.sdk.dispose().catch((error) => options.stderr.write(`omo daemon adopt: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`))
   }
 }
 
@@ -124,7 +125,9 @@ export function runDaemonCommand(args, options) {
     return DAEMON_EXIT.usage
   }
   if (!SUBCOMMANDS.has(subcommand)) {
-    stderr.write(`omo daemon: unknown subcommand '${subcommand}'\n${USAGE}\n`)
+    // Scripts written for the removed shared-host join get a pointer to what replaced it.
+    const removed = subcommand === "attach" ? "omo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\n" : ""
+    stderr.write(`omo daemon: unknown subcommand '${subcommand}'\n${removed}${USAGE}\n`)
     return DAEMON_EXIT.usage
   }
   // A named pipe is per-process on win32: there is no socket for a second client to attach to,

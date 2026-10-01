@@ -148,7 +148,7 @@ describe("omo daemon", () => {
     expect(engine.calls).toHaveLength(0)
   })
 
-  test("attach is no longer a subcommand: usage exit, empty stdout, engine untouched", () => {
+  test("attach is no longer a subcommand: usage exit, empty stdout, engine untouched, and stderr points to adopt", () => {
     const { pluginRoot, agentDir } = workspace()
     const engine = fakeEngine({ exitCode: 0, stdout: "" })
     const stdout = capture()
@@ -161,6 +161,7 @@ describe("omo daemon", () => {
     expect(exitCode).toBe(2)
     expect(stdout.text()).toBe("")
     expect(stderr.text()).toContain("unknown subcommand 'attach'")
+    expect(stderr.text()).toContain("omo daemon adopt <session>")
     expect(stderr.text()).not.toContain("attach ")
     expect(engine.calls).toHaveLength(0)
   })
