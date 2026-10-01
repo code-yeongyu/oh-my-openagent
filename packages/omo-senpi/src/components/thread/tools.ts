@@ -57,6 +57,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   // the row stays `prepared` under this instance, which would answer `idempotency_in_progress`
   // forever. A retry of such a key is `idempotency_uncertain` with the note instead.
   const unsettled = new Map<string, string>()
+  // Keys whose receipt admission failed without a reply: the store may still have committed the
+  // prepared row (its worker exited after the commit), which this instance's retry would read as
+  // `in_progress` forever. Nothing ran for such a call, so a retry that finds that row while no
+  // invocation of this facade is running the key takes it up and runs the call.
+  const unanswered = new Set<string>()
+  const running = new Set<string>()
   const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
   async function execute<T extends ThreadToolName>(name: T, callId: string, args: unknown, ectx: unknown, sideEffect: (view: ThreadHostView, value: Static<(typeof threadToolParamSchemas)[T]>, operationId: string, callerId: string) => Promise<ThreadToolResult>): Promise<ToolOutput> {
     const callerId = (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ?? options.callerSessionId()
@@ -77,8 +83,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (isLockWaitExceeded(error)) return output(failure("overloaded", `The gateway store is locked by another process; nothing ran: ${message}`, "Wait a few seconds, then retry the call."))
+        unanswered.add(receiptKey(scope))
         return output(failure("internal_error", `The gateway store could not record the call; nothing ran: ${message}`, "Retry the call; if it keeps failing, check the gateway store."))
       }
+      const key = receiptKey(scope)
+      if (admission.kind === "in_progress" && unanswered.has(key) && !running.has(key) && !unsettled.has(key)) admission = { kind: "accepted" }
+      unanswered.delete(key)
       if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
       if (admission.kind === "conflict") return output(failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key."))
       if (admission.kind === "in_progress") {
@@ -92,12 +102,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       unsettled.set(receiptKey(scope), `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`)
     }
     let result: ThreadToolResult
+    if (receipted) running.add(receiptKey(scope))
     try {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
       result = await sideEffect(await view(receipted ? undefined : { offline: true }), value, scope.idempotency_key, callerId)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the call failed (${message})`))
+      running.delete(receiptKey(scope))
       if (message.startsWith("host_unavailable:")) {
         return output(failure("host_unavailable", `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`, "Retry when the shared Senpi host is running."))
       }
@@ -107,6 +119,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       return output(failure("internal_error", `Thread operation failed: ${message}`, "Call thread_list and retry after checking the target."))
     }
     if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the call ran"))
+    running.delete(receiptKey(scope))
     return output(result)
   }
 

@@ -439,4 +439,61 @@ describe("tool receipts the store could not settle", () => {
     expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
+
+  test("#given the store committed a call's receipt but its reply was lost #when the same key is retried #then the retry runs the call once and later retries replay its result", async () => {
+    const f = fixture()
+    const real = f.store
+    let dropReply = true
+    const store: GatewayStore = {
+      ...real,
+      toolReceiptBegin: async (request) => {
+        const admission = await real.toolReceiptBegin(request)
+        if (!dropReply) return admission
+        // The worker committed the prepared receipt, then exited before its reply reached the caller.
+        dropReply = false
+        throw new Error("the gateway store worker exited (1)")
+      },
+    }
+    const run = runner({ ...f, store }, "caller")
+    const args = { thread: "peer", name: "Renamed", idempotency_key: "rename-lost-reply" }
+    expect(await run("thread_rename", args, "caller")).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(f.setSessionName).not.toHaveBeenCalled()
+    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given a call still running under a key #when a second invocation of the key loses its receipt reply and a third retries #then the retry is idempotency_in_progress and the side effect runs once", async () => {
+    const f = fixture()
+    const real = f.store
+    let begins = 0
+    let releaseRename: () => void = () => undefined
+    const renameHeld = new Promise<void>((resolve) => { releaseRename = resolve })
+    let renameStarted: () => void = () => undefined
+    const started = new Promise<void>((resolve) => { renameStarted = resolve })
+    f.setSessionName.mockImplementation(async (sessionId: string, name: string) => {
+      renameStarted()
+      await renameHeld
+      const index = f.sessions.findIndex((entry) => entry.sessionId === sessionId)
+      f.sessions[index] = { ...f.sessions[index], name }
+    })
+    const store: GatewayStore = {
+      ...real,
+      toolReceiptBegin: async (request) => {
+        const admission = await real.toolReceiptBegin(request)
+        // The second invocation's admission (in_progress, nothing written) never reaches it.
+        if (++begins === 2) throw new Error("the gateway store worker exited (1)")
+        return admission
+      },
+    }
+    const run = runner({ ...f, store }, "caller")
+    const args = { thread: "peer", name: "Renamed", idempotency_key: "rename-lost-concurrent" }
+    const first = run("thread_rename", args, "caller")
+    await started
+    expect(await run("thread_rename", args, "caller")).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(await run("thread_rename", args, "caller")).toMatchObject({ kind: "error", error: { code: "idempotency_in_progress" } })
+    releaseRename()
+    expect(await first).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
 })

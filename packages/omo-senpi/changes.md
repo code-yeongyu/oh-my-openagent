@@ -43,6 +43,11 @@
   (the receipt stays `prepared`) was refused `binding_inactive` after an unbind; it now replays the delivered outcome
   from the durable row and completes the receipt, an undecided one stays `idempotency_in_progress`, and a new or edited
   event is still `binding_inactive`. `store.completedDelivery` became `store.deliveryReceipt`.
+- `tools.ts`: a receipted thread tool retried after its receipt admission failed without a reply runs the call. The
+  store worker can commit the `prepared` receipt and exit before replying, and every retry of the same key from this
+  process then read that row as `idempotency_in_progress` until it expired, though nothing had run. The facade notes
+  such a key, and a retry that finds this instance's prepared row while no invocation of the facade runs the key takes
+  it up and runs the call once; a call still running under the key keeps the retry `idempotency_in_progress`.
 
 ## 2026-10-01 - session gateway review round 6: receipts, questions, retention, bindings snapshot, causes, session facts, identifiers (#9222)
 
