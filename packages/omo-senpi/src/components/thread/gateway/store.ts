@@ -102,9 +102,11 @@ export type GatewayStore = {
   readonly bindingView: (request: { readonly now: number; readonly binding_id: string }) => Promise<BindingRecord | null>
   readonly registerIncarnation: (request: { readonly durable_id: string; readonly incarnation: string }) => Promise<void>
   readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
-  readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly armed_through?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Completion arms waiting for the session's settle; a plain read that takes no write lock. */
   readonly pendingCompletionArms: (durableId: string) => Promise<number>
+  /** The sequence number of the newest completion arm waiting for the session's settle, null when none waits; a plain read that takes no write lock. */
+  readonly latestCompletionArm: (durableId: string) => Promise<number | null>
   readonly readOutbox: (request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayOutcome<OutboxPage>>
   readonly ackOutbox: (request: { readonly now: number; readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayOutcome<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   readonly claimAnswer: (request: { readonly now: number; readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly answered_by?: ExternalAuthor | null }) => Promise<RelayOutcome<AnswerClaim>>
@@ -251,6 +253,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     report: (request) => call("report", request),
     emitCompletions: (request) => call("emit_completions", request),
     pendingCompletionArms: (durableId) => call("pending_completion_arms", durableId),
+    latestCompletionArm: (durableId) => call("latest_completion_arm", durableId),
     readOutbox: (request) => call("read_outbox", request),
     ackOutbox: (request) => call("ack_outbox", request),
     claimAnswer: (request) => call("claim_answer", request),

@@ -181,9 +181,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
       const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
-      const completions = createCompletionTracker((durableId, outcome, armedThrough) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, armed_through: armedThrough }), {
+      const completions = createCompletionTracker((durableId, outcome, throughArmSeq) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq }), {
         retryAfterMs: () => store.busyTimeoutMs,
-        now: () => store.now(),
         onWriteFailed: (error, retrying) =>
           ctx.logger.warn(retrying
             ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
@@ -202,7 +201,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerCause: () => run.cause,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
-        onCompletionArmed: (durableId) => completions.arm(durableId),
+        onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
       })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
@@ -211,7 +210,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const pickUpArms = async (durableId: string): Promise<void> => {
         if (!existsSync(gatewayDatabasePath(agentDir()))) return
         try {
-          if (await store.pendingCompletionArms(durableId) > 0) completions.arm(durableId)
+          const latest = await store.latestCompletionArm(durableId)
+          if (latest !== null) completions.arm(durableId, latest)
         } catch (error) {
           ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`)
         }

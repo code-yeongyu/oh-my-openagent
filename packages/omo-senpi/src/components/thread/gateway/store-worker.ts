@@ -110,6 +110,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "report": return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
     case "emit_completions": return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
     case "pending_completion_arms": return relay.pendingCompletionArms(ctx, args as string)
+    case "latest_completion_arm": return relay.latestCompletionArm(ctx, args as string)
     case "read_outbox": return await relay.readOutbox(ctx, args as Parameters<typeof relay.readOutbox>[1])
     case "ack_outbox": return await relay.ackOutbox(ctx, args as Parameters<typeof relay.ackOutbox>[1])
     case "claim_answer": return await relay.claimAnswer(ctx, args as Parameters<typeof relay.claimAnswer>[1])

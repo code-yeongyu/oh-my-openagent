@@ -111,8 +111,8 @@ export type ThreadToolSurfaceOptions = {
   readonly callerRunDeliveries?: () => readonly string[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
-  /** `thread_report {kind: "completion"}` armed a completion for this session; the component writes it at the next settle. */
-  readonly onCompletionArmed?: (durableId: string) => void
+  /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
+  readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
 }
 

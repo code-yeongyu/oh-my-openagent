@@ -40,8 +40,8 @@ export type GatewayRelay = {
    * is `invalid_arguments`, and `steer` is refused on every binding.
    */
   readonly inbound: (request: { readonly binding_id: string; readonly event_id: string; readonly text: string; readonly author?: ExternalAuthor; readonly mode?: InboundMode }) => Promise<GatewayDeliveryResult>
-  /** The session settled: armed completions (those made by `armed_through`, when given) become outbox rows with this outcome. */
-  readonly settle: (request: { readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly armed_through?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  /** The session settled: armed completions (those up to `through_arm_seq`, when given) become outbox rows with this outcome. */
+  readonly settle: (request: { readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Shutdown: cancels background answer-release retries. */
   readonly dispose: () => void
 }

@@ -33,6 +33,14 @@
   sweep that follows deleted a full batch besides, so a peer tool call, keyed relay mutation or keyed send could remove
   `RETENTION_SWEEP_BATCH + 1` receipts. The key's deletion now counts against the sweep's receipt batch, and a batch
   used up that way still makes the next sweep due at once.
+- `gateway/completion.ts` / `store-relay-ops.ts`: a settling run owns the completion arms up to the newest `arm_seq`
+  the session knew of when it settled (`emitCompletions` `through_arm_seq`, replacing the `armed_through` time). The
+  time cutoff assigned an arm made in the same millisecond as an earlier run's settle to that earlier run, so with an
+  outstanding first write and an equal clock reading the two runs collapsed into one completion with the second text
+  and the first outcome. A later run's arm always has a higher sequence number, so each run's completion lands with
+  its own text and outcome, in run order. `thread_report` now hands the tracker the arm's `arm_seq` (kept out of the
+  tool and SDK results), and a durable arm picked up at startup or on a wake arms with the newest stored sequence
+  (`store.latestCompletionArm`).
 
 ## 2026-10-01 - session gateway review round 7: receipt retention, completion arms, replay after unbind, lost receipt replies (#9222)
 

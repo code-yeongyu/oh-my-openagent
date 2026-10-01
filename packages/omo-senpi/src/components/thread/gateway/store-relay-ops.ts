@@ -423,6 +423,8 @@ export type ReportOpResult = {
   readonly cursor: number | null
   readonly reply_token: string | null
   readonly armed: boolean
+  /** For a completion: the arm's sequence number, the watermark a settling run passes to `emitCompletions`; null otherwise. */
+  readonly arm_seq: number | null
 }
 
 /**
@@ -492,7 +494,8 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
       write(ctx, "INSERT INTO completion_arms (session_durable_id, binding_id, revision, text, armed_at) VALUES (?, ?, ?, ?, ?)", [
         request.session_durable_id, bindingId, binding.revision, request.text, request.now,
       ])
-      return { kind: "ok", ...base, cursor: null, reply_token: null, armed: true }
+      const armSeq = Number(ctx.sql.one(["s"], "SELECT last_insert_rowid() AS s")?.s)
+      return { kind: "ok", ...base, cursor: null, reply_token: null, armed: true, arm_seq: armSeq }
     }
     if (request.event === "question") {
       if (request.ui_request_id === null) return refused("invalid_arguments", "A question names the session's pending extension UI request (request_id).")
@@ -500,11 +503,11 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
       const token = mintReplyToken(meta(ctx, "token_secret"), { binding_id: bindingId, revision: binding.revision, session_durable_id: request.session_durable_id, incarnation, ui_request_id: request.ui_request_id })
       const cursor = insertOutbox(ctx, { binding, event: "question", text: request.text, now: request.now, reply_token: token, ui_request_id: request.ui_request_id, ...(request.ui_request_kind === null ? {} : { ui_request_kind: request.ui_request_kind }), incarnation })
       pruneOutbox(ctx, request.now)
-      return { kind: "ok", ...base, cursor, reply_token: token, armed: false }
+      return { kind: "ok", ...base, cursor, reply_token: token, armed: false, arm_seq: null }
     }
     const cursor = insertOutbox(ctx, { binding, event: request.event, text: request.text, now: request.now })
     pruneOutbox(ctx, request.now)
-    return { kind: "ok", ...base, cursor, reply_token: null, armed: false }
+    return { kind: "ok", ...base, cursor, reply_token: null, armed: false, arm_seq: null }
   })
 }
 
@@ -512,18 +515,19 @@ export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): 
  * Called when the session settles (no retry, compaction or queued continuation will run): every
  * completion armed for it becomes one outbox row with the run's outcome, on a binding still active
  * at the revision it was armed under. Arms are consumed, so a later settle emits nothing. With
- * `armed_through` (the time the run settled) only arms made by then are consumed: an arm a later run
- * made waits for that run's own settle, even when this write was delayed or retried past it. Every
- * arm is its own row, so a later run's arm of the same binding never replaces an earlier run's; the
- * consumed arms of one binding become one row with the newest arm's text.
+ * `through_arm_seq` (the newest arm the session knew of when the run settled) only arms up to that
+ * sequence number are consumed: every arm a later run makes has a higher one, so it waits for that
+ * run's own settle, even when this write was delayed or retried past it and whatever the clock read.
+ * Every arm is its own row, so a later run's arm of the same binding never replaces an earlier run's;
+ * the consumed arms of one binding become one row with the newest arm's text.
  */
-export async function emitCompletions(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly armed_through?: number }): Promise<readonly { readonly binding_id: string; readonly cursor: number }[]> {
+export async function emitCompletions(ctx: StoreContext, request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }): Promise<readonly { readonly binding_id: string; readonly cursor: number }[]> {
   return await transaction(ctx, "emit_completions", () => {
     expireDue(ctx, request.now)
     const columns = ["arm_seq", "binding_id", "revision", "text"]
-    const consumed = request.armed_through === undefined
+    const consumed = request.through_arm_seq === undefined
       ? ctx.sql.all(columns, "SELECT arm_seq, binding_id, revision, text FROM completion_arms WHERE session_durable_id = ?", [request.session_durable_id], "arm_seq")
-      : ctx.sql.all(columns, "SELECT arm_seq, binding_id, revision, text FROM completion_arms WHERE session_durable_id = ? AND armed_at <= ?", [request.session_durable_id, request.armed_through], "arm_seq")
+      : ctx.sql.all(columns, "SELECT arm_seq, binding_id, revision, text FROM completion_arms WHERE session_durable_id = ? AND arm_seq <= ?", [request.session_durable_id, request.through_arm_seq], "arm_seq")
     const newest = new Map<string, (typeof consumed)[number]>()
     for (const arm of consumed) {
       write(ctx, "DELETE FROM completion_arms WHERE arm_seq = ?", [Number(arm.arm_seq)])
@@ -546,6 +550,12 @@ export async function emitCompletions(ctx: StoreContext, request: { readonly now
 /** How many completion arms wait for the session's settle: a plain read that takes no write lock, so it never waits on another writer. */
 export function pendingCompletionArms(ctx: StoreContext, durableId: string): number {
   return Number(ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM completion_arms WHERE session_durable_id = ?", [durableId])?.n ?? 0)
+}
+
+/** The sequence number of the newest completion arm waiting for the session's settle, null when none waits: the same lock-free read. */
+export function latestCompletionArm(ctx: StoreContext, durableId: string): number | null {
+  const latest = ctx.sql.one(["s"], "SELECT MAX(arm_seq) AS s FROM completion_arms WHERE session_durable_id = ?", [durableId])?.s
+  return latest === null || latest === undefined ? null : Number(latest)
 }
 
 function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {

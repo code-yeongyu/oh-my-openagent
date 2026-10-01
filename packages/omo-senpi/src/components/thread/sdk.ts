@@ -7,8 +7,9 @@ import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
 import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
-import type { GatewayRelay } from "./gateway/relay"
+import type { GatewayRelay, RelayResult } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import type { ReportOpResult } from "./gateway/store-relay-ops"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayServices } from "./tools/gateway-services"
@@ -36,6 +37,8 @@ type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type Scoped = { readonly all_scope?: boolean }
 type Keyed = { readonly idempotency_key?: string }
 type Relayed<K extends keyof GatewayRelay> = Promise<Awaited<ReturnType<GatewayRelay[K]>> | Failure>
+/** A report as the SDK answers it: the arm's sequence number stays inside the gateway. */
+type Reported = Promise<RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean }> | Failure>
 
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<AddressEntry, "thread_id" | "title" | "cwd" | "status" | "session_path" | "endpoint" | "surface" | "alive">
@@ -54,7 +57,7 @@ export type ThreadSdk = {
   readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Relayed<"unbind">
   readonly rebind: (request: Scoped & Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session: string }) => Relayed<"rebind">
   readonly bindings: (request: Scoped & { readonly session?: string; readonly platform?: string; readonly account_id?: string; readonly chat_id?: string; readonly thread_id?: string; readonly status?: string; readonly cursor?: string; readonly limit?: number }) => Relayed<"bindings">
-  readonly report: (request: Scoped & Keyed & { readonly session: string; readonly kind: string; readonly text: string; readonly binding_id?: string; readonly request_id?: string; readonly request_kind?: string }) => Relayed<"report">
+  readonly report: (request: Scoped & Keyed & { readonly session: string; readonly kind: string; readonly text: string; readonly binding_id?: string; readonly request_id?: string; readonly request_kind?: string }) => Reported
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Relayed<"outbox">
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Relayed<"ack">
   readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly author?: ExternalAuthor }) => Relayed<"answer">
@@ -187,8 +190,11 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         ...(request.request_id === undefined ? {} : { request_id: request.request_id }),
         ...(requestKind === undefined ? {} : { request_kind: requestKind }),
       })
-      if (reported.kind === "ok" && reported.armed) await wakeForArm(session.id)
-      return reported
+      if (reported.kind !== "ok") return reported
+      // The arm's sequence number is the running session's settle watermark, read back on the wake; not part of the result.
+      const { arm_seq: _armSeq, ...result } = reported
+      if (result.armed) await wakeForArm(session.id)
+      return result
     }),
     outbox: (request) => guarded(() => relay.outbox(request)),
     ack: (request) => guarded(() => relay.ack(request)),

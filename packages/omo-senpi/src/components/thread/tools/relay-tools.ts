@@ -148,8 +148,11 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         ...(input.request_id === undefined ? {} : { request_id: input.request_id }),
         ...(input.request_kind === undefined ? {} : { request_kind: input.request_kind }),
       })
-      if (reported.kind === "ok" && reported.armed) options.onCompletionArmed?.(callerId)
-      return reported as ThreadToolResult
+      if (reported.kind !== "ok") return reported as ThreadToolResult
+      // The arm's sequence number is the settle watermark, internal to the component; the result stays as documented.
+      const { arm_seq: armSeq, ...result } = reported
+      if (armSeq !== null) options.onCompletionArmed?.(callerId, armSeq)
+      return result as ThreadToolResult
     }),
     tool("thread_outbox", async ({ value }) => {
       const input = value as ThreadOutboxInput

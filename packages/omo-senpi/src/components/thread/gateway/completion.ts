@@ -19,8 +19,11 @@ export function completionOutcome(event: AgentEndFacts): CompletionOutcome {
 type Emitted = readonly { readonly binding_id: string; readonly cursor: number }[]
 
 export type CompletionTracker = {
-  /** The session has a completion arm: `thread_report {kind: "completion"}` answered `armed`, or one was found at startup. */
-  readonly arm: (durableId: string) => void
+  /**
+   * The session has a completion arm: `thread_report {kind: "completion"}` answered `armed` with this
+   * `arm_seq`, or the newest durable arm found at startup or on a wake had it.
+   */
+  readonly arm: (durableId: string, armSeq: number) => void
   readonly agentEnd: (durableId: string, event: AgentEndFacts) => void
   /** Writes the armed completions; a session with no arm resolves `[]` without calling the store. */
   readonly settled: (durableId: string) => Promise<Emitted>
@@ -31,8 +34,6 @@ export type CompletionTracker = {
 export type CompletionTrackerOptions = {
   /** Delay before a write that failed at the store's lock-wait bound is retried (the store's busy timeout). */
   readonly retryAfterMs: () => number
-  /** The store's clock, read when a run settles; arms made after it belong to a later run. Defaults to `Date.now`. */
-  readonly now?: () => number
   /** A write failed; `retrying` tells whether it is retried in the background. */
   readonly onWriteFailed?: (error: unknown, retrying: boolean) => void
 }
@@ -49,14 +50,16 @@ export type CompletionTrackerOptions = {
  * in the background after the busy timeout, with the outcome of the run that settled, until it
  * lands. Each settled run is written with its own outcome, one write at a time per session: a run
  * that settles while an earlier run's write is outstanding waits behind it, and every write consumes
- * only the arms made by the time its run settled (`armedThrough`), so a delayed or retried write never
- * takes a later run's arm with the earlier outcome.
+ * only the arms up to the newest `arm_seq` the session knew of when its run settled (`throughArmSeq`).
+ * A later run's arm always has a higher sequence number, so a delayed or retried write never takes it
+ * with the earlier outcome, even when both runs settle at the same clock reading.
  */
-export function createCompletionTracker(settle: (durableId: string, outcome: CompletionOutcome, armedThrough: number) => Promise<Emitted>, options: CompletionTrackerOptions): CompletionTracker {
-  type SettledRun = { readonly outcome: CompletionOutcome; readonly armedThrough: number; readonly generation: number | undefined }
-  const now = options.now ?? Date.now
+export function createCompletionTracker(settle: (durableId: string, outcome: CompletionOutcome, throughArmSeq: number) => Promise<Emitted>, options: CompletionTrackerOptions): CompletionTracker {
+  type Arm = { readonly generation: number; readonly throughArmSeq: number }
+  type SettledRun = Arm & { readonly outcome: CompletionOutcome }
   const lastOutcome = new Map<string, CompletionOutcome>()
-  const armed = new Map<string, number>()
+  // Per armed session: the arm's generation and the newest arm_seq it knows, which a settling run takes as its watermark.
+  const armed = new Map<string, Arm>()
   const writing = new Set<string>()
   // Runs that settled while an earlier run's write was outstanding, oldest first.
   const waiting = new Map<string, SettledRun[]>()
@@ -81,8 +84,8 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
   async function write(durableId: string, run: SettledRun): Promise<Emitted> {
     writing.add(durableId)
     try {
-      const emitted = await settle(durableId, run.outcome, run.armedThrough)
-      if (armed.get(durableId) === run.generation) armed.delete(durableId)
+      const emitted = await settle(durableId, run.outcome, run.throughArmSeq)
+      if (armed.get(durableId)?.generation === run.generation) armed.delete(durableId)
       next(durableId)
       return emitted
     } catch (error) {
@@ -103,8 +106,8 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
   }
 
   return {
-    arm: (durableId) => {
-      armed.set(durableId, ++generation)
+    arm: (durableId, armSeq) => {
+      armed.set(durableId, { generation: ++generation, throughArmSeq: Math.max(armed.get(durableId)?.throughArmSeq ?? armSeq, armSeq) })
     },
     agentEnd: (durableId, event) => {
       lastOutcome.set(durableId, completionOutcome(event))
@@ -113,8 +116,9 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
       const outcome = lastOutcome.get(durableId)
       if (outcome === undefined) return []
       lastOutcome.delete(durableId)
-      if (!armed.has(durableId)) return []
-      const run: SettledRun = { outcome, armedThrough: now(), generation: armed.get(durableId) }
+      const arm = armed.get(durableId)
+      if (arm === undefined) return []
+      const run: SettledRun = { ...arm, outcome }
       if (writing.has(durableId)) {
         waiting.set(durableId, [...(waiting.get(durableId) ?? []), run])
         return []
