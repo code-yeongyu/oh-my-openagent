@@ -98,12 +98,16 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
   const handlers = new Map<string, Handler[]>()
   const tools: CapturedTool[] = []
   let drain: Drain | undefined
+  // Registration runs off the session_start path (it records the incarnation first), so setup waits for this edge.
+  let endpointRegistered: () => void = () => undefined
+  const endpointReady = new Promise<void>((resolve) => { endpointRegistered = resolve })
   const engine = { running: false, start: undefined as EngineMessage | undefined, followUps: [] as EngineMessage[], pending: new Set<string>(), emitted: new Set<string>(), calls: 0 }
   const busy = () => engine.running || engine.start !== undefined
   const session = {
     persistHeaderNow: async () => undefined,
     registerControlEndpoint: async (registration: RegisterControlEndpointOptions) => {
       drain = registration.drain
+      endpointRegistered()
       return { status: "registered", socket: HOST_SOCKET, dispose: async () => undefined }
     },
     admissionGate: () => ({ can_admit: true, editor_revision: 0, turn_epoch: 1 }),
@@ -139,7 +143,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
   const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: host(registered), store: connectorStore })
   cleanups.push(() => sdk.dispose())
   await dispatch("session_start")
-  registered()
+  await within(endpointReady, "the control endpoint to register")
 
   const bindThread = async (chat: string) => {
     const bound = await sdk.bind({ session: "dur-1", binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "t1" } })

@@ -204,6 +204,17 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       drain.stop()
     }
     const drainOnce = async (event: SenpiWakeEvent) => toSessionControlDrainResult(await drain.drain(drainEvent(event)))
+    // A reply token names the runtime that held the session when it asked; this runtime becomes the
+    // holder before its endpoint can take a wake, so a restart turns earlier tokens stale before the
+    // first drain could mint one. A session whose holder cannot be recorded is not registered.
+    try {
+      await store.registerIncarnation({ durable_id: session.durableId, incarnation: (await store.identity()).instance_id })
+    } catch (error) {
+      retire()
+      const reason = error instanceof Error ? error.message : String(error)
+      log(`thread gateway: the session incarnation for ${session.durableId} could not be recorded, so the session is not registered: ${reason}`)
+      return { status: "failed", reason }
+    }
     const reply = await control.registerControlEndpoint({
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
       drain: async (event) => {
@@ -219,13 +230,6 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       return reply
     }
     active = { durableId: session.durableId, drain, retire, dispose: reply.dispose }
-    // A reply token names the runtime that held the session when it asked; registering is what
-    // makes this runtime the holder, so a restart turns earlier tokens stale.
-    try {
-      await store.registerIncarnation({ durable_id: session.durableId, incarnation: (await store.identity()).instance_id })
-    } catch (error) {
-      log(`thread gateway: the session incarnation for ${session.durableId} was not recorded: ${error instanceof Error ? error.message : String(error)}`)
-    }
     return { status: "registered", socket: reply.socket }
   }
 

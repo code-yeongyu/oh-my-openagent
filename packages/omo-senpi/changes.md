@@ -42,6 +42,10 @@
 - `store-relay-ops.ts` `ackOutbox`: a newer cursor must name one of the binding's own outbox rows. Cursors are global
   across bindings, and the check used to compare only with the binding's newest cursor, so acking binding A with
   binding B's cursor marked A's unread rows below it acked. Such a cursor is now `cursor_invalid` and acks nothing.
+- `gateway/registration.ts`: the session's incarnation is recorded before its control endpoint is registered, and a
+  failure to record it fails the registration (`{ status: "failed" }`, logged) with no endpoint exposed. The endpoint
+  used to go live first, so its first drain could run under the previous runtime's incarnation, and a failed record
+  was only logged while the registration still succeeded, which left earlier reply tokens valid after a restart.
 
 ## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
 

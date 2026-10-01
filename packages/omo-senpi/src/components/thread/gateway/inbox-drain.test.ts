@@ -457,6 +457,44 @@ describe("session inbox drain through the control endpoint registrant", () => {
     })
   })
 
+  test("#given a terminal registering its endpoint #when registration runs #then the session's incarnation is recorded before the endpoint can take a wake", async () => {
+    const w = await world()
+    const runtime = new FakeSessionRuntime(w.sessionPath, "B", w.agentDir)
+    const control = new FakeSessionControl(runtime)
+    const order: string[] = []
+    const store = createGatewayStore({ agentDir: w.agentDir })
+    disposers.push(() => store.dispose())
+    const recording: GatewayStore = { ...store, registerIncarnation: async (request) => { order.push("incarnation"); await store.registerIncarnation(request) } }
+    const port: SessionControlActionsPort = { ...control, registerControlEndpoint: async (options) => { order.push("endpoint"); return await control.registerControlEndpoint(options) } }
+    const registrant = createControlEndpointRegistrant({ control: port, agentDir: () => w.agentDir, _test: { store: recording } })
+    expect(await registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })).toEqual({ status: "registered", socket: "fake:tui" })
+    await control.settled()
+    await registrant.stop()
+    expect(order).toEqual(["incarnation", "endpoint"])
+  })
+
+  test("#given the store cannot record the session's incarnation #when the terminal registers #then registration fails, no endpoint is exposed, and a delivery sent to it stays queued", async () => {
+    const w = await world()
+    const runtime = new FakeSessionRuntime(w.sessionPath, "B", w.agentDir)
+    const control = new FakeSessionControl(runtime)
+    const store = createGatewayStore({ agentDir: w.agentDir })
+    disposers.push(() => store.dispose())
+    const failing: GatewayStore = { ...store, registerIncarnation: async () => { throw new Error("disk I/O error") } }
+    const logs: string[] = []
+    const registrant = createControlEndpointRegistrant({ control, agentDir: () => w.agentDir, log: (line) => logs.push(line), _test: { store: failing } })
+    const outcome = await registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })
+    const id = okId(await send(w, "while unregistered"))
+    const wake = await control.wake("command", [id])
+    expect({ outcome, endpoint: registrant.currentDrain(), wake, state: await stateOf(w.senderStore, id), enqueued: runtime.enqueueCalls.length }).toEqual({
+      outcome: { status: "failed", reason: "disk I/O error" },
+      endpoint: undefined,
+      wake: { admitted: [] },
+      state: "queued",
+      enqueued: 0,
+    })
+    expect(logs.some((line) => line.includes("disk I/O error"))).toBe(true)
+  })
+
   test("#given a registered session #when session_start fires again for the same durable id and then the registrant stops #then it registers once and later edges reach nothing", async () => {
     const w = await world()
     const b = await w.process()

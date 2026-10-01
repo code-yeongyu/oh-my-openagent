@@ -31,10 +31,14 @@ type Drain = RegisterControlEndpointOptions["drain"]
 function runtime(agentDir: string, store: GatewayStore) {
   const handlers = new Map<string, Handler[]>()
   let drain: Drain | undefined
+  // Registration runs off the session_start path (it records the incarnation first), so a test waits for this edge.
+  let endpointRegistered: () => void = () => undefined
+  const endpointReady = new Promise<void>((resolve) => { endpointRegistered = resolve })
   const session = {
     persistHeaderNow: async () => undefined,
     registerControlEndpoint: async (options: RegisterControlEndpointOptions) => {
       drain = options.drain
+      endpointRegistered()
       return { status: "registered", socket: HOST_SOCKET, dispose: async () => undefined }
     },
     admissionGate: () => ({ can_admit: true, editor_revision: 0, turn_epoch: 0 }),
@@ -55,7 +59,7 @@ function runtime(agentDir: string, store: GatewayStore) {
     await dispatch("agent_end", { messages: [{ role: "assistant", stopReason }] })
     await dispatch("agent_settled")
   }
-  return { dispatch, registered, run }
+  return { dispatch, registered, endpointReady, run }
 }
 
 type WakeEdge = { readonly reason: "command" | "idle"; readonly reasons: readonly ("command" | "idle")[] }
@@ -102,7 +106,7 @@ async function setup(options: { readonly wakeReachesSession: boolean; readonly e
   const bound = await sdk.bind({ session: "dur-1", binding: { platform: "custom", account_id: "bot", chat_id: "c1", thread_id: "t1", outbound_events: ["completion"] } })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   await target.dispatch("session_start")
-  target.registered()
+  await target.endpointReady
   // The store worker is serial: this read returns after the session_start pickup's read, so that
   // pickup has seen no arm and only the wake edge can arm the tracker for the report below.
   expect(await runtimeStore.pendingCompletionArms("dur-1")).toBe(0)
