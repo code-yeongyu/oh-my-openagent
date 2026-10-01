@@ -30,3 +30,4 @@ describe("formatDurationHuman", () => {
     expect(formatDurationHuman(86_400_000)).toBe("24h 0m 0s")
   })
 })
+// ci probe for #9245: runtime change without the ci:full-matrix label
