@@ -20,7 +20,7 @@ import { spawn } from "node:child_process"
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createConnection } from "node:net"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -518,7 +518,8 @@ export function stopOwnedShardHosts(scratchDir) {
       } catch {
         continue
       }
-      if (typeof meta.owner_session_file !== "string" || !meta.owner_session_file.startsWith(scratchDir)) continue
+      // Separator-bounded: `/tmp/run` must not own a session file under a sibling `/tmp/run-other`.
+      if (typeof meta.owner_session_file !== "string" || !meta.owner_session_file.startsWith(scratchDir.endsWith(sep) ? scratchDir : `${scratchDir}${sep}`)) continue
       owned = true
       if (typeof meta.socket !== "string") continue
       sockets.push(meta.socket)
