@@ -208,6 +208,27 @@ describe("thread tools across host endpoints", () => {
     expect(w.dialed).not.toContain(shard)
   })
 
+  test("#given the legacy endpoint stopped answering after it claimed a session file #when thread_list and thread_read run #then its thread is listed from disk as resumable on the legacy socket and reads from JSONL, while the live i-* thread stays live", async () => {
+    // given: the legacy socket path names nothing; host status --all still reports its claim
+    const dir = tempDir("thr-ep-")
+    const legacy = join(dir, "rpc.sock")
+    const shard = join(dir, "i-0123456789abcdef.sock")
+    const terminalJsonl = join(dir, "terminal.jsonl")
+    writeSessionJsonl(terminalJsonl, "dur-terminal", "hello from the legacy host")
+    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")))
+    const w = world({ legacy, shard, reports: () => [report(legacy, false, [terminalJsonl]), report(shard, true)] })
+
+    // when
+    const listed = await w.run("thread_list", { all_scope: true })
+    const read = await w.run("thread_read", { thread: "dur-terminal" })
+
+    // then
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; status: string; socket?: string; error_note?: string }>
+    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({ status: "resumable", socket: legacy, error_note: `host_unavailable:${legacy}` })
+    expect(threads.find((thread) => thread.thread_id === "dur-desktop")).toMatchObject({ status: "live", socket: shard })
+    expect(read).toMatchObject({ kind: "ok", source: "session_jsonl", items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the legacy host") }, expect.anything(), expect.anything()] })
+  })
+
   test("#given thread tools listing and acting on both endpoints #when the frames are inspected #then every list_sessions is an observing read and no request that acts on a session is", async () => {
     // given
     const dir = tempDir("thr-ep-")

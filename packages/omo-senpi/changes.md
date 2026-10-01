@@ -31,6 +31,9 @@
 - `gateway/legacy-mailbox.ts`: a legacy `steer` keeps its `expected_turn_id`. The host's `turn-N` id becomes the
   gateway turn epoch `N`, so a migrated steer for the turn the target is still running steers into it and one for an
   earlier turn is refused `turn_conflict`; the import used to store no epoch, which refused every migrated steer.
+- `live-surface.ts`: the legacy endpoint keeps the session files `host status --all` reports for it, as dev did. When
+  the legacy host stops answering, its threads are listed from disk as `resumable` with an `error_note` and read from
+  their JSONL, instead of disappearing from `thread_list`.
 
 ## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
 

@@ -290,8 +290,11 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
               kind: report.endpoint_kind ?? endpointKindOf(report.socket, recorded),
               verdict: { ...(report.alive === undefined ? {} : { alive: report.alive }), ...(report.reason === undefined ? {} : { reason: report.reason }) },
             }])
-    const legacyKind = endpointKindOf(legacy, recorded)
-    return [{ socket: legacy, paths: [], kind: legacyKind, verdict: {} }, ...found.filter((endpoint) => resolve(endpoint.socket) !== resolve(legacy))]
+    // The legacy endpoint keeps its own socket name, and the session files its report names: they are
+    // the only record of its threads when it stops answering.
+    const isLegacy = (endpoint: KnownEndpoint) => resolve(endpoint.socket) === resolve(legacy)
+    const legacyPaths = [...new Set(found.filter(isLegacy).flatMap((endpoint) => endpoint.paths))]
+    return [{ socket: legacy, paths: legacyPaths, kind: endpointKindOf(legacy, recorded), verdict: {} }, ...found.filter((endpoint) => !isLegacy(endpoint))]
   }
 
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
