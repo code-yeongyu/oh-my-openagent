@@ -63,6 +63,9 @@
   back (`deduplicated: true`) even after the binding was unbound or expired; only a new event, or the same id with
   other content, is refused `binding_inactive`. The inactive check ran before the receipt replay, so a connector that
   lost the ACK was told a delivered message was refused. `store.completedDelivery` is the plain read behind it.
+- `gateway/legacy-mailbox.ts`: only the legacy host's exact turn id spelling (`turn-N`, no leading zeros) becomes a
+  migrated steer's epoch. Bare digits (`1`) and leading-zero ids (`turn-01`) were read as that turn too and steered
+  into it; they now stay without an epoch and are refused `turn_conflict`.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

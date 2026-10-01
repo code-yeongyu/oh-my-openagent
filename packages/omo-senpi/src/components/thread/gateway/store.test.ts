@@ -176,12 +176,15 @@ describe("legacy mailbox migration", () => {
       JSON.stringify({ version: 1, kind: "snapshot", next_seq: 1, items: [] }),
       JSON.stringify({ version: 1, kind: "enqueue", item: steer(1, "for this turn", "turn-1") }),
       JSON.stringify({ version: 1, kind: "enqueue", item: steer(2, "for an old turn", "turn-0") }),
+      // Not the legacy host's spelling of a turn id: neither names turn 1.
+      JSON.stringify({ version: 1, kind: "enqueue", item: steer(3, "bare digits", "1") }),
+      JSON.stringify({ version: 1, kind: "enqueue", item: steer(4, "leading zero", "turn-01") }),
     ].join("\n")}\n`)
     const b = h.session("B", { storeOptions: { legacyMailboxDirectories: [legacy] } })
     b.runtime.beginUserTurn()
 
     // when
-    expect(await b.store.legacyMigrated()).toBe(2)
+    expect(await b.store.legacyMigrated()).toBe(4)
     await b.drain.drain({ reason: "inbox" })
     b.runtime.toolBoundary()
     await h.quiesce()
@@ -191,6 +194,8 @@ describe("legacy mailbox migration", () => {
     expect(rows.map((row) => [row.body, row.state, row.reason])).toEqual([
       ["for this turn", "applied", null],
       ["for an old turn", "refused", "turn_conflict"],
+      ["bare digits", "refused", "turn_conflict"],
+      ["leading zero", "refused", "turn_conflict"],
     ])
     expect(b.runtime.enqueueCalls.map((call) => [call.delivery_id, call.lane])).toEqual([[rows[0]?.delivery_id, "steer"]])
   })

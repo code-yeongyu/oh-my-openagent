@@ -93,11 +93,12 @@ function parseItem(value: unknown): LegacyMailboxItem {
 /**
  * The legacy mailbox kept the host's turn id (`turn-N`); the gateway compares a steer's epoch with
  * the target's current `turn_epoch`, so `N` becomes that epoch and a steer for a turn that is no
- * longer running is refused `turn_conflict`. An id that names no turn number stays `null`, which the
- * gateway refuses the same way, so a migrated steer never lands in a turn it was not meant for.
+ * longer running is refused `turn_conflict`. Only the host's exact spelling migrates (`turn-` and a
+ * number without leading zeros); any other id, bare digits included, stays `null`, which the gateway
+ * refuses the same way, so a migrated steer never lands in a turn it was not meant for.
  */
 function turnEpochOf(turnId: string): number | null {
-  const match = /^(?:turn-)?(\d+)$/.exec(turnId)
+  const match = /^turn-(0|[1-9]\d*)$/.exec(turnId)
   if (match === null) return null
   const epoch = Number(match[1])
   return Number.isSafeInteger(epoch) ? epoch : null
