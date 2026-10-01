@@ -197,6 +197,39 @@ describe("lost_ack_and_durable_recovery", () => {
     expect(rows.every((row) => b.runtime.transcriptEntries(row.delivery_id) <= 1)).toBe(true)
   })
 
+  /** A sender whose store gives up both receipt writes of a delivery (completion, then abandonment) at the lock-wait bound. */
+  function stuckSender(h: GatewayHarness) {
+    const sender = h.store()
+    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+    return {
+      stuck: h.engineFor({ ...sender, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } }),
+      retrying: h.engineFor(sender),
+      request: (key: string): GatewayDeliverRequest => ({ sender: { kind: "session", durable_id: "A" }, target: "B", text: `stuck ${key}`, idempotency_key: key }),
+    }
+  }
+
+  test("#given the sender's store gave up both receipt writes after the target admitted the delivery #when the same process retries the key #then it replays the admitted outcome and the target sees one entry", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B")
+    const { stuck, retrying, request } = stuckSender(h)
+    await expect(stuck.deliver(request("admitted"))).rejects.toThrow("lock wait exceeded")
+    await h.quiesce()
+    expect(await retrying.deliver(request("admitted"))).toMatchObject({ kind: "ok", delivery: { kind: "started" }, deduplicated: true })
+    const rows = await b.store.list({ target_durable_id: "B" })
+    expect(rows.map((row) => [row.body, b.runtime.enqueueCount(row.delivery_id)])).toEqual([["stuck admitted", 1]])
+  })
+
+  test("#given the sender's store gave up both receipt writes while the target has not taken the delivery #when the same process retries the key #then it is still idempotency_in_progress and nothing is sent twice", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B", { online: false })
+    const { stuck, retrying, request } = stuckSender(h)
+    await expect(stuck.deliver(request("queued"))).rejects.toThrow("lock wait exceeded")
+    expect(summary(await retrying.deliver(request("queued")))).toBe("error:idempotency_in_progress")
+    expect((await b.store.list({ target_durable_id: "B" })).map((row) => row.state)).toEqual(["queued"])
+  })
+
   test("#given three deliveries queued for an offline target #when every store is closed and a fresh process drains #then they are admitted in their original order", async () => {
     const h = open()
     h.session("A")

@@ -295,11 +295,13 @@ function classifyReceipt(ctx: StoreContext, request: EnqueueRequest, receipt: Re
     return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
   }
   if (receipt.status === "completed" && receipt.result !== null) return { kind: "replay", result: JSON.parse(receipt.result) }
-  if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id) {
-    return refused("idempotency_in_progress", "The same delivery is already in progress.")
-  }
+  // The row is read before the owner: a decided row proves the outcome whoever began the receipt,
+  // including this process when both of its receipt writes failed (the receipt then stays prepared).
   const row = receipt.delivery_id === null ? undefined : selectRow(ctx, receipt.delivery_id)
   const decided = row !== undefined && (row.state === "admitted" || row.state === "applied" || row.state === "refused")
+  if (receipt.status === "prepared" && !decided && receipt.owner_instance === ctx.config.instance_id) {
+    return refused("idempotency_in_progress", "The same delivery is already in progress.")
+  }
   if (receipt.status === "prepared" && decided) {
     // Lost ACK with proof: the target's row records the admission outcome, so the stored result
     // is rebuilt from it and the receipt completes - never a second send.

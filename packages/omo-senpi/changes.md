@@ -36,6 +36,10 @@
   of an ask_user call that waits for its answer (`ask_user_question` with `waitForAnswer`, `request_user_input` with
   `wait_for_answer`) to that call's `tool_execution_end`; `auto` and `follow_up` still queue behind it. The phase was
   never reported, so such a steer was admitted into the blocked turn. A question that does not wait blocks nothing.
+- `gateway/store-ops.ts`: a retried send whose delivery the target already decided (admitted, applied or refused)
+  replays that outcome and completes the receipt even when this process began the receipt. When both receipt writes
+  of the first call failed (for example at the lock-wait bound), the receipt stayed `prepared` under this store, and
+  every retry answered `idempotency_in_progress` until the receipt expired; an undecided row is still in progress.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 
