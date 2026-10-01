@@ -1,7 +1,7 @@
 import { join } from "node:path"
 import { runChild } from "./child-process.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
-import { channelDistTagVersion, channelPackageSpec, packageManifest, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import { channelDistTagVersion, channelPackageSpec, detectNpmMajor, packageManifest, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 
 export { isPrintOnlyUpdate }
@@ -53,7 +53,13 @@ export function formatVersionChange(before, after) {
  */
 export async function runSelfUpdate(args, options = {}) {
   const resolveUpdate = options.resolveUpdate
-    ?? ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
+    ?? ((targetVersion) => {
+      const update = updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion)
+      // Only an npm install needs npm's version, so a bun install never spawns npm.
+      return update.manager === "npm"
+        ? updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion, detectNpmMajor())
+        : update
+    })
   const fetchDistTags = options.fetchDistTags ?? fetchNpmDistTagsSync
   const log = options.log ?? ((line) => console.log(line))
   const error = options.error ?? ((line) => console.error(line))

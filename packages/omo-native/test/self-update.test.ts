@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
+import { channelPackageSpec, detectNpmMajor, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
 // manifest, so the expected spelling follows the package channel (`omo-ai` stable, `omo-ai@beta` prerelease).
@@ -60,6 +60,48 @@ describe("updateTarget", () => {
         argv: ["npm", "i", "-g", SPEC],
       })
     })
+
+    const NPM_ROOT = "/tmp/prefix/lib/node_modules/omo-ai"
+    const ALLOW_SCRIPTS = "--allow-scripts=esbuild,@google/genai,protobufjs"
+    const resolveNpm = (major: number | undefined) =>
+      updateTarget(NPM_ROOT, "linux", undefined, undefined, undefined, undefined, major)
+
+    test("#then npm 11 gets --allow-scripts after the package spec, in argv and in the printed command", () => {
+      expect(resolveNpm(11)).toEqual({
+        manager: "npm",
+        command: `npm i -g ${SPEC} ${ALLOW_SCRIPTS}`,
+        argv: ["npm", "i", "-g", SPEC, ALLOW_SCRIPTS],
+      })
+      expect(resolveNpm(12).argv).toEqual(["npm", "i", "-g", SPEC, ALLOW_SCRIPTS])
+    })
+
+    test("#then npm 10 and an unknown npm version never receive --allow-scripts", () => {
+      expect(resolveNpm(10).argv).toEqual(["npm", "i", "-g", SPEC])
+      expect(resolveNpm(undefined).argv).toEqual(["npm", "i", "-g", SPEC])
+    })
+
+    test("#then a pinned target keeps its exact spec ahead of the npm 11 flag", () => {
+      const target = updateTarget(NPM_ROOT, "linux", undefined, undefined, undefined, "5.1.5", 11)
+      expect(target.argv).toEqual(["npm", "i", "-g", "omo-ai@5.1.5", ALLOW_SCRIPTS])
+    })
+
+    test("#then a Bun layout ignores the npm version", () => {
+      const root = bunRoot("/tmp/custom-bun/install/global/node_modules/omo-ai")
+      expect(updateTarget(root, "linux", undefined, undefined, undefined, undefined, 11).argv).toEqual(["bun", "add", "-g", SPEC])
+    })
+  })
+})
+
+describe("detectNpmMajor", () => {
+  const spawnOutput = (status: number | null, stdout: string) => () => ({ status, stdout }) as never
+  test("#then it reads the major from npm --version output", () => {
+    expect(detectNpmMajor(spawnOutput(0, "10.9.2\n"))).toBe(10)
+    expect(detectNpmMajor(spawnOutput(0, "11.6.0\n"))).toBe(11)
+  })
+  test("#then a failed or unparsable npm yields undefined", () => {
+    expect(detectNpmMajor(spawnOutput(1, ""))).toBeUndefined()
+    expect(detectNpmMajor(spawnOutput(0, "garbage"))).toBeUndefined()
+    expect(detectNpmMajor(() => { throw new Error("ENOENT") })).toBeUndefined()
   })
 })
 
