@@ -37,6 +37,12 @@
   run armed the same binding again, the replacement destroyed the earlier run's arm and only the later completion was
   ever written. Each write now consumes the arms made by its run's settle, so both completions land on the binding in
   run order with their own text and outcome; two arms of one binding within a run still make one row, the newest text.
+- `gateway/relay.ts` `inbound` / `gateway/store-ops.ts`: a connector event retried after its binding closed is answered
+  through the same receipt classification a retried send uses (`recoverDelivery` over `classifyReceipt`). The closed
+  binding's replay read only completed receipts, so an event the session had applied while both receipt writes failed
+  (the receipt stays `prepared`) was refused `binding_inactive` after an unbind; it now replays the delivered outcome
+  from the durable row and completes the receipt, an undecided one stays `idempotency_in_progress`, and a new or edited
+  event is still `binding_inactive`. `store.completedDelivery` became `store.deliveryReceipt`.
 
 ## 2026-10-01 - session gateway review round 6: receipts, questions, retention, bindings snapshot, causes, session facts, identifiers (#9222)
 

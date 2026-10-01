@@ -290,7 +290,10 @@ function selectReceipt(ctx: StoreContext, principal: string, key: string): Recei
   }
 }
 
-function classifyReceipt(ctx: StoreContext, request: EnqueueRequest, receipt: ReceiptRecord): EnqueueOutcome {
+type ReceiptRetry = Pick<EnqueueRequest, "now" | "sender_principal" | "endpoint_kind"> & { readonly receipt: Pick<EnqueueRequest["receipt"], "idempotency_key" | "args_hash"> }
+
+/** How a retry under an existing delivery receipt is answered: a send's retry and a closed binding's replayed event both come here. */
+function classifyReceipt(ctx: StoreContext, request: ReceiptRetry, receipt: ReceiptRecord): EnqueueOutcome {
   if (receipt.args_hash !== request.receipt.args_hash) {
     return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
   }
@@ -723,19 +726,35 @@ export async function abandonReceipt(ctx: StoreContext, request: { readonly now:
   ) === 1)
 }
 
-export type CompletedDelivery = { readonly args_hash: string; readonly result: unknown; readonly target_durable_id: string; readonly binding_revision: number | null }
+/** `result` is the stored result of a completed receipt, null for one that has not recorded it. */
+export type DeliveryReceipt = { readonly args_hash: string; readonly completed: boolean; readonly result: unknown; readonly target_durable_id: string; readonly binding_revision: number | null }
 
 /**
- * The stored result of a completed, unexpired delivery receipt, with the facts of its row the
- * receipt's arguments hash was taken over; null otherwise. A plain read (no write lock): it lets a
- * binding that has since closed still answer a retry of an event it delivered.
+ * An unexpired delivery receipt with the facts of its row the receipt's arguments hash was taken
+ * over; null otherwise. A plain read (no write lock): it lets a binding that has since closed still
+ * answer a retry of an event it delivered. A receipt that has not recorded its result goes through
+ * `recoverDelivery`.
  */
-export function completedDelivery(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string }): CompletedDelivery | null {
+export function deliveryReceipt(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string }): DeliveryReceipt | null {
   const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
-  if (receipt === undefined || receipt.expires_at <= request.now || receipt.status !== "completed" || receipt.result === null || receipt.delivery_id === null) return null
+  if (receipt === undefined || receipt.expires_at <= request.now || receipt.delivery_id === null) return null
   const row = selectRow(ctx, receipt.delivery_id)
   if (row === undefined) return null
-  return { args_hash: receipt.args_hash, result: JSON.parse(receipt.result), target_durable_id: row.target_durable_id, binding_revision: row.binding_revision }
+  const completed = receipt.status === "completed" && receipt.result !== null
+  return { args_hash: receipt.args_hash, completed, result: completed ? JSON.parse(receipt.result as string) : null, target_durable_id: row.target_durable_id, binding_revision: row.binding_revision }
+}
+
+/**
+ * A retry under an existing delivery receipt, answered exactly as a retried send is
+ * (`classifyReceipt`): a decided row replays its outcome and completes the receipt, an undecided one
+ * stays in progress or uncertain. Admits nothing; null when no unexpired receipt exists.
+ */
+export async function recoverDelivery(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly args_hash: string }): Promise<EnqueueOutcome | null> {
+  return await transaction(ctx, "recover_delivery", () => {
+    const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
+    if (receipt === undefined || receipt.expires_at <= request.now) return null
+    return classifyReceipt(ctx, { now: request.now, sender_principal: request.principal, endpoint_kind: null, receipt: { idempotency_key: request.idempotency_key, args_hash: request.args_hash } }, receipt)
+  })
 }
 
 export function deliveryView(ctx: StoreContext, deliveryId: string): { readonly row: DeliveryRow; readonly queue_position: number } | null {

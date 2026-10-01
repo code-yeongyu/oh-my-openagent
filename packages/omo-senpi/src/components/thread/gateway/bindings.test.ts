@@ -158,6 +158,47 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     expect(await b.store.list({ target_durable_id: "B" })).toHaveLength(1)
   })
 
+  test("#given a connector event the session applied while the relay's store gave up both receipt writes #when the connector retries it after the binding was unbound #then the retry recovers the delivered outcome from the durable row, while an edited or new event meets binding_inactive", async () => {
+    const h = open()
+    const b = h.session("B")
+    const store = h.store()
+    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+    // The delivery commits and the target applies it, but the receipt never records the outcome: it stays prepared.
+    const stuck: GatewayStore = { ...store, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } }
+    const relay = createGatewayRelay({ store, engine: h.engineFor(stuck), endpoints: { wake: async () => ({ admitted: [] }) }, locate: async () => null, now: () => h.clock.now })
+    const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
+    // Awaited as a settled value: Bun 1.4.2's `expect(promise).rejects` misses a store worker's reply (oven-sh/bun#43819).
+    const lost = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }).then(() => null, (error: unknown) => error)
+    expect(lost instanceof Error ? lost.message : lost).toContain("lock wait exceeded")
+    await h.quiesce()
+    const [row] = await b.store.list({ target_durable_id: "B" })
+    expect(row?.state).toBe("applied")
+    ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
+
+    const retried = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })
+    expect(retried).toMatchObject({ kind: "ok", delivery_id: row?.delivery_id, deduplicated: true })
+    expect(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })).toEqual(retried)
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi, edited" }))).toBe("binding_inactive")
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "new" }))).toBe("binding_inactive")
+    expect({ entries: b.runtime.enqueueCount(row?.delivery_id ?? ""), rows: (await b.store.list({ target_durable_id: "B" })).length }).toEqual({ entries: 1, rows: 1 })
+  })
+
+  test("#given a connector event still queued for an offline session while the relay's store gave up both receipt writes #when the connector retries it after the binding was unbound #then the retry is idempotency_in_progress, never a second delivery and never binding_inactive", async () => {
+    const h = open()
+    const b = h.session("B", { online: false })
+    const store = h.store()
+    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded: complete_receipt waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+    const stuck: GatewayStore = { ...store, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } }
+    const relay = createGatewayRelay({ store, engine: h.engineFor(stuck), endpoints: { wake: async () => ({ admitted: [] }) }, locate: async () => null, now: () => h.clock.now })
+    const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
+    const lost = await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }).then(() => null, (error: unknown) => error)
+    expect(lost instanceof Error ? lost.message : lost).toContain("lock wait exceeded")
+    ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
+
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }))).toBe("idempotency_in_progress")
+    expect((await b.store.list({ target_durable_id: "B" })).map((row) => row.state)).toEqual(["queued"])
+  })
+
   test("#given a binding with a 60 s TTL #when the injected clock passes it #then the binding reads expired, refuses inbound and rebind, and the thread can be bound again; a rebind before expiry never extends the TTL", async () => {
     const h = open()
     h.session("B")

@@ -231,7 +231,10 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       if (binding.status !== "active") {
         // An event the session already took keeps its stored result after the binding closes (a
         // connector that lost the ACK retries it); only a new or changed event meets the closed binding.
-        const prior = await store.completedDelivery({ now: now(), principal: `binding:${binding.binding_id}`, idempotency_key: `event:${request.event_id}` })
+        // A receipt that never recorded its result is answered as a retried send is: a decided row
+        // replays its outcome, an undecided one stays in progress or uncertain.
+        const key = { principal: `binding:${binding.binding_id}`, idempotency_key: `event:${request.event_id}` }
+        const prior = await store.deliveryReceipt({ now: now(), ...key })
         const same = prior !== null && prior.binding_revision !== null && prior.args_hash === deliveryArgsHash({
           target: prior.target_durable_id,
           text: request.text,
@@ -241,8 +244,12 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
           author,
         })
         if (same) {
-          const replayed = prior.result as GatewayDeliveryResult
-          return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
+          const recovered = prior.completed ? { kind: "replay" as const, result: prior.result } : await store.recoverDelivery({ now: now(), ...key, args_hash: prior.args_hash })
+          if (recovered?.kind === "replay") {
+            const replayed = recovered.result as GatewayDeliveryResult
+            return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
+          }
+          if (recovered?.kind === "refused") return failure(recovered.code, recovered.message, recovered.details)
         }
         return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
       }
