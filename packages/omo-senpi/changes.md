@@ -55,6 +55,10 @@
 - `gateway/bindings.ts`: a binding identifier carrying a C1 control (U+0080-U+009F, NEL included) or a Unicode line or
   paragraph separator (U+2028, U+2029) is refused `invalid_arguments`, like a C0 control. NEL passed the check and
   reached the `actor=` provenance header raw, since the header's whitespace class does not cover it.
+- `gateway/schema.ts`: `bindings` gets an `INTEGER PRIMARY KEY AUTOINCREMENT` key (`seq`, the rowid) with `binding_id`
+  kept `UNIQUE`; schema v1 is unreleased, so the table is defined that way from the start. The `thread_bindings`
+  snapshot watermarks on the rowid, which SQLite reused after retention deleted the newest binding, so a binding made
+  later could appear in a later page of an older snapshot.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

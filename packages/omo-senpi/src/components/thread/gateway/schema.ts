@@ -73,8 +73,12 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
       next_seq INTEGER NOT NULL,
       applied_seq INTEGER NOT NULL DEFAULT 0
     )`,
+    // `seq` is the rowid the bindings snapshot watermarks on (`store-relay-ops.ts` `listBindings`):
+    // AUTOINCREMENT never hands a deleted binding's rowid to a later one, so a binding made after a
+    // snapshot can never fall under its watermark, even when retention deleted the newest row.
     `CREATE TABLE bindings (
-      binding_id TEXT PRIMARY KEY,
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      binding_id TEXT NOT NULL UNIQUE,
       schema_version INTEGER NOT NULL DEFAULT 1,
       revision INTEGER NOT NULL CHECK (revision >= 1),
       status TEXT NOT NULL CHECK (status IN ('active', 'detached', 'expired')),

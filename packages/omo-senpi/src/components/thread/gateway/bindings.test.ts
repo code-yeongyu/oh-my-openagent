@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 
 import { parseThreadParams, threadToolParamSchemas } from "../contracts"
-import { BINDING_DEFAULT_TTL_SECONDS, type BindInput, normalizeBindInput, WHOLE_CHAT_THREAD_ID } from "./bindings"
+import { BINDING_DEFAULT_TTL_SECONDS, type BindInput, normalizeBindInput, OUTBOX_RETENTION_MS, WHOLE_CHAT_THREAD_ID } from "./bindings"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayRelay, type GatewayRelay } from "./relay"
 import type { GatewayStore } from "./store"
@@ -91,6 +91,34 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     for (const account_id of ["bot\u0085acct", "bot\u009bacct", "bot\u2028acct", "bot\u2029acct"]) refused.push(code(await relay.bind({ principal: "session:A", binding: thread("B", { account_id }) })))
     expect(refused).toEqual(["invalid_arguments", "invalid_arguments", "invalid_arguments", "invalid_arguments"])
     expect(ok(await relay.bindings({ filter: {} })).bindings).toEqual([])
+  })
+
+  test("#given a bindings snapshot whose newest binding is a closed one #when retention deletes that binding between pages and a new binding is made #then the remaining pages list only the snapshot's bindings", async () => {
+    const h = open()
+    const store = h.store()
+    const relay = relayOn(h, store)
+    const bindAt = async (chat: string) => {
+      h.clock.now += 1_000
+      return ok(await relay.bind({ principal: "session:A", binding: thread("B", { chat_id: chat, ttl_seconds: null }) })).binding
+    }
+    const kept = [(await bindAt("c-1")).binding_id, (await bindAt("c-2")).binding_id]
+    const closed = await bindAt("c-3")
+    ok(await relay.unbind({ principal: "session:A", binding_id: closed.binding_id, expected_revision: 1 }))
+    const first = ok(await relay.bindings({ filter: {}, limit: 1 }))
+
+    // The closed binding is past retention: the next write transaction (an outbox read) sweeps it away,
+    // and a binding made after that is newer than the snapshot.
+    h.clock.now += OUTBOX_RETENTION_MS + 1
+    expect((await store.readOutbox({ now: h.clock.now, binding_id: kept[0] as string })).kind).toBe("ok")
+    expect(ok(await relay.bindings({ filter: { chat_id: "c-3" } })).bindings).toEqual([])
+    const late = await bindAt("c-4")
+    const listed = first.bindings.map((binding) => binding.binding_id)
+    for (let cursor = first.next_cursor; cursor !== null;) {
+      const page = ok(await relay.bindings({ filter: {}, cursor, limit: 1 }))
+      listed.push(...page.bindings.map((binding) => binding.binding_id))
+      cursor = page.next_cursor
+    }
+    expect({ listed, late_listed: listed.includes(late.binding_id) }).toEqual({ listed: kept, late_listed: false })
   })
 
   test("#given a binding at revision 1 #when unbind and rebind name a stale revision #then both are stale_revision; the right revision detaches, lists in-flight work, and a second unbind replays success", async () => {
