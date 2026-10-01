@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
@@ -236,7 +236,7 @@ exit 0
       const code = await runSelfUpdate(["update"], {
         resolveUpdate: () => ({ manager: "npm", command: `npm i -g ${spec}`, argv: ["npm", "i", "-g", spec] }),
         ...offline,
-        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_NPM_DIR: dir, FAKE_NPM_NOTICE: notice ? "1" : "0", FAKE_NPM_HEADLINE: HEADLINES[npm] },
+        env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}`, FAKE_NPM_DIR: dir, FAKE_NPM_NOTICE: notice ? "1" : "0", FAKE_NPM_HEADLINE: HEADLINES[npm] },
         readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
         log: (line) => lines.push(line),
         error: (line) => errors.push(line),
@@ -247,9 +247,12 @@ exit 0
       return { code, lines, errors, argv, marker }
     }
 
+    // The fake is a #!/bin/sh script, so these run where a shell script is executable by name.
+    const posixOnly = test.skipIf(process.platform === "win32")
+
     // npm 11 only notices and npm 12 blocks; omo's argv and guidance are the same for both.
     for (const npm of ["11", "12"]) {
-      test(`#then an npm ${npm} update never passes --allow-scripts, runs no install script, and prints a working retry command`, async () => {
+      posixOnly(`#then an npm ${npm} update never passes --allow-scripts, runs no install script, and prints a working retry command`, async () => {
         const { code, lines, errors, argv, marker } = await updateWithFakeNpm(true, "omo-ai@5.1.6", npm)
         expect(code).toBe(0)
         expect(errors).toEqual([])
@@ -265,7 +268,7 @@ exit 0
       })
     }
 
-    test("#then an npm without the notice prints no guidance and passes the plain argv", async () => {
+    posixOnly("#then an npm without the notice prints no guidance and passes the plain argv", async () => {
       const { code, lines, argv, marker } = await updateWithFakeNpm(false)
       expect(code).toBe(0)
       expect(argv).toEqual([`i -g ${SPEC}`])
