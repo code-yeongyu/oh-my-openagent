@@ -13,6 +13,8 @@ import { join } from "node:path"
 import { KIT_DIR, OMO_ROOT, assistantTexts, awaitTuiEndpoint, deliveryEntries, deliveryIdOf, runScenario, storeRows, track, waitFor } from "./lib/gateway.mjs"
 
 const TOKEN = "QA-TOKEN-sender-death"
+// A sender stuck at startup or on the store lock must fail the step, not hang the run.
+const SENDER_EXIT_TIMEOUT_MS = 120_000
 const SENDER = join(OMO_ROOT, "packages", "omo-senpi", "src", "components", "thread", "gateway", "testing", "sender-process.ts")
 
 await runScenario("sender-death", async ({ report, scratch, startTui }) => {
@@ -26,7 +28,24 @@ await runScenario("sender-death", async ({ report, scratch, startTui }) => {
   const output = []
   child.stdout.on("data", (chunk) => output.push(chunk.toString("utf8")))
   child.stderr.on("data", (chunk) => output.push(chunk.toString("utf8")))
-  const [code, signal] = await new Promise((resolvePromise) => child.once("exit", (exitCode, exitSignal) => resolvePromise([exitCode, exitSignal])))
+  const [code, signal] = await new Promise((resolvePromise, rejectPromise) => {
+    const timer = setTimeout(() => {
+      try {
+        process.kill(-child.pid, "SIGKILL")
+      } catch {
+        // Already gone.
+      }
+      rejectPromise(new Error(`sender did not exit within ${SENDER_EXIT_TIMEOUT_MS}ms: ${JSON.stringify(output.join("").slice(0, 300))}`))
+    }, SENDER_EXIT_TIMEOUT_MS)
+    child.once("error", (error) => {
+      clearTimeout(timer)
+      rejectPromise(error)
+    })
+    child.once("exit", (exitCode, exitSignal) => {
+      clearTimeout(timer)
+      resolvePromise([exitCode, exitSignal])
+    })
+  })
   report.assert("sender-killed-at-commit", signal === "SIGKILL" && !output.join("").includes("DONE"), `code=${code} signal=${signal} output=${JSON.stringify(output.join("").slice(0, 300))}`)
   const rows = await storeRows(scratch.agentDir, "SELECT delivery_id, state FROM deliveries WHERE target_durable_id = ?", [target.durableId])
   report.assert("row-committed-before-death", rows.length === 1, JSON.stringify(rows))
