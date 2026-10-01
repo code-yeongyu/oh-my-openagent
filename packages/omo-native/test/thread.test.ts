@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { runDaemonCommand } from "../bin/lib/daemon.js"
 import { loadThreadSdk, runThreadCommand, THREAD_EXIT } from "../bin/lib/thread.js"
 
 /**
@@ -204,6 +205,22 @@ describe("omo thread: exit codes", () => {
     const result = await run(["list"], fakeSdk(), { platform: "win32" })
     expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.unsupported, loaded: 0 })
     expect(result.stderr).toContain("win32")
+  })
+
+  test("#given win32 #when omo thread and omo daemon each refuse #then a script sees one unsupported exit code from both", async () => {
+    const thread = await run(["list"], fakeSdk(), { platform: "win32" })
+    const engineCalls: unknown[] = []
+    const daemon = runDaemonCommand(["run"], {
+      engine: { run: (args: string[]) => { engineCalls.push(args); return { exitCode: 0, stdout: "", stderr: "" } } },
+      pluginRoot: "/plugin",
+      agentDir: "/agent",
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "win32",
+    })
+    expect({ thread: thread.exitCode, loaded: thread.loaded, engineCalls: engineCalls.length }).toEqual({ thread: daemon, loaded: 0, engineCalls: 0 })
+    expect(daemon).not.toBe(THREAD_EXIT.ok)
   })
 
   test("#given a runtime without node:sqlite #when a subcommand runs #then it is a named refusal before the SDK loads", async () => {

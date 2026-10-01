@@ -1,7 +1,7 @@
 import { describe, expect, jest, test } from "bun:test"
 import { Database } from "bun:sqlite"
 import { spawn } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { COMPLETION_SETTLE_WAIT_MS, createThreadComponent } from "./component"
@@ -222,6 +222,60 @@ describe("thread component control endpoint registration", () => {
       await disposal
       expect(calls).toEqual(["persistHeaderNow", "registerControlEndpoint", "dispose"])
       expect(registered?.inboxDir).toBe(gatewayInboxDirectory(agentDir, "dur-1"))
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a terminal whose engine has no control endpoint on this platform (a win32 TUI) #when session_start registers and the registrar answers unsupported_platform #then the session starts, gets no inbox and no binding, nothing is reported as a failure, and its thread tools still reach another session", async () => {
+    const agentDir = realpathSync(mkdtempSync(join(tmpdir(), "thr-component-unsupported-")))
+    try {
+      const reported: string[] = []
+      const logger = { logger: { info(message: string) { reported.push(`info: ${message}`) }, error(message: string) { reported.push(`error: ${message}`) }, warn(message: string) { reported.push(`warn: ${message}`) } }, config: { getFlag: () => undefined } }
+      let answered!: () => void
+      const registrationAnswered = new Promise<void>((resolve) => { answered = resolve })
+      const reached: string[] = []
+      const session = {
+        persistHeaderNow: async () => undefined,
+        registerControlEndpoint: async () => {
+          answered()
+          return { status: "unsupported", reason: "unsupported_platform" }
+        },
+        admissionGate: () => ({ can_admit: true, editor_revision: 0, turn_epoch: 0 }),
+        admitExternalMessage: (input: { readonly delivery_id: string }) => { reached.push(input.delivery_id); return { kind: "started", turn_epoch: 1 } },
+        listAdmittedDeliveries: () => ({ pending: [...reached], emitted: [] }),
+      }
+      const f = eventApi(session)
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir }).register(f.pi as never, logger as never)
+      // Another session of this workspace that is not running: a send to it is queued for its next start.
+      const peerDir = join(agentDir, "sessions", "--peer--")
+      mkdirSync(peerDir, { recursive: true })
+      writeFileSync(join(peerDir, "2026-10-01T10-00-00-000Z_dur-peer.jsonl"), `${JSON.stringify({ type: "session", id: "dur-peer", timestamp: "2026-10-01T10:00:00.000Z", cwd: process.cwd() })}\n`)
+      const notices: string[] = []
+      const ctx = { sessionManager: { getSessionId: () => "dur-win", getSessionFile: () => join(agentDir, "dur-win.jsonl") }, isIdle: () => true, ui: { notify: (text: string) => { notices.push(text) } } }
+
+      await f.dispatch("session_start", ctx)
+      await within(registrationAnswered, 10_000, "the registrar to answer")
+      const sent = (await f.tool("thread_send").execute("call-send", { thread: "dur-peer", message: "from a terminal with no endpoint" }, undefined, undefined, ctx)) as { details: { result: unknown } }
+      // Shutdown is serialized behind the registration, so everything it did is settled after this.
+      await f.dispatch("session_shutdown", ctx)
+
+      expect(sent.details.result).toMatchObject({ kind: "ok", thread_id: "dur-peer", delivery: { kind: "queued_offline" } })
+      const store = createGatewayStore({ agentDir })
+      try {
+        const bindings = await store.listBindings({ now: Date.now(), filter: { session_durable_id: "dur-win" } })
+        expect({
+          inbox: existsSync(gatewayInboxDirectory(agentDir, "dur-win")),
+          bindings: bindings.kind === "ok" ? bindings.bindings.length : bindings,
+          peerRows: (await store.list({ target_durable_id: "dur-peer" })).map((row) => row.state),
+          ownRows: (await store.list({ target_durable_id: "dur-win" })).length,
+          reached,
+          reported,
+          notices,
+        }).toEqual({ inbox: false, bindings: 0, peerRows: ["queued"], ownRows: 0, reached: [], reported: [], notices: [] })
+      } finally {
+        await store.dispose()
+      }
     } finally {
       rmSync(agentDir, { recursive: true, force: true })
     }
