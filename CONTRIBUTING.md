@@ -382,3 +382,5 @@ Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the 
 ---
 
 Thank you for contributing to Oh My OpenCode! Your efforts help make AI-assisted coding better for everyone.
+
+<!-- ci probe for #9245: docs-only change -->
