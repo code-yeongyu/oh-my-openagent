@@ -34,6 +34,11 @@
 - `live-surface.ts`: the legacy endpoint keeps the session files `host status --all` reports for it, as dev did. When
   the legacy host stops answering, its threads are listed from disk as `resumable` with an `error_note` and read from
   their JSONL, instead of disappearing from `thread_list`.
+- `component.ts`: a run's causal cause (`RunContext.cause`, sent as `cause_delivery_id`) is the newest delivery whose
+  message the model consumed (the engine's `message_start`, the same edge `RunContext.consumed` reads), not the newest
+  one admitted. While thread B's message waited behind A's run, a `thread_send` from A's run continued B's causal
+  chain, charging B's hop, cycle and budget guards; it now continues A's, and a send after the engine drains B's
+  follow-up continues B's. The registrant's `onAdmitted` hook, which only fed the cause, is gone.
 
 ## 2026-10-01 - session gateway review round 3: store recovery, legacy mailbox import, retention, binding defaults (#9222)
 

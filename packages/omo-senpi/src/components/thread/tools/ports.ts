@@ -102,8 +102,9 @@ export type ThreadToolSurfaceOptions = {
   /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
   /**
-   * The delivery that caused the caller's current run, when one did: a send continues that causal
-   * root (hop, cycle and budget guards), and a send with none starts a new root.
+   * The newest delivery whose message the caller's current run has consumed (`component.ts`
+   * `RunContext.cause`), when one has: a send continues that causal root (hop, cycle and budget
+   * guards), and a send with none starts a new root. A delivery still queued behind the run is not it.
    */
   readonly callerCause?: () => string | undefined
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */

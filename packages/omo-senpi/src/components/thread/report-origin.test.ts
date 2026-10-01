@@ -38,13 +38,15 @@ type EngineMessage = Record<string, unknown>
 
 function host(drain: () => Drain): ThreadHost {
   const session: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-1", cwd: process.cwd(), name: "lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
+  // A second session on the same host: the peer a run's thread_send reaches.
+  const peer: ThreadHostSession = { sessionId: "rpc-2", durableSessionId: "dur-2", cwd: process.cwd(), name: "peer", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
   const unused = async (): Promise<never> => {
     throw new Error("not used")
   }
   return {
     socket: "/tmp/thread-report-origin-legacy.sock",
-    listSessions: async () => [session],
-    listView: async () => ({ sessions: [session], hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: [session] }, endpoint_kind: "rpc_host", alive: true }], disk: [] }),
+    listSessions: async () => [session, peer],
+    listView: async () => ({ sessions: [session, peer], hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: [session, peer] }, endpoint_kind: "rpc_host", alive: true }], disk: [] }),
     openSession: unused,
     getMessages: async () => [],
     getState: async () => ({ isStreaming: false }),
@@ -154,6 +156,18 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     await message(toolResultMessage(id))
     return details.result
   }
+  /** The run calls thread_send to the peer session; resolves the causal root the gateway placed that send under. */
+  const sendFromRun = async (text: string): Promise<string | undefined> => {
+    const id = `call-${++engine.calls}`
+    await message(toolCallMessage(id))
+    const tool = tools.find((entry) => entry.name === "thread_send")
+    if (tool === undefined) throw new Error("thread_send is not registered")
+    const result = ((await tool.execute(id, { thread: "dur-2", message: text, delivery: "follow_up" }, undefined, undefined, ctx)).details as { readonly result: { readonly kind: string; readonly delivery_id?: string } }).result
+    await message(toolResultMessage(id))
+    if (result.kind !== "ok" || result.delivery_id === undefined) throw new Error(`thread_send failed: ${JSON.stringify(result)}`)
+    return await rootOf(result.delivery_id)
+  }
+  const rootOf = async (deliveryId: string): Promise<string | undefined> => (await connectorStore.deliveryView(deliveryId))?.row.root_id
   /** senpi `_promptAgent`: the delivery admitted as `started` begins the run and is its first message. */
   const runStartedDelivery = async () => {
     const start = engine.start
@@ -206,8 +220,28 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     const page = await connectorStore.readOutbox({ now: Date.now(), binding_id: bindingId })
     return page.kind === "ok" ? page.rows.map((row) => `${row.event}:${row.text}`) : []
   }
-  return { bindThread, send, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
+  return { bindThread, send, sendFromRun, rootOf, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
 }
+
+describe("a send from a run continues the causal chain of the message that run consumed", () => {
+  test("#given A's message started the run and B's is queued behind it #when the run sends to a peer before and after the engine drains B #then the first send continues A's chain and the second B's", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    const b = await s.bindThread("chat-b")
+    const fromA = await s.send(a, "please do the job")
+    await s.runStartedDelivery()
+    const fromB = await s.send(b, "and what about me")
+    expect(fromB).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    if (fromA.kind !== "ok" || fromB.kind !== "ok") throw new Error("the bound messages were not delivered")
+    const rootA = await s.rootOf(fromA.delivery_id)
+    const rootB = await s.rootOf(fromB.delivery_id)
+    expect(rootA).not.toBe(rootB)
+
+    expect(await s.sendFromRun("asking the peer for A")).toBe(rootA)
+    await s.answerAndContinue()
+    expect(await s.sendFromRun("asking the peer for B")).toBe(rootB)
+  })
+})
 
 describe("a report or completion without binding_id goes to the thread whose message the current run consumed", () => {
   test("#given threads A and B bound to one session #when A's message starts the run and B's is queued behind it #then A's report and A's completion land in A only, and after the run a report must name a binding", async () => {

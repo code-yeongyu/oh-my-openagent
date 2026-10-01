@@ -42,7 +42,8 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
 }
 
 /**
- * `cause`: the newest delivery the session took (a send from this run continues its causal root).
+ * `cause`: the newest delivery whose message the model has taken into its context (a send from this
+ * run continues its causal root). A delivery admitted but still waiting in a queue is not a cause yet.
  * `consumed`: the deliveries the model has taken into its context since its last final answer (an
  * assistant message without a tool call), read from the engine's own `message_start` of each
  * delivery's custom message. senpi drains a queued follow-up after that answer and before
@@ -89,7 +90,9 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   }
   if (message.role === "user") run.local = true
   const deliveryId = deliveryIdOf(message)
-  if (deliveryId !== undefined && !run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
+  if (deliveryId === undefined) return
+  run.cause = deliveryId
+  if (!run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
 }
 
 function durableIdOf(eventCtx: unknown): string | undefined {
@@ -106,7 +109,7 @@ function durableIdOf(eventCtx: unknown): string | undefined {
  * `session_start` path (the inbox watch arms asynchronously); shutdown waits for it and disposes
  * the endpoint before the store, because senpi's clean exit asks `isSessionReferenced` then.
  */
-function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, run: RunContext, onCommandWake: (durableId: string) => Promise<void>) {
+function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, onCommandWake: (durableId: string) => Promise<void>) {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
   if (control === undefined) return undefined
   const runtimeInstance = hostInstanceOf(pi)
@@ -114,9 +117,6 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     control,
     agentDir,
     store,
-    onAdmitted: (_durableId, deliveryId) => {
-      run.cause = deliveryId
-    },
     onCommandWake,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
     log: (line) => ctx.logger.warn(line),
@@ -190,7 +190,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
-      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, run, pickUpArms)
+      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms)
       let legacyImportStarted = false
       const importLegacyMailbox = async (): Promise<void> => {
         if (legacyImportStarted || !LEGACY_MAILBOX_FILES.some((file) => existsSync(join(legacyMailbox, file)))) return
