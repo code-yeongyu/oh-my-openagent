@@ -209,14 +209,24 @@ echo "$@" >> "$FAKE_NPM_DIR/argv"
 case "$*" in
   *--allow-scripts*) echo ran > "$FAKE_NPM_DIR/marker" ;;
   *) if [ "$FAKE_NPM_NOTICE" = 1 ]; then
-       echo "npm warn install-scripts 3 packages had install scripts blocked because they are not covered by allowScripts:" >&2
-       echo "npm warn install-scripts Run npm install -g --allow-scripts=esbuild,@google/genai,protobufjs to allow these scripts once" >&2
+       echo "npm warn install-scripts 3 packages $FAKE_NPM_HEADLINE covered by allowScripts:" >&2
+       echo "npm warn install-scripts   @google/genai@2.25.0 (preinstall: echo 'preinstall: no-op')" >&2
+       echo "npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)" >&2
+       echo "npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)" >&2
+       echo "npm warn install-scripts" >&2
+       echo "npm warn install-scripts Run npm install -g --allow-scripts=@google/genai,esbuild,protobufjs to allow these scripts once" >&2
      fi ;;
 esac
 exit 0
 `
 
-    async function updateWithFakeNpm(notice: boolean, spec = SPEC) {
+    // The headline npm prints before "covered by allowScripts:", captured from real npm 11 and npm 12 output.
+    const HEADLINES: Record<string, string> = {
+      "11": "have install scripts not yet",
+      "12": "had install scripts blocked because they are not",
+    }
+
+    async function updateWithFakeNpm(notice: boolean, spec = SPEC, npm = "11") {
       const dir = mkdtempSync(join(tmpdir(), "omo-fake-npm-"))
       const npmPath = join(dir, "npm")
       writeFileSync(npmPath, FAKE_NPM)
@@ -226,7 +236,7 @@ exit 0
       const code = await runSelfUpdate(["update"], {
         resolveUpdate: () => ({ manager: "npm", command: `npm i -g ${spec}`, argv: ["npm", "i", "-g", spec] }),
         ...offline,
-        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_NPM_DIR: dir, FAKE_NPM_NOTICE: notice ? "1" : "0" },
+        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_NPM_DIR: dir, FAKE_NPM_NOTICE: notice ? "1" : "0", FAKE_NPM_HEADLINE: HEADLINES[npm] },
         readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
         log: (line) => lines.push(line),
         error: (line) => errors.push(line),
@@ -237,18 +247,19 @@ exit 0
       return { code, lines, errors, argv, marker }
     }
 
-    // npm 11 only notices; npm 12 is the same notice here since strict blocking changes nothing omo does.
+    // npm 11 only notices and npm 12 blocks; omo's argv and guidance are the same for both.
     for (const npm of ["11", "12"]) {
       test(`#then an npm ${npm} update never passes --allow-scripts, runs no install script, and prints a working retry command`, async () => {
-        const { code, lines, errors, argv, marker } = await updateWithFakeNpm(true, "omo-ai@5.1.6")
+        const { code, lines, errors, argv, marker } = await updateWithFakeNpm(true, "omo-ai@5.1.6", npm)
         expect(code).toBe(0)
         expect(errors).toEqual([])
         expect(argv).toEqual(["i -g omo-ai@5.1.6"])
         expect(marker).toBe(false)
-        const guidance = lines.filter((line) => line.startsWith("omo: npm skipped") || line.startsWith("omo: to run them anyway"))
+        const guidance = lines.filter((line) => line.startsWith("omo: npm skipped") || line.startsWith("omo: if npm suggested"))
         expect(guidance[0]).toContain("esbuild, @google/genai, protobufjs")
         expect(guidance[0]).toContain("skipping them is safe, omo runs without them")
-        const printed = guidance[1].slice("omo: to run them anyway: ".length)
+        expect(lines.join("\n")).not.toContain("--allow-scripts")
+        const printed = guidance[1].slice(guidance[1].lastIndexOf("use: ") + "use: ".length)
         expect(printed.split(" ").slice(0, 3)).toEqual(["npm", "i", "-g"])
         expect(printed.split(" ")[3]).toBe("omo-ai@5.1.6")
       })
