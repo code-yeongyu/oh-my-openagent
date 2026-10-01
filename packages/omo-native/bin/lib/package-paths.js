@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, join, parse } from "node:path"
@@ -14,6 +15,29 @@ export function packageManifest() {
 }
 
 const BUN_GLOBAL_PACKAGE_SUFFIX = "/install/global/node_modules/omo-ai"
+
+// npm 11 reports install scripts that no `allowScripts` entry covers, and omo's transitive esbuild,
+// @google/genai and protobufjs scripts are safe to skip, so the update names them up front (#9281).
+// npm before 11 has no such option, so it never receives the flag.
+const NPM_ALLOW_SCRIPTS_MIN_MAJOR = 11
+const NPM_ALLOW_SCRIPTS_FLAG = "--allow-scripts=esbuild,@google/genai,protobufjs"
+
+/** The major version of the `npm` on PATH, or undefined when it cannot be read. */
+export function detectNpmMajor(spawn = spawnSync) {
+  try {
+    const result = spawn("npm", ["--version"], {
+      encoding: "utf8",
+      shell: process.platform === "win32",
+      timeout: 5000,
+      windowsHide: true,
+    })
+    if (result.status !== 0) return undefined
+    const major = Number.parseInt(String(result.stdout).trim().split(".")[0], 10)
+    return Number.isInteger(major) ? major : undefined
+  } catch {
+    return undefined
+  }
+}
 
 /** The npm dist-tag this build ships on: a prerelease version is on beta, a stable one on latest. */
 export function releaseChannel(version = packageManifest().version) {
@@ -55,6 +79,8 @@ function installedVersion(root) {
  * @param {string} [homeDir]
  * @param {(path: string) => boolean} [exists]
  * @param {string} [targetVersion]
+ * @param {number} [npmMajor] the npm major version; the allow-scripts flag is added only from 11. It is
+ *   a parameter, not detected here, because the launcher resolves this target on every start.
  */
 export function updateTarget(
   root = packageRoot,
@@ -63,6 +89,7 @@ export function updateTarget(
   homeDir = process.env.HOME || process.env.USERPROFILE || homedir(),
   exists = existsSync,
   targetVersion = undefined,
+  npmMajor = undefined,
 ) {
   // A resolved target installs that exact version; without one the channel spec is the only answer.
   const spec = targetVersion === undefined ? channelPackageSpec(version) : `omo-ai@${targetVersion}`
@@ -84,6 +111,13 @@ export function updateTarget(
       command: `bun add -g ${spec}`,
       argv: ["bun", "add", "-g", spec],
       ...(bunInstall === undefined ? {} : { env: { BUN_INSTALL: bunInstall } }),
+    }
+  }
+  if (npmMajor !== undefined && npmMajor >= NPM_ALLOW_SCRIPTS_MIN_MAJOR) {
+    return {
+      manager: "npm",
+      command: `npm i -g ${spec} ${NPM_ALLOW_SCRIPTS_FLAG}`,
+      argv: ["npm", "i", "-g", spec, NPM_ALLOW_SCRIPTS_FLAG],
     }
   }
   return {
