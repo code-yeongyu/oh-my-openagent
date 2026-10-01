@@ -72,6 +72,9 @@
 - `store-relay-ops.ts`: `readOutbox` and `listBindings` put `ORDER BY ... LIMIT` in the SQL (bindings read one row past
   the page to know whether another follows) instead of loading every matching row and slicing. `relay.test.ts` pages an
   outbox; the bindings snapshot-cursor test already pages bindings.
+- `tools/ports.ts` `ThreadToolSurfaceOptions.store` is required and `tools/gateway-services.ts` lost its fallback, which
+  opened a second, separate database under `stateDirectory` when a caller passed no store. The legacy
+  `session-control-qa.mjs` scenario opens its stores explicitly and disposes them at teardown.
 - Docs (`docs/reference/omo-thread.md`, `thread/AGENTS.md`): `omo thread` creates and resumes no session (a connector
   opens one through the host API and binds it); a completion row carries the armed text, not the model's reply; the
   per-author rate bucket trusts the connector's author id and stays bounded by the target backlog.

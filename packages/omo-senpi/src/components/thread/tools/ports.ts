@@ -94,10 +94,11 @@ export type ThreadToolSurfaceOptions = {
   readonly ensureHost?: () => Promise<void>
   /**
    * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
-   * the one store it shares with the session's control endpoint; without one, a store is opened
-   * under `stateDirectory` (QA harnesses and tests).
+   * the one store it shares with the session's control endpoint; the SDK passes the one it opened
+   * under the agent dir. There is no fallback: a second store opened elsewhere would be a separate
+   * database.
    */
-  readonly store?: GatewayStore
+  readonly store: GatewayStore
   /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
   /**

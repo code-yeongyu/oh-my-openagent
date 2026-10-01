@@ -2,7 +2,7 @@ import { toGatewayAddressEntries } from "../address-book"
 import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter"
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
 import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
-import { createGatewayStore, type GatewayStore } from "../gateway/store"
+import type { GatewayStore } from "../gateway/store"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
@@ -23,15 +23,14 @@ export type GatewayServices = {
 }
 
 /**
- * The one composition of the gateway over a thread surface: the store (the options' store, else one
- * under `stateDirectory`), the engine resolving addresses through the address book of `view`, and
+ * The one composition of the gateway over a thread surface: the caller's store, the engine resolving addresses through the address book of `view`, and
  * the relay. The agent tools and the `omo thread` SDK both build on it, so neither duplicates the
  * engine; they differ only in the principal they pass. `view` is the send path's view (callers pass
  * one that answers even when nothing is live): a target no endpoint lists resolves from disk
  * (`sendAddressBook`) and is queued offline.
  */
 export function createGatewayServices(options: ThreadToolSurfaceOptions, view: () => Promise<ThreadHostView>): GatewayServices {
-  const store = options.store ?? createGatewayStore({ agentDir: options.stateDirectory })
+  const store = options.store
   const now = options.now ?? store.now
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))

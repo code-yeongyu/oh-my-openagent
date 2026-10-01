@@ -106,17 +106,26 @@ const errorCode = (result) => (result.kind === "error" ? result.error.code : `ok
 
 let scratchDir
 let socketPath
+// The thread tools take the gateway store from their caller, as the component passes its own.
+const stores = []
 // Part A's thread-tool state dir lives outside the scratch tree, so it is removed on its own.
 const liveStateDirectory = join(process.env.TMPDIR ?? "/tmp", `thread-qa-live-${STAMP}`)
 try {
   const { createThreadTools } = await threadComponent("tools")
   const { createLiveThreadSurface, resolveThreadSocket } = await threadComponent("live-surface")
+  const { createGatewayStore } = await threadComponent("gateway/store")
+  const storeAt = (agentDir) => {
+    const store = createGatewayStore({ agentDir })
+    stores.push(store)
+    return store
+  }
 
   // ---------------------------------------------------------------- Part A: read-only live probe
   const defaultSocket = resolveThreadSocket(process.env)
   const liveTools = createThreadTools({
     host: createLiveThreadSurface({}, {}),
     stateDirectory: liveStateDirectory,
+    store: storeAt(liveStateDirectory),
     callerSessionId: () => "unknown-caller",
     callerWorkspaceRoot: () => process.cwd(),
   })
@@ -168,6 +177,7 @@ try {
   const tools = createThreadTools({
     host: surface,
     stateDirectory: join(scratch.dir, "thread-state"),
+    store: storeAt(join(scratch.dir, "thread-state")),
     callerSessionId: () => callerId,
     callerWorkspaceRoot: () => scratch.cwd,
   })
@@ -290,6 +300,7 @@ try {
   report.assert("scenario-completed", false, error instanceof Error ? `${error.name}: ${error.message}` : String(error))
 } finally {
   // 12. teardown: host process, socket and scratch dir all gone
+  await Promise.all(stores.map((store) => store.dispose()))
   await cleanupAllAndWait()
   rmSync(liveStateDirectory, { recursive: true, force: true })
   const cleanup = verifyCleanup(report, { scratchDir, socketPaths: socketPath === undefined ? [] : [socketPath] })
