@@ -278,6 +278,25 @@ finish in the background. A write that cannot get the store's write lock gives u
 (never past 30 s) and is retried after the store's 5 s busy timeout, with the same outcome, until
 it lands.
 
+## Retention
+
+The gateway store keeps a delivered message's body and bookkeeping only as long as something can
+still read it. Pruning runs inside the store's own write transactions (a send, a binding or report
+operation, an outbox read), at most once an hour unless the previous pass hit its bound of 256 rows
+per table, so it never adds a write when nothing else writes.
+
+| Rows | Kept for |
+| --- | --- |
+| A delivered (`applied`) or refused message, with its body | 30 days after its last change, and longer while its idempotency receipt is kept |
+| An undelivered, admitting or admitted message | until it is delivered, refused or expires (never pruned) |
+| Idempotency receipts | 30 days |
+| A causal chain's loop-guard record | until the chain's 7-day lifetime ends; a later continuation is refused `loop_detected` either way |
+| A sender's rate bucket | until it is idle for a full refill (40 s), which is exactly a fresh bucket |
+| Acked outbox rows | 30 days after their ack |
+| Unacked outbox rows | as long as their binding, plus 30 days after it closes |
+| A detached or expired binding and its outbox cursor | 30 days after it closed, once no outbox row, completion arm or undelivered message of it remains; after that `outbox` answers `not_found` |
+| A session's sequence counter and incarnation | while any delivery, binding, outbox row or completion arm names the session; rebuilt on its next use |
+
 ## JSON
 
 With `--json`, stdout is exactly one JSON value, also on failure. `list` prints the thread array;

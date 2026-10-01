@@ -100,6 +100,8 @@ None of these is a setting (`gateway/constants.ts`, `component.ts`):
 | Delivery size | 1 MiB through the engine; tool message 32 KiB (`THREAD_MESSAGE_MAX_BYTES`); report/answer text 32 KiB (`RELAY_TEXT_MAX_BYTES`) | `message_too_large` |
 | Queued delivery TTL | 24 h (`QUEUED_TTL_MS`), or the binding's expiry when sooner | row `refused` `expired` |
 | Receipts | 30 days (`GATEWAY_RECEIPT_RETENTION_MS`) | `receipts` table |
+| Delivered/refused deliveries | 30 days after their last change (`DELIVERY_RETENTION_MS`), never while a receipt points at one; open deliveries are never pruned | `store-retention.ts` |
+| Retention sweep | at most 256 rows per table per sweep (`RETENTION_SWEEP_BATCH`), once an hour (`RETENTION_SWEEP_INTERVAL_MS`) unless the last sweep hit the bound; runs at the end of an enqueue, a relay mutation or an outbox read, never at open. Expired causal roots and their edges, rate buckets idle for a full refill, closed bindings 30 days old with no outbox row, arm or open delivery (and their `outbox_cursors`), and `session_meta` rows nothing references | `store-retention.ts` |
 | `tui` request | 1.5 s (`TUI_REQUEST_TIMEOUT_MS`); host listing 10 s per endpoint; enumeration reused 5 s | `live-surface.ts` |
 
 Self-send and a cycle back to the sender under one causal root are `loop_detected` (`self_send`, `cycle`); a caller-chosen root is refused (`forged_root`).

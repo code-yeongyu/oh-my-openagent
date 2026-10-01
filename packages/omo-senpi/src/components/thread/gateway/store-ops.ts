@@ -32,6 +32,7 @@ import {
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
+import { sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { GATEWAY_MIGRATIONS } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
@@ -489,6 +490,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
     ])
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     const position = queuePosition(ctx, row)
+    sweepRetentionIfDue(ctx, request.now)
     await ctx.hook("beforeDbCommit")
     ctx.sql.exec("COMMIT")
     committed = true

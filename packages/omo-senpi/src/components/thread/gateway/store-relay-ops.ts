@@ -33,6 +33,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
 import type { SqlRow, SqlValue } from "./sql"
 import { gatewayOutboxMarkerPath } from "./paths"
 import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
+import { sweepRetentionIfDue } from "./store-retention"
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
 const BINDING_COLUMNS = [
@@ -170,6 +171,8 @@ async function relayMutation<T extends object>(ctx: StoreContext, op: string, no
     if (prior !== undefined) return prior
     const outcome = body()
     if (outcome.kind === "ok") recordOutcome(ctx, key, now, { ...outcome, deduplicated: false })
+    // After the body, so what this call just wrote protects the rows it references.
+    sweepRetentionIfDue(ctx, now)
     return outcome.kind === "ok" ? ({ ...outcome, deduplicated: false } as RelayOutcome<T>) : outcome
   })
 }
@@ -542,6 +545,7 @@ export async function readOutbox(
       .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ?`, [binding.binding_id, after], "cursor")
       .slice(0, limit)
       .map((row) => outboxRowFrom(row, binding))
+    sweepRetentionIfDue(ctx, request.now)
     return { kind: "ok", binding_id: binding.binding_id, revision: binding.revision, status: binding.status, rows, next_cursor: rows.at(-1)?.cursor ?? after, acked_cursor: acked }
   })
 }

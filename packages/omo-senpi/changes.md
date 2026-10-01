@@ -44,6 +44,12 @@
   without the prefix (written by a pre-release build of the gateway, in that process's locale) cannot be compared,
   so it counts as live while its pid exists, like an unreadable one. `process-identity.test.ts` records and checks
   in two processes with different locales and time zones.
+- `gateway/store-retention.ts` (new): a bounded retention sweep for the tables nothing pruned. Delivered and refused
+  deliveries 30 days after their last change (not while a receipt points at one), causal edges and roots once the root
+  expired, rate buckets idle for a full refill, closed bindings 30 days old with no outbox row, completion arm or open
+  delivery, their `outbox_cursors`, and `session_meta` rows nothing references. At most 256 rows per table per sweep,
+  hourly unless the last sweep hit the bound; it runs at the end of an enqueue, a relay mutation or an outbox read, so
+  opening a current store still takes no write lock. Retention periods: `docs/reference/omo-thread.md` "Retention".
 
 ## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
 
