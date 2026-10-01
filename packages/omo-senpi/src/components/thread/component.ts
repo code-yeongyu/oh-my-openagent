@@ -49,8 +49,11 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
  * `agent_settled`, so the follow-up starts a new group: a report without `binding_id` goes to the
  * binding of the message the current answer is for, never to the thread the session started on.
  * Any other input after a final answer (a prompt typed in the terminal) also starts a new group.
+ * `local`: a prompt typed in the terminal (a `user` message: a prompt, steer or follow-up) is in the
+ * group. Together with a bound message the answer has two possible origins, so a report without
+ * `binding_id` is refused rather than sent to the bound thread.
  */
-type RunContext = { turn: number; cause: string | undefined; consumed: string[]; answered: boolean }
+type RunContext = { turn: number; cause: string | undefined; consumed: string[]; local: boolean; answered: boolean }
 
 type EngineMessage = { readonly role?: unknown; readonly customType?: unknown; readonly details?: unknown; readonly content?: unknown }
 
@@ -74,8 +77,10 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   if (run.answered) {
     run.consumed = []
+    run.local = false
     run.answered = false
   }
+  if (message.role === "user") run.local = true
   const deliveryId = deliveryIdOf(message)
   if (deliveryId !== undefined && !run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
 }
@@ -143,7 +148,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         if (event.kind === "legacy_mailbox_invalid") ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (retried at the next start): ${event.error}`)
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
-      const run: RunContext = { turn: 0, cause: undefined, consumed: [], answered: true }
+      const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
       const completions = createCompletionTracker((durableId, outcome) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
@@ -163,6 +168,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerCause: () => run.cause,
         callerRunDeliveries: () => [...run.consumed],
+        callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId) => completions.arm(durableId),
       })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
@@ -213,6 +219,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
         run.consumed = []
+        run.local = false
         run.answered = true
         if (durableId === undefined) return
         // A failed write is reported (and retried) by the tracker's onWriteFailed.

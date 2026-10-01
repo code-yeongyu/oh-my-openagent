@@ -398,6 +398,8 @@ export type ReportOpRequest = {
   readonly binding_id: string | null
   /** The deliveries the reporter's current answer is for, when the reporter knows them (the `thread_report` tool does; the CLI does not): empty when none. */
   readonly origin_delivery_ids: readonly string[]
+  /** A prompt typed in the reporter's terminal is part of the same answer: with a bound message there, the origin is ambiguous and refused. */
+  readonly origin_local_input?: boolean
   readonly event: OutboundEvent
   readonly text: string
   readonly ui_request_id: string | null
@@ -419,21 +421,24 @@ export type ReportOpResult = {
  * The binding a report without `binding_id` goes to: the binding of the messages the reporter's
  * current answer is for, so a message from another thread queued behind the run never takes it over,
  * and a queued follow-up the session answers next is answered in its own thread. Messages from two
- * bound threads in one answer refuse. Without a bound message, the session's one active outbound
- * binding; with several, the caller must name one. Never a guess between bindings.
+ * bound threads in one answer refuse, and so does a bound message answered together with a prompt
+ * typed in the terminal (a local steer into a thread's run, or a thread's steer into a local run).
+ * Without a bound message, the session's one active outbound binding; with several, the caller must
+ * name one. Never a guess between bindings.
  */
-function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, originDeliveryIds: readonly string[]): { readonly binding_id: string } | StoreRefusal {
+function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, originDeliveryIds: readonly string[], localInput: boolean): { readonly binding_id: string } | StoreRefusal {
   const origins = [...new Set(originDeliveryIds.flatMap((deliveryId) => {
     const row = ctx.sql.one(["binding_id"], "SELECT binding_id FROM deliveries WHERE delivery_id = ? AND target_durable_id = ?", [deliveryId, sessionDurableId])
     const bindingId = nullableString(row?.binding_id)
     return bindingId === null ? [] : [bindingId]
   }))].sort()
-  const [origin, ...otherOrigins] = origins
-  if (origin !== undefined && otherOrigins.length === 0) return { binding_id: origin }
-  if (origin !== undefined) return refused("invalid_arguments", `This session's current run answers messages from ${origins.length} bound threads; name binding_id.`, { binding_ids: origins })
   const outbound = ctx.sql
     .all(["binding_id"], "SELECT binding_id FROM bindings WHERE session_durable_id = ? AND status = 'active' AND direction_outbound = 1", [sessionDurableId], "binding_id")
     .map((row) => String(row.binding_id))
+  const [origin, ...otherOrigins] = origins
+  if (origin !== undefined && otherOrigins.length > 0) return refused("invalid_arguments", `This session's current run answers messages from ${origins.length} bound threads; name binding_id.`, { binding_ids: origins })
+  if (origin !== undefined && localInput) return refused("invalid_arguments", "This session's current run answers a bound thread's message and a prompt typed in its terminal together; name binding_id.", { binding_ids: outbound })
+  if (origin !== undefined) return { binding_id: origin }
   const [only, ...others] = outbound
   if (only !== undefined && others.length === 0) return { binding_id: only }
   if (only === undefined) return refused("invalid_arguments", "This session has no active outbound binding and its current run answers no bound message; name binding_id.")
@@ -462,7 +467,7 @@ function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord;
  */
 export async function reportEvent(ctx: StoreContext, request: ReportOpRequest): Promise<RelayOutcome<ReportOpResult>> {
   return await relayMutation(ctx, "report", request.now, request.receipt, () => {
-    const resolved = request.binding_id === null ? reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_ids) : { binding_id: request.binding_id }
+    const resolved = request.binding_id === null ? reportBindingDefault(ctx, request.session_durable_id, request.origin_delivery_ids, request.origin_local_input === true) : { binding_id: request.binding_id }
     if ("kind" in resolved) return resolved
     const bindingId = resolved.binding_id
     const binding = selectBinding(ctx, bindingId)

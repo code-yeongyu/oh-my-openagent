@@ -225,7 +225,9 @@ message the session is answering now. A message from another thread that arrives
 going waits behind it and does not change that; once the session takes that queued message up (after
 its answer to the first, even before the session goes idle), reports answer the new message's thread.
 When one answer covers messages from two bound threads (a steer, or several queued messages taken up
-together), a report without a binding is refused and names both. Otherwise, and always for `omo thread report`, which
+together), a report without a binding is refused and names both. So is one whose answer covers a
+bound thread's message and a prompt typed in the session's terminal (typed while the thread's message
+runs, or the reverse): the answer has two possible origins, so the report must name its binding. Otherwise, and always for `omo thread report`, which
 runs outside the session, a report without `--binding` goes to the session's only active outbound
 binding; a session with none or several must name `--binding` (`invalid_arguments`, with the
 `binding_ids` to choose from). Nothing is ever copied to the session's other bindings.

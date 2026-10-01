@@ -58,7 +58,9 @@
   would have sent B's own answer to A, because senpi drains a queued follow-up after the final answer and before
   `agent_settled`. That drain, or a prompt typed in the terminal after the answer, starts a new group. Messages from
   two bound threads in one answer (a steer at a tool boundary, or `followUpMode: "all"`) are `invalid_arguments`
-  naming both `binding_ids`. Without a bound message (a prompt the user typed, `omo thread report`) the session's only
+  naming both `binding_ids`. A bound message answered together with a prompt typed in the terminal (a local steer
+  into thread A's run, or the reverse; `RunContext.local`, carried as `origin_local_input`) has two possible origins
+  and is `invalid_arguments` naming the session's active outbound `binding_ids`, where it used to go to A. Without a bound message (a prompt the user typed, `omo thread report`) the session's only
   active outbound binding is used, and several are `invalid_arguments` naming their `binding_ids`.
   `report-origin.test.ts` drives two threads through the SDK and the real `thread_report` tool, with the engine's
   event order (`agent_end`, then the follow-up's `agent_start` and `message_start`, no `agent_settled` between).

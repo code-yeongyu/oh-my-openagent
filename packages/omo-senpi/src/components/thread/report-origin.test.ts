@@ -145,12 +145,12 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     return bound.binding.binding_id
   }
   const send = async (bindingId: string, text: string) => await sdk.send({ binding_id: bindingId, text, idempotency_key: `evt-${text}` })
-  const callReport = async (kind: "report" | "completion", text: string): Promise<ToolOutcome> => {
+  const callReport = async (kind: "report" | "completion", text: string, bindingId?: string): Promise<ToolOutcome> => {
     const id = `call-${++engine.calls}`
     await message(toolCallMessage(id))
     const tool = tools.find((entry) => entry.name === "thread_report")
     if (tool === undefined) throw new Error("thread_report is not registered")
-    const details = (await tool.execute(id, { kind, text }, undefined, undefined, ctx)).details as { readonly result: ToolOutcome }
+    const details = (await tool.execute(id, { kind, text, ...(bindingId === undefined ? {} : { binding_id: bindingId }) }, undefined, undefined, ctx)).details as { readonly result: ToolOutcome }
     await message(toolResultMessage(id))
     return details.result
   }
@@ -163,6 +163,10 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     await dispatch("agent_start")
     await dispatch("turn_start")
     await message(start)
+  }
+  /** senpi `_queueSteer`: a prompt typed in the terminal while the run streams enters it at the next tool boundary. */
+  const steerLocal = async (text: string) => {
+    await message(userMessage(text))
   }
   const runLocalPrompt = async (text: string) => {
     engine.running = true
@@ -194,7 +198,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     const page = await connectorStore.readOutbox({ now: Date.now(), binding_id: bindingId })
     return page.kind === "ok" ? page.rows.map((row) => `${row.event}:${row.text}`) : []
   }
-  return { bindThread, send, callReport, runStartedDelivery, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
+  return { bindThread, send, callReport, runStartedDelivery, steerLocal, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
 }
 
 describe("a report or completion without binding_id goes to the thread whose message the current run consumed", () => {
@@ -261,6 +265,25 @@ describe("a report or completion without binding_id goes to the thread whose mes
     expect(await s.callReport("report", "after the local follow-up")).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(await s.callReport("completion", "local run done")).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect({ a: await s.texts(a), b: await s.texts(b) }).toEqual({ a: ["report:A's step"], b: [] })
+  })
+
+  test("#given A's message started the run #when a prompt typed in the terminal is steered into A's answer #then a report or completion without binding_id is refused naming the session's bindings, one naming A lands in A, and the next run from A reports to A again", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    const b = await s.bindThread("chat-b")
+    expect(await s.send(a, "please do the job")).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+    await s.runStartedDelivery()
+    await s.steerLocal("also check the tests while you are at it")
+    const refused = await s.callReport("report", "whose step?")
+    expect(refused).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect([...(refused.error?.details?.binding_ids ?? [])].sort()).toEqual([a, b].sort())
+    expect(await s.callReport("completion", "whose completion?")).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(await s.callReport("report", "named A", a)).toMatchObject({ kind: "ok", binding_id: a })
+    await s.answerAndSettle()
+    await s.send(a, "next job")
+    await s.runStartedDelivery()
+    expect(await s.callReport("report", "A again")).toMatchObject({ kind: "ok", binding_id: a })
+    expect({ a: await s.texts(a), b: await s.texts(b) }).toEqual({ a: ["report:named A", "report:A again"], b: [] })
   })
 
   test("#given a session with one active outbound binding #when it reports outside a run started by a bound message #then the report goes to that binding", async () => {
