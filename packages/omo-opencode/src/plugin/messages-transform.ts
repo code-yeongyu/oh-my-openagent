@@ -169,6 +169,36 @@ function hasInternalContinuationTrigger(messages: MessageWithParts[]): boolean {
   return findLastUserTurn(messages)?.parts.some(isCompactionContinuationPart) === true
 }
 
+function isClientExecutedToolPart(part: Part): boolean {
+  if (part.type !== "tool") {
+    return false
+  }
+
+  const metadata: unknown = part.metadata
+  return !(isRecord(metadata) && metadata["providerExecuted"] === true)
+}
+
+// OpenCode sends an assistant message step by step (steps are split at step-start parts), and
+// every client-executed tool part in a step goes out as a tool_use plus a tool_result after it -
+// a pending or running one as an "interrupted" error result. When the last step that reaches the
+// wire carries such a part, the request already ends on a tool result, which is a user turn, so
+// there is no assistant prefill to repair. Appending a recovery turn there would only push text
+// next to the tool result, and that text moves on the next round, rewriting earlier history.
+function assistantTailEndsOnToolResult(message: MessageWithParts): boolean {
+  const parts = message.parts
+  const lastWirePartIndex = parts.findLastIndex((part) =>
+    part.type === "text" || part.type === "reasoning" || part.type === "tool"
+  )
+  if (lastWirePartIndex < 0) {
+    return false
+  }
+
+  const lastStepStartIndex = parts.findLastIndex((part, index) =>
+    index < lastWirePartIndex && part.type === "step-start"
+  )
+  return parts.slice(lastStepStartIndex + 1, lastWirePartIndex + 1).some(isClientExecutedToolPart)
+}
+
 function createAssistantPrefillRecoveryMessage(
   lastAssistantMessage: MessageWithParts,
   messages: MessageWithParts[],
@@ -207,7 +237,7 @@ function createAssistantPrefillRecoveryMessage(
 
 function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void {
   const lastMessage = output.messages.at(-1)
-  if (!lastMessage || lastMessage.info.role !== "assistant") {
+  if (!lastMessage || lastMessage.info.role !== "assistant" || assistantTailEndsOnToolResult(lastMessage)) {
     return
   }
 
