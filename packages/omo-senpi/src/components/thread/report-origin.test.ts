@@ -5,7 +5,8 @@ import { join } from "node:path"
 
 import { createThreadComponent } from "./component"
 import type { AdmitExternalMessageInput, RegisterControlEndpointOptions } from "./gateway/adapter"
-import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
+import { GATEWAY_LOCK_WAIT_MAX_MS, SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
+import { lockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { createThreadSdk } from "./sdk"
 import type { ThreadHost, ThreadHostSession } from "./tools"
@@ -89,7 +90,7 @@ function completionsWritten(store: GatewayStore): Promise<void> {
   })
 }
 
-async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" } = {}) {
+async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all"; readonly outcomeWritesLost?: number } = {}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-report-origin-"))
   directories.push(agentDir)
   const runtimeStore = createGatewayStore({ agentDir, instanceId: "runtime-1" })
@@ -139,7 +140,19 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all" 
     return drain
   }
   const logger = { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } }
-  createThreadComponent({ host: host(registered), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store: runtimeStore }).register(pi as never, logger as never)
+  // A writer holding the store's lock past the wait bound: the runtime's next outcome writes give up.
+  let outcomeWritesLost = options.outcomeWritesLost ?? 0
+  const componentStore: GatewayStore = outcomeWritesLost === 0 ? runtimeStore : {
+    ...runtimeStore,
+    recordOutcome: async (request) => {
+      if (outcomeWritesLost > 0) {
+        outcomeWritesLost--
+        throw lockWaitExceeded("record_outcome", GATEWAY_LOCK_WAIT_MAX_MS, GATEWAY_LOCK_WAIT_MAX_MS)
+      }
+      return await runtimeStore.recordOutcome(request)
+    },
+  }
+  createThreadComponent({ host: host(registered), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store: componentStore }).register(pi as never, logger as never)
   const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: host(registered), store: connectorStore })
   cleanups.push(() => sdk.dispose())
   await dispatch("session_start")
@@ -244,6 +257,16 @@ describe("a send from a run continues the causal chain of the message that run c
     expect(await s.sendFromRun("asking the peer for A")).toBe(rootA)
     await s.answerAndContinue()
     expect(await s.sendFromRun("asking the peer for B")).toBe(rootB)
+  })
+
+  test("#given the runtime's store gave up recording the outcome of the delivery that started the run #when the run sends to a peer #then the send still continues that delivery's chain", async () => {
+    const s = await setup({ outcomeWritesLost: 1 })
+    const a = await s.bindThread("chat-a")
+    const fromA = await s.send(a, "please do the job")
+    if (fromA.kind !== "ok") throw new Error(`the bound message was not delivered: ${JSON.stringify(fromA)}`)
+    await s.runStartedDelivery()
+
+    expect(await s.sendFromRun("asking the peer")).toBe(await s.rootOf(fromA.delivery_id))
   })
 })
 

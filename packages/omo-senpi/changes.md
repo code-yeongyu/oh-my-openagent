@@ -45,6 +45,10 @@
   call (`enqueue`, a relay mutation, `toolReceiptBegin`), used to delete every expired receipt in one statement, so a
   store reopened after a long idle cleared its whole backlog inside one write transaction; a receipt check now clears
   only the expired receipt under its own key.
+- `gateway/store-ops.ts`: a send continues the causal chain of the delivery its run consumed while that delivery's
+  row is still `admitting`, which is the state the row keeps when the runtime took the message but its outcome write
+  gave up at the lock-wait bound. Such a send was refused `invalid_arguments` (`unknown_cause`) until the drain's
+  retry recorded the outcome; a delivery that is only queued, or addressed to another session, is still refused.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

@@ -328,7 +328,10 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   let placement: CausalPlacement
   if (request.cause_delivery_id !== null) {
     const cause = selectRow(ctx, request.cause_delivery_id)
-    if (cause === undefined || cause.target_durable_id !== request.sender_node || (cause.state !== "admitted" && cause.state !== "applied")) {
+    // The cause is the delivery whose message the sender's model consumed (runtime context, never a
+    // model), so a row still `admitting` is one the runtime took but could not record yet (its outcome
+    // write gave up at the lock-wait bound): the chain continues rather than refusing the send.
+    if (cause === undefined || cause.target_durable_id !== request.sender_node || (cause.state !== "admitting" && cause.state !== "admitted" && cause.state !== "applied")) {
       return refused("invalid_arguments", "The delivery this send continues is not one the sender received.", { guard: "unknown_cause" })
     }
     placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [...cause.envelope.via, request.sender_node], new_root: false }
