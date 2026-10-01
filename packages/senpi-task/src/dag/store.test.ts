@@ -37,6 +37,7 @@ function tempProject(): string {
   for (const name of ["keys", "runs", "events", "results", "locks"]) {
     fs.mkdirSync(join(dagRoot, name), { recursive: true })
   }
+  fs.writeFileSync(join(directory, ".omo", "senpi-task", ".in-project"), "")
   return directory
 }
 

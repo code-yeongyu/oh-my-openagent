@@ -49,7 +49,8 @@ describe("task engine state directory", () => {
   test("#given a project that already has .omo/senpi-task #when the engine composes #then it keeps that directory", () => {
     // given
     const project = tempProject()
-    mkdirSync(join(project, ".omo", "senpi-task"), { recursive: true })
+    mkdirSync(join(project, ".omo", "senpi-task", "tasks"), { recursive: true })
+    writeFileSync(join(project, ".omo", "senpi-task", "tasks", "st_x.json"), "{}")
 
     // when
     const engine = composeIn(project)
