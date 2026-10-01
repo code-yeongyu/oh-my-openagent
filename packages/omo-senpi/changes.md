@@ -52,6 +52,9 @@
 - `session-facts.ts` `readSessionFacts`: the tail window drops its first line only when the window cut it (the byte
   before the window is not a newline). A rename line starting exactly at the tail window's first byte was dropped, so
   the session listed with `name: null`.
+- `gateway/bindings.ts`: a binding identifier carrying a C1 control (U+0080-U+009F, NEL included) or a Unicode line or
+  paragraph separator (U+2028, U+2029) is refused `invalid_arguments`, like a C0 control. NEL passed the check and
+  reached the `actor=` provenance header raw, since the header's whitespace class does not cover it.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

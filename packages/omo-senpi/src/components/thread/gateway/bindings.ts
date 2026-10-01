@@ -127,8 +127,10 @@ function refusal(message: string): StoreRefusal {
 function identifier(field: string, value: unknown): string | StoreRefusal {
   if (typeof value !== "string" || value.trim().length === 0) return refusal(`${field} must be a non-empty string.`)
   if (value.length > IDENTIFIER_MAX_LENGTH) return refusal(`${field} is longer than ${IDENTIFIER_MAX_LENGTH} characters.`)
+  // C0 and C1 controls, DEL, and the Unicode line and paragraph separators: an identifier lands in the
+  // provenance header (`actor=`), whose whitespace class does not cover NEL (U+0085).
   // biome-ignore lint/suspicious/noControlCharactersInRegex: identifiers are rejected when they carry control characters.
-  if (/[\u0000-\u001f\u007f]/.test(value)) return refusal(`${field} carries a control character.`)
+  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(value)) return refusal(`${field} carries a control character or a line separator.`)
   return value
 }
 

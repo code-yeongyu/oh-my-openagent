@@ -84,6 +84,15 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     expect(ok(await relay.bindings({ filter: { status: "active" } })).bindings.map((binding) => binding.platform).sort()).toEqual(["feishu", "notion"])
   })
 
+  test("#given identifiers carrying a C1 control or a Unicode line separator #when a thread is bound with them #then the bind is invalid_arguments and nothing is stored", async () => {
+    const h = open()
+    const relay = relayOn(h)
+    const refused = []
+    for (const account_id of ["bot\u0085acct", "bot\u009bacct", "bot\u2028acct", "bot\u2029acct"]) refused.push(code(await relay.bind({ principal: "session:A", binding: thread("B", { account_id }) })))
+    expect(refused).toEqual(["invalid_arguments", "invalid_arguments", "invalid_arguments", "invalid_arguments"])
+    expect(ok(await relay.bindings({ filter: {} })).bindings).toEqual([])
+  })
+
   test("#given a binding at revision 1 #when unbind and rebind name a stale revision #then both are stale_revision; the right revision detaches, lists in-flight work, and a second unbind replays success", async () => {
     const h = open()
     h.session("B", { online: false })
