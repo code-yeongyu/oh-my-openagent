@@ -26,6 +26,13 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-10-01 - session gateway review round 7: receipt retention, completion arms, replay after unbind, lost receipt replies (#9222)
+
+- `gateway/store-relay-ops.ts` `toolReceiptBegin`: a peer tool call's receipt admission runs the bounded retention
+  sweep when one is due, as an enqueue, relay mutation or outbox read does. Since round 6 narrowed the receipt check
+  to its own key, traffic made only of peer tool calls (`thread_list`, `thread_read`, `thread_rename`, ...) never
+  swept, so their expired receipts were kept indefinitely; each admission now deletes at most one batch.
+
 ## 2026-10-01 - session gateway review round 6: receipts, questions, retention, bindings snapshot, causes, session facts, identifiers (#9222)
 
 - `tools.ts`: a receipted thread tool whose receipt the store cannot admit answers as data instead of throwing:

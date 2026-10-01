@@ -140,6 +140,45 @@ describe("gateway store retention", () => {
     }
   })
 
+  test("#given more expired receipts than one sweep may delete #when only peer tool calls write (no enqueue, relay mutation or outbox read) #then each call deletes at most one batch, the backlog drains over successive calls, and a later backlog waits for the sweep interval", async () => {
+    const h = (harness = createGatewayHarness())
+    const t0 = h.clock.now
+    const store = h.store()
+    expect(await store.journalMode()).toBe("wal")
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    const seed = (prefix: string, count: number, expiresAt: number) => db.transaction(() => {
+      for (let index = 1; index <= count; index++) {
+        db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [`${prefix}-${index}`, t0, t0, expiresAt])
+      }
+    })()
+    const expired = (prefix: string) => ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith(`${prefix}-`)).length
+    const toolCall = async (key: string) => {
+      const scope = { principal: "session:caller", operation: "thread_list", idempotency_key: key }
+      expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({ kind: "accepted" })
+      expect(await store.toolReceiptSettle({ ...scope, now: h.clock.now, result: { kind: "ok" } })).toBe(true)
+    }
+    try {
+      db.run("PRAGMA busy_timeout = 5000")
+      const total = RETENTION_SWEEP_BATCH + 44
+      seed("old", total, t0 + DAY)
+      h.clock.now = t0 + 2 * DAY
+      await toolCall("call-1")
+      expect(expired("old")).toBe(total - RETENTION_SWEEP_BATCH)
+      await toolCall("call-2")
+      expect(expired("old")).toBe(0)
+
+      seed("later", 1, t0 + DAY)
+      h.clock.now += RETENTION_SWEEP_INTERVAL_MS - 1
+      await toolCall("call-3")
+      expect(expired("later")).toBe(1)
+      h.clock.now += 1
+      await toolCall("call-4")
+      expect({ later: expired("later"), calls: expired("call") }).toEqual({ later: 0, calls: 4 })
+    } finally {
+      db.close()
+    }
+  })
+
   test("#given a sweep that hit no batch bound #when another write follows within the sweep interval #then it deletes nothing, and the first write after the interval does", async () => {
     const h = (harness = createGatewayHarness())
     const t0 = h.clock.now
