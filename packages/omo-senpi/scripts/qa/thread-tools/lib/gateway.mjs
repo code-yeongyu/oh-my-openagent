@@ -312,9 +312,14 @@ function installedEngineVersion() {
   }
 }
 
-/** Install the released engine (and the screen emulator) into the kit once; later calls reuse it. */
+/** Every kit dependency present on disk; a kit missing any one (an older or partial kit) is reinstalled. */
+function kitDependenciesPresent() {
+  return Object.keys(KIT_DEPENDENCIES).every((name) => existsSync(join(KIT_DIR, "node_modules", ...name.split("/"), "package.json")))
+}
+
+/** Install the released engine (and the screen emulators) into the kit once; later calls reuse it. */
 export async function ensureKit() {
-  if (installedEngineVersion() !== ENGINE_VERSION || !existsSync(join(KIT_DIR, "node_modules", "@xterm", "headless"))) {
+  if (installedEngineVersion() !== ENGINE_VERSION || !kitDependenciesPresent()) {
     mkdirSync(KIT_DIR, { recursive: true })
     writeFileSync(join(KIT_DIR, "package.json"), `${JSON.stringify({ name: "qa-thread-tools-kit", private: true, type: "module", dependencies: KIT_DEPENDENCIES }, null, 2)}\n`)
     const installed = await run(process.execPath, ["install"], { cwd: KIT_DIR })
