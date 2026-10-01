@@ -62,7 +62,12 @@ function option(name) {
   return index === -1 ? undefined : process.argv[index + 1]
 }
 
+const SUITES = ["gateway", "legacy", "all"]
 const suite = option("--suite") ?? "all"
+if (!SUITES.includes(suite)) {
+  process.stderr.write(`run-all: unknown --suite ${JSON.stringify(suite)}; expected one of ${SUITES.join(", ")}\n`)
+  process.exit(2)
+}
 const outDir = option("--out-dir")
 if (outDir !== undefined) mkdirSync(outDir, { recursive: true })
 
