@@ -145,9 +145,8 @@ function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): S
   return { args_hash: String(found.args_hash), status: String(found.status), owner_instance: String(found.owner_instance), result: nullableString(found.result) }
 }
 
-function priorOutcome<T>(ctx: StoreContext, key: ReceiptKey | null, now: number): RelayOutcome<T> | undefined {
+function priorOutcome<T>(ctx: StoreContext, key: ReceiptKey | null): RelayOutcome<T> | undefined {
   if (key === null) return undefined
-  deleteExpiredReceipt(ctx, key, now)
   const receipt = selectReceipt(ctx, key)
   if (receipt === undefined) return undefined
   if (receipt.args_hash !== key.args_hash) return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
@@ -168,12 +167,13 @@ function recordOutcome(ctx: StoreContext, key: ReceiptKey | null, now: number, r
 async function relayMutation<T extends object>(ctx: StoreContext, op: string, now: number, key: ReceiptKey | null, body: () => RelayOutcome<T>): Promise<RelayOutcome<T>> {
   return await transaction(ctx, op, () => {
     expireDue(ctx, now)
-    const prior = priorOutcome<T>(ctx, key, now)
+    const cleared = key === null ? 0 : deleteExpiredReceipt(ctx, key, now)
+    const prior = priorOutcome<T>(ctx, key)
     if (prior !== undefined) return prior
     const outcome = body()
     if (outcome.kind === "ok") recordOutcome(ctx, key, now, { ...outcome, deduplicated: false })
     // After the body, so what this call just wrote protects the rows it references.
-    sweepRetentionIfDue(ctx, now)
+    sweepRetentionIfDue(ctx, now, cleared)
     return outcome.kind === "ok" ? ({ ...outcome, deduplicated: false } as RelayOutcome<T>) : outcome
   })
 }
@@ -194,15 +194,15 @@ export type ToolReceiptBegin =
  */
 export async function toolReceiptBegin(ctx: StoreContext, request: ReceiptKey & { readonly now: number }): Promise<ToolReceiptBegin> {
   return await transaction(ctx, "tool_receipt_begin", (): ToolReceiptBegin => {
+    const cleared = deleteExpiredReceipt(ctx, request, request.now)
     const admission = admitToolReceipt(ctx, request)
     // After the admission, so the receipt this call just wrote or read is not what the sweep removes.
-    sweepRetentionIfDue(ctx, request.now)
+    sweepRetentionIfDue(ctx, request.now, cleared)
     return admission
   })
 }
 
 function admitToolReceipt(ctx: StoreContext, request: ReceiptKey & { readonly now: number }): ToolReceiptBegin {
-  deleteExpiredReceipt(ctx, request, request.now)
   const receipt = selectReceipt(ctx, request)
   if (receipt === undefined) {
     write(

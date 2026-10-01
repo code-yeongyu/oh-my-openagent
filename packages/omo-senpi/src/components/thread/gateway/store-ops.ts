@@ -427,7 +427,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
   let marker: string | null = null
   let committed = false
   try {
-    deleteExpiredReceipt(ctx, { principal: request.sender_principal, operation: "deliver", idempotency_key: request.receipt.idempotency_key }, request.now)
+    const cleared = deleteExpiredReceipt(ctx, { principal: request.sender_principal, operation: "deliver", idempotency_key: request.receipt.idempotency_key }, request.now)
     const receipt = selectReceipt(ctx, request.sender_principal, request.receipt.idempotency_key)
     if (receipt !== undefined) {
       const outcome = classifyReceipt(ctx, request, receipt)
@@ -498,7 +498,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
     ])
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     const position = queuePosition(ctx, row)
-    sweepRetentionIfDue(ctx, request.now)
+    sweepRetentionIfDue(ctx, request.now, cleared)
     await ctx.hook("beforeDbCommit")
     ctx.sql.exec("COMMIT")
     committed = true

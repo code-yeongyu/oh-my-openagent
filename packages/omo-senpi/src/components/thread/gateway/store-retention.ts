@@ -1,8 +1,9 @@
 /**
  * Retention for the tables nothing else prunes. Runs inside a write transaction the store already
  * takes (an enqueue, a relay mutation, an outbox read), never at open, so opening a current store
- * still takes no write lock. Each statement deletes at most `RETENTION_SWEEP_BATCH` rows; a sweep
- * that hit a batch bound makes the next sweep due at once, any other sweep waits
+ * still takes no write lock. Each statement deletes at most `RETENTION_SWEEP_BATCH` rows, and the
+ * receipts one call deletes - the expired receipt under its own key included - stay within one batch
+ * in total; a sweep that hit a batch bound makes the next sweep due at once, any other sweep waits
  * `RETENTION_SWEEP_INTERVAL_MS`. Nothing an open claim, a live receipt or an active binding still
  * reads is deleted.
  */
@@ -23,24 +24,32 @@ export type RetentionSweep = {
   readonly session_meta: number
 }
 
-/** Clears the expired receipt under one key, so a call can reuse a key whose receipt outlived its retention. */
-export function deleteExpiredReceipt(ctx: StoreContext, key: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }, now: number): void {
-  write(ctx, "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND expires_at <= ?", [key.principal, key.operation, key.idempotency_key, now])
+/**
+ * Clears the expired receipt under one key, so a call can reuse a key whose receipt outlived its
+ * retention. Answers how many rows it deleted: the caller passes that to `sweepRetentionIfDue`, which
+ * counts it against the call's receipt batch.
+ */
+export function deleteExpiredReceipt(ctx: StoreContext, key: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }, now: number): number {
+  return write(ctx, "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND expires_at <= ?", [key.principal, key.operation, key.idempotency_key, now])
 }
 
-/** Runs one bounded sweep when one is due; call it inside an open write transaction. */
-export function sweepRetentionIfDue(ctx: StoreContext, now: number): RetentionSweep | null {
+/**
+ * Runs one bounded sweep when one is due; call it inside an open write transaction. `receiptsDeleted`
+ * is what the call already deleted from `receipts` (`deleteExpiredReceipt`): the receipt sweep takes
+ * only the rest of the batch, and a batch used up that way still makes the next sweep due at once.
+ */
+export function sweepRetentionIfDue(ctx: StoreContext, now: number, receiptsDeleted = 0): RetentionSweep | null {
   if (now < (nextSweepDue.get(ctx) ?? Number.NEGATIVE_INFINITY)) return null
-  const swept = sweepRetention(ctx, now)
-  const full = Object.values(swept).some((count) => count >= RETENTION_SWEEP_BATCH)
+  const swept = sweepRetention(ctx, now, Math.max(RETENTION_SWEEP_BATCH - receiptsDeleted, 0))
+  const full = swept.receipts + receiptsDeleted >= RETENTION_SWEEP_BATCH || Object.values(swept).some((count) => count >= RETENTION_SWEEP_BATCH)
   nextSweepDue.set(ctx, full ? now : now + RETENTION_SWEEP_INTERVAL_MS)
   return swept
 }
 
-export function sweepRetention(ctx: StoreContext, now: number): RetentionSweep {
+export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RETENTION_SWEEP_BATCH): RetentionSweep {
   const batch = RETENTION_SWEEP_BATCH
   // A receipt check clears only an expired receipt under its own key; the backlog goes here, a batch at a time.
-  const receipts = write(ctx, "DELETE FROM receipts WHERE rowid IN (SELECT rowid FROM receipts WHERE expires_at <= ? LIMIT ?)", [now, batch])
+  const receipts = write(ctx, "DELETE FROM receipts WHERE rowid IN (SELECT rowid FROM receipts WHERE expires_at <= ? LIMIT ?)", [now, receiptBatch])
   // A terminal delivery a live receipt points at stays: the receipt's replay reads it.
   const deliveries = write(
     ctx,

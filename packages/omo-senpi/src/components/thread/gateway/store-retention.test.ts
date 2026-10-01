@@ -179,6 +179,61 @@ describe("gateway store retention", () => {
     }
   })
 
+  type KeyedCall = { readonly principal: string; readonly operation: string; readonly call: (h: GatewayHarness, key: string) => Promise<void> }
+  const keyedCalls: readonly (readonly [string, KeyedCall])[] = [
+    ["peer tool call", {
+      principal: "session:caller",
+      operation: "thread_list",
+      call: async (h, key) => {
+        const scope = { principal: "session:caller", operation: "thread_list", idempotency_key: key }
+        const store = h.get("A").store
+        expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({ kind: "accepted" })
+        expect(await store.toolReceiptSettle({ ...scope, now: h.clock.now, result: { kind: "ok" } })).toBe(true)
+      },
+    }],
+    ["keyed relay mutation", {
+      principal: "session:A",
+      operation: "thread_bind",
+      call: async (h, key) => await bindSomething(h.get("A").store, h.clock.now, key.slice("bind-".length), true),
+    }],
+    ["keyed send", {
+      principal: "session:A",
+      operation: "deliver",
+      call: async (h, key) => {
+        const sent = await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "hello", idempotency_key: key })
+        expect(sent.kind).toBe("ok")
+      },
+    }],
+  ]
+
+  test.each(keyedCalls)("#given more expired receipts than one sweep may delete, one of them under the calling key #when a %s reuses that expired key #then the call deletes at most one batch of receipts in total, and the next call drains the rest", async (_name, entry) => {
+    const h = (harness = createGatewayHarness())
+    const t0 = h.clock.now
+    h.session("A")
+    h.session("B")
+    expect(await h.get("A").store.journalMode()).toBe("wal")
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    const prefix = entry.operation === "thread_bind" ? "bind" : "old"
+    const expired = () => Number((db.query("SELECT COUNT(*) AS n FROM receipts WHERE expires_at <= ?").get(h.clock.now) as { n: number }).n)
+    try {
+      db.run("PRAGMA busy_timeout = 5000")
+      const total = RETENTION_SWEEP_BATCH + 44
+      db.transaction(() => {
+        for (let index = 1; index <= total; index++) {
+          db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, ?, ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [entry.principal, entry.operation, `${prefix}-${index}`, t0, t0, t0 + DAY])
+        }
+      })()
+      h.clock.now = t0 + 2 * DAY
+      const before = expired()
+      await entry.call(h, `${prefix}-${total}`)
+      const afterFirst = expired()
+      await entry.call(h, `${prefix}-fresh`)
+      expect({ before, deletedByFirstCall: before - afterFirst, leftAfterSecondCall: expired() }).toEqual({ before: total, deletedByFirstCall: RETENTION_SWEEP_BATCH, leftAfterSecondCall: 0 })
+    } finally {
+      db.close()
+    }
+  })
+
   test("#given a sweep that hit no batch bound #when another write follows within the sweep interval #then it deletes nothing, and the first write after the interval does", async () => {
     const h = (harness = createGatewayHarness())
     const t0 = h.clock.now
