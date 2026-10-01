@@ -20,6 +20,7 @@ import {
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
+import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import type { GatewayEngine } from "./gateway/engine"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
@@ -45,6 +46,9 @@ import {
   type ToolOutput,
 } from "./tools/internals"
 
+/** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
+export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
+
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -60,8 +64,21 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   // Keys whose receipt admission failed without a reply: the store may still have committed the
   // prepared row (its worker exited after the commit), which this instance's retry would read as
   // `in_progress` forever. Nothing ran for such a call, so a retry that finds that row while no
-  // invocation of this facade is running the key takes it up and runs the call.
-  const unanswered = new Set<string>()
+  // invocation of this facade is running the key takes it up and runs the call. Each key is kept
+  // until the receipt it may have left expires (admission time + the receipt retention), at most
+  // `RECEIPT_RECOVERY_MAX_KEYS` at once: when full, a call under a new key is refused before its
+  // admission, so no key that may still need recovering is ever dropped. Disposal clears them.
+  const unanswered = new Map<string, number>()
+  const recoverable = (key: string, at: number): boolean => {
+    const until = unanswered.get(key)
+    if (until !== undefined && until <= at) unanswered.delete(key)
+    return unanswered.has(key)
+  }
+  const recoveryFull = (at: number): boolean => {
+    if (unanswered.size < RECEIPT_RECOVERY_MAX_KEYS) return false
+    for (const [key, until] of unanswered) if (until <= at) unanswered.delete(key)
+    return unanswered.size >= RECEIPT_RECOVERY_MAX_KEYS
+  }
   const running = new Set<string>()
   const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
   async function execute<T extends ThreadToolName>(name: T, callId: string, args: unknown, ectx: unknown, sideEffect: (view: ThreadHostView, value: Static<(typeof threadToolParamSchemas)[T]>, operationId: string, callerId: string) => Promise<ThreadToolResult>): Promise<ToolOutput> {
@@ -77,17 +94,21 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     if (receipted) {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
       // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
+      const key = receiptKey(scope)
+      const at = now()
+      if (!recoverable(key, at) && recoveryFull(at)) {
+        return output(failure("overloaded", `${RECEIPT_RECOVERY_MAX_KEYS} earlier calls on this surface failed before the gateway store answered and may still need recovering; nothing ran.`, "Retry those calls under their own idempotency keys, then retry this one.", { budget: "receipt_recovery", max_keys: RECEIPT_RECOVERY_MAX_KEYS }))
+      }
       let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
       try {
-        admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
+        admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (isLockWaitExceeded(error)) return output(failure("overloaded", `The gateway store is locked by another process; nothing ran: ${message}`, "Wait a few seconds, then retry the call."))
-        unanswered.add(receiptKey(scope))
+        unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
         return output(failure("internal_error", `The gateway store could not record the call; nothing ran: ${message}`, "Retry the call; if it keeps failing, check the gateway store."))
       }
-      const key = receiptKey(scope)
-      if (admission.kind === "in_progress" && unanswered.has(key) && !running.has(key) && !unsettled.has(key)) admission = { kind: "accepted" }
+      if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key)) admission = { kind: "accepted" }
       unanswered.delete(key)
       if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
       if (admission.kind === "conflict") return output(failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key."))
@@ -196,7 +217,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     }),
   }
   const relayTools = createRelayTools({ options, relay, view, failure })
-  return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose: relay.dispose }
+  const dispose = () => {
+    unanswered.clear()
+    relay.dispose()
+  }
+  return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose }
 
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
     const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, value.all_scope)), address, callerId, value.all_scope)
@@ -250,7 +275,7 @@ async function deliverThroughGateway(
   return { kind: "ok", thread, resolved_by: resolvedBy, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
 }
 
-/** Registers the seventeen tools; `dispose` (shutdown) cancels the relay's background retries. */
+/** Registers the seventeen tools; `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys. */
 export function registerThreadTools(pi: { registerTool(tool: Record<string, unknown>): void }, options: ThreadToolSurfaceOptions): { readonly dispose: () => void } {
   const built = buildThreadTools(options)
   for (const tool of built.tools) pi.registerTool({ ...tool })

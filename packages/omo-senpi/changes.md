@@ -41,6 +41,12 @@
   its own text and outcome, in run order. `thread_report` now hands the tracker the arm's `arm_seq` (kept out of the
   tool and SDK results), and a durable arm picked up at startup or on a wake arms with the newest stored sequence
   (`store.latestCompletionArm`).
+- `tools.ts`: the keys a tool surface keeps for recovering a receipt whose admission reply was lost are bounded. Each
+  key is kept until the receipt it may have left expires (admission time + the 30-day receipt retention), at most
+  `RECEIPT_RECOVERY_MAX_KEYS` (4,096) at once, and disposing the surface clears them; the set grew by one key per
+  failed admission for the surface's lifetime. When it is full, a call under a new key is refused `overloaded`
+  (`details.budget: "receipt_recovery"`) before its admission and runs nothing, so no key that may still need
+  recovering is dropped; a retry of a kept key still recovers.
 
 ## 2026-10-01 - session gateway review round 7: receipt retention, completion arms, replay after unbind, lost receipt replies (#9222)
 

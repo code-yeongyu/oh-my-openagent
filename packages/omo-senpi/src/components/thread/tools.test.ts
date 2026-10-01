@@ -4,8 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
+import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import { createThreadTools, registerThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
+import { createThreadTools, RECEIPT_RECOVERY_MAX_KEYS, registerThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
 const directories: string[] = []
 const stores: GatewayStore[] = []
@@ -460,6 +461,70 @@ describe("tool receipts the store could not settle", () => {
     expect(f.setSessionName).not.toHaveBeenCalled()
     expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
     expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
+
+  /** A registered surface over a store whose receipt admission can fail before writing (`fail`) or after committing (`lost-reply`). */
+  function recoverySurface(f: ReturnType<typeof fixture>, clock: { now: number }) {
+    const real = f.store
+    const admissions = { mode: "real" as "real" | "fail" | "lost-reply" }
+    const store: GatewayStore = {
+      ...real,
+      toolReceiptBegin: async (request) => {
+        if (admissions.mode === "fail") throw new Error("the gateway store worker exited (1)")
+        const admission = await real.toolReceiptBegin(request)
+        if (admissions.mode === "lost-reply") throw new Error("the gateway store worker exited (1)")
+        return admission
+      },
+    }
+    const tools: Record<string, unknown>[] = []
+    const surface = registerThreadTools({ registerTool: (tool) => tools.push(tool) }, { ...f, store, now: () => clock.now, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+    const rename = async (key: string): Promise<ThreadToolResult> => {
+      const tool = tools.find((candidate) => candidate.name === "thread_rename") as { execute: (...args: unknown[]) => Promise<{ details: { result: ThreadToolResult } }> }
+      return (await tool.execute(`call-${key}`, { thread: "dur-peer", name: "Renamed", idempotency_key: key }, undefined, undefined, { sessionManager: { getSessionId: () => "caller" } })).details.result
+    }
+    /** `count` calls whose admissions fail without a reply and without a receipt. */
+    const failMany = async (prefix: string, count: number) => {
+      admissions.mode = "fail"
+      for (let index = 0; index < count; index++) expect(await rename(`${prefix}-${index}`)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+      admissions.mode = "real"
+    }
+    return { admissions, rename, failMany, dispose: surface.dispose }
+  }
+
+  test("#given as many keys as the recovery bound whose admissions failed without a reply #when a call under a new key arrives #then it is refused overloaded and runs nothing, the oldest key still recovers, and a new key runs once that frees a slot", async () => {
+    const f = fixture()
+    const s = recoverySurface(f, { now: Date.now() })
+    s.admissions.mode = "lost-reply"
+    expect(await s.rename("lost-oldest")).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    await s.failMany("fill", RECEIPT_RECOVERY_MAX_KEYS - 1)
+
+    expect(await s.rename("new")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
+    expect(f.setSessionName).not.toHaveBeenCalled()
+    expect(await s.rename("lost-oldest")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("new")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(2)
+  })
+
+  test("#given the recovery bound filled by failed admissions #when the receipt retention passes #then those keys stop holding slots and a call under a new key runs", async () => {
+    const f = fixture()
+    const clock = { now: Date.now() }
+    const s = recoverySurface(f, clock)
+    await s.failMany("fill", RECEIPT_RECOVERY_MAX_KEYS)
+    clock.now += GATEWAY_RECEIPT_RETENTION_MS - 1
+    expect(await s.rename("before-expiry")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
+    clock.now += 1
+    expect(await s.rename("at-expiry")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given the recovery bound filled by failed admissions #when the tool surface is disposed #then its recovery keys are released and a call under a new key runs", async () => {
+    const f = fixture()
+    const s = recoverySurface(f, { now: Date.now() })
+    await s.failMany("fill", RECEIPT_RECOVERY_MAX_KEYS)
+    expect(await s.rename("before-dispose")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
+    s.dispose()
+    expect(await s.rename("after-dispose")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
 
