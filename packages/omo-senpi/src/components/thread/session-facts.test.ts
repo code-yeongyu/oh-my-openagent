@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { assembleAddressBook, type DiskSession } from "./address-book"
-import { readSessionFacts } from "./session-facts"
+import { readSessionFacts, SESSION_FACTS_LAST_LINE_MAX_BYTES, SESSION_FACTS_WINDOW_BYTES } from "./session-facts"
 import { summary } from "./tools/internals"
 
 const directories: string[] = []
@@ -26,6 +26,23 @@ function line(entry: Record<string, unknown>): string {
 const HEADER = { type: "session", version: 3, id: "session-id", cwd: "/work", timestamp: "2026-09-30T01:00:00.000Z" }
 const OLD = { type: "message", id: "old", parentId: null, timestamp: "2026-09-30T01:01:00.000Z", message: { role: "user", content: [{ type: "text", text: "old" }] } }
 const NEW_TIMESTAMP = "2026-09-30T02:00:00.000Z"
+
+describe("readSessionFacts name from the tail window", () => {
+  /** A long session whose only rename sits in the tail window, starting `offset` bytes after the window's first byte. */
+  function renamedSession(offset: number): string {
+    const path = sessionPath()
+    const filler = { type: "message", id: "filler", parentId: null, timestamp: "2026-09-30T01:01:00.000Z", message: { role: "user", content: [{ type: "text", text: "f".repeat(100 * 1024) }] } }
+    const rename = `${line({ type: "session_info", name: "renamed", timestamp: "2026-09-30T01:30:00.000Z" })}\n`
+    const trailer = (padding: number) => `${line({ type: "message", id: "tail", parentId: "filler", timestamp: NEW_TIMESTAMP, message: { role: "assistant", content: [{ type: "text", text: "t".repeat(padding) }] } })}\n`
+    const padding = SESSION_FACTS_WINDOW_BYTES - offset - Buffer.byteLength(rename) - Buffer.byteLength(trailer(0))
+    writeFileSync(path, `${line(HEADER)}\n${line(filler)}\n${rename}${trailer(padding)}`)
+    return path
+  }
+
+  test("#given a rename line that starts exactly where the tail window starts #when facts are read #then the name is the renamed one, as when the window starts a byte earlier", () => {
+    expect([0, 1].map((offset) => readSessionFacts(renamedSession(offset))?.name)).toEqual(["renamed", "renamed"])
+  })
+})
 
 describe("readSessionFacts newest timestamp", () => {
   test("#given a normal small session #when facts are read #then the final entry timestamp is returned", () => {
@@ -79,7 +96,8 @@ describe("readSessionFacts newest timestamp", () => {
 
     expect(facts?.updated_at).toBeNull()
     expect(requestedBytes).toBeGreaterThan(0)
-    expect(requestedBytes).toBeLessThanOrEqual(393_217)
+    // The head window, the tail window plus the byte before it, the final byte, and the last-line scan cap.
+    expect(requestedBytes).toBeLessThanOrEqual(SESSION_FACTS_WINDOW_BYTES + (SESSION_FACTS_WINDOW_BYTES + 1) + 1 + SESSION_FACTS_LAST_LINE_MAX_BYTES)
   })
 
   test("#given a newer entry is appended during the bounded reads #when facts are returned #then updated_at is null instead of the older snapshot timestamp", () => {

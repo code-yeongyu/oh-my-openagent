@@ -145,9 +145,11 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
     let tailEntries: JsonRecord[] = []
     if (!whole) {
       const tailStart = Math.max(headLength, size - SESSION_FACTS_WINDOW_BYTES)
-      const tail = Buffer.alloc(size - tailStart)
-      read(fd, tail, 0, tail.length, tailStart)
-      tailEntries = parseSessionLines(tail.toString("utf8"), true, false)
+      // One byte before the window says whether it starts on a whole line: only a line the window
+      // cut (the byte before is not a newline) is dropped.
+      const tail = Buffer.alloc(size - tailStart + 1)
+      read(fd, tail, 0, tail.length, tailStart - 1)
+      tailEntries = parseSessionLines(tail.subarray(1).toString("utf8"), tail[0] !== 0x0a, false)
     }
     const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
     const finalLine = finalCompleteLine(fd, size, read)

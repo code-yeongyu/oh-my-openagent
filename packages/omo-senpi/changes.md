@@ -49,6 +49,9 @@
   row is still `admitting`, which is the state the row keeps when the runtime took the message but its outcome write
   gave up at the lock-wait bound. Such a send was refused `invalid_arguments` (`unknown_cause`) until the drain's
   retry recorded the outcome; a delivery that is only queued, or addressed to another session, is still refused.
+- `session-facts.ts` `readSessionFacts`: the tail window drops its first line only when the window cut it (the byte
+  before the window is not a newline). A rename line starting exactly at the tail window's first byte was dropped, so
+  the session listed with `name: null`.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 
