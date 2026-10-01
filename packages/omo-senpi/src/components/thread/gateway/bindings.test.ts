@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 
+import { parseThreadParams, threadToolParamSchemas } from "../contracts"
 import { BINDING_DEFAULT_TTL_SECONDS, type BindInput, normalizeBindInput, WHOLE_CHAT_THREAD_ID } from "./bindings"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayRelay, type GatewayRelay } from "./relay"
@@ -71,6 +72,16 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     ok(await relay.bind({ principal: "session:A", binding: thread("D", { account_id: "other" }) }))
     ok(await relay.bind({ principal: "session:A", binding: thread("E", { platform: "discord" }) }))
     expect(ok(await relay.bindings({ filter: { thread_id: "t1", status: "active" } })).bindings.map((binding) => binding.session_durable_id).sort()).toEqual(["B", "C", "D", "E"])
+  })
+
+  test("#given the Notion and Feishu connectors #when a thread is bound on each by its native platform name #then the tool schema takes the name and the store keeps it", async () => {
+    const h = open()
+    const relay = relayOn(h)
+    for (const platform of ["notion", "feishu"] as const) {
+      expect(parseThreadParams(threadToolParamSchemas.thread_bind, { platform, account_id: "qa", chat_id: "c1" }).kind).toBe("ok")
+      ok(await relay.bind({ principal: "session:A", binding: thread(`S-${platform}`, { platform }) }))
+    }
+    expect(ok(await relay.bindings({ filter: { status: "active" } })).bindings.map((binding) => binding.platform).sort()).toEqual(["feishu", "notion"])
   })
 
   test("#given a binding at revision 1 #when unbind and rebind name a stale revision #then both are stale_revision; the right revision detaches, lists in-flight work, and a second unbind replays success", async () => {

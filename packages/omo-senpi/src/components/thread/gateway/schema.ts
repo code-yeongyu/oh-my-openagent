@@ -78,7 +78,7 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
       schema_version INTEGER NOT NULL DEFAULT 1,
       revision INTEGER NOT NULL CHECK (revision >= 1),
       status TEXT NOT NULL CHECK (status IN ('active', 'detached', 'expired')),
-      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'herdr', 'custom')),
+      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom')),
       account_id TEXT NOT NULL,
       chat_id TEXT NOT NULL,
       thread_id TEXT NOT NULL,

@@ -178,7 +178,7 @@ export const THREAD_TOOL_SEARCH_METADATA: readonly ThreadToolSearchEntry[] = [
 		name: "thread_bind",
 		label: "Bind session to chat thread",
 		description:
-			"Attaches a session to an external chat thread on Discord, Telegram, Slack, herdr or a custom connector, for when the user wants a chat conversation connected to a session",
+			"Attaches a session to an external chat thread on Discord, Telegram, Slack, Notion, Feishu, herdr or a custom connector, for when the user wants a chat conversation connected to a session",
 		searchText:
 			"connect a discord or telegram thread to this session, attach a slack conversation to a session, let a chat thread talk to a session",
 		searchKeywords: ["connect a discord thread", "attach session to chat", "link telegram chat", "bind slack thread", "mirror session to chat"],

@@ -16,7 +16,7 @@ import {
 } from "./fields"
 
 const BINDING_PLATFORM = Type.Union(
-  [Type.Literal("discord"), Type.Literal("telegram"), Type.Literal("slack"), Type.Literal("herdr"), Type.Literal("custom")],
+  [Type.Literal("discord"), Type.Literal("telegram"), Type.Literal("slack"), Type.Literal("notion"), Type.Literal("feishu"), Type.Literal("herdr"), Type.Literal("custom")],
   { description: "Chat platform of the external conversation; custom covers any other connector." },
 )
 
