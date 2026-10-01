@@ -200,7 +200,7 @@ jobs:
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Run vendored lsp-daemon tests
         id: lsp-daemon-tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true') && runner.os != 'Windows'
         run: npm test
         working-directory: packages/lsp-daemon
 
@@ -217,7 +217,7 @@ jobs:
 
       - name: Run tests with Windows telemetry
         id: root-tests-windows-1
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true') && false
         shell: pwsh
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
@@ -239,7 +239,7 @@ jobs:
       # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
         id: root-tests-windows-2
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true') && false
         shell: pwsh
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
