@@ -45,6 +45,7 @@ const gateway = [
   ["draft-preservation", "draft-preservation.mjs"],
   ["binding-author", "binding-author.mjs"],
   ["report-origin", "report-origin.mjs"],
+  ["report-origin-steer", "report-origin-steer.mjs"],
 ]
 
 const legacy = [

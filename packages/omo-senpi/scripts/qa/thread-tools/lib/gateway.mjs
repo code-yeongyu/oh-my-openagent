@@ -481,7 +481,8 @@ function contentText(message) {
  * several sessions can share it. It reads the newest message:
  * - a tool result -> `QA-TOOL-RESULT <tool> <result>` (the scenario parses the result from `requests`);
  * - a user message (a typed prompt, or a delivery, whose body is unwrapped) with `QA:SCRIPT <name>`
- *   (registered by `fake.script`) or `QA:CALL <tool> <b64>` lines -> those tool calls; with `QA:HOLD <tag>` -> a stream held open until `release(tag)`;
+ *   (registered by `fake.script`) or `QA:CALL <tool> <b64>` lines -> those tool calls; with `QA:HOLD <tag>` -> a stream held open until `release(tag)`
+ *   (with tool calls too, the calls arrive on release, so input the user steers in while it is held enters the run at that tool boundary);
  *   otherwise -> `QA-ACK <every QA-TOKEN-* in it>`.
  * Every request is recorded with the directive it answered.
  */
@@ -526,8 +527,8 @@ export async function startFakeModel() {
         const hold = /QA:HOLD ([A-Za-z0-9_-]+)/.exec(text)?.[1]
         const tokens = [...new Set(text.match(/QA-TOKEN-[A-Za-z0-9_-]+/g) ?? [])]
         if (calls.length > 0) {
-          record.answer = { kind: "tool_calls", calls, delivery: delivery?.header }
-          turn = { toolCalls: calls }
+          record.answer = { kind: "tool_calls", calls, ...(hold === undefined ? {} : { hold }), delivery: delivery?.header }
+          turn = { toolCalls: calls, ...(hold === undefined ? {} : { hold }) }
         } else if (hold !== undefined) {
           record.answer = { kind: "hold", tag: hold, tokens, delivery: delivery?.header }
           turn = { hold, text: `QA-RELEASED ${hold} ${tokens.join(" ")}`.trim() }
@@ -585,9 +586,24 @@ function writeSse(res, turn, model, holds) {
   }
   send({ role: "assistant", content: "" })
   if (turn.toolCalls !== undefined) {
-    send({ tool_calls: turn.toolCalls.map((call, index) => ({ index, id: `call_${randomBytes(6).toString("hex")}`, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } })) })
-    send({}, "tool_calls")
-    complete()
+    const sendCalls = () => {
+      send({ tool_calls: turn.toolCalls.map((call, index) => ({ index, id: `call_${randomBytes(6).toString("hex")}`, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } })) })
+      send({}, "tool_calls")
+      complete()
+    }
+    if (turn.hold === undefined) {
+      sendCalls()
+      return
+    }
+    // Held tool calls: the turn streams now and makes its calls on release.
+    send({ content: `QA-STREAMING ${turn.hold} ` })
+    holds.set(turn.hold, () => {
+      holds.delete(turn.hold)
+      if (res.destroyed) return
+      sendCalls()
+      tick("model")
+    })
+    res.once("close", () => holds.delete(turn.hold))
     return
   }
   if (turn.hold !== undefined) {
