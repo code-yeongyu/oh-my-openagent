@@ -21,6 +21,7 @@ import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
 import type { GatewayEngine } from "./gateway/engine"
+import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
@@ -68,7 +69,16 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
     const receipted = !(name === "thread_send" || name === "thread_handoff")
     if (receipted) {
-      const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
+      // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
+      // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
+      let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
+      try {
+        admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (isLockWaitExceeded(error)) return output(failure("overloaded", `The gateway store is locked by another process; nothing ran: ${message}`, "Wait a few seconds, then retry the call."))
+        return output(failure("internal_error", `The gateway store could not record the call; nothing ran: ${message}`, "Retry the call; if it keeps failing, check the gateway store."))
+      }
       if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
       if (admission.kind === "conflict") return output(failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key."))
       if (admission.kind === "in_progress") {

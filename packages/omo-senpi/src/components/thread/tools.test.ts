@@ -415,4 +415,28 @@ describe("tool receipts the store could not settle", () => {
     expect(retried).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain", details: { error_note: expect.stringContaining("could not be recorded") } } })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
+
+  test("#given the store fails while admitting a receipted call's receipt #when the tool runs #then it answers overloaded for a lock-wait and internal_error otherwise, as data, runs nothing, and a later call runs once", async () => {
+    const f = fixture()
+    const real = f.store
+    const failures: Error[] = [
+      Object.assign(new Error("gateway store lock wait exceeded: tool_receipt_begin waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" }),
+      new Error("the gateway store worker exited"),
+    ]
+    const store: GatewayStore = {
+      ...real,
+      toolReceiptBegin: async (request) => {
+        const failure = failures.shift()
+        if (failure !== undefined) throw failure
+        return await real.toolReceiptBegin(request)
+      },
+    }
+    const run = runner({ ...f, store }, "caller")
+    const args = { thread: "peer", name: "Renamed", idempotency_key: "rename-begin" }
+    expect(await run("thread_rename", args, "caller")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
+    expect(await run("thread_rename", args, "caller")).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(f.setSessionName).not.toHaveBeenCalled()
+    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
 })

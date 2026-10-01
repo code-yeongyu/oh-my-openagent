@@ -26,6 +26,12 @@
 - Tests: `index.test.ts` starts a session on each geeky-normal registry shape (Fast served -> Fast medium; Fast absent ->
   plain 6.1 Sol medium) and geeky-heavy (Astra high); removing the Fast rung fails the Fast case.
 
+## 2026-10-01 - session gateway review round 6: receipts, questions, retention, bindings snapshot, causes, session facts, identifiers (#9222)
+
+- `tools.ts`: a receipted thread tool whose receipt the store cannot admit answers as data instead of throwing:
+  `overloaded` when another process holds the store's write lock past the wait bound, `internal_error` for any other
+  store failure. Nothing has run at that point, so a retry runs the call once.
+
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 
 - `gateway/legacy-mailbox.ts`: a legacy `steer` keeps its `expected_turn_id`. The host's `turn-N` id becomes the
