@@ -66,6 +66,13 @@ describe("omo daemon adopt", () => {
     expect(JSON.parse(result.stdout)).toMatchObject({ kind: "released", dropped: { deliveries: ["d-1"] } })
   })
 
+  test("#given --interrupt took queued input out #when released without --json #then every replayed message is printed on stderr before the relaunch", async () => {
+    const released = { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: [], user_messages: ["first ask", "second ask"] } } }
+    const result = await adopt(["dur-host", "--interrupt"], { replies: [released] })
+    expect(result.outcome).toEqual({ launch: ["--session", "/sessions/dur-host.jsonl", "--", "first ask", "second ask"], cwd: "/work/repo" })
+    expect({ first: result.stderr.includes("first ask"), second: result.stderr.includes("second ask") }).toEqual({ first: true, second: true })
+  })
+
   test("#given a terminal session #when adopted #then it exits 4 already a terminal session and nothing is released", async () => {
     const result = await adopt(["dur-tui"], { located: { kind: "ok", thread: TUI_THREAD } })
     expect(result.outcome).toBe(DAEMON_EXIT.unsupported)

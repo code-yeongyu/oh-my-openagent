@@ -27,6 +27,9 @@ read a node launch already pays. Outside a POSIX bun-global install the call is 
 - `bin/lib/thread.js`: an SDK that cannot be imported is `internal_error` (exit 5), printed as one JSON error with
   `--json` instead of an uncaught import failure with empty stdout; a `dispose()` that rejects after the command is
   logged on stderr and changes neither the printed result nor the exit code.
+- `bin/lib/daemon-adopt.js`: the queued messages `--interrupt` took out and the relaunch replays as argv are also
+  printed on stderr before the relaunch, as the refusal path already printed them, so a launch that fails after the
+  release does not lose them.
 ## 2026-09-30 - host status and thread list share strict unknown-activity semantics (#9222 gate round 2)
 
 Malformed, partial and over-cap final session records now remain `null` through both `last_activity_at` and degraded

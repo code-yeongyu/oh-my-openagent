@@ -115,6 +115,8 @@ export async function runAdoptCommand(args, { sdk, stdout, stderr }) {
   for (const message of taken.user_messages.filter((entry) => entry.startsWith("@"))) stderr.write(`  queued message not replayed (starts with @), send it again: ${message}\n`)
   const path = reply.data.session_path
   stderr.write(`omo daemon adopt: ${thread.thread_id} released from ${thread.endpoint.socket}; resuming it here${replayable.length > 0 ? ` with ${replayable.length} queued message(s)` : ""}\n`)
+  // The relaunch carries them as argv, so they are also printed: a launch that fails after the release still leaves them on screen.
+  for (const message of replayable) stderr.write(`  queued message taken out by --interrupt, replayed as a prompt: ${message}\n`)
   if (taken.deliveries.length > 0) stderr.write(`  ${taken.deliveries.length} gateway deliver${taken.deliveries.length === 1 ? "y returns" : "ies return"} to the session's inbox\n`)
   outcome({ kind: "released", thread_id: thread.thread_id, session_path: path, attachments: reply.data.attachments, dropped: taken }, DAEMON_EXIT.ok)
   return { launch: ["--session", path, ...(replayable.length > 0 ? ["--", ...replayable] : [])], cwd: thread.cwd }
