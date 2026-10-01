@@ -235,6 +235,10 @@ binding; a session with none or several must name `--binding` (`invalid_argument
   `select`, `confirm`, `input` or `editor`); it decides the answer forms above. Without it the answer
   goes out in every text form, and as `confirmed` for a yes/no word (see above).
   Another kind name is `invalid_arguments`, and so is `--request-kind` on a non-question report.
+  A question row's `question_state` is `pending` or `answered`. Two more values are reserved and
+  not written yet: `expired` (the question timed out in the session) and `cancelled` (it was
+  cancelled or closed without an answer). A connector should treat either as a closed question
+  that takes no answer.
 - `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
   row appears when the session settles.
 

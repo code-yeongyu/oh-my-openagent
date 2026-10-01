@@ -129,7 +129,9 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE outbox ADD COLUMN reply_token TEXT",
     "ALTER TABLE outbox ADD COLUMN ui_request_id TEXT",
     "ALTER TABLE outbox ADD COLUMN incarnation TEXT",
-    "ALTER TABLE outbox ADD COLUMN question_state TEXT CHECK (question_state IS NULL OR question_state IN ('pending', 'answered'))",
+    // `expired` and `cancelled` are reserved for question closure (the session's terminal question
+    // outcome); nothing writes them yet, but a CHECK cannot be widened after release without a rebuild.
+    "ALTER TABLE outbox ADD COLUMN question_state TEXT CHECK (question_state IS NULL OR question_state IN ('pending', 'answered', 'expired', 'cancelled'))",
     "ALTER TABLE outbox ADD COLUMN answer TEXT",
     "ALTER TABLE outbox ADD COLUMN answered_at INTEGER",
     "ALTER TABLE outbox ADD COLUMN outcome TEXT CHECK (outcome IS NULL OR outcome IN ('completed', 'failed', 'cancelled'))",

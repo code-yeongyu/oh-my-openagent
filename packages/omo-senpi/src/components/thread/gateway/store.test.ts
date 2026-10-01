@@ -63,6 +63,22 @@ describe("store open recovery", () => {
   })
 })
 
+describe("outbox question states", () => {
+  test("#given the outbox question_state column #when a row carries the reserved expired or cancelled state #then it is stored, and any other value is refused by the CHECK", async () => {
+    const h = (harness = createGatewayHarness())
+    expect(await h.store().journalMode()).toBe("wal")
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    const insert = (state: string) => db.run("INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at, question_state) VALUES ('bnd-1', 1, 'question', '{}', 'pending', 1, ?)", [state])
+    try {
+      for (const state of ["pending", "answered", "expired", "cancelled"]) insert(state)
+      expect(() => insert("closed")).toThrow(/CHECK constraint failed/)
+      expect(db.query("SELECT question_state AS s FROM outbox ORDER BY cursor").all()).toEqual([{ s: "pending" }, { s: "answered" }, { s: "expired" }, { s: "cancelled" }])
+    } finally {
+      db.close()
+    }
+  })
+})
+
 describe("schema migration v1 -> v2", () => {
   test("#given a store written by the todo-11 schema #when the current store opens it #then its deliveries survive, the relay tables exist, and a question can be asked and answered", async () => {
     const h = (harness = createGatewayHarness())

@@ -109,7 +109,8 @@ export type OutboxRow = {
   readonly edit_message_id: string | null
   readonly provider_message_id: string | null
   readonly reply_token: string | null
-  readonly question_state: "pending" | "answered" | null
+  /** `expired` and `cancelled` are reserved for question closure; this release writes only `pending` and `answered`. */
+  readonly question_state: "pending" | "answered" | "expired" | "cancelled" | null
   readonly outcome: CompletionOutcome | null
   /** For an answered `question`: the human the connector named with the answer; null without one. */
   readonly answered_by: ExternalAuthor | null
