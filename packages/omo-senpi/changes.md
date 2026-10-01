@@ -34,6 +34,11 @@
   admission is awaited: the check counts every distinct key whose admission is in flight together with the kept keys,
   and the slot is released when the store answers or passes to the key's recovery entry when the reply is lost.
   Overlapping calls under one key share one slot, and a kept key still recovers at capacity without evicting another.
+- `tools/relay-tools.ts`: a replayed completion report whose stored receipt has no `arm_seq` (written by the revision
+  before it existed) no longer arms the tracker with `undefined`, which became a NaN settle watermark and left the
+  completion pending. Only an integer `arm_seq` is taken; an armed receipt without one arms with the session's newest
+  durable arm (`store.latestCompletionArm`), and when the session has none the replay answers `idempotency_uncertain`
+  instead of an `armed` result that would write nothing.
 
 ## 2026-10-01 - session gateway review round 8: receipt batch per call, completion arms per run, recovery-key bound (#9222)
 

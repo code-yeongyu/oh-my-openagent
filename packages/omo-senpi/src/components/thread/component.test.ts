@@ -1,4 +1,5 @@
 import { describe, expect, jest, test } from "bun:test"
+import { Database } from "bun:sqlite"
 import { spawn } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -64,6 +65,29 @@ async function outboxRows(store: GatewayStore, bindingId: string) {
   return page.kind === "ok" ? page.rows.map((row) => ({ event: row.event, outcome: row.outcome, text: row.text })) : []
 }
 
+/** Rewrites the completed completion-report receipt the way the revision before `arm_seq` stored it: armed, with no sequence. */
+function storeReportReceiptWithoutArmSeq(agentDir: string): number {
+  const db = new Database(gatewayDatabasePath(agentDir))
+  try {
+    return db.run("UPDATE receipts SET result = json_remove(result, '$.arm_seq') WHERE status = 'completed' AND json_extract(result, '$.armed') = 1 AND json_type(result, '$.arm_seq') IS NOT NULL").changes
+  } finally {
+    db.close()
+  }
+}
+
+/** A component over `store` whose completion writes record the watermark each one was given. */
+function watermarkedComponent(agentDir: string, store: GatewayStore, watermarks: unknown[]) {
+  const f = eventApi()
+  const observed: GatewayStore = { ...store, emitCompletions: async (request) => { watermarks.push(request.through_arm_seq); return await store.emitCompletions(request) } }
+  createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store: observed }).register(f.pi as never, context([]) as never)
+  return f
+}
+
+async function settleRun(f: ReturnType<typeof eventApi>, durableId: string): Promise<void> {
+  await f.dispatch("agent_end", sessionCtx(durableId), { messages: [{ role: "assistant", stopReason: "stop" }] })
+  await f.dispatch("agent_settled", sessionCtx(durableId))
+}
+
 /** Another process that takes the store's write lock and keeps it until released (or stopped/killed). */
 async function holdWriteLock(databasePath: string) {
   const script = 'const { Database } = await import("bun:sqlite"); const db = new Database(process.env.HOLD_DB); db.exec("PRAGMA busy_timeout = 5000"); db.exec("BEGIN IMMEDIATE"); console.log("LOCKED"); for await (const _line of console) { db.exec("COMMIT"); db.close(); process.exit(0) }'
@@ -109,6 +133,52 @@ describe("thread component control endpoint registration", () => {
       expect((await rows()).map((row) => ({ event: row.event, outcome: row.outcome, text: row.text }))).toEqual([{ event: "completion", outcome: "failed", text: "all done" }])
       await f.dispatch("agent_settled", ctx)
       expect(await rows()).toHaveLength(1)
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a completion report whose stored receipt predates arm_seq #when a restarted runtime replays the same report #then it arms the session's durable arm and the next settle writes the completion with an integer watermark", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-legacy-arm-"))
+    const store = createGatewayStore({ agentDir })
+    const watermarks: unknown[] = []
+    try {
+      const before = watermarkedComponent(agentDir, store, watermarks)
+      const bindingId = await bindAndArm(before, store, "dur-1")
+      expect(storeReportReceiptWithoutArmSeq(agentDir)).toBe(1)
+
+      const after = watermarkedComponent(agentDir, store, watermarks)
+      const replay = (await after.tool("thread_report").execute("call-arm", { kind: "completion", text: "all done", binding_id: bindingId }, undefined, undefined, sessionCtx("dur-1"))) as { details: { result: unknown } }
+      expect(replay.details.result).toMatchObject({ kind: "ok", armed: true, deduplicated: true })
+      await settleRun(after, "dur-1")
+
+      expect(await outboxRows(store, bindingId)).toEqual([{ event: "completion", outcome: "completed", text: "all done" }])
+      expect(watermarks.map((watermark) => Number.isInteger(watermark))).toEqual([true])
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a completion report whose stored receipt predates arm_seq and whose completion was already written #when a restarted runtime replays the report #then it answers idempotency_uncertain, arms nothing, and no settle writes a second completion", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-legacy-arm-gone-"))
+    const store = createGatewayStore({ agentDir })
+    const watermarks: unknown[] = []
+    try {
+      const before = watermarkedComponent(agentDir, store, watermarks)
+      const bindingId = await bindAndArm(before, store, "dur-1")
+      await settleRun(before, "dur-1")
+      expect(await outboxRows(store, bindingId)).toEqual([{ event: "completion", outcome: "completed", text: "all done" }])
+      expect(storeReportReceiptWithoutArmSeq(agentDir)).toBe(1)
+
+      const after = watermarkedComponent(agentDir, store, watermarks)
+      const replay = (await after.tool("thread_report").execute("call-arm", { kind: "completion", text: "all done", binding_id: bindingId }, undefined, undefined, sessionCtx("dur-1"))) as { details: { result: unknown } }
+      expect(replay.details.result).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+      await settleRun(after, "dur-1")
+
+      expect(await outboxRows(store, bindingId)).toHaveLength(1)
+      expect(watermarks.map((watermark) => Number.isInteger(watermark))).toEqual([true])
     } finally {
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })

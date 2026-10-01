@@ -150,8 +150,14 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
       })
       if (reported.kind !== "ok") return reported as ThreadToolResult
       // The arm's sequence number is the settle watermark, internal to the component; the result stays as documented.
-      const { arm_seq: armSeq, ...result } = reported
-      if (armSeq !== null) options.onCompletionArmed?.(callerId, armSeq)
+      const { arm_seq: reportedArmSeq, ...result } = reported
+      if (typeof reportedArmSeq === "number" && Number.isInteger(reportedArmSeq)) options.onCompletionArmed?.(callerId, reportedArmSeq)
+      else if (result.armed) {
+        // A replayed receipt written before arm_seq existed carries none: the session's newest durable arm is the watermark.
+        const durableArmSeq = await options.store.latestCompletionArm(callerId)
+        if (durableArmSeq === null) return failure("idempotency_uncertain", "An earlier completion report under this key was recorded without its arm sequence, and the session has no completion armed now: its completion was already written, or the arm is gone.", "Read the binding's outbox with thread_outbox to see whether the completion was sent; to arm another, report again under a new idempotency_key.")
+        options.onCompletionArmed?.(callerId, durableArmSeq)
+      }
       return result as ThreadToolResult
     }),
     tool("thread_outbox", async ({ value }) => {
