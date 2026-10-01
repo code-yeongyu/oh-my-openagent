@@ -41,15 +41,30 @@ export function propagateResult(result) {
  *
  * Windows has no POSIX signals: `process.on("SIGTERM")` never fires there and `subprocess.kill`
  * would terminate the child abruptly, so nothing is forwarded and the wait is the whole behavior.
+ *
+ * `onOutput(text)` observes the child's stdout and stderr while still passing both through to this
+ * process's own streams unchanged; without it the child inherits the terminal directly.
  */
 export function runChild(command, args, options = {}) {
-  const env = options.env ?? process.env
+  const { onOutput, ...spawnOptions } = options
+  const env = spawnOptions.env ?? process.env
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: "inherit",
       windowsHide: true,
-      ...options,
+      ...spawnOptions,
+      ...(onOutput ? { stdio: ["inherit", "pipe", "pipe"] } : {}),
     })
+    if (onOutput) {
+      child.stdout.on("data", (chunk) => {
+        process.stdout.write(chunk)
+        onOutput(String(chunk))
+      })
+      child.stderr.on("data", (chunk) => {
+        process.stderr.write(chunk)
+        onOutput(String(chunk))
+      })
+    }
 
     let settled = false
     let graceTimer
@@ -98,7 +113,8 @@ export function runChild(command, args, options = {}) {
     child.on("error", (error) => settle(() => reject(error)))
     // A child that died of the forwarded signal needs no special case: `propagateResult` turns a
     // signaled result into this process dying by the same signal, which is exactly right.
-    child.on("exit", (status, signal) => settle(() => resolve({ status, signal })))
+    // With observed output, "close" (not "exit") guarantees every chunk reached `onOutput` first.
+    child.on(onOutput ? "close" : "exit", (status, signal) => settle(() => resolve({ status, signal })))
   })
 }
 
