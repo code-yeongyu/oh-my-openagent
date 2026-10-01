@@ -215,7 +215,7 @@ function isConnectRefusal(error: unknown): boolean {
 
 /** senpi's `release_session` frame as the adapter's union: the success payload, or the refusal code with its `errorData`. */
 function releaseReply(frame: RpcFrame): ReleaseSessionReply {
-  if (frame.success === true && record(frame.data) && frame.data.released === true) {
+  if (frame.success === true && record(frame.data) && frame.data.released === true && typeof frame.data.session_path === "string") {
     return { success: true, data: frame.data as Extract<ReleaseSessionReply, { success: true }>["data"] }
   }
   const error = typeof frame.error === "string" ? frame.error : "release_failed"

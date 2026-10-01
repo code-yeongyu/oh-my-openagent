@@ -78,7 +78,7 @@ async function tuiEndpoint(socketPath: string, session: { id: string; path: stri
   return { frames, rejected }
 }
 
-async function hostEndpoint(socketPath: string): Promise<{ readonly frames: Frame[] }> {
+async function hostEndpoint(socketPath: string, replies: Readonly<Record<string, unknown>> = {}): Promise<{ readonly frames: Frame[] }> {
   const frames: Frame[] = []
   const sockets = new Set<Socket>()
   const server = createServer((socket) => {
@@ -92,7 +92,7 @@ async function hostEndpoint(socketPath: string): Promise<{ readonly frames: Fram
       const frame = JSON.parse(buffer.slice(0, newline)) as Frame
       buffer = buffer.slice(newline + 1)
       frames.push(frame)
-      const data = frame.type === "list_sessions"
+      const data = frame.type in replies ? replies[frame.type] : frame.type === "list_sessions"
         ? { sessions: [{ sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host-thread", status: "open", kind: "interactive" }] }
         : frame.type === "wake" ? { admitted: [] } : {}
       socket.end(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data })}\n`)
@@ -264,6 +264,15 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(release).toBe("unsupported:release_session")
     expect(liveness).toBe("routable")
     expect(host.frames.some((frame) => frame.type === "prompt")).toBe(false)
+  })
+
+  test("#given a host whose release reply says released but names no session path #when the session is released #then it is a failed release, not a success to relaunch from", async () => {
+    const dir = tempDir("thr-tui-")
+    const legacy = join(dir, "rpc.sock")
+    const endpoint = { kind: "rpc_host", socket: legacy, routing_id: "rpc-1" } as const
+    await hostEndpoint(legacy, { release_session: { released: true, attachments: 0, dropped: { deliveries: [], user_messages: [] } } })
+    const w = surfaceFor(legacy, [{ socket: legacy, reachable: true, session_paths: [], endpoint_kind: "rpc_host", alive: true, reason: null }])
+    expect(await w.surface.gateway.releaseSession?.(endpoint, { reason: "takeover" })).toEqual({ success: false, error: "release_failed" })
   })
 
   test("#given an engine that cannot enumerate #when the registry on disk names a terminal #then the terminal is listed from the registry", async () => {

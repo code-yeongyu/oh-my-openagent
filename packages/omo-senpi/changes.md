@@ -75,6 +75,9 @@
 - `tools/ports.ts` `ThreadToolSurfaceOptions.store` is required and `tools/gateway-services.ts` lost its fallback, which
   opened a second, separate database under `stateDirectory` when a caller passed no store. The legacy
   `session-control-qa.mjs` scenario opens its stores explicitly and disposes them at teardown.
+- `live-surface.ts` `releaseReply`: a `release_session` reply counts as released only when it also names a
+  `session_path` string; without one it is `release_failed`, so `omo daemon adopt` never relaunches with
+  `--session undefined`.
 - Docs (`docs/reference/omo-thread.md`, `thread/AGENTS.md`): `omo thread` creates and resumes no session (a connector
   opens one through the host API and binds it); a completion row carries the armed text, not the model's reply; the
   per-author rate bucket trusts the connector's author id and stays bounded by the target backlog.
