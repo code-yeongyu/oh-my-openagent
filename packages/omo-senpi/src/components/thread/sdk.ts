@@ -12,7 +12,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayServices } from "./tools/gateway-services"
-import { addressBook, hostView, resolution, resolveEntries } from "./tools/internals"
+import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 
@@ -111,7 +111,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   }
 
   async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
-    const resolved = resolution(surface, resolveEntries(surface, await view()), address, UNKNOWN_CALLER, allScope)
+    const resolved = await resolveStoredSession(surface, (request) => hostView(surface, request), address, UNKNOWN_CALLER, allScope)
     return resolved.kind === "error" ? { kind: "error", error: resolved } : { id: resolved.entry.thread_id }
   }
 

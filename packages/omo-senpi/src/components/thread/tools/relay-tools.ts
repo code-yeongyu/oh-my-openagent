@@ -16,15 +16,15 @@ import {
 } from "../contracts"
 import type { ThreadErrorCode } from "../errors"
 import type { GatewayRelay } from "../gateway/relay"
-import { metadata, output, resolution, resolveEntries, type AnyTool, type ToolOutput } from "./internals"
-import { UNKNOWN_CALLER, type ThreadHostView, type ThreadToolSurfaceOptions } from "./ports"
+import { metadata, output, resolveStoredSession, type AnyTool, type ToolOutput } from "./internals"
+import { UNKNOWN_CALLER, type ThreadHostView, type ThreadHostViewRequest, type ThreadToolSurfaceOptions } from "./ports"
 
 type RelayToolName = "thread_bind" | "thread_unbind" | "thread_rebind" | "thread_bindings" | "thread_report" | "thread_outbox" | "thread_outbox_ack" | "thread_answer"
 
 export type RelayToolsContext = {
   readonly options: ThreadToolSurfaceOptions
   readonly relay: GatewayRelay
-  readonly view: () => Promise<ThreadHostView>
+  readonly view: (request: ThreadHostViewRequest) => Promise<ThreadHostView>
   readonly failure: (code: ThreadErrorCode, message: string, next: string, details?: Readonly<Record<string, unknown>>) => ThreadToolResult
 }
 
@@ -63,7 +63,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
       if (callerId === UNKNOWN_CALLER) return failure("caller_context_missing", "The calling session's durable id is unknown.", "Name the session explicitly, or retry from a session that passes its execution context.")
       return { id: callerId }
     }
-    const resolved = resolution(options, resolveEntries(options, await context.view()), address, callerId, allScope)
+    const resolved = await resolveStoredSession(options, context.view, address, callerId, allScope)
     if (resolved.kind === "error") return { kind: "error", error: resolved }
     return { id: resolved.entry.thread_id }
   }

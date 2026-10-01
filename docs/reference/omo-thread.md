@@ -336,7 +336,7 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | 0 | done |
 | 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
-| 3 | `host_unavailable`: no endpoint answered where one was needed (never for `send`, which queues offline) |
+| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`. Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
 | 5 | `internal_error` |
 

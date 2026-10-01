@@ -57,6 +57,10 @@
   completion. Without an origin (a prompt the user typed, `omo thread report`) the session's only active outbound
   binding is used, and several are `invalid_arguments` naming their `binding_ids`. `report-origin.test.ts` drives two
   threads through the SDK and the real `thread_report` tool.
+- `sdk.ts` `bind`/`rebind`/`report`/`bindings --session` and the relay tools that name another session resolve it
+  through `tools/internals.ts` `resolveStoredSession` (the offline host view plus `sendAddressBook`), as a send
+  does: with nothing running they no longer fail `host_unavailable` (exit 3, or 5 on a stale socket), and a session
+  known only from its session file resolves by id or name. `offline-address.test.ts` covers the SDK and the tool.
 
 ## 2026-09-30 - thread activity round 2: strict records, one freshness policy, public ordering (#9222)
 

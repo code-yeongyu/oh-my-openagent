@@ -111,6 +111,16 @@ export function sendAddressBook(options: ThreadToolSurfaceOptions, view: ThreadH
   return found.length === 0 ? book : addressBook(options, view, found)
 }
 
+/**
+ * Resolves a session address for a store-only operation (bind, rebind, report, bindings by
+ * session) the way a send resolves its target: with nothing live it is a view with no live
+ * sessions, not `host_unavailable`, and a session known only from its session file still resolves.
+ */
+export async function resolveStoredSession(options: ThreadToolSurfaceOptions, view: (request: ThreadHostViewRequest) => Promise<ThreadHostView>, address: string, callerId: string, allScope?: boolean) {
+  const current = await view({ offline: true })
+  return resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, allScope)), address, callerId, allScope)
+}
+
 /** A thread listed from disk because its endpoint is dead: resumable, addressed by its durable id. */
 export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { readonly error_note?: string } {
   return {

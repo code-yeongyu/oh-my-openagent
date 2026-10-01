@@ -155,6 +155,33 @@ describe("thread send with no live endpoint anywhere", () => {
   })
 })
 
+describe("store-only operations with no live endpoint", () => {
+  test("#given no endpoint of the agent dir answers and the sessions exist only on disk #when the CLI binds, lists, reports and rebinds by id and by name #then every call resolves the sessions instead of host_unavailable", async () => {
+    const agentDir = agentDirectory()
+    sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
+    sessionFile(agentDir, "dur-next", process.cwd(), "next-tui")
+    const sdk = sdkOver(agentDir)
+    const bound = await sdk.bind({ session: "dur-gone", binding: { platform: "custom", account_id: "bot", chat_id: "c1", thread_id: "t1" } })
+    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+    expect(bound.binding.session_durable_id).toBe("dur-gone")
+    const listed = await sdk.bindings({ session: "gone-tui" })
+    expect(listed.kind === "ok" ? listed.bindings.map((binding) => binding.binding_id) : listed).toEqual([bound.binding.binding_id])
+    expect(await sdk.report({ session: "gone-tui", kind: "milestone", text: "still here", binding_id: bound.binding.binding_id })).toMatchObject({ kind: "ok", cursor: 1 })
+    const moved = await sdk.rebind({ binding_id: bound.binding.binding_id, expected_revision: bound.binding.revision, session: "next-tui" })
+    expect(moved).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-next", revision: 2 } })
+  })
+
+  test("#given no endpoint answers #when a session's thread_bind names another session known only from disk #then the tool binds it", async () => {
+    const agentDir = agentDirectory()
+    sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
+    const host = createLiveThreadSurface(undefined, { env: { HOME: agentDir, OMO_CODING_AGENT_DIR: agentDir }, statusAll: async () => parseHostStatusAll(deadTerminalStatus(agentDir)) })
+    const tools = createThreadTools({ host, stateDirectory: agentDir, store: storeAt(agentDir), sessionsDirectory: () => join(agentDir, "sessions"), callerSessionId: () => "dur-caller", callerWorkspaceRoot: () => process.cwd() })
+    const bind = tools.find((tool) => tool.name === "thread_bind")
+    const output = await bind!.execute("call-1", { platform: "custom", account_id: "bot", chat_id: "c1", session: "gone-tui" }, undefined, undefined, { sessionManager: { getSessionId: () => "dur-caller" } } as never)
+    expect(output.details.result).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-gone" } })
+  })
+})
+
 describe("findDiskSessions", () => {
   test("#given sessions in the caller's workspace and in another directory #when looked up by name and by id #then a name is read only in the workspace's session directories unless all_scope, and an id is found by its file name anywhere", () => {
     const agentDir = agentDirectory()
