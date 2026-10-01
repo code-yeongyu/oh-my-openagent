@@ -48,10 +48,17 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
  * delivery's custom message. senpi drains a queued follow-up after that answer and before
  * `agent_settled`, so the follow-up starts a new group: a report without `binding_id` goes to the
  * binding of the message the current answer is for, never to the thread the session started on.
- * Any other input after a final answer (a prompt typed in the terminal) also starts a new group.
- * `local`: a prompt typed in the terminal (a `user` message: a prompt, steer or follow-up) is in the
- * group. Together with a bound message the answer has two possible origins, so a report without
- * `binding_id` is refused rather than sent to the bound thread.
+ * Any other `user` or `custom` message after a final answer also starts a new group: a prompt typed
+ * in the terminal, and equally an extension's message that starts a turn (a delegated task's result,
+ * or a `sendUserMessage`), which keeps none of the bound messages taken up before it.
+ * `local`: a `user` message is in the group. senpi 2026.9.30 gives a prompt, steer or follow-up typed
+ * in the terminal and an extension's `sendUserMessage` (a non-blocking ask_user answer, a stop-hook
+ * follow-up, `/remember`) the same shape, with no field naming its source, so every one counts as
+ * typed input. Together with a bound message the answer then has two possible origins, and while the
+ * session has another outbound binding a report without `binding_id` is refused rather than sent to
+ * the bound thread (`store-relay-ops.ts` `reportBindingDefault`); with that thread's binding as the
+ * only one it goes there. Never a misroute: an input the session cannot attribute makes an implicit
+ * report refuse when several bindings exist.
  */
 type RunContext = { turn: number; cause: string | undefined; consumed: string[]; local: boolean; answered: boolean }
 

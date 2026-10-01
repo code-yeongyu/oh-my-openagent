@@ -226,8 +226,23 @@ going waits behind it and does not change that; once the session takes that queu
 its answer to the first, even before the session goes idle), reports answer the new message's thread.
 When one answer covers messages from two bound threads (a steer, or several queued messages taken up
 together), a report without a binding is refused and names both. So is one whose answer covers a
-bound thread's message and a prompt typed in the session's terminal (typed while the thread's message
-runs, or the reverse): the answer has two possible origins, so the report must name its binding. Otherwise, and always for `omo thread report`, which
+bound thread's message and a user message (typed while the thread's message runs, or the reverse)
+while the session has another active outbound binding: the answer has two possible origins, so the
+report must name its binding. With the thread's binding as the session's only outbound binding,
+both inputs can only be answered there, and the report goes to it.
+
+The session cannot tell where a user message came from: senpi gives a prompt typed in the terminal
+and a message an extension sends with `sendUserMessage` the same shape. So these all count as typed
+input: a prompt, steer or follow-up typed in the terminal, a non-blocking ask_user answer (also when
+a thread's user gave it), a stop-hook follow-up, and `/remember`. And after the session's final
+answer (a reply without a tool call), any new message the run takes up starts a new answer: a user
+message, a bound thread's message, or another extension message that starts a turn, such as a
+delegated task's result. When the session has several active outbound bindings, a report without a
+binding is therefore refused (never misrouted) when its answer covers a bound thread's message and
+one of these user messages, and when it follows such an extension message that arrived after the
+final answer, since that answer covers no bound message. Name the binding in those cases.
+
+Otherwise, and always for `omo thread report`, which
 runs outside the session, a report without `--binding` goes to the session's only active outbound
 binding; a session with none or several must name `--binding` (`invalid_arguments`, with the
 `binding_ids` to choose from). Nothing is ever copied to the session's other bindings.
