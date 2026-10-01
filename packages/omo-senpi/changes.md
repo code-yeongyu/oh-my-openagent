@@ -59,6 +59,10 @@
   kept `UNIQUE`; schema v1 is unreleased, so the table is defined that way from the start. The `thread_bindings`
   snapshot watermarks on the rowid, which SQLite reused after retention deleted the newest binding, so a binding made
   later could appear in a later page of an older snapshot.
+- `gateway/relay.ts` `inbound`: a connector that retries an event the session already took gets the stored result
+  back (`deduplicated: true`) even after the binding was unbound or expired; only a new event, or the same id with
+  other content, is refused `binding_inactive`. The inactive check ran before the receipt replay, so a connector that
+  lost the ACK was told a delivered message was refused. `store.completedDelivery` is the plain read behind it.
 
 ## 2026-10-01 - session gateway review round 5: legacy steers, degraded legacy host, causes, outbox acks, registration, completions (#9222)
 

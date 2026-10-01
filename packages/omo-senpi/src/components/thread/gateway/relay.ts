@@ -9,7 +9,7 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { GatewayEndpointPort, GatewayEndpointRef, UiAnswerReply } from "./adapter"
 import { answerShape, type UiRequestKind } from "./answer-shape"
 import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, INBOUND_MODES, type InboundMode, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
-import type { GatewayEngine } from "./engine"
+import { deliveryArgsHash, type GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
 import { CLOSED_ELSEWHERE, type AnswerClaimRef, type AnswerDelivered, type BindingsFilter, type ReportOpResult } from "./store-relay-ops"
@@ -228,7 +228,24 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       if (author !== undefined && "kind" in author) return author
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
       if (binding === null) return failure("not_found", "No binding has this id.", { binding_id: request.binding_id })
-      if (binding.status !== "active") return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
+      if (binding.status !== "active") {
+        // An event the session already took keeps its stored result after the binding closes (a
+        // connector that lost the ACK retries it); only a new or changed event meets the closed binding.
+        const prior = await store.completedDelivery({ now: now(), principal: `binding:${binding.binding_id}`, idempotency_key: `event:${request.event_id}` })
+        const same = prior !== null && prior.binding_revision !== null && prior.args_hash === deliveryArgsHash({
+          target: prior.target_durable_id,
+          text: request.text,
+          mode: request.mode ?? binding.inbound_mode,
+          expected_turn_id: null,
+          binding: { binding_id: binding.binding_id, revision: prior.binding_revision },
+          author,
+        })
+        if (same) {
+          const replayed = prior.result as GatewayDeliveryResult
+          return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
+        }
+        return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
+      }
       if (!binding.direction.inbound) return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
       const mode = request.mode ?? binding.inbound_mode
       if (mode === "auto" && binding.inbound_mode === "follow_up") {

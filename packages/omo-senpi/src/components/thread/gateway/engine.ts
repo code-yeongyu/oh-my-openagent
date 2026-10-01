@@ -7,7 +7,7 @@ import { TARGET_MAX_BYTES } from "./constants"
 import { decideDelivery } from "./decision"
 import { resultFromRow } from "./result"
 import type { GatewayStore } from "./store"
-import type { EnvelopeOrigin, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender } from "./types"
+import type { EnvelopeOrigin, ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -129,6 +129,18 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
+/** The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. */
+export function deliveryArgsHash(fields: {
+  readonly target: string
+  readonly text: string
+  readonly mode: GatewayDeliveryMode
+  readonly expected_turn_id: number | null
+  readonly binding: { readonly binding_id: string; readonly revision: number } | null
+  readonly author: ExternalAuthor | undefined
+}): string {
+  return argsHash({ target: fields.target, text: fields.text, mode: fields.mode, expected_turn_id: fields.expected_turn_id, binding: fields.binding, author: fields.author })
+}
+
 /**
  * Sender half of a delivery: resolve, one `BEGIN IMMEDIATE` transaction that writes the row, its
  * receipt, causal edge, budgets and the target's inbox marker, then a best-effort `wake` of a
@@ -172,7 +184,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       binding: facts.binding,
       receipt: {
         idempotency_key: idempotencyKey,
-        args_hash: argsHash({ target: target.durable_id, text: request.text, mode, expected_turn_id: request.expected_turn_id ?? null, binding: facts.binding, author: request.sender.kind === "external" ? request.sender.origin.author : undefined }),
+        args_hash: deliveryArgsHash({ target: target.durable_id, text: request.text, mode, expected_turn_id: request.expected_turn_id ?? null, binding: facts.binding, author: request.sender.kind === "external" ? request.sender.origin.author : undefined }),
       },
       endpoint_kind: endpoint?.kind ?? null,
     })

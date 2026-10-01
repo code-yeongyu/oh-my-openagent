@@ -17,6 +17,7 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
+import type { CompletedDelivery } from "./store-ops"
 import type {
   ClaimOutcome,
   ClaimRequest,
@@ -84,6 +85,8 @@ export type GatewayStore = {
   readonly completeReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly result: unknown }) => Promise<boolean>
   readonly abandonReceipt: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly error_note: string }) => Promise<boolean>
   readonly deliveryView: (deliveryId: string) => Promise<DeliveryView | null>
+  /** A completed delivery receipt's stored result and the row facts its arguments were hashed with; a plain read. */
+  readonly completedDelivery: (request: { readonly now: number; readonly principal: string; readonly idempotency_key: string }) => Promise<CompletedDelivery | null>
   readonly list: (filter?: { readonly target_durable_id?: string; readonly root_id?: string }) => Promise<readonly DeliveryRow[]>
   readonly isReferenced: (durableId: string) => Promise<boolean>
   readonly journalMode: () => Promise<string>
@@ -229,6 +232,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
+    completedDelivery: (request) => call("completed_delivery", request),
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
     journalMode: () => call("journal_mode"),

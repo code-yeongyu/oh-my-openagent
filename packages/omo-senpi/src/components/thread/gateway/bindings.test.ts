@@ -142,6 +142,22 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "late" }))).toBe("binding_inactive")
   })
 
+  test("#given a connector event the session already received #when the connector retries it after the binding was unbound #then it gets the stored result back, while an edited or new event meets binding_inactive", async () => {
+    const h = open()
+    const b = h.session("B")
+    const relay = relayOn(h)
+    const bound = ok(await relay.bind({ principal: "session:A", binding: thread("B") })).binding
+    const first = ok(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" }))
+    ok(await relay.unbind({ principal: "session:A", binding_id: bound.binding_id, expected_revision: 1 }))
+    await h.quiesce()
+
+    expect(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi" })).toEqual({ ...first, deduplicated: true })
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-1", text: "hi, edited" }))).toBe("binding_inactive")
+    expect(code(await relay.inbound({ binding_id: bound.binding_id, event_id: "m-2", text: "new" }))).toBe("binding_inactive")
+    expect(b.runtime.enqueueCount(first.delivery_id)).toBe(1)
+    expect(await b.store.list({ target_durable_id: "B" })).toHaveLength(1)
+  })
+
   test("#given a binding with a 60 s TTL #when the injected clock passes it #then the binding reads expired, refuses inbound and rebind, and the thread can be bound again; a rebind before expiry never extends the TTL", async () => {
     const h = open()
     h.session("B")

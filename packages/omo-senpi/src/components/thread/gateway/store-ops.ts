@@ -723,6 +723,21 @@ export async function abandonReceipt(ctx: StoreContext, request: { readonly now:
   ) === 1)
 }
 
+export type CompletedDelivery = { readonly args_hash: string; readonly result: unknown; readonly target_durable_id: string; readonly binding_revision: number | null }
+
+/**
+ * The stored result of a completed, unexpired delivery receipt, with the facts of its row the
+ * receipt's arguments hash was taken over; null otherwise. A plain read (no write lock): it lets a
+ * binding that has since closed still answer a retry of an event it delivered.
+ */
+export function completedDelivery(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string }): CompletedDelivery | null {
+  const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
+  if (receipt === undefined || receipt.expires_at <= request.now || receipt.status !== "completed" || receipt.result === null || receipt.delivery_id === null) return null
+  const row = selectRow(ctx, receipt.delivery_id)
+  if (row === undefined) return null
+  return { args_hash: receipt.args_hash, result: JSON.parse(receipt.result), target_durable_id: row.target_durable_id, binding_revision: row.binding_revision }
+}
+
 export function deliveryView(ctx: StoreContext, deliveryId: string): { readonly row: DeliveryRow; readonly queue_position: number } | null {
   const row = selectRow(ctx, deliveryId)
   return row === undefined ? null : { row, queue_position: queuePosition(ctx, row) }
