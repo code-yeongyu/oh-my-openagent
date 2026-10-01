@@ -18,6 +18,18 @@ import type { ThreadHost, ThreadHostSession } from "./tools"
  */
 
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
+/** Registration records the session's incarnation in the store first; past this bound it never happened. */
+const ENDPOINT_WAIT_MS = 3_000
+
+/** Awaits `work`, failing with what was awaited once `ms` pass: a circuit breaker, not a sleep. */
+async function within<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${what}`)), ms) })])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 const directories: string[] = []
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -106,7 +118,7 @@ async function setup(options: { readonly wakeReachesSession: boolean; readonly e
   const bound = await sdk.bind({ session: "dur-1", binding: { platform: "custom", account_id: "bot", chat_id: "c1", thread_id: "t1", outbound_events: ["completion"] } })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   await target.dispatch("session_start")
-  await target.endpointReady
+  await within(target.endpointReady, ENDPOINT_WAIT_MS, "the component to call registerControlEndpoint on session_start")
   // The store worker is serial: this read returns after the session_start pickup's read, so that
   // pickup has seen no arm and only the wake edge can arm the tracker for the report below.
   expect(await runtimeStore.pendingCompletionArms("dur-1")).toBe(0)
