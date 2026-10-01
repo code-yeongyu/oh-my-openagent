@@ -2,8 +2,9 @@ import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { rfc3339 } from "./bindings"
-import { DELIVERY_RETENTION_MS, RETENTION_SWEEP_BATCH } from "./constants"
+import { DELIVERY_RETENTION_MS, RETENTION_SWEEP_BATCH, RETENTION_SWEEP_INTERVAL_MS } from "./constants"
 import { gatewayDatabasePath } from "./paths"
+import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
 const DAY = 24 * 60 * 60 * 1000
@@ -33,8 +34,9 @@ function ids(db: Database, table: string, column: string): string[] {
   return db.query(`SELECT ${column} AS id FROM ${table} ORDER BY ${column}`).all().map((row) => String((row as { id: unknown }).id))
 }
 
-async function bindSomething(h: GatewayHarness, chat: string) {
-  const bound = await h.store().bind({ now: h.clock.now, receipt: null, binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "C", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["report"], policy_id: "default", ttl_seconds: null } })
+/** A relay mutation: one write transaction, which runs the retention sweep when one is due. */
+async function bindSomething(store: GatewayStore, now: number, chat: string) {
+  const bound = await store.bind({ now, receipt: null, binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "C", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["report"], policy_id: "default", ttl_seconds: null } })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
 }
 
@@ -42,7 +44,8 @@ describe("gateway store retention", () => {
   test("#given rows past their retention next to rows something still reads #when a write transaction sweeps #then only the unreferenced old rows are gone", async () => {
     const h = (harness = createGatewayHarness())
     const t0 = h.clock.now
-    expect(await h.store().journalMode()).toBe("wal")
+    const store = h.store()
+    expect(await store.journalMode()).toBe("wal")
     const db = new Database(gatewayDatabasePath(h.agentDir))
     try {
       db.run("PRAGMA busy_timeout = 5000")
@@ -66,7 +69,7 @@ describe("gateway store retention", () => {
       db.run("INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES ('bnd-closed', 1, ?), ('bnd-active', 0, ?)", [t0, t0])
       db.run("INSERT INTO session_meta (durable_id, next_seq) VALUES ('B', 8), ('S-gone', 3)")
       h.clock.now = t0 + 31 * DAY
-      await bindSomething(h, "trigger")
+      await bindSomething(store, h.clock.now, "trigger")
       expect({
         deliveries: ids(db, "deliveries", "delivery_id"),
         causal_roots: ids(db, "causal_roots", "root_id"),
@@ -89,20 +92,47 @@ describe("gateway store retention", () => {
     }
   })
 
-  test("#given more expired deliveries than one sweep may delete #when two write transactions run #then the first deletes one batch and the second, due at once, deletes the rest", async () => {
+  // One store throughout: the next sweep's due time is kept per open store, so a second store would
+  // sweep regardless of what the first sweep scheduled.
+  test("#given more expired deliveries than one sweep may delete #when two write transactions run on one store #then the first deletes one batch and the second, due at once, deletes the rest", async () => {
     const h = (harness = createGatewayHarness())
     const t0 = h.clock.now
-    expect(await h.store().journalMode()).toBe("wal")
+    const store = h.store()
+    expect(await store.journalMode()).toBe("wal")
     const db = new Database(gatewayDatabasePath(h.agentDir))
     try {
       db.run("PRAGMA busy_timeout = 5000")
       const total = RETENTION_SWEEP_BATCH + 44
       db.transaction(() => { for (let seq = 1; seq <= total; seq++) insertDelivery(db, `d-${seq}`, "refused", t0, { seq }) })()
       h.clock.now = t0 + DELIVERY_RETENTION_MS + 1
-      await bindSomething(h, "first")
+      await bindSomething(store, h.clock.now, "first")
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(total - RETENTION_SWEEP_BATCH)
-      await bindSomething(h, "second")
+      await bindSomething(store, h.clock.now, "second")
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(0)
+    } finally {
+      db.close()
+    }
+  })
+
+  test("#given a sweep that hit no batch bound #when another write follows within the sweep interval #then it deletes nothing, and the first write after the interval does", async () => {
+    const h = (harness = createGatewayHarness())
+    const t0 = h.clock.now
+    const store = h.store()
+    expect(await store.journalMode()).toBe("wal")
+    const db = new Database(gatewayDatabasePath(h.agentDir))
+    try {
+      db.run("PRAGMA busy_timeout = 5000")
+      insertDelivery(db, "d-swept", "refused", t0, { seq: 1 })
+      h.clock.now = t0 + DELIVERY_RETENTION_MS + 1
+      await bindSomething(store, h.clock.now, "first")
+      expect(ids(db, "deliveries", "delivery_id")).toEqual([])
+      insertDelivery(db, "d-waits", "refused", t0, { seq: 2 })
+      h.clock.now += RETENTION_SWEEP_INTERVAL_MS - 1
+      await bindSomething(store, h.clock.now, "second")
+      expect(ids(db, "deliveries", "delivery_id")).toEqual(["d-waits"])
+      h.clock.now += 1
+      await bindSomething(store, h.clock.now, "third")
+      expect(ids(db, "deliveries", "delivery_id")).toEqual([])
     } finally {
       db.close()
     }
