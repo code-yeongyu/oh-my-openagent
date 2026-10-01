@@ -70,6 +70,25 @@ describe("resolveProjectStateDirectory", () => {
     })
   })
 
+  describe("#given a legacy state directory whose records sit behind a symlink", () => {
+    test("#then the legacy directory is kept instead of being treated as empty", () => {
+      const project = mkdtempSync(join(import.meta.dir, ".omo-project-state-"))
+      try {
+        const elsewhere = join(project, "elsewhere")
+        mkdirSync(elsewhere, { recursive: true })
+        writeFileSync(join(elsewhere, "task.json"), "{}")
+        mkdirSync(join(project, ".omo", "senpi-task"), { recursive: true })
+        symlinkSync(elsewhere, join(project, ".omo", "senpi-task", "tasks"))
+
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(
+          join(resolve(project), ".omo", "senpi-task"),
+        )
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+  })
+
   describe("#given no explicit environment", () => {
     test("#then the process environment decides, so the hermetic test HOME is honored", () => {
       const directory = resolveProjectStateDirectory("/work/app", "senpi-task", { exists: nothingExists })

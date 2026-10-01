@@ -35,13 +35,17 @@ function canonicalProjectPath(projectDir: string): string {
   }
 }
 
+// Conservative on purpose: only a directory that is truly empty reads as scaffolding. A symlink
+// entry or a subtree that fails to read for any reason other than "gone" is treated as holding
+// records, so a migration probe never strands in-flight state.
 function holdsRecords(directory: string): boolean {
   try {
     return readdirSync(directory, { withFileTypes: true }).some((entry) =>
-      entry.isDirectory() ? holdsRecords(join(directory, entry.name)) : entry.isFile(),
+      entry.isDirectory() ? holdsRecords(join(directory, entry.name)) : true,
     )
-  } catch {
-    return false
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return false
+    return true
   }
 }
 
