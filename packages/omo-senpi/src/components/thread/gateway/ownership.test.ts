@@ -9,10 +9,11 @@ test("successful host registration publishes ownership and release clears it", a
   const w = await world()
   const owner = await w.owner("host")
   const live = await w.store.sessionOwner("target")
+  if (live === null) throw new Error("registered owner was not published")
   expect(live?.endpoint).toEqual({ kind: "rpc_host", socket: owner.socketPath })
   expect(live?.incarnation).toBeString()
   await owner.stop()
-  expect(await w.store.sessionOwner("target")).toEqual({ incarnation: live?.incarnation, endpoint: null })
+  expect(await w.store.sessionOwner("target")).toEqual({ incarnation: live.incarnation, endpoint: null })
 })
 
 test("successful terminal registration publishes the terminal endpoint kind", async () => {
