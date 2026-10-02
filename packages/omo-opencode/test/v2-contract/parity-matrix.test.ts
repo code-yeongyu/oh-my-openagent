@@ -2,69 +2,73 @@
  * Runtime parity matrix — automated behaviour checks for the V2 port.
  *
  * Agreed shape in code-yeongyu/oh-my-openagent#9389: each row of the
- * parity matrix is a behaviour check that runs in CI. Rows whose
- * subsystem is not yet ported are tracked here as pending and flip to
- * active assertions in the corresponding subsystem PR.
+ * 25-row parity matrix is a behaviour check that runs in CI. Rows whose
+ * subsystem is not yet ported are `test.todo` entries and flip to active
+ * assertions in the corresponding subsystem PR.
  *
  * Source matrix with harness evidence: docs/parity-matrix.md on the
  * reference fork (fazulfi/omo-v2, branch port/v2).
  */
 import { describe, expect, test } from "bun:test"
 
-import omoV2Plugin, { omoV2 } from "../src/index"
+import { omoV2Plugin } from "../../src/v2"
 
-const matrix = [
-  { feature: "plugin load (dual-host export)", status: "pass" },
-  { feature: "bootstrap RPC omo.status", status: "pass" },
-  { feature: "tools: glob", status: "pending", pr: "tools+hooks" },
-  { feature: "tools: grep", status: "pending", pr: "tools+hooks" },
-  { feature: "hooks: tool.execute.before/after", status: "pending", pr: "tools+hooks" },
-  { feature: "hooks: session compaction", status: "pending", pr: "tools+hooks" },
-  { feature: "hooks: shell create.before", status: "pending", pr: "tools+hooks" },
-  { feature: "client/session/event surface", status: "pending", pr: "client" },
-  { feature: "agents: listing (10 OMC agents)", status: "pending", pr: "agents" },
-  { feature: "agents: dispatch roundtrip", status: "pending", pr: "agents" },
-  { feature: "agents: unknown agent -> clear error", status: "pending", pr: "agents" },
-  { feature: "agents: builtin build/plan demoted, default sisyphus", status: "pending", pr: "agents" },
-  { feature: "background task: spawn -> collect", status: "pending", pr: "orchestration" },
-  { feature: "background task: error path does not hang", status: "pending", pr: "orchestration" },
-  { feature: "todos: write/read roundtrip", status: "pending", pr: "orchestration" },
-  { feature: "MCP: builtin server injection", status: "pending", pr: "mcp" },
-  { feature: "skills: location fallback listing", status: "pending", pr: "skills" },
-  { feature: "config: V1 config normalizes without rewrite", status: "pending", pr: "config" },
-  { feature: "TUI: registerTui slot claims + keymap", status: "pending", pr: "tui" },
-  { feature: "companion: DCP 3.2.0 co-loads (no conflicts)", status: "pending", pr: "integration" },
-  { feature: "companion: tokenscope co-loads (no conflicts)", status: "pending", pr: "integration" },
-] as const
-
-describe("V2 parity matrix", () => {
+describe("V2 parity matrix — scaffold slice (live rows)", () => {
   test("row: plugin load (dual-host export)", () => {
     expect(omoV2Plugin.id).toBe("oh-my-openagent")
     expect(typeof omoV2Plugin.setup).toBe("function")
-    expect(omoV2).toBe(omoV2Plugin)
   })
 
   test("row: bootstrap RPC omo.status", async () => {
-    const registered: string[] = []
+    const registered: Array<{ id: string; handler: () => Promise<unknown> }> = []
     const ctx = {
       rpc: {
-        register: (definition: { id: string; methods: Record<string, unknown> }, handlers: Record<string, () => Promise<unknown>>) => {
+        register: (
+          definition: { id: string; methods: Record<string, unknown> },
+          handlers: Record<string, () => Promise<unknown>>,
+        ) => {
           for (const method of Object.keys(definition.methods)) {
-            registered.push(`${definition.id}.${method}`)
-            void handlers[method]
+            registered.push({ id: `${definition.id}.${method}`, handler: handlers[method] })
           }
         },
       },
     }
     await omoV2Plugin.setup(ctx as never)
-    expect(registered).toContain("omo.status")
+    const status = registered.find((r) => r.id === "omo.status")
+    expect(status).toBeDefined()
+    expect(await status!.handler()).toEqual({ ok: true, stage: "bootstrap" })
   })
 
-  test("matrix bookkeeping: every row is pass or mapped to a subsystem PR", () => {
-    for (const row of matrix) {
-      if (row.status === "pending") {
-        expect(typeof (row as { pr?: string }).pr).toBe("string")
-      }
-    }
+  test("row: V1 host still loads the V1 entry unchanged", async () => {
+    const v1 = await import("../../src/index")
+    expect(typeof v1.default).toBe("object")
+    expect(typeof v1.default.server).toBe("function")
+    expect(typeof v1.omoPlugin).toBe("function")
+    // The V1 module graph must not reach the V2 entry: the default export
+    // is a V1 PluginModule, which has no `setup` key.
+    expect("setup" in v1.default).toBe(false)
   })
+})
+
+describe("V2 parity matrix — subsystem rows (pending, flip in subsystem PRs)", () => {
+  test.todo("row: tools: glob (PR: tools+hooks)")
+  test.todo("row: tools: grep (PR: tools+hooks)")
+  test.todo("row: hooks: tool.execute.before/after (PR: tools+hooks)")
+  test.todo("row: hooks: session compaction (PR: tools+hooks)")
+  test.todo("row: hooks: shell create.before (PR: tools+hooks)")
+  test.todo("row: client/session/event surface (PR: client)")
+  test.todo("row: agents: listing (10 OMC agents) (PR: agents)")
+  test.todo("row: agents: dispatch roundtrip (PR: agents)")
+  test.todo("row: agents: unknown agent -> clear error (PR: agents)")
+  test.todo("row: agents: builtin build/plan demoted, default sisyphus (PR: agents)")
+  test.todo("row: background task: spawn -> collect (PR: orchestration)")
+  test.todo("row: background task: error path does not hang (PR: orchestration)")
+  test.todo("row: todos: write/read roundtrip (PR: orchestration)")
+  test.todo("row: MCP: builtin server injection (PR: mcp)")
+  test.todo("row: skills: location fallback listing (PR: skills)")
+  test.todo("row: config: V1 config normalizes without rewrite (PR: config)")
+  test.todo("row: TUI: registerTui slot claims + keymap (PR: tui)")
+  test.todo("row: companion: DCP 3.2.0 co-loads, no conflicts (PR: integration)")
+  test.todo("row: companion: tokenscope co-loads, no conflicts (PR: integration)")
+  test.todo("row: static gates: zero @opencode-ai/* in v2 surface, exact 2.0.20 pins (PR: gates)")
 })

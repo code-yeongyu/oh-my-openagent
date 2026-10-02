@@ -1,11 +1,11 @@
 /**
  * OpenCode V2 entry — scaffold slice (upstream PR 1).
  *
- * Exports the V2 plugin definition (`setup`) alongside the untouched V1
- * plugin module (`server`, re-exported from ../index). V2 hosts resolve
- * `setup`; V1 hosts resolve `server` — the additive dual-host shape agreed
- * in code-yeongyu/oh-my-openagent#9389.
- *
+ * This module exports only the V2 plugin definition (`omoV2Plugin`, `setup`).
+ * It is exposed as the package subpath `./v2` (see package.json exports), so
+ * V2 hosts load this entry directly while V1 hosts keep loading the package
+ * root (`../index`, the untouched V1 PluginModule) and never evaluate this
+ * file. V1 behaviour is unchanged.
  * Subsystem registration (tools/hooks, agents, orchestration, MCP, skills,
  * config, TUI) lands in follow-up PRs; each turns its rows of the runtime
  * parity matrix green.

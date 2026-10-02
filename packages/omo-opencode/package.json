@@ -12,6 +12,10 @@
     "./binary-downloader": {
       "types": "./src/shared/binary-downloader.ts",
       "import": "./src/shared/binary-downloader.ts"
+    },
+    "./v2": {
+      "types": "./src/v2/index.ts",
+      "import": "./src/v2/index.ts"
     }
   },
   "scripts": {

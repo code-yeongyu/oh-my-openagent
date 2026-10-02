@@ -16,20 +16,19 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
 
       - name: Install workspace deps
         run: bun install --frozen-lockfile
 
-      - name: Install V2 host deps (exact)
-        run: bun add --dev --exact @opencode/plugin@2.0.20 @opencode/client@2.0.20 --filter @oh-my-opencode/omo-opencode
-
-      - name: V1 entry loads
+      - name: V1 entry loads unchanged
         working-directory: packages/omo-opencode
-        run: bun -e 'const m = await import("./src/index.ts"); if (!m.default || typeof m.default.server !== "function") throw new Error("V1 PluginModule.server missing"); console.log("V1 entry OK:", m.default.id)'
+        run: bun -e 'const m = await import("./src/index.ts"); if (!m.default || typeof m.default.server !== "function") throw new Error("V1 PluginModule.server missing"); if ("setup" in m.default) throw new Error("V1 module graph reaches V2 entry"); console.log("V1 entry OK:", m.default.id)'
 
       - name: V2 entry loads
         working-directory: packages/omo-opencode
-        run: bun -e 'const m = await import("./src/v2/index.ts"); if (!m.default || typeof m.default.setup !== "function") throw new Error("V2 setup missing"); console.log("V2 entry OK:", m.default.id)'
+        run: bun -e 'const m = await import("./src/v2/index.ts"); if (!m.omoV2Plugin || typeof m.omoV2Plugin.setup !== "function") throw new Error("V2 setup missing"); console.log("V2 entry OK:", m.omoV2Plugin.id)'
 
       - name: Parity matrix behaviour checks
         working-directory: packages/omo-opencode
