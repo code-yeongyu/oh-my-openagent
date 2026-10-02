@@ -89,11 +89,15 @@ re-modelled). The record is kept in the gateway store by durable id, so it survi
 reopening a session never changes its model, and an explicit choice stays explicit.
 
 `create` takes `--model` as `provider/id`, an exact id, or a unique fragment of the id or display
-name; `--provider` narrows a bare id. `--thinking` is the starting level. Everything that can be
+name; `--provider` narrows a bare id, and without `--model` it restricts the auto choice to that
+provider (`model_not_found` when it serves no connected model); an empty `--provider` counts as none. `--thinking` is the starting level. Everything that can be
 refused is refused before a session opens: `model_not_found` (`details.available`, the first 20
 `provider/id`; empty when no provider is connected), `model_ambiguous` (`details.candidates`, up
 to 10), `thinking_level_unsupported` (`details.supported`), `invalid_arguments` (an empty model, a
-bad `--set-by`, `--set-by` without `--model`). `--set-by` defaults to `user` when a model is given.
+bad `--set-by`, `--set-by` without `--model`), and `unsupported` for any `--model` or `--thinking`, or a
+non-empty `--provider`, on a host that cannot list a new session's models. That `unsupported` is a gateway
+refusal (exit 1), not the CLI's own exit-4 `unsupported`. `--set-by` defaults to `user` when a model is given.
+A created session runs no first-run onboarding turn: its first turn is the creator's message.
 
 `models` lists what a new session could run (no thread), or what the thread's live session can
 switch to, with `current` its record: `{kind:"ok", thread_id|null, current: model|null, available:
@@ -472,7 +476,7 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | Code | Meaning |
 | --- | --- |
 | 0 | done |
-| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
+| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `unsupported` for a `create` model choice or a thread-less `models` on a host that cannot list a new session's models, `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name`, a `--set-by`, `--scope`, `--thinking` or `set-reasoning` level outside its set, `--set-by` on `create` without `--model`, an empty `set-model` model (the SDK is not loaded) |
 | 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`, `create` and `models` without a thread (the operator endpoint). Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
