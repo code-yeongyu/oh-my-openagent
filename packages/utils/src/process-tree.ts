@@ -17,11 +17,12 @@ export interface ProcessTreeRunOptions {
   readonly args: readonly string[]
   readonly command: string
   readonly cwd: string
-  readonly env: Record<string, string>
+  readonly env: NodeJS.ProcessEnv
   readonly maxBuffer: number
   readonly onTerminationReport?: (report: ProcessTreeTerminationReport) => void
   readonly terminationGraceMs?: number
   readonly terminationWaitMs?: number
+  readonly stdin?: string
   readonly timeoutSignal?: AbortSignal
   readonly timeoutMs: number
 }
@@ -40,13 +41,21 @@ const DEFAULT_TERMINATION_WAIT_MS = 2_000
 
 export function runProcessWithTreeTimeout(options: ProcessTreeRunOptions): Promise<ProcessTreeRunResult> {
   return new Promise((resolvePromise) => {
-    const child = spawn(options.command, [...options.args], {
-      cwd: options.cwd,
-      detached: process.platform !== "win32",
-      env: options.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    })
+    const child = options.stdin === undefined
+      ? spawn(options.command, [...options.args], {
+          cwd: options.cwd,
+          detached: process.platform !== "win32",
+          env: options.env,
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        })
+      : spawn(options.command, [...options.args], {
+          cwd: options.cwd,
+          detached: process.platform !== "win32",
+          env: options.env,
+          stdio: ["pipe", "pipe", "pipe"],
+          windowsHide: true,
+        })
     let stderr = ""
     let stderrBytes = 0
     let stdout = ""
@@ -102,6 +111,10 @@ export function runProcessWithTreeTimeout(options: ProcessTreeRunOptions): Promi
 
     child.stdout.on("data", (chunk: Buffer) => capture("stdout", chunk))
     child.stderr.on("data", (chunk: Buffer) => capture("stderr", chunk))
+    if (child.stdin !== null) {
+      child.stdin.on("error", () => undefined)
+      child.stdin.end(options.stdin)
+    }
 
     let removeTimeoutSignal = (): void => undefined
     let timeout: ReturnType<typeof setTimeout>

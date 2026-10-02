@@ -14,6 +14,7 @@ interface SessionNotificationConfig {
   message?: string
   questionMessage?: string
   permissionMessage?: string
+  script?: string
   playSound?: boolean
   soundPath?: string
   /** Delay in ms before sending notification to confirm session is still idle (default: 1500) */
@@ -46,6 +47,25 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
   let currentPlatform: Platform | null = null
   let defaultSoundPath = mergedConfig.soundPath
 
+  const sendNotification = async (
+    hookCtx: PluginInput,
+    platform: Platform,
+    hookType: "idle" | "permission" | "question",
+    sessionID: string,
+    title: string,
+    message: string
+  ): Promise<void> => {
+    await sessionNotificationSender.sendSessionNotification(
+      hookCtx,
+      platform,
+      title,
+      message,
+      mergedConfig.script
+        ? { scriptPath: mergedConfig.script, hookType, sessionID, projectDir: hookCtx.directory }
+        : undefined
+    )
+  }
+
   const scheduler = createIdleNotificationScheduler({
     ctx,
     config: mergedConfig,
@@ -53,7 +73,7 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
     send: async (hookCtx, sessionID) => {
       const platform = ensureNotificationPlatform()
       if (typeof hookCtx.client.session.get !== "function" && typeof hookCtx.client.session.messages !== "function") {
-        await sessionNotificationSender.sendSessionNotification(hookCtx, platform, mergedConfig.title, mergedConfig.message)
+        await sendNotification(hookCtx, platform, "idle", sessionID, mergedConfig.title, mergedConfig.message)
         return
       }
 
@@ -63,7 +83,7 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
         baseMessage: mergedConfig.message,
       })
 
-      await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
+      await sendNotification(hookCtx, platform, "idle", sessionID, content.title, content.message)
     },
     playSound: async (hookCtx, soundPath) => {
       const platform = ensureNotificationPlatform()
@@ -109,7 +129,7 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
       if (!sessionID) return
 
       const platform = ensureNotificationPlatform()
-      if (platform === "unsupported") return
+      if (platform === "unsupported" && !mergedConfig.script) return
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.scheduleIdleNotification(sessionID)
@@ -132,11 +152,11 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
       if (!sessionID) return
 
       const platform = ensureNotificationPlatform()
-      if (platform === "unsupported") return
+      if (platform === "unsupported" && !mergedConfig.script) return
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sessionNotificationSender.sendSessionNotification(ctx, platform, mergedConfig.title, mergedConfig.permissionMessage)
+      await sendNotification(ctx, platform, "permission", sessionID, mergedConfig.title, mergedConfig.permissionMessage)
       if (mergedConfig.playSound && defaultSoundPath) {
         await sessionNotificationSender.playSessionNotificationSound(ctx, platform, defaultSoundPath)
       }
@@ -152,13 +172,14 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
           const toolName = getEventToolName(props)?.toLowerCase()
           if (toolName && QUESTION_TOOLS.has(toolName)) {
             const platform = ensureNotificationPlatform()
-            if (platform === "unsupported") return
+            if (platform === "unsupported" && !mergedConfig.script) return
             if (!shouldNotifyForSession(sessionID)) return
 
             const questionText = getQuestionText(props)
-            const message = PERMISSION_HINT_PATTERN.test(questionText) ? mergedConfig.permissionMessage : mergedConfig.questionMessage
+            const permissionPrompt = PERMISSION_HINT_PATTERN.test(questionText)
+            const message = permissionPrompt ? mergedConfig.permissionMessage : mergedConfig.questionMessage
 
-            await sessionNotificationSender.sendSessionNotification(ctx, platform, mergedConfig.title, message)
+            await sendNotification(ctx, platform, permissionPrompt ? "permission" : "question", sessionID, mergedConfig.title, message)
             if (mergedConfig.playSound && defaultSoundPath) {
               await sessionNotificationSender.playSessionNotificationSound(ctx, platform, defaultSoundPath)
             }
