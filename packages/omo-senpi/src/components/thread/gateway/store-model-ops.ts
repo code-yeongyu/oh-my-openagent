@@ -89,9 +89,11 @@ export async function observeModelSelect(ctx: StoreContext, request: ObserveMode
   const result = await transaction(ctx, "observe_model_select", () => {
     const row = selectModel(ctx, request.durable_id)
     if (row !== undefined) observe(ctx, request, row)
-    if (request.source !== "fallback") return { updated: row !== undefined, milestones: [] }
+    // senpi's fallback always switches away from a current model, so `from` is known; the record stands in when the event omits it.
+    const from = request.from ?? (row === undefined ? null : { provider: String(row.provider), id: String(row.model_id) })
+    if (request.source !== "fallback" || from === null) return { updated: row !== undefined, milestones: [] }
     expireDue(ctx, request.now)
-    const change: ModelChange = { from: request.from, to: request.to, reason: request.reason }
+    const change: ModelChange = { from, to: request.to, reason: request.reason }
     const milestones = selectBindings(ctx, "session_durable_id = ? AND status = 'active' AND direction_outbound = 1", [request.durable_id])
       .filter((binding) => binding.outbound_events.includes("milestone"))
       .map((binding) => ({ binding_id: binding.binding_id, cursor: insertOutbox(ctx, { binding, event: "milestone", text: fallbackMilestoneText(change), now: request.now, model_change: change }) }))

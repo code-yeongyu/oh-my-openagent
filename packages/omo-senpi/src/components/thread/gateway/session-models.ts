@@ -22,7 +22,7 @@ export type ThreadModel = ModelRef & {
 }
 
 /** The `model_change` field of the milestone row a fallback switch writes. */
-export type ModelChange = { readonly from: ModelRef | null; readonly to: ModelRef; readonly reason: string | null }
+export type ModelChange = { readonly from: ModelRef; readonly to: ModelRef; readonly reason: string | null }
 
 /** senpi `ModelSelectSource`: why the engine switched the session's model. */
 export type ModelSelectSource = "set" | "cycle" | "restore" | "fallback" | "fallback-revert"
@@ -49,5 +49,5 @@ export function modelLabel(model: ModelRef): string {
 
 /** The human sentence of a fallback milestone row; the structured switch travels beside it as `model_change`. */
 export function fallbackMilestoneText(change: ModelChange): string {
-  return change.from === null ? `switched to ${modelLabel(change.to)} after a provider error` : `switched to ${modelLabel(change.to)} after a provider error on ${modelLabel(change.from)}`
+  return `switched to ${modelLabel(change.to)} after a provider error on ${modelLabel(change.from)}`
 }
