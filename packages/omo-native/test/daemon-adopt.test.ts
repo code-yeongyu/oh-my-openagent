@@ -148,6 +148,18 @@ describe("omo daemon adopt", () => {
     expect([...missing.releases, ...dead.releases]).toEqual([])
   })
 
+  test.each([
+    ["no session, with --json", ["--json"], true],
+    ["a bad flag before --json", ["--bogus", "--json", "dur-host"], true],
+    ["a bad flag after --json", ["dur-host", "--json", "--bogus"], true],
+    ["no session, without --json", [], false],
+    ["a bad flag, without --json", ["dur-host", "--bogus"], false],
+  ] as const)("#given %s #when adopted #then it exits 2 with the usage line, stdout carries one refused/usage object only under --json, and nothing is released", async (_name, args, json) => {
+    const result = await adopt(args)
+    expect({ outcome: result.outcome, releases: result.releases, usage: result.stderr.includes("usage: omo daemon adopt") }).toEqual({ outcome: DAEMON_EXIT.usage, releases: [], usage: true })
+    expect(result.stdout).toBe(json ? `${JSON.stringify({ kind: "refused", error: "usage" })}\n` : "")
+  })
+
   test("#given win32 or no session argument #when adopted #then it is refused before the SDK loads", async () => {
     const windows = await adopt(["dur-host"], { platform: "win32" })
     const missing = await adopt([])

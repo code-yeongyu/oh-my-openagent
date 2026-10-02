@@ -75,17 +75,19 @@ async function release(sdk, thread, request) {
  * released session in this terminal, and the directory it runs in.
  */
 export async function runAdoptCommand(args, { sdk, stdout, stderr }) {
-  const parsed = parseArgs(args, { booleans: ["--interrupt", "--force", "--json"] })
-  if (parsed.error !== undefined || parsed.positionals.length !== 1) {
-    stderr.write(`omo daemon adopt: ${parsed.error ?? "expects one session"}\n${USAGE}\n`)
-    return DAEMON_EXIT.usage
-  }
-  const json = parsed.flags.has("--json")
-  const interrupt = parsed.flags.has("--interrupt")
+  // `--json` among the options, before `--`, is read before the parse: a usage error still answers in JSON.
+  const end = args.indexOf("--")
+  const json = (end === -1 ? args : args.slice(0, end)).includes("--json")
   const outcome = (payload, code) => {
     if (json) stdout.write(`${JSON.stringify(payload)}\n`)
     return code
   }
+  const parsed = parseArgs(args, { booleans: ["--interrupt", "--force", "--json"] })
+  if (parsed.error !== undefined || parsed.positionals.length !== 1) {
+    stderr.write(`omo daemon adopt: ${parsed.error ?? "expects one session"}\n${USAGE}\n`)
+    return outcome({ kind: "refused", error: "usage" }, DAEMON_EXIT.usage)
+  }
+  const interrupt = parsed.flags.has("--interrupt")
 
   const located = await sdk.locate({ thread: parsed.positionals[0], all_scope: true })
   if (located.kind !== "ok") {
