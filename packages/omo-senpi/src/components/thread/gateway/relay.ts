@@ -228,31 +228,32 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       if (author !== undefined && "kind" in author) return author
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
       if (binding === null) return failure("not_found", "No binding has this id.", { binding_id: request.binding_id })
-      if (binding.status !== "active") {
-        // An event the session already took keeps its stored result after the binding closes (a
-        // connector that lost the ACK retries it); only a new or changed event meets the closed binding.
-        // A receipt that never recorded its result is answered as a retried send is: a decided row
-        // replays its outcome, an undecided one stays in progress or uncertain.
-        const key = { principal: `binding:${binding.binding_id}`, idempotency_key: `event:${request.event_id}` }
-        const prior = await store.deliveryReceipt({ now: now(), ...key })
-        const same = prior !== null && prior.binding_revision !== null && prior.args_hash === deliveryArgsHash({
-          target: prior.target_durable_id,
-          text: request.text,
-          mode: request.mode ?? binding.inbound_mode,
-          expected_turn_id: null,
-          binding: { binding_id: binding.binding_id, revision: prior.binding_revision },
-          author,
-        })
-        if (same) {
-          const recovered = prior.completed ? { kind: "replay" as const, result: prior.result } : await store.recoverDelivery({ now: now(), ...key, args_hash: prior.args_hash })
-          if (recovered?.kind === "replay") {
-            const replayed = recovered.result as GatewayDeliveryResult
-            return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
-          }
-          if (recovered?.kind === "refused") return failure(recovered.code, recovered.message, recovered.details)
+      // An event the session already took keeps its stored result whatever the binding did since (a
+      // connector that lost the ACK retries it): the receipt is checked against the target and
+      // revision it was delivered under BEFORE the binding's current status or revision, so neither an
+      // unbind nor a rebind turns the identical retry into binding_inactive or idempotency_conflict.
+      // Only a new or changed event meets the binding as it is now. A receipt that never recorded its
+      // result is answered as a retried send is: a decided row replays its outcome, an undecided one
+      // stays in progress or uncertain.
+      const key = { principal: `binding:${binding.binding_id}`, idempotency_key: `event:${request.event_id}` }
+      const prior = await store.deliveryReceipt({ now: now(), ...key })
+      const same = prior !== null && prior.binding_revision !== null && prior.args_hash === deliveryArgsHash({
+        target: prior.target_durable_id,
+        text: request.text,
+        mode: request.mode ?? binding.inbound_mode,
+        expected_turn_id: null,
+        binding: { binding_id: binding.binding_id, revision: prior.binding_revision },
+        author,
+      })
+      if (same) {
+        const recovered = prior.completed ? { kind: "replay" as const, result: prior.result } : await store.recoverDelivery({ now: now(), ...key, args_hash: prior.args_hash })
+        if (recovered?.kind === "replay") {
+          const replayed = recovered.result as GatewayDeliveryResult
+          return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
         }
-        return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
+        if (recovered?.kind === "refused") return failure(recovered.code, recovered.message, recovered.details)
       }
+      if (binding.status !== "active") return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
       if (!binding.direction.inbound) return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
       const mode = request.mode ?? binding.inbound_mode
       if (mode === "auto" && binding.inbound_mode === "follow_up") {

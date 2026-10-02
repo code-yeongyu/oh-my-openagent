@@ -402,6 +402,66 @@ describe("relay_direction_question_authority_and_completion", () => {
   })
 })
 
+describe("inbound_lost_ack_replay_across_a_rebind", () => {
+  const JANE = { platform_user_id: "U123", display: "Jane" }
+
+  test("#given an event delivered to B #when the binding is rebound to C and the connector retries the identical event after a lost-ACK #then the original delivery replays, B holds it once and C receives nothing", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const c = h.session("C")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE }))
+    await h.quiesce()
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+
+    const retried = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE })
+    await h.quiesce()
+
+    expect(retried).toEqual({ ...first, deduplicated: true })
+    expect({ enqueued: b.runtime.enqueueCount(first.delivery_id), entries: b.runtime.transcriptEntries(first.delivery_id), toC: (await c.store.list({ target_durable_id: "C" })).length }).toEqual({ enqueued: 1, entries: 1, toC: 0 })
+  })
+
+  test.each([
+    ["its text", { text: "ship it now" }],
+    ["its mode", { mode: "follow_up" }],
+    ["its author", { author: { platform_user_id: "U456", display: "Kim" } }],
+  ] as const)("#given an event delivered to B before the binding was rebound to C #when the key is reused with %s changed #then it is idempotency_conflict and nothing is delivered again", async (_name, change) => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const c = h.session("C")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE }))
+    await h.quiesce()
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+
+    const changed = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it", author: JANE, ...change })
+    await h.quiesce()
+
+    expect(code(changed)).toBe("idempotency_conflict")
+    expect({ enqueued: b.runtime.enqueueCount(first.delivery_id), toC: (await c.store.list({ target_durable_id: "C" })).length }).toEqual({ enqueued: 1, toC: 0 })
+  })
+
+  test("#given an event delivered to B #when the binding is rebound to C, then unbound, and the connector retries the identical event after a lost-ACK #then the original delivery replays instead of binding_inactive", async () => {
+    const h = (harness = createGatewayHarness())
+    const b = h.session("B")
+    const c = h.session("C")
+    const { relay } = relayOn(h)
+    const x = await bindAs(relay, binding("B"))
+    const first = ok(await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it" }))
+    await h.quiesce()
+    ok(await relay.rebind({ principal: "session:A", binding_id: x, expected_revision: 1, session_durable_id: "C" }))
+    ok(await relay.unbind({ principal: "session:A", binding_id: x, expected_revision: 2 }))
+
+    const retried = await relay.inbound({ binding_id: x, event_id: "evt-1", text: "ship it" })
+
+    expect(retried).toEqual({ ...first, deduplicated: true })
+    expect(code(await relay.inbound({ binding_id: x, event_id: "evt-2", text: "new" }))).toBe("binding_inactive")
+    expect({ enqueued: b.runtime.enqueueCount(first.delivery_id), toC: (await c.store.list({ target_durable_id: "C" })).length }).toEqual({ enqueued: 1, toC: 0 })
+  })
+})
+
 describe("answer_when_the_session_cannot_be_located", () => {
   test("#given a pending question whose host is gone #when thread_answer cannot locate the session #then it is host_unavailable with the question pending and no frame sent, and once the host is back a retry delivers exactly once", async () => {
     // given
