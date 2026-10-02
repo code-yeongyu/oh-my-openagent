@@ -112,7 +112,8 @@ A runtime fallback switch writes ONE `milestone` row to each active outbound bin
 subscribed to milestones. Its `text` is the sentence ("switched to openai/gpt-y after a provider
 error on anthropic/claude-opus-5-5") and it carries
 `model_change: {from: {provider, id}, to: {provider, id}, reason}`. Only such a row has
-`model_change`.
+`model_change`. A switch the engine held or refused after announcing it changes neither the model
+record nor the outbox: both are written only once the switch is applied.
 
 ## Sending
 

@@ -5,7 +5,6 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createThreadComponent } from "./component"
-import type { GatewayStoreEvent } from "./gateway/types"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
@@ -354,89 +353,211 @@ describe("#9425 set-reasoning records the level the engine runs", () => {
   })
 })
 
-/** A component over a real store; the store's `model_observed` event is the signal a model_select write landed. */
-function componentFixture() {
-  const agentDir = scratch("thread-9425-component-")
-  const store = createGatewayStore({ agentDir })
-  disposables.push(store)
-  const handlers = new Map<string, Array<(payload: unknown, ctx?: unknown) => unknown>>()
-  const pi = { cwd: process.cwd(), registerTool() {}, on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) }, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {}, getThinkingLevel: () => "high" }
-  createThreadComponent({ host: fakeHost().host, stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(pi as never, { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } } as never)
-  const ctx = (durableId: string) => ({ sessionManager: { getSessionId: () => durableId } })
-  const dispatch = async (event: string, durableId: string, payload: Record<string, unknown> = {}) => {
-    for (const handler of handlers.get(event) ?? []) await handler({ type: event, ...payload }, ctx(durableId))
-  }
-  const observed = (durableId: string) => new Promise<GatewayStoreEvent>((resolve, reject) => {
-    const timer = setTimeout(() => { stop(); reject(new Error(`no model_observed for ${durableId} within 10 s`)) }, 10_000)
-    const stop = store.onEvent((event) => {
-      if (event.kind !== "model_observed" || event.session_durable_id !== durableId) return
-      clearTimeout(timer)
-      stop()
-      resolve(event)
-    })
-  })
-  const bindMilestones = async (durableId: string) => {
-    const bound = await store.bind({ now: Date.now(), receipt: null, binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: `t-${durableId}`, root_message_id: null, progress_message_id: null, session_durable_id: durableId, direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["milestone", "completion"], policy_id: "default", ttl_seconds: null } })
-    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-    return bound.binding.binding_id
-  }
-  const rows = async (bindingId: string) => {
-    const page = await store.readOutbox({ now: Date.now(), binding_id: bindingId })
-    return page.kind === "ok" ? page.rows : []
-  }
-  const modelOf = async (durableId: string) => (await store.sessionModels([durableId]))[durableId] ?? null
-  return { store, dispatch, observed, bindMilestones, rows, modelOf }
+type EngineModel = { readonly provider: string; readonly id: string; readonly defaultThinkingLevel?: string }
+type EngineSwitchOptions = Record<string, unknown>
+type EngineSession = {
+  readonly model: EngineModel | undefined
+  readonly thinkingLevel: string
+  _switchActiveModel(model: EngineModel, options: EngineSwitchOptions): Promise<unknown>
 }
 
 const CLAUDE = { provider: "anthropic", id: "claude-opus-5-5" }
 const GPT_Y = { provider: "openai", id: "gpt-y" }
+const CLAUDE_MODEL: EngineModel = { ...CLAUDE, defaultThinkingLevel: "high" }
+const GPT_Y_MODEL: EngineModel = { ...GPT_Y, defaultThinkingLevel: "xhigh" }
+const ENGINE_LEVELS: Readonly<Record<string, readonly string[]>> = { "anthropic/claude-opus-5-5": ["off", "low", "medium", "high"], "openai/gpt-y": ["off", "low", "medium", "high", "xhigh"] }
+
+/**
+ * A gateway session as the pinned engine runs it: its own model switch (AgentSession._switchActiveModel,
+ * _emitModelSelect, _setThinkingLevel, _applyEphemeralThinkingLevel) over a real in-memory session, with the
+ * component's handlers called the way the extension runner calls them and a real gateway store. The services
+ * the switch consults but this behavior does not depend on are doubles. `admission` makes the engine
+ * hold the candidate (its context-budget deferral) or refuse it (its usability check) AFTER the model_select
+ * hook ran, which is where a switch is decided. The switches mirror the engine's callers: setModel for /model
+ * and the gateway's set-model, the retry fallback for fallback and fallback-revert.
+ */
+function engineFixture() {
+  const agentDir = scratch("thread-9425-engine-")
+  const store = createGatewayStore({ agentDir })
+  disposables.push(store)
+  const handlers = new Map<string, Array<(payload: unknown, ctx?: unknown) => unknown>>()
+  const engine = Object.create(AgentSession.prototype) as EngineSession
+  const sessionManager = SessionManager.inMemory(process.cwd())
+  const durableId = sessionManager.getSessionId()
+  const admission = { hold: false, refuse: false }
+  const ctx = { get model() { return engine.model }, sessionManager }
+  const deliver = async (event: { readonly type: string }) => {
+    for (const handler of handlers.get(event.type) ?? []) await handler(event, ctx)
+  }
+  Object.assign(engine, {
+    agent: { state: { model: CLAUDE_MODEL, thinkingLevel: "high", thinkingSelection: undefined, reasoningBaseline: undefined, systemPrompt: "base", messages: [] }, abortServerSideFallback: false },
+    sessionManager,
+    _scopedModels: [],
+    _currentServiceTier: undefined,
+    _baseSystemPromptOptions: {},
+    _shownHighReasoningWarningKeys: new Set<string>(),
+    _extensionRunner: { emitModelSelect: async (event: { readonly type: string }) => { await deliver(event); return undefined }, emit: deliver },
+    settingsManager: { getAbortServerSideFallback: () => false, setDefaultModelAndProvider() {}, setModelThinkingLevel() {}, setDefaultThinkingLevel() {} },
+    _retryFallback: { hasConfiguredChain: () => false, noteManualThinkingLevel() {} },
+    _emit() {},
+    syncPromptCacheSafeWaitEnv() {},
+    _modelSelectionChangesContext: () => true,
+    _invalidateCompactionForModelSelection() {},
+    _getDownswitchLiveContextTokens: () => 0,
+    _getThinkingForModelSwitch: (model: EngineModel, explicit?: string) => ({ level: explicit ?? model.defaultThinkingLevel ?? "medium", selection: undefined }),
+    isFastModeActive: () => false,
+    _resolveServiceTier: () => undefined,
+    _emitHighReasoningWarningIfNeeded() {},
+    _emitServiceTierChangeIfNeeded() {},
+    getAvailableThinkingLevels: () => ENGINE_LEVELS[`${engine.model?.provider}/${engine.model?.id}`] ?? ["off"],
+    _projectSwitchDeferral: () => (admission.hold ? { requiredTokens: 200_000, contextWindow: 100_000 } : undefined),
+    _admitSwitchCompactionRequired() {},
+    _reduceForSwitchTarget: (_model: EngineModel, tokens: number) => tokens,
+    _assertModelUsableForSwitch: () => { if (admission.refuse) throw new Error("the live context does not fit the candidate model") },
+  })
+  const pi = { cwd: process.cwd(), registerTool() {}, on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) }, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {}, getThinkingLevel: () => engine.thinkingLevel }
+  createThreadComponent({ host: fakeHost().host, stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(pi as never, { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } } as never)
+  const userSwitch = (model: EngineModel) => engine._switchActiveModel(model, { persistDefault: false, appendSessionEntry: true, emitModelSelect: true, modelSelectSource: "set", invalidateCompaction: true })
+  // The retry fallback passes the fallback chain entry's thinking level along with the model.
+  const runtimeSwitch = (model: EngineModel, source: "fallback" | "fallback-revert", thinking = "high") => engine._switchActiveModel(model, { persistDefault: false, appendSessionEntry: true, entryReason: source, emitModelSelect: true, modelSelectSource: source, invalidateCompaction: true, ephemeralThinkingLevel: thinking, allowDeferral: false, repairWithSlice: true })
+  const providerError = (text: string) => deliver({ type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: text } } as { readonly type: string })
+  /** The session settles: the point by which every switch it started has been applied, held or refused. */
+  const settle = () => deliver({ type: "agent_settled" })
+  /** Resolves on the store's next `count` model_observed events for this session; subscribe before the switch. */
+  const observed = (count = 1) => new Promise<void>((resolve, reject) => {
+    let seen = 0
+    const timer = setTimeout(() => { stop(); reject(new Error(`saw ${seen} of ${count} model_observed events within 10 s`)) }, 10_000)
+    const stop = store.onEvent((event) => {
+      if (event.kind !== "model_observed" || event.session_durable_id !== durableId || ++seen < count) return
+      clearTimeout(timer)
+      stop()
+      resolve()
+    })
+  })
+  const bindMilestones = async () => {
+    const bound = await store.bind({ now: Date.now(), receipt: null, binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: `t-${durableId}`, root_message_id: null, progress_message_id: null, session_durable_id: durableId, direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["milestone", "completion"], policy_id: "default", ttl_seconds: null } })
+    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+    return bound.binding.binding_id
+  }
+  // Store operations run in order on its one worker, so a read issued after a step sees every write that step issued.
+  const rows = async (bindingId: string) => {
+    const page = await store.readOutbox({ now: Date.now(), binding_id: bindingId })
+    return page.kind === "ok" ? page.rows : []
+  }
+  const recorded = async () => (await store.sessionModels([durableId]))[durableId] ?? null
+  const record = (model: GatewayStoreModel) => store.recordSessionModel({ now: Date.now(), durable_id: durableId, model })
+  return { engine, admission, userSwitch, runtimeSwitch, providerError, settle, observed, bindMilestones, rows, recorded, record }
+}
+
+type GatewayStoreModel = Parameters<GatewayStore["recordSessionModel"]>[0]["model"]
 
 describe("#9425 runtime fallback is visible", () => {
   test("#given a gateway session with a set model and a milestone binding #when the engine falls back after a provider error #then ONE milestone row carries the switch and its reason, and the model reads fallback with the original setter kept", async () => {
-    const f = componentFixture()
-    await f.store.recordSessionModel({ now: Date.now(), durable_id: "dur-fb", model: { provider: "anthropic", id: "claude-opus-5-5", thinking_level: "high", provenance: "set", set_by: "config", reason: null } })
-    const bindingId = await f.bindMilestones("dur-fb")
-    await f.dispatch("message_end", "dur-fb", { message: { role: "assistant", content: [], stopReason: "error", errorMessage: "429 rate_limit_error: quota exhausted" } })
-    const landed = f.observed("dur-fb")
-    await f.dispatch("model_select", "dur-fb", { model: GPT_Y, previousModel: CLAUDE, source: "fallback" })
+    const f = engineFixture()
+    await f.record({ ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "config", reason: null })
+    const bindingId = await f.bindMilestones()
+    await f.providerError("429 rate_limit_error: quota exhausted")
+    const landed = f.observed()
+    await f.runtimeSwitch(GPT_Y_MODEL, "fallback")
+    await f.settle()
     await landed
     const written = await f.rows(bindingId)
-    expect(written.map((row) => ({ event: row.event, text: row.text, model_change: row.model_change }))).toEqual([
-      { event: "milestone", text: "switched to openai/gpt-y after a provider error on anthropic/claude-opus-5-5", model_change: { from: CLAUDE, to: GPT_Y, reason: "429 rate_limit_error: quota exhausted" } },
-    ])
-    expect(await f.modelOf("dur-fb")).toEqual({ provider: "openai", id: "gpt-y", thinking_level: "high", provenance: "fallback", set_by: "config", reason: "429 rate_limit_error: quota exhausted" })
+    expect(written.map((row) => ({ event: row.event, model_change: row.model_change }))).toEqual([{ event: "milestone", model_change: { from: CLAUDE, to: GPT_Y, reason: "429 rate_limit_error: quota exhausted" } }])
+    expect(written[0]?.text).toContain("openai/gpt-y")
+    expect(await f.recorded()).toEqual({ ...GPT_Y, thinking_level: "high", provenance: "fallback", set_by: "config", reason: "429 rate_limit_error: quota exhausted" })
   })
 
   test("#given a session on its fallback model #when the engine reverts to the chosen model #then the model reads its original provenance again and no second milestone is written", async () => {
-    const f = componentFixture()
-    await f.store.recordSessionModel({ now: Date.now(), durable_id: "dur-rv", model: { provider: "anthropic", id: "claude-opus-5-5", thinking_level: "high", provenance: "auto", set_by: null, reason: null } })
-    const bindingId = await f.bindMilestones("dur-rv")
-    const fell = f.observed("dur-rv")
-    await f.dispatch("model_select", "dur-rv", { model: GPT_Y, previousModel: CLAUDE, source: "fallback" })
-    await fell
-    const reverted = f.observed("dur-rv")
-    await f.dispatch("model_select", "dur-rv", { model: CLAUDE, previousModel: GPT_Y, source: "fallback-revert" })
-    await reverted
-    expect(await f.modelOf("dur-rv")).toEqual({ provider: "anthropic", id: "claude-opus-5-5", thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    const f = engineFixture()
+    await f.record({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    const bindingId = await f.bindMilestones()
+    const both = f.observed(2)
+    await f.runtimeSwitch(GPT_Y_MODEL, "fallback")
+    await f.runtimeSwitch(CLAUDE_MODEL, "fallback-revert")
+    await f.settle()
+    await both
+    expect(await f.recorded()).toEqual({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
     expect((await f.rows(bindingId)).map((row) => row.event)).toEqual(["milestone"])
   })
 
-  test("#given a gateway session #when the user switches with /model and later the session resumes #then the switch is set by the user and the resume's restore changes nothing", async () => {
-    const f = componentFixture()
-    await f.store.recordSessionModel({ now: Date.now(), durable_id: "dur-user", model: { provider: "anthropic", id: "claude-opus-5-5", thinking_level: "high", provenance: "auto", set_by: null, reason: null } })
-    const switched = f.observed("dur-user")
-    await f.dispatch("model_select", "dur-user", { model: GPT_Y, previousModel: CLAUDE, source: "set" })
-    await switched
-    await f.dispatch("model_select", "dur-user", { model: CLAUDE, previousModel: GPT_Y, source: "restore" })
-    expect(await f.modelOf("dur-user")).toEqual({ provider: "openai", id: "gpt-y", thinking_level: "high", provenance: "set", set_by: "user", reason: null })
+  test("#given a gateway session #when the user switches with /model #then the switch is set by the user at the level the engine applied for that model", async () => {
+    const f = engineFixture()
+    await f.record({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    const landed = f.observed()
+    await f.userSwitch(GPT_Y_MODEL)
+    await f.settle()
+    await landed
+    expect(f.engine.thinkingLevel).toBe("xhigh")
+    expect(await f.recorded()).toEqual({ ...GPT_Y, thinking_level: "xhigh", provenance: "set", set_by: "user", reason: null })
   })
 
-  test("#given a gateway set-model by the config #when the session's own model_select lands after the store write #then the setter stays config", async () => {
-    const f = componentFixture()
-    await f.store.recordSessionModel({ now: Date.now(), durable_id: "dur-cfg", model: { provider: "openai", id: "gpt-y", thinking_level: "high", provenance: "set", set_by: "config", reason: null } })
-    const landed = f.observed("dur-cfg")
-    await f.dispatch("model_select", "dur-cfg", { model: GPT_Y, previousModel: CLAUDE, source: "set" })
+  test("#given a gateway set-model by the config #when the session's own switch to that model lands #then the setter stays config", async () => {
+    const f = engineFixture()
+    await f.record({ ...GPT_Y, thinking_level: "high", provenance: "set", set_by: "config", reason: null })
+    const landed = f.observed()
+    await f.userSwitch(GPT_Y_MODEL)
+    await f.settle()
     await landed
-    expect(await f.modelOf("dur-cfg")).toMatchObject({ provenance: "set", set_by: "config" })
+    expect(await f.recorded()).toMatchObject({ ...GPT_Y, provenance: "set", set_by: "config" })
+  })
+})
+
+describe("#9425 a switch the engine does not apply leaves the record and the outbox alone", () => {
+  test("#given a fallback the engine refuses after the model_select hook #when the session settles #then the engine is still on the chosen model, the record still names it, and no milestone announces a switch", async () => {
+    const f = engineFixture()
+    const chosen: GatewayStoreModel = { ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "config", reason: null }
+    await f.record(chosen)
+    const bindingId = await f.bindMilestones()
+    await f.providerError("529 overloaded_error")
+    f.admission.refuse = true
+    await expect(f.runtimeSwitch(GPT_Y_MODEL, "fallback")).rejects.toThrow("does not fit")
+    await f.settle()
+    expect(f.engine.model).toMatchObject(CLAUDE)
+    expect(await f.recorded()).toEqual(chosen)
+    expect(await f.rows(bindingId)).toEqual([])
+  })
+
+  test("#given a /model switch the engine holds for compaction #when the session settles #then the record keeps the model and level the session still runs", async () => {
+    const f = engineFixture()
+    const before: GatewayStoreModel = { ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null }
+    await f.record(before)
+    f.admission.hold = true
+    await f.userSwitch(GPT_Y_MODEL)
+    await f.settle()
+    expect(f.engine.model).toMatchObject(CLAUDE)
+    expect(f.engine.thinkingLevel).toBe("high")
+    expect(await f.recorded()).toEqual(before)
+  })
+
+  test("#given a session on its fallback model #when the engine refuses the revert #then the record still reads the fallback it runs and the one milestone stays the only one", async () => {
+    const f = engineFixture()
+    await f.record({ ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "user", reason: null })
+    const bindingId = await f.bindMilestones()
+    await f.providerError("429 rate_limit_error")
+    const fell = f.observed()
+    await f.runtimeSwitch(GPT_Y_MODEL, "fallback")
+    await f.settle()
+    await fell
+    f.admission.refuse = true
+    await expect(f.runtimeSwitch(CLAUDE_MODEL, "fallback-revert")).rejects.toThrow("does not fit")
+    await f.settle()
+    expect(f.engine.model).toMatchObject(GPT_Y)
+    expect(await f.recorded()).toEqual({ ...GPT_Y, thinking_level: "high", provenance: "fallback", set_by: "user", reason: "429 rate_limit_error" })
+    expect((await f.rows(bindingId)).map((row) => row.event)).toEqual(["milestone"])
+  })
+
+  test("#given a refused fallback #when a later fallback is applied #then only the applied switch is recorded and announced", async () => {
+    const f = engineFixture()
+    await f.record({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    const bindingId = await f.bindMilestones()
+    f.admission.refuse = true
+    await expect(f.runtimeSwitch({ provider: "openai", id: "gpt-x" }, "fallback")).rejects.toThrow("does not fit")
+    f.admission.refuse = false
+    const landed = f.observed()
+    await f.runtimeSwitch(GPT_Y_MODEL, "fallback")
+    await f.settle()
+    await landed
+    expect((await f.rows(bindingId)).map((row) => row.model_change)).toEqual([{ from: CLAUDE, to: GPT_Y, reason: null }])
+    expect(await f.recorded()).toMatchObject({ ...GPT_Y, provenance: "fallback" })
   })
 })

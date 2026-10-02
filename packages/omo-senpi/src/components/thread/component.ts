@@ -134,6 +134,37 @@ function providerErrorOf(message: EngineMessage): string | undefined {
   return stopReason === "error" && typeof errorMessage === "string" && errorMessage.length > 0 ? errorMessage : undefined
 }
 
+type ModelSelect = NonNullable<ReturnType<typeof modelSelectOf>>
+
+/** The session-manager reads that show whether a switch landed (senpi `ReadonlySessionManager`). */
+type SessionEntryReader = { readonly getLeafId: () => string | null; readonly getEntry: (id: string) => { readonly type?: unknown; readonly parentId?: unknown; readonly provider?: unknown; readonly modelId?: unknown } | undefined }
+
+function entryReaderOf(eventCtx: unknown): SessionEntryReader | undefined {
+  const manager = (eventCtx as { readonly sessionManager?: Partial<SessionEntryReader> } | undefined)?.sessionManager
+  return typeof manager?.getLeafId === "function" && typeof manager.getEntry === "function" ? (manager as SessionEntryReader) : undefined
+}
+
+/**
+ * A switch the engine's `model_select` announced for a session, not yet known to have landed. `since` is
+ * the session leaf when the hook ran: the engine appends the switch's `model_change` entry after it only
+ * once every admission check accepted the candidate, and never for a switch it held or refused.
+ */
+type PendingSwitch = { readonly select: ModelSelect; readonly reason: string | null; readonly entries: SessionEntryReader; readonly since: string | null }
+
+/** How many entries a landed switch's `model_change` may sit above the hook's leaf; a switch appends a handful. */
+const SWITCH_ENTRY_WALK_LIMIT = 256
+
+function switchLanded(pending: PendingSwitch): boolean {
+  let id = pending.entries.getLeafId()
+  for (let step = 0; id !== null && id !== pending.since && step < SWITCH_ENTRY_WALK_LIMIT; step++) {
+    const entry = pending.entries.getEntry(id)
+    if (entry === undefined) return false
+    if (entry.type === "model_change" && entry.provider === pending.select.to.provider && entry.modelId === pending.select.to.id) return true
+    id = typeof entry.parentId === "string" ? entry.parentId : null
+  }
+  return false
+}
+
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
   const id = typeof manager?.getSessionId === "function" ? manager.getSessionId() : undefined
@@ -259,8 +290,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) void pickUpArms(durableId)
       })
-      pi.on("agent_start", () => {
+      pi.on("agent_start", async (_event, eventCtx) => {
         run.turn++
+        await settleQuiescent(eventCtx)
       })
       pi.on("message_start", (event) => {
         const message = messageOf(event)
@@ -274,33 +306,76 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         lastProviderError = providerErrorOf(message)
       })
       // #9425: the record of a session the gateway created or re-modelled follows the engine's own
-      // switches, and a fallback switch is written as a milestone to the session's bindings. Only a store
-      // that already exists is touched, and the switch waits for the write at most the settle bound.
+      // switches, and a fallback switch is written as a milestone to the session's bindings. senpi's
+      // `model_select` is an admission hook, not a committed switch: after it the engine can still hold
+      // the switch (context budget) or refuse it and restore the previous model and level. So the hook
+      // only notes the candidate, and the record and the milestone are written once the session holds the
+      // switch's `model_change` entry - right after the switch when it lands, and at the latest at the
+      // session's next quiescent point (the next switch, a run start, a provider request, the settle,
+      // shutdown), where a candidate without one is dropped. A thinking level is recorded at a quiescent
+      // point, read from the engine then, because a switch changes it before its admission is decided.
+      // Only a store that already exists is touched, and a write is waited for at most the settle bound.
+      const pendingSwitches = new Map<string, PendingSwitch>()
+      const thinkingChanged = new Set<string>()
+      const currentThinking = (): string | null => {
+        const level = (pi as { readonly getThinkingLevel?: () => unknown }).getThinkingLevel?.()
+        return typeof level === "string" ? level : null
+      }
+      const warnUnrecorded = (what: string) => (error: unknown) => ctx.logger.warn(`thread gateway: ${what} was not recorded: ${error instanceof Error ? error.message : String(error)}`)
+      /**
+       * `probe`: just after the switch, which may still be under admission - a landed switch is written, an
+       * undecided one waits. `superseded`: the next switch began, so this one is decided; the engine's level
+       * belongs to the new candidate by then and is recorded later. `quiescent`: no switch is in flight.
+       */
+      const settleSwitch = async (durableId: string, mode: "probe" | "superseded" | "quiescent"): Promise<void> => {
+        const writes: Promise<void>[] = []
+        const pending = pendingSwitches.get(durableId)
+        if (pending !== undefined) {
+          const landed = switchLanded(pending)
+          if (landed || mode !== "probe") pendingSwitches.delete(durableId)
+          if (landed) {
+            const thinking = mode === "superseded" ? null : currentThinking()
+            if (thinking !== null) thinkingChanged.delete(durableId)
+            const { select } = pending
+            writes.push(store.observeModelSelect({ now: store.now(), durable_id: durableId, ...select, thinking_level: thinking, reason: pending.reason }).then(() => undefined, warnUnrecorded(`the model switch to ${select.to.provider}/${select.to.id}`)))
+          }
+        }
+        if (mode === "quiescent" && !pendingSwitches.has(durableId) && thinkingChanged.delete(durableId)) {
+          const level = currentThinking()
+          if (level !== null) writes.push(store.updateSessionThinking({ now: store.now(), durable_id: durableId, thinking_level: level }).then(() => undefined, warnUnrecorded(`the thinking level ${level}`)))
+        }
+        if (writes.length > 0) await waitAtMost(Promise.all(writes).then(() => undefined), COMPLETION_SETTLE_WAIT_MS)
+      }
+      const settleQuiescent = async (eventCtx: unknown): Promise<void> => {
+        const durableId = durableIdOf(eventCtx)
+        if (durableId !== undefined && (pendingSwitches.has(durableId) || thinkingChanged.has(durableId))) await settleSwitch(durableId, "quiescent")
+      }
       pi.on("model_select", async (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         const select = modelSelectOf(event)
         if (durableId === undefined || select === undefined || select.source === "restore" || !existsSync(gatewayDatabasePath(agentDir()))) return
-        const thinking = (pi as { readonly getThinkingLevel?: () => unknown }).getThinkingLevel?.()
-        const written = store.observeModelSelect({
-          now: store.now(),
-          durable_id: durableId,
-          ...select,
-          thinking_level: typeof thinking === "string" ? thinking : null,
-          reason: select.source === "fallback" ? (lastProviderError ?? null) : null,
-        }).then(() => undefined, (error: unknown) => ctx.logger.warn(`thread gateway: the model switch to ${select.to.provider}/${select.to.id} was not recorded: ${error instanceof Error ? error.message : String(error)}`))
-        await waitAtMost(written, COMPLETION_SETTLE_WAIT_MS)
+        await settleSwitch(durableId, "superseded")
+        const entries = entryReaderOf(eventCtx)
+        if (entries === undefined) return
+        thinkingChanged.add(durableId)
+        pendingSwitches.set(durableId, { select, reason: select.source === "fallback" ? (lastProviderError ?? null) : null, entries, since: entries.getLeafId() })
+        // The engine finishes admitting the switch synchronously once the model_select handlers return.
+        setImmediate(() => void settleSwitch(durableId, "probe"))
       })
-      pi.on("thinking_level_select", (event, eventCtx) => {
+      pi.on("thinking_level_select", (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
-        const level = (event as { readonly level?: unknown } | undefined)?.level
-        if (durableId === undefined || typeof level !== "string" || !existsSync(gatewayDatabasePath(agentDir()))) return
-        void store.updateSessionThinking({ now: store.now(), durable_id: durableId, thinking_level: level }).catch((error: unknown) => ctx.logger.warn(`thread gateway: the thinking level ${level} was not recorded: ${error instanceof Error ? error.message : String(error)}`))
+        if (durableId === undefined || !existsSync(gatewayDatabasePath(agentDir()))) return
+        thinkingChanged.add(durableId)
+      })
+      pi.on("before_provider_request", async (_event, eventCtx) => {
+        await settleQuiescent(eventCtx)
       })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) completions.agentEnd(durableId, event as AgentEndFacts)
       })
       pi.on("agent_settled", async (_event, eventCtx) => {
+        await settleQuiescent(eventCtx)
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
         run.consumed = []
@@ -310,7 +385,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)
       })
-      pi.on("session_shutdown", async () => {
+      pi.on("session_shutdown", async (_event, eventCtx) => {
+        await settleQuiescent(eventCtx)
         completions.dispose()
         tools.dispose()
         await registrant?.stop().catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`))
