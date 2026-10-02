@@ -247,7 +247,7 @@ describe("live thread request correlation", () => {
       async (surface, frames) => {
         expect(await surface.availableModels?.()).toEqual([{ provider: "anthropic", id: "claude-opus-5-5" }])
         expect(frames.map((f) => f.type)).toEqual(["list_sessions", "open_session", "get_available_models", "close_session"])
-        expect(frames[1]).toMatchObject({ kind: "worker", retain_on_disconnect: true })
+        expect(frames[1]).toMatchObject({ kind: "worker", retain_on_disconnect: true, context: { omo_probe: "model_catalog" } })
         expect(frames[3]).toMatchObject({ sessionId: "rpc-9" })
       },
     )

@@ -162,6 +162,21 @@ describe("createOnboardingComponent", () => {
     expect(mock.appendEntry).not.toHaveBeenCalled()
   })
 
+  test("#given the hidden model-catalog probe session, even with force #when startup fires #then onboarding is neither claimed nor injected", async () => {
+    // given: the label `omo thread` opens its catalog probe with, as senpi exposes it to the session's extensions
+    const { pi, mock } = createHarness()
+    Object.assign(pi, { sessionContext: { omo_probe: "model_catalog", host_instance: "host-1" } })
+    pi.setFlag("onboard", true)
+
+    // when
+    await dispatchSessionStart(pi, "startup")
+
+    // then
+    expect(mock.claimOnboarding).not.toHaveBeenCalled()
+    expect(mock.sendMessage).not.toHaveBeenCalled()
+    expect(mock.appendEntry).not.toHaveBeenCalled()
+  })
+
   test("#given an existing marker without force #when startup fires #then claim blocks onboarding injection", async () => {
     // given
     const { pi, mock } = createHarness(false)
