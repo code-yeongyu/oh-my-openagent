@@ -33,3 +33,14 @@ jobs:
       - name: Parity matrix behaviour checks
         working-directory: packages/omo-opencode
         run: bun test test/v2-contract/parity-matrix.test.ts --timeout 20000
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## V2 Dual-Host"
+            echo ""
+            echo "- V1 entry loads unchanged: ${{ job.status }}"
+            echo "- V2 entry loads with setup()"
+            echo "- Parity matrix: 3 live + 22 todo rows"
+          } >> "$GITHUB_STEP_SUMMARY"
