@@ -328,8 +328,7 @@ export async function discardUnstartedChildSession(session: ChildSession): Promi
 // shutdown budget, so a hung handler cannot hold teardown, and dispose() runs either way.
 async function shutDownChildSession(session: ChildSession): Promise<void> {
   try {
-    const runner = session.extensionRunner
-    if (runner?.hasHandlers("session_shutdown") === true) await runner.emit({ type: "session_shutdown", reason: "quit" })
+    // PROBE ONLY (never merged): the fix's session_shutdown emit is removed to prove AC1/AC3 can fail.
   } finally {
     session.dispose()
   }
