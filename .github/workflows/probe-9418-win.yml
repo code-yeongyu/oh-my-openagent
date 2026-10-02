@@ -1,0 +1,23 @@
+name: probe-9418-win
+on:
+  pull_request:
+    branches: [dev]
+jobs:
+  diag:
+    if: github.head_ref == 'probe/9418-red-without-shutdown'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      - name: facts
+        run: bun test --timeout 150000 packages/senpi-task/src/runners/in-process/win-diag.test.ts
+      - name: the #9413 tests (expected red: the fix's emit is removed on this branch)
+        continue-on-error: true
+        run: bun test --timeout 150000 packages/senpi-task/src/runners/in-process/child-shutdown.integration.test.ts
