@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createThreadComponent } from "./component"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { createEngineSession, engineHost, type EngineModel as HarnessModel } from "./gateway/testing/engine-session"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
@@ -559,5 +560,42 @@ describe("#9425 a switch the engine does not apply leaves the record and the out
     await landed
     expect((await f.rows(bindingId)).map((row) => row.model_change)).toEqual([{ from: CLAUDE, to: GPT_Y, reason: null }])
     expect(await f.recorded()).toMatchObject({ ...GPT_Y, provenance: "fallback" })
+  })
+})
+
+/**
+ * Review 5394047653, the SDK side of the same root cause: senpi answers `set_model` with success for a switch
+ * it only holds for a compaction, and refuses one whose context the model cannot hold. The session runs the
+ * pinned engine's own `setModel` (`gateway/testing/engine-session.ts`) behind a host that answers like
+ * senpi's rpc host and the live surface.
+ */
+describe("#9425 set-model records only the model the engine runs", () => {
+  const MODELS: readonly HarnessModel[] = [{ provider: "openai", id: "primary", levels: "xhigh" }, { provider: "openai", id: "candidate", levels: "xhigh" }]
+  function engineSdk() {
+    const agentDir = scratch("thread-9429-setmodel-")
+    const store = createGatewayStore({ agentDir })
+    const engine = createEngineSession({ models: MODELS, initial: "primary", thinkingLevel: "high", handlers: () => new Map() })
+    const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: engineHost(MODELS, [engine]), store, modelProfile: () => ({ model_profile: "recommended" }) })
+    disposables.push(sdk)
+    const record = () => store.recordSessionModel({ now: Date.now(), durable_id: engine.durableId, model: { provider: "openai", id: "primary", thinking_level: "high", provenance: "set", set_by: "config", reason: null } })
+    return { engine, sdk, record }
+  }
+
+  test("#given a switch the engine holds for a compaction #when set-model runs #then it answers held and models keeps naming the model in force", async () => {
+    const { engine, sdk, record } = engineSdk()
+    await record()
+    engine.verdicts.hold.add("candidate")
+    expect(await sdk.setModel({ thread: "lane-1", model: "candidate", set_by: "lead" })).toMatchObject({ kind: "ok", held: true, model: { id: "candidate", set_by: "lead" } })
+    expect(engine.session.model?.id).toBe("primary")
+    expect(await sdk.models({ thread: "lane-1" })).toMatchObject({ kind: "ok", current: { id: "primary", set_by: "config" } })
+  })
+
+  test("#given a switch the engine refuses after its model_select hook #when set-model runs #then it is unsupported with the engine's reason and nothing changes", async () => {
+    const { engine, sdk, record } = engineSdk()
+    await record()
+    engine.verdicts.refuse.add("candidate")
+    expect(await sdk.setModel({ thread: "lane-1", model: "candidate" })).toMatchObject({ kind: "error", error: { code: "unsupported", details: { model: "openai/candidate", reason: expect.stringContaining("does not fit candidate") } } })
+    expect(engine.session.model?.id).toBe("primary")
+    expect(await sdk.models({ thread: "lane-1" })).toMatchObject({ kind: "ok", current: { id: "primary", set_by: "config" } })
   })
 })

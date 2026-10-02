@@ -76,25 +76,13 @@ export function createEngineSession(options: { readonly models: readonly EngineM
       if (verdicts.refuse.has(model.id) && hooked.delete(model.id)) throw new Error(`the session's context does not fit ${model.id}`)
     },
   })
-  const fallbackOptions = (reason: "fallback" | "fallback-revert") => ({ persistDefault: false, appendSessionEntry: true, entryReason: reason, emitModelSelect: true, modelSelectSource: reason, invalidateCompaction: true, allowDeferral: false, repairWithSlice: false })
   return {
     session,
     ctx,
     durableId: sessionManager.getSessionId(),
     verdicts,
     find,
-    catalog: (): ModelCatalogEntry[] => models.map((model) => ({ provider: model.provider, id: model.id, name: model.name, thinking_levels: session.getAvailableThinkingLevels.call({ model }) })),
-    /** The retry controller's `switchModel` (agent-session.js): a fallback or its revert. */
-    fallback: async (id: string, reason: "fallback" | "fallback-revert" = "fallback") => {
-      const model = models.find((candidate) => candidate.id === id)
-      if (model === undefined) throw new Error(`no model ${id}`)
-      await (session as unknown as { _switchActiveModel: (model: unknown, opts: unknown) => Promise<unknown> })._switchActiveModel(model, fallbackOptions(reason))
-    },
-    /** A resume re-applying the persisted model. */
-    restore: async (id: string) => {
-      const model = models.find((candidate) => candidate.id === id)
-      await (session as unknown as { _switchActiveModel: (model: unknown, opts: unknown) => Promise<unknown> })._switchActiveModel(model, { persistDefault: false, appendSessionEntry: false, emitModelSelect: true, modelSelectSource: "restore", invalidateCompaction: false })
-    },
+    catalog: (): ModelCatalogEntry[] => models.map((model) => ({ provider: model.provider, id: model.id, name: model.name, thinking_levels: session.getAvailableThinkingLevels.call({ model }) }))
   }
 }
 
