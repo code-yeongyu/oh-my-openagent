@@ -2,7 +2,7 @@ import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot, getOmoNativeStateDir } from "../telemetry/product-identity"
-import { isCatalogProbeSession } from "../thread/catalog-probe"
+import { isCatalogProbeSession, isThreadCreatedSession } from "../thread/catalog-probe"
 import { claimOnboarding } from "./state"
 
 export interface OnboardingComponentDependencies {
@@ -53,7 +53,8 @@ export function createOnboardingComponent(
         if (!eventCtx.hasUI) return
         // The hidden session `omo thread` opens only to read the model catalog is never talked to:
         // a turn there would spend a model call nobody sees and the marker the user's first session is owed.
-        if (isCatalogProbeSession(pi)) return
+        // A session `omo thread create` opens is the same: its first turn is the creator's message.
+        if (isCatalogProbeSession(pi) || isThreadCreatedSession(pi)) return
         if (pi.getFlag("omo-senpi-onboarding-disabled") === true) return
         const force = pi.getFlag("onboard") === true
         if (force && onboardConsumed) return

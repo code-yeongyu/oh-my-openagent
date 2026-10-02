@@ -200,7 +200,7 @@ describe("live thread request correlation", () => {
         // This client is one-shot: the connection that opens a session drops immediately. Without
         // retain_on_disconnect the host closes that session at once and every later call is
         // session_closing, so a created thread would never be usable.
-        expect(frames[0]).toMatchObject({ type: "open_session", retain_on_disconnect: true })
+        expect(frames[0]).toMatchObject({ type: "open_session", retain_on_disconnect: true, context: { omo_origin: "thread_create" } })
       },
     )
   })

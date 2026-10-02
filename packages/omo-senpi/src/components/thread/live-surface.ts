@@ -9,7 +9,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worker/senpi-command"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
-import { CATALOG_PROBE_CONTEXT } from "./catalog-probe"
+import { CATALOG_PROBE_CONTEXT, THREAD_CREATE_CONTEXT } from "./catalog-probe"
 import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
 import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
@@ -432,7 +432,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...(params as Record<string, unknown>), retain_on_disconnect: true })
+      // `THREAD_CREATE_CONTEXT` keeps onboarding out of it: its first turn is the creator's message.
+      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...(params as Record<string, unknown>), retain_on_disconnect: true, context: { ...THREAD_CREATE_CONTEXT } })
       const routingId = result.sessionId
       const name = (params as { readonly name?: string }).name
       if (name !== undefined && name.trim() !== "") await call("set_session_name", { sessionId: routingId, name })

@@ -6,9 +6,24 @@
  */
 export const CATALOG_PROBE_CONTEXT = { omo_probe: "model_catalog" } as const
 
-export function isCatalogProbeSession(pi: unknown): boolean {
-  if (typeof pi !== "object" || pi === null) return false
+/**
+ * #9425: the `open_session` context label of a session `thread_create` / `omo thread create` opens.
+ * Its first turn belongs to the creator's message and nobody sits at a terminal for it, so the same
+ * startup work skips it: an onboarding turn there would greet no one and race the creator's send.
+ */
+export const THREAD_CREATE_CONTEXT = { omo_origin: "thread_create" } as const
+
+function sessionLabel(pi: unknown, key: string): unknown {
+  if (typeof pi !== "object" || pi === null) return undefined
   const context = (pi as { readonly sessionContext?: unknown }).sessionContext
-  if (typeof context !== "object" || context === null) return false
-  return (context as { readonly omo_probe?: unknown }).omo_probe === CATALOG_PROBE_CONTEXT.omo_probe
+  if (typeof context !== "object" || context === null) return undefined
+  return (context as Readonly<Record<string, unknown>>)[key]
+}
+
+export function isCatalogProbeSession(pi: unknown): boolean {
+  return sessionLabel(pi, "omo_probe") === CATALOG_PROBE_CONTEXT.omo_probe
+}
+
+export function isThreadCreatedSession(pi: unknown): boolean {
+  return sessionLabel(pi, "omo_origin") === THREAD_CREATE_CONTEXT.omo_origin
 }

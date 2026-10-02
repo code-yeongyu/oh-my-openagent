@@ -94,9 +94,10 @@ provider (`model_not_found` when it serves no connected model); an empty `--prov
 refused is refused before a session opens: `model_not_found` (`details.available`, the first 20
 `provider/id`; empty when no provider is connected), `model_ambiguous` (`details.candidates`, up
 to 10), `thinking_level_unsupported` (`details.supported`), `invalid_arguments` (an empty model, a
-bad `--set-by`, `--set-by` without `--model`), and `unsupported` for a non-empty `--provider`, `--model`
-or `--thinking` on a host that cannot list a new session's models. That `unsupported` is a gateway
+bad `--set-by`, `--set-by` without `--model`), and `unsupported` for any `--model` or `--thinking`, or a
+non-empty `--provider`, on a host that cannot list a new session's models. That `unsupported` is a gateway
 refusal (exit 1), not the CLI's own exit-4 `unsupported`. `--set-by` defaults to `user` when a model is given.
+A created session runs no first-run onboarding turn: its first turn is the creator's message.
 
 `models` lists what a new session could run (no thread), or what the thread's live session can
 switch to, with `current` its record: `{kind:"ok", thread_id|null, current: model|null, available:

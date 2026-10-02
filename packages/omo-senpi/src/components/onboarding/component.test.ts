@@ -191,6 +191,20 @@ describe("createOnboardingComponent", () => {
     expect(mock.appendEntry).not.toHaveBeenCalled()
   })
 
+  test("#given a session thread_create opened on a first run #when startup fires #then the once-per-install marker is not claimed and nothing is injected", async () => {
+    // given: the label `thread_create` / `omo thread create` opens a session with; the creator's message is its first turn
+    const { pi, mock } = createHarness()
+    Object.assign(pi, { sessionContext: { omo_origin: "thread_create", host_instance: "host-1" } })
+
+    // when
+    await dispatchSessionStart(pi, "startup")
+
+    // then
+    expect(mock.claimOnboarding).not.toHaveBeenCalled()
+    expect(mock.sendMessage).not.toHaveBeenCalled()
+    expect(mock.appendEntry).not.toHaveBeenCalled()
+  })
+
   test("#given an existing marker without force #when startup fires #then claim blocks onboarding injection", async () => {
     // given
     const { pi, mock } = createHarness(false)
