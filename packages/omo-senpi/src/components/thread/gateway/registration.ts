@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import {
   toSessionControlDrainResult,
   type AdmitExternalMessageInput,
@@ -134,6 +135,7 @@ function drainEvent(event: SenpiWakeEvent): DrainWakeEvent {
 
 type Active = {
   readonly durableId: string
+  readonly incarnation: string
   readonly drain: InboxDrain
   readonly retire: () => void
   readonly dispose: () => Promise<void>
@@ -170,6 +172,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       await current.dispose()
     } finally {
       current.retire()
+      await store?.clearEndpoint({ durable_id: current.durableId, incarnation: current.incarnation })
     }
   }
 
@@ -232,8 +235,12 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       if (reply.status === "failed") log(`thread gateway: the control endpoint for ${session.durableId} failed to register: ${reply.reason}`)
       return reply
     }
+    const incarnation = randomUUID()
     try {
-      await store.registerIncarnation({ durable_id: session.durableId, incarnation: (await store.identity()).instance_id })
+      await store.registerIncarnation({
+        durable_id: session.durableId, incarnation,
+        endpoint: { socket: reply.socket, kind: options.runtimeInstance === undefined ? "tui" : "rpc_host" },
+      })
     } catch (error) {
       retire()
       recorded(false)
@@ -243,7 +250,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       return { status: "failed", reason }
     }
     recorded(true)
-    active = { durableId: session.durableId, drain, retire, dispose: reply.dispose }
+    active = { durableId: session.durableId, incarnation, drain, retire, dispose: reply.dispose }
     return { status: "registered", socket: reply.socket }
   }
 

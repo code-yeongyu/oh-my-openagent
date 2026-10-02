@@ -383,16 +383,7 @@ export async function bindingView(ctx: StoreContext, request: { readonly now: nu
   })
 }
 
-/** Records which runtime holds a session now; a reply token minted under an earlier incarnation goes stale. */
-export async function registerIncarnation(ctx: StoreContext, request: { readonly durable_id: string; readonly incarnation: string }): Promise<void> {
-  await transaction(ctx, "register_incarnation", () => {
-    write(
-      ctx,
-      "INSERT INTO session_meta (durable_id, next_seq, incarnation) VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM deliveries WHERE target_durable_id = ?), ?) ON CONFLICT(durable_id) DO UPDATE SET incarnation = excluded.incarnation",
-      [request.durable_id, request.durable_id, request.incarnation],
-    )
-  })
-}
+export { registerIncarnation } from "./store-ownership"
 
 function incarnationOf(ctx: StoreContext, durableId: string): string | null {
   return nullableString(ctx.sql.one(["incarnation"], "SELECT incarnation FROM session_meta WHERE durable_id = ?", [durableId])?.incarnation)

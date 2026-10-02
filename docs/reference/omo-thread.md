@@ -11,6 +11,16 @@ It never starts a host. Sessions are listed from what the engine enumerates
 and bindingless sends are keyed by it, and a delivered message carries the provenance header
 `source=external`, `actor=<os user>`.
 
+Exact durable-id sends read the gateway's `session_meta` ownership record rather than running
+`host status --all`. Migration v5 adds nullable `endpoint_socket` and `endpoint_kind` (`tui` or
+`rpc_host`) beside `incarnation`. A successful control registration publishes all three in one
+transaction. Re-registration replaces them with a fresh incarnation; release clears the endpoint
+only when its own incarnation still matches, so a late old owner cannot erase a takeover.
+The sender validates durable identity and workspace from a fresh `list_sessions` on only that
+socket, under a bounded 200 ms request. A stale socket, different live identity, or cleared endpoint
+uses the existing durable queued-offline path. A target with no metadata row keeps legacy discovery.
+Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or setting changes.
+
 ```bash
 omo thread list [--all-scope] [--json]
 omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--json]

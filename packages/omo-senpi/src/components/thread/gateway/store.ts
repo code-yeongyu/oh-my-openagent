@@ -18,6 +18,7 @@ import type {
   ToolReceiptBegin,
 } from "./store-relay-ops"
 import type { DeliveryReceipt } from "./store-ops"
+import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
   ClaimOutcome,
   ClaimRequest,
@@ -100,7 +101,9 @@ export type GatewayStore = {
   readonly rebind: (request: CasRequest & { readonly session_durable_id: string }) => Promise<RelayOutcome<{ readonly binding: BindingRecord; readonly closed: readonly string[] } & Deduplicated>>
   readonly listBindings: (request: { readonly now: number; readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number }) => Promise<RelayOutcome<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
   readonly bindingView: (request: { readonly now: number; readonly binding_id: string }) => Promise<BindingRecord | null>
-  readonly registerIncarnation: (request: { readonly durable_id: string; readonly incarnation: string }) => Promise<void>
+  readonly registerIncarnation: (request: RegisterIncarnationRequest) => Promise<void>
+  readonly clearEndpoint: (request: ClearEndpointRequest) => Promise<void>
+  readonly sessionOwner: (durableId: string) => Promise<SessionOwner | null>
   readonly report: (request: ReportOpRequest) => Promise<RelayOutcome<ReportOpResult & Deduplicated>>
   readonly emitCompletions: (request: { readonly now: number; readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Completion arms waiting for the session's settle; a plain read that takes no write lock. */
@@ -250,6 +253,8 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     listBindings: (request) => call("list_bindings", request),
     bindingView: (request) => call("binding_view", request),
     registerIncarnation: (request) => call("register_incarnation", request),
+    clearEndpoint: (request) => call("clear_endpoint", request),
+    sessionOwner: (durableId) => call("session_owner", durableId),
     report: (request) => call("report", request),
     emitCompletions: (request) => call("emit_completions", request),
     pendingCompletionArms: (durableId) => call("pending_completion_arms", durableId),

@@ -14,6 +14,7 @@ import { processStartTime } from "./process-identity"
 import { isBusyError, Sql, type SqliteConnection } from "./sql"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
+import * as ownership from "./store-ownership"
 import type { GatewayStoreConfig, GatewayStoreEvent } from "./types"
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
@@ -106,7 +107,9 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "rebind": return await relay.rebindThread(ctx, args as Parameters<typeof relay.rebindThread>[1])
     case "list_bindings": return await relay.listBindings(ctx, args as Parameters<typeof relay.listBindings>[1])
     case "binding_view": return await relay.bindingView(ctx, args as Parameters<typeof relay.bindingView>[1])
-    case "register_incarnation": return await relay.registerIncarnation(ctx, args as Parameters<typeof relay.registerIncarnation>[1])
+    case "register_incarnation": return await ownership.registerIncarnation(ctx, args as Parameters<typeof ownership.registerIncarnation>[1])
+    case "clear_endpoint": return await ownership.clearEndpoint(ctx, args as Parameters<typeof ownership.clearEndpoint>[1])
+    case "session_owner": return ownership.sessionOwner(ctx, args as string)
     case "report": return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
     case "emit_completions": return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
     case "pending_completion_arms": return relay.pendingCompletionArms(ctx, args as string)

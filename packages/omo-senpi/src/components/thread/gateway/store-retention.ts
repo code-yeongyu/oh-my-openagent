@@ -93,7 +93,8 @@ export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RE
   const sessionMeta = write(
     ctx,
     `DELETE FROM session_meta WHERE durable_id IN (SELECT m.durable_id FROM session_meta m WHERE
-      NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.target_durable_id = m.durable_id)
+      m.incarnation IS NULL
+      AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.target_durable_id = m.durable_id)
       AND NOT EXISTS (SELECT 1 FROM bindings b WHERE b.session_durable_id = m.durable_id)
       AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.session_durable_id = m.durable_id)
       AND NOT EXISTS (SELECT 1 FROM completion_arms a WHERE a.session_durable_id = m.durable_id) LIMIT ?)`,
