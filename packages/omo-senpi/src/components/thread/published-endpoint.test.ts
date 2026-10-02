@@ -1,5 +1,16 @@
 import { afterEach, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { publishedWorld } from "./published-endpoint-fixture"
+
+/** A listener process killed with SIGKILL never unlinks its socket file: connects to it are refused. */
+async function leaveStaleSocket(socketPath: string) {
+  const child = Bun.spawn([process.execPath, "-e", `require("node:net").createServer(() => {}).listen(${JSON.stringify(socketPath)}, () => console.log("up"))`], { stdout: "pipe" })
+  const reader = child.stdout.getReader()
+  await reader.read()
+  reader.releaseLock()
+  child.kill("SIGKILL")
+  await child.exited
+}
 
 const worlds: Array<Awaited<ReturnType<typeof publishedWorld>>> = []
 afterEach(async () => { for (const world of worlds.splice(0)) await world.close() })
@@ -50,6 +61,19 @@ test("dead published socket queues offline after the close event without discove
   const result = await w.send()
   expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
   expect(target.runtime.listAdmittedDeliveries().pending).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+}, 10000)
+
+test("owner killed uncleanly leaves its socket file and the send queues offline after a refused connect without discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  await target.crash()
+  await leaveStaleSocket(target.socketPath)
+  expect(existsSync(target.socketPath)).toBe(true)
+  expect((await w.store.sessionOwner("target"))?.endpoint?.socket).toBe(target.socketPath)
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(0)
   expect(w.discovery()).toBe(0)
 }, 10000)
 
