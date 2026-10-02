@@ -23,19 +23,18 @@ if (scenario === "ac1") {
     createSession: async (options): Promise<ChildSession> => {
       const session = await openBoundSession(options)
       bridges = listening()
-      return {
-        sessionId: session.sessionId,
-        extensionRunner: session.extensionRunner,
-        prompt: (text) => session.prompt(text),
-        steer: (text) => session.steer(text),
-        followUp: (text) => session.followUp(text),
-        abort: () => session.abort(),
-        subscribe: () => {
-          throw new Error("handle construction failed")
+      // The real session with only handle construction made to fail: every other member is bound to it.
+      return new Proxy(session, {
+        get(target, property) {
+          if (property === "subscribe") {
+            return () => {
+              throw new Error("handle construction failed")
+            }
+          }
+          const value: unknown = Reflect.get(target, property, target)
+          return typeof value === "function" ? value.bind(target) : value
         },
-        getLastAssistantText: () => session.getLastAssistantText(),
-        dispose: () => session.dispose(),
-      }
+      })
     },
   })
   startError = await runner.start(machine.spec("ac3-child", "succeeds")).then(
