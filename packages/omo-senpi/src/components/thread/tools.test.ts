@@ -91,6 +91,27 @@ describe("thread tool registration", () => {
     const result = await list[2].execute("call-1", { thread: "missing" }, undefined, undefined, {} as never)
     expect((result.details as { result: { kind: string; error?: { code: string } } }).result).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
+
+  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then each read returns the next slice until the end", async () => {
+    // given
+    const f = fixture()
+    const transcript = Array.from({ length: 12 }, (_, index) => ({ role: "assistant", content: `m${index}:${"x".repeat(200)}` }))
+    const run = runner({ ...f, host: { ...f.host, getMessages: async () => transcript } })
+
+    // when
+    const pages: Array<{ contents: string[]; next_cursor?: string }> = []
+    let cursor: string | undefined
+    do {
+      const page = await run("thread_read", { thread: "dur-peer", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) }, undefined, `read-${pages.length}`) as Extract<ThreadToolResult, { kind: "ok"; items: unknown }>
+      expect(page).toMatchObject({ kind: "ok" })
+      cursor = (page as { next_cursor?: string }).next_cursor
+      pages.push({ contents: (page.items as ReadonlyArray<{ content: string }>).map((item) => item.content), ...(cursor === undefined ? {} : { next_cursor: cursor }) })
+    } while (cursor !== undefined && pages.length < 20)
+
+    // then
+    expect(pages.length).toBeGreaterThan(1)
+    expect(pages.flatMap((page) => page.contents)).toEqual(transcript.map((message) => JSON.stringify(message.content)))
+  })
 })
 
 describe("thread session controls", () => {
