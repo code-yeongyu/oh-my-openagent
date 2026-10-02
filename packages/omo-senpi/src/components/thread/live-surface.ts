@@ -263,6 +263,17 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   const kinds = new Map<string, EndpointKind>()
 
   const kindOf = (socket: string): EndpointKind => kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
+  // One listing budget per kind for every caller - discovery, the published send path and the
+  // liveness probe - so an owner one path takes as live is never judged offline by another.
+  const listBudget = (kind: EndpointKind): number => (kind === "tui" ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS)
+  // A listing that timed out reached a live process that is busy or stopped; a refused connect or a
+  // missing socket reached nothing. Only the latter is dead.
+  const listingFailure = (endpoint: { readonly socket: string; readonly kind: EndpointKind }, error: unknown): "live_unresponsive" | "dead" | null => {
+    if (endpoint.kind === "tui" && !exists(endpoint.socket)) return "dead"
+    if (error instanceof Error && error.message === "thread RPC request timed out") return "live_unresponsive"
+    if (error instanceof Error && error.message.startsWith("host_unavailable:")) return "dead"
+    return isConnectRefusal(error) ? "dead" : null
+  }
 
   const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number): Promise<RpcFrame> => {
     const tui = kindOf(socket) === "tui"
@@ -323,7 +334,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     // suspended or remote terminal is reported, never dialed again, reaped or reopened elsewhere.
     if (tui && endpoint.verdict.alive === false) return degraded(endpoint, new Error(endpoint.verdict.reason ?? "live_unresponsive"), endpoint.verdict.reason ?? "live_unresponsive")
     try {
-      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS)
+      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, listBudget(endpoint.kind))
       const tagged = sessions.map((session) => ({
         ...session,
         socket: endpoint.socket,
@@ -335,8 +346,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     } catch (error) {
       // A terminal removes its socket when it exits, so a registered terminal whose socket is gone has ended.
       if (tui && !exists(endpoint.socket)) return degraded(endpoint, new Error("dead"), "dead")
-      const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
-      return degraded(endpoint, error, endpoint.verdict.reason ?? (timedOut ? "live_unresponsive" : isConnectRefusal(error) ? "dead" : null))
+      return degraded(endpoint, error, endpoint.verdict.reason ?? listingFailure(endpoint, error))
     }
   }
 
@@ -372,7 +382,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     if (known?.verdict.alive === true) return "routable"
     if (known?.verdict.reason === "live_unresponsive" || known?.verdict.reason === "dead") return known.verdict.reason
     try {
-      await callOn(endpoint.socket, "get_protocol_info", {}, endpoint.kind === "tui" ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS)
+      await callOn(endpoint.socket, "get_protocol_info", {}, listBudget(endpoint.kind))
       return "routable"
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("host_unavailable:")) return "dead"
@@ -407,15 +417,18 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     listTarget: async (durableId, endpoint) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
       try {
-        // A live owner gets the bound a terminal listing gets in discovery: nothing else is tried after
-        // this call, so a shorter one reports a busy owner offline (and refuses its steers).
-        const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", endpoint.kind === "tui" ? {} : OBSERVE, TUI_REQUEST_TIMEOUT_MS)
+        // The owner gets the budget discovery gives its kind: nothing else is tried after this call,
+        // so a shorter one reports a busy owner offline (and refuses its steers) that discovery reaches.
+        const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", endpoint.kind === "tui" ? {} : OBSERVE, listBudget(endpoint.kind))
         const target = sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
           .map((session) => ({ ...session, socket: endpoint.socket, endpoint_kind: endpoint.kind }))
         return { sessions: target, hosts: [{ socket: endpoint.socket, endpoint_kind: endpoint.kind, list_sessions: { sessions: target }, alive: true }], disk: [] }
-      } catch {
-        // A stale publication is offline, not a reason to discover another endpoint.
-        return { sessions: [], hosts: [], disk: [] }
+      } catch (error) {
+        // Not a reason to discover another endpoint either way, but the owner is reported the way
+        // discovery reports it: `live_unresponsive` past the budget (never reaped or reopened
+        // elsewhere; its inbox keeps the delivery), `dead` when nothing listens.
+        const reason = listingFailure(endpoint, error)
+        return { sessions: [], hosts: [{ socket: endpoint.socket, endpoint_kind: endpoint.kind, alive: false, reason, error: error instanceof Error ? error.message : String(error) }], disk: [] }
       }
     },
     listSessions: async () => (await listView()).sessions,

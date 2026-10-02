@@ -88,16 +88,14 @@ export async function publishedWorld() {
         },
       },
     })
-    const start = () => registrant.start({ durableId, sessionPath: () => sessionPath, isIdle: () => true })
+    const start = () => registrant.start({ durableId, sessionPath: () => sessionPath, isIdle: () => runtime.phaseValue === "idle" })
     await start()
     releases.push(async () => { await registrant.stop(); await crash() })
-    return { frames, runtime, crash, stop: registrant.stop, start, socketPath, listing,
-      connected: () => once(server, "connection", { signal: AbortSignal.timeout(5000) }),
-    }
+    return { frames, runtime, crash, stop: registrant.stop, start, socketPath, listing }
   }
   const sdk = createThreadSdk({ agentDir: dir, cwd: dir, uid: 123, user: "test", host: surface, store })
   return {
-    dir, store, owner, send, sdk, discovery: () => discovery,
+    dir, store, surface, owner, send, sdk, discovery: () => discovery,
     async close() {
       for (const release of releases.reverse()) await release()
       await sdk.dispose()

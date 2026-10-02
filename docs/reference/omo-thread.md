@@ -17,8 +17,10 @@ Exact durable-id sends read the gateway's `session_meta` ownership record rather
 transaction. Re-registration replaces them with a fresh incarnation; release clears the endpoint
 only when its own incarnation still matches, so a late old owner cannot erase a takeover.
 The sender validates durable identity and workspace from a fresh `list_sessions` on only that
-socket, bounded like a terminal listing in discovery (1.5 s). A stale socket, different live identity, or cleared endpoint
-uses the existing durable queued-offline path. A target no registration published (no row, or only the sequence row its first delivery created)
+socket, under the budget discovery gives that endpoint kind (10 s for an RPC host, 1.5 s for a terminal).
+An owner that does not answer within it is reported `live_unresponsive`, as discovery reports it, and a
+refused or missing socket `dead`. Either way, and for a different live identity or a cleared endpoint,
+the send uses the existing durable queued-offline path; a live owner applies it from its inbox. A target no registration published (no row, or only the sequence row its first delivery created)
 keeps legacy discovery.
 Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or setting changes.
 

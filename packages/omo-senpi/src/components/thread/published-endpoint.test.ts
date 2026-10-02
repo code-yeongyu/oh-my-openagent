@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
+import { ENDPOINT_LIST_TIMEOUT_MS, TUI_REQUEST_TIMEOUT_MS } from "./live-surface"
 import { publishedWorld } from "./published-endpoint-fixture"
 
 /** A listener process killed with SIGKILL never unlinks its socket file: connects to it are refused. */
@@ -161,14 +162,47 @@ test("a live owner that lists slower than 200 ms is still reached", async () => 
   expect(w.discovery()).toBe(0)
 }, 10000)
 
-test("published listener that never answers completes offline after bounded validation", async () => {
+test("a busy RPC owner listing slower than the terminal budget but within the RPC budget takes a send and a steer", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  target.runtime.beginUserTurn()
+  target.listing.delayMs = 1800
+  const [followUp, steer] = await Promise.all([
+    w.sdk.send({ thread: "target", text: "busy followup" }),
+    w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
+  ])
+  expect(followUp).toMatchObject({ kind: "ok", delivery: { kind: "queued" }, endpoint_kind: "rpc_host" })
+  expect(steer).toMatchObject({ kind: "ok", delivery: { kind: "steered" }, endpoint_kind: "rpc_host" })
+  expect(target.runtime.enqueueCalls.map((call) => call.lane).sort()).toEqual(["followUp", "steer"])
+  expect(target.frames.filter((frame) => frame === "wake").length).toBeGreaterThan(0)
+  expect(w.discovery()).toBe(0)
+}, 15000)
+
+// The real RPC budget is the behavior under test: the listing and the send each wait it out once, concurrently.
+test("published listener that never answers within the RPC budget is live_unresponsive, not dead, and completes offline", async () => {
   const w = await world()
   const target = await w.owner("a")
   target.listing.answer = false
-  const connection = target.connected()
-  const sent = w.send()
-  await connection
-  expect(await sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  const [view, sent] = await Promise.all([
+    w.surface.listTarget?.("target", { socket: target.socketPath, kind: "rpc_host" }),
+    w.send(),
+  ])
+  expect(view?.hosts).toEqual([expect.objectContaining({ socket: target.socketPath, alive: false, reason: "live_unresponsive" })])
+  expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+}, ENDPOINT_LIST_TIMEOUT_MS + 10_000)
+
+test("a published owner nothing listens on is dead and its send queues offline without waiting for a listing budget", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  await target.crash()
+  await leaveStaleSocket(target.socketPath)
+  const view = await w.surface.listTarget?.("target", { socket: target.socketPath, kind: "rpc_host" })
+  expect(view?.hosts).toEqual([expect.objectContaining({ socket: target.socketPath, alive: false, reason: "dead" })])
+  const started = performance.now()
+  expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(performance.now() - started).toBeLessThan(TUI_REQUEST_TIMEOUT_MS)
   expect(target.runtime.enqueueCalls).toHaveLength(0)
   expect(w.discovery()).toBe(0)
 }, 10000)
