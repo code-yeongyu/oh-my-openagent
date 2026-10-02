@@ -64,7 +64,7 @@ function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonl
     models.set(sessionId, { provider, id: modelId })
     return { provider, id: modelId }
   })
-  const setThinkingLevel = mock(async (sessionId: string, level: string) => void thinking.set(sessionId, level))
+  const setThinkingLevel = mock(async (sessionId: string, level: string, _scope?: "session" | "turn") => void thinking.set(sessionId, level))
   const levelsOf = (sessionId: string) => catalog.find((entry) => entry.provider === models.get(sessionId)?.provider && entry.id === models.get(sessionId)?.id)?.thinking_levels ?? []
   const disk = (options.dead ?? []).map((id) => ({ durable_id: id, name: id, cwd: process.cwd(), created_at: "2026-10-01T00:00:00.000Z", updated_at: null, session_path: `/sessions/${id}.jsonl`, source_host: DEAD_SOCKET }))
   const host: ThreadHost = {
@@ -107,7 +107,7 @@ function sdkFixture(options: { readonly catalog?: Catalog; readonly dead?: reado
   const agentDir = scratch("thread-9425-sdk-")
   const store = createGatewayStore({ agentDir })
   const fake = fakeHost(options)
-  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: fake.host, store, modelProfile: () => ({ active: options.profile ?? "recommended" }) })
+  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: fake.host, store, modelProfile: () => ({ model_profile: options.profile ?? "recommended" }) })
   disposables.push(sdk)
   return { ...fake, sdk, store, agentDir }
 }
@@ -145,7 +145,7 @@ describe("#9425 spawn: an explicit choice wins", () => {
     const expected = { provider: "openai", id: "gpt-x", thinking_level: "high", provenance: "set", set_by: "config", reason: null }
     expect(threadOf(created).model).toEqual(expected)
     const listed = await sdk.list({})
-    expect((listed as { threads: { thread_id: string; model: unknown }[] }).threads.find((thread) => thread.thread_id === threadOf(created).thread_id)?.model).toEqual(expected)
+    expect((listed as unknown as { threads: { thread_id: string; model: unknown }[] }).threads.find((thread) => thread.thread_id === threadOf(created).thread_id)?.model).toEqual(expected)
     expect(await sdk.read({ thread: "pinned" })).toMatchObject({ kind: "ok", model: expected })
   })
 
@@ -231,7 +231,7 @@ describe("#9425 resume keeps the explicit choice", () => {
     const { sdk, reopen } = sdkFixture()
     const created = await sdk.create({ name: "sticky", model: "gpt-x", set_by: "config" })
     reopen(threadOf(created).thread_id)
-    const listed = (await sdk.list({})) as { threads: { thread_id: string; sessionId: string; model: unknown }[] }
+    const listed = (await sdk.list({})) as unknown as { threads: { thread_id: string; sessionId: string; model: unknown }[] }
     const row = listed.threads.find((thread) => thread.thread_id === threadOf(created).thread_id)
     expect(row?.sessionId).not.toBe((threadOf(created) as unknown as { sessionId: string }).sessionId)
     expect(row?.model).toEqual({ provider: "openai", id: "gpt-x", thinking_level: "high", provenance: "set", set_by: "config", reason: null })
@@ -246,7 +246,7 @@ describe("#9425 agent tool thread_create", () => {
     disposables.push(store)
     const tools = createThreadTools({ host: fake.host, store, stateDirectory: agentDir, callerSessionId: () => "dur-lead", callerWorkspaceRoot: () => process.cwd(), modelProfile: () => ({ active: "recommended" }) })
     const create = tools.find((tool) => tool.name === "thread_create")
-    const output = await create?.execute("call-1", { name: "child", model: "gpt-y", thinking: "low" }, undefined, undefined, undefined)
+    const output = await create?.execute("call-1", { name: "child", model: "gpt-y", thinking: "low" }, undefined, undefined, undefined as never)
     const result = (output as { details: { result: unknown } }).details.result
     expect(fake.openSession.mock.calls[0]?.[0]).toMatchObject({ provider: "openai", modelId: "gpt-y", thinkingLevel: "low" })
     expect(result).toMatchObject({ kind: "ok", thread: { model: { provider: "openai", id: "gpt-y", thinking_level: "low", provenance: "set", set_by: "lead", reason: null } } })

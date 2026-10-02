@@ -60,7 +60,7 @@ function relayFor(handOff: HandOff) {
 
 /**
  * Turns the store back into what the v2 code left on disk: the rows keep their data, the later
- * columns go, and the version reads 2. `before` runs first, to put a row into a state only the v2 code
+ * columns and tables go, and the version reads 2. `before` runs first, to put a row into a state only the v2 code
  * wrote. The next store that opens it migrates it to the current version again.
  */
 function downgradeToV2(agentDir: string, before: (db: Database) => void = () => {}): void {
@@ -74,6 +74,7 @@ function downgradeToV2(agentDir: string, before: (db: Database) => void = () => 
     db.run("ALTER TABLE outbox DROP COLUMN answered_by")
     db.run("ALTER TABLE session_meta DROP COLUMN endpoint_kind")
     db.run("ALTER TABLE session_meta DROP COLUMN endpoint_socket")
+    db.run("DROP TABLE session_models")
     db.run("PRAGMA user_version = 2")
   } finally {
     db.close()

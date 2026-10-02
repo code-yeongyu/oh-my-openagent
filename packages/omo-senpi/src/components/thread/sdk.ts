@@ -15,7 +15,9 @@ import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
-import { createThread, listThreadModels, setThreadModel, setThreadReasoning, type CreateThreadInput, type ModelProfileChoice, type ModelsResult } from "./model-control"
+import type { OmoModelProfile } from "@oh-my-opencode/omo-config-core"
+
+import { createThread, listThreadModels, modelProfileChoice, setThreadModel, setThreadReasoning, type CreateThreadInput, type ModelsResult } from "./model-control"
 import type { ModelSetter, ThreadModel } from "./gateway/session-models"
 import { listThreads, readThread } from "./tools/read-ops"
 
@@ -33,8 +35,8 @@ export type ThreadSdkOptions = {
   readonly host?: ThreadHost
   readonly store?: GatewayStore
   readonly now?: () => number
-  /** The `model_profile` a session created with no model resolves from; absent: `cwd`'s omo.json. */
-  readonly modelProfile?: () => ModelProfileChoice
+  /** omo.json's `model_profile` / `model_profiles` (senpi view) a session created with no model resolves from; absent: the default profile. */
+  readonly modelProfile?: () => { readonly model_profile?: string; readonly model_profiles?: Readonly<Record<string, OmoModelProfile>> }
 }
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -112,7 +114,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   })
   const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const now = options.now ?? store.now
-  const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now, ...(options.modelProfile === undefined ? {} : { modelProfile: options.modelProfile }) }
+  const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now, ...(options.modelProfile === undefined ? {} : { modelProfile: () => modelProfileChoice(options.modelProfile?.() ?? {}) }) }
   const view = () => hostView(surface)
   const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))
 

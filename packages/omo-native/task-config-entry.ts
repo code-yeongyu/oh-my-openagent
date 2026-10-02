@@ -6,7 +6,7 @@
  * instead of a copy of the file lookup, the parse or the precedence.
  */
 
-import { loadOmoConfig, mergeOmoConfigRecords, resolveOmoConfigView, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { loadOmoConfig, mergeOmoConfigRecords, resolveModelReferences, resolveOmoConfigView, type OmoConfigEnv, type OmoModelProfile } from "@oh-my-opencode/omo-config-core"
 
 /** The `task.*` keys `omo daemon` reads. Each is present only when a loaded layer sets it, so the caller can
  * tell "configured" from the schema default. */
@@ -38,5 +38,18 @@ export function resolveDaemonTaskSettings(input: { readonly cwd: string; readonl
   return {
     ...(policy === undefined ? {} : { host_engine_policy: policy }),
     ...(idleExitMs === undefined ? {} : { host_idle_exit_ms: idleExitMs }),
+  }
+}
+
+/**
+ * The `model_profile` and `model_profiles` an `omo thread create` with no model resolves from (#9425):
+ * the same senpi-harness view the extension's session-start component reads (omo-senpi config-resolution),
+ * with model references expanded. The thread SDK bundle carries no config loader, so the CLI passes this in.
+ */
+export function resolveThreadModelProfile(input: { readonly cwd: string; readonly env: OmoConfigEnv }): { readonly model_profile?: string; readonly model_profiles?: Readonly<Record<string, OmoModelProfile>> } {
+  const view = resolveModelReferences(loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" }).config).view
+  return {
+    ...(view.model_profile === undefined ? {} : { model_profile: view.model_profile }),
+    ...(view.model_profiles === undefined ? {} : { model_profiles: view.model_profiles }),
   }
 }

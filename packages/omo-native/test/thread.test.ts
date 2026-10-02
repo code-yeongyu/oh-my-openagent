@@ -280,6 +280,29 @@ describe("omo thread: SDK loading", () => {
     expect(result.stderr).toContain("worker gone")
   })
 
+  test("#given the staged task-config runtime #when the SDK resolves an auto model #then it reads omo.json's model_profile view for the cwd and env, and a broken runtime falls back to the default profile", async () => {
+    const asked: unknown[] = []
+    const profileOf = async (loadTaskConfig: (root: string) => unknown) => {
+      let received: Record<string, unknown> = {}
+      await loadThreadSdk({
+        pluginRoot: "/plugin",
+        agentDir: "/agent",
+        env: { KEEP: "1" },
+        cwd: "/work",
+        engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
+        loadSqlite: async () => ({}),
+        importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
+        identity: { uid: 501, user: "qa" },
+        loadTaskConfig,
+      })
+      return (received.modelProfile as () => unknown)()
+    }
+    const view = { model_profile: "geeky-heavy", model_profiles: { mine: { models: ["openai/gpt-x"] } } }
+    expect(await profileOf((root) => { asked.push(root); return { resolveThreadModelProfile: (input: unknown) => { asked.push(input); return view } } })).toEqual(view)
+    expect(asked).toEqual(["/plugin", { cwd: "/work", env: { KEEP: "1" } }])
+    expect(await profileOf(() => { throw new Error("Cannot find module index.js") })).toEqual({})
+  })
+
   test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd, cli identity, and an engine status reader over host status --all", async () => {
     const engineCalls: { args: readonly string[]; env: Record<string, string> }[] = []
     let received: Record<string, unknown> = {}
@@ -292,6 +315,7 @@ describe("omo thread: SDK loading", () => {
       loadSqlite: async () => ({}),
       importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
       identity: { uid: 501, user: "qa" },
+      loadTaskConfig: () => { throw new Error("Cannot find module index.js") },
     })
     expect(loaded.error).toBeUndefined()
     expect({ agentDir: received.agentDir, cwd: received.cwd, uid: received.uid, user: received.user }).toEqual({ agentDir: "/agent", cwd: "/work", uid: 501, user: "qa" })

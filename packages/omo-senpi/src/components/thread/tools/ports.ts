@@ -122,7 +122,7 @@ export type ThreadToolSurfaceOptions = {
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
-  /** The `model_profile` a session created with no model resolves from; absent: the caller workspace's omo.json. */
+  /** The `model_profile` a session created with no model resolves from; absent: the default profile. */
   readonly modelProfile?: () => ModelProfileChoice
   readonly now?: () => number
 }

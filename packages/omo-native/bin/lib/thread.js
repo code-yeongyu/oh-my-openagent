@@ -1,3 +1,4 @@
+import { createRequire } from "node:module"
 import { userInfo } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -203,7 +204,23 @@ export function threadExitCode(result) {
  * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
  * plugin SDK that cannot be imported (a broken or partial install).
  */
-export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, identity }) {
+const requireRuntime = createRequire(import.meta.url)
+
+/**
+ * The omo.json `model_profile` view a `create` with no model resolves from (#9425), read through the
+ * staged task-config runtime (the omo-config-core loader; `daemon-config.js` reads `task.*` the same way).
+ * Fail-open like that reader: without the runtime, auto uses the default profile.
+ */
+function threadModelProfile(pluginRoot, cwd, env, loadTaskConfig) {
+  try {
+    const runtime = (loadTaskConfig ?? ((root) => requireRuntime(join(root, "runtime", "task-config", "index.js"))))(pluginRoot)
+    return runtime.resolveThreadModelProfile({ cwd, env })
+  } catch {
+    return {}
+  }
+}
+
+export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, identity, loadTaskConfig }) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {
@@ -217,7 +234,8 @@ export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, lo
   }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
   const engineStatusAll = async () => engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } }).stdout
-  return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll }) }
+  const modelProfile = () => threadModelProfile(pluginRoot, cwd, env, loadTaskConfig)
+  return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll, modelProfile }) }
 }
 
 export async function runThreadCommand(args, options) {

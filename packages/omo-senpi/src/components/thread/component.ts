@@ -3,6 +3,8 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
+import { modelProfileChoice } from "./model-control"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
@@ -224,6 +226,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
+        // #9425: thread_create with no model resolves from the same model_profile the session-start component applies.
+        modelProfile: options.modelProfile ?? (() => modelProfileChoice(loadSenpiOmoConfig({ cwd: pi.cwd ?? process.cwd() }).config)),
       })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is

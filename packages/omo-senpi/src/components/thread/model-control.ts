@@ -1,6 +1,5 @@
 import type { OmoModelProfile } from "@oh-my-opencode/omo-config-core"
 
-import { loadSenpiOmoConfig } from "../config-resolution"
 import { DEFAULT_MODEL_PROFILE_ID } from "../model-profile/builtin-profiles"
 import { resolveModelProfile } from "../model-profile/resolve"
 import type { ThreadToolResult } from "./contracts"
@@ -45,9 +44,12 @@ function profileThinking(reasoning: string | undefined): string | undefined {
   return level !== undefined && isThinkingLevel(level) ? level : undefined
 }
 
-/** The active `model_profile` of the caller's workspace, read the way the session-start component reads it. */
-export function workspaceModelProfile(cwd: string): ModelProfileChoice {
-  const config = loadSenpiOmoConfig({ cwd }).config
+/**
+ * The `model_profile` choice from a loaded omo.json view: the default profile when unset. Reading
+ * omo.json is the caller's job (the extension through `loadSenpiOmoConfig`, the `omo thread` CLI through
+ * its task-config runtime), so the thread SDK bundle stays free of the config loader.
+ */
+export function modelProfileChoice(config: { readonly model_profile?: string; readonly model_profiles?: Readonly<Record<string, OmoModelProfile>> }): ModelProfileChoice {
   const active = config.model_profile?.trim()
   return { profiles: config.model_profiles, active: active !== undefined && active.length > 0 ? active : DEFAULT_MODEL_PROFILE_ID }
 }
@@ -126,7 +128,7 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
     if (matched.kind === "error") return matched
     entry = matched.entry
   } else {
-    const auto = chooseAutoModel(catalog, options.modelProfile?.() ?? workspaceModelProfile(options.callerWorkspaceRoot()))
+    const auto = chooseAutoModel(catalog, options.modelProfile?.() ?? modelProfileChoice({}))
     if (auto === undefined) return failure("model_not_found", "No connected provider serves a model.", "Connect a provider (omo setup, or /login in a session), then retry.", { available: [] })
     entry = auto.entry
     thinking ??= auto.thinking
