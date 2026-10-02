@@ -167,6 +167,13 @@ every later one are `already_answered` with "The session no longer waits for thi
 (answered or closed elsewhere)". Such a question costs at most one refused frame, and nothing
 reaches the session twice.
 
+Both outcomes in the paragraph above belong to a takeover only: an answer that took over an
+expired claim. A normal claim (nothing to take over) that the session refuses because it no longer
+waits on the question (`question_already_resolved`, `unknown_extension_ui_request`,
+`unknown_request`) is `stale_token` (exit 1), and the question stays `pending`. An answer given in
+the terminal or Desktop is not written back to the outbox, so a connector that lists pending
+questions keeps showing that one until the question-closure follow-up below lands.
+
 The answer text takes the form of the request the session reported (`--request-kind`):
 
 | request kind | accepted answer | reaches the session as |
@@ -193,6 +200,15 @@ refuses it (it no longer waits on that question, or cannot read the answer), the
 again. The one exception is an answer that took over an expired claim (above) and is refused because
 the session no longer waits on the request: the question is then delivered with the earlier answer,
 and the answer is `already_answered`. A delivered answer is never released.
+
+### Question-closure follow-up
+
+Not included yet: a question that ends inside the session (answered in the terminal or Desktop,
+timed out, cancelled) is not reported to its binding. The reserved `question_closed` event and the
+reserved `expired` and `cancelled` question states ([Reports and the outbox](#reports-and-the-outbox))
+are its contract; their producer is not part of this release. Until it lands, a connector learns
+that such a question closed only from a refused answer: `already_answered` after a takeover,
+`stale_token` on a normal claim.
 
 ## Bindings
 
