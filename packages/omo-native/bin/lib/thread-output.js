@@ -29,7 +29,7 @@ const RENDER = {
     ...(result.current === null ? [] : [`current: ${modelLine(result.current)}`]),
     ...result.available.map((entry) => `${entry.provider}/${entry.id}  ${entry.name}  thinking ${entry.thinking_levels.join(",") || "-"}`),
   ],
-  "set-model": (result) => [`${result.thread_id}: ${modelLine(result.model)}`],
+  "set-model": (result) => [`${result.thread_id}: ${modelLine(result.model)}${result.held === true ? " (held: the session switches once a compaction makes its context fit)" : ""}`],
   "set-reasoning": (result) => [`${result.thread_id}: thinking ${result.level} (${result.scope})`],
   send: (result) => [`${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread_id}${result.deduplicated ? " (already sent)" : ""}`],
   read: (result) => [

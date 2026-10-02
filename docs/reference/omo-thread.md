@@ -103,7 +103,10 @@ A created session runs no first-run onboarding turn: its first turn is the creat
 switch to, with `current` its record: `{kind:"ok", thread_id|null, current: model|null, available:
 [{provider, id, name, thinking_levels}]}`. `set-model` switches a live session (the engine applies
 it from the next turn) with the same matching and refusals, plus `not_resumable` for a thread with
-no live owner. `set-reasoning` checks the level against the active model before anything changes
+no live owner. A switch the engine holds until a compaction makes the context fit answers
+`held: true`, and `current` keeps naming the model in force until it lands. A switch the engine
+refuses (a context the model cannot hold, a provider with no key) is `unsupported` with
+`details.model` and `details.reason`, and nothing changes. `set-reasoning` checks the level against the active model before anything changes
 (`thinking_level_unsupported` with `details.supported`); `--scope turn` changes only the current
 level, `session` (the default) also the model's remembered one. The reported `level` and the
 recorded `thinking_level` are the level the session runs after the change, as the engine reports it.
@@ -448,7 +451,7 @@ every other subcommand prints the full result.
 | `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at: <ISO 8601 string>\|null, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, model: <model>\|null, error_note?, ...}]`; live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread_id` ascending for ties. A live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
 | `create` | `{kind:"ok", thread: {thread_id, name, status, cwd, ..., model: <model>}, deduplicated: false}` |
 | `models` | `{kind:"ok", thread_id: <id>\|null, current: <model>\|null, available: [{provider, id, name, thinking_levels}]}` |
-| `set-model` | `{kind:"ok", thread_id, model: <model>}` |
+| `set-model` | `{kind:"ok", thread_id, model: <model>, held?: true}`; `held` means the engine has not switched yet and `model` is the requested one |
 | `set-reasoning` | `{kind:"ok", thread_id, level, scope: session\|turn}` |
 | `send` | `{kind:"ok", thread_id, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
 | `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?, model: <model>\|null}` |

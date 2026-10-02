@@ -202,7 +202,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     parameters: threadToolParamSchemas.thread_set_model,
     execute: (id: string, args: ThreadSetModelInput, _signal, _onUpdate, ectx) => execute("thread_set_model", id, args, ectx, async (current, value, _operationId, callerId) => {
       const set = await setThreadModel(options, current, value, callerId, "lead")
-      return set.kind === "error" ? set : { kind: "ok", thread_id: set.thread_id, model: { provider: set.model.provider, id: set.model.id } }
+      return set.kind === "error" ? set : { kind: "ok", thread_id: set.thread_id, model: { provider: set.model.provider, id: set.model.id }, ...(set.held === true ? { held: true } : {}) }
     }),
   }
   const setReasoning: AnyTool = {

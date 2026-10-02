@@ -103,6 +103,11 @@ function stateThinking(state: unknown): string | null {
   return typeof level === "string" ? level : null
 }
 
+function stateModel(state: unknown): { readonly provider: string; readonly id: string } | null {
+  const { provider, id } = ((state as { readonly model?: unknown } | null | undefined)?.model ?? {}) as { readonly provider?: unknown; readonly id?: unknown }
+  return typeof provider === "string" && typeof id === "string" ? { provider, id } : null
+}
+
 /**
  * `thread_create` / `omo thread create`. Everything that can be refused is refused before the host
  * opens anything: a bad setter or level, a name in use, a model no connected provider serves, a level
@@ -148,13 +153,20 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
   const session = await options.host.openSession({ ...opening, provider: entry.provider, modelId: entry.id, ...(thinking === undefined ? {} : { thinkingLevel: thinking }) })
   const thread = summary(session)
   const explicit = input.model !== undefined
-  const model: ThreadModel = { provider: entry.provider, id: entry.id, thinking_level: thinking ?? stateThinking(session), provenance: explicit ? "set" : "auto", set_by: explicit ? (input.set_by ?? defaults.set_by) : null, reason: null }
+  const model: ThreadModel = { provider: entry.provider, id: entry.id, thinking_level: stateThinking(session) ?? thinking ?? null, provenance: explicit ? "set" : "auto", set_by: explicit ? (input.set_by ?? defaults.set_by) : null, reason: null }
   await options.store.recordSessionModel({ now: (options.now ?? options.store.now)(), durable_id: thread.thread_id, model })
   return { kind: "ok", thread: { ...thread, model }, deduplicated: false }
 }
 
-/** `thread_set_model` / `omo thread set-model`: the switch the engine applies from the next turn, recorded as set by `setBy`. */
-export async function setThreadModel(options: ThreadToolSurfaceOptions, current: ThreadHostView, input: { readonly thread: string; readonly model: string; readonly provider?: string; readonly all_scope?: boolean }, callerId: string, setBy: unknown): Promise<{ readonly kind: "ok"; readonly thread_id: string; readonly model: ThreadModel } | Failure> {
+/**
+ * `thread_set_model` / `omo thread set-model`: the switch the engine applies from the next turn, recorded
+ * as set by `setBy`. The record follows the model the engine reports in force afterwards, never the
+ * `set_model` reply alone: senpi answers success for a switch it only HOLDS until a compaction makes the
+ * context fit (`_setModel` / `_switchActiveModel` deferral). A held switch answers `held: true` and is
+ * recorded by the session itself (`component.ts`) once it lands. A switch senpi refuses (a context the
+ * model cannot hold, a provider with no key) is `unsupported` with the engine's reason, nothing recorded.
+ */
+export async function setThreadModel(options: ThreadToolSurfaceOptions, current: ThreadHostView, input: { readonly thread: string; readonly model: string; readonly provider?: string; readonly all_scope?: boolean }, callerId: string, setBy: unknown): Promise<{ readonly kind: "ok"; readonly thread_id: string; readonly model: ThreadModel; readonly held?: true } | Failure> {
   if (!isModelSetter(setBy)) return badSetter(setBy)
   const resolved = resolution(options, resolveEntries(options, current), input.thread, callerId, input.all_scope)
   if (resolved.kind === "error") return { kind: "error", error: resolved }
@@ -164,8 +176,18 @@ export async function setThreadModel(options: ThreadToolSurfaceOptions, current:
   const port = sessionPort(options, session)
   const matched = matchModel(await port.getAvailableModels(routingId(session)), input.model, input.provider)
   if (matched.kind === "error") return matched
-  const selected = await port.setModel(routingId(session), matched.entry.provider, matched.entry.id)
-  const model: ThreadModel = { provider: selected.provider, id: selected.id, thinking_level: stateThinking(await port.getState(routingId(session))), provenance: "set", set_by: setBy, reason: null }
+  let selected: Awaited<ReturnType<typeof port.setModel>>
+  try {
+    selected = await port.setModel(routingId(session), matched.entry.provider, matched.entry.id)
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.startsWith("model_refused:")) throw error
+    const reason = error.message.slice("model_refused:".length)
+    return failure("unsupported", `The session refused to switch to ${modelLabel(matched.entry)}: ${reason}`, "Choose another model from the available list, or compact the session first when its context does not fit.", { model: modelLabel(matched.entry), reason }) as Failure
+  }
+  const state = await port.getState(routingId(session))
+  const model: ThreadModel = { provider: selected.provider, id: selected.id, thinking_level: stateThinking(state), provenance: "set", set_by: setBy, reason: null }
+  const active = stateModel(state)
+  if (active !== null && (active.provider !== selected.provider || active.id !== selected.id)) return { kind: "ok", thread_id: resolved.entry.thread_id, model, held: true }
   await options.store.recordSessionModel({ now: (options.now ?? options.store.now)(), durable_id: resolved.entry.thread_id, model })
   return { kind: "ok", thread_id: resolved.entry.thread_id, model }
 }
