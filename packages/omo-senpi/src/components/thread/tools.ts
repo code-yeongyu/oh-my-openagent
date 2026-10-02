@@ -285,7 +285,7 @@ async function deliverThroughGateway(
     text: value.message,
     mode: value.delivery ?? "auto",
     ...(expected === undefined ? {} : { expected_turn_id: expected }),
-    all_scope: true,
+    all_scope: value.all_scope,
     idempotency_key: idempotencyKey,
   })
   if (sent.kind === "error") return { kind: "error", error: sent.error }

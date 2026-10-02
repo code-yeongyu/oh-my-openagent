@@ -1,5 +1,5 @@
 import type { GatewayEndpointKind } from "./adapter"
-import { transaction, type StoreContext } from "./store-ops"
+import { transaction, write, type StoreContext } from "./store-ops"
 
 export type SessionOwner = {
   readonly incarnation: string | null
@@ -15,7 +15,7 @@ export type ClearEndpointRequest = Pick<RegisterIncarnationRequest, "durable_id"
 /** The endpoint and its fencing token become visible in the same transaction. */
 export async function registerIncarnation(ctx: StoreContext, request: RegisterIncarnationRequest): Promise<void> {
   await transaction(ctx, "register_incarnation", () => {
-    ctx.sql.run(
+    write(ctx,
       `INSERT INTO session_meta (durable_id, next_seq, incarnation, endpoint_socket, endpoint_kind)
        VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM deliveries WHERE target_durable_id = ?), ?, ?, ?)
        ON CONFLICT(durable_id) DO UPDATE SET incarnation = excluded.incarnation,
@@ -28,7 +28,7 @@ export async function registerIncarnation(ctx: StoreContext, request: RegisterIn
 /** A late exit owns only its incarnation, never its successor's endpoint. */
 export async function clearEndpoint(ctx: StoreContext, request: ClearEndpointRequest): Promise<void> {
   await transaction(ctx, "clear_endpoint", () => {
-    ctx.sql.run("UPDATE session_meta SET endpoint_socket = NULL, endpoint_kind = NULL WHERE durable_id = ? AND incarnation = ?", [request.durable_id, request.incarnation])
+    write(ctx, "UPDATE session_meta SET endpoint_socket = NULL, endpoint_kind = NULL WHERE durable_id = ? AND incarnation = ?", [request.durable_id, request.incarnation])
   })
 }
 

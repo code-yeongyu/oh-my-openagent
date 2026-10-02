@@ -23,6 +23,17 @@ test("registered exact-id SDK send delivers without global discovery", async () 
   expect(w.discovery()).toBe(0)
 })
 
+test("bound exact-id SDK send validates its target without global discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  const bound = await w.sdk.bind({ session: "target", binding: { platform: "custom", account_id: "bot", chat_id: "chat" } })
+  if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+  const result = await w.sdk.send({ thread: "target", binding_id: bound.binding.binding_id, text: "hello bound" })
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(1)
+  expect(w.discovery()).toBe(0)
+})
+
 test("cleanly closed target queues offline without global discovery", async () => {
   const w = await world()
   const target = await w.owner("a")

@@ -6,6 +6,7 @@ import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadHostViewRequest, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
+import { sendView } from "./send-view"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -117,7 +118,7 @@ export function sendAddressBook(options: ThreadToolSurfaceOptions, view: ThreadH
  * sessions, not `host_unavailable`, and a session known only from its session file still resolves.
  */
 export async function resolveStoredSession(options: ThreadToolSurfaceOptions, view: (request: ThreadHostViewRequest) => Promise<ThreadHostView>, address: string, callerId: string, allScope?: boolean) {
-  const current = await view({ offline: true })
+  const current = await sendView(options, address, () => view({ offline: true }))
   return resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, allScope)), address, callerId, allScope)
 }
 
