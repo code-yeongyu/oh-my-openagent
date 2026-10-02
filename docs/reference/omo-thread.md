@@ -89,7 +89,8 @@ re-modelled). The record is kept in the gateway store by durable id, so it survi
 reopening a session never changes its model, and an explicit choice stays explicit.
 
 `create` takes `--model` as `provider/id`, an exact id, or a unique fragment of the id or display
-name; `--provider` narrows a bare id. `--thinking` is the starting level. Everything that can be
+name; `--provider` narrows a bare id, and without `--model` it restricts the auto choice to that
+provider (`model_not_found` when it serves no connected model). `--thinking` is the starting level. Everything that can be
 refused is refused before a session opens: `model_not_found` (`details.available`, the first 20
 `provider/id`; empty when no provider is connected), `model_ambiguous` (`details.candidates`, up
 to 10), `thinking_level_unsupported` (`details.supported`), `invalid_arguments` (an empty model, a

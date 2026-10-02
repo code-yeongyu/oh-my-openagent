@@ -130,6 +130,15 @@ describe("#9425 spawn: auto from the connected providers", () => {
     expect(threadOf(created).model).toMatchObject({ provider: "openai", id: "gpt-y", provenance: "auto", set_by: null })
   })
 
+  test("#given only --provider #when a session is created #then auto picks within that provider, and a provider serving nothing is refused model_not_found before anything opens", async () => {
+    const { sdk, openSession } = sdkFixture()
+    const created = await sdk.create({ provider: "openai" })
+    expect(openSession.mock.calls[0]?.[0]).toMatchObject({ provider: "openai", modelId: "gpt-x" })
+    expect(threadOf(created).model).toMatchObject({ provider: "openai", id: "gpt-x", provenance: "auto", set_by: null })
+    expect(await sdk.create({ provider: "google" })).toMatchObject({ kind: "error", error: { code: "model_not_found", details: { available: ["anthropic/claude-opus-5-5", "openai/gpt-x", "openai/gpt-y"] } } })
+    expect(openSession).toHaveBeenCalledTimes(1)
+  })
+
   test("#given no provider is connected #when a session is created #then it is refused model_not_found with an empty list and nothing opens", async () => {
     const { sdk, openSession } = sdkFixture({ catalog: [] })
     expect(await sdk.create({ name: "nothing" })).toMatchObject({ kind: "error", error: { code: "model_not_found", details: { available: [] } } })

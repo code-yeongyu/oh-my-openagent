@@ -128,7 +128,11 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
     if (matched.kind === "error") return matched
     entry = matched.entry
   } else {
-    const auto = chooseAutoModel(catalog, options.modelProfile?.() ?? modelProfileChoice({}))
+    // An explicit provider with no model narrows auto to that provider: the caller's choice wins.
+    const wanted = input.provider?.trim().toLowerCase()
+    const candidates = wanted === undefined ? catalog : catalog.filter((candidate) => candidate.provider.toLowerCase() === wanted)
+    const auto = chooseAutoModel(candidates, options.modelProfile?.() ?? modelProfileChoice({}))
+    if (auto === undefined && wanted !== undefined) return failure("model_not_found", `No connected model is served by provider "${input.provider}".`, "Choose a provider from the available list, or connect that provider, then retry.", { available: catalog.slice(0, 20).map(modelLabel) })
     if (auto === undefined) return failure("model_not_found", "No connected provider serves a model.", "Connect a provider (omo setup, or /login in a session), then retry.", { available: [] })
     entry = auto.entry
     thinking ??= auto.thinking
