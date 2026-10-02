@@ -61,8 +61,8 @@ export default function(pi) {
       const admission = await accepted
       const result = await awaitToolResult(fake, "thread_send", mark)
       const emitted = await waitFor(() => records().find((row) => row.event === "target_message_start" && row.delivery_id === admission.delivery_id), { label: "target's originating message event" })
-      const started = await waitFor(() => records().find((row) => row.event === "agent_start" && row.pid === admission.pid && row.at >= admission.at), { label: "target's originating agent_start" })
       const entry = records().find((row) => row.event === "tool_enter" && row.args?.message === token)
+      const started = await waitFor(() => records().find((row) => row.event === "agent_start" && row.pid === admission.pid && row.at >= entry.at), { label: "target's originating agent_start" })
       const returned = records().find((row) => row.event === "tool_return" && row.args?.message === token)
       const load = Bun.spawn(["sysctl", "-n", "vm.loadavg"], { stdout: "pipe" })
       const loadText = await new Response(load.stdout).text()
