@@ -21,6 +21,7 @@ import { createRestoredChildHandle, type ChildSession } from "./child-handle"
 // teardown is exactly the leak that kept `omo -p` alive.
 
 const PRINT_RUN = join(import.meta.dir, "__fixtures__", "print-run.ts")
+const BRIDGE_RUN = join(import.meta.dir, "__fixtures__", "bridge-run.ts")
 const PRINT_RUN_BOUND_MS = 90_000
 
 let watch: ServerWatch | undefined
@@ -48,8 +49,22 @@ async function stillOpen(ports: readonly number[]): Promise<number[]> {
 
 type PrintRun = { readonly exit: number | "still running"; readonly stdout: string; readonly stderr: string }
 
+type BridgeRun = { readonly bridges: number; readonly stillListening: number; readonly stillOpen: number; readonly startError?: string }
+
+// AC1/AC3 run in a fresh process: a shared test process can already hold module state from other
+// files (an earlier codemode load), which hides the bridge from a listen hook armed later.
+async function bridgeRun(scenario: "ac1" | "ac3"): Promise<BridgeRun> {
+  const run = await spawnBounded(BRIDGE_RUN, scenario)
+  if (run.exit !== 0) throw new Error(`bridge run ${scenario} did not exit cleanly (${run.exit}): ${run.stderr}`)
+  return JSON.parse(run.stdout) as BridgeRun
+}
+
 async function printRun(turn: "succeeds" | "fails"): Promise<PrintRun> {
-  const child = Bun.spawn([process.execPath, PRINT_RUN, turn], { stdout: "pipe", stderr: "pipe" })
+  return spawnBounded(PRINT_RUN, turn)
+}
+
+async function spawnBounded(script: string, arg: string): Promise<PrintRun> {
+  const child = Bun.spawn([process.execPath, script, arg], { stdout: "pipe", stderr: "pipe" })
   let watchdog: ReturnType<typeof setTimeout> | undefined
   const bound = new Promise<"still running">((resolve) => {
     watchdog = setTimeout(() => resolve("still running"), PRINT_RUN_BOUND_MS)
@@ -63,22 +78,12 @@ async function printRun(turn: "succeeds" | "fails"): Promise<PrintRun> {
 
 describe("in-process child teardown shuts down its extensions (#9413)", () => {
   test("#9413 AC1: disposing an in-process child that loaded the builtin extensions runs its session_shutdown handlers and closes its codemode bridge, leaving no listening socket", async () => {
-    // given: a real child with the builtin extensions, whose turn has settled
-    watch = watchHttpServers()
-    machine = await createBuiltinChildMachine()
-    const handle = await new InProcessRunner().start(machine.spec("ac1-child", "succeeds"))
-    expect(await handle.waitForIdle()).toMatchObject({ status: "completed", finalResponse: "child done" })
-    const bridges = listeningPorts(watch)
-    expect(bridges).toHaveLength(1)
-    expect(await stillOpen(bridges)).toEqual(bridges)
+    // when: a real child with the builtin extensions settles its turn and is disposed
+    const run = await bridgeRun("ac1")
 
-    // when
-    await handle.dispose()
-
-    // then: codemode's session_shutdown handler ran, so its bridge no longer listens
-    expect(watch.servers.filter((server) => server.listening)).toHaveLength(0)
-    expect(await stillOpen(bridges)).toEqual([])
-  }, 120_000)
+    // then: it had opened exactly one codemode bridge, and after teardown nothing listens or accepts
+    expect(run).toEqual({ bridges: 1, stillListening: 0, stillOpen: 0 })
+  }, PRINT_RUN_BOUND_MS + 30_000)
 
   test.each(["succeeds", "fails"] as const)(
     "#9413 AC2: a print run that delegates one in-process task to a child that %s exits with code 0 within the bound",
@@ -94,40 +99,12 @@ describe("in-process child teardown shuts down its extensions (#9413)", () => {
   )
 
   test("#9413 AC3: discardUnstartedChildSession gives a child whose handle never started the same shutdown, closing its codemode bridge", async () => {
-    // given: a real builtin session whose handle construction fails, so the runner must discard it unstarted
-    const servers = watchHttpServers()
-    watch = servers
-    machine = await createBuiltinChildMachine()
-    let bridges: number[] = []
-    const runner = new InProcessRunner({
-      createSession: async (options): Promise<ChildSession> => {
-        const session = await openBoundSession(options)
-        bridges = listeningPorts(servers)
-        return {
-          sessionId: session.sessionId,
-          extensionRunner: session.extensionRunner,
-          prompt: (text) => session.prompt(text),
-          steer: (text) => session.steer(text),
-          followUp: (text) => session.followUp(text),
-          abort: () => session.abort(),
-          subscribe: () => {
-            throw new Error("handle construction failed")
-          },
-          getLastAssistantText: () => session.getLastAssistantText(),
-          dispose: () => session.dispose(),
-        }
-      },
-    })
+    // when: a real builtin session opens, but its handle construction fails, so the runner discards it unstarted
+    const run = await bridgeRun("ac3")
 
-    // when
-    const start = runner.start(machine.spec("ac3-child", "succeeds"))
-
-    // then: the start fails, and the session it opened was shut down before being disposed
-    await expect(start).rejects.toThrow("handle construction failed")
-    expect(bridges).toHaveLength(1)
-    expect(servers.servers.filter((server) => server.listening)).toHaveLength(0)
-    expect(await stillOpen(bridges)).toEqual([])
-  }, 120_000)
+    // then: the start failed, and the bridge that session opened was shut down before being disposed
+    expect(run).toEqual({ bridges: 1, stillListening: 0, stillOpen: 0, startError: "handle construction failed" })
+  }, PRINT_RUN_BOUND_MS + 30_000)
 
   test("a hung session_shutdown handler does not block child teardown past the host budget", async () => {
     // given: a child with an extension whose session_shutdown handler never settles, under a 300ms budget
