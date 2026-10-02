@@ -23,6 +23,11 @@ Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or 
 
 ```bash
 omo thread list [--all-scope] [--json]
+omo thread create [--name <n>] [--cwd <dir>] [--fork-from <id>] [--provider <p>] [--model <m>] [--thinking <level>]
+                  [--set-by config|user|lead] [--json]
+omo thread models [<thread>] [--provider <p>] [--json]
+omo thread set-model <thread> <model> [--provider <p>] [--set-by config|user|lead] [--json]
+omo thread set-reasoning <thread> <level> [--scope session|turn] [--json]
 omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--json]
 omo thread send --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]
                 [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]] [--json]
@@ -43,19 +48,66 @@ omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
 omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 ```
 
-`omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
-API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
-give a new chat thread its own session, a connector opens one on the operator endpoint
-(`omo daemon run` ensures it on `<agent dir>/rpc/rpc.sock`; its `open_session` command is what the
-agent tool `thread_create` calls) or launches `omo` itself, then binds that session's durable id with
-`omo thread bind`. A session that is not running is still bound, sent to (`queued_offline`) and
-reported for; it takes its messages when it next starts.
+`omo thread create` opens a new session on the operator endpoint (`omo daemon run` ensures it on
+`<agent dir>/rpc/rpc.sock`; with nothing answering there it is `host_unavailable`, exit 3), the same
+`open_session` the agent tool `thread_create` uses. A connector creates one session per new chat
+thread this way and binds its durable id with `omo thread bind`. `omo thread` never resumes a
+session: a session that is not running is still bound, sent to (`queued_offline`) and reported for,
+and it takes its messages when it next starts.
 
 A target or session is a durable session id, or an exact name. Without `--all-scope` only
 sessions in the current directory's workspace resolve (the same rule the agent tools apply);
 an id outside it is `scope_denied`. `--idempotency-key` on a mutation replays the first result
 instead of acting twice (`deduplicated: true`); reusing a key with other arguments is
 `idempotency_conflict`.
+
+## Models
+
+Every session the gateway creates or re-models has a model record, reported as `model` on `list`
+rows, on `read`, on `create`, `set-model` and as `current` on `models`:
+
+```json
+{ "provider": "anthropic", "id": "claude-opus-5-5", "thinking_level": "medium", "provenance": "auto", "set_by": null, "reason": null }
+```
+
+- `provenance: "auto"`: nobody chose a model, so it was resolved from the user's connected
+  providers: the first rung of the active `model_profile` (`omo.json`, default `recommended`) that
+  a connected provider serves, else the first model a connected provider serves. It is resolved
+  before the session opens and passed to the host, so the host's own default (a stale settings
+  default, a scoped model) never decides it. `set_by` and `reason` are `null`. Chat: "model X (auto)".
+- `provenance: "set"`: an explicit choice, at `create --model` or later with `set-model` (or the
+  agent tools `thread_create` / `thread_set_model`, or `/model` in the session itself). `set_by`
+  says whose: `config` (the connector's configuration), `user` (the default for `omo thread`, and
+  for `/model`) or `lead` (a lead session's agent tool). Chat: "(scope default)", "(set by you)",
+  "(chosen by the lead)".
+- `provenance: "fallback"`: the engine switched away after a provider error. `set_by` keeps the
+  setter of the choice it overrode and `reason` is the provider error. When the engine reverts, the
+  record reads the original provenance again. Chat: "switched to Z".
+
+`model` is `null` for a session the gateway has no record of (one it neither created nor
+re-modelled). The record is kept in the gateway store by durable id, so it survives every resume:
+reopening a session never changes its model, and an explicit choice stays explicit.
+
+`create` takes `--model` as `provider/id`, an exact id, or a unique fragment of the id or display
+name; `--provider` narrows a bare id. `--thinking` is the starting level. Everything that can be
+refused is refused before a session opens: `model_not_found` (`details.available`, the first 20
+`provider/id`; empty when no provider is connected), `model_ambiguous` (`details.candidates`, up
+to 10), `thinking_level_unsupported` (`details.supported`), `invalid_arguments` (an empty model, a
+bad `--set-by`, `--set-by` without `--model`). `--set-by` defaults to `user` when a model is given.
+
+`models` lists what a new session could run (no thread), or what the thread's live session can
+switch to, with `current` its record: `{kind:"ok", thread_id|null, current: model|null, available:
+[{provider, id, name, thinking_levels}]}`. `set-model` switches a live session (the engine applies
+it from the next turn) with the same matching and refusals, plus `not_resumable` for a thread with
+no live owner. `set-reasoning` checks the level against the active model before anything changes
+(`thinking_level_unsupported` with `details.supported`); `--scope turn` changes only the current
+level, `session` (the default) also the model's remembered one.
+
+A runtime fallback switch writes ONE `milestone` row to each active outbound binding of the session
+subscribed to milestones. Its `text` is the sentence ("switched to openai/gpt-y after a provider
+error on anthropic/claude-opus-5-5") and it carries
+`model_change: {from: {provider, id}, to: {provider, id}, reason}`. Only such a row has
+`model_change`.
 
 ## Sending
 
@@ -387,22 +439,28 @@ every other subcommand prints the full result.
 
 | Subcommand | `--json` on success |
 | --- | --- |
-| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at: <ISO 8601 string>\|null, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, error_note?, ...}]`; live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread_id` ascending for ties. A live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
+| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at: <ISO 8601 string>\|null, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, model: <model>\|null, error_note?, ...}]`; live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread_id` ascending for ties. A live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
+| `create` | `{kind:"ok", thread: {thread_id, name, status, cwd, ..., model: <model>}, deduplicated: false}` |
+| `models` | `{kind:"ok", thread_id: <id>\|null, current: <model>\|null, available: [{provider, id, name, thinking_levels}]}` |
+| `set-model` | `{kind:"ok", thread_id, model: <model>}` |
+| `set-reasoning` | `{kind:"ok", thread_id, level, scope: session\|turn}` |
 | `send` | `{kind:"ok", thread_id, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
-| `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
+| `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?, model: <model>\|null}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
 | `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |
 | `rebind` | `{kind:"ok", binding, closed: [delivery ids], deduplicated}` |
 | `bindings` | `{kind:"ok", bindings: [<binding>], next_cursor}` |
 | `report` | `{kind:"ok", binding_id, revision, event, cursor, reply_token, armed, deduplicated}` |
 | `answer` | `{kind:"ok", binding_id, cursor, session_durable_id, answered_by: {platform_user_id, display, user_id?} \| null}` |
-| `outbox` | `{kind:"ok", binding_id, revision, status, rows: [{cursor, binding_id, revision, event, text, state, created_at, edit_message_id, provider_message_id, reply_token, question_state, outcome, answered_by}], next_cursor, acked_cursor, acked?}`; `answered_by` is the author an answer named (`--author-*` on `answer`), `null` for an answer without one and for every row that is not an answered question |
+| `outbox` | `{kind:"ok", binding_id, revision, status, rows: [{cursor, binding_id, revision, event, text, state, created_at, edit_message_id, provider_message_id, reply_token, question_state, outcome, answered_by, model_change?}], next_cursor, acked_cursor, acked?}`; `model_change` is only on a fallback milestone row (see Models); `answered_by` is the author an answer named (`--author-*` on `answer`), `null` for an answer without one and for every row that is not an answered question |
 | `ack` | `{kind:"ok", binding_id, acked_cursor, changed}` |
 
 `<binding>` is `{schema_version, binding_id, revision, status, platform, account_id, chat_id,
 thread_id, root_message_id, progress_message_id, session_realm_id, session_durable_id,
 direction: {inbound, outbound}, inbound_mode, outbound_events, policy_id, created_at, updated_at,
 lease_started_at, ttl_seconds, expires_at}`.
+
+`<model>` is `{provider, id, thinking_level, provenance: auto|set|fallback, set_by: config|user|lead|null, reason}` (see Models).
 
 A failure is `{kind:"error", error: {code, message, next_action, details?}}`; the code is one of
 the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`, "Error taxonomy").
@@ -415,8 +473,8 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | --- | --- |
 | 0 | done |
 | 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
-| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
-| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`. Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
+| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name`, a `--set-by`, `--scope`, `--thinking` or `set-reasoning` level outside its set, `--set-by` on `create` without `--model`, an empty `set-model` model (the SDK is not loaded) |
+| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`, `create` and `models` without a thread (the operator endpoint). Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
 | 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
 | 5 | `internal_error`, also when the plugin's thread SDK cannot be loaded (a broken install; with `--json` still one JSON error) |
 
@@ -433,6 +491,9 @@ try {
   await sdk.dispose()
 }
 ```
+
+The model verbs are `create`, `models`, `setModel` and `setReasoning`, with the CLI's fields in
+snake case (`fork_from`, `set_by`; `thread`, `model`, `provider`, `thinking`, `level`, `scope`).
 
 `pluginRoot` is `<omo-ai install>/plugin`. Every method resolves to the same data union as the
 CLI's JSON; nothing throws for a refusal. Pass `engineStatusAll` (a function returning the stdout of
