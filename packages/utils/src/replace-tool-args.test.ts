@@ -27,17 +27,30 @@ describe("replaceToolArgs", () => {
 			expect(output.args.format).toBe("markdown")
 		})
 
-		it("#when patching #then the original args object is not the same reference", () => {
-			// given
-			const originalArgs = { command: "echo hi" } as Record<string, unknown>
-			const output = { args: originalArgs }
+		it("#when patching #then the args object the host holds is the one that changes", () => {
+			// given: opencode passes `{ args }` to the hook and then executes its own `args` reference
+			const hostArgs = { command: "echo hi" } as Record<string, unknown>
+			const output = { args: hostArgs }
 
 			// when
 			replaceToolArgs(output, { command: "echo bye" })
 
 			// then
-			expect(output.args).not.toBe(originalArgs)
-			expect(originalArgs.command).toBe("echo hi")
+			expect(output.args).toBe(hostArgs)
+			expect(hostArgs.command).toBe("echo bye")
+		})
+
+		it("#when a later hook edits output.args in place #then the host still sees that edit", () => {
+			// given
+			const hostArgs = { command: "git status" } as Record<string, unknown>
+			const output = { args: hostArgs }
+
+			// when
+			replaceToolArgs(output, { command: "export CI=true; git status" })
+			output.args.command = `wrap '${output.args.command}'`
+
+			// then
+			expect(hostArgs.command).toBe("wrap 'export CI=true; git status'")
 		})
 	})
 

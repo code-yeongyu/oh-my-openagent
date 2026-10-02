@@ -65,7 +65,42 @@ function detectCommandShellType(): ShellType {
   return "powershell"
 }
 
+const POSIX_SHELL_NAMES = new Set(["bash", "sh", "zsh", "dash", "ksh"])
+
+// The `shell` key of the opencode config names the shell the bash tool really runs, which the
+// server's own environment cannot tell: Git Bash on Windows is `"shell": "bash"` with no SHELL set.
+export function shellTypeFromConfiguredShell(shell: unknown): ShellType | undefined {
+  if (typeof shell !== "string" || shell === "") {
+    return undefined
+  }
+
+  const shellName = shell.replace(/\\/g, "/").split("/").pop()?.toLowerCase().replace(/\.exe$/, "")
+  if (shellName && POSIX_SHELL_NAMES.has(shellName)) {
+    return "unix"
+  }
+  if (shellName === "csh" || shellName === "tcsh") {
+    return "csh"
+  }
+  return detectWindowsShellType(shell)
+}
+
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
+  let configuredShellType: Promise<ShellType | undefined> | undefined
+
+  function readConfiguredShellType(): Promise<ShellType | undefined> {
+    configuredShellType ??= (async () => {
+      try {
+        const result = await _ctx.client.config.get()
+        return shellTypeFromConfiguredShell((result as { data?: { shell?: unknown } }).data?.shell)
+      } catch {
+        // Not cached: the next git command asks again, and this one falls back to the environment.
+        configuredShellType = undefined
+        return undefined
+      }
+    })()
+    return configuredShellType
+  }
+
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -98,7 +133,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      const shellType = detectCommandShellType()
+      const shellType = (await readConfiguredShellType()) ?? detectCommandShellType()
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
       
       // Check if the command already starts with the prefix to avoid stacking.
