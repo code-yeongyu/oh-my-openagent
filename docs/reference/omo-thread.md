@@ -105,7 +105,8 @@ switch to, with `current` its record: `{kind:"ok", thread_id|null, current: mode
 it from the next turn) with the same matching and refusals, plus `not_resumable` for a thread with
 no live owner. `set-reasoning` checks the level against the active model before anything changes
 (`thinking_level_unsupported` with `details.supported`); `--scope turn` changes only the current
-level, `session` (the default) also the model's remembered one.
+level, `session` (the default) also the model's remembered one. The reported `level` and the
+recorded `thinking_level` are the level the session runs after the change, as the engine reports it.
 
 A runtime fallback switch writes ONE `milestone` row to each active outbound binding of the session
 subscribed to milestones. Its `text` is the sentence ("switched to openai/gpt-y after a provider

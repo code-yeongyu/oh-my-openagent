@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createThreadComponent } from "./component"
 import type { GatewayStoreEvent } from "./gateway/types"
@@ -16,6 +17,16 @@ import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./to
  * row to each outbound binding. Every test drives the SDK, the agent tool or the component the way a
  * connector, a lead session or the engine does, over a real gateway store.
  */
+
+/**
+ * The pinned engine's own session class, loaded from its dist like `senpi-test-runtime.ts` does: its model
+ * switch and thinking-level clamp are what the gateway's record has to agree with.
+ */
+type EngineSessionClass = { readonly prototype: { _clampThinkingLevel(level: string, available: readonly string[]): string } }
+const senpiDist = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
+const { AgentSession } = (await import(pathToFileURL(join(senpiDist, "core", "agent-session.js")).href)) as { AgentSession: EngineSessionClass }
+const { SessionManager } = (await import(pathToFileURL(join(senpiDist, "core", "session-manager.js")).href)) as { SessionManager: { inMemory(cwd?: string): EngineSessionManager } }
+type EngineSessionManager = { getSessionId(): string }
 
 const HOST_SOCKET = "/tmp/i-9425aaaaaaaaaaaa.sock"
 const DEAD_SOCKET = "/tmp/i-9425dddddddddddd.sock"
@@ -64,8 +75,14 @@ function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonl
     models.set(sessionId, { provider, id: modelId })
     return { provider, id: modelId }
   })
-  const setThinkingLevel = mock(async (sessionId: string, level: string, _scope?: "session" | "turn") => void thinking.set(sessionId, level))
   const levelsOf = (sessionId: string) => catalog.find((entry) => entry.provider === models.get(sessionId)?.provider && entry.id === models.get(sessionId)?.id)?.thinking_levels ?? []
+  // As senpi's rpc host answers set_thinking_level: `turn` refuses a level the active model cannot run before
+  // changing anything; the session scope applies it through the session, which clamps it to a supported one.
+  const setThinkingLevel = mock(async (sessionId: string, level: string, scope?: "session" | "turn") => {
+    const supported = levelsOf(sessionId)
+    if (scope === "turn" && !supported.includes(level)) throw new Error(`thinking_level_unsupported:Thinking level ${level} is not supported by the active model.`)
+    thinking.set(sessionId, supported.length === 0 || supported.includes(level) ? level : AgentSession.prototype._clampThinkingLevel(level, supported))
+  })
   const disk = (options.dead ?? []).map((id) => ({ durable_id: id, name: id, cwd: process.cwd(), created_at: "2026-10-01T00:00:00.000Z", updated_at: null, session_path: `/sessions/${id}.jsonl`, source_host: DEAD_SOCKET }))
   const host: ThreadHost = {
     socket: "/tmp/thread-9425-legacy.sock",
@@ -280,6 +297,60 @@ describe("#9425 agent tool thread_create", () => {
     const result = (output as { details: { result: unknown } }).details.result
     expect(fake.openSession.mock.calls[0]?.[0]).toMatchObject({ provider: "openai", modelId: "gpt-y", thinkingLevel: "low" })
     expect(result).toMatchObject({ kind: "ok", thread: { model: { provider: "openai", id: "gpt-y", thinking_level: "low", provenance: "set", set_by: "lead", reason: null } } })
+  })
+})
+
+/**
+ * #9425 set-reasoning through the agent tool, which leaves an unsupported session-scope level to the
+ * engine: the result and the record name the level the session runs after the change, which is the
+ * engine's clamp of the request when the model cannot run it, never the request itself.
+ */
+function toolFixture() {
+  const fake = fakeHost()
+  const agentDir = scratch("thread-9425-reasoning-")
+  const store = createGatewayStore({ agentDir })
+  disposables.push(store)
+  const tools = createThreadTools({ host: fake.host, store, stateDirectory: agentDir, callerSessionId: () => "dur-lead", callerWorkspaceRoot: () => process.cwd(), modelProfile: () => ({ active: "recommended" }) })
+  let calls = 0
+  const run = async (name: string, args: Record<string, unknown>) => {
+    const tool = tools.find((candidate) => candidate.name === name)
+    if (tool === undefined) throw new Error(`no tool ${name}`)
+    return ((await tool.execute(`call-${++calls}`, args, undefined, undefined, undefined as never)) as { details: { result: unknown } }).details.result
+  }
+  const engineLevel = async () => ((await fake.host.getState("rpc-1")) as { thinkingLevel?: string }).thinkingLevel
+  const recordedLevel = async () => (await store.sessionModels(["dur-lane"]))["dur-lane"]?.thinking_level
+  return { run, engineLevel, recordedLevel }
+}
+
+describe("#9425 set-reasoning records the level the engine runs", () => {
+  test("#given a model that runs at most high and is already at high #when the agent tool asks for xhigh #then the engine stays at high and the result and the record both say high", async () => {
+    const f = toolFixture()
+    expect(await f.run("thread_set_model", { thread: "lane", model: "claude-opus-5-5" })).toMatchObject({ kind: "ok" })
+    expect(await f.run("thread_set_reasoning", { thread: "lane", level: "high" })).toEqual({ kind: "ok", thread_id: "dur-lane", level: "high", scope: "session" })
+    expect(await f.run("thread_set_reasoning", { thread: "lane", level: "xhigh" })).toEqual({ kind: "ok", thread_id: "dur-lane", level: "high", scope: "session" })
+    expect(await f.engineLevel()).toBe("high")
+    expect(await f.recordedLevel()).toBe("high")
+  })
+
+  test("#given a session at medium #when the agent tool asks for xhigh and then low #then each change lands, the clamped one is reported and recorded at the level the engine chose, the supported one as asked", async () => {
+    const f = toolFixture()
+    await f.run("thread_set_model", { thread: "lane", model: "claude-opus-5-5" })
+    expect(await f.recordedLevel()).toBe("medium")
+    const clamped = (await f.run("thread_set_reasoning", { thread: "lane", level: "xhigh" })) as { level: string }
+    expect<string | undefined>(clamped.level).toBe(await f.engineLevel())
+    expect(clamped.level).not.toBe("xhigh")
+    expect(await f.recordedLevel()).toBe(clamped.level)
+    expect(await f.run("thread_set_reasoning", { thread: "lane", level: "low" })).toEqual({ kind: "ok", thread_id: "dur-lane", level: "low", scope: "session" })
+    expect(await f.engineLevel()).toBe("low")
+    expect(await f.recordedLevel()).toBe("low")
+  })
+
+  test("#given a turn-scope level the model cannot run #when the agent tool asks for it #then it is refused with the supported list and neither the engine nor the record changes", async () => {
+    const f = toolFixture()
+    await f.run("thread_set_model", { thread: "lane", model: "claude-opus-5-5" })
+    expect(await f.run("thread_set_reasoning", { thread: "lane", level: "xhigh", scope: "turn" })).toMatchObject({ kind: "error", error: { code: "thinking_level_unsupported", details: { supported: ["off", "low", "medium", "high"] } } })
+    expect(await f.engineLevel()).toBe("medium")
+    expect(await f.recordedLevel()).toBe("medium")
   })
 })
 

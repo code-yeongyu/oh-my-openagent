@@ -174,6 +174,8 @@ export async function setThreadModel(options: ThreadToolSurfaceOptions, current:
  * `thread_set_reasoning` / `omo thread set-reasoning`. With `checkFirst` the level is checked against
  * the active model before anything changes: senpi clamps an unsupported session-scope level silently
  * instead of refusing it. Without it the engine's own refusal is classified, as the agent tool always did.
+ * Either way the result and the record name the level the engine reports after the change - the clamped
+ * one when it clamped - never the level asked for.
  */
 export async function setThreadReasoning(options: ThreadToolSurfaceOptions, current: ThreadHostView, input: { readonly thread: string; readonly level: string; readonly scope?: string; readonly all_scope?: boolean }, callerId: string, checkFirst: boolean): Promise<ThreadToolResult> {
   if (!isThinkingLevel(input.level)) return failure("invalid_arguments", `The thinking level must be one of ${THINKING_LEVELS.join(", ")}.`, "Pass one of the listed levels.")
@@ -193,8 +195,11 @@ export async function setThreadReasoning(options: ThreadToolSurfaceOptions, curr
     if (!(error instanceof Error) || !error.message.startsWith("thinking_level_unsupported:")) throw error
     return unsupportedThinking(input.level, await port.getAvailableThinkingLevels(routingId(session)))
   }
-  await options.store.updateSessionThinking({ now: (options.now ?? options.store.now)(), durable_id: resolved.entry.thread_id, thinking_level: input.level })
-  return { kind: "ok", thread_id: resolved.entry.thread_id, level: input.level as (typeof THINKING_LEVELS)[number], scope: input.scope === "turn" ? "turn" : "session" }
+  const reported = stateThinking(await port.getState(routingId(session)))
+  // A host whose state names no level gives nothing true to record; the request is echoed and the record left as it was.
+  const effective = reported !== null && isThinkingLevel(reported) ? reported : undefined
+  if (effective !== undefined) await options.store.updateSessionThinking({ now: (options.now ?? options.store.now)(), durable_id: resolved.entry.thread_id, thinking_level: effective })
+  return { kind: "ok", thread_id: resolved.entry.thread_id, level: (effective ?? input.level) as (typeof THINKING_LEVELS)[number], scope: input.scope === "turn" ? "turn" : "session" }
 }
 
 export type ModelsResult = {
