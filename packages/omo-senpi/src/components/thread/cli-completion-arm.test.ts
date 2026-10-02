@@ -57,7 +57,7 @@ function runtime(agentDir: string, store: GatewayStore) {
     admitExternalMessage: () => ({ kind: "started", turn_epoch: 1 }),
     listAdmittedDeliveries: () => ({ pending: [], emitted: [] }),
   }
-  const pi = { cwd: process.cwd(), session, registerTool() {}, on(event: string, handler: Handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) }, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {} }
+  const pi = { cwd: process.cwd(), sessionContext: { host_instance: "runtime-1" }, session, registerTool() {}, on(event: string, handler: Handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) }, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {} }
   const ctx = { sessionManager: { getSessionId: () => "dur-1", getSessionFile: () => join(agentDir, "dur-1.jsonl") }, isIdle: () => true }
   const dispatch = async (event: string, payload: Record<string, unknown> = {}) => { for (const handler of handlers.get(event) ?? []) await handler({ type: event, ...payload }, ctx) }
   const logger = { logger: { info() {}, error() {}, warn() {} }, config: { getFlag: () => undefined } }
@@ -85,6 +85,10 @@ function sdkHost(onWake: () => Drain | undefined, edge: WakeEdge = COMMAND_WAKE)
   return {
     socket: "/tmp/thread-cli-arm-legacy.sock",
     listSessions: async () => [session],
+    listTarget: async (id, endpoint) => {
+      const sessions = [session].filter((row) => row.durableSessionId === id).map((row) => ({ ...row, socket: endpoint.socket, endpoint_kind: endpoint.kind }))
+      return { sessions, hosts: [{ socket: endpoint.socket, list_sessions: { sessions }, endpoint_kind: endpoint.kind, alive: true }], disk: [] }
+    },
     listView: async () => ({ sessions: [session], hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: [session] }, endpoint_kind: "rpc_host", alive: true }], disk: [] }),
     openSession: unused,
     getMessages: async () => [],

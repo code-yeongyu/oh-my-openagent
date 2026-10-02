@@ -47,6 +47,10 @@ function host(drain: () => Drain): ThreadHost {
   return {
     socket: "/tmp/thread-report-origin-legacy.sock",
     listSessions: async () => [session, peer],
+    listTarget: async (id, endpoint) => {
+      const sessions = [session, peer].filter((row) => row.durableSessionId === id).map((row) => ({ ...row, socket: endpoint.socket, endpoint_kind: endpoint.kind }))
+      return { sessions, hosts: [{ socket: endpoint.socket, list_sessions: { sessions }, endpoint_kind: endpoint.kind, alive: true }], disk: [] }
+    },
     listView: async () => ({ sessions: [session, peer], hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: [session, peer] }, endpoint_kind: "rpc_host", alive: true }], disk: [] }),
     openSession: unused,
     getMessages: async () => [],
@@ -124,7 +128,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
     },
     listAdmittedDeliveries: () => ({ pending: [...engine.pending], emitted: [...engine.emitted] }),
   }
-  const pi = { cwd: process.cwd(), session, registerTool(tool: CapturedTool) { tools.push(tool) }, on(event: string, handler: Handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) }, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {} }
+  const pi = { cwd: process.cwd(), sessionContext: { host_instance: "runtime-1" }, session, registerTool(tool: CapturedTool) { tools.push(tool) }, on(event: string, handler: Handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) }, registerCommand() {}, registerFlag() {}, getFlag() { return undefined }, sendMessage() {}, sendUserMessage() {} }
   const ctx = { sessionManager: { getSessionId: () => "dur-1", getSessionFile: () => join(agentDir, "dur-1.jsonl") }, isIdle: () => !busy() }
   const dispatch = async (event: string, payload: Record<string, unknown> = {}) => {
     for (const handler of handlers.get(event) ?? []) await handler({ type: event, ...payload }, ctx)
@@ -152,6 +156,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
       return await runtimeStore.recordOutcome(request)
     },
   }
+  await connectorStore.registerIncarnation({ durable_id: "dur-2", incarnation: "peer-runtime", endpoint: { socket: HOST_SOCKET, kind: "rpc_host" } })
   createThreadComponent({ host: host(registered), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store: componentStore }).register(pi as never, logger as never)
   const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: host(registered), store: connectorStore })
   cleanups.push(() => sdk.dispose())

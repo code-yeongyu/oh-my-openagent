@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { endpointKindOf } from "../endpoint-registry"
 import {
   toSessionControlDrainResult,
   type AdmitExternalMessageInput,
@@ -239,7 +240,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     try {
       await store.registerIncarnation({
         durable_id: session.durableId, incarnation,
-        endpoint: { socket: reply.socket, kind: options.runtimeInstance === undefined ? "tui" : "rpc_host" },
+        endpoint: { socket: reply.socket, kind: endpointKindOf(reply.socket, []) },
       })
     } catch (error) {
       retire()

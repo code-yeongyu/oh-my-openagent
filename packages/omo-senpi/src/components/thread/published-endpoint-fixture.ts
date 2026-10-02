@@ -33,7 +33,7 @@ export async function publishedWorld() {
     return (await tool.execute(`send-${++sequence}`, { thread, message: "hello" }, undefined, undefined, undefined as never)).details.result
   }
   async function owner(name: string, cwd = dir, durableId = "target", terminal = false) {
-    const socketPath = join(dir, `${name}.sock`)
+    const socketPath = join(dir, terminal ? "t-0123456789abcdef.sock" : `${name}.sock`)
     const sessionDir = join(dir, "sessions", "--test--")
     mkdirSync(sessionDir, { recursive: true })
     const sessionPath = join(sessionDir, `2026-10-02_${durableId}.jsonl`)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
@@ -315,6 +315,9 @@ function gatewayFixture() {
   const f = fixture()
   const hostSession: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
   const tuiSession: ThreadHostSession = { sessionId: "dur-tui", durableSessionId: "dur-tui", cwd: process.cwd(), name: "my-tui", status: "open", socket: TUI_SOCKET, endpoint_kind: "tui" }
+  const sessionsDir = join(f.stateDirectory, "sessions", "--fixture--")
+  mkdirSync(sessionsDir, { recursive: true })
+  for (const session of [hostSession, tuiSession]) writeFileSync(join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`), JSON.stringify({ type: "session", id: session.durableSessionId, cwd: session.cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n")
   const wakes: { endpoint: GatewayEndpointRef; ids: readonly string[] }[] = []
   const host: ThreadHost = {
     ...f.host,
@@ -334,7 +337,7 @@ function gatewayFixture() {
     },
   }
   const run = async (name: ThreadToolName, args: unknown, callerId: string, callId: string): Promise<ThreadToolResult> => {
-    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
+    const tools = createThreadTools({ host, stateDirectory: f.stateDirectory, sessionsDirectory: () => join(f.stateDirectory, "sessions"), store: f.store, callerSessionId: () => callerId, callerWorkspaceRoot: () => process.cwd() })
     const tool = tools.find((candidate) => candidate.name === name)
     const result = await tool!.execute(callId, args, undefined, undefined, { sessionManager: { getSessionId: () => callerId } } as never)
     return result.details.result as ThreadToolResult

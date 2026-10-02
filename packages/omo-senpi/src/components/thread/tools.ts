@@ -24,7 +24,6 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import type { GatewayEngine } from "./gateway/engine"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
-import { sendView } from "./tools/send-view"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -49,6 +48,8 @@ import {
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
+/** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
+const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
@@ -146,8 +147,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     if (receipted) running.add(receiptKey(scope))
     try {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
-      const current = name === "thread_send" && "thread" in value && typeof value.thread === "string"
-        ? await sendView(options, value.thread, () => view({ offline: true }))
+      const current = name === "thread_send" && "thread" in value && typeof value.thread === "string" && value.thread !== "self" && await store.sessionOwner(value.thread) !== null
+        ? PUBLISHED_SEND_VIEW
         : await view(receipted ? undefined : { offline: true })
       result = await sideEffect(current, value, scope.idempotency_key, callerId)
     } catch (error) {
@@ -247,6 +248,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose }
 
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
+    if (current === PUBLISHED_SEND_VIEW) return await deliverThroughGateway(options, engine, current, address, value, idempotencyKey, callerId, resolvedBy)
     const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, value.all_scope)), address, callerId, value.all_scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
     return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
@@ -254,8 +256,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
 }
 
 /**
- * The send path: resolution already applied the
- * caller's scope, so the engine is handed the durable id. The result keeps the send contract and
+ * The send path hands the durable id to the engine, which freshly validates the
+ * published endpoint and caller's scope. The result keeps the send contract and
  * adds `delivery_id`, `effective_mode` and `endpoint.kind`; an unreachable target is
  * `queued_offline` (the row is durable). A direct reply to the session that messaged this one
  * under the same causal root is refused `loop_detected`: answers travel through thread_read,
