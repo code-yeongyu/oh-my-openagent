@@ -6,12 +6,16 @@
  * V2 hosts load this entry directly while V1 hosts keep loading the package
  * root (`../index`, the untouched V1 PluginModule) and never evaluate this
  * file. V1 behaviour is unchanged.
- * Subsystem registration (tools/hooks, agents, orchestration, MCP, skills,
- * config, TUI) lands in follow-up PRs; each turns its rows of the runtime
- * parity matrix green.
+ * This slice (2/N) registers the tools and hooks subsystem: glob/grep
+ * tools, execute/session/shell hooks, and the `omo.tools` RPC surface.
+ * Remaining subsystems (agents, orchestration, MCP, skills, config, TUI)
+ * land in follow-up PRs; each turns its rows of the runtime parity
+ * matrix green.
  */
 import { Plugin } from "@opencode/plugin"
 import { z } from "zod"
+
+import { registerToolsAndHooks } from "./tools"
 
 const bootstrapRpc = {
   id: "omo",
@@ -30,6 +34,10 @@ export const omoV2Plugin = Plugin.define({
     ctx.rpc.register(bootstrapRpc, {
       status: async () => ({ ok: true, stage: "bootstrap" }),
     })
+    const disposeTools = await registerToolsAndHooks(ctx)
+    return async () => {
+      await disposeTools()
+    }
   },
 })
 
