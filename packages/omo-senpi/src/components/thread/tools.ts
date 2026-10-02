@@ -24,6 +24,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import type { GatewayEngine } from "./gateway/engine"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
+import { createThread, setThreadModel, setThreadReasoning } from "./model-control"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -168,12 +169,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     return output(result)
   }
 
-  const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value) => {
-    const entries = resolveEntries(options, current)
-    if (value.name !== undefined) { const existing = entries.find((entry) => entry.name.toLowerCase() === value.name?.trim().toLowerCase()); if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.") }
-    const session = await options.host.openSession({ cwd: value.cwd, forkFrom: value.fork_from, name: value.name })
-    return { kind: "ok", thread: summary(session), deduplicated: false }
-  }) }
+  const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value) => createThread(options, current, value, { set_by: "lead" })) }
   const list: AnyTool = {
     ...metadata("thread_list"),
     parameters: threadToolParamSchemas.thread_list,
@@ -205,40 +201,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     ...metadata("thread_set_model"),
     parameters: threadToolParamSchemas.thread_set_model,
     execute: (id: string, args: ThreadSetModelInput, _signal, _onUpdate, ectx) => execute("thread_set_model", id, args, ectx, async (current, value, _operationId, callerId) => {
-      const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope)
-      if (resolved.kind === "error") return { kind: "error", error: resolved }
-      const session = targetSession(current, resolved.entry.thread_id)
-      if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-      const pattern = value.model.trim().toLowerCase()
-      if (pattern.length === 0) return failure("invalid_arguments", "The model pattern is empty.", "Pass a model id or display-name fragment.")
-      const catalog = await sessionPort(options, session).getAvailableModels(routingId(session))
-      const available = value.provider === undefined ? catalog : catalog.filter((model) => model.provider.toLowerCase() === value.provider?.trim().toLowerCase())
-      let matches = available.filter((model) => `${model.provider}/${model.id}`.toLowerCase() === pattern)
-      if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase() === pattern)
-      if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase().includes(pattern) || model.name?.toLowerCase().includes(pattern))
-      if (matches.length === 0) return failure("model_not_found", `No available model matches "${value.model}".`, "Choose a provider/id from the available list and retry.", { available: catalog.slice(0, 20).map((model) => `${model.provider}/${model.id}`) })
-      if (matches.length > 1) return failure("model_ambiguous", `Several available models match "${value.model}".`, "Pass an exact provider/id or narrow the pattern with provider.", { candidates: matches.slice(0, 10).map((model) => `${model.provider}/${model.id}`) })
-      const selected = await sessionPort(options, session).setModel(routingId(session), matches[0].provider, matches[0].id)
-      return { kind: "ok", thread_id: resolved.entry.thread_id, model: { provider: selected.provider, id: selected.id } }
+      const set = await setThreadModel(options, current, value, callerId, "lead")
+      return set.kind === "error" ? set : { kind: "ok", thread_id: set.thread_id, model: { provider: set.model.provider, id: set.model.id } }
     }),
   }
   const setReasoning: AnyTool = {
     ...metadata("thread_set_reasoning"),
     parameters: threadToolParamSchemas.thread_set_reasoning,
-    execute: (id: string, args: ThreadSetReasoningInput, _signal, _onUpdate, ectx) => execute("thread_set_reasoning", id, args, ectx, async (current, value, _operationId, callerId) => {
-      const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope)
-      if (resolved.kind === "error") return { kind: "error", error: resolved }
-      const session = targetSession(current, resolved.entry.thread_id)
-      if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-      try {
-        await sessionPort(options, session).setThinkingLevel(routingId(session), value.level, value.scope === "turn" ? "turn" : undefined)
-      } catch (error) {
-        if (!(error instanceof Error) || !error.message.startsWith("thinking_level_unsupported:")) throw error
-        const supported = await sessionPort(options, session).getAvailableThinkingLevels(routingId(session))
-        return failure("thinking_level_unsupported", `Thinking level "${value.level}" is not supported by the active model.`, "Choose a level from the supported list and retry.", { supported })
-      }
-      return { kind: "ok", thread_id: resolved.entry.thread_id, level: value.level, scope: value.scope ?? "session" }
-    }),
+    execute: (id: string, args: ThreadSetReasoningInput, _signal, _onUpdate, ectx) => execute("thread_set_reasoning", id, args, ectx, async (current, value, _operationId, callerId) => setThreadReasoning(options, current, value, callerId, false)),
   }
   const relayTools = createRelayTools({ options, relay, view, failure })
   const dispose = () => {

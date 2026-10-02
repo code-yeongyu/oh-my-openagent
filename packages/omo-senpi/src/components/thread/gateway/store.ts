@@ -17,6 +17,7 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
+import type { ObserveModelRequest, ObserveModelResult, ThreadModel } from "./session-models"
 import type { DeliveryReceipt } from "./store-ops"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
@@ -116,6 +117,14 @@ export type GatewayStore = {
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
   readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
   readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
+  /** #9425: the gateway's own model choice for a session it created or re-modelled. */
+  readonly recordSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly model: ThreadModel }) => Promise<ThreadModel>
+  /** A new thinking level for a session with a model record; false when there is none. */
+  readonly updateSessionThinking: (request: { readonly now: number; readonly durable_id: string; readonly thinking_level: string }) => Promise<boolean>
+  /** The session's own `model_select`: keeps its record true and writes a fallback switch's milestone rows. */
+  readonly observeModelSelect: (request: ObserveModelRequest) => Promise<ObserveModelResult>
+  /** The model records of these sessions that exist, keyed by durable id; a plain read that takes no write lock. */
+  readonly sessionModels: (durableIds: readonly string[]) => Promise<Readonly<Record<string, ThreadModel>>>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
@@ -265,6 +274,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     releaseAnswer: (request) => call("release_answer", request),
     confirmAnswer: (request) => call("confirm_answer", request),
     markPriorDelivered: (request) => call("mark_prior_delivered", request),
+    recordSessionModel: (request) => call("record_session_model", request),
+    updateSessionThinking: (request) => call("update_session_thinking", request),
+    observeModelSelect: (request) => call("observe_model_select", request),
+    sessionModels: (durableIds) => call("session_models", durableIds),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

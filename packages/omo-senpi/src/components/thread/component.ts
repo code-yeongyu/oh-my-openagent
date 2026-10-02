@@ -7,6 +7,7 @@ import { createCompletionTracker, type AgentEndFacts } from "./gateway/completio
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
+import type { ModelRef, ModelSelectSource } from "./gateway/session-models"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
@@ -108,6 +109,27 @@ function waitingQuestionCallOf(event: unknown): string | undefined {
   if (typeof toolCallId !== "string" || typeof toolName !== "string") return undefined
   const flag = ASK_USER_WAIT_FLAGS[toolName]
   return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true ? toolCallId : undefined
+}
+
+const MODEL_SELECT_SOURCES: readonly ModelSelectSource[] = ["set", "cycle", "restore", "fallback", "fallback-revert"]
+
+function modelRefOf(value: unknown): ModelRef | null {
+  const { provider, id } = (value ?? {}) as { readonly provider?: unknown; readonly id?: unknown }
+  return typeof provider === "string" && typeof id === "string" ? { provider, id } : null
+}
+
+/** senpi `model_select`: the new model, the one it replaced, and why the engine switched. */
+function modelSelectOf(event: unknown): { readonly to: ModelRef; readonly from: ModelRef | null; readonly source: ModelSelectSource } | undefined {
+  const { model, previousModel, source } = (event ?? {}) as { readonly model?: unknown; readonly previousModel?: unknown; readonly source?: unknown }
+  const to = modelRefOf(model)
+  const known = MODEL_SELECT_SOURCES.find((candidate) => candidate === source)
+  return to === null || known === undefined ? undefined : { to, from: modelRefOf(previousModel), source: known }
+}
+
+/** The provider error of a failed assistant message (`stopReason: "error"`): what a fallback switch that follows it reports. */
+function providerErrorOf(message: EngineMessage): string | undefined {
+  const { stopReason, errorMessage } = message as { readonly stopReason?: unknown; readonly errorMessage?: unknown }
+  return stopReason === "error" && typeof errorMessage === "string" && errorMessage.length > 0 ? errorMessage : undefined
 }
 
 function durableIdOf(eventCtx: unknown): string | undefined {
@@ -240,9 +262,35 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const message = messageOf(event)
         if (message !== undefined) noteInput(run, message)
       })
+      let lastProviderError: string | undefined
       pi.on("message_end", (event) => {
         const message = messageOf(event)
-        if (message?.role === "assistant") run.answered = !callsTools(message)
+        if (message?.role !== "assistant") return
+        run.answered = !callsTools(message)
+        lastProviderError = providerErrorOf(message)
+      })
+      // #9425: the record of a session the gateway created or re-modelled follows the engine's own
+      // switches, and a fallback switch is written as a milestone to the session's bindings. Only a store
+      // that already exists is touched, and the switch waits for the write at most the settle bound.
+      pi.on("model_select", async (event, eventCtx) => {
+        const durableId = durableIdOf(eventCtx)
+        const select = modelSelectOf(event)
+        if (durableId === undefined || select === undefined || select.source === "restore" || !existsSync(gatewayDatabasePath(agentDir()))) return
+        const thinking = (pi as { readonly getThinkingLevel?: () => unknown }).getThinkingLevel?.()
+        const written = store.observeModelSelect({
+          now: store.now(),
+          durable_id: durableId,
+          ...select,
+          thinking_level: typeof thinking === "string" ? thinking : null,
+          reason: select.source === "fallback" ? (lastProviderError ?? null) : null,
+        }).then(() => undefined, (error: unknown) => ctx.logger.warn(`thread gateway: the model switch to ${select.to.provider}/${select.to.id} was not recorded: ${error instanceof Error ? error.message : String(error)}`))
+        await waitAtMost(written, COMPLETION_SETTLE_WAIT_MS)
+      })
+      pi.on("thinking_level_select", (event, eventCtx) => {
+        const durableId = durableIdOf(eventCtx)
+        const level = (event as { readonly level?: unknown } | undefined)?.level
+        if (durableId === undefined || typeof level !== "string" || !existsSync(gatewayDatabasePath(agentDir()))) return
+        void store.updateSessionThinking({ now: store.now(), durable_id: durableId, thinking_level: level }).catch((error: unknown) => ctx.logger.warn(`thread gateway: the thinking level ${level} was not recorded: ${error instanceof Error ? error.message : String(error)}`))
       })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)

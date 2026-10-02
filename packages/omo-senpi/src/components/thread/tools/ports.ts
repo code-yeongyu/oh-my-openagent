@@ -2,6 +2,7 @@ import type { AddressBookHost, DiskSession } from "../address-book"
 import type { EndpointKind } from "../endpoint-registry"
 import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
 import type { GatewayStore } from "../gateway/store"
+import type { ModelProfileChoice } from "../model-control"
 import type { ThreadTranscriptEntry } from "../reader"
 
 export type ThreadHostSession = {
@@ -27,6 +28,9 @@ export type ThreadHostSession = {
    */
   readonly socket?: string
 }
+
+/** One model a session could run, as `get_available_models` lists it (connected providers only). */
+export type ModelCatalogEntry = { readonly provider: string; readonly id: string; readonly name?: string; readonly thinking_levels?: readonly string[] }
 
 /** The per-session half of the host surface, bound to the ONE endpoint that holds the session. */
 export type ThreadSessionPort = Pick<
@@ -57,14 +61,17 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string }) => Promise<ThreadHostSession>
+  /** `provider`/`modelId`/`thinkingLevel` go to `open_session` as given: the session is created on them, a resume ignores them. */
+  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly provider?: string; readonly modelId?: string; readonly thinkingLevel?: string }) => Promise<ThreadHostSession>
+  /** The models a NEW session on this host could run; `get_available_models` is per session, so the host answers it through one. */
+  readonly availableModels?: () => Promise<readonly ModelCatalogEntry[]>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
-  readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
+  readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string; readonly thinkingLevel?: string }>
   readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }) => Promise<{ readonly turnId?: string }>
   readonly interrupt: (sessionId: string, turnId?: string) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
   readonly setSessionName: (sessionId: string, name: string) => Promise<void>
   readonly setModel: (sessionId: string, provider: string, modelId: string) => Promise<{ provider: string; id: string; name?: string }>
-  readonly getAvailableModels: (sessionId: string) => Promise<readonly { provider: string; id: string; name?: string }[]>
+  readonly getAvailableModels: (sessionId: string) => Promise<readonly ModelCatalogEntry[]>
   readonly setThinkingLevel: (sessionId: string, level: string, scope?: "session" | "turn") => Promise<void>
   readonly getAvailableThinkingLevels: (sessionId: string) => Promise<readonly string[]>
   /** Runs the session's registered inbox drain once (`wake`); every endpoint kind answers it. */
@@ -115,6 +122,8 @@ export type ThreadToolSurfaceOptions = {
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
+  /** The `model_profile` a session created with no model resolves from; absent: the caller workspace's omo.json. */
+  readonly modelProfile?: () => ModelProfileChoice
   readonly now?: () => number
 }
 

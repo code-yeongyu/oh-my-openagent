@@ -177,6 +177,25 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE session_meta ADD COLUMN endpoint_socket TEXT",
     "ALTER TABLE session_meta ADD COLUMN endpoint_kind TEXT CHECK (endpoint_kind IS NULL OR endpoint_kind IN ('tui', 'rpc_host'))",
   ],
+  // v6 (#9425): the model of each session the gateway created or re-modelled, and why it runs that
+  // model (`auto` from the connected providers, `set` by config/user/lead, `fallback` after a provider
+  // error). Keyed by durable id, so every resume path reads the same record. `chosen_*` is the model a
+  // fallback overrode, restored on the engine's fallback-revert.
+  [
+    `CREATE TABLE session_models (
+      durable_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      thinking_level TEXT,
+      provenance TEXT NOT NULL CHECK (provenance IN ('auto', 'set', 'fallback')),
+      set_by TEXT CHECK (set_by IS NULL OR set_by IN ('config', 'user', 'lead')),
+      reason TEXT,
+      chosen_provider TEXT,
+      chosen_model_id TEXT,
+      chosen_provenance TEXT CHECK (chosen_provenance IS NULL OR chosen_provenance IN ('auto', 'set')),
+      updated_at INTEGER NOT NULL
+    )`,
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms"] as const
+export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "session_models"] as const

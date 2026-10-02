@@ -223,6 +223,36 @@ describe("live thread request correlation", () => {
     )
   })
 
+  test("#given an open session on the host #when the catalog for a new session is read #then that session's get_available_models answers it with each model's thinking levels, and nothing is opened", async () => {
+    const models = [{ provider: "openai", id: "gpt-x", name: "GPT X", supportedThinkingLevels: ["low", "high"], contextWindow: 1 }]
+    await withRpc(
+      (frame) => (frame.type === "list_sessions" ? { success: true, data: { sessions: [{ sessionId: "rpc-7", cwd: "/w", status: "open" }] } } : { success: true, data: { models } }),
+      async (surface, frames) => {
+        expect(await surface.availableModels?.()).toEqual([{ provider: "openai", id: "gpt-x", name: "GPT X", thinking_levels: ["low", "high"] }])
+        expect(frames.map((f) => [f.type, f.sessionId])).toEqual([["list_sessions", undefined], ["get_available_models", "rpc-7"]])
+      },
+    )
+  })
+
+  test("#given a host with no open session #when the catalog for a new session is read #then a hidden worker probe is opened, asked, and closed", async () => {
+    await withRpc(
+      (frame) =>
+        frame.type === "list_sessions"
+          ? { success: true, data: { sessions: [{ sessionId: "rpc-1", cwd: "/w", status: "closing" }] } }
+          : frame.type === "open_session"
+            ? { success: true, data: { sessionId: "rpc-9", state: {} } }
+            : frame.type === "get_available_models"
+              ? { success: true, data: { models: [{ provider: "anthropic", id: "claude-opus-5-5" }] } }
+              : { success: true, data: {} },
+      async (surface, frames) => {
+        expect(await surface.availableModels?.()).toEqual([{ provider: "anthropic", id: "claude-opus-5-5" }])
+        expect(frames.map((f) => f.type)).toEqual(["list_sessions", "open_session", "get_available_models", "close_session"])
+        expect(frames[1]).toMatchObject({ kind: "worker", retain_on_disconnect: true })
+        expect(frames[3]).toMatchObject({ sessionId: "rpc-9" })
+      },
+    )
+  })
+
   test("#given a failure response for a different request id #when a request is pending #then it is ignored rather than settling the pending call", async () => {
     await withRpc(
       { success: true, data: {} },
