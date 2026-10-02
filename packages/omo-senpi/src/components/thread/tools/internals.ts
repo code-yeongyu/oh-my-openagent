@@ -98,17 +98,19 @@ export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostV
  * address names none of them - the session files on disk it names. A session no endpoint lists (its
  * terminal exited, was killed or stopped before this process saw it) is then still found by id or
  * name; its entry has no endpoint, so the gateway queues the send offline. Ambiguity and scope are
- * judged over the same entries as always.
+ * judged over the same entries as always. An exact durable id wins over every name, live or on disk:
+ * when no endpoint lists the id, its session file is looked up even if a live session's name matches.
  */
 export function sendAddressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView, address: string, allScope?: boolean): AddressEntry[] {
   const book = addressBook(options, view)
   const sessionsDirectory = options.sessionsDirectory?.()
   if (sessionsDirectory === undefined || address === "self") return book
+  const known = new Set(book.map((entry) => entry.durable_id))
+  if (known.has(address)) return book
   const root = options.callerWorkspaceRoot()
   const resolved = resolveTarget(toThreadAddressEntries(book), address, { all_scope: allScope, callerWorkspaceRoot: root })
-  if (resolved.kind !== "error" || resolved.code !== "not_found") return book
-  const known = new Set(book.map((entry) => entry.durable_id))
-  const found = findDiskSessions(sessionsDirectory, address, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) }).filter((session) => !known.has(session.durable_id))
+  const idOnly = resolved.kind !== "error" || resolved.code !== "not_found"
+  const found = findDiskSessions(sessionsDirectory, address, { all_scope: allScope, workspaceRoots: workspaceDirectories(root), id_only: idOnly }).filter((session) => !known.has(session.durable_id))
   return found.length === 0 ? book : addressBook(options, view, found)
 }
 

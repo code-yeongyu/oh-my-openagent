@@ -70,8 +70,8 @@ function storeAt(agentDir: string): GatewayStore {
 }
 
 /** One live host session that is not the target: another endpoint answers, the target's does not. */
-function otherLiveHost(): ThreadHost {
-  const other: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-other", cwd: process.cwd(), name: "other lane", status: "open", socket: "/tmp/i-0123456789abcdef.sock", endpoint_kind: "rpc_host" }
+function otherLiveHost(name = "other lane", wakes: string[] = []): ThreadHost {
+  const other: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-other", cwd: process.cwd(), name, status: "open", socket: "/tmp/i-0123456789abcdef.sock", endpoint_kind: "rpc_host" }
   const unused = async (): Promise<never> => {
     throw new Error("not used")
   }
@@ -89,7 +89,7 @@ function otherLiveHost(): ThreadHost {
     getAvailableModels: unused,
     setThinkingLevel: unused,
     getAvailableThinkingLevels: unused,
-    gateway: { wake: async () => ({ admitted: [] }) },
+    gateway: { wake: async (endpoint) => { wakes.push(endpoint.socket); return { admitted: [] } } },
   }
 }
 
@@ -222,6 +222,22 @@ describe("thread send to a session this process never saw alive", () => {
     const send = tools.find((tool) => tool.name === "thread_send")
     const output = await send!.execute("call-1", { thread: "dead-tui", message: "hello" }, undefined, undefined, { sessionManager: { getSessionId: () => "dur-other" } } as never)
     expect(output.details.result).toMatchObject({ kind: "ok", thread_id: "dur-dead", delivery: { kind: "queued_offline" }, endpoint: null })
+  })
+
+  test("#given an offline session X and a live session named X's durable id #when a tool and the SDK send to X's id #then both reach X queued_offline and the live session is never woken", async () => {
+    const agentDir = agentDirectory()
+    sessionFile(agentDir, "dur-x", process.cwd(), "x-lane")
+    const wakes: string[] = []
+    const host = otherLiveHost("dur-x", wakes)
+    const tools = createThreadTools({ host, stateDirectory: agentDir, store: storeAt(agentDir), sessionsDirectory: () => join(agentDir, "sessions"), callerSessionId: () => "dur-caller", callerWorkspaceRoot: () => process.cwd() })
+    const send = tools.find((tool) => tool.name === "thread_send")
+    const output = await send!.execute("call-1", { thread: "dur-x", message: "for x" }, undefined, undefined, { sessionManager: { getSessionId: () => "dur-caller" } } as never)
+    expect(output.details.result).toMatchObject({ kind: "ok", thread_id: "dur-x", delivery: { kind: "queued_offline" }, endpoint: null })
+    const sdk = sdkOver(agentDir, host)
+    expect(await sdk.send({ thread: "dur-x", text: "for x too" })).toMatchObject({ kind: "ok", thread_id: "dur-x", delivery: { kind: "queued_offline" }, endpoint_kind: null })
+    const store = storeAt(agentDir)
+    expect((await store.list()).map((row) => row.target_durable_id)).toEqual(["dur-x", "dur-x"])
+    expect(wakes).toEqual([])
   })
 
   test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and not_found unless all_scope, with nothing written", async () => {

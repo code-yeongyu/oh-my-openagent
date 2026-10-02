@@ -308,6 +308,8 @@ export type FindDiskSessionsOptions = {
   readonly all_scope?: boolean
   /** The caller's workspace as paths (its root, the git top level, their realpaths); a session directory under one of them is read for names. */
   readonly workspaceRoots?: readonly string[]
+  /** Look the address up as a durable id only: no session file is read for its name. */
+  readonly id_only?: boolean
 }
 
 /** senpi's session directory name for a cwd (`getDefaultSessionDirPath`), without the closing `--`: every cwd under `root` starts with it. */
@@ -368,7 +370,7 @@ export function findDiskSessions(sessionsDir: string, address: string, opts: Fin
     const session = diskSessionFromFacts(join(sessionsDir, dir, name))
     return session !== null && session.durable_id === address ? [session] : []
   }))
-  if (byId.length > 0) return byId
+  if (byId.length > 0 || opts.id_only === true) return byId
 
   const wanted = normalizeThreadName(address)
   if (wanted.length === 0) return []
