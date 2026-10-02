@@ -1,0 +1,123 @@
+import { afterEach, expect, test } from "bun:test"
+import { publishedWorld } from "./published-endpoint-fixture"
+
+const worlds: Array<Awaited<ReturnType<typeof publishedWorld>>> = []
+afterEach(async () => { for (const world of worlds.splice(0)) await world.close() })
+async function world() { const w = await publishedWorld(); worlds.push(w); return w }
+
+test("registered exact-id tool send delivers without global discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(1)
+  expect(w.discovery()).toBe(0)
+})
+
+test("registered exact-id SDK send delivers without global discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  const result = await w.sdk.send({ thread: "target", text: "hello sdk" })
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(1)
+  expect(w.discovery()).toBe(0)
+})
+
+test("cleanly closed target queues offline without global discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  await target.stop()
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(w.discovery()).toBe(0)
+})
+
+test("dead published socket queues offline after the close event without discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  await target.crash()
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(target.runtime.listAdmittedDeliveries().pending).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+}, 10000)
+
+test("old owner late shutdown cannot erase the takeover endpoint", async () => {
+  const w = await world()
+  const a = await w.owner("a")
+  const b = await w.owner("b")
+  await a.stop()
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(b.runtime.enqueueCalls).toHaveLength(1)
+  expect(a.runtime.listAdmittedDeliveries().pending).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+})
+
+test("moved owner receives the send and stale socket is never dialed", async () => {
+  const w = await world()
+  const a = await w.owner("a")
+  const b = await w.owner("b")
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(a.frames).toEqual([])
+  expect(b.runtime.enqueueCalls).toHaveLength(1)
+  expect(w.discovery()).toBe(0)
+})
+
+test("same durable id new incarnation replaces its own published record", async () => {
+  const w = await world()
+  const a = await w.owner("a")
+  const before = await w.store.sessionOwner("target")
+  await a.stop()
+  const b = await w.owner("b")
+  const after = await w.store.sessionOwner("target")
+  expect(after?.endpoint?.socket).toBe(b.socketPath)
+  expect(after?.incarnation).not.toBe(before?.incarnation)
+  expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+})
+
+test("foreign workspace is refused without a target entry or global discovery", async () => {
+  const w = await world()
+  const target = await w.owner("a", "/")
+  const result = await w.send()
+  expect(result).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+  expect(target.runtime.listAdmittedDeliveries().pending).toHaveLength(0)
+  expect(await w.store.list()).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+})
+
+test("missing metadata row preserves legacy discovery and delivery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  // A legacy session can answer list_sessions but never published ownership.
+  await w.store.identity()
+  const { Database } = await import("bun:sqlite")
+  const db = new Database(`${w.dir}/gateway/gateway.sqlite`)
+  db.run("DELETE FROM session_meta WHERE durable_id = ?", ["target"])
+  db.close()
+  expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(1)
+  expect(w.discovery()).toBeGreaterThan(0)
+})
+
+test("published listener that never answers completes offline after bounded validation", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  target.listing.answer = false
+  const connection = target.connected()
+  const sent = w.send()
+  await connection
+  expect(await sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+}, 10000)
+
+test("reused socket with a different live identity queues offline without delivery", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  target.listing.durableId = "unrelated"
+  expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(0)
+  expect(w.discovery()).toBe(0)
+})

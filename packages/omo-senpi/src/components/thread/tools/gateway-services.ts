@@ -5,6 +5,7 @@ import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
 import type { GatewayStore } from "../gateway/store"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
+import { sendView } from "./send-view"
 
 /** A host without the gateway port reaches no endpoint: every gateway send lands `queued_offline`. */
 const UNREACHABLE: GatewayEndpointPort = {
@@ -35,7 +36,7 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))
   const resolve: GatewayResolve = async (address, request) => {
-    const current = await view()
+    const current = await sendView(options, address, view)
     return await resolveFromEntries(() => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)), options.callerWorkspaceRoot)(address, request)
   }
   const engine = createGatewayEngine({ store, endpoints, resolve, now })

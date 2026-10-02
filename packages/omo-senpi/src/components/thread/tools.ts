@@ -24,6 +24,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import type { GatewayEngine } from "./gateway/engine"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
+import { sendView } from "./tools/send-view"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -145,7 +146,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     if (receipted) running.add(receiptKey(scope))
     try {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
-      result = await sideEffect(await view(receipted ? undefined : { offline: true }), value, scope.idempotency_key, callerId)
+      const current = name === "thread_send" && "thread" in value && typeof value.thread === "string"
+        ? await sendView(options, value.thread, () => view({ offline: true }))
+        : await view(receipted ? undefined : { offline: true })
+      result = await sideEffect(current, value, scope.idempotency_key, callerId)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the call failed (${message})`))

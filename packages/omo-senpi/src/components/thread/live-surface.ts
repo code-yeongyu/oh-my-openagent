@@ -404,6 +404,18 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
 
   return {
     socket: legacy,
+    listTarget: async (durableId, endpoint) => {
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      try {
+        const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", endpoint.kind === "tui" ? {} : OBSERVE, 200)
+        const target = sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
+          .map((session) => ({ ...session, socket: endpoint.socket, endpoint_kind: endpoint.kind }))
+        return { sessions: target, hosts: [{ socket: endpoint.socket, endpoint_kind: endpoint.kind, list_sessions: { sessions: target }, alive: true }], disk: [] }
+      } catch {
+        // A stale publication is offline, not a reason to discover another endpoint.
+        return { sessions: [], hosts: [], disk: [] }
+      }
+    },
     listSessions: async () => (await listView()).sessions,
     listView,
     endpoint: (socket) => sessionMethods(socket, (type, data) => callOn(socket, type, data)),

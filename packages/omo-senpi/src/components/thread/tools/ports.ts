@@ -73,6 +73,8 @@ export type ThreadHost = {
   readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
+  /** Fresh identity validation on exactly one published endpoint, without enumeration. */
+  readonly listTarget?: (durableId: string, endpoint: { readonly socket: string; readonly kind: EndpointKind }) => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */
   readonly endpoint?: (socket: string) => ThreadSessionPort
   /** The session gateway's sender port over the same endpoints (`wake`, `release_session`, `extension_ui_response`). */
