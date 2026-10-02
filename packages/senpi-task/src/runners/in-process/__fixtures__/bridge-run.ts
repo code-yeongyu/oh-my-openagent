@@ -50,5 +50,6 @@ for (const server of watch.servers) {
 }
 watch.stop()
 machine.cleanup()
-process.stdout.write(`${JSON.stringify({ bridges: bridges.length, stillListening: stillListening.length, stillOpen: stillOpen.length, startError })}\n`)
-process.exit(0)
+// Exit only once the line is flushed: on Windows a write to a pipe completes asynchronously, and
+// process.exit() would drop it. The explicit exit still ends the run if a leaked handle would keep it alive.
+process.stdout.write(`${JSON.stringify({ bridges: bridges.length, stillListening: stillListening.length, stillOpen: stillOpen.length, startError })}\n`, () => process.exit(0))
