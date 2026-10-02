@@ -10,7 +10,7 @@ export async function instrumentAcceptance(install, kitDir) {
   const edits = []
   let sends = 0
   let admissions = 0
-  const log = (fields) => `process.getBuiltinModule("node:fs").appendFileSync(process.env.THREAD_QA_TRACE,JSON.stringify({at:performance.timeOrigin+performance.now(),${fields}})+"\\n");`
+  const log = (fields) => `process.getBuiltinModule("node:fs").appendFileSync(process.env.THREAD_QA_TRACE,JSON.stringify({at:performance.timeOrigin+performance.now(),pid:process.pid,${fields}})+"\\n");`
   const text = (node) => source.slice(node.start, node.end)
   function visit(node) {
     if (node === null || typeof node !== "object") return
