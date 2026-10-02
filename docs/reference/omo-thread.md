@@ -90,11 +90,12 @@ reopening a session never changes its model, and an explicit choice stays explic
 
 `create` takes `--model` as `provider/id`, an exact id, or a unique fragment of the id or display
 name; `--provider` narrows a bare id, and without `--model` it restricts the auto choice to that
-provider (`model_not_found` when it serves no connected model). `--thinking` is the starting level. Everything that can be
+provider (`model_not_found` when it serves no connected model); an empty `--provider` counts as none. `--thinking` is the starting level. Everything that can be
 refused is refused before a session opens: `model_not_found` (`details.available`, the first 20
 `provider/id`; empty when no provider is connected), `model_ambiguous` (`details.candidates`, up
 to 10), `thinking_level_unsupported` (`details.supported`), `invalid_arguments` (an empty model, a
-bad `--set-by`, `--set-by` without `--model`). `--set-by` defaults to `user` when a model is given.
+bad `--set-by`, `--set-by` without `--model`), and `unsupported` for `--provider`, `--model` or
+`--thinking` on a host that cannot list a new session's models. `--set-by` defaults to `user` when a model is given.
 
 `models` lists what a new session could run (no thread), or what the thread's live session can
 switch to, with `current` its record: `{kind:"ok", thread_id|null, current: model|null, available:

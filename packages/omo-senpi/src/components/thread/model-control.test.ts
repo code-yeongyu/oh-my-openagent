@@ -46,7 +46,7 @@ function scratch(prefix: string): string {
  * providers, as get_available_models answers). `openSession` adds the session it opens; `reopen`
  * gives an existing durable id a new routing id, as a host restart and resume does.
  */
-function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonly string[] } = {}) {
+function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonly string[]; readonly listsCatalog?: boolean } = {}) {
   const catalog = options.catalog ?? CATALOG
   const sessions: ThreadHostSession[] = [{ sessionId: "rpc-1", durableSessionId: "dur-lane", cwd: process.cwd(), name: "lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }]
   const thinking = new Map<string, string>([["rpc-1", "medium"]])
@@ -79,7 +79,7 @@ function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonl
       disk,
     }),
     openSession,
-    availableModels: async () => catalog,
+    ...(options.listsCatalog === false ? {} : { availableModels: async () => catalog }),
     getMessages: async () => [{ role: "user", content: "hello" }],
     getState: async (sessionId) => ({ isStreaming: false, thinkingLevel: thinking.get(sessionId) }),
     prompt: async () => ({}),
@@ -103,7 +103,7 @@ function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonl
   return { host, openSession, setModel, setThinkingLevel, models, reopen }
 }
 
-function sdkFixture(options: { readonly catalog?: Catalog; readonly dead?: readonly string[]; readonly profile?: string } = {}) {
+function sdkFixture(options: { readonly catalog?: Catalog; readonly dead?: readonly string[]; readonly profile?: string; readonly listsCatalog?: boolean } = {}) {
   const agentDir = scratch("thread-9425-sdk-")
   const store = createGatewayStore({ agentDir })
   const fake = fakeHost(options)
@@ -137,6 +137,25 @@ describe("#9425 spawn: auto from the connected providers", () => {
     expect(threadOf(created).model).toMatchObject({ provider: "openai", id: "gpt-x", provenance: "auto", set_by: null })
     expect(await sdk.create({ provider: "google" })).toMatchObject({ kind: "error", error: { code: "model_not_found", details: { available: ["anthropic/claude-opus-5-5", "openai/gpt-x", "openai/gpt-y"] } } })
     expect(openSession).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given an empty or whitespace-only --provider #when a session is created #then it counts as no provider: auto over every connected model, and a model is matched unscoped", async () => {
+    const { sdk, openSession } = sdkFixture()
+    expect(threadOf(await sdk.create({ provider: "" })).model).toMatchObject({ provider: "anthropic", id: "claude-opus-5-5", provenance: "auto" })
+    expect(threadOf(await sdk.create({ provider: "  " })).model).toMatchObject({ provider: "anthropic", id: "claude-opus-5-5", provenance: "auto" })
+    expect(threadOf(await sdk.create({ provider: " ", model: "gpt-y" })).model).toMatchObject({ provider: "openai", id: "gpt-y", provenance: "set" })
+    expect(threadOf(await sdk.create({ provider: "", model: "openai/gpt-x" })).model).toMatchObject({ provider: "openai", id: "gpt-x", provenance: "set" })
+    expect(openSession.mock.calls.map(([params]) => `${params.provider}/${params.modelId}`)).toEqual(["anthropic/claude-opus-5-5", "anthropic/claude-opus-5-5", "openai/gpt-y", "openai/gpt-x"])
+  })
+
+  test("#given a host that cannot list a new session's models #when a session is created with a provider, model or level #then it is refused unsupported and nothing opens, and with none of them it opens on the host's default", async () => {
+    const { sdk, openSession } = sdkFixture({ listsCatalog: false })
+    expect(await sdk.create({ provider: "openai" })).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    expect(await sdk.create({ model: "gpt-x" })).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    expect(await sdk.create({ thinking: "high" })).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(await sdk.create({ name: "plain", provider: " " })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect(openSession.mock.calls).toEqual([[{ cwd: process.cwd(), name: "plain" }]])
   })
 
   test("#given no provider is connected #when a session is created #then it is refused model_not_found with an empty list and nothing opens", async () => {
@@ -194,6 +213,7 @@ describe("#9425 mid-session: set-model, set-reasoning, models", () => {
     expect(models.get("rpc-1")).toEqual({ provider: "openai", id: "gpt-y" })
     expect(await sdk.setModel({ thread: "lane", model: "gpt-x", set_by: "lead" })).toMatchObject({ kind: "ok", model: { id: "gpt-x", provenance: "set", set_by: "lead" } })
     expect(await sdk.read({ thread: "lane" })).toMatchObject({ kind: "ok", model: { provider: "openai", id: "gpt-x", set_by: "lead" } })
+    expect(await sdk.setModel({ thread: "lane", model: "gpt-y", provider: "  " })).toMatchObject({ kind: "ok", model: { provider: "openai", id: "gpt-y" } })
   })
 
   test("#given an unknown, ambiguous or empty model, or a thread with no live owner #when set-model runs #then each is refused with its code and the engine is not touched", async () => {
@@ -226,6 +246,7 @@ describe("#9425 mid-session: set-model, set-reasoning, models", () => {
     const { sdk } = sdkFixture()
     expect(await sdk.models({})).toEqual({ kind: "ok", thread_id: null, current: null, available: CATALOG.map((entry) => ({ ...entry })) })
     expect(await sdk.models({ provider: "anthropic" })).toMatchObject({ kind: "ok", available: [{ provider: "anthropic", id: "claude-opus-5-5" }] })
+    expect(await sdk.models({ provider: " " })).toEqual({ kind: "ok", thread_id: null, current: null, available: CATALOG.map((entry) => ({ ...entry })) })
   })
 
   test("#given a thread created through the gateway #when models runs for it #then current is its recorded model", async () => {

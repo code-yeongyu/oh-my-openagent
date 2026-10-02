@@ -54,11 +54,17 @@ export function modelProfileChoice(config: { readonly model_profile?: string; re
   return { profiles: config.model_profiles, active: active !== undefined && active.length > 0 ? active : DEFAULT_MODEL_PROFILE_ID }
 }
 
+/** The provider filter a caller asked for, lowercased; an empty or whitespace-only provider asks for none. */
+function providerFilter(provider: string | undefined): string | undefined {
+  const wanted = provider?.trim().toLowerCase()
+  return wanted === undefined || wanted.length === 0 ? undefined : wanted
+}
+
 /** Exact `provider/id`, then exact id, then a case-insensitive fragment of the id or display name; `provider` narrows first. */
 export function matchModel(catalog: readonly ModelCatalogEntry[], model: string, provider?: string): Matched | Failure {
   const pattern = model.trim().toLowerCase()
   if (pattern.length === 0) return failure("invalid_arguments", "The model pattern is empty.", "Pass a model id or display-name fragment.") as Failure
-  const wanted = provider?.trim().toLowerCase()
+  const wanted = providerFilter(provider)
   const available = wanted === undefined ? catalog : catalog.filter((entry) => entry.provider.toLowerCase() === wanted)
   let matches = available.filter((entry) => modelLabel(entry).toLowerCase() === pattern)
   if (matches.length === 0) matches = available.filter((entry) => entry.id.toLowerCase() === pattern)
@@ -112,9 +118,11 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
   }
   const cwd = input.cwd ?? defaults.cwd
   const opening = { ...(cwd === undefined ? {} : { cwd }), ...(input.fork_from === undefined ? {} : { forkFrom: input.fork_from }), ...(input.name === undefined ? {} : { name: input.name }) }
+  const wanted = providerFilter(input.provider)
   const listCatalog = options.host.availableModels
   if (listCatalog === undefined) {
-    if (input.model !== undefined || input.thinking !== undefined) return failure("unsupported", "This host cannot list the models a new session could use.", "Create the thread without a model, then use thread_set_model.")
+    // Without a catalog nothing can be chosen for the caller, so an explicit choice is refused rather than left to the host's default.
+    if (input.model !== undefined || input.thinking !== undefined || wanted !== undefined) return failure("unsupported", "This host cannot list the models a new session could use.", "Create the thread without a provider, model or thinking level, then use thread_set_model.")
     const session = await options.host.openSession(opening)
     return { kind: "ok", thread: summary(session), deduplicated: false }
   }
@@ -123,16 +131,15 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
   let thinking = input.thinking
   if (input.model !== undefined) {
     const separator = input.model.indexOf("/")
-    const scoped = input.provider === undefined && separator > 0 && separator < input.model.length - 1
-    const matched = matchModel(catalog, input.model, scoped ? input.model.slice(0, separator) : input.provider)
+    const scoped = wanted === undefined && separator > 0 && separator < input.model.length - 1
+    const matched = matchModel(catalog, input.model, scoped ? input.model.slice(0, separator) : wanted)
     if (matched.kind === "error") return matched
     entry = matched.entry
   } else {
     // An explicit provider with no model narrows auto to that provider: the caller's choice wins.
-    const wanted = input.provider?.trim().toLowerCase()
     const candidates = wanted === undefined ? catalog : catalog.filter((candidate) => candidate.provider.toLowerCase() === wanted)
     const auto = chooseAutoModel(candidates, options.modelProfile?.() ?? modelProfileChoice({}))
-    if (auto === undefined && wanted !== undefined) return failure("model_not_found", `No connected model is served by provider "${input.provider}".`, "Choose a provider from the available list, or connect that provider, then retry.", { available: catalog.slice(0, 20).map(modelLabel) })
+    if (auto === undefined && wanted !== undefined) return failure("model_not_found", `No connected model is served by provider "${input.provider?.trim()}".`, "Choose a provider from the available list, or connect that provider, then retry.", { available: catalog.slice(0, 20).map(modelLabel) })
     if (auto === undefined) return failure("model_not_found", "No connected provider serves a model.", "Connect a provider (omo setup, or /login in a session), then retry.", { available: [] })
     entry = auto.entry
     thinking ??= auto.thinking
@@ -212,7 +219,7 @@ export async function listThreadModels(options: ThreadToolSurfaceOptions, curren
     threadId = resolved.entry.thread_id
     catalog = await sessionPort(options, session).getAvailableModels(routingId(session))
   }
-  const wanted = input.provider?.trim().toLowerCase()
+  const wanted = providerFilter(input.provider)
   const available = (wanted === undefined ? catalog : catalog.filter((entry) => entry.provider.toLowerCase() === wanted))
     .map((entry) => ({ provider: entry.provider, id: entry.id, name: entry.name ?? entry.id, thinking_levels: [...(entry.thinking_levels ?? [])] }))
   const recorded = threadId === null ? null : ((await options.store.sessionModels([threadId]))[threadId] ?? null)
