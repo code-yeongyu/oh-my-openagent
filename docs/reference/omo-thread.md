@@ -17,8 +17,9 @@ Exact durable-id sends read the gateway's `session_meta` ownership record rather
 transaction. Re-registration replaces them with a fresh incarnation; release clears the endpoint
 only when its own incarnation still matches, so a late old owner cannot erase a takeover.
 The sender validates durable identity and workspace from a fresh `list_sessions` on only that
-socket, under a bounded 200 ms request. A stale socket, different live identity, or cleared endpoint
-uses the existing durable queued-offline path. A target with no metadata row keeps legacy discovery.
+socket, bounded like a terminal listing in discovery (1.5 s). A stale socket, different live identity, or cleared endpoint
+uses the existing durable queued-offline path. A target no registration published (no row, or only the sequence row its first delivery created)
+keeps legacy discovery.
 Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or setting changes.
 
 ```bash

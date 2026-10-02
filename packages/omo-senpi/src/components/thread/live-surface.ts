@@ -407,7 +407,9 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     listTarget: async (durableId, endpoint) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
       try {
-        const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", endpoint.kind === "tui" ? {} : OBSERVE, 200)
+        // A live owner gets the bound a terminal listing gets in discovery: nothing else is tried after
+        // this call, so a shorter one reports a busy owner offline (and refuses its steers).
+        const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", endpoint.kind === "tui" ? {} : OBSERVE, TUI_REQUEST_TIMEOUT_MS)
         const target = sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
           .map((session) => ({ ...session, socket: endpoint.socket, endpoint_kind: endpoint.kind }))
         return { sessions: target, hosts: [{ socket: endpoint.socket, endpoint_kind: endpoint.kind, list_sessions: { sessions: target }, alive: true }], disk: [] }

@@ -136,6 +136,31 @@ test("missing metadata row preserves legacy discovery and delivery", async () =>
   expect(w.discovery()).toBeGreaterThan(0)
 })
 
+test("a row only a delivery created keeps legacy discovery for the next send", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  await w.store.identity()
+  const { Database } = await import("bun:sqlite")
+  const db = new Database(`${w.dir}/gateway/gateway.sqlite`)
+  db.run("DELETE FROM session_meta WHERE durable_id = ?", ["target"])
+  db.close()
+  expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(await w.store.sessionOwner("target")).toBeNull()
+  // The target is still busy with the first message: the live endpoint takes the second as a follow-up behind it.
+  const second = await w.send()
+  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(2)
+})
+
+test("a live owner that lists slower than 200 ms is still reached", async () => {
+  const w = await world()
+  const target = await w.owner("a")
+  target.listing.delayMs = 400
+  expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+  expect(target.runtime.enqueueCalls).toHaveLength(1)
+  expect(w.discovery()).toBe(0)
+}, 10000)
+
 test("published listener that never answers completes offline after bounded validation", async () => {
   const w = await world()
   const target = await w.owner("a")

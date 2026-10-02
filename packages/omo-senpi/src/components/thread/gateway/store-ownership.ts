@@ -32,12 +32,16 @@ export async function clearEndpoint(ctx: StoreContext, request: ClearEndpointReq
   })
 }
 
-/** No row means legacy discovery; a row without an endpoint means queued offline. */
+/**
+ * A session no registration ever published means legacy discovery; a published one without an
+ * endpoint means queued offline. A delivery also creates the row (its sequence counter) with no
+ * incarnation, so only a row a registration wrote counts as published.
+ */
 export function sessionOwner(ctx: StoreContext, durableId: string): SessionOwner | null {
   const row = ctx.sql.one(["incarnation", "endpoint_socket", "endpoint_kind"], "SELECT incarnation, endpoint_socket, endpoint_kind FROM session_meta WHERE durable_id = ?", [durableId])
-  if (row === undefined) return null
+  if (row === undefined || typeof row.incarnation !== "string") return null
   return {
-    incarnation: typeof row.incarnation === "string" ? row.incarnation : null,
+    incarnation: row.incarnation,
     endpoint: typeof row.endpoint_socket === "string" && (row.endpoint_kind === "tui" || row.endpoint_kind === "rpc_host")
       ? { socket: row.endpoint_socket, kind: row.endpoint_kind }
       : null,

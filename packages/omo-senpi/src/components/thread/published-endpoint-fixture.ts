@@ -41,7 +41,7 @@ export async function publishedWorld() {
     const runtime = new FakeSessionRuntime(sessionPath, durableId, cwd)
     let drain: ((event: SenpiWakeEvent) => unknown) | undefined
     const frames: string[] = []
-    const listing = { answer: true, durableId }
+    const listing = { answer: true, durableId, delayMs: 0 }
     const sockets = new Set<Socket>()
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -54,6 +54,7 @@ export async function publishedWorld() {
         frames.push(frame.type)
         if (frame.type === "list_sessions" && !listing.answer) return
         void (async () => {
+          if (frame.type === "list_sessions" && listing.delayMs > 0) await new Promise((done) => setTimeout(done, listing.delayMs))
           const data = frame.type === "list_sessions"
             ? { sessions: [{ sessionId: `route-${name}`, durableSessionId: listing.durableId, sessionPath, cwd, name, status: "open" }] }
             : await drain?.({ type: "session_control_wake", reason: "command", reasons: ["command"], delivery_ids: frame.delivery_ids })
