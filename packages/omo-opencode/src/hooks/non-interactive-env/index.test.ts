@@ -544,3 +544,88 @@ describe("non-interactive-env hook", () => {
     })
   })
 })
+
+
+describe("non-interactive-env hook follows the shell opencode is configured to run", () => {
+  let originalPlatform: NodeJS.Platform
+  let originalEnv: Record<string, string | undefined>
+
+  beforeEach(() => {
+    originalPlatform = process.platform
+    originalEnv = {
+      SHELL: process.env.SHELL,
+      PSModulePath: process.env.PSModulePath,
+      MSYSTEM: process.env.MSYSTEM,
+      ComSpec: process.env.ComSpec,
+    }
+    // given the Windows server environment: no SHELL, no MSYSTEM, cmd as ComSpec
+    Object.defineProperty(process, "platform", { value: "win32" })
+    delete process.env.SHELL
+    delete process.env.MSYSTEM
+    process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+    process.env.ComSpec = "C:\\Windows\\System32\\cmd.exe"
+  })
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform })
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value
+      } else {
+        delete process.env[key]
+      }
+    }
+  })
+
+  function ctxWithShell(get: () => Promise<unknown>) {
+    return { client: { config: { get } } } as unknown as Parameters<typeof createNonInteractiveEnvHook>[0]
+  }
+
+  async function run(ctx: Parameters<typeof createNonInteractiveEnvHook>[0]): Promise<string> {
+    const hook = createNonInteractiveEnvHook(ctx)
+    const output: { args: Record<string, unknown>; message?: string } = { args: { command: "git status" } }
+    await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID: "1" }, output)
+    return output.args.command as string
+  }
+
+  test("#given Windows and shell bash in the opencode config #when git command executes #then uses unix export syntax", async () => {
+    const cmd = await run(ctxWithShell(async () => ({ data: { shell: "bash" } })))
+
+    expect(cmd).toStartWith("export ")
+    expect(cmd).toContain("GIT_EDITOR=:")
+    expect(cmd).toContain("; git status")
+    expect(cmd).not.toContain("$env:")
+    expect(cmd).not.toContain("set ")
+  })
+
+  test("#given Windows and a Git Bash path in the opencode config #when git command executes #then uses unix export syntax", async () => {
+    const cmd = await run(ctxWithShell(async () => ({ data: { shell: "C:\\Program Files\\Git\\bin\\bash.exe" } })))
+
+    expect(cmd).toStartWith("export ")
+  })
+
+  test("#given Windows and shell pwsh in the opencode config #when git command executes #then uses powershell syntax", async () => {
+    const cmd = await run(ctxWithShell(async () => ({ data: { shell: "pwsh" } })))
+
+    expect(cmd).toStartWith("$env:")
+  })
+
+  test("#given the opencode config cannot be read #when git command executes #then falls back to environment detection", async () => {
+    const cmd = await run(ctxWithShell(async () => { throw new Error("unavailable") }))
+
+    expect(cmd).toStartWith("set ")
+  })
+
+  test("#given the config is read once #when two git commands execute #then the config is not fetched again", async () => {
+    let calls = 0
+    const ctx = ctxWithShell(async () => { calls++; return { data: { shell: "bash" } } })
+    const hook = createNonInteractiveEnvHook(ctx)
+    for (const callID of ["1", "2"]) {
+      const output: { args: Record<string, unknown>; message?: string } = { args: { command: "git log" } }
+      await hook["tool.execute.before"]({ tool: "bash", sessionID: "test", callID }, output)
+      expect(output.args.command as string).toStartWith("export ")
+    }
+
+    expect(calls).toBe(1)
+  })
+})
