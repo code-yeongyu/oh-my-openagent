@@ -112,9 +112,14 @@ Self-send and a cycle back to the sender under one causal root are `loop_detecte
 
 - The record is closed: every field is present (`null` when unset), timestamps are UTC RFC 3339, `schema_version` 1. `thread_id` defaults to `"@chat"`, `direction` to both ways, `inbound_mode` to `auto`, `outbound_events` to all four, `ttl_seconds` to 604800 (`null` = no expiry).
 - At most one `active` binding per `(platform, account_id, chat_id, thread_id)`; a second bind is `binding_conflict` with the holder's `binding_id`/`revision`/`session`. No implicit takeover.
+- Trust model for binding mutations: `thread_unbind` and `thread_rebind` (and the CLI's `unbind`/`rebind`) share `thread_bind`'s local single-user trust model. Any session or CLI caller of this agent dir may unbind or rebind any binding; they are NOT restricted to the session the binding is attached to (unlike `thread_report`, which is `scope_denied` outside it). The `expected_revision` CAS guards against stale writes, not against another local caller.
 - `revision` is a CAS token: `unbind`/`rebind` name `expected_revision` (`stale_revision` otherwise) and bump it. `rebind` resets `lease_started_at` but never moves `expires_at`, and refuses deliveries queued under the old revision `binding_closed` (they are never moved). A detached or expired binding is `binding_inactive`; unbinding it again replays success with `already_closed: true`.
 - Idempotency is per `(principal, tool, key)`: the same key with the same arguments replays (`deduplicated: true`), with other arguments it is `idempotency_conflict`. An inbound connector message uses `event:<event_id>` as its key, so one platform message is admitted once.
 - A delivery through a binding carries `binding=<id>@<revision>` in its provenance header, `source=external`, and the actor.
+
+## Claimant liveness
+
+A claim (an inbox drain claiming a delivery, an answer in flight) records its claimant as `{ pid, process_start_time, instance_id }`; `gateway/process-identity.ts` `isClaimantDead` decides whether another process may reconcile it. The start time comes from `ps -o lstart=` (C locale, UTC, recorded as `epoch:<seconds>`). On win32 there is no `ps`, so `process_start_time` is null and liveness falls back to the pid alone: a dead pid is dead, a live pid counts as live, and a reused pid is mistaken for the original claimant. That is acceptable only because `omo thread` and the gateway endpoints refuse win32 today. Windows support requires a real start-time source (for example the process creation time from the OS) before it lands.
 
 ## Outbox contract
 

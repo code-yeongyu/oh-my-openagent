@@ -230,6 +230,15 @@ a connector drives the binding.
   `binding_inactive`.
 - `--ttl` is in seconds (default 604800, 7 days); `--ttl none` never expires. `--direction` and
   `--events` (default all four) decide what may flow each way.
+- `unbind` and `rebind` follow the same local single-user trust model as `bind`: any session or
+  CLI caller on this agent dir may unbind or rebind any binding, not only the session it is
+  attached to. `--revision` protects against a stale write, not against another local caller.
+  Run the gateway only for one local user.
+
+Claimant liveness: a claim records the claiming process's pid and start time, so a pid that was
+reused after the claimant died is not mistaken for it. On win32 there is no start-time source, so
+liveness would rest on the pid alone; that is why `omo thread` and the gateway endpoints refuse
+win32 today, and Windows support requires a real start-time source first.
 
 ## Reports and the outbox
 
