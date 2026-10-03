@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs } from "./types"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
-import { isCoordinatorAgent, COORDINATOR_AGENT_NAMES, isPlanFamily } from "./constants"
+import { isCoordinatorAgent, COORDINATOR_AGENT_NAMES, isPlanFamily, isHephaestusAgent, HEPHAESTUS_DELEGATION_ALLOWLIST } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { sanitizeSubagentType } from "./subagent-discovery"
 import type { ResolveSubagentExecutionOptions, SubagentRequestPreflight } from "./subagent-resolution-types"
@@ -13,6 +13,10 @@ function buildSisyphusJuniorError(categoryExamples: string): string {
   return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. ${exampleHint}
 
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
+}
+
+function buildHephaestusAllowlistError(agentName: string): string {
+  return `Cannot delegate to "${agentName}" via task. Hephaestus's delegation table only allows subagent_type=${HEPHAESTUS_DELEGATION_ALLOWLIST.map((name) => `"${name}"`).join(", ")}. Use category="..." for implementation work instead.`
 }
 
 export function validateSubagentRequest(
@@ -62,6 +66,17 @@ Create the work plan directly - that's your job as the planning agent.`,
         agentToUse: "",
         categoryModel: undefined,
         error: `Cannot delegate to coordinator agent "${agentName}" via task(). Coordinator agents (${COORDINATOR_AGENT_NAMES.join(", ")}) own the orchestration loop and must not be used as subagent targets — doing so creates duplicate coordinators and conflicting team state. Select a worker agent (e.g., sisyphus-junior via category, hephaestus, oracle) instead.`,
+      },
+    }
+  }
+
+  if (isHephaestusAgent(parentAgent) && !HEPHAESTUS_DELEGATION_ALLOWLIST.includes(agentConfigKey)) {
+    return {
+      kind: "invalid",
+      result: {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: buildHephaestusAllowlistError(agentName),
       },
     }
   }
