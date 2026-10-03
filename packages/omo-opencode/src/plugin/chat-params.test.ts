@@ -183,6 +183,88 @@ describe("createChatParamsHandler", () => {
     })
   })
 
+  test("injects anthropic thinking when variant cannot resolve on a metadata-less custom provider", async () => {
+    //#given
+    sharedModule.writeProviderModelsCache({ connected: [], models: {} })
+
+    const handler = createChatParamsHandler()
+
+    const input = {
+      sessionID: "ses_chat_params_custom_thinking",
+      agent: { name: "sisyphus" },
+      model: {
+        providerID: "custom-anthropic",
+        modelID: "glm-4.7",
+        api: { id: "glm-4.7", url: "https://custom.api.com/api/v1", npm: "@ai-sdk/anthropic" },
+      },
+      provider: { id: "custom-anthropic" },
+      message: { variant: "high" },
+    }
+
+    const output: ChatParamsOutput = {
+      temperature: 0.1,
+      topP: 1,
+      topK: 1,
+      options: {},
+    }
+    const rawMessage = (input as { message: Record<string, unknown> }).message
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.options.thinking).toEqual({ type: "enabled", budgetTokens: 16000 })
+    expect(rawMessage.variant).toBeUndefined()
+  })
+
+  test("keeps variants untouched for non-anthropic SDK packages", async () => {
+    //#given
+    sharedModule.writeProviderModelsCache({
+      connected: ["openai"],
+      models: {
+        openai: [
+          {
+            id: "gpt-5.4",
+            name: "GPT-5.4",
+            temperature: true,
+            reasoning: true,
+            variants: { low: {}, high: {} },
+            limit: { output: 128_000 },
+          },
+        ],
+      },
+    })
+
+    const handler = createChatParamsHandler()
+
+    const input = {
+      sessionID: "ses_chat_params_known_provider",
+      agent: { name: "oracle" },
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.4",
+        api: { id: "gpt-5.4", url: "https://api.openai.com/v1", npm: "@ai-sdk/openai" },
+      },
+      provider: { id: "openai" },
+      message: { variant: "high" },
+    }
+
+    const output: ChatParamsOutput = {
+      temperature: 0.1,
+      topP: 1,
+      topK: 1,
+      options: {},
+    }
+    const rawMessage = (input as { message: Record<string, unknown> }).message
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.options.thinking).toBeUndefined()
+    expect(rawMessage.variant).toBe("high")
+  })
+
   test("falls back to default maxOutputTokens when stored and compatibility tokens are non-positive", async () => {
     //#given
     const logSpy = spyOn(sharedModule, "log").mockImplementation(() => undefined)

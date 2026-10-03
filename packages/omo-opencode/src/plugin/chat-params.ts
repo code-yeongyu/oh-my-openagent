@@ -4,6 +4,21 @@ import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../sh
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
+const ANTHROPIC_COMPATIBLE_NPM_PACKAGES = new Set([
+  "@ai-sdk/anthropic",
+  "@ai-sdk/google-vertex/anthropic",
+])
+
+const THINKING_BUDGET_TOKENS_BY_LEVEL: Record<string, number> = {
+  low: 4000,
+  medium: 8000,
+  high: 16000,
+  xhigh: 31999,
+  max: 31999,
+}
+
+const DEFAULT_THINKING_BUDGET_TOKENS = 16000
+
 export type ChatParamsInput = {
   sessionID: string
   agent: { name?: string }
@@ -14,6 +29,7 @@ export type ChatParamsInput = {
 
 type ChatParamsHookInput = ChatParamsInput & {
   rawMessage?: Record<string, unknown>
+  modelApiNpm?: string
 }
 
 export type ChatParamsOutput = {
@@ -62,6 +78,8 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (typeof modelID !== "string") return null
   if (typeof providerId !== "string") return null
 
+  const modelApiNpm = isRecord(model.api) && typeof model.api.npm === "string" ? model.api.npm : undefined
+
   return {
     sessionID,
     agent: { name: agentName },
@@ -69,6 +87,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     provider: { id: providerId },
     message,
     rawMessage: message,
+    modelApiNpm,
   }
 }
 
@@ -141,6 +160,24 @@ export function createChatParamsHandler(_args: {
       }
     }
     normalizedInput.message = normalizedInput.rawMessage as { variant?: string }
+
+    if (
+      compatibility.variant !== undefined &&
+      !isRecord(output.options.thinking) &&
+      output.options.effort === undefined &&
+      output.options.reasoningEffort === undefined &&
+      normalizedInput.modelApiNpm !== undefined &&
+      ANTHROPIC_COMPATIBLE_NPM_PACKAGES.has(normalizedInput.modelApiNpm)
+    ) {
+      output.options.thinking = {
+        type: "enabled",
+        budgetTokens:
+          THINKING_BUDGET_TOKENS_BY_LEVEL[compatibility.variant.toLowerCase()] ?? DEFAULT_THINKING_BUDGET_TOKENS,
+      }
+      if (normalizedInput.rawMessage) {
+        delete normalizedInput.rawMessage.variant
+      }
+    }
 
     if (compatibility.reasoningEffort !== undefined) {
       output.options.reasoningEffort = compatibility.reasoningEffort
