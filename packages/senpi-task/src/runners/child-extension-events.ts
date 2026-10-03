@@ -1,6 +1,7 @@
 import * as z from "zod"
 
 export const CHILD_PERMISSION_EVENT = "computer.permission_required"
+export const TASK_CHILD_EXTENSION_EVENT = "omo.task.child_extension_event"
 
 const permissionEventSchema = z.object({
   type: z.literal(CHILD_PERMISSION_EVENT),

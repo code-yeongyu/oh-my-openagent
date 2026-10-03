@@ -1,5 +1,5 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
-export { CHILD_PERMISSION_EVENT, parseChildExtensionEvent } from "./runners/child-extension-events"
+export { CHILD_PERMISSION_EVENT, TASK_CHILD_EXTENSION_EVENT, parseChildExtensionEvent } from "./runners/child-extension-events"
 export type { ChildExtensionEvent, ChildExtensionListener } from "./runners/child-extension-events"
 export { createWorkpoolTool, createWorkpoolWorkerTool, buildWorkpoolExecute } from "./tools/workpool"
 export { WorkpoolParams, WorkpoolYieldParams } from "./tools/workpool-schema"

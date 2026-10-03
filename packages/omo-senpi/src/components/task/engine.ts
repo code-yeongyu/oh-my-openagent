@@ -10,6 +10,7 @@ import {
   createTaskRecordStore,
   readSessionAncestry,
   resolveMemberExtensionEntryPath,
+  TASK_CHILD_EXTENSION_EVENT,
   type AgentDefinition,
   type ChildPlanner,
   type CompletionNotifier,
@@ -49,7 +50,6 @@ import type { TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "./terminal-observers"
-import { TASK_CHILD_EXTENSION_EVENT } from "../computer-use/permission-events"
 import { admitAdapter } from "./engine-admission"
 
 export { admitAdapter } from "./engine-admission"
