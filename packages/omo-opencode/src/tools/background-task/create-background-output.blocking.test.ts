@@ -61,6 +61,7 @@ describe("createBackgroundOutput block=true polling", () => {
       sessionId: "ses-retry-visible",
     })
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: (id: string) => {
         if (id !== task.id) return undefined
         lookupCount += 1
@@ -98,6 +99,7 @@ describe("createBackgroundOutput block=true polling", () => {
     let pollCount = 0
     const task = createTask({ status: "running" })
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: (id: string) => {
         if (id !== task.id) return undefined
 
@@ -135,6 +137,7 @@ describe("createBackgroundOutput block=true polling", () => {
     let pollCount = 0
     const task = createTask({ status: "running" })
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: (id: string) => {
         if (id !== task.id) return undefined
         pollCount += 1
