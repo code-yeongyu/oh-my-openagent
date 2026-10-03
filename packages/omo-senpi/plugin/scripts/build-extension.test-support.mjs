@@ -11,6 +11,7 @@ export function outputPathsIn(root) {
     memberOutputPath: join(root, "omo-member.js"),
     supervisorOutputPath: join(root, "memory-run-supervisor.mjs"),
     advisorRuntimeOutputPath: join(root, "omo-init-deep-advisor.js"),
+    sidePanelRuntimeOutputPath: join(root, "omo-side-panel.js"),
     toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(root, "runtime", "rollback-migrate.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),

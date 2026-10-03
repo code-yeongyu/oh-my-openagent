@@ -67,6 +67,8 @@ const threadSdkEntryPath = join(packageRoot, "src", "extension", "thread-sdk.ts"
 const threadSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, THREAD_SDK_RELATIVE_PATH)
 const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-deep-advisor", "runtime.ts")
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
+const sidePanelRuntimeEntryPath = join(packageRoot, "src", "components", "side-panel", "runtime.ts")
+const sidePanelRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-side-panel.js")
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
@@ -107,6 +109,7 @@ export const extensionBuildPaths = {
   toolkitSdkOutputPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
+  sidePanelRuntimeOutputPath,
   rollbackRuntimeOutputPath,
   computerUseOutputPath,
   gatewayStoreWorkerOutputPath,
@@ -123,6 +126,7 @@ export function resolveOutputs(options) {
     memberOutput: sibling(options.memberOutputPath, memberOutputPath, "omo-member.js"),
     supervisorOutput: sibling(options.supervisorOutputPath, supervisorOutputPath, "memory-run-supervisor.mjs"),
     advisorRuntimeOutput: sibling(options.advisorRuntimeOutputPath, advisorRuntimeOutputPath, "omo-init-deep-advisor.js"),
+    sidePanelRuntimeOutput: sibling(options.sidePanelRuntimeOutputPath, sidePanelRuntimeOutputPath, "omo-side-panel.js"),
     toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
@@ -146,6 +150,7 @@ export async function buildExtension(options = {}) {
     memberOutput,
     supervisorOutput,
     advisorRuntimeOutput,
+    sidePanelRuntimeOutput,
     toolkitSdkOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
@@ -158,6 +163,7 @@ export async function buildExtension(options = {}) {
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
   const advisorRuntimeInputs = await buildEntry(advisorRuntimeEntryPath, advisorRuntimeOutput, buildDefines)
+  const sidePanelRuntimeInputs = await buildEntry(sidePanelRuntimeEntryPath, sidePanelRuntimeOutput, buildDefines)
   const rollbackRuntimeInputs = await buildEntry(rollbackRuntimeEntryPath, rollbackRuntimeOutput, buildDefines, sdkExternalSpecifiers)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
@@ -174,6 +180,7 @@ export async function buildExtension(options = {}) {
     memberInputs,
     supervisorInputs,
     advisorRuntimeInputs,
+    sidePanelRuntimeInputs,
     toolkitSdkInputs,
     rollbackRuntimeInputs,
     computerUseInputs,

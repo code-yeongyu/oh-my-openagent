@@ -183,6 +183,109 @@ To opt in to the body footer:
 
 The block may live at the shared top level, in `[native]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Native harness.
 
+### `side_panel` (Senpi harness)
+
+The optional `side_panel` block controls the omo side panel (`schema/side-panel.ts`): a right-hand
+column in the Senpi TUI carrying session, goal, context, usage, subagent, tool, git and memory
+state. The
+transcript reflows into the remaining width instead of being covered. The panel is **off by
+default** because it rearranges the whole screen.
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `enabled` | boolean | `false` | Render the panel. |
+| `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
+| `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
+| `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
+| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval, and a floor rather than a ceiling: each provider keeps its own freshness window (five minutes for Anthropic, two and a half for Codex), so a smaller value does not poll faster than that. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
+| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default: it is the one section that reads credentials and contacts a vendor, so it is its own opt-in (see below). |
+
+Rows are clickable because the fullscreen renderer already captures the mouse and activates OSC 8
+hyperlinks; the panel paints its rows as links to a private scheme and claims the renderer's URL
+callback while it is mounted, handing every other URL straight back. Clicking a file opens its diff;
+clicking a subagent opens its card followed by everything that child recorded, rendered by the task
+engine itself - the same text `task_output` would give you. `/side-panel-diff` reaches the file
+viewer by name; it is registered only when the panel is enabled for the run.
+
+A child the engine is holding rather than running - a host session whose daemon went away, one
+caught by a draining host, or simply one the engine detached when its session ended - is counted
+and drawn as `parked` rather than as running or done, and its card names the reason, because a
+dead daemon and a draining host ask different things of you. The ordinary detach names no reason
+at all and shows up only as a residency that is no longer resident, so the column reads both: a
+child whose record still says `running` while nothing holds it would otherwise sit there with its
+timer climbing. The card also names the lane a child runs in - a session of the shared daemon, a
+child process, or the parent's own process - because those three fail in different ways.
+
+The viewer scrolls with the wheel as well as with the arrow keys, and while it is open the wheel
+belongs to it: the host routes a wheel event to whatever sits under the pointer in its layout, and
+an overlay is not part of that layout, so without this the wheel would scroll the transcript behind
+the popup instead. Text selection is untouched either way, because the renderer activates a link
+only on a press and release inside one cell with no drag - dragging still selects, and double or
+triple clicks still take a word or a line.
+
+The `goal` section is drawn only while a goal is registered, so an ordinary session loses no rows
+to it. It carries the objective, the goal's status, the time and tokens it has spent, how much of a
+token budget is gone when one is set, and the continuation count once the loop has run unattended.
+Clicking the objective opens the whole text, which is the point of that row: the column has space
+for one cut line of it. The block follows the panel's ordinary refresh instead of subscribing,
+because a goal publishes no event an extension can listen for; an unchanged store costs one `stat`
+and no parse at all.
+
+The `memory` section names the memory identity this session writes to - one machine carries many,
+and the wrong one is invisible otherwise - and then reports only what is wrong or waiting. It warns
+when automatic reflection is **parked**: repeated failures trip a circuit breaker that stops
+reflection until a half-open probe, so the row says when that probe is due, and clicking it opens
+the whole failure - reason, fingerprint and the host's own detail - which is what tells you whether
+to run `/reflect` or fix a sandbox. It also carries the resident kibitzer, the sidecar that decides what memory to surface: how many
+wakes it has settled for this session, how long ago the last one was, and a warning when that last
+wake failed - a kibitzer failing every wake is memory that quietly stopped being updated. Whether
+it is awake *right now* is deliberately not shown: that state lives in the sidecar process and is
+never written down, so the column reports what it did rather than guessing at what it is doing.
+Below that it counts the facts batches queued but not yet
+applied, and what recall is holding for this session: nudges waiting for the next prompt, and
+memory paths already surfaced in it. Healthy memory with an empty backlog is a single line. The
+block is read on a five-second floor rather than a watcher, because a park takes three failed
+reflection runs and the queue drains per reflection - nothing here can change between two tool
+calls of one turn.
+
+The `usage` section is **off by default** and is the only part of the panel that reaches the
+network. Turning it on (`"sections": { "usage": true }`) makes the panel read, from the agent
+directory, `auth.json` (the OAuth access token of the subscription the session is serving from) and
+`credential-pool-state.json` (which pooled account is pinned or rotated in), and send that token as a
+bearer to the vendor's own usage endpoint: `api.anthropic.com/api/oauth/usage` for a Claude
+subscription, `chatgpt.com/backend-api/wham/usage` for Codex. Nothing else is read or sent, and no
+API key is ever used. While it is off the poller is never created: no credential read, no timer,
+no request. The answers land in one cache file
+per machine (`$XDG_CACHE_HOME/omo-senpi/side-panel-usage.json`), so parallel sessions share both
+the numbers and the backoff instead of each asking on its own.
+
+```jsonc
+{
+  "side_panel": {
+    "enabled": true,
+    "width": "24%",
+    "sections": { "usage": true }
+  }
+}
+```
+
+`--omo-side-panel` forces the panel on for one run. It cannot force it off: senpi sets a boolean
+extension flag to `true` whatever value follows it (`--omo-side-panel=false` still turns it on) and
+rejects a `--no-` form as an unknown option, so `enabled` in `omo.json` is the switch that can say no.
+
+The reflowing column needs the fullscreen TUI (`--tui-mode fullscreen`, or `tuiMode: "fullscreen"` in
+senpi's settings): only that renderer owns a layout root to wrap. In the default regular mode - and on
+any host that does not expose the layout seam - the same rows render as a block above the editor
+instead, and a headless run renders nothing.
+
+The `files` section lists the working copy as `git status` sees it, both status columns included.
+Clicking a row opens that file's diff in a scrollable read-only viewer, and `/side-panel-diff`
+reaches the same viewer by name - for keyboards, and for a host that hands out no URL hook. No
+keyboard chord is registered by default.
+
+The block may live at the shared top level, in `[native]`, or in profile layers, and follows the
+normal resolution order.
+
 ### `models` (shared catalog)
 
 A record of short name to catalog entry (`schema/model-catalog.ts`). The canonical strict shape is `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs remain accepted and are normalized to `reasoning`; other tuning fields are not catalog-entry keys.
