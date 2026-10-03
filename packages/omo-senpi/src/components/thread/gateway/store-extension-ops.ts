@@ -68,6 +68,10 @@ export class StoreExtensions {
 
   private async ensure(descriptor: StoreExtensionRegistration, now: number): Promise<number> {
     const { name, migrations } = descriptor
+    // Like core `migrate`, a current extension costs no write lock: read its version lock-free and
+    // take the lock only when a step is pending or the version is unknown.
+    const current = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
+    if (current !== undefined && Number(current.version) === migrations.length) return migrations.length
     for (;;) {
       const step = await transaction(this.ctx, "extension_migrate", () => {
         const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
@@ -104,8 +108,12 @@ export class StoreExtensions {
     const compensations: (() => void)[] = []
     let value: unknown
     try {
-      await this.ensure(entry.descriptor, now)
+      const version = await this.ensure(entry.descriptor, now)
       value = await transaction(this.ctx, "extension_call", async () => {
+        // Re-check under the call's own lock: a newer binary may have migrated the extension since.
+        const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
+        const locked = Number(row?.version ?? 0)
+        if (locked !== version) throw new GatewaySchemaVersionError(locked, entry.descriptor.migrations.length, `Extension ${name}`)
         const before = extensionSchema(this.ctx.sql)
         const scope = extensionTransaction({ ...this.ctx, afterCommit: effects, afterRollback: compensations }, name, now, this.resolveTarget)
         let timer: ReturnType<typeof setTimeout> | undefined

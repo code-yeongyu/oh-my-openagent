@@ -13,6 +13,11 @@ The session-gateway store supports namespaced extensions: compiled operations ca
 
 A session-gateway store or store extension whose schema is newer than the running omo is refused with `gateway_schema_too_new` and left untouched: an older binary neither migrates nor lowers the core `user_version`, and an extension that registers fewer migrations than its stored version keeps its stored version, data and existing registration. ([#9331](https://github.com/code-yeongyu/oh-my-openagent/pull/9331))
 
+### Fixed
+
+- Session-gateway store extensions hold the write lock for less time and can no longer commit a partial operation: a call to a current extension takes the lock once and re-checks the extension's version under it, an exact session id resolves from its session file without enumerating live endpoints inside the lock, and a statement run while an `enqueue`/`bind`/... helper is still in flight fails the call instead of landing inside that helper's savepoint.
+
+
 ## [5.1.13] - 2026-10-03
 
 **MCP tools work again when memory is on.** Since 5.1.10, a finished memory child or delegated task shut the shared MCP servers down for the whole process, so every MCP call failed with `MCP server <name> is disabled`. This release runs on senpi 2026.10.3, which gives each session its own binding to the shared servers; it was verified with the shipped bundle. If you can't update yet, turn memory off until you do: set `"memory": { "enabled": false }` in `~/.omo/omo.json`, or start omo with `--omo-senpi-memory-disabled=true`.

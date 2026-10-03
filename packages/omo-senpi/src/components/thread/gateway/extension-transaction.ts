@@ -13,8 +13,18 @@ export class ExtensionTransactionEndedError extends Error {
   }
 }
 
+export class ExtensionTransactionBusyError extends Error {
+  readonly code = "extension_operation_failed"
+  constructor(readonly extension: string) {
+    super(`The ${extension} extension ran a statement while a tx helper (enqueue, bind, ...) was still in flight; await the helper first.`)
+  }
+}
+
 export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve) {
   let active = true
+  // Helpers that are running right now. A joined helper can hold a savepoint open across an await,
+  // so a statement run in that gap would land inside it and vanish with a data refusal's rollback.
+  let running = 0
   let cancelled = false
   let failure: unknown
   let tail = Promise.resolve()
@@ -28,12 +38,20 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
     return body()
   }
   function schedule<T>(body: () => Promise<T>): Promise<T> {
-    const next = active ? tail.then(() => joined(body)) : Promise.reject<T>(new ExtensionTransactionEndedError(name))
-    tail = next.then(() => undefined, (error: unknown) => { failure = error })
+    if (!active) return Promise.reject<T>(new ExtensionTransactionEndedError(name))
+    // In flight from the call until it settles, not from when its turn on `tail` comes.
+    running++
+    const next = tail.then(() => joined(body))
+    // Registered before the caller can await `next`, so the count drops before the caller resumes.
+    tail = next.then(() => { running-- }, (error: unknown) => { running--; failure = error })
     return next
   }
   function sql<T>(statement: string, body: () => T): T {
     checkActive()
+    if (running > 0) {
+      failure = new ExtensionTransactionBusyError(name)
+      throw failure
+    }
     const before = extensionSchema(ctx.sql)
     try {
       singleExtensionStatement(statement)
