@@ -110,7 +110,7 @@ async function flushPendingParentWakeForTest(manager: BackgroundManager, session
 }
 
 describe("BackgroundManager parent wake active turn events", () => {
-  test("#when background task completes during active parent turn #then parent wake stays queued without prompt injection", async () => {
+  test("#when background task completes during active parent turn #then wake is admitted noReply and reply obligation stays queued", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -132,11 +132,12 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
-  test("#when duplicate background completions overlap an active parent turn #then one coalesced wake stays queued", async () => {
+  test("#when duplicate background completions overlap an active parent turn #then one coalesced noReply wake is admitted", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "busy" },
@@ -164,15 +165,14 @@ describe("BackgroundManager parent wake active turn events", () => {
     // when
     await notifyParentSessionForTest(manager, taskA)
     await notifyParentSessionForTest(manager, taskB)
-    await Promise.all([
-      flushPendingParentWakeForTest(manager, "parent-1"),
-      flushPendingParentWakeForTest(manager, "parent-1"),
-    ])
+    await flushPendingParentWakeForTest(manager, "parent-1")
+    await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
     const pendingWake = getPendingParentWakes(manager).get("parent-1")
-    expect(pendingWake).toBeDefined()
+    expect(pendingWake?.shouldReply).toBe(true)
     expect(JSON.stringify(pendingWake?.notifications)).toContain("ALL BACKGROUND TASKS COMPLETE")
   })
 
