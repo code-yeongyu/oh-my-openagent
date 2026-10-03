@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -51,6 +51,32 @@ describe("reflection health alert", () => {
       lastDetail: "stable",
     })
     expect(typeof entry.recommendation).toBe("string")
+  })
+
+  test("#given completions beside the newest failing run's log #when the alert fires #then the remediation names that log's absolute path", async () => {
+    // given: production keeps completions at <reflectionDir>/completions next to <reflectionDir>/runs
+    const reflection = await mkdtemp(join(tmpdir(), "reflection-health-alert-dir-"))
+    roots.push(reflection)
+    const completions = join(reflection, "completions")
+    await mkdir(completions)
+    for (let index = 0; index < 3; index += 1) {
+      await writeFile(
+        join(completions, `run-${index}.json`),
+        JSON.stringify(completion(`run-${index}`, minutesAgo(60 - index * 10), "stable")),
+      )
+    }
+    const log = join(reflection, "runs", "run-2", "child-stderr.log")
+    await mkdir(join(reflection, "runs", "run-2"), { recursive: true })
+    await writeFile(log, "stable\n")
+    const harness = liveHarness()
+
+    // when
+    await emitReflectionHealthAlert(completions, "agent-test", harness.live, harness.once)
+
+    // then
+    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)?.data as ReflectionHealthEntry
+    expect(entry.recommendation).toBe(`inspect ${log}`)
+    expect(harness.notifications[0]).toContain(log)
   })
 
   test("#given a child that died inside a Bun code frame #when the alert fires #then neither the notice nor the entry carries source lines", async () => {
