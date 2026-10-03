@@ -9,7 +9,7 @@ import {
 
 import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
 import { defaultEngineChild, describeEngineSource } from "./engine-source"
-import { engineErrorCode, TrackedDesktopService } from "./engine-status"
+import { engineErrorCode, TrackedDesktopService, type TrackedDesktopServiceOptions } from "./engine-status"
 import { describeEnginePermissions } from "./permission-status"
 
 export interface ComputerUseRuntimeOptions {
@@ -18,6 +18,7 @@ export interface ComputerUseRuntimeOptions {
   /** Starts the engine child; `enginePath` is `computer.engine_path` (`undefined`: the located binary). */
   readonly engineChild?: (enginePath: string | undefined) => ChildFactory
   readonly onEngineError: (code: ComputerUseEngineErrorCode) => void
+  readonly onPermissionRequired?: TrackedDesktopServiceOptions["onPermissionRequired"]
 }
 
 /**
@@ -31,6 +32,7 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
   const service = new TrackedDesktopService({
     createChild: engineChild(options.settings.enginePath),
     onError: (error) => options.onEngineError(engineErrorCode(error)),
+    onPermissionRequired: options.onPermissionRequired,
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
   const deps: ComputerToolDeps = { handle, executeTool: options.executeTool }

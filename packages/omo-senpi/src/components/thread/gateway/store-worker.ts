@@ -16,10 +16,18 @@ import * as ops from "./store-ops"
 import * as models from "./store-model-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
+import { StoreExtensions } from "./store-extension-ops"
+import { ExtensionTransactionEndedError } from "./extension-transaction"
+import type { GatewayResolution, GatewayResolve } from "./engine"
+import type { StoreExtensionRegistration } from "./store-extensions"
 import type { GatewayStoreConfig, GatewayStoreEvent } from "./types"
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
 type WorkerControl = { readonly type: "resume"; readonly hook: string }
+type ResolutionReply = { readonly type: "resolution"; readonly id: number } & (
+  | { readonly ok: true; readonly value: GatewayResolution }
+  | { readonly ok: false; readonly error: string }
+)
 
 const port = parentPort
 if (port === null) throw new Error("the gateway store worker must run as a worker thread")
@@ -31,8 +39,39 @@ const barriers = new Map<string, () => void>()
 let running = false
 let context: ops.StoreContext | undefined
 let connection: SqliteConnection | undefined
+let extensions: StoreExtensions | undefined
+/** The extension whose registration or call ran most recently; a late error is attributed to it. */
+let lastExtensionActivity: string | undefined
+let nextResolution = 1
+const resolutions = new Map<number, { readonly resolve: (value: GatewayResolution) => void; readonly reject: (error: Error) => void }>()
+const resolveTarget: GatewayResolve = (address, request) => new Promise((resolve, reject) => {
+  const id = nextResolution++
+  resolutions.set(id, { resolve, reject })
+  port.postMessage({ type: "resolve", id, address, request })
+})
 
-port.on("message", (message: WorkerRequest | WorkerControl) => {
+function lateTransactionError(error: unknown): void {
+  if (error instanceof ExtensionTransactionEndedError) {
+    emit({ kind: "extension_error", extension: error.extension, phase: "stale_transaction", error: error.message })
+    return
+  }
+  // A late asynchronous error fires after its operation returned: report it as a store event,
+  // attributed to the most recent extension activity on a best effort, and keep the worker (and
+  // with it the store) serving instead of letting the process default take the worker down.
+  emit({ kind: "extension_error", extension: lastExtensionActivity ?? "worker", phase: "async", error: error instanceof Error ? error.message : String(error) })
+}
+
+process.on("uncaughtException", lateTransactionError)
+process.on("unhandledRejection", lateTransactionError)
+
+port.on("message", (message: WorkerRequest | WorkerControl | ResolutionReply) => {
+  if (message.type === "resolution") {
+    const pending = resolutions.get(message.id)
+    resolutions.delete(message.id)
+    if (message.ok) pending?.resolve(message.value)
+    else pending?.reject(new Error(message.error))
+    return
+  }
   if (message.type === "resume") {
     barriers.get(message.hook)?.()
     barriers.delete(message.hook)
@@ -83,10 +122,27 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     connection?.close()
     connection = undefined
     context = undefined
+    extensions = undefined
     return null
   }
   const ctx = requireContext()
   switch (op) {
+    case "extension_register": {
+      const request = args as { readonly extension: StoreExtensionRegistration; readonly now: number }
+      lastExtensionActivity = request.extension.name
+      const result = await extensions?.register(request.extension, request.now)
+      return { result, retained: extensions?.holds(request.extension) === true }
+    }
+    case "extension_call": {
+      const request = args as { readonly name: string; readonly op: string; readonly args: unknown; readonly now: number }
+      lastExtensionActivity = request.name
+      try {
+        return await extensions?.call(request.name, request.op, request.args, request.now)
+      } finally {
+        for (const pending of resolutions.values()) pending.reject(new ExtensionTransactionEndedError(request.name))
+        resolutions.clear()
+      }
+    }
     case "enqueue": return await ops.enqueue(ctx, args as Parameters<typeof ops.enqueue>[1])
     case "reconcile": return await ops.reconcile(ctx, args as Parameters<typeof ops.reconcile>[1])
     case "claim": return await ops.claim(ctx, args as Parameters<typeof ops.claim>[1])
@@ -122,9 +178,12 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "confirm_answer": return await relay.confirmAnswer(ctx, args as Parameters<typeof relay.confirmAnswer>[1])
     case "mark_prior_delivered": return await relay.markPriorDelivered(ctx, args as Parameters<typeof relay.markPriorDelivered>[1])
     case "record_session_model": return await models.recordSessionModel(ctx, args as Parameters<typeof models.recordSessionModel>[1])
+    case "record_session_model_if_current": return await models.recordSessionModelIfCurrent(ctx, args as Parameters<typeof models.recordSessionModelIfCurrent>[1])
     case "update_session_thinking": return await models.updateSessionThinking(ctx, args as Parameters<typeof models.updateSessionThinking>[1])
+    case "record_pending_session_model": return await models.recordPendingSessionModel(ctx, args as Parameters<typeof models.recordPendingSessionModel>[1])
     case "observe_model_select": return await models.observeModelSelect(ctx, args as Parameters<typeof models.observeModelSelect>[1])
     case "session_models": return models.sessionModels(ctx, args as readonly string[])
+    case "session_model_record": return models.sessionModelRecord(ctx, args as string)
     default: throw new Error(`unknown gateway store op: ${op}`)
   }
 }
@@ -172,6 +231,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
     delay: (ms) => delay(ms),
   }
   await ops.migrate(context)
+  extensions = new StoreExtensions(context, resolveTarget)
   const legacy = await ops.migrateLegacyMailboxes(context, request.now)
   context.stats.writes = 0
   context.stats.transactions = 0

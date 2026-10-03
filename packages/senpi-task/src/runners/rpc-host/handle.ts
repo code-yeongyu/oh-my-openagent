@@ -22,11 +22,13 @@ import type {
 import { startHostHeartbeat } from "./handle-heartbeat"
 import { createHandleListeners } from "./handle-listeners"
 import { createHandleRecovery } from "./handle-recovery"
+import { createHandleStop } from "./handle-stop"
 import { createHandleTeardown } from "./handle-teardown"
 import { createHandleWaiters } from "./handle-waiters"
 import { isTransportLossError } from "./reattach"
 import type { HostSessionParked } from "./session-client"
 import { extractTerminalAssistantMessage } from "./terminal-message"
+import { isTransportRecoveryExpired } from "./transport-recovery"
 
 /**
  * The steerable child handle over ONE daemon session: identical turn semantics to
@@ -36,7 +38,7 @@ import { extractTerminalAssistantMessage } from "./terminal-message"
  * `terminate()` is `abort` then `close_session`, both bounded.
  */
 export function createHostSessionHandle(options: HostSessionHandleOptions): HostSessionChildHandle {
-  const { taskId, heartbeatIntervalMs, now, closeGraceMs, reattach, shardEvents } = options
+  const { taskId, heartbeatIntervalMs, now, closeGraceMs, reattach, shardEvents, transportRecovery } = options
   // Both move on a reattach: a recovered transport is a new port, and a reopened session a new
   // routing handle on a possibly new host generation. The session PATH is the child's identity.
   let client: HostSessionPort = options.client
@@ -131,10 +133,28 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     settleClassified(classifySessionExit({ cause, intent }))
   }
 
+  const stop = createHandleStop({
+    taskId, closeGraceMs, settleExit,
+    port: () => client,
+    exited: () => outcome !== undefined,
+    detached: () => detached,
+    recovering: () => recovery.recovering(),
+    markAborted: () => { abortedByUser = true },
+    intent: () => intent,
+    settleClosed: () => settleClassified(classifySessionExit({ cause: { kind: "session_closed", reason: "client_close" }, intent })),
+    waitForExit: () => waiters.waitForExit(outcome),
+  })
+
   const recovery = createHandleRecovery({
     taskId,
     reattach,
     events: shardEvents,
+    bound: transportRecovery,
+    // A child being closed or terminated is stopping too: a session a late reattach reopens is ended.
+    stopRequested: () => stop.requested() || intent !== "running",
+    endOnHost: stop.endOnHost,
+    stopUnreached: stop.stopUnreached,
+    recoveryEnded: stop.recoveryEnded,
     port: () => client,
     identity: () => session,
     alive: () => intent === "running" && !parked && !detached && outcome === undefined,
@@ -152,6 +172,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     // undelivered prompt, instead of escaping as an unhandled rejection.
     continuationFailed: (error) => {
       log("senpi-task host session reattach continuation failed", { taskId, error: String(error) })
+      if (isTransportRecoveryExpired(error)) return stop.lostOnReopen()
       if (!isTransportLossError(error)) settleTurn(promptFailureOutcome(error))
     },
     park: (reason) => park({ sessionId: session.routingId, sessionPath: session.sessionPath, reason }),
@@ -161,6 +182,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     currentPort: () => client,
     acceptsLifecycleEvent: () => !parked && !detached && outcome === undefined,
     onEvent: (event: Parameters<ChildEventListener>[0]) => { onSessionEvent(event); listeners.emitEvent(event) },
+    onExtensionEvent: listeners.extensionEvents.publish,
     onParked: park,
     onClosed: (event: { readonly reason: string | undefined }) => endSession({ kind: "session_closed", reason: event.reason }),
     onTransportGone: recovery.onTransportGone,
@@ -241,10 +263,17 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       }
     },
     followUp: (text) => runPrompt(text, "followUp"),
-    abort: () => { abortedByUser = true; return recovery.issue({ type: "abort" }) },
-    subscribe: listeners.subscribe,
-    onParked: listeners.onParked,
-    onTurnResumed: listeners.onTurnResumed,
+    // A child whose cancel is waiting on its lost connection is stopped by that cancel: an abort (a
+    // parent shutting down suspends it) must not wait out the whole recovery for nothing.
+    abort: () => {
+      abortedByUser = true
+      if (stop.requested() && recovery.recovering()) return Promise.resolve()
+      return recovery.issue({ type: "abort" })
+    },
+    transportRecovering: () => recovery.recovering() && outcome === undefined,
+    markStopping: stop.markStopping,
+    stopWhenReachable: stop.stopWhenReachable,
+    ...listeners.registrations,
     adoptFinishedTurn: async (finalResponse) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       // A state read that fails is not proof of idleness, and must never cost the reattach: stay busy.
@@ -252,7 +281,6 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       if (state === undefined || !sessionIsIdle(state)) return
       if (turnOutcome === undefined && settlement.pending() === undefined) settleTurn({ status: "completed", finalResponse })
     },
-    onSelfResumed: listeners.onSelfResumed,
     waitForIdle: () => waiters.waitForIdle(reachedIdle || outcome !== undefined),
     hasExited: () => outcome !== undefined,
     waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),

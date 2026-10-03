@@ -143,6 +143,31 @@ describe("a session the host parks parks its task record", () => {
     expect(child.parent.store.load(child.record.task_id)?.final_response).toBe("DONE_SENTINEL")
   })
 
+  test("#given a running child the idle sweep parked #when task_send reaches it on a free lane #then it is reopened and delivered to instead of answering lane_capacity, and its run releases the lane when it ends (omo#9403)", async () => {
+    // given
+    const child = await oneChild({ transcripts: true })
+    const seen = parkSeen(child)
+    child.world.host.evict(child.record.host_session?.session_path ?? "")
+    await seen
+    await expectParked(child, "idle_evicted", "running")
+    const delivered = child.world.host.waitForCommand("prompt")
+
+    // when
+    const sent = await runTaskSend(child.parent.manager, { to: child.record.task_id, message: "KEEP_GOING_SENTINEL" }, child.parent.sessionId)
+
+    // then
+    expect(JSON.stringify(sent.details)).not.toContain("lane_capacity")
+    expect(String((await delivered).payload.message)).toContain("KEEP_GOING_SENTINEL")
+    const revived = child.parent.store.load(child.record.task_id)
+    expect(revived).toMatchObject({ status: "running", residency_state: "resident" })
+    const live = child.world.host.sessions().find((session) => session.sessionPath === child.record.host_session?.session_path)
+    if (live === undefined) throw new Error("the revived session is not open on the host")
+    child.world.host.completeTurn(live.routingId, "DONE_AFTER_REVIVAL")
+    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: AbortSignal.timeout(10_000) })
+    expect(done).toMatchObject({ status: "completed", final_response: "DONE_AFTER_REVIVAL" })
+    expect(concurrencyOf(child.parent).getCount(HOST_CHILD_MODEL)).toBe(0)
+  })
+
   test("#given a completed child a handoff parked #when task_send revives it on the new generation #then the record names the session the new generation serves", async () => {
     // given
     const child = await oneChild({ transcripts: true })

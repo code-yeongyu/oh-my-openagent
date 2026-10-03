@@ -66,7 +66,8 @@ export type ThreadHost = {
   /** The models a NEW session on this host could run; `get_available_models` is per session, so the host answers it through one. */
   readonly availableModels?: () => Promise<readonly ModelCatalogEntry[]>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
-  readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string; readonly thinkingLevel?: string; readonly model?: { readonly provider: string; readonly id: string } }>
+  /** `pendingModelSwitch`: the switch the engine holds for compaction, or null; absent on an engine that does not report holds. */
+  readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string; readonly thinkingLevel?: string; readonly model?: { readonly provider: string; readonly id: string } | null; readonly pendingModelSwitch?: { readonly provider: string; readonly id: string } | null }>
   readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }) => Promise<{ readonly turnId?: string }>
   readonly interrupt: (sessionId: string, turnId?: string) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
   readonly setSessionName: (sessionId: string, name: string) => Promise<void>

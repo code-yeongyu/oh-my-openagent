@@ -38,6 +38,12 @@ export type SteeringPort = {
   // transition steering performs (the manager's later outcome transition is late-transition
   // ignored by terminal idempotence, so this is the only chance cancel has).
   runStatsSnapshot(taskId: string): TaskRunStats | undefined
+  // A cancel that must wait for the child's lost connection: until `stopSettled`, only the cancel ends
+  // that run, so no failure the stop itself causes is written over it.
+  stopRequested?(taskId: string): void
+  stopSettled?(taskId: string): void
+  // A reopened child handed back parked runs nowhere: no epoch of it keeps a lane slot.
+  releaseTaskLeases?(taskId: string): void
   now(): number
 }
 
@@ -86,6 +92,9 @@ export type CancelOptions = {
 
 export type CancelOutcome =
   | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }
+  // The child is unreachable right now: the cancel runs on its host before anything else once it is
+  // reachable (or the child ends when its connection does not come back), and only then is it cancelled.
+  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 

@@ -10,6 +10,7 @@ import { clearSuspensionReason, markSuspensionReason } from "./host-session-reco
 import { detachTerminalResident } from "./reconcile-terminal"
 import { getLifecycleReattachPorts, type RespawnFailureCode, type RespawnPort, type RespawnResult } from "./port"
 import { markCrashedResident } from "./reconcile-crashed-resident"
+import { finishPendingCancel } from "./pending-cancel"
 import { reclaimOrphanedResident } from "./residency"
 import { deferred, disposeClaimed, markLost, rollbackOrDeferred, terminateOldRpc, type SuspendedResidency } from "./revive-rollback"
 import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
@@ -115,13 +116,21 @@ export async function reviveClaimed(
   if (!isClaimHeld(context, fresh, claimed.parent_session_id) || fresh.killed === true || (!REVIVABLE_STATUSES.has(fresh?.status ?? "pending") && !terminalAllowed)) {
     return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "foreign_live_owner", claimed)
   }
-
-  // A host session has no pid of its own; only the child-process runner ever leaves one behind.
+  // A host session has no pid of its own; only the child-process runner ever leaves one behind. A
+  // previous process's child is ended first, a cancelled one included: finishing a cancel never leaves
+  // its process running.
   if (fresh.execution_mode === "process" && fresh.pid !== undefined && !isHostSessionRecord(fresh)) {
     const terminated = await terminateOldRpc(context, fresh)
     if (!terminated) {
       return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
     }
+  }
+
+  // An accepted cancel is final: this claim finishes it rather than running the child again. A host
+  // that does not confirm the session closed leaves the cancel pending for the next revival.
+  if (fresh.cancel_requested !== undefined && !TERMINAL_STATUSES.has(fresh.status)) {
+    const finished = await finishPendingCancel(context, fresh)
+    return finished ?? rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "host_unreachable", fresh)
   }
 
   if (!(await endClosingFallbackChild(context, fresh))) {

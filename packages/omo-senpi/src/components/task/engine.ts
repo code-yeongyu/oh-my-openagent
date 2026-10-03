@@ -5,7 +5,6 @@ import {
   createCompletionNotifier,
   createFsSkillLoader,
   createIsolationRuntime,
-  parseExtensionEntries,
   createTaskManager,
   createTeamMemberRespawnLaunchResolver,
   createTaskRecordStore,
@@ -18,7 +17,6 @@ import {
   type ResolveAncestry,
   type SessionAncestry,
   type SkillInvocationState,
-  type SpawnAdmission,
   type SkillLoader,
   type TaskLifecycle,
   type TaskManager,
@@ -51,6 +49,10 @@ import type { TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "./terminal-observers"
+import { TASK_CHILD_EXTENSION_EVENT } from "../computer-use/permission-events"
+import { admitAdapter } from "./engine-admission"
+
+export { admitAdapter } from "./engine-admission"
 
 export interface TaskEngine {
   readonly manager: TaskManager
@@ -225,6 +227,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     settings,
   })
   const manager = createTaskManager({
+    // An in-process child's task tool shares this manager; its owner connection is still ours.
+    onChildExtensionEvent: (event, owner) => deps.pi.events?.emit(TASK_CHILD_EXTENSION_EVENT, {
+      parent_session_id: runtime.sessionId(), root_session_id: owner.root_session_id, event,
+    }),
     store: storeChain.store,
     isolation,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
@@ -282,21 +288,5 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     }),
     appendTaskEvent,
     onStoreMutation: storeChain.onMutation,
-  }
-}
-
-// Exported for scripts/qa/dag-cross-run-residency-qa.ts, which composes the real lifecycle +
-// manager + scheduler graph through this exact seam.
-export async function admitAdapter(lifecycle: TaskLifecycle, parentSessionId: string): Promise<SpawnAdmission> {
-  const admission = await lifecycle.admitResident(parentSessionId)
-  if (admission.kind === "admitted") return { kind: "admitted" }
-  if (admission.kind === "evicted") return { kind: "evicted", evicted_task_id: admission.evicted_task_id }
-  // #8396: keep the residents on the rejection so a residency-denied DAG node can tell "held by
-  // live siblings, wait" from "nothing can free a slot".
-  return {
-    kind: "rejected",
-    message: admission.error.message,
-    max_children: admission.error.max_children,
-    residents: admission.error.residents,
   }
 }

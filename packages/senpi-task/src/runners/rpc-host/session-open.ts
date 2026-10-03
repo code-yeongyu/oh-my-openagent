@@ -12,6 +12,7 @@ import type { LiveHostChildren } from "./live-children"
 import { openTaskHostSession } from "./open-session"
 import { createReattachPort } from "./reattach-port"
 import type { OpenedHostSession } from "./session-client"
+import type { TransportRecoveryOptions } from "./transport-recovery"
 import { discardUnstartedRpcHandle } from "../rpc/start-cleanup"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
@@ -25,6 +26,7 @@ export interface HostSessionOpenerInput {
   readonly closeGraceMs?: number
   readonly now: () => number
   readonly reattachDelaysMs: readonly number[]
+  readonly transportRecovery?: TransportRecoveryOptions
   readonly admissionWaitMs: number
   readonly sleep: (ms: number) => Promise<void>
   readonly onWarning: (message: string) => void | (() => void)
@@ -85,6 +87,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         closeGraceMs: input.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
         openDisposition: opened.attached ? "attached" : "reopened",
         shardEvents: input.liveChildren.events,
+        ...(input.transportRecovery === undefined ? {} : { transportRecovery: input.transportRecovery }),
         reattach: createReattachPort({
           endpoint: input.endpoint,
           spec,

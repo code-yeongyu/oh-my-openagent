@@ -91,7 +91,7 @@ export function createEngineSession(options: { readonly models: readonly EngineM
  * `modes/rpc/connection-handler.js` does: `set_model` looks the model up and runs `session.setModel`,
  * `set_thinking_level` validates first only for `scope: "turn"` and otherwise runs the clamping
  * `session.setThinkingLevel`, `get_state` reports the live model and level, and `open_session` starts
- * a new engine session on the model and level it is given.
+ * a new engine session on the model it is given, at the level it is given clamped to that model.
  */
 export function engineHost(models: readonly EngineModel[], sessions: EngineSession[], socket = "/tmp/i-9429engine000000.sock"): ThreadHost {
   const names = new Map<EngineSession, string | null>()
@@ -109,6 +109,9 @@ export function engineHost(models: readonly EngineModel[], sessions: EngineSessi
     listView: async () => ({ sessions: rows(), hosts: [{ socket, list_sessions: { sessions: rows() }, endpoint_kind: "rpc_host", alive: true }], disk: [] }),
     openSession: async (params) => {
       const entry = createEngineSession({ models, initial: params.modelId ?? models[0]?.id ?? "", thinkingLevel: params.thinkingLevel ?? "medium", handlers: () => new Map() })
+      // As senpi's createAgentSession (clampThinkingLevelToModel): a level the model cannot run opens clamped.
+      const opened = entry.session as unknown as { agent: { state: { thinkingLevel: string } }; _clampThinkingLevel(level: string, available: readonly string[]): string }
+      opened.agent.state.thinkingLevel = opened._clampThinkingLevel(opened.agent.state.thinkingLevel, entry.session.getAvailableThinkingLevels())
       sessions.push(entry)
       names.set(entry, params.name ?? null)
       return { ...row(entry, sessions.length - 1), thinkingLevel: entry.session.thinkingLevel } as ThreadHostSession

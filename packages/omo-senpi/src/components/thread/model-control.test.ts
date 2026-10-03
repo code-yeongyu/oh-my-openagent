@@ -98,7 +98,7 @@ function fakeHost(options: { readonly catalog?: Catalog; readonly dead?: readonl
     openSession,
     ...(options.listsCatalog === false ? {} : { availableModels: async () => catalog }),
     getMessages: async () => [{ role: "user", content: "hello" }],
-    getState: async (sessionId) => ({ isStreaming: false, thinkingLevel: thinking.get(sessionId) }),
+    getState: async (sessionId) => ({ isStreaming: false, model: models.get(sessionId), thinkingLevel: thinking.get(sessionId) }),
     prompt: async () => ({}),
     interrupt: async () => ({ interrupted: false }),
     setSessionName: async () => {},
@@ -126,7 +126,10 @@ function sdkFixture(options: { readonly catalog?: Catalog; readonly dead?: reado
   const fake = fakeHost(options)
   const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: fake.host, store, modelProfile: () => ({ model_profile: options.profile ?? "recommended" }) })
   disposables.push(sdk)
-  return { ...fake, sdk, store, agentDir }
+  const readEngine = fake.host.getState
+  /** The level the fake engine runs, read past any read-back a test holds. */
+  const engineLevel = async () => ((await readEngine("rpc-1")) as { thinkingLevel?: string }).thinkingLevel ?? null
+  return { ...fake, sdk, store, agentDir, engineLevel }
 }
 
 const threadOf = (result: unknown) => (result as { thread: { thread_id: string; model: unknown } }).thread
@@ -447,7 +450,48 @@ function engineFixture() {
   }
   const recorded = async () => (await store.sessionModels([durableId]))[durableId] ?? null
   const record = (model: GatewayStoreModel) => store.recordSessionModel({ now: Date.now(), durable_id: durableId, model })
-  return { engine, admission, userSwitch, runtimeSwitch, providerError, settle, observed, bindMilestones, rows, recorded, record }
+  /**
+   * The thread SDK over this session's own store, as a connector's `omo thread` runs beside the live
+   * session: its host drives this engine's switch and answers get_state from it. `beforeStateReply`
+   * holds the first get_state after the next set_model until `wait` resolves, after computing the answer.
+   */
+  const sharedSdk = () => {
+    const session: ThreadHostSession = { sessionId: "rpc-e", durableSessionId: durableId, cwd: process.cwd(), name: "lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
+    let hold: { readonly wait: () => Promise<void>; armed: boolean } | undefined
+    const host: ThreadHost = {
+      socket: "/tmp/thread-9429-shared.sock",
+      listSessions: async () => [session],
+      listView: async () => ({ sessions: [session], hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: [session] }, endpoint_kind: "rpc_host", alive: true }], disk: [] }),
+      openSession: async () => { throw new Error("this session is already open") },
+      availableModels: async () => CATALOG,
+      getMessages: async () => [],
+      getState: async () => {
+        const answer = { isStreaming: false, model: engine.model === undefined ? null : { provider: engine.model.provider, id: engine.model.id }, thinkingLevel: engine.thinkingLevel }
+        const pending = hold
+        if (pending?.armed === true) {
+          hold = undefined
+          await pending.wait()
+        }
+        return answer
+      },
+      prompt: async () => ({}),
+      interrupt: async () => ({ interrupted: false }),
+      setSessionName: async () => {},
+      setModel: async (_sessionId: string, provider: string, id: string) => {
+        await userSwitch(provider === GPT_Y.provider && id === GPT_Y.id ? GPT_Y_MODEL : CLAUDE_MODEL)
+        if (hold !== undefined) hold.armed = true
+        // The pinned engine's set_model reply echoes the requested model (connection-handler.js:883-884).
+        return { provider, id }
+      },
+      getAvailableModels: async () => CATALOG,
+      setThinkingLevel: async () => {},
+      getAvailableThinkingLevels: async () => ENGINE_LEVELS[`${engine.model?.provider}/${engine.model?.id}`] ?? ["off"],
+    }
+    const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host, store, modelProfile: () => ({ model_profile: "recommended" }) })
+    disposables.push(sdk)
+    return { sdk, beforeStateReply: (wait: () => Promise<void>) => { hold = { wait, armed: false } } }
+  }
+  return { engine, admission, userSwitch, runtimeSwitch, providerError, settle, observed, bindMilestones, rows, recorded, record, sharedSdk }
 }
 
 type GatewayStoreModel = Parameters<GatewayStore["recordSessionModel"]>[0]["model"]
@@ -564,28 +608,368 @@ describe("#9425 a switch the engine does not apply leaves the record and the out
 })
 
 /**
- * Review 5394047653, the SDK side of the same root cause: senpi answers `set_model` with success for a switch
- * it only holds for a compaction, and refuses one whose context the model cannot hold. The session runs the
- * pinned engine's own `setModel` (`gateway/testing/engine-session.ts`) behind a host that answers like
- * senpi's rpc host and the live surface.
+ * Holds the first state read-back a model command makes after it changed the engine (the first
+ * get_state after a set_model or set_thinking_level issued once this is installed), until `release`.
+ * `at-request` computes that answer when the request arrives and delivers it late, as a reply in flight
+ * while another call switches the engine; `at-reply` computes it on delivery.
  */
-describe("#9425 set-model records only the model the engine runs", () => {
-  const MODELS: readonly HarnessModel[] = [{ provider: "openai", id: "primary", levels: "xhigh" }, { provider: "openai", id: "candidate", levels: "xhigh" }]
-  function engineSdk() {
+function holdFirstReadBack(f: ReturnType<typeof sdkFixture>, answer: "at-request" | "at-reply") {
+  const entered = Promise.withResolvers<void>()
+  const released = Promise.withResolvers<void>()
+  const changes = () => f.setModel.mock.calls.length + f.setThinkingLevel.mock.calls.length
+  const baseline = changes()
+  let held = false
+  const originalGetState = f.host.getState
+  const snapshot = async (sessionId: string) => ({ ...((await originalGetState(sessionId)) as object), model: f.models.get(sessionId) })
+  Object.assign(f.host, {
+    getState: async (sessionId: string) => {
+      if (held || changes() === baseline) return await snapshot(sessionId)
+      held = true
+      const early = answer === "at-request" ? await snapshot(sessionId) : undefined
+      entered.resolve()
+      await released.promise
+      return early ?? (await snapshot(sessionId))
+    },
+  })
+  return { entered: entered.promise, release: () => released.resolve() }
+}
+
+describe("#9425 a held or out-of-order set-model never lies about what the engine runs", () => {
+  test("#given a set-model the engine holds for compaction #when the SDK call returns #then the result names the requested model as pending until the hold applies", async () => {
+    const f = sdkFixture()
+    const e = engineFixture()
+    await f.sdk.setModel({ thread: "lane", model: "the model" })
+    Object.assign(f.host, {
+      setModel: async (_sessionId: string, provider: string, id: string) => {
+        await e.userSwitch({ provider, id, defaultThinkingLevel: "xhigh" })
+        // The pinned engine's exact set_model RPC contract (connection-handler.js:883-884): the reply echoes the requested model.
+        return { provider, id }
+      },
+      getState: async () => ({ model: e.engine.model, thinkingLevel: e.engine.thinkingLevel }),
+    })
+    e.admission.hold = true
+    const result = await f.sdk.setModel({ thread: "lane", model: "gpt-y" })
+    await e.settle()
+    const stored = (await f.store.sessionModels(["dur-lane"]))["dur-lane"]
+    const engineId = e.engine.model?.id
+    const engineProvider = e.engine.model?.provider
+    if (engineId === undefined || engineProvider === undefined) throw new Error("engine held no model")
+    expect(engineId).toBe(CLAUDE.id)
+    expect(engineProvider).toBe(CLAUDE.provider)
+    expect(stored?.id).toBe(engineId)
+    expect(stored?.provider).toBe(engineProvider)
+    // The ok result reports the model the engine still runs and marks the requested one pending:
+    // the caller learns its switch is held, never that it applied.
+    expect(result).toMatchObject({ kind: "ok", model: { provider: CLAUDE.provider, id: CLAUDE.id }, pending: { provider: GPT_Y.provider, id: GPT_Y.id } })
+  })
+
+  test("#given a set-model the engine applies at once #when the SDK call returns #then the result carries no pending field", async () => {
+    const f = sdkFixture()
+    const result = await f.sdk.setModel({ thread: "lane", model: "gpt-y" })
+    expect(result).toMatchObject({ kind: "ok", model: { provider: "openai", id: "gpt-y" } })
+    expect("pending" in result).toBe(false)
+  })
+
+  test("#given two set-model calls whose first completes last #when both finish #then the store still names the later applied model, and the earlier call reports its switch superseded", async () => {
+    const f = sdkFixture()
+    const gate = holdFirstReadBack(f, "at-reply")
+    const first = f.sdk.setModel({ thread: "lane", model: "gpt-x", set_by: "config" })
+    await gate.entered
+    const second = await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "user" })
+    gate.release()
+    const earlier = await first
+    const stored = (await f.store.sessionModels(["dur-lane"]))["dur-lane"]
+    expect(f.models.get("rpc-1")).toEqual({ provider: "openai", id: "gpt-y" })
+    expect(second).toMatchObject({ kind: "ok", model: { id: "gpt-y", set_by: "user" } })
+    // The earlier switch applied and was replaced: it will not apply again, so it is not pending.
+    expect(earlier).toMatchObject({ kind: "ok", model: { id: "gpt-y", set_by: "user" }, superseded: { provider: "openai", id: "gpt-x" } })
+    expect("pending" in earlier).toBe(false)
+    expect(stored).toMatchObject({ id: "gpt-y", set_by: "user" })
+  })
+
+  test("#given a set-model whose read-back is answered from before a later call switched back to the recorded model #when both finish #then the record names the model the engine runs", async () => {
+    const f = sdkFixture()
+    await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "user" })
+    const gate = holdFirstReadBack(f, "at-request")
+    const first = f.sdk.setModel({ thread: "lane", model: "gpt-x", set_by: "config" })
+    await gate.entered
+    expect(await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })).toMatchObject({ kind: "ok", model: { id: "gpt-y", set_by: "lead" } })
+    gate.release()
+    expect(await first).toMatchObject({ kind: "ok", model: { id: "gpt-y" }, superseded: { provider: "openai", id: "gpt-x" } })
+    expect(f.models.get("rpc-1")).toEqual({ provider: "openai", id: "gpt-y" })
+    expect((await f.store.sessionModels(["dur-lane"]))["dur-lane"]).toMatchObject({ provider: "openai", id: "gpt-y", provenance: "set", set_by: "lead" })
+  })
+
+  test("#given a session with no record whose engine switches with no writer between a set-model's stale read-back and its write #when the call finishes #then it reads the engine again and the record names the model it runs", async () => {
+    const f = sdkFixture()
+    expect(await f.store.sessionModels(["dur-lane"])).toEqual({})
+    const gate = holdFirstReadBack(f, "at-request")
+    const first = f.sdk.setModel({ thread: "lane", model: "gpt-x", set_by: "config" })
+    await gate.entered
+    // A /model in a session the gateway has no record of: its observer writes nothing to fence the stale answer.
+    f.models.set("rpc-1", { provider: "openai", id: "gpt-y" })
+    gate.release()
+    expect(await first).toMatchObject({ kind: "ok", model: { provider: "openai", id: "gpt-y", set_by: "user" }, superseded: { provider: "openai", id: "gpt-x" } })
+    expect((await f.store.sessionModels(["dur-lane"]))["dur-lane"]).toMatchObject({ provider: "openai", id: "gpt-y" })
+  })
+
+  test("#given a session with no record whose level changes between a set-model's stale read-back and its write #when the call finishes #then the record names the level the engine runs", async () => {
+    const f = sdkFixture()
+    const gate = holdFirstReadBack(f, "at-request")
+    const first = f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "config" })
+    await gate.entered
+    // set-reasoning on a session with no record writes nothing, so nothing fences the stale answer.
+    expect(await f.sdk.setReasoning({ thread: "lane", level: "high" })).toMatchObject({ kind: "ok", level: "high" })
+    gate.release()
+    expect(await first).toMatchObject({ kind: "ok", model: { provider: "openai", id: "gpt-y", set_by: "config" } })
+    expect(await f.engineLevel()).toBe("high")
+    expect((await f.store.sessionModels(["dur-lane"]))["dur-lane"]).toMatchObject({ provider: "openai", id: "gpt-y", thinking_level: "high", set_by: "config" })
+  })
+
+  test("#given a host whose state names no model #when set-model runs #then it is refused unsupported and the engine is not touched", async () => {
+    const f = sdkFixture()
+    const originalGetState = f.host.getState
+    Object.assign(f.host, { getState: async (sessionId: string) => ({ ...((await originalGetState(sessionId)) as object), model: undefined }) })
+    expect(await f.sdk.setModel({ thread: "lane", model: "gpt-y" })).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    expect(f.setModel).not.toHaveBeenCalled()
+    expect(await f.store.sessionModels(["dur-lane"])).toEqual({})
+  })
+
+  test("#given a set-reasoning completing after a later set-model switched the model #when both finish #then the record keeps the newer model, not the read-back from before the switch", async () => {
+    const f = sdkFixture()
+    const gate = holdFirstReadBack(f, "at-reply")
+    const first = f.sdk.setReasoning({ thread: "lane", level: "high" })
+    await gate.entered
+    const second = await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "user" })
+    gate.release()
+    const earlier = await first
+    const stored = (await f.store.sessionModels(["dur-lane"]))["dur-lane"]
+    expect(f.models.get("rpc-1")).toEqual({ provider: "openai", id: "gpt-y" })
+    expect(earlier).toMatchObject({ kind: "ok", level: "high" })
+    expect(second).toMatchObject({ kind: "ok", model: { id: "gpt-y" } })
+    expect(stored?.id).toBe("gpt-y")
+    expect(stored?.set_by).toBe("user")
+    expect(stored?.thinking_level).toBe("high")
+  })
+
+  test("#given two set-reasoning calls whose first state read is answered from before the second applied #when both finish #then the record names the level the engine runs", async () => {
+    const f = sdkFixture()
+    await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "user" })
+    const gate = holdFirstReadBack(f, "at-request")
+    const first = f.sdk.setReasoning({ thread: "lane", level: "high" })
+    await gate.entered
+    const second = await f.sdk.setReasoning({ thread: "lane", level: "low" })
+    gate.release()
+    const earlier = await first
+    const engineLevel = await f.engineLevel()
+    const stored = (await f.store.sessionModels(["dur-lane"]))["dur-lane"]
+    expect(engineLevel).toBe("low")
+    expect(earlier).toMatchObject({ kind: "ok" })
+    expect(second).toMatchObject({ kind: "ok", level: "low" })
+    expect(stored?.id).toBe("gpt-y")
+    expect(stored?.thinking_level).toBe(engineLevel)
+  })
+
+  test("#given a set-reasoning whose read-back is answered from before a later call set the recorded level again #when both finish #then the record names the level the engine runs", async () => {
+    const f = sdkFixture()
+    await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "user" })
+    const recorded = (await f.store.sessionModels(["dur-lane"]))["dur-lane"]?.thinking_level
+    expect(recorded).toBe("medium")
+    const gate = holdFirstReadBack(f, "at-request")
+    const first = f.sdk.setReasoning({ thread: "lane", level: "high" })
+    await gate.entered
+    expect(await f.sdk.setReasoning({ thread: "lane", level: "medium" })).toMatchObject({ kind: "ok", level: "medium" })
+    gate.release()
+    await first
+    expect(await f.engineLevel()).toBe("medium")
+    expect((await f.store.sessionModels(["dur-lane"]))["dur-lane"]?.thinking_level).toBe("medium")
+  })
+})
+
+describe("#9429 a switch replaced by a switch straight back, on a host that does not report holds", () => {
+  test("#given a recorded session #when another client switches it back to the model from before a set-model's switch #then that call answers superseded, because the record moved", async () => {
+    const f = sdkFixture()
+    await f.sdk.setModel({ thread: "lane", model: "claude-opus-5-5", set_by: "config" })
+    const gate = holdFirstReadBack(f, "at-reply")
+    const first = f.sdk.setModel({ thread: "lane", model: "gpt-x", set_by: "lead" })
+    await gate.entered
+    expect(await f.sdk.setModel({ thread: "lane", model: "claude-opus-5-5", set_by: "user" })).toMatchObject({ kind: "ok", model: { ...CLAUDE, set_by: "user" } })
+    gate.release()
+    const earlier = await first
+    expect(earlier).toMatchObject({ kind: "ok", model: { ...CLAUDE, set_by: "user" }, superseded: { provider: "openai", id: "gpt-x" } })
+    expect("pending" in earlier).toBe(false)
+  })
+
+  test("#given a live session #when its own /model switches back while a set-model's read-back is in flight #then the call answers superseded and the record names the model the engine runs", async () => {
+    const e = engineFixture()
+    await e.record({ ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "config", reason: null })
+    const shared = e.sharedSdk()
+    // The engine's own observer writes both switches: the set-model's landing and the /model back.
+    const both = e.observed(2)
+    shared.beforeStateReply(async () => {
+      await e.userSwitch(CLAUDE_MODEL)
+      await both
+    })
+    const result = await shared.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })
+    await e.settle()
+    expect(e.engine.model).toMatchObject(CLAUDE)
+    expect(result).toMatchObject({ kind: "ok", model: CLAUDE, superseded: GPT_Y })
+    expect("pending" in result).toBe(false)
+    expect(await e.recorded()).toMatchObject(CLAUDE)
+  })
+})
+
+describe("#9429 a host that reports its held switch", () => {
+  /** get_state as an engine that reports holds answers it: `pendingModelSwitch` names the held switch, or null. */
+  function reportingHolds(f: ReturnType<typeof sdkFixture>, held: () => { readonly provider: string; readonly id: string } | null) {
+    const originalGetState = f.host.getState
+    Object.assign(f.host, { getState: async (sessionId: string) => ({ ...((await originalGetState(sessionId)) as object), model: f.models.get(sessionId), pendingModelSwitch: held() }) })
+  }
+
+  test("#given a switch replaced by a switch straight back to the model from before it #when the host reports no held switch #then the earlier call answers superseded, not pending", async () => {
+    const f = sdkFixture()
+    reportingHolds(f, () => null)
+    const gate = holdFirstReadBack(f, "at-reply")
+    const first = f.sdk.setModel({ thread: "lane", model: "gpt-x", set_by: "config" })
+    await gate.entered
+    expect(await f.sdk.setModel({ thread: "lane", model: "claude-opus-5-5", set_by: "lead" })).toMatchObject({ kind: "ok", model: { ...CLAUDE, set_by: "lead" } })
+    gate.release()
+    const earlier = await first
+    expect(earlier).toMatchObject({ kind: "ok", model: { ...CLAUDE, set_by: "lead" }, superseded: { provider: "openai", id: "gpt-x" } })
+    expect("pending" in earlier).toBe(false)
+  })
+
+  test("#given a switch the host reports as held #when set-model returns #then it answers pending and the record keeps the running model", async () => {
+    const f = sdkFixture()
+    await f.store.recordSessionModel({ now: Date.now(), durable_id: "dur-lane", model: { ...CLAUDE, thinking_level: "medium", provenance: "set", set_by: "config", reason: null } })
+    let held: { provider: string; id: string } | null = null
+    reportingHolds(f, () => held)
+    Object.assign(f.host, { setModel: async (_sessionId: string, provider: string, id: string) => { held = { provider, id }; return { provider, id } } })
+    const result = await f.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })
+    expect(result).toMatchObject({ kind: "ok", model: { ...CLAUDE, set_by: "config" }, pending: GPT_Y })
+    expect("superseded" in result).toBe(false)
+    expect((await f.store.sessionModels(["dur-lane"]))["dur-lane"]).toMatchObject({ ...CLAUDE, provenance: "set", set_by: "config" })
+  })
+})
+
+describe("#9429 the command path and the session's own observer share one store", () => {
+  test("#given a live session whose observer records the switch before the command reads the engine back #when set-model runs with --set-by config #then the record and the result say config", async () => {
+    const e = engineFixture()
+    await e.record({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    const shared = e.sharedSdk()
+    const landed = e.observed()
+    shared.beforeStateReply(() => landed)
+    const result = await shared.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "config" })
+    await e.settle()
+    expect(e.engine.model).toMatchObject(GPT_Y)
+    expect(result).toMatchObject({ kind: "ok", model: { ...GPT_Y, provenance: "set", set_by: "config" } })
+    expect(await e.recorded()).toMatchObject({ ...GPT_Y, provenance: "set", set_by: "config" })
+  })
+
+  test("#given a live session whose observer records the switch after the command wrote #when set-model runs with --set-by lead #then the record and the result say lead", async () => {
+    const e = engineFixture()
+    await e.record({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    const shared = e.sharedSdk()
+    const result = await shared.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })
+    await e.settle()
+    expect(result).toMatchObject({ kind: "ok", model: { ...GPT_Y, provenance: "set", set_by: "lead" } })
+    expect(await e.recorded()).toMatchObject({ ...GPT_Y, provenance: "set", set_by: "lead" })
+  })
+
+  test("#given a session on its fallback model #when a set-reasoning rewrites its record and the engine then reverts #then the record reads the original provenance again", async () => {
+    const e = engineFixture()
+    await e.record({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+    await e.providerError("429 rate_limit_error")
+    const fell = e.observed()
+    await e.runtimeSwitch(GPT_Y_MODEL, "fallback")
+    await e.settle()
+    await fell
+    const shared = e.sharedSdk()
+    expect(await shared.sdk.setReasoning({ thread: "lane", level: "high" })).toMatchObject({ kind: "ok" })
+    expect(await e.recorded()).toMatchObject({ ...GPT_Y, provenance: "fallback" })
+    const reverted = e.observed()
+    await e.runtimeSwitch(CLAUDE_MODEL, "fallback-revert")
+    await e.settle()
+    await reverted
+    expect(await e.recorded()).toEqual({ ...CLAUDE, thinking_level: "high", provenance: "auto", set_by: null, reason: null })
+  })
+
+  test("#given a set-model the engine holds for compaction #when the SDK call returns #then the record keeps the running model's own setter and the result says pending, not superseded", async () => {
+    const e = engineFixture()
+    const chosen: GatewayStoreModel = { ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "config", reason: null }
+    await e.record(chosen)
+    const shared = e.sharedSdk()
+    e.admission.hold = true
+    const result = await shared.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })
+    await e.settle()
+    expect(e.engine.model).toMatchObject(CLAUDE)
+    expect(result).toMatchObject({ kind: "ok", model: chosen, pending: GPT_Y })
+    expect("superseded" in result).toBe(false)
+    expect(await e.recorded()).toEqual(chosen)
+  })
+
+  test("#given a set-model --set-by lead the engine holds for compaction #when the hold lands on a later turn #then the record names the requested model as set by lead", async () => {
+    const e = engineFixture()
+    await e.record({ ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "config", reason: null })
+    const shared = e.sharedSdk()
+    e.admission.hold = true
+    expect(await shared.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })).toMatchObject({ kind: "ok", pending: GPT_Y })
+    await e.settle()
+    e.admission.hold = false
+    const landed = e.observed()
+    // The engine's own apply of a held switch (_applyPendingModelSwitch): a "set" switch that may not defer again.
+    await e.engine._switchActiveModel(GPT_Y_MODEL, { persistDefault: false, appendSessionEntry: true, emitModelSelect: true, modelSelectSource: "set", invalidateCompaction: true, allowDeferral: false })
+    await e.settle()
+    await landed
+    expect(e.engine.model).toMatchObject(GPT_Y)
+    expect(await e.recorded()).toMatchObject({ ...GPT_Y, provenance: "set", set_by: "lead" })
+  })
+
+  test("#given a held set-model --set-by lead #when the user lands another switch first and then picks the held model himself #then the held choice is gone and that pick is the user's", async () => {
+    const e = engineFixture()
+    await e.record({ ...CLAUDE, thinking_level: "high", provenance: "set", set_by: "config", reason: null })
+    const shared = e.sharedSdk()
+    e.admission.hold = true
+    expect(await shared.sdk.setModel({ thread: "lane", model: "gpt-y", set_by: "lead" })).toMatchObject({ kind: "ok", pending: GPT_Y })
+    await e.settle()
+    e.admission.hold = false
+    const away = e.observed()
+    await e.userSwitch(CLAUDE_MODEL)
+    await e.settle()
+    await away
+    expect(await e.recorded()).toMatchObject({ ...CLAUDE, provenance: "set", set_by: "config" })
+    const back = e.observed()
+    await e.userSwitch(GPT_Y_MODEL)
+    await e.settle()
+    await back
+    expect(await e.recorded()).toMatchObject({ ...GPT_Y, provenance: "set", set_by: "user" })
+  })
+})
+
+/**
+ * The SDK over the pinned engine's own `setModel` and level clamp (`gateway/testing/engine-session.ts`),
+ * behind a host that answers like senpi's rpc host and the live surface: a switch senpi holds for a
+ * compaction, one it refuses, and a session it opens at a level the model cannot run.
+ */
+describe("#9425 set-model and create over the engine's own model code", () => {
+  const MODELS: readonly HarnessModel[] = [{ provider: "openai", id: "primary", levels: "xhigh" }, { provider: "openai", id: "candidate", levels: "xhigh" }, { provider: "openai", id: "capped", levels: "high" }]
+  function engineSdk(host?: (base: ThreadHost) => ThreadHost) {
     const agentDir = scratch("thread-9429-setmodel-")
     const store = createGatewayStore({ agentDir })
     const engine = createEngineSession({ models: MODELS, initial: "primary", thinkingLevel: "high", handlers: () => new Map() })
-    const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: engineHost(MODELS, [engine]), store, modelProfile: () => ({ model_profile: "recommended" }) })
+    const sessions = [engine]
+    const base = engineHost(MODELS, sessions)
+    const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: host === undefined ? base : host(base), store, modelProfile: () => ({ model_profile: "recommended" }) })
     disposables.push(sdk)
     const record = () => store.recordSessionModel({ now: Date.now(), durable_id: engine.durableId, model: { provider: "openai", id: "primary", thinking_level: "high", provenance: "set", set_by: "config", reason: null } })
-    return { engine, sdk, record }
+    return { engine, sessions, sdk, record }
   }
 
-  test("#given a switch the engine holds for a compaction #when set-model runs #then it answers held and models keeps naming the model in force", async () => {
+  test("#given a switch the engine holds for a compaction #when set-model runs #then it answers pending and models keeps naming the model in force", async () => {
     const { engine, sdk, record } = engineSdk()
     await record()
     engine.verdicts.hold.add("candidate")
-    expect(await sdk.setModel({ thread: "lane-1", model: "candidate", set_by: "lead" })).toMatchObject({ kind: "ok", held: true, model: { id: "candidate", set_by: "lead" } })
+    expect(await sdk.setModel({ thread: "lane-1", model: "candidate", set_by: "lead" })).toMatchObject({ kind: "ok", model: { id: "primary", set_by: "config" }, pending: { provider: "openai", id: "candidate" } })
     expect(engine.session.model?.id).toBe("primary")
     expect(await sdk.models({ thread: "lane-1" })).toMatchObject({ kind: "ok", current: { id: "primary", set_by: "config" } })
   })
@@ -597,5 +981,13 @@ describe("#9425 set-model records only the model the engine runs", () => {
     expect(await sdk.setModel({ thread: "lane-1", model: "candidate" })).toMatchObject({ kind: "error", error: { code: "unsupported", details: { model: "openai/candidate", reason: expect.stringContaining("does not fit candidate") } } })
     expect(engine.session.model?.id).toBe("primary")
     expect(await sdk.models({ thread: "lane-1" })).toMatchObject({ kind: "ok", current: { id: "primary", set_by: "config" } })
+  })
+
+  test("#given a host whose catalog names no thinking levels #when create asks for a level the model cannot run #then the record names the level the engine opened at", async () => {
+    const { sessions, sdk } = engineSdk((base) => ({ ...base, availableModels: async () => (await base.availableModels?.() ?? []).map(({ provider, id, name }) => ({ provider, id, ...(name === undefined ? {} : { name }) })) }))
+    const created = await sdk.create({ name: "capped-lane", model: "capped", thinking: "xhigh" })
+    expect(sessions.at(-1)?.session.thinkingLevel).toBe("high")
+    expect(created).toMatchObject({ kind: "ok", thread: { model: { id: "capped", thinking_level: "high" } } })
+    expect(await sdk.models({ thread: "capped-lane" })).toMatchObject({ kind: "ok", current: { id: "capped", thinking_level: "high" } })
   })
 })

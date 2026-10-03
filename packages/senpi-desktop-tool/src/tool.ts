@@ -31,6 +31,8 @@ export interface ComputerToolDetails {
 	readonly readOnly?: boolean;
 	readonly screenshots?: readonly ComputerScreenshot[];
 	readonly audit?: readonly AuditRecord[];
+	/** Mirrors the top-level `isError` so a code-mode marshal (which reads `details`) reports the failure. */
+	readonly isError?: boolean;
 }
 
 /** Structurally the agent's `AgentToolResult<ComputerToolDetails>`. */
@@ -156,7 +158,7 @@ async function permissionResult(result: Promise<ComputerToolResult>, handle: Com
 		const failure = computerFailure(error.data.code, error.message, handle.settings().stopHotkey, error.data.permission);
 		return {
 			content: [{ type: "text", text: JSON.stringify(failure, null, 2) }],
-			details: { value: failure },
+			details: { value: failure, isError: true },
 			isError: true,
 		};
 	}

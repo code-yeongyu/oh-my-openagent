@@ -1,5 +1,5 @@
 import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-engine"
-import type { EngineMethod, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
+import type { EngineMethod, PermissionDeniedData, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
   type CallOptions,
   DesktopEngineRpcError,
@@ -19,6 +19,7 @@ export type EngineState = "not started" | "ready" | EngineDiagnostic
 
 export interface TrackedDesktopServiceOptions extends DesktopServiceOptions {
   readonly onError?: (error: Error) => void
+  readonly onPermissionRequired?: (permission: Pick<PermissionDeniedData, "permission" | "app">) => void
 }
 
 export class ComputerEngineUnavailableError extends Error {
@@ -41,10 +42,12 @@ function diagnosticOf(error: Error): EngineDiagnostic | undefined {
 export class TrackedDesktopService extends DesktopService {
   #engineState: EngineState = "not started"
   readonly #onError: ((error: Error) => void) | undefined
+  readonly #onPermissionRequired: TrackedDesktopServiceOptions["onPermissionRequired"]
 
   constructor(options: TrackedDesktopServiceOptions = {}) {
     super(options)
     this.#onError = options.onError
+    this.#onPermissionRequired = options.onPermissionRequired
   }
 
   get engineState(): EngineState {
@@ -58,7 +61,7 @@ export class TrackedDesktopService extends DesktopService {
       return capabilities
     } catch (error) {
       if (!(error instanceof Error)) throw error
-      this.#onError?.(error)
+      this.#report(error)
       const diagnostic = diagnosticOf(error)
       if (diagnostic === undefined) throw error
       this.#engineState = diagnostic
@@ -91,9 +94,18 @@ export class TrackedDesktopService extends DesktopService {
       return await operation
     } catch (error) {
       if (!(error instanceof Error)) throw error
-      this.#onError?.(error)
+      this.#report(error)
       throw error
     }
+  }
+
+  #report(error: Error): void {
+    if (error instanceof DesktopEngineRpcError && error.data !== null && "code" in error.data) {
+      if (error.data.code === "PermissionDenied" && error.data.permission != null) {
+        this.#onPermissionRequired?.(error.data.permission)
+      }
+    }
+    this.#onError?.(error)
   }
 }
 

@@ -5,6 +5,9 @@ import { Worker } from "node:worker_threads"
 
 import type { BindingRecord, CompletionOutcome, OutboxRow, RelayOutcome } from "./bindings"
 import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS } from "./constants"
+import type { GatewayResolve } from "./engine"
+import type { StoreExtensionApi, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult } from "./store-extensions"
+export type { StoreExtensionApi, StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRefusalCode, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionTransaction } from "./store-extensions"
 import type {
   AnswerClaim,
   AnswerClaimRef,
@@ -17,7 +20,7 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
-import type { ObserveModelRequest, ObserveModelResult, ThreadModel } from "./session-models"
+import type { ModelSetter, ObserveModelRequest, ObserveModelResult, SessionModelRecord, ThreadModel } from "./session-models"
 import type { DeliveryReceipt } from "./store-ops"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
@@ -47,6 +50,8 @@ export type GatewayStoreOptions = {
   readonly now?: () => number
   /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
   readonly workerModuleUrl?: string | URL
+  /** Resolves extension enqueue targets through the caller's live-and-disk address book. */
+  readonly resolveTarget?: GatewayResolve
   /** Test seams only: a shorter busy timeout and lock-wait bound, commit-boundary hooks, and the module location the worker is resolved from. */
   readonly _test?: GatewayStoreTestHooks & { readonly busyTimeoutMs?: number; readonly lockWaitMaxMs?: number; readonly moduleUrl?: string | URL; readonly onWorkerStarted?: (worker: Worker) => void }
 }
@@ -73,7 +78,7 @@ export type OutboxPage = { readonly binding_id: string; readonly revision: numbe
 /** Relay results carry `deduplicated`: true when an idempotency key replayed an earlier success. */
 export type Deduplicated = { readonly deduplicated?: boolean }
 
-export type GatewayStore = {
+export type GatewayStore = StoreExtensionApi & {
   /** The store's busy timeout: the delay before a caller re-arms an operation that failed with a lock-wait error. */
   readonly busyTimeoutMs: number
   /** The clock this store's rows are stamped and expired against; drains, engines and relays built on the store default to it. */
@@ -119,21 +124,31 @@ export type GatewayStore = {
   readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
   /** #9425: the gateway's own model choice for a session it created or re-modelled. */
   readonly recordSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly model: ThreadModel }) => Promise<ThreadModel>
+  /** Compare-and-swap variant (#9429 B2): writes only while the record is still at `expect_revision` (null: no record); `record` is the record after the call. */
+  readonly recordSessionModelIfCurrent: (request: { readonly now: number; readonly durable_id: string; readonly expect_revision: number | null; readonly model: ThreadModel }) => Promise<{ readonly applied: boolean; readonly record: SessionModelRecord | null }>
   /** A new thinking level for a session with a model record; false when there is none. */
   readonly updateSessionThinking: (request: { readonly now: number; readonly durable_id: string; readonly thinking_level: string }) => Promise<boolean>
+  /** A held set-model's choice, waiting on the record until the switch lands (#9429); false without a record. */
+  readonly recordPendingSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly provider: string; readonly id: string; readonly set_by: ModelSetter }) => Promise<boolean>
   /** The session's own `model_select`: keeps its record true and writes a fallback switch's milestone rows. */
   readonly observeModelSelect: (request: ObserveModelRequest) => Promise<ObserveModelResult>
   /** The model records of these sessions that exist, keyed by durable id; a plain read that takes no write lock. */
   readonly sessionModels: (durableIds: readonly string[]) => Promise<Readonly<Record<string, ThreadModel>>>
+  /** One session's model record with its revision, null when it has none; a plain read that takes no write lock. */
+  readonly sessionModelRecord: (durableId: string) => Promise<SessionModelRecord | null>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
   readonly dispose: () => Promise<void>
 }
 
+/** The worker's registration reply: the caller's result, and whether calls for that name now use this registration. */
+type ExtensionRegisterReply = { readonly result: StoreExtensionResult<{ readonly version: number }>; readonly retained: boolean }
+
 type Pending = { readonly worker: Worker; readonly resolve: (value: unknown) => void; readonly reject: (error: Error) => void }
 
 type WorkerMessage =
+  | { readonly type: "resolve"; readonly id: number; readonly address: string; readonly request: Parameters<GatewayResolve>[1] }
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
   | { readonly type: "response"; readonly id: number; readonly ok: false; readonly error: { readonly message: string; readonly stack?: string; readonly code?: string } }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
@@ -165,6 +180,17 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   let opened: Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }> | undefined
   let nextId = 1
   let disposed = false
+  let resolveTarget = options.resolveTarget
+  /** The registrations the current worker holds, restored on the next worker after one exits. */
+  const registrations = new Map<string, StoreExtensionRegistration>()
+
+  const resolveExtensionTarget: GatewayResolve = async (address, request) => {
+    if (resolveTarget === undefined) {
+      const { createExtensionResolver } = await import("./extension-resolver")
+      resolveTarget = createExtensionResolver(options.agentDir)
+    }
+    return await resolveTarget(address, request)
+  }
 
   /** Fails the requests posted to one worker; a successor's requests are not its to fail. */
   function failAll(owner: Worker, error: Error): void {
@@ -181,7 +207,14 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     const id = nextId++
     const reply = new Promise<unknown>((resolve, reject) => pending.set(id, { worker: active, resolve, reject }))
     active.ref()
-    active.postMessage({ type: "request", id, op, args })
+    try {
+      active.postMessage({ type: "request", id, op, args })
+    } catch (error) {
+      const entry = pending.get(id)
+      pending.delete(id)
+      if (pending.size === 0) active.unref()
+      entry?.reject(error instanceof Error ? error : new Error(String(error)))
+    }
     return reply
   }
 
@@ -195,6 +228,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     worker = spawned
     spawned.unref()
     spawned.on("message", (message: WorkerMessage) => {
+      if (message.type === "resolve") {
+        void resolveExtensionTarget(message.address, message.request).then(
+          (value) => { if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value }) },
+          (error: unknown) => { if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: false, error: error instanceof Error ? error.message : String(error) }) },
+        )
+        return
+      }
       if (message.type === "event") {
         for (const listener of listeners) listener(message.event)
         return
@@ -217,7 +257,15 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       failAll(spawned, new Error(`the gateway store worker exited (${code})`))
     })
     options._test?.onWorkerStarted?.(spawned)
-    const attempt = post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>
+    const attempt = (post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>).then(async (value) => {
+      // A fresh worker holds no extension registrations: restore the ones its predecessor held
+      // before any call reaches it, keeping only those the new worker holds in turn.
+      for (const [name, extension] of registrations) {
+        const reply = (await post("extension_register", { extension, now: now() })) as ExtensionRegisterReply
+        if (!reply.retained) registrations.delete(name)
+      }
+      return value
+    })
     opened = attempt
     // A failed open is not cached: every caller of this attempt sees its error, and the next call
     // opens again (a lock held during the first open, a migration that hit the lock-wait bound).
@@ -235,7 +283,44 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     return (await post(op, args)) as T
   }
 
+  /** A newer core schema refuses extension requests as data; anything else stays an error. */
+  function schemaTooNew(error: unknown): StoreExtensionRefusal {
+    if (error instanceof Error && "code" in error && error.code === "gateway_schema_too_new") {
+      return { kind: "refused", code: "gateway_schema_too_new", message: error.message }
+    }
+    throw error
+  }
+
+  async function extensionRequest<T>(op: string, args: unknown): Promise<StoreExtensionResult<T>> {
+    try {
+      return await call(op, args)
+    } catch (error) {
+      return schemaTooNew(error)
+    }
+  }
+
+  async function registerExtension(extension: StoreExtensionRegistration): Promise<StoreExtensionResult<{ readonly version: number }>> {
+    let reply: ExtensionRegisterReply
+    try {
+      reply = await call("extension_register", { extension, now: now() })
+    } catch (error) {
+      return schemaTooNew(error)
+    }
+    if (reply.retained) registrations.set(extension.name, structuredClone(extension))
+    return reply.result
+  }
+
   return {
+    registerStoreExtension: registerExtension,
+    extensionCall: async (name, op, args) => {
+      let cloned: unknown
+      try {
+        cloned = structuredClone(args)
+      } catch (error) {
+        return { kind: "refused", code: "invalid_arguments", message: `Extension arguments are not cloneable: ${error instanceof Error ? error.message : String(error)}` }
+      }
+      return await extensionRequest("extension_call", { name, op, args: cloned, now: now() })
+    },
     busyTimeoutMs: config.busy_timeout_ms,
     now,
     identity: async () => (await start()).self,
@@ -275,9 +360,12 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     confirmAnswer: (request) => call("confirm_answer", request),
     markPriorDelivered: (request) => call("mark_prior_delivered", request),
     recordSessionModel: (request) => call("record_session_model", request),
+    recordSessionModelIfCurrent: (request) => call("record_session_model_if_current", request),
     updateSessionThinking: (request) => call("update_session_thinking", request),
+    recordPendingSessionModel: (request) => call("record_pending_session_model", request),
     observeModelSelect: (request) => call("observe_model_select", request),
     sessionModels: (durableIds) => call("session_models", durableIds),
+    sessionModelRecord: (durableId) => call("session_model_record", durableId),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

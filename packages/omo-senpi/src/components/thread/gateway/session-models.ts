@@ -21,6 +21,12 @@ export type ThreadModel = ModelRef & {
   readonly reason: string | null
 }
 
+/**
+ * A model record with its revision (#9429): every write bumps it, so a caller that read revision N
+ * knows its write is the next one only while the record still reads N.
+ */
+export type SessionModelRecord = { readonly model: ThreadModel; readonly revision: number }
+
 /** The `model_change` field of the milestone row a fallback switch writes. */
 export type ModelChange = { readonly from: ModelRef; readonly to: ModelRef; readonly reason: string | null }
 

@@ -73,7 +73,9 @@ describe("all_fifteen_delivery_state_cases", () => {
       }
     }
     expect(observed).toEqual(expected)
-  })
+    // Fifteen sessions, each opening its own store worker, sent to in sequence; nothing here waits on a
+    // timer, so a loaded runner only needs room past the 5 s default (it took 5.1 s in a CPU-capped run).
+  }, 30_000)
 })
 
 describe("turn_epoch_cas_and_fifo", () => {

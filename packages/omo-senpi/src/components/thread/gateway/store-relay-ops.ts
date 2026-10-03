@@ -71,6 +71,10 @@ function authorFromColumn(value: unknown): ExternalAuthor | null {
  * one - and a rolled-back insert leaves a spurious wake, never a missed one.
  */
 function touchOutboxMarker(ctx: StoreContext, bindingId: string, cursor: number, now: number): void {
+  if (ctx.afterCommit !== undefined) {
+    ctx.afterCommit.push(() => touchOutboxMarker({ ...ctx, afterCommit: undefined }, bindingId, cursor, now))
+    return
+  }
   const marker = gatewayOutboxMarkerPath(ctx.config.agent_dir)
   const temporary = `${marker}.${process.pid}.${randomUUID()}.tmp`
   writeFileSync(temporary, JSON.stringify({ binding_id: bindingId, cursor, written_at: rfc3339(now) }), { mode: 0o600 })
@@ -386,6 +390,13 @@ export async function bindingView(ctx: StoreContext, request: { readonly now: nu
 
 export { registerIncarnation } from "./store-ownership"
 
+export async function bindingFor(ctx: StoreContext, request: { readonly now: number; readonly platform: string; readonly account_id: string; readonly chat_id: string; readonly thread_id: string }): Promise<BindingRecord | null> {
+  return await transaction(ctx, "binding_for", () => {
+    expireDue(ctx, request.now)
+    return selectBindings(ctx, "platform = ? AND account_id = ? AND chat_id = ? AND thread_id = ? AND status = 'active'", [request.platform, request.account_id, request.chat_id, request.thread_id])[0] ?? null
+  })
+}
+
 function incarnationOf(ctx: StoreContext, durableId: string): string | null {
   return nullableString(ctx.sql.one(["incarnation"], "SELECT incarnation FROM session_meta WHERE durable_id = ?", [durableId])?.incarnation)
 }
@@ -582,7 +593,7 @@ function ackedCursor(ctx: StoreContext, bindingId: string): number {
  */
 export async function readOutbox(
   ctx: StoreContext,
-  request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number },
+  request: { readonly now: number; readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number; readonly pendingOnly?: boolean },
 ): Promise<RelayOutcome<{ readonly binding_id: string; readonly revision: number; readonly status: BindingRecord["status"]; readonly rows: readonly OutboxRow[]; readonly next_cursor: number; readonly acked_cursor: number }>> {
   const limit = Math.min(Math.max(request.limit ?? OUTBOX_PAGE_DEFAULT, 1), OUTBOX_PAGE_MAX)
   return await transaction(ctx, "read_outbox", () => {
@@ -593,7 +604,7 @@ export async function readOutbox(
     const acked = ackedCursor(ctx, binding.binding_id)
     const after = request.after_cursor ?? acked
     const rows = ctx.sql
-      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ? ORDER BY cursor LIMIT ?`, [binding.binding_id, after, limit], "cursor")
+      .all(OUTBOX_COLUMNS, `SELECT ${OUTBOX_COLUMNS.join(", ")} FROM outbox WHERE binding_id = ? AND cursor > ?${request.pendingOnly ? " AND state = 'pending'" : ""} ORDER BY cursor LIMIT ?`, [binding.binding_id, after, limit], "cursor")
       .map((row) => outboxRowFrom(row, binding))
     sweepRetentionIfDue(ctx, request.now)
     return { kind: "ok", binding_id: binding.binding_id, revision: binding.revision, status: binding.status, rows, next_cursor: rows.at(-1)?.cursor ?? after, acked_cursor: acked }

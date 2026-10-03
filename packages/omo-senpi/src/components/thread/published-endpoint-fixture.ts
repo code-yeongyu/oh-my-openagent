@@ -2,6 +2,7 @@ import { once } from "node:events"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Socket } from "node:net"
 import { join } from "node:path"
+import { controlSocketSecretPath } from "./endpoint-registry"
 import { createLiveThreadSurface } from "./live-surface"
 import { createControlEndpointRegistrant, type SenpiWakeEvent } from "./gateway/registration"
 import { createGatewayStore } from "./gateway/store"
@@ -15,11 +16,19 @@ export async function publishedWorld() {
   const releases: Array<() => Promise<void>> = []
   const calls: string[] = []
   let discovery = 0
+  // The engine's per-endpoint liveness verdicts as `host status --all` last reported them; sockets
+  // without an entry are reported answering, with no verdict.
+  const verdicts = new Map<string, { readonly alive: boolean; readonly reason: "live_unresponsive" | "dead" | null; readonly paths: readonly string[] }>()
   const surface = createLiveThreadSurface(undefined, {
     env: { SENPI_RPC_SOCKET: join(dir, "missing.sock") },
     statusAll: async () => {
       discovery++
-      return calls.map((socket) => ({ socket, reachable: true, session_paths: [] }))
+      return calls.map((socket) => {
+        const verdict = verdicts.get(socket)
+        return verdict === undefined
+          ? { socket, reachable: true, session_paths: [] }
+          : { socket, reachable: verdict.alive, session_paths: [...verdict.paths], alive: verdict.alive, reason: verdict.reason }
+      })
     },
     registry: async () => [],
     connect: (path) => createConnection(path),
@@ -34,6 +43,8 @@ export async function publishedWorld() {
   }
   async function owner(name: string, cwd = dir, durableId = "target", terminal = false) {
     const socketPath = join(dir, terminal ? "t-0123456789abcdef.sock" : `${name}.sock`)
+    // A terminal endpoint authenticates every connection with its 32-byte secret before the first frame.
+    if (terminal) writeFileSync(controlSocketSecretPath(socketPath), Buffer.alloc(32, 7))
     const sessionDir = join(dir, "sessions", "--test--")
     mkdirSync(sessionDir, { recursive: true })
     const sessionPath = join(sessionDir, `2026-10-02_${durableId}.jsonl`)
@@ -41,19 +52,26 @@ export async function publishedWorld() {
     const runtime = new FakeSessionRuntime(sessionPath, durableId, cwd)
     let drain: ((event: SenpiWakeEvent) => unknown) | undefined
     const frames: string[] = []
-    const listing = { answer: true, durableId }
+    const listing = { answer: true, durableId, delayMs: 0 }
     const sockets = new Set<Socket>()
     const server = createServer((socket) => {
       sockets.add(socket)
       socket.once("close", () => sockets.delete(socket))
       let buffer = ""
+      let authenticated = !terminal
       socket.on("data", (chunk) => {
         buffer += chunk.toString()
+        if (!authenticated) {
+          if (buffer.length < 32) return
+          buffer = buffer.slice(32)
+          authenticated = true
+        }
         if (!buffer.includes("\n")) return
         const frame = JSON.parse(buffer.slice(0, buffer.indexOf("\n")))
         frames.push(frame.type)
         if (frame.type === "list_sessions" && !listing.answer) return
         void (async () => {
+          if (frame.type === "list_sessions" && listing.delayMs > 0) await new Promise((done) => setTimeout(done, listing.delayMs))
           const data = frame.type === "list_sessions"
             ? { sessions: [{ sessionId: `route-${name}`, durableSessionId: listing.durableId, sessionPath, cwd, name, status: "open" }] }
             : await drain?.({ type: "session_control_wake", reason: "command", reasons: ["command"], delivery_ids: frame.delivery_ids })
@@ -87,16 +105,18 @@ export async function publishedWorld() {
         },
       },
     })
-    const start = () => registrant.start({ durableId, sessionPath: () => sessionPath, isIdle: () => true })
+    const start = () => registrant.start({ durableId, sessionPath: () => sessionPath, isIdle: () => runtime.phase() === "idle" })
     await start()
     releases.push(async () => { await registrant.stop(); await crash() })
-    return { frames, runtime, crash, stop: registrant.stop, start, socketPath, listing,
+    return { frames, runtime, crash, stop: registrant.stop, start, socketPath, sessionPath, listing,
       connected: () => once(server, "connection", { signal: AbortSignal.timeout(5000) }),
     }
   }
   const sdk = createThreadSdk({ agentDir: dir, cwd: dir, uid: 123, user: "test", host: surface, store })
   return {
     dir, store, owner, send, sdk, discovery: () => discovery,
+    /** The engine judged this socket `alive`/`reason` until the next enumeration; `paths` are its session files. */
+    setVerdict: (socket: string, verdict: { readonly alive: boolean; readonly reason: "live_unresponsive" | "dead" | null; readonly paths: readonly string[] }) => verdicts.set(socket, verdict),
     async close() {
       for (const release of releases.reverse()) await release()
       await sdk.dispose()

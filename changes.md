@@ -1,3 +1,66 @@
+## 2026-10-03 - Task kills are recorded from the runner, not guessed from stderr (#9471)
+
+A killed process-mode task child on Windows could be reported as a crash when its teardown wrote memory diagnostics to stderr. The runner now records the kills it issues itself and never infers a kill from stderr. A Windows child terminated from outside the runner is reported as an unexpected exit (`killed=false`, exit code and stderr kept), because Windows gives no signal that separates it from a crash. Details: `packages/senpi-task/changes.md`.
+
+## 2026-10-03 - The browser skill obeys the session's browser engine and asks before irreversible actions (#9486)
+
+The OmO desktop app lets the user choose which browser an agent drives and passes the choice to the session as `OMO_BROWSER_ENGINE` (senpi#2611). `packages/shared-skills/skills/browser/scripts/omowright.mjs` now returns omowright through `guardOmowright()` (`browser-engine-guard.mjs`) whenever that variable is set; unset (terminal use) returns the library untouched.
+
+- `connected`: only `connectBrowserSkill()`; a missing browser, daemon or extension becomes `BrowserNotConnectedError` ("Connect your browser") and nothing else is launched. `builtin` refuses `connectBrowserSkill()` (use the app's in-app browser tools), `none` refuses browser work, an unknown value is refused rather than read as unset. The owned-engine entry points (`connectPipe`, `connectCloakProfile`) are not touched.
+- State: the wrapper reports `omo.browser.state` (engine, status, tab id/url/title/favicon, action kind, failure reason) when a session starts, around each action, after each navigation or tab change, when it stops and when a connect fails, through the new eval-only `omo_browser_bridge` tool (`packages/omo-senpi/src/components/browser-bridge`) that republishes it as a session `extension_event`. A host or bridge that cannot take events never blocks an action.
+- Policy: `BROWSER_CONFIRMATION_POLICY = "ask-before-irreversible"`. Before a click, Enter or script that sends/posts/publishes, pays/purchases/orders/subscribes, or deletes/removes/cancels a subscription/closes an account, the user is asked through the engine's question tool (`ask_user_question` or `request_user_input`); only an exact "Allow" proceeds, anything else raises `BrowserActionDeclinedError`, and a session with no question tool fails closed. The control is read from the page first (markup for a daemon ref, an element probe for a selector); a control that cannot be read is asked about. `evaluate` that clicks, submits or posts and the daemon's raw `session.tool("click"|"press"|"evaluate"|"fill"|"select")` are covered; `bskSnapshot` reads through the raw session.
+- Closed ways around it (review round 1): the guard returns an allowlisted library, so the owned engine (`connect`, `connectPipe`, `connectCloakProfile`) is refused with `browser_engine_owned_blocked` naming the engine, and any export that can act on a browser and is not on the allowlist is refused with `browser_engine_export_blocked` (setup, doctor, error classes, pure helpers and data pass through). Enter (not Shift+Enter) in a `textarea`, `contenteditable` or `role=textbox` element outside a GET form asks, since it sends in most chat apps. `session.tool()` passes only the read tools (`observe`, `snapshot`, `get_html`, `screenshot`, `tab_list`, `console`, `network`). `sendBeacon` counts as a write, and the label list gains submit, confirm, checkout, transfer, approve, merge, sign-a-document and their Korean forms. This prevents mistakes by a cooperating agent; it is not a boundary against code that imports the raw entry. Side effect: while the variable is set, the visual-qa, debugging and frontend skills cannot launch their own owned browser through this loader.
+- Stop: a daemon `user_aborted`, or the app's `omo.browser.stop` request, makes the next call throw `BrowserUserStoppedError` and blocks new sessions until the user's next message.
+- `SKILL.md` gains Step 0 (engine selection), `references/install.md` notes that inside the app the app installs and starts the daemon, and `references/commands.md` lists the typed errors. `BSK_HOME` / `BSK_BIN` handling is unchanged.
+
+`browser-skill-engine.test.ts` drives the guard against a fake BrowserSkill session and a fake kernel host (60 cases), and `browser-bridge/index.test.ts` covers the bridge tool. The committed `omo.js` bundle is rebuilt in the Linux container.
+
+## 2026-10-03 - The task tool stops describing few-read investigations and small foreground children as delegation targets (#9499)
+
+GPT-6 Astra followed the task tool's wording literally and handed few-call reading, credential lookups and the checks on its own change to subagents on executable lanes, then waited for them: in a 10-day survey of local sessions 86% of its spawns went to executable categories against 30-50% for the Claude and Kimi presets on the same text, nine were read-only investigations, and two were browser-use credential lookups. The sentences that named those as delegation targets are replaced at their source, in both editions where a twin exists. `packages/senpi-task/src/tools/task/description.ts` drops "pass false only for a short child whose result gates your very next call" from the run_in_background guideline (the flag stays documented in the tool description). The deep-low caller guidance in `packages/senpi-task/src/category/openai-categories.ts` and `packages/omo-opencode/src/tools/delegate-task/openai-categories.ts` no longer describes a one-subsystem-plus-callers investigation as the lane's home and its description names the lane as "preferred over deep-high for" the listed work instead of the bold "is routed here". The ultrawork skill's routing item 4 (`packages/omo-senpi/skills/ultrawork/SKILL.md`, embedded into `generated-directive.ts`) sends only work "across more files than one wave can read" to parallel explore agents. The Codex Hephaestus GPT-6 rule (`packages/omo-codex/plugin/components/rules/bundled-rules/hephaestus/gpt-6.md`) carries the same delegation paragraph as the senpi GPT-6 preset after senpi#2630: reading, lookups and own-change checks stay in the session however many calls they take; a subagent is for a track that runs beside the session's own and lands the task sooner. The rendered task tool description and the ultrawork directive both shrink; the omo-senpi plugin bundles are regenerated on Linux.
+
+## 2026-10-03 - Adopt senpi 2026.10.3
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.2 to 2026.10.3: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine fixes MCP tools failing with `MCP server <name> is disabled` once a child session ends (#9461, senpi#2524 and senpi#2608); the generated plugin bundles are regenerated for it on Linux.
+
+## 2026-10-03 - LazyCodex spawns a project's own registered agent roles (lazycodex#171, lazycodex#164)
+
+Reported by @aconley-vultr. On the LazyCodex surface, `spawnRoleDenial()` (`packages/omo-codex/plugin/components/ulw-loop/src/spawn-role-guard.ts`) accepted only the 12 bundled role names, and `applySpawnGuards()` ran it on every spawn before the plan and budget checks. A project's own roles in `.codex/agents/*.toml`, which Codex offers as valid `agent_type` choices, were denied even with no LazyCodex plan active.
+
+The guard now also accepts an `agent_type` that Codex has a role file for, read the way Codex reads them (`ulw-loop/src/registered-agent-roles.ts`): a standalone `agents/*.toml` keyed by its `name` (else the file name), or an `[agents.<name>]` table in `config.toml`, under `CODEX_HOME` and under the `.codex/` of the working directory and its ancestors. A missing `agent_type`, or a name with no role file, is still denied, so a LazyCodex workflow never falls back to a generic agent (#134). The denial lists the registered roles as well as the bundled ones. Bundled roles are matched before any disk read, and the plan and budget guards are unchanged.
+
+The bundled Hephaestus rule's `multi_agent_v2` `spawn_agent` example (`components/rules/bundled-rules/hephaestus/{gpt-5.5,gpt-5.6,gpt-6}.md`) now passes `"agent_type":"<role>"`, so a session copying it is no longer denied (lazycodex#164). The v1 examples already did. Codex exposes `agent_type` on the v2 `spawn_agent` whenever agent roles are configured, so `plugin/test/aggregate-plugin-fixture.mjs` stops treating the object-form v2 `agent_type` as unsupported (the direct keyword form still is); that rule predated the guard requiring the role.
+
+`ulw-loop/test/spawn-role-registered.test.ts` covers project roles from a nested cwd, keying by declared name, a role file without a name field, `CODEX_HOME` roles in both forms, and the denials (no role file, no `agent_type`, a role registered only in another project). Five of its eight cases fail on `dev`. `spawn-role-matrix.test.ts` now isolates `CODEX_HOME`.
+
+## 2026-10-03 - OpenCode executes tool-argument rewrites on the original object (#9448)
+
+`replaceToolArgs` replaced `output.args` with a shallow clone, but OpenCode executes tools with the argument object it retained before calling `tool.execute.before`. The patch never reached that object, and later plugins edited a detached copy. The helper now merges patches into mutable arguments in place, so both OmO's rewrites and later hooks' edits reach tool execution. All 12 OpenCode call sites are unchanged.
+
+Frozen arguments retain the existing clone behavior to avoid throwing on older hosts. Executing that replacement still requires the host to read `output.args` back; this change does not claim to fix frozen host-held arguments. The helper tests reproduce both mutable-reference failures on the development code and preserve the frozen-object cases.
+## 2026-10-02 - The skill tool lists skills and commands in a stable order (#9432)
+
+Reported by @kimchupa-l10n, with relay captures that pinned the cause. `sortByScopePriority` in `packages/skills-loader-core/src/tools/skill/scope-priority.ts` compared scope priority only, so items in the same scope kept their discovery order, and that order varies between processes. The OpenCode edition's skill tool description (`packages/omo-opencode/src/tools/skill/description-formatter.ts`) is built from that sort, so the tool definition changed from one session to the next and every new session and subagent missed the Anthropic prompt cache.
+
+The sort is now total: scope priority first, then name, compared by UTF-16 code units so the order cannot depend on the machine's locale. Scope precedence is unchanged, and `matchCommandByName` still resolves by exact name with the higher-priority scope winning a shared name. OmO Native does not use this sort: `omo-senpi`, `senpi-task` and `omo-native` never import `skills-loader-core`, Native's tool descriptions are static, and the bundled skills Native contributes are already listed in sorted order (`packages/omo-senpi/src/components/bundled-skills/index.ts:40`).
+
+`description-formatter.order.test.ts` renders the same skills and commands discovered in different orders and requires byte-identical descriptions; both cases fail on `dev` and pass with this change. `skill-matcher.test.ts` covers exact-name command resolution and scope precedence under both discovery orders.
+
+## 2026-10-02 - Adopt senpi 2026.10.2
+
+Every `@code-yeongyu/senpi` pin moves from 2026.10.1-3 to 2026.10.2: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. This is the first senpi release carrying the upstream pi v1.0.0 engine sync; the generated plugin bundles are regenerated for it on Linux. No omo source needed changes: the engine's builtin provider registry still matches `provider-map.json`, and the omo-senpi, senpi-task and omo-native suites pass against it.
+
+## 2026-10-02 - omob builds the engine with its own source siblings (#9416)
+
+Since senpi publishes `@code-yeongyu/senpi` with exact `npm:@code-yeongyu/senpi-*` aliases instead of bundled workspaces, `script/build-omob.ts` packed only `packages/coding-agent` and the install resolved `pi-tui`, `pi-ai` and the other lockstep siblings from npm at the same version string. A source commit that used a sibling export newer than the published build then failed `bun build --compile` (`No matching export ... for import "nextRenderRevision"`), and the commit-keyed artifact cache kept serving that install. `packSenpiSiblingTarballs` now packs every workspace in senpi's `scripts/registry-packages.mjs` list from the same checkout and fails when one is missing, and `installSenpiTarball` places each reachable sibling beside the engine through alias, range and peer edges, installs only the remaining external dependencies, and rejects siblings that declare different version specs for one external package. Artifact manifests carry `assembly: "source-siblings-1"`; an older same-commit artifact is rebuilt instead of reused.
+## 2026-10-03 - set-model and set-reasoning never lose a newer write, and keep the caller's setter (#9429)
+
+Two `set-model` or `set-reasoning` calls on one session could leave the gateway's record behind the engine: the compare-and-swap compared the record's values, and a call that found the engine already on the recorded values wrote nothing, so after a switch away and back (or a level set back to the recorded one) an earlier call's stale read-back still won. The record now carries a revision (schema v8) that every write bumps, the swap is on it, and a call writes even when nothing changed. `set-model --set-by config|lead` on a live session also recorded and returned `user` whenever the session's own observer recorded the switch first; the caller's setter is now written on the model it asked for. A held or superseded switch keeps the running model's own setter while it runs; a held switch that lands later takes the setter its call recorded (schema v9 `pending_*`, cleared by every model write), so a held `--set-by lead|config` no longer reads `user` once it applies. The v7 core-object reservation no longer adds a second, core-owned row for an extension object whose DDL used mixed case (the registry stores extension names lower-cased; the reservation now ignores case, and v9 removes such rows), so that extension registers again after the upgrade, and a switch another one replaced answers `superseded: {provider, id}` instead of `pending` (from the engine's `pendingModelSwitch` when it reports one, else from whether anything wrote the record meanwhile). A call that creates the record reads the engine back once more, so a change nothing recorded cannot leave it stale, and `set-model` on a host whose state names no model is refused `unsupported`. A command write on a session running its fallback model keeps the choice the fallback overrode, so the engine's revert reads the original provenance again.
+
+## 2026-10-02 - A held set-model names the requested model as pending (#9429)
+
+When the engine holds a model switch for compaction, `thread_set_model`, the thread SDK and `omo thread set-model` used to answer ok with the previous model and say nothing about the request: the caller asked for one model and got back another with no explanation. The ok result now carries `pending: {provider, id}` naming the requested model whenever the engine's read-back differs from it, and the CLI prints the pending model on its own line. The stored record is unchanged: it keeps naming the model the engine runs until the hold applies.
+
 ## 2026-10-02 - Gateway sessions get their model auto from connected providers, or as set, and show it (#9425)
 
 A session a chat connector creates through `omo thread` used to take whatever the host defaulted to (a scoped model or a stale settings default could win), and nobody could see which model a gateway session ran or why. `omo thread create` (and the agent tool `thread_create`) now resolves a session given no model from the user's connected providers before it opens: the active `model_profile` ladder, else the first connected model, passed to the host explicitly. `--model` (`provider/id`, an id or a unique fragment), `--provider`, `--thinking` and `--set-by config|user|lead` make an explicit choice, which always wins; an unknown or ambiguous model and an unsupported level are refused before anything opens. `omo thread models`, `set-model` and `set-reasoning` (and the SDK's `create`, `models`, `setModel`, `setReasoning`) control a bound session mid-run. The choice is recorded in the gateway store (schema v5, `session_models`) by durable id, so it survives every resume, and `list`/`read` report `model: {provider, id, thinking_level, provenance: auto|set|fallback, set_by, reason}`. The session's own runtime keeps that record true through the engine's `model_select`, writing a switch only once the engine has applied it (a switch the engine holds or refuses after announcing it changes neither the record nor the outbox), and a runtime fallback switch writes one `milestone` outbox row per outbound binding with `model_change: {from, to, reason}`. `set-reasoning` reports and records the level the session runs after the change, which is the engine's clamp when the model cannot run the requested level. Reference: `docs/reference/omo-thread.md` (Models).
@@ -113,6 +176,104 @@ macOS responsibility API and report its executable path, optional application bu
 and pid. Shell-launched engines report themselves; application-launched engines report the
 responsible application. Failed resolution is explicitly unresolved and labels the engine path
 only as diagnostic context, never as a guessed TCC identity.
+
+## 2026-10-01 - Store extensions survive a worker restart and share the hourly retention sweep (#9331)
+
+Rebased onto the gateway's failed-open recovery and retention sweep. A store handle whose worker
+exits now registers the extensions the previous worker held on the fresh worker before serving
+the next call, instead of answering `extension_unknown_name`; only registrations that worker
+actually held are restored, so a refused downgrade or reserved name stays unregistered. The
+sweep's hourly schedule is kept per connection, so an extension call joining core operations no
+longer sweeps on every call. The sweep never deletes extension rows or a core row an extension
+can still act on; a foreign key from an extension table to a core table is refused on write,
+so none can cascade. Docs state that an operation's time budget equals the writers' lock-wait
+bound, and the CHANGELOG names `gateway_schema_too_new` for core and extension downgrades.
+
+## 2026-10-01 - Refuse extension schema downgrades without changing registration (#9331)
+
+An extension whose stored version exceeds the caller's migration count now returns
+gateway_schema_too_new under the migration lock. Refusal preserves stored rows, metadata,
+ownership and any existing compatible registration; core service remains usable. Other
+migration failures keep the existing lazy-retry behavior. Fresh-handle and replacement
+regressions cover the refusal, unchanged SQLite data version and subsequent valid writes.
+
+## 2026-10-01 - Exercise direct extension guards and document transaction behavior (#9331)
+
+Direct SQLite authorization tests assert the trigger/view create decisions without the
+statement lexer or schema-diff guard masking them. Caught constraint errors must roll back
+prior writes, and table-valued sources remain refused. The SDK smoke uses a real disk-session
+record and exercises clone recovery, shared target resolution and schema-version refusal.
+The reference documents the shipped SDK entry point, owned DDL, deadlines and commit effects.
+
+## 2026-10-01 - Refuse unsupported newer gateway schemas (#9331)
+
+Core schema reads reject versions newer than this binary supports before migration or
+normal operations. Core callers receive a typed gateway_schema_too_new error; extension
+registration and calls receive that code as a refusal. The stored version and rows remain
+unchanged. The check is also performed on the version re-read under the migration lock.
+
+## 2026-10-01 - Normalize SQLite ownership and make namespace overlap symmetric (#9331)
+
+Ownership checks fold identifier and schema-label ASCII case like SQLite, while retaining
+the registry boundary around core and foreign objects. New ownership rows use canonical
+names and schema changes replace legacy mixed-case rows. Overlapping extension namespaces
+can register in either order; only unowned prefixed lookalikes block first registration.
+
+## 2026-10-01 - Tokenize SQL parameters without changing quoted text (#9331)
+
+The statement-free SQLite binder and extension statement guard share a tokenizer for
+strings, quoted identifiers and comments. Literal question marks remain unchanged and
+do not consume parameters. Row queries keep trailing line comments separate from their
+generated wrapper. Regression coverage exercises each quote/comment form through the
+real store worker, including escaped quotes and identifiers containing a question mark.
+
+## 2026-10-01 - Refuse uncloneable extension arguments before posting (#9331)
+
+Extension calls snapshot their arguments before crossing the worker boundary and return
+invalid_arguments when cloning fails. A failed post also removes and rejects its pending
+request rather than leaving an unhandled rejection for disposal. Function and symbol
+arguments now leave the worker alive, preserve its registration and allow core calls.
+
+## 2026-10-01 - Preserve relay validation and committed extension results (#9331)
+
+Extension enqueue resolves its binding target with the relay's shared live-and-disk
+address book over a worker request port. Missing sessions return not_found; receivers
+are still signaled only after commit. Post-commit effects run independently, reporting
+failed markers through extension_error store events without misreporting committed data
+as a refused operation. Pending resolution requests are released on operation completion.
+Tests cover missing/present targets, blocked markers followed by healthy markers, and
+unawaited resolution failures and timeouts without late writes or worker loss.
+
+## 2026-10-01 - Bound extension operations and revoke expired transactions (#9331)
+
+Extension operations and pending helpers share the store's lock-wait budget. On expiry,
+their transaction is revoked and rolled back and the worker accepts the next request.
+Retained transactions raise typed errors; late asynchronous helper calls reject promises
+instead of throwing synchronously. The worker reports an unhandled expired-transaction
+error as a store event without losing core service. Other uncaught errors remain fatal.
+
+## 2026-10-01 - Own automatic indexes through their extension tables (#9331)
+
+Extension migrations now accept SQLite's automatic indexes for TEXT and composite primary
+keys and UNIQUE constraints. Authorization requires the owning table; schema validation
+checks the automatic index's table and records its extension owner atomically. Core
+automatic indexes remain core-owned and inaccessible to extension operations.
+
+## 2026-09-30 - Session gateway extension contract and actor identity (Refs #9143)
+
+Core schema v5 adds `extension_schema` and nullable `deliveries.actor_user_id`, populated from
+`author.user_id` without adding a CLI flag. The exported store-extension types define registration,
+worker operations, namespaced SQL, joined relay transactions and typed refusals. The v4 migration
+preserves existing rows. Registration and calls apply pending steps under the bounded core write
+lock. SQLite authorization and schema-effect checks protect other namespaces and core objects.
+The transaction adapter reuses relay/engine validation and budgets, defers file effects until
+commit, and rolls back both kinds of writes on failure. Object ownership is persisted in
+`extension_objects`, with the core schema captured before any extension runs; matching a prefix
+never grants access. Core-colliding names, triggers and views are refused, and DELETE without a
+WHERE clause is checked against the same ownership registry. The public thread SDK forwards the API.
+Tests cover cross-process ensure, namespace violations, all refusals and continued core service,
+relay parity, rollback, actor attribution, and lock bounds. The v2 fixture now removes v5 additions
+when constructing its historical database. PR #9331 stacks on #9222.
 
 ## 2026-10-01 - ultrawork reuses evidence per target, spawns a new reviewer per round, and scopes defects to the blast radius (#9294)
 

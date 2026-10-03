@@ -64,6 +64,19 @@ describe("JavaScript computer facade", () => {
 		await expect(call).rejects.toThrow("Suspended: the user pressed the stop chord");
 	});
 
+	it("throws the COMPUTER_PERMISSION_REQUIRED text when a permission denial comes back as an error", async () => {
+		// Given — the shape a code-mode marshal produces for the denial at omo #9475
+		const text =
+			'COMPUTER_PERMISSION_REQUIRED: accessibility permission is missing. Do not retry until the user says the grant is done and the app was relaunched.';
+		const kernel = loadJsFacade(() => ({ text, details: { value: { code: "COMPUTER_PERMISSION_REQUIRED" }, isError: true }, hasError: true }));
+
+		// When
+		const call = kernel.run("await computer.screenshot();");
+
+		// Then
+		await expect(call).rejects.toThrow("COMPUTER_PERMISSION_REQUIRED");
+	});
+
 	it("drops trailing undefined arguments from a chain step", async () => {
 		// Given
 		const kernel = loadJsFacade(windowResponder);

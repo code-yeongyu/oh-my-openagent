@@ -121,6 +121,7 @@ export type {
   SpawnSpecV1,
   StartQueued,
   TaskNotification,
+  CancelRequest,
   TaskRecord,
   TaskRecordInput,
   TaskSpawnSpec,

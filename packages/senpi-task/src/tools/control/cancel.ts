@@ -45,6 +45,11 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         status,
       })
     }
+    case "cancel_pending":
+      return toolResult(
+        `Cancel requested for ${outcome.task_id}, but the child is unreachable: its connection to the task host dropped. It is stopped on its host before it runs anything else once reachable, or ends when the connection does not come back; its lane is released then. task_output shows the pending cancel.`,
+        { kind: "cancel_pending", task_id: outcome.task_id, previous_status: outcome.previous_status, reason: outcome.reason },
+      )
     case "noop":
       return toolResult(`${outcome.reason} No change.`, {
         kind: "noop",

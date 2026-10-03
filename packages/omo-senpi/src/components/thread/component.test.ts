@@ -497,7 +497,11 @@ describe("thread component settle never waits on the gateway store", () => {
       const warning = await within(firstWarning, 15_000, "the delayed completion write to be reported")
       expect(warning).toContain("retrying")
       const waited = Number(/waited (\d+) ms/.exec(warning)?.[1])
-      expect(waited).toBeLessThan(1_000)
+      // The store gives up once another busy step could carry the wait past lockWaitMaxMs (1_000), i.e. at a
+      // check where waited + 2 * busyTimeoutMs (100) > 1_000. That rule, not a wall-clock ceiling, is what the
+      // report proves: it waited out the window instead of bailing on the first busy reply. Timer lateness on
+      // a loaded runner can push the measured value past 1_000 (#9487).
+      expect(waited).toBeGreaterThan(1_000 - 2 * 100)
       await f.dispatch("agent_start", sessionCtx("dur-1"))
       await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
       await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "a later settle to return while the first write is still outstanding")

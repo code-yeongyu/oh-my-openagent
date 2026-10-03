@@ -1,5 +1,6 @@
 import type { ChildExitFacts, ChildExitOutcome } from "../types"
 import type { HostParkCause } from "./session-client"
+import { TRANSPORT_LOST_REASON } from "./transport-recovery"
 
 /**
  * How a daemon SESSION ends, mapped onto the same `ChildExitOutcome` vocabulary a child PROCESS
@@ -15,7 +16,7 @@ const PARKING_REASONS: readonly HostParkCause[] = ["handoff_parked", "idle_evict
 export const SESSION_PARKED_CAUSE: HostParkCause = "idle_evicted"
 
 /** The reason a lost connection carries: a session has no stderr of its own. */
-const TRANSPORT_GONE_REASON = "transport_gone"
+const TRANSPORT_GONE_REASON = TRANSPORT_LOST_REASON
 
 /** Placeholder reason for a `session_closed` frame that named none. */
 const UNNAMED_REASON = "session_closed"

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative, resolve } from "node:path"
 
 import { projectStateKey, resolveProjectStateDirectory } from "./project-state-directory"
+import { createTaskRecordStore } from "./record-store"
 
 const HOME = "/home/tester"
 const nothingExists = () => false
@@ -38,7 +39,8 @@ describe("resolveProjectStateDirectory", () => {
     test("#then that in-project directory keeps being used so recorded tasks stay reachable", () => {
       const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
       try {
-        mkdirSync(join(project, ".omo", "senpi-task"), { recursive: true })
+        mkdirSync(join(project, ".omo", "senpi-task", "tasks"), { recursive: true })
+        writeFileSync(join(project, ".omo", "senpi-task", "tasks", "st_x.json"), "{}")
 
         expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(join(project, ".omo", "senpi-task"))
         expect(resolveProjectStateDirectory(project, "thread-tools", { env: { HOME } })).toBe(
@@ -48,6 +50,103 @@ describe("resolveProjectStateDirectory", () => {
         rmSync(project, { recursive: true, force: true })
       }
     })
+  })
+
+  describe("#given a project holding only empty state directories created this session", () => {
+    test("#then task state still lands in the agent dir instead of being pulled into the project", () => {
+      const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
+      try {
+        mkdirSync(join(project, ".omo", "senpi-task", "tasks"), { recursive: true })
+        mkdirSync(join(project, ".omo", "thread-tools"), { recursive: true })
+
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(
+          join(HOME, ".omo", "agent", "projects", projectStateKey(project), "senpi-task"),
+        )
+        expect(resolveProjectStateDirectory(project, "thread-tools", { env: { HOME } })).toBe(
+          join(HOME, ".omo", "agent", "projects", projectStateKey(project), "thread-tools"),
+        )
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+  })
+
+  describe("#given a legacy state directory whose records sit behind a symlink", () => {
+    test("#then the legacy directory is kept instead of being treated as empty", () => {
+      const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
+      try {
+        const elsewhere = join(project, "elsewhere")
+        mkdirSync(elsewhere, { recursive: true })
+        writeFileSync(join(elsewhere, "task.json"), "{}")
+        mkdirSync(join(project, ".omo", "senpi-task"), { recursive: true })
+        symlinkSync(elsewhere, join(project, ".omo", "senpi-task", "tasks"))
+
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(
+          join(resolve(project), ".omo", "senpi-task"),
+        )
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+  })
+
+  describe("#given a legacy state root that is not a plain directory", () => {
+    test("#then a root symlink to an empty directory is kept instead of being treated as scaffolding", () => {
+      const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
+      try {
+        mkdirSync(join(project, "shared-state"))
+        mkdirSync(join(project, ".omo"))
+        symlinkSync(join(project, "shared-state"), join(project, ".omo", "senpi-task"))
+
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(join(project, ".omo", "senpi-task"))
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+
+    test("#then a file in place of the store is kept so its error is reported instead of hidden", () => {
+      const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
+      try {
+        mkdirSync(join(project, ".omo"))
+        writeFileSync(join(project, ".omo", "senpi-task"), "")
+
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(join(project, ".omo", "senpi-task"))
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+  })
+
+  describe("#given a legacy store whose records are expunged after it was adopted", () => {
+    test("#then later probes keep selecting it so one project's records never split across two stores", () => {
+      const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
+      try {
+        const record = join(project, ".omo", "senpi-task", "tasks", "st_x.json")
+        mkdirSync(join(project, ".omo", "senpi-task", "tasks"), { recursive: true })
+        writeFileSync(record, "{}")
+        const adopted = resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })
+        rmSync(record)
+
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(adopted)
+        expect(adopted).toBe(join(project, ".omo", "senpi-task"))
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+  })
+
+  test("#given a malformed legacy task artifact #when listing tasks #then its diagnostic remains visible", () => {
+    const project = mkdtempSync(join(tmpdir(), "omo-project-state-"))
+    try {
+      // Given: an artifact filename is present, but a directory makes it unreadable.
+      mkdirSync(join(project, ".omo", "senpi-task", "tasks", "st_00000007.json"), { recursive: true })
+      // When: the normal store resolves its location and lists persisted tasks.
+      const result = createTaskRecordStore({ project_dir: project }).list()
+      // Then: the bad record is diagnosed instead of disappearing during migration.
+      expect(result.diagnostics.map((diagnostic) => diagnostic.type)).toEqual(["parse_error"])
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
   })
 
   describe("#given no explicit environment", () => {

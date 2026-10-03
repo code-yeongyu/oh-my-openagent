@@ -48,9 +48,14 @@ export async function destroyResidentTask(
         if (cause !== "fallback_handoff") context.registry.forget(taskId)
         if (cause === "revive_failure") recordRevivalFailure(context, taskId)
       }
+      // A daemon child whose stop could not reach its host (the transport was down, or crash recovery
+      // gave up) may still hold its session there: the cancel ends it once the host answers.
+      if (handle.kind !== "in-process" && (cause === "cancel" || cause === "cancel_without_abort")) await closeParkedSession(context, taskId)
     } else if (cause === "reconcile_lost" || cause === "ttl" || cause === "revive_failure") {
       await terminateOrphan(context, taskId, orphan)
       if (cause === "revive_failure") recordRevivalFailure(context, taskId)
+    } else if (cause === "cancel" || cause === "cancel_without_abort") {
+      await closeParkedSession(context, taskId)
     }
     // Runtime fallback starts the next model only once the failed rung's child is confirmed gone: the
     // handle's own teardown is best-effort and bounded, so it cannot tell a refused close from a done one.
@@ -130,6 +135,16 @@ function forgetConsumedPid(context: LifecycleContext, taskId: string, pid: numbe
     const { pid: _consumed, ...rest } = fresh
     return rest
   })
+}
+
+// A cancelled child this process holds no handle for (it parked, or its connection was let go) may
+// still run on its host and keep committing: the cancel ends that session there (omo#9403).
+async function closeParkedSession(context: LifecycleContext, taskId: string): Promise<void> {
+  const record = context.store.load(taskId)
+  if (!isHostSessionRecord(record)) return
+  context.hostSessionProbe.refresh(record.host_session.socket)
+  if (!(await context.hostSessionProbe.sessionLive(record.host_session))) return
+  await closeOrphanSession(context, taskId, record.host_session, record.spawn_spec?.cwd)
 }
 
 async function closeOrphanSession(

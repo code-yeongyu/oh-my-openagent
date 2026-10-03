@@ -4,6 +4,7 @@ import { log } from "@oh-my-opencode/utils"
 import { loadSenpiBarrel, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
+import { createChildExtensionEvents } from "../child-extension-events"
 import { socketAcceptsConnection } from "./busy-host"
 import { HostUnavailableError } from "./daemon"
 import { SESSION_PARKED_CAUSE } from "./exit-mapping"
@@ -94,6 +95,8 @@ export interface HostSessionClientOptions {
  * the session path, never on the instance).
  */
 export class HostSessionClient {
+  readonly extensionEvents = createChildExtensionEvents()
+  readonly onExtensionEvent = this.extensionEvents.subscribe
   readonly socketPath: string
   readonly transportGone: Promise<RpcTransportGoneError>
   private readonly createClient: HostRpcClientFactory
@@ -223,6 +226,7 @@ export class HostSessionClient {
 
   /** End the session on the host (`close_session`), then drop this child's connection. */
   async close(): Promise<void> {
+    this.extensionEvents.clear()
     const client = this.client
     const routingId = this.routingId
     this.client = undefined
@@ -234,6 +238,7 @@ export class HostSessionClient {
 
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
   async detach(): Promise<void> {
+    this.extensionEvents.clear()
     const client = this.client
     this.client = undefined
     this.routingId = undefined
@@ -249,6 +254,7 @@ export class HostSessionClient {
 
   private ingest(record: unknown): void {
     if (!isRoutedTo(record, this.routingId)) return
+    if (this.extensionEvents.ingest(record)) return
     const control = parseControlRecord(record)
     if (control === undefined) {
       if (isAgentSessionEvent(record)) for (const listener of this.eventListeners) listener(record)
@@ -260,7 +266,8 @@ export class HostSessionClient {
   private handleControl(control: HostControlRecord): void {
     switch (control.type) {
       case "extension_ui_request":
-        return this.answerUi(control)
+        this.answerUi(control)
+        return
       case "session_parked": {
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
@@ -274,7 +281,7 @@ export class HostSessionClient {
         return
       }
       default:
-        return unreachable(control)
+        unreachable(control)
     }
   }
 

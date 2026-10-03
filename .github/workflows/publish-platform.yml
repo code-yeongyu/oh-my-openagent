@@ -266,36 +266,6 @@ jobs:
           file "$LAUNCHER"
           head -n 1 "$LAUNCHER" | grep -F "#!/usr/bin/env node"
 
-      - name: Compress binary
-        if: steps.check.outputs.skip != 'true'
-        run: |
-          PLATFORM="${{ matrix.platform }}"
-          PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
-          cd "$PACKAGE_DIR"
-          
-          if [[ "$PLATFORM" == windows-* ]]; then
-            # Windows: use 7z (pre-installed on windows-latest)
-            7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
-          else
-            # Unix: use tar.gz
-            tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
-          fi
-          
-          cd ../..
-          echo "Compressed artifact:"
-          ls -lh binary-${PLATFORM}.*
-
-      - name: Upload artifact
-        if: steps.check.outputs.skip != 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: binary-${{ matrix.platform }}
-          path: |
-            binary-${{ matrix.platform }}.tar.gz
-            binary-${{ matrix.platform }}.zip
-          retention-days: 1
-          if-no-files-found: error
-
       - name: Check release assets
         id: release-assets
         env:
@@ -555,6 +525,38 @@ jobs:
             --binary .omo/release-binaries/omo-darwin-arm64
         timeout-minutes: 5
 
+      # The npm payload is uploaded only after this leg's release-binary smokes passed:
+      # a failed smoke leaves this platform with no payload, so only its publish stops.
+      - name: Compress binary
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
+          cd "$PACKAGE_DIR"
+          
+          if [[ "$PLATFORM" == windows-* ]]; then
+            # Windows: use 7z (pre-installed on windows-latest)
+            7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
+          else
+            # Unix: use tar.gz
+            tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
+          fi
+          
+          cd ../..
+          echo "Compressed artifact:"
+          ls -lh binary-${PLATFORM}.*
+
+      - name: Upload artifact
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.platform }}
+          path: |
+            binary-${{ matrix.platform }}.tar.gz
+            binary-${{ matrix.platform }}.zip
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Upload release binary artifact
         if: steps.release-assets.outputs.binary_exists != 'true'
         uses: actions/upload-artifact@v7
@@ -578,7 +580,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish:
-    needs: build
+    needs: [build, smoke-linux-arm64]
     if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-latest
     strategy:
@@ -591,6 +593,24 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
+      - name: Require the linux-arm64 smoke for arm64 legs
+        env:
+          ARM64_SMOKE_RESULT: ${{ needs.smoke-linux-arm64.result }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          case "$PLATFORM" in
+            linux-arm64*)
+              if [ "$ARM64_SMOKE_RESULT" != "success" ]; then
+                echo "::error::$PLATFORM is not published: the linux-arm64 release-binary smoke finished with '$ARM64_SMOKE_RESULT'"
+                exit 1
+              fi
+              echo "$PLATFORM: linux-arm64 release-binary smoke passed"
+              ;;
+            *)
+              echo "$PLATFORM: smoked in its own build leg"
+              ;;
+          esac
+
       - name: Validate release inputs
         id: validate
         env:
@@ -645,10 +665,24 @@ jobs:
       - name: Download artifact
         id: download
         if: steps.check.outputs.skip_all != 'true'
+        # A missing payload is decided by the next step with a clear reason, not by an opaque download error.
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.platform }}
           path: .
+
+      - name: Require this platform's smoked payload
+        if: steps.check.outputs.skip_all != 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [ -f "binary-$PLATFORM.tar.gz" ] || [ -f "binary-$PLATFORM.zip" ]; then
+            echo "$PLATFORM: payload present, its release-binary smoke passed in this run"
+          else
+            echo "::error::$PLATFORM is not published: its npm payload was never uploaded, because this platform's release-binary smoke did not pass in this run"
+            exit 1
+          fi
 
       - name: Extract artifact
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
@@ -761,7 +795,9 @@ jobs:
   # =============================================================================
   smoke-linux-arm64:
     needs: build
-    if: github.repository == 'code-yeongyu/oh-my-openagent' && needs.build.result == 'success'
+    # Runs even when an unrelated build leg failed, so a windows failure cannot block
+    # the arm64 publishes; a failed arm64 build still fails here (its artifact is missing).
+    if: always() && !cancelled() && github.repository == 'code-yeongyu/oh-my-openagent'
     runs-on: ubuntu-24.04-arm
     defaults:
       run:

@@ -137,6 +137,8 @@ export function buildHostChaosHarness(): HostChaosHarness {
     hostSessionProbe: {
       daemonAlive: () => Promise.resolve(daemon.alive),
       sessionLive: (identity) => Promise.resolve(daemon.alive && daemon.livePaths.has(identity.session_path)),
+      sessionLiveness: (identity) =>
+        Promise.resolve(daemon.alive && daemon.livePaths.has(identity.session_path) ? "live" : "gone"),
       refresh: () => undefined,
     },
     hostSessionClose: (request) => {

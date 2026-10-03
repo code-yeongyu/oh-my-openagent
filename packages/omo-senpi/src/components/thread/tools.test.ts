@@ -34,7 +34,12 @@ function fixture() {
     const index = sessions.findIndex((entry) => entry.sessionId === sessionId)
     sessions[index] = { ...sessions[index], name }
   })
-  const setModel = mock(async (_sessionId: string, provider: string, modelId: string) => ({ provider, id: modelId, name: "Selected model" }))
+  // Like senpi's get_state, the fake names the model each session runs.
+  const running = new Map<string, { provider: string; id: string }>()
+  const setModel = mock(async (sessionId: string, provider: string, modelId: string) => {
+    running.set(sessionId, { provider, id: modelId })
+    return { provider, id: modelId, name: "Selected model" }
+  })
   const getAvailableModels = mock(async (_sessionId: string) => models)
   const setThinkingLevel = mock(async (_sessionId: string, _level: string, _scope?: "session" | "turn") => {})
   const getAvailableThinkingLevels = mock(async (_sessionId: string) => ["off", "high"])
@@ -44,7 +49,7 @@ function fixture() {
     listSessions: async () => sessions,
     openSession: async () => session,
     getMessages: async () => [{ role: "user", content: "hello" }],
-    getState: async () => ({ isStreaming: false }),
+    getState: async (sessionId) => ({ isStreaming: false, model: running.get(sessionId) ?? { provider: "anthropic", id: "claude-test" } }),
     prompt,
     interrupt: async () => ({ interrupted: false }),
     setSessionName,

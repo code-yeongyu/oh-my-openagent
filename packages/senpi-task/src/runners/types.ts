@@ -1,5 +1,6 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
 import type { RunnerOutcome } from "./in-process/child-handle"
+import type { ChildExtensionListener } from "./child-extension-events"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -55,6 +56,7 @@ export type ChildHandle = {
   followUp(text: string): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
+  subscribeExtensionEvents?(listener: ChildExtensionListener): () => void
   waitForIdle(): Promise<void>
   waitForOutcome?(): Promise<RunnerOutcome>
   hasExited?(): boolean

@@ -8,6 +8,9 @@
  * the marker starts its drain with its own `BEGIN IMMEDIATE` (`reconcile`), which cannot succeed
  * until this transaction is fully published or fully rolled back - so a notification is only ever
  * early, never late, and every marker a lock holder sees names a row that is visible or gone.
+ * An enqueue joined to an extension's transaction follows the same ordering: its marker is created
+ * under the lock and removed by the rollback compensation when the operation does not commit, so a
+ * committed delivery always has its marker and a rolled-back one never keeps it.
  */
 import { createHash, randomUUID } from "node:crypto"
 import { closeSync, constants, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeSync } from "node:fs"
@@ -34,7 +37,7 @@ import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
-import { GATEWAY_MIGRATIONS } from "./schema"
+import { GATEWAY_MIGRATIONS, GatewaySchemaVersionError } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
@@ -65,12 +68,16 @@ export type StoreContext = {
   readonly emit: (event: GatewayStoreEvent) => void
   readonly hook: (name: "beforeDbCommit" | "afterDbCommit") => Promise<void>
   readonly delay: (ms: number) => Promise<void>
+  /** Present only on a context joining an extension's outer transaction. */
+  readonly afterCommit?: (() => void)[]
+  /** Filesystem compensations run when a joined extension transaction rolls back (e.g. removing the wake markers it created early). */
+  readonly afterRollback?: (() => void)[]
 }
 
 const DELIVERY_COLUMNS = [
   "delivery_id", "target_durable_id", "seq", "sender", "sender_turn", "envelope", "body", "bytes", "mode_requested",
   "mode_effective", "expected_turn_id", "state", "reason", "admitted_by", "claimed_at", "attempt", "admission_kind",
-  "turn_epoch", "root_id", "hop", "created_at", "updated_at", "expires_at", "binding_id", "binding_revision",
+  "turn_epoch", "root_id", "hop", "created_at", "updated_at", "expires_at", "binding_id", "binding_revision", "actor_user_id",
 ] as const
 
 export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
@@ -108,6 +115,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     expires_at: Number(record.expires_at),
     binding_id: record.binding_id === null ? null : String(record.binding_id),
     binding_revision: nullableNumber(record.binding_revision),
+    actor_user_id: record.actor_user_id === null ? null : String(record.actor_user_id),
   }
 }
 
@@ -132,6 +140,10 @@ function queuePosition(ctx: StoreContext, row: DeliveryRow): number {
 }
 
 async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: boolean): Promise<boolean> {
+  if (ctx.afterCommit !== undefined) {
+    ctx.sql.exec("SAVEPOINT gateway_enqueue")
+    return true
+  }
   const started = Date.now()
   for (;;) {
     try {
@@ -159,16 +171,17 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
 
 function rollbackQuietly(ctx: StoreContext): void {
   try {
-    ctx.sql.exec("ROLLBACK")
+    ctx.sql.exec(ctx.afterCommit === undefined ? "ROLLBACK" : "ROLLBACK TO gateway_enqueue; RELEASE gateway_enqueue")
   } catch {
     return
   }
 }
 
-export async function transaction<T>(ctx: StoreContext, op: string, body: () => T): Promise<T> {
+export async function transaction<T>(ctx: StoreContext, op: string, body: () => T | Promise<T>): Promise<T> {
+  if (ctx.afterCommit !== undefined) return await body()
   await beginImmediate(ctx, op, true)
   try {
-    const value = body()
+    const value = await body()
     ctx.sql.exec("COMMIT")
     return value
   } catch (error) {
@@ -179,6 +192,10 @@ export async function transaction<T>(ctx: StoreContext, op: string, body: () => 
 
 function createMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string, allowExisting: boolean): string {
   const directory = gatewayInboxDirectory(ctx.config.agent_dir, targetDurableId)
+  // The marker is created eagerly, inside the transaction like a core enqueue: a committed
+  // delivery always has its wake, and the rollback compensation removes it when the joined
+  // operation does not commit. A receiver's reconcile deletes the marker of a row that never
+  // landed, so an early marker is only ever early.
   mkdirSync(directory, { recursive: true, mode: 0o700 })
   const path = join(directory, deliveryId)
   let fd: number
@@ -193,10 +210,15 @@ function createMarker(ctx: StoreContext, targetDurableId: string, deliveryId: st
   } finally {
     closeSync(fd)
   }
+  ctx.afterRollback?.push(() => rmSync(path, { force: true }))
   return path
 }
 
 export function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
+  if (ctx.afterCommit !== undefined) {
+    ctx.afterCommit.push(() => unlinkMarker({ ...ctx, afterCommit: undefined }, targetDurableId, deliveryId))
+    return
+  }
   const path = join(gatewayInboxDirectory(ctx.config.agent_dir, targetDurableId), deliveryId)
   try {
     rmSync(path)
@@ -232,7 +254,7 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.delivery_id, row.target_durable_id, row.seq, row.sender, row.sender_turn, JSON.stringify(row.envelope), row.body, row.bytes,
       row.mode_requested, row.mode_effective, row.expected_turn_id, row.state, row.reason,
       row.admitted_by === null ? null : JSON.stringify(row.admitted_by), row.claimed_at, row.attempt, row.admission_kind,
-      row.turn_epoch, row.root_id, row.hop, row.created_at, row.updated_at, row.expires_at, row.binding_id, row.binding_revision,
+      row.turn_epoch, row.root_id, row.hop, row.created_at, row.updated_at, row.expires_at, row.binding_id, row.binding_revision, row.actor_user_id,
     ],
   )
 }
@@ -242,7 +264,9 @@ function argsHash(value: unknown): string {
 }
 
 function schemaVersion(ctx: StoreContext): number {
-  return Number(ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0)
+  const version = Number(ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0)
+  if (version > GATEWAY_MIGRATIONS.length) throw new GatewaySchemaVersionError(version, GATEWAY_MIGRATIONS.length)
+  return version
 }
 
 /**
@@ -426,12 +450,14 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
   if (!(await beginImmediate(ctx, "enqueue", false))) return { kind: "busy" }
   let marker: string | null = null
   let committed = false
+  const effectsAtStart = ctx.afterCommit?.length ?? 0
+  const commitSql = ctx.afterCommit === undefined ? "COMMIT" : "RELEASE gateway_enqueue"
   try {
     const cleared = deleteExpiredReceipt(ctx, { principal: request.sender_principal, operation: "deliver", idempotency_key: request.receipt.idempotency_key }, request.now)
     const receipt = selectReceipt(ctx, request.sender_principal, request.receipt.idempotency_key)
     if (receipt !== undefined) {
       const outcome = classifyReceipt(ctx, request, receipt)
-      ctx.sql.exec("COMMIT")
+      ctx.sql.exec(commitSql)
       committed = true
       return outcome
     }
@@ -490,6 +516,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       expires_at: Math.min(request.now + QUEUED_TTL_MS, binding.expires_at ?? Number.POSITIVE_INFINITY),
       binding_id: request.binding?.binding_id ?? null,
       binding_revision: request.binding?.revision ?? null,
+      actor_user_id: "external" in request.origin ? request.origin.external.author?.user_id ?? null : null,
     }
     insertDelivery(ctx, row)
     write(ctx, "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, 'prepared', ?, ?, ?, ?, ?)", [
@@ -499,14 +526,15 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     const position = queuePosition(ctx, row)
     sweepRetentionIfDue(ctx, request.now, cleared)
-    await ctx.hook("beforeDbCommit")
-    ctx.sql.exec("COMMIT")
+    if (ctx.afterCommit === undefined) await ctx.hook("beforeDbCommit")
+    ctx.sql.exec(commitSql)
     committed = true
-    await ctx.hook("afterDbCommit")
+    if (ctx.afterCommit === undefined) await ctx.hook("afterDbCommit")
     return { kind: "inserted", row, queue_position: position }
   } catch (error) {
     if (!committed) {
       rollbackQuietly(ctx)
+      if (ctx.afterCommit !== undefined) ctx.afterCommit.length = effectsAtStart
       if (marker !== null) rmSync(marker, { force: true })
     }
     throw error
@@ -844,6 +872,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           expires_at: now + QUEUED_TTL_MS,
           binding_id: null,
           binding_revision: null,
+          actor_user_id: null,
         })
         createMarker(ctx, item.target, deliveryId, true)
         count++

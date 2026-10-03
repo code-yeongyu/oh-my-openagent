@@ -1,3 +1,67 @@
+## 2026-10-03 - A kill is the one the runner issued; Windows external terminations are reported as crashes (#9471)
+
+`runners/rpc/exit-mapping.ts` `classifyChildExit` decided a signal-less exit was a kill on Windows when the child's stderr held nothing but Bun's child-reaper advisory. A killed child's teardown also writes diagnostics there: the memory component's `memory shutdown drain step failed` (EPERM on a state rename) and `memory shutdown drain hit its budget`. Those made a real kill read as a crash (`killed=false`), and the Windows RPC e2e `kill_marks_error_killed_true` failed intermittently on unrelated PRs.
+
+A kill now comes only from facts the runner owns: the handle's own `terminate()` (`terminationRequested`, passed as `terminatedByRunner`) or a POSIX signal. stderr is never read to decide it, and the Windows stderr heuristic (`hasOnlyWindowsStartupAdvisories`, `isWindowsExternalTermination`) is gone. **Behavior change:** on Windows, a child terminated from outside the runner (TerminateProcess, Task Manager, an OOM kill) exits with code 1 and no signal, exactly like a crash. It is now recorded as `status=error`, `killed=false`, with `RPC child exited unexpectedly (exit code N)` followed by the stderr tail. A process crash's message gains that lead line too, while a daemon session's exit keeps the host's reason as its whole message. A runner-issued signal-less kill reads `RPC child was terminated by its runner (exit code N, pid=…)`.
+
+Tests: `exit-mapping.test.ts` covers a runner-terminated child with the memory EPERM and drain-budget stderr (killed), a child that writes "killed" on its own (crashed), an external Windows termination with and without the advisory (crashed), the spawn-error precedence, and the messages. `handle-terminated-by-runner.test.ts` drives the real handle: `terminate()` followed by a code-1 exit is killed, and the same exit without `terminate()` is crashed. The e2e keeps the external SIGKILL check on POSIX, where the signal is the evidence, and on Windows proves the honest outcome as `external_termination_reports_unexpected_exit`.
+
+## 2026-10-03 - Task tool wording stops naming few-read investigations and small foreground children as delegation targets (#9499)
+
+- `src/tools/task/description.ts`: the run_in_background guideline is "Spawn children with run_in_background=true." The deleted clause ("pass false only for a short child whose result gates your very next call") contradicted the GPT-6 preset's foreground rule and named a small child as a routine spawn; `run_in_background=false` stays documented in the tool description body.
+- `src/category/openai-categories.ts`: the deep-low `Selection_Gate` now reads "Of the two deep lanes this is the default: the child settles its decisions from what it reads. When unsure, choose deep-low; a misrouted child returns `ESCALATE: deep-high` after one cheap attempt, and you re-spawn the same brief as deep-high with its findings." (the one-subsystem-plus-callers shape and "wide but mechanical work belongs here" are gone), and the deep-low description says "preferred over deep-high for 3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work" without bold. Both strings are byte-identical to the omo-opencode twins.
+
+## 2026-10-03 - A pending task_cancel waits when the host cannot list its sessions (#9450)
+
+`finishPendingCancel` closes a child's host session before it marks a pending cancel finished (#9403). It decided whether there was a session to close with `sessionLive()`, and a `list_sessions` the daemon refused or did not answer read as an empty list (`runners/rpc-host/liveness.ts` returned `[]`). On a host that answers its probe but is too loaded to list, the cancel therefore finished, skipped the close, and left the session running until the TTL sweep. `liveSessionPaths` now reports a failed listing as an error, the probe (`lifecycle/host-session.ts`) keeps whether the listing succeeded and answers `sessionLiveness()` as `live`, `gone` or `unknown`, and `lifecycle/pending-cancel.ts` leaves the cancel pending on `unknown`, as it already does for an unconfirmed close. `sessionLive()` keeps its answer for reconcile, TTL and destroy.
+
+## 2026-10-02 - OpenGateway defaults to unlimited provider concurrency
+
+- `src/manager/concurrency.ts`: the native task allocator uses an unlimited OpenGateway provider default before the generic lane limit. Explicit model and provider limits still win, and the global admission limit still applies.
+- `src/manager/concurrency-opengateway.test.ts`: exercises admissions beyond the generic limit, explicit caps and queued handoff, other providers' limits, global capacity, and lease cleanup.
+- `docs/reference/omo-json.md`: documents the built-in default and override precedence. No user configuration changes are required.
+## 2026-10-02 - A killed Windows child stays killed when Bun's reaper advisory fills its stderr tail (#9228)
+
+- `runners/rpc/exit-mapping.ts`: on win32 a child ended by `TerminateProcess` exits with code 1 and no signal, and stderr that holds only Bun's `child reaper unavailable under Bun on win32 ...` advisory still counts as a kill. Bun prints that advisory once per terminated worker thread, and the handle classifies the last 4 KB of stderr (`client.stderrTail`), so with enough advisories the tail began mid-advisory, or the kill cut the last advisory mid-write; either fragment made the exit a crash, and the task ended `status=error killed=false` with the advisory as its error (the Windows RPC e2e `kill_marks_error_killed_true` check, timing-dependent). Those two fragments are now recognized: a cut first line that ends a full advisory line in the same tail, and a last line that is the start of the advisory. Any other text, whole or cut, still makes the exit a crash.
+- Tests (`exit-mapping.test.ts`): 40 advisories through the 4 KB tail and an advisory cut mid-write both classify as killed (both fail before this change); a diagnostic among the advisories (cut by the tail, after them, or cut mid-write) still classifies as crashed, and POSIX is unchanged.
+
+## 2026-10-01 - A child whose host connection drops resumes or fails within a bound; task_cancel really stops it (#9403)
+
+Builds on #9406 (Dante-dan), which reports a recovery `continued` only after the host takes the continuation; this entry is the rest of #9403.
+
+- `runners/rpc-host/transport-recovery.ts` + `handle-recovery.ts`: every lost-transport recovery runs under a bound (`TRANSPORT_RECOVERY_BOUND_MS`, 180 s, armed only by a closed connection, so a quiet healthy child is never failed). When the bound runs out first the child ends `error` with `transport lost: ...` (was: waiting forever on a reopen that never answered), its lane lease is released, and a connection a late reattach still produces ends the session on the host (abort + `close_session`) instead of being adopted, so the child's own processes end with it. The exhausted-retries exit carries the same readable reason instead of `transport_gone`.
+- `task_cancel` on a child whose connection is down answers `cancel_pending` ("cancel requested, child unreachable", also on `task_output`) instead of a false `cancelled`. The stop is applied on the recovered connection before anything else (no continuation is sent); only then is the record `cancelled`, the child torn down and its lane released. Cancelling a child this process holds no handle for (parked, or let go) now closes its session on the host (`lifecycle/destroy.ts`), and a cancelled task releases every lease it holds at any epoch (`TaskConcurrency.releaseTask`).
+- `task_send` to a parked child that was still `running` reopens its session and delivers the message as a follow-up. Before, the send reserved the run's next lane slot and the revival's reattach then refused that same slot, so every send answered `lane_capacity` even on an empty lane. A child that ended `transport lost` answers `not_continuable` naming the loss.
+- Lane leases are held only in the parent's in-memory lane manager (`manager/concurrency.ts`); none are persisted, so a parent restart already starts with none. A dead child's lease is now released by its bounded failure or its cancel, without restarting the parent; a live child's lease is never touched.
+- Tests (real unix sockets to the fake host, a hand-driven recovery clock, no sleeps): `rpc-host-transport-loss.test.ts` (socket close + rejoin, silent reopen -> `transport lost` + next child admitted, host restart with an unanswered continuation, the session process closed on the host, the quiet healthy child, the stopped host with a pending child), `rpc-host-cancel-stop.test.ts` (cancel while unreachable, cancel of a parked live session) and one `rpc-host-host-park.test.ts` case (send to a parked running child). The fake host can give each session a real long-running process (`sessionProcesses`) and re-allow a withheld reply.
+- Review round (#9407): an accepted cancel is final on every path. A pending cancel is durable (`cancel_requested` on the record): a parent that shuts down, or a host shard that crashes, before the stop lands no longer gets the child back - every revival (`lifecycle/reconcile-reclamation.ts` `reviveClaimed`, via `lifecycle/pending-cancel.ts`) finishes the cancel instead, closing the session on its host. A cancel accepted while the child is reachable marks the handle stopping first, so crash recovery that reopens the session ends it there rather than resuming it (a live repro: a cancelled child's shard crashed and recovery ran it on for ~20 minutes). The deferred stop always settles: a recovery that exhausts its attempts or is refused stops the child locally, the cancel's record write is covered by a `finally`, and the outcome tracker waits on the stop and writes `cancelled` itself if that write failed (`manager/pending-stops.ts`). `interruptTask` and a repeat `task_cancel` defer to the pending cancel; `task_send` refuses a child whose cancel is pending; a parent shutdown no longer waits out the recovery bound on such a child's abort. `task_send` to a parked running child (`steering/revive-running.ts`) fences delivery on the reopened run before and after the follow-up, and a refused message hands the child back parked with its lanes free. A deadline-edge result is reported expired (`withinBound`, the reattach race). `abort: "skip"` releases every lease of a task with no live handle. `task_output` shows the pending-cancel note only while the record is running. Steering reads the loss reason from the shared `state/transport-loss.ts`. Tests: `rpc-host-cancel-pending.test.ts`, `rpc-host-cancel-crash.test.ts`, `rpc-host-revive-running.test.ts`, `rpc-host/transport-recovery.test.ts`, a `cancel_pending` renderer row.
+
+## 2026-10-01 - Empty project scaffolding does not select legacy runtime storage
+## 2026-10-01 - Empty project scaffolding does not select legacy runtime storage (#9395)
+
+- `store/project-state-directory.ts` keeps the agent-directory store when old
+  observers have created only empty project directories. Populated legacy stores,
+  a store root that is a symlink or a file, symlink entries, unreadable subtrees
+  and malformed artifact filenames retain their existing location so live state
+  and diagnostics remain reachable.
+- A legacy store seen holding records is marked with `.in-project`, so it stays
+  selected after its records are expunged and one project's records never split
+  across the project and the agent directory.
+- The resolver tests cover empty scaffolding, symlinked records, root symlink and
+  file stores, and adoption that survives expunge. The malformed-artifact case
+  goes through the real record store, and `omo-senpi`'s engine test composes the
+  task engine over empty scaffolding and checks nothing is written into it. The
+  DAG fixture marks its legacy store rather than depending on empty directories
+  selecting it.
+- Preserves and extends drakeo338's state-lookup work from PR #9367. The separate
+  desktop observer fix removes the directory writer; this lookup change alone is
+  not evidence that first-turn project writes are fixed.
+
+## 2026-10-01 - Relay typed child computer permission events through task ownership (omo-desktop-app#1437)
+
+- Add a separate, validated child extension-event channel for `computer.permission_required`; keep `AgentSessionEvent` and its listeners unchanged. Invalid permission records are dropped.
+- Preserve denials received before the manager subscribes, forward daemon events across transport replacement, and retire subscriptions with their owning handles. The manager supplies trusted task ownership rather than accepting session identities from the child record.
+
 ## 2026-10-01 - Builtin chain rungs name thinking levels their models accept (#9378)
 
 - `category/fallback-chains.ts`: `quick` opencode-go `minimax-m3` / `minimax-m2.7` drop `variant: "max"` (the child now inherits the
@@ -11,6 +75,12 @@
   and still runs at an accepted level. The fixture's `assistant`/`streamMessage` helpers are exported for that last case.
 - Pins updated to the new variants: `fallback-chains`, `category-routing-policy`, `unspecified-low-chain`,
   `in-process-runtime-fallback`, `manager-runtime-fallback`.
+
+## 2026-10-02 - A split or repeated Bun reaper advisory is still a Windows kill (#9228)
+
+- `runners/rpc/exit-mapping.ts` `hasOnlyWindowsStartupAdvisories` now matches the sentence senpi's `startHostChildReaper` writes (`packages/coding-agent/src/modes/rpc/child-reaper.ts`, ending `until this host exits`) as source text: one or more copies, each either whole on one line or split across lines at any point with only its own remaining words after it. Before, every line had to start with the sentence's first 119 characters, so a copy whose tail (`host exits`) arrived on its own line made the kill a crash (dev run 36881640066, `kill_marks_error_killed_true`).
+- Any other text still makes the exit a crash: a real error line before or after the advisory, the advisory's head followed by other words, or a lone piece of the sentence with no copy started before it. Combined with #9443's rules for the 4 KB tail the handle classifies: when stderr fills that tail, its first line may be any piece of a copy the tail cut, and that copy's remaining words must follow; the last copy may stop short anywhere when the kill cut it mid-write (no line end after it), and otherwise once it reaches `until this`, as #9347 accepted.
+- The N-copy tests used a guessed `until this runtime exits` ending; they now use the source sentence. New cases: the dev CI excerpt with `host exits` on the next CRLF line, three split points repeated beside a whole copy (both crashed on the base, killed now), and six advisory-plus-other-text shapes that stay crashed. The tail and mid-write tests from #9443 use the source sentence too.
 
 ## 2026-10-01 - In-process task children honor the caller's settings (#9353)
 

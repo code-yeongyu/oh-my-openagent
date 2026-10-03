@@ -8,6 +8,11 @@ import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry, type
 import { createGatewayStore, type GatewayStore, type GatewayStoreOptions } from "../store"
 import { FakeSessionRuntime } from "./fake-runtime"
 
+// Cross-version conformance runs select a real older facade, which starts its own older worker.
+const storeFactory: typeof createGatewayStore = process.env.OMO_GATEWAY_TEST_STORE_MODULE === undefined
+  ? createGatewayStore
+  : (await import(process.env.OMO_GATEWAY_TEST_STORE_MODULE) as typeof import("../store")).createGatewayStore
+
 export type HarnessSession = {
   readonly id: string
   readonly cwd: string
@@ -58,7 +63,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
   }
 
   function store(extra: Partial<GatewayStoreOptions> = {}): GatewayStore {
-    const created = createGatewayStore({ agentDir, now, ...extra })
+    const created = storeFactory({ agentDir, now, resolveTarget: resolveFromEntries(entries, () => agentDir), ...extra })
     stores.push(created)
     return created
   }

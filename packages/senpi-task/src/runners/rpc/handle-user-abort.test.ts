@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test"
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { createRpcChildHandle } from "./handle"
 import type { RpcProtocolClient } from "./protocol-client"
+import { createChildExtensionEvents } from "../child-extension-events"
 
 type TrackedHandle = ReturnType<typeof createRpcChildHandle> & {
   waitForOutcome(): Promise<RunnerOutcome>
@@ -18,6 +19,7 @@ function createHarness(): {
   const child = Object.assign(new EventEmitter(), { pid: 4243 }) as unknown as ChildProcess
   const listeners = new Set<(event: AgentSessionEvent) => void>()
   const client = {
+    extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
     send: () => Promise.resolve({ success: true }),
     onEvent: (listener: (event: AgentSessionEvent) => void) => {

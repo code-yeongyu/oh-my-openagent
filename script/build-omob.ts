@@ -9,6 +9,7 @@ import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, chmodSync, renameSync, cpSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 import { versionLines, type OmoBuildInfo } from "../packages/omo-native/build-info"
 import { installOmobLauncher, isCurrentOmobBuild } from "./omob-launcher"
 import { writeProvenanceMarker } from "./omob-provenance"
@@ -294,10 +295,14 @@ export function packSoleSenpiTarball(tarballDir: string, pack: () => void): stri
 	return tarballs[0] as string
 }
 
+/** Bumped whenever the engine install layout changes, so a same-commit artifact from an older layout is rebuilt. */
+export const SENPI_ARTIFACT_ASSEMBLY = "source-siblings-1"
+
 interface SenpiArtifactCache {
 	readonly commit: string
 	readonly packageRoot: string
 	readonly tarballName: string
+	readonly assembly: string
 }
 
 function senpiArtifactCachePath(cacheDir: string, commit: string): string {
@@ -309,7 +314,8 @@ function readSenpiArtifactCache(cacheDir: string, commit: string): string | unde
 	if (!existsSync(manifestPath)) return undefined
 	try {
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Partial<SenpiArtifactCache>
-		if (manifest.commit !== commit || typeof manifest.packageRoot !== "string" || !existsSync(manifest.packageRoot)) return undefined
+		if (manifest.commit !== commit || manifest.assembly !== SENPI_ARTIFACT_ASSEMBLY) return undefined
+		if (typeof manifest.packageRoot !== "string" || !existsSync(manifest.packageRoot)) return undefined
 		return manifest.packageRoot
 	} catch {
 		return undefined
@@ -324,6 +330,39 @@ function writeSenpiArtifactCache(cacheDir: string, artifact: SenpiArtifactCache)
 
 export function resolveCachedSenpiPackage(cacheDir: string, commit: string): string | undefined {
 	return readSenpiArtifactCache(cacheDir, commit)
+}
+
+/**
+ * Packs every lockstep workspace the engine reaches through a registry alias, keyed by the
+ * dependency name the engine declares. senpi's own registry list decides which workspaces ride the
+ * lockstep version; a listed workspace absent from the checkout is an error, never a registry copy.
+ */
+export async function packSenpiSiblingTarballs(
+	senpiDir: string,
+	tarballRoot: string,
+	pack: (workspaceDir: string, destination: string) => void,
+): Promise<Record<string, string>> {
+	const registry = (await import(pathToFileURL(join(senpiDir, "scripts", "registry-packages.mjs")).href)) as {
+		readonly registrySourcePackageNames: ReadonlySet<string>
+	}
+	const workspaces = new Map<string, string>()
+	for (const entry of readdirSync(join(senpiDir, "packages"))) {
+		const manifestPath = join(senpiDir, "packages", entry, "package.json")
+		if (!existsSync(manifestPath)) continue
+		const { name } = JSON.parse(readFileSync(manifestPath, "utf8")) as { name?: string }
+		if (name !== undefined) workspaces.set(name, join(senpiDir, "packages", entry))
+	}
+	const engineName = (JSON.parse(readFileSync(join(senpiDir, "packages", "coding-agent", "package.json"), "utf8")) as { name: string }).name
+	rmSync(tarballRoot, { recursive: true, force: true })
+	const tarballs: Record<string, string> = {}
+	for (const name of registry.registrySourcePackageNames) {
+		if (name === engineName) continue
+		const workspaceDir = workspaces.get(name)
+		if (workspaceDir === undefined) throw new Error(`senpi checkout has no workspace for lockstep package ${name}`)
+		const destination = join(tarballRoot, name.replace(/^@/, "").replace("/", "__"))
+		tarballs[name] = join(destination, packSoleSenpiTarball(destination, () => pack(workspaceDir, destination)))
+	}
+	return tarballs
 }
 
 async function buildSenpiPackage(senpiDir: string, cacheDir: string, commit: string): Promise<string> {
@@ -345,9 +384,12 @@ async function buildSenpiPackage(senpiDir: string, cacheDir: string, commit: str
 	const tarballName = packSoleSenpiTarball(tarballDir, () =>
 		run("bun", ["pm", "pack", "--destination", tarballDir], join(senpiDir, "packages", "coding-agent")),
 	)
+	const siblingTarballs = await packSenpiSiblingTarballs(senpiDir, join(cacheDir, "sibling-tarballs"), (workspaceDir, destination) =>
+		run("bun", ["pm", "pack", "--destination", destination], workspaceDir),
+	)
 	const installRoot = join(cacheDir, "artifacts", "senpi", commit, "install")
-	const packageRoot = await installSenpiTarball(resolve(tarballDir, tarballName), installRoot)
-	writeSenpiArtifactCache(cacheDir, { commit, packageRoot, tarballName })
+	const packageRoot = await installSenpiTarball(resolve(tarballDir, tarballName), installRoot, siblingTarballs)
+	writeSenpiArtifactCache(cacheDir, { commit, packageRoot, tarballName, assembly: SENPI_ARTIFACT_ASSEMBLY })
 	return packageRoot
 }
 

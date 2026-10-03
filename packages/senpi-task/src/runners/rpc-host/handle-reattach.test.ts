@@ -9,6 +9,7 @@ import { event, fakeSessionPort, FAKE_SESSION } from "./handle.test-support"
 import { HOST_SESSION_REATTACH_TAG, type HostSessionReattach } from "./reattach"
 import { childOpenInput } from "./session-client.test-support"
 import { sessionClientHarness } from "./session-client.test-support"
+import { TRANSPORT_LOST_REASON } from "./transport-recovery"
 
 // omo#8563: a lost connection ended every host-session child as crashed(transport_gone) while its
 // session kept running on the daemon (or sat intact in its JSONL after the daemon died). The
@@ -244,7 +245,7 @@ describe("host-session handle reattach", () => {
     await handle.dispose()
   })
 
-  test("#given the transport is lost #when every reattach attempt fails #then the child ends crashed with transport_gone", async () => {
+  test("#given the transport is lost #when every reattach attempt fails #then the child ends crashed with transport lost", async () => {
     // given
     const host = await fakeHost()
     const handle = await openWithReattach(host, "/tmp/sessions/reattach-d.jsonl", async () => undefined)
@@ -256,7 +257,7 @@ describe("host-session handle reattach", () => {
     // then
     expect(await handle.waitForExit()).toEqual({
       kind: "crashed",
-      facts: { pid: undefined, code: null, signal: null, stderrTail: "transport_gone" },
+      facts: { pid: undefined, code: null, signal: null, stderrTail: TRANSPORT_LOST_REASON },
     })
     expect(handle.attached).toBe(false)
     await handle.dispose()

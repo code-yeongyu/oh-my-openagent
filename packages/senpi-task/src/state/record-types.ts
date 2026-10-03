@@ -123,4 +123,12 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly fallback_handoff_epoch?: number
   readonly fallback_closing_child?: { readonly pid?: number; readonly host_session?: HostSessionIdentity }
   readonly residency_claim?: string
+  // task_cancel accepted while the child was unreachable (omo#9403). The cancel is final: every
+  // revival reads it and finishes the cancel instead of running the child again.
+  readonly cancel_requested?: CancelRequest
+}
+
+export type CancelRequest = {
+  readonly requested_at: string
+  readonly reason?: string
 }

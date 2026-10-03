@@ -10,15 +10,17 @@ import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/b
 import type { GatewayRelay, RelayResult } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { ReportOpResult } from "./gateway/store-relay-ops"
+import type { StoreExtensionApi } from "./gateway/store-extensions"
+export type { StoreExtensionApi, StoreExtensionRegistration, StoreExtensionTransaction, StoreExtensionOperation, StoreExtensionResult, StoreExtensionRefusal, StoreExtensionRefusalCode } from "./gateway/store-extensions"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
-import { createGatewayServices } from "./tools/gateway-services"
+import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import type { OmoModelProfile } from "@oh-my-opencode/omo-config-core"
 
-import { createThread, listThreadModels, modelProfileChoice, setThreadModel, setThreadReasoning, type CreateThreadInput, type ModelsResult } from "./model-control"
-import type { ModelSetter, ThreadModel } from "./gateway/session-models"
+import { createThread, listThreadModels, modelProfileChoice, setThreadModel, setThreadReasoning, type CreateThreadInput, type ModelsResult, type SetModelOk } from "./model-control"
+import type { ModelSetter } from "./gateway/session-models"
 import { listThreads, readThread } from "./tools/read-ops"
 
 export type ThreadSdkOptions = {
@@ -49,7 +51,7 @@ type Reported = Promise<RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<AddressEntry, "thread_id" | "title" | "cwd" | "status" | "session_path" | "endpoint" | "surface" | "alive">
 
-export type ThreadSdk = {
+export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and bindingless send of this SDK is keyed by. */
   readonly principal: string
   readonly list: (request: Scoped) => Promise<ThreadToolResult>
@@ -71,7 +73,7 @@ export type ThreadSdk = {
   readonly create: (request: Scoped & CreateThreadInput) => Promise<ThreadToolResult>
   /** With no thread, what a new session could run; with one, what its live session can switch to, and its recorded model. */
   readonly models: (request: Scoped & { readonly thread?: string; readonly provider?: string }) => Promise<ModelsResult | Failure>
-  readonly setModel: (request: Scoped & { readonly thread: string; readonly model: string; readonly provider?: string; readonly set_by?: ModelSetter }) => Promise<{ readonly kind: "ok"; readonly thread_id: string; readonly model: ThreadModel } | Failure>
+  readonly setModel: (request: Scoped & { readonly thread: string; readonly model: string; readonly provider?: string; readonly set_by?: ModelSetter }) => Promise<SetModelOk | Failure>
   readonly setReasoning: (request: Scoped & { readonly thread: string; readonly level: string; readonly scope?: "session" | "turn" }) => Promise<ThreadToolResult>
   readonly locate: (request: Scoped & { readonly thread: string }) => Promise<{ readonly kind: "ok"; readonly thread: LocatedThread } | Failure>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
@@ -112,11 +114,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     env,
     ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
   })
-  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
+  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const now = options.now ?? store.now
   const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now, ...(options.modelProfile === undefined ? {} : { modelProfile: () => modelProfileChoice(options.modelProfile?.() ?? {}) }) }
   const view = () => hostView(surface)
   const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))
+  // An extension call resolves its target while the store worker runs that call's transaction, so it
+  // takes the store-free live-and-disk resolver: the send path's `resolve` first asks this same store
+  // for the session's owner, a request the busy worker would only answer after the call's budget.
+  const resolveForExtension = createGatewayResolver(surface, () => hostView(surface, { offline: true }))
 
   // A running session writes a completion only once it knows of the arm; the arm is durable, so a
   // wake that does not get through leaves it to the session's next start instead.
@@ -133,10 +139,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   async function inbound(request: Parameters<ThreadSdk["send"]>[0] & { readonly binding_id: string }): Promise<GatewayDeliveryResult> {
     if (request.thread !== undefined) {
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
-      const target = await sessionId(request.thread, request.all_scope)
-      if ("kind" in target) return target
-      if (binding !== null && binding.session_durable_id !== target.id) {
-        return fail("invalid_arguments", `Binding ${binding.binding_id} delivers to session ${binding.session_durable_id}, not ${target.id}.`, "Drop the target (the binding names its session) or pass the binding of that session.", { binding_id: binding.binding_id, session: binding.session_durable_id })
+      // An explicit durable id that IS the binding's session needs no validating lookup: the inbound
+      // delivery resolves that same owner once, so a bound send pays one lookup budget like any
+      // other send. Any other address still resolves here to enforce the match.
+      if (binding === null || binding.session_durable_id !== request.thread) {
+        const target = await sessionId(request.thread, request.all_scope)
+        if ("kind" in target) return target
+        if (binding !== null && binding.session_durable_id !== target.id) {
+          return fail("invalid_arguments", `Binding ${binding.binding_id} delivers to session ${binding.session_durable_id}, not ${target.id}.`, "Drop the target (the binding names its session) or pass the binding of that session.", { binding_id: binding.binding_id, session: binding.session_durable_id })
+        }
       }
     }
     if (request.expected_turn_id !== undefined) return fail("invalid_arguments", "A binding message never steers, so it takes no expected_turn_id.", "Drop expected_turn_id.")
@@ -151,6 +162,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   }
 
   return {
+    registerStoreExtension: store.registerStoreExtension,
+    extensionCall: store.extensionCall,
     principal,
     list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
     read: (request) => guarded(async () => readThread(surface, await view(), { thread: request.thread, max_bytes: request.max_bytes, cursor: request.cursor, all_scope: request.all_scope }, UNKNOWN_CALLER)),

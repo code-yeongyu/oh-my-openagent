@@ -409,15 +409,18 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     socket: legacy,
     listTarget: async (durableId, endpoint) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
-      try {
-        const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", endpoint.kind === "tui" ? {} : OBSERVE, 200)
-        const target = sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
-          .map((session) => ({ ...session, socket: endpoint.socket, endpoint_kind: endpoint.kind }))
-        return { sessions: target, hosts: [{ socket: endpoint.socket, endpoint_kind: endpoint.kind, list_sessions: { sessions: target }, alive: true }], disk: [] }
-      } catch {
-        // A stale publication is offline, not a reason to discover another endpoint.
-        return { sessions: [], hosts: [], disk: [] }
-      }
+      // The owner is listed exactly as thread_list lists it (the same per-kind budget and failure
+      // classification), so a send, a steer and a listing never disagree on whether it is live. A stale
+      // publication is offline, not a reason to discover another endpoint. For a terminal that means
+      // honoring a verdict the engine already reported: an enumeration still fresh in this process is
+      // the one a listing could have shown, so the send and the steer read the same liveness. A send
+      // never starts an enumeration itself - a published durable id needs none - so with no fresh
+      // listing the direct probe decides, exactly as a fresh listing would.
+      const fresh = endpoint.kind === "tui" && enumeration !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
+      const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
+      const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: cached ?? {} })
+      const target = listed.sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
+      return { sessions: target, hosts: [listed.failure === undefined ? { ...listed.host, list_sessions: { sessions: target } } : listed.host], disk: [] }
     },
     listSessions: async () => (await listView()).sessions,
     listView,

@@ -30,6 +30,7 @@ export type {
   StartQueued,
   SuspensionReason,
   TaskNotification,
+  CancelRequest,
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
@@ -44,6 +45,7 @@ export { createTaskRecord } from "./record"
 export { bumpTaskId, createTaskId, parseTaskId, syncTaskIdFloor } from "./id"
 export type { TaskId } from "./id"
 export { messageability } from "./messageability"
+export { isTransportLostMessage, TRANSPORT_LOST_REASON } from "./transport-loss"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
 export {
   TASK_START_FAILURE_KINDS,

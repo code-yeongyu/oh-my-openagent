@@ -3,15 +3,20 @@
  * file open after `close()` whenever a `StatementSync` was ever created (oven-sh/bun#40001), so
  * nothing here calls `prepare()`: parameters reach SQL through a user function (`gw_p(n)`), rows
  * come back through a varargs sink function, and `exec()` is the only entry point. `?` in SQL text
- * is rewritten to `gw_p(n)` in order; SQL written here never carries a literal `?`.
+ * is tokenized so only anonymous placeholders become `gw_p(n)`; quotes and comments stay intact.
  *
  * Row order is never taken from a subquery or from the order the sink is called in: `all()` with
  * `orderBy` puts the ORDER BY on the outer select and passes `row_number() OVER (ORDER BY ...)` as
  * the sink's first argument, and rows are placed by that number.
  */
 
+import { sqlTokens } from "./sql-tokens"
+
+export type SqlAuthorizer = (action: number, arg1: string | null, arg2: string | null, database: string | null, source: string | null) => number
+
 export type SqliteConnection = {
   exec(sql: string): void
+  setAuthorizer(authorizer: SqlAuthorizer | null): void
   function(name: string, options: { readonly varargs?: boolean; readonly deterministic?: boolean }, fn: (...args: never[]) => unknown): void
   close(): void
 }
@@ -38,6 +43,15 @@ export class Sql {
     this.db.exec(sql)
   }
 
+  authorized<T>(authorizer: SqlAuthorizer, body: () => T): T {
+    this.db.setAuthorizer(authorizer)
+    try {
+      return body()
+    } finally {
+      this.db.setAuthorizer(null)
+    }
+  }
+
   run(sql: string, params: readonly SqlValue[] = []): number {
     this.params = params
     try {
@@ -53,7 +67,7 @@ export class Sql {
     this.sinkRows = []
     try {
       const ordinal = orderBy === undefined ? "0" : `row_number() OVER (ORDER BY ${orderBy})`
-      this.db.exec(`SELECT gw_sink(${ordinal}, ${columns.join(", ")}) FROM (${bind(sql)})${orderBy === undefined ? "" : ` ORDER BY ${orderBy}`}`)
+      this.db.exec(`SELECT gw_sink(${ordinal}, ${columns.join(", ")}) FROM (${bind(sql)}\n)${orderBy === undefined ? "" : ` ORDER BY ${orderBy}`}`)
       const rows = orderBy === undefined ? this.sinkRows : this.sinkRows.toSorted((left, right) => Number(left[0]) - Number(right[0]))
       return rows.map((values) => Object.fromEntries(columns.map((column, index) => [column, values[index + 1] ?? null])))
     } finally {
@@ -69,7 +83,9 @@ export class Sql {
 
 function bind(sql: string): string {
   let index = 0
-  return sql.replace(/\?/g, () => `gw_p(${index++})`)
+  let bound = ""
+  for (const token of sqlTokens(sql)) bound += token.kind === "parameter" ? `gw_p(${index++})` : token.text
+  return bound
 }
 
 export function isBusyError(error: unknown): boolean {

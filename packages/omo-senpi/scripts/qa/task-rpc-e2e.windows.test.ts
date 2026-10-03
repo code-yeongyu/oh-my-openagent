@@ -9,7 +9,10 @@ import { expect, test } from "bun:test"
 
 const isWin32 = process.platform === "win32"
 const driverPath = fileURLToPath(new URL("./task-rpc-e2e.mjs", import.meta.url))
-const DRIVER_TIMEOUT_MS = 180_000
+// The kill and reconcile checks can each wait their full parent + child budget (120 s + 40 s,
+// task-rpc-e2e-scenarios.mjs) and tear down (15 s); the other checks take about a minute. The driver
+// must outlast all of that, so a slow cold start reports its diagnostic facts instead of being killed.
+const DRIVER_TIMEOUT_MS = 420_000
 const CLEANUP_TIMEOUT_MS = 10_000
 
 type DriverExit = {
@@ -177,11 +180,16 @@ test.skipIf(!isWin32)(
     const payload = parsed as DriverPayload
     const route = check(payload, "process_mode_routes_to_rpc_runner")
     const spawnProof = check(payload, "spawn_process_pid_and_session_jsonl")
-    const killProof = check(payload, "kill_marks_error_killed_true")
+    // Windows cannot attribute an external TerminateProcess to a kill, so its check proves the honest
+    // outcome: status=error, killed=false, an unexpected-exit message (#9471).
+    const killProof = check(payload, "external_termination_reports_unexpected_exit")
     const leakProof = check(payload, "no_leaked_rpc_child_pids")
 
     // then
     console.log(`WINDOWS_TASK_RPC_E2E ${JSON.stringify(payload)}`)
+    if (killProof?.verdict !== "PASS") {
+      console.log(`WINDOWS_TASK_RPC_E2E_KILL_FACTS ${JSON.stringify(killProof?.facts ?? null)}`)
+    }
     assertDriverChecks(payload)
     expect(payload.wiringFixed).toBe(true)
     expect(route?.verdict).toBe("PASS")

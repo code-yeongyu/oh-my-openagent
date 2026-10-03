@@ -67,6 +67,7 @@ describe("cleanupExpiredRecords tombstone recovery", () => {
       hostSessionProbe: {
         daemonAlive: () => Promise.resolve(true),
         sessionLive: () => Promise.resolve(true),
+        sessionLiveness: () => Promise.resolve("live" as const),
         refresh: () => {},
       },
       hostSessionClose: async () => {

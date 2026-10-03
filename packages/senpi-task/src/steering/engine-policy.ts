@@ -90,3 +90,12 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
     notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
   }
 }
+
+export function evictionRefusal(taskId: string): SendOutcome {
+  return {
+    kind: "not_continuable",
+    task_id: taskId,
+    reason: `Task ${taskId} is being evicted; send was not started.`,
+    suggestion: "Use task_output to read the final result.",
+  }
+}

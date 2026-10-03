@@ -131,6 +131,8 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
       daemonAlive: (identity) => daemon.daemonReachable(identity.socket),
       sessionLive: async (identity) =>
         (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
+      sessionLiveness: async (identity) =>
+        (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path) ? "live" : "gone",
       refresh: () => undefined,
     },
     hostSessionClose: (request) => daemon.close(request),

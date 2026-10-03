@@ -115,12 +115,6 @@ describe("omo thread: argv to SDK calls", () => {
     expect(JSON.parse(result.stdout).items).toEqual([{ seq: 2, role: "assistant", content: "b" }])
   })
 
-  test("#given create --cwd --fork-from and models --all-scope #when run #then the SDK request carries them", async () => {
-    const created = JSON.parse((await run(["create", "--cwd", "/repo", "--fork-from", "dur-1", "--json"])).stdout)
-    const models = JSON.parse((await run(["models", "lane", "--all-scope", "--json"])).stdout)
-    expect([created.request, models.request]).toEqual([{ cwd: "/repo", fork_from: "dur-1" }, { all_scope: true, thread: "lane" }])
-  })
-
   test("#given unbind, rebind, report and answer #when run #then each maps its positionals and flags", async () => {
     const printed = [
       JSON.parse((await run(["unbind", "b-1", "--revision", "2", "--json"])).stdout),
@@ -163,6 +157,12 @@ function modelWorld() {
 }
 
 describe("omo thread: model control (#9425)", () => {
+  test("#given create --cwd --fork-from and models --all-scope #when run #then the SDK request carries them", async () => {
+    const created = JSON.parse((await run(["create", "--cwd", "/repo", "--fork-from", "dur-1", "--json"])).stdout)
+    const models = JSON.parse((await run(["models", "lane", "--all-scope", "--json"])).stdout)
+    expect([created.request, models.request]).toEqual([{ cwd: "/repo", fork_from: "dur-1" }, { all_scope: true, thread: "lane" }])
+  })
+
   test("#given connected models #when create runs with model flags, then with none #then the engine opens on exactly that model, auto otherwise, and models reports what the record says", async () => {
     const world = modelWorld()
     try {
@@ -204,6 +204,9 @@ describe("omo thread: model control (#9425)", () => {
       expect({ exitCode: ambiguous.exitCode, error: ambiguous.json.error }).toMatchObject({ exitCode: THREAD_EXIT.refused, error: { code: "model_ambiguous", details: { candidates: ["openai/capped", "openai/candidate"] } } })
       const unsupported = await world.cli(["set-reasoning", "lane", "xhigh", "--json"])
       expect({ exitCode: unsupported.exitCode, error: unsupported.json.error }).toMatchObject({ exitCode: THREAD_EXIT.refused, error: { code: "thinking_level_unsupported", details: { supported: ["off", "minimal", "low", "medium", "high"] } } })
+      world.sessions[0]?.verdicts.refuse.add("candidate")
+      const refusedByEngine = await world.cli(["set-model", "lane", "openai/candidate", "--json"])
+      expect({ exitCode: refusedByEngine.exitCode, error: refusedByEngine.json.error }).toMatchObject({ exitCode: THREAD_EXIT.refused, error: { code: "unsupported", details: { model: "openai/candidate", reason: expect.stringContaining("does not fit candidate") } } })
       expect({ model: world.sessions[0]?.session.model?.id, level: world.sessions[0]?.session.thinkingLevel }).toEqual({ model: "capped", level: before.thinking_level })
       expect((await world.cli(["models", "lane", "--json"])).json.current).toEqual(before)
     } finally {
@@ -211,16 +214,19 @@ describe("omo thread: model control (#9425)", () => {
     }
   })
 
-  test("#given a created thread #when printed for a person #then the line names the thread, the model and who set it", async () => {
-    const world = modelWorld()
-    try {
-      const created = await world.cli(["create", "--name", "lane", "--model", "capped", "--set-by", "config"])
-      const durableId = world.sessions[0]?.durableId ?? "missing"
-      expect(created.exitCode).toBe(THREAD_EXIT.ok)
-      for (const token of [durableId, "openai/capped", "config"]) expect(created.stdout).toContain(token)
-    } finally {
-      world.dispose()
-    }
+  test("#given a created thread and a model listing #when printed for a person #then the model and its provenance are on the line", async () => {
+    const model = { provider: "openai", id: "gpt-x", thinking_level: "high", provenance: "set", set_by: "config", reason: null }
+    const created = await run(["create", "--model", "gpt-x"], fakeSdk({ create: { kind: "ok", thread: { thread_id: "dur-9", name: "lane", model }, deduplicated: false } }))
+    const listed = await run(["models"], fakeSdk({ models: { kind: "ok", thread_id: null, current: null, available: [{ provider: "openai", id: "gpt-x", name: "GPT X", thinking_levels: ["low", "high"] }] } }))
+    expect(created.stdout).toBe("created dur-9 lane  model openai/gpt-x (high, set by config)\n")
+    expect(listed.stdout).toBe("openai/gpt-x  GPT X  thinking low,high\n")
+  })
+
+  test("#given a set-model the engine held for compaction #when printed for a person #then the pending switch is named on its own line", async () => {
+    const model = { provider: "anthropic", id: "", thinking_level: "high", provenance: "set", set_by: "user", reason: null }
+    const pending = { provider: "openai", id: "gpt-y" }
+    const result = await run(["set-model", "lane", "gpt-y"], fakeSdk({ setModel: { kind: "ok", thread_id: "dur-1", model, pending } }))
+    expect(result.stdout).toBe("dur-1: model anthropic/ (high, set by user)\nmodel openai/gpt-y pending until the engine applies it\n")
   })
 })
 

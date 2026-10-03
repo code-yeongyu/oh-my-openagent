@@ -90,7 +90,13 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // only - no manifest changes, bundle-purity stays green. dev measured 1,414,341 (5,659 bytes of slack left
 // under the previous ceiling); this branch measures 1,420,760 (+6,419) after minification (linux/amd64 and
 // darwin/arm64, bun 1.4.2). 1,460,000 keeps ~2.8% headroom rather than the failing value.
-const BUDGET_BYTES = 1_460_000
+// Raised 1,460,000 -> 1,510,000 for gateway session model control (#9429, #9485): the session-model
+// store records, auto model resolution from connected providers, and the set-model / set-reasoning
+// paths the thread tools and `omo thread` share. First-party code only - no manifest changes,
+// bundle-purity stays green. dev (5.1.13) measured 1,453,623 (6,377 bytes of slack left under the
+// previous ceiling); this branch measures 1,468,127 (+14,504) after minification (linux/amd64, bun
+// 1.4.2, the CI workspace path). 1,510,000 keeps ~2.8% headroom rather than the failing value.
+const BUDGET_BYTES = 1_510_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
