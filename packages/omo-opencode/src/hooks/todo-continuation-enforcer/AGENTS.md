@@ -78,8 +78,20 @@ interface SessionState {
   countdownStartedAt?: number
   inFlight?: boolean                           // Injection in progress
   allTodosCompletedAt?: number
+  gateRetryTimer?: ReturnType<typeof setTimeout> // Pending transient gate-decline retry
+  gateRetryCount?: number                       // Bounded by MAX_GATE_RETRIES per idle cycle
 }
 ```
+
+## GATE-DECLINE WATCHDOG
+
+When `dispatchInternalPrompt` declines the injection with a transient status (`"active"` or
+`"reserved"`), `gate-retry.ts` schedules up to `MAX_GATE_RETRIES` retries spaced
+`GATE_RETRY_DELAY_MS` apart instead of dropping the wake. Each retry re-runs the full guard
+chain plus the gate, so a live session can never be double-injected. Without it, a declined
+injection after `session.idle` leaves the turn parked until the user sends a message.
+`cancelCountdown()` clears the pending timer and resets the budget; permanent declines
+(`"cancelled"` / `"unavailable"`) never schedule retries.
 
 ## RELATIONSHIP TO ATLAS
 

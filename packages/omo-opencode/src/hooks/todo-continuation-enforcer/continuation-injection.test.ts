@@ -292,6 +292,11 @@ describe("injectContinuation", () => {
     expect(state.inFlight).toBe(false)
     expect(state.lastInjectedAt).toBe(0)
     expect(state.awaitingPostInjectionProgressCheck).not.toBe(true)
+
+    if (state.gateRetryTimer) {
+      clearTimeout(state.gateRetryTimer)
+      state.gateRetryTimer = undefined
+    }
   })
 
   test("#given promptAsync may have accepted before EOF #when continuation injection observes the failure #then it records an optimistic injection", async () => {

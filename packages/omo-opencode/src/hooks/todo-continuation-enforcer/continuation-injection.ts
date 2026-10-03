@@ -32,6 +32,7 @@ import {
   HOOK_NAME,
 } from "./constants"
 import { isCompactionGuardActive } from "./compaction-guard"
+import { isTransientGateDecline, scheduleGateRetry } from "./gate-retry"
 import { getMessageDir } from "./message-directory"
 import { isTokenLimitError } from "./token-limit-detection"
 import { isUnrecoverableRequestError } from "./unrecoverable-request-error"
@@ -247,6 +248,7 @@ ${todoList}`
           injectionState.continuationBlockReason = undefined
           injectionState.pendingUserMessageID = undefined
           injectionState.consecutiveFailures = 0
+          injectionState.gateRetryCount = 0
         }
         return
       }
@@ -256,6 +258,14 @@ ${todoList}`
       log(`[${HOOK_NAME}] Injection skipped by promptAsync gate`, { sessionID, status: promptResult.status })
       if (injectionState) {
         injectionState.inFlight = false
+      }
+      if (isTransientGateDecline(promptResult.status)) {
+        scheduleGateRetry({
+          sessionID,
+          state: injectionState ?? sessionStateStore.getState(sessionID),
+          reason: promptResult.status,
+          inject: () => injectContinuation(args),
+        })
       }
       return
     }
@@ -269,6 +279,7 @@ ${todoList}`
       injectionState.continuationBlockReason = undefined
       injectionState.pendingUserMessageID = undefined
       injectionState.consecutiveFailures = 0
+      injectionState.gateRetryCount = 0
     }
   } catch (error) {
     log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(error) })
