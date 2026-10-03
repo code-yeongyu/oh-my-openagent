@@ -204,6 +204,10 @@ export function createEventHandler(args: {
       }
     }
 
+    if (event.type === "message.updated" || event.type === "message.part.updated") {
+      await runEventHookSafely("teamMemberPaneRefresher", teamHandlers.teamMemberPaneRefresher, input);
+    }
+
     if (event.type === "session.status") {
       const sessionID = resolveSessionEventID(props);
       const status = props?.status as { type?: string; attempt?: number; message?: string; next?: number } | undefined;
