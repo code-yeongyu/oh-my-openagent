@@ -61,6 +61,8 @@ Windows는 PowerShell에서 `irm https://get.omo.dev/install.ps1 | iex`를 실�
 
 프로젝트를 열고 `omo`를 실행한 다음, 할 일을 말하세요. 설정은 그게 끝.
 
+세션 안에서 `/thinking <level>`로 모델이 얼마나 깊이 생각할지 정해요. `/thinking`만 치면 고르는 창이 뜨고, `Shift+Tab`은 레벨을 차례로 바꾸고, `/efforts <level>`은 추론 강도를 바로 정합니다. 이전 작업을 이어 가려면 `/resume`(또는 `/sessions`)으로 지난 세션을 열면 돼요. 셸에서는 `omo -c`가 마지막 세션을 이어 가고 `omo -r`이 세션 목록을 엽니다. 나머지 명령은 `/help`에 다 있어요.
+
 OpenCode 에디션이나 LazyCodex에서 넘어오셨다면 `omo setup`을 한 번 실행하세요. 프로바이더 키, 커스텀 프로바이더, MCP 서버, 스킬, 모델 선택까지 그대로 옮겨 옵니다.
 
 그다음 `omo doctor`가 지금 연결된 프로바이더로 어떤 작업 카테고리를 돌릴 수 있는지, 이전 설치가 무엇을 남겼는지 보여 줘요. 자세한 과정은 [OpenCode에서 옮겨 오기](docs/guide/migrating-from-opencode.md)에 있습니다.
