@@ -1,0 +1,9 @@
+fixture_saved=true
+command=bun packages/omo-opencode/src/cli/index.ts mcp oauth status github --server-url https://oauth.example.test/mcp
+OAuth Status for github:
+  oauth.example.test/https://oauth.example.test/mcp:
+    Access Token: [REDACTED]
+    Refresh Token: [REDACTED]
+cli_exit_code=0
+raw_access_token_present=false
+raw_refresh_token_present=false
