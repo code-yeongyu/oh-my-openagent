@@ -22,6 +22,10 @@ import {
   createHashlineEditTool,
   createLookAt,
   createMonitorTools,
+  createSecurityFindingAddTool,
+  createSecurityFindingVerifyTool,
+  createSecurityMissionReportTool,
+  createSecurityMissionStartTool,
   createSessionManagerTools,
   createSkillMcpTool,
   createSkillTool,
@@ -32,6 +36,7 @@ import {
   discoverCommandsSync,
   interactive_bash,
 } from "../tools"
+import { createMissionStore } from "../features/security-mission"
 
 export type ToolRegistryFactories = {
   createBackgroundTools: typeof createBackgroundTools
@@ -63,6 +68,11 @@ export type ToolRegistryFactories = {
   createTeamTaskUpdateTool: typeof createTeamTaskUpdateTool
   createTeamStatusTool: typeof createTeamStatusTool
   createTeamListTool: typeof createTeamListTool
+  createSecurityMissionStartTool: typeof createSecurityMissionStartTool
+  createSecurityFindingAddTool: typeof createSecurityFindingAddTool
+  createSecurityFindingVerifyTool: typeof createSecurityFindingVerifyTool
+  createSecurityMissionReportTool: typeof createSecurityMissionReportTool
+  createMissionStore: typeof createMissionStore
 }
 
 export const defaultToolRegistryFactories: ToolRegistryFactories = {
@@ -95,4 +105,9 @@ export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createTeamTaskUpdateTool,
   createTeamStatusTool,
   createTeamListTool,
+  createSecurityMissionStartTool,
+  createSecurityFindingAddTool,
+  createSecurityFindingVerifyTool,
+  createSecurityMissionReportTool,
+  createMissionStore,
 }
