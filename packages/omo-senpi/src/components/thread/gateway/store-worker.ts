@@ -176,6 +176,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "release_answer": return await relay.releaseAnswer(ctx, args as Parameters<typeof relay.releaseAnswer>[1])
     case "confirm_answer": return await relay.confirmAnswer(ctx, args as Parameters<typeof relay.confirmAnswer>[1])
     case "mark_prior_delivered": return await relay.markPriorDelivered(ctx, args as Parameters<typeof relay.markPriorDelivered>[1])
+    case "close_question": return await relay.closeQuestion(ctx, args as Parameters<typeof relay.closeQuestion>[1])
     default: throw new Error(`unknown gateway store op: ${op}`)
   }
 }

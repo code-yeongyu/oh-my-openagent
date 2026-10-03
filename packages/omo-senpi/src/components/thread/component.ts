@@ -110,6 +110,19 @@ function waitingQuestionCallOf(event: unknown): string | undefined {
   return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true ? toolCallId : undefined
 }
 
+/** senpi `ask-user/notify.js` ASK_USER_CLOSED_EVENT: every terminal outcome of an ask_user question, `{ requestId, status, resolvedBy? }`. */
+const ASK_USER_CLOSED_EVENT = "ask-user:closed"
+/** Recently closed ask_user requests remembered for a question report still being written; bounded. */
+const CLOSED_REQUESTS_KEPT = 64
+
+/** The ask_user request a `thread_report` call relays as a question (`kind: "question"` with `request_id`). */
+function relayedQuestionOf(event: unknown): { readonly call: string; readonly request: string } | undefined {
+  const { toolCallId, toolName, args } = (event ?? {}) as { readonly toolCallId?: unknown; readonly toolName?: unknown; readonly args?: unknown }
+  if (toolName !== "thread_report" || typeof toolCallId !== "string") return undefined
+  const { kind, request_id } = (args ?? {}) as { readonly kind?: unknown; readonly request_id?: unknown }
+  return kind === "question" && typeof request_id === "string" && request_id.length > 0 ? { call: toolCallId, request: request_id } : undefined
+}
+
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
   const id = typeof manager?.getSessionId === "function" ? manager.getSessionId() : undefined
@@ -217,6 +230,48 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         }
       }
       const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms)
+      // A question this session relayed to a chat thread and then closed itself (answered here, timed out,
+      // cancelled) is closed in the store too, so the connector stops holding that thread's later rows behind
+      // it. Only a session that relayed a question touches the store for it; an answer that came through
+      // thread_answer finds its question no longer pending and changes nothing.
+      // An engine without an extension event bus never says a question closed; nothing to track then.
+      const events = pi.events
+      if (events !== undefined) {
+        const reporting = new Map<string, { readonly request: string; readonly durableId: string }>()
+        const relayed = new Map<string, string>()
+        const closedEarly = new Set<string>()
+        const closeRelayed = (request: string, durableId: string): void => {
+          void store.closeQuestion({ now: store.now(), session_durable_id: durableId, ui_request_id: request }).catch((error: unknown) =>
+            ctx.logger.warn(`thread gateway: the relayed question ${request} was not closed: ${error instanceof Error ? error.message : String(error)}`))
+        }
+        pi.on("tool_execution_start", (event, eventCtx) => {
+          const question = relayedQuestionOf(event)
+          const durableId = durableIdOf(eventCtx)
+          if (question !== undefined && durableId !== undefined) reporting.set(question.call, { request: question.request, durableId })
+        })
+        pi.on("tool_execution_end", (event) => {
+          const call = (event as { readonly toolCallId?: unknown } | undefined)?.toolCallId
+          const report = typeof call === "string" ? reporting.get(call) : undefined
+          if (report === undefined || typeof call !== "string") return
+          reporting.delete(call)
+          // Closed while its report was still being written: close the row that report just wrote.
+          if (closedEarly.delete(report.request)) closeRelayed(report.request, report.durableId)
+          else relayed.set(report.request, report.durableId)
+        })
+        events.on(ASK_USER_CLOSED_EVENT, (payload) => {
+          const request = (payload as { readonly requestId?: unknown } | undefined)?.requestId
+          if (typeof request !== "string") return
+          const durableId = relayed.get(request)
+          if (durableId !== undefined) {
+            relayed.delete(request)
+            closeRelayed(request, durableId)
+            return
+          }
+          if (![...reporting.values()].some((report) => report.request === request)) return
+          closedEarly.add(request)
+          if (closedEarly.size > CLOSED_REQUESTS_KEPT) closedEarly.delete(closedEarly.values().next().value as string)
+        })
+      }
       let legacyImportStarted = false
       const importLegacyMailbox = async (): Promise<void> => {
         if (legacyImportStarted || !LEGACY_MAILBOX_FILES.some((file) => existsSync(join(legacyMailbox, file)))) return

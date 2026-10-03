@@ -121,6 +121,8 @@ export type GatewayStore = StoreExtensionApi & {
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
   readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
   readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
+  /** The session closed a relayed question itself (answered locally, timed out, cancelled); the questions closed. */
+  readonly closeQuestion: (request: { readonly now: number; readonly session_durable_id: string; readonly ui_request_id: string }) => Promise<number>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
@@ -344,6 +346,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     releaseAnswer: (request) => call("release_answer", request),
     confirmAnswer: (request) => call("confirm_answer", request),
     markPriorDelivered: (request) => call("mark_prior_delivered", request),
+    closeQuestion: (request) => call("close_question", request),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
