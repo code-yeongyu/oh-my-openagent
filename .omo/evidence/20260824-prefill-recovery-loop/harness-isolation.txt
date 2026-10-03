@@ -1,0 +1,2 @@
+isolation: all state under /tmp/opencode/qa7150b.eagBL9 (XDG_* redirected)
+real ~/.local/share/opencode never referenced by the probe
