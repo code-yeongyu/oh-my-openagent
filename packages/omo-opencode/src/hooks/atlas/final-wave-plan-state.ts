@@ -1,11 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
+import { isStructuredTaskRow } from "../../features/boulder-state"
 
 const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i
 const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i
 const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/
 const UNCHECKED_CHECKBOX_PATTERN = /^\s*[-*]\s*\[\s*\]\s*(.+)$/
-const TODO_TASK_PATTERN = /^\d+\./
-const FINAL_WAVE_TASK_PATTERN = /^F\d+\./i
 
 type PlanSection = "todo" | "final-wave" | "other"
 
@@ -35,17 +34,19 @@ export function readFinalWavePlanState(planPath: string): FinalWavePlanState | n
             : "other"
       }
 
-      const uncheckedTaskMatch = line.match(UNCHECKED_CHECKBOX_PATTERN)
-      if (!uncheckedTaskMatch) {
+      if (section === "other" || !UNCHECKED_CHECKBOX_PATTERN.test(line)) {
         continue
       }
 
-      const taskLabel = uncheckedTaskMatch[1].trim()
-      if (section === "todo" && TODO_TASK_PATTERN.test(taskLabel)) {
+      if (!isStructuredTaskRow(line, section)) {
+        continue
+      }
+
+      if (section === "todo") {
         pendingImplementationTaskCount += 1
       }
 
-      if (section === "final-wave" && FINAL_WAVE_TASK_PATTERN.test(taskLabel)) {
+      if (section === "final-wave") {
         pendingFinalWaveTaskCount += 1
       }
     }
