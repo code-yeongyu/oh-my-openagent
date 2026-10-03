@@ -36,6 +36,7 @@
       "subcopy": "把你的 token 变成真正有价值的成果。\n上万个来源的研究。一看就懂的演示。\n公司事务、实验、后端、前端、编程。\n你想做的任何事。",
       "getStarted": "开始使用",
       "readManifesto": "阅读宣言",
+      "downloadDesktop": "下载桌面应用",
       "installLabel": "一条命令，一个工具"
     },
     "command": {
@@ -402,6 +403,86 @@
       "eyebrow": "旧版 · 2026.01.19",
       "note": "那时人们还说不读代码是疯了，所有人都守在代理前面。",
       "back": "阅读当前版本"
+    }
+  },
+  "download": {
+    "metadata": {
+      "title": "下载 OmO 桌面应用",
+      "description": "下载适用于 macOS、Windows 和 Linux 的 OmO 桌面应用。每个安装包都标有大小和 SHA-256 校验和。"
+    },
+    "eyebrow": "桌面应用",
+    "title": "下载 OmO",
+    "lead": "适用于 Mac、Windows 电脑和 Linux 的 OmO 桌面应用。我们会选出适合你电脑的安装包,并在下方列出全部安装包及其校验和。",
+    "channel": {
+      "label": "发布渠道",
+      "stable": "稳定版",
+      "beta": "测试版",
+      "betaNote": "测试版比稳定版更早发布,也更不成熟。"
+    },
+    "detecting": "正在查找适合你电脑的安装包…",
+    "arch": {
+      "mac-arm64": "Apple 芯片",
+      "mac-x64": "Intel",
+      "win-x64": "64 位",
+      "linux-x64": "64 位",
+      "linux-arm64": "ARM64"
+    },
+    "kinds": {
+      "dmg": "磁盘映像 (.dmg)",
+      "exe": "安装程序 (.exe)",
+      "deb": "Debian 软件包 (.deb)",
+      "appimage": "AppImage"
+    },
+    "primary": {
+      "button": "下载 {os} 版",
+      "meta": "OmO {version} · {arch} · {size}",
+      "metaNoSize": "OmO {version} · {arch}",
+      "intelPrompt": "不是 Apple 芯片的 Mac?",
+      "intelLink": "下载 Intel Mac 版",
+      "released": "{date} 发布",
+      "notes": "发布说明"
+    },
+    "noInstaller": {
+      "title": "暂无适合你系统的安装包",
+      "body": "此版本没有适合你电脑的安装包。它包含的所有安装包都列在下方。"
+    },
+    "phone": {
+      "title": "桌面应用需要在电脑上安装",
+      "body": "请在你的 Mac、Windows 或 Linux 电脑上打开此页面下载。安装包列表见下方。"
+    },
+    "coming": {
+      "title": "{date}上线",
+      "body": "桌面应用尚未公开。在此之前,你可以通过命令行安装 OmO。",
+      "cli": "通过命令行安装"
+    },
+    "unavailable": {
+      "title": "暂时无法下载",
+      "body": "下载列表加载失败。请几分钟后重试,或通过命令行安装 OmO。",
+      "cli": "通过命令行安装"
+    },
+    "all": {
+      "title": "全部下载",
+      "sha": "SHA-256"
+    },
+    "verify": {
+      "title": "验证你的下载",
+      "body": "每个安装包都有 SHA-256 校验和。下载后请计算文件的校验和,并与上面列出的值比对。此版本的 SHA256SUMS 文件中也有同样的值。",
+      "checksums": "此版本的 SHA256SUMS",
+      "macos": "macOS",
+      "windows": "Windows (PowerShell)",
+      "linux": "Linux",
+      "mismatch": "两个值不一致时,请删除文件并重新下载,不要打开它。"
+    },
+    "supported": {
+      "title": "支持的系统",
+      "macos": "macOS 14 或更高版本,Apple 芯片和 Intel",
+      "windows": "Windows 11,64 位",
+      "linux": "Ubuntu 24.04,64 位(.deb 或 AppImage)"
+    },
+    "os": {
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux"
     }
   }
 }

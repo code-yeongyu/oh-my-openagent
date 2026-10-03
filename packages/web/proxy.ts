@@ -20,6 +20,8 @@ const installGuidePaths = new Set([
   "docs/guide/install.md",
 ])
 
+const desktopPaths = new Set(["desktop"])
+
 function getLocaleSegment(segment: string | undefined): Locale | null {
   if (!segment) return null
   return locales.find((locale) => locale === segment) ?? null
@@ -43,6 +45,16 @@ function getInstallGuidePath(pathname: string): string | null {
   if (!installGuidePaths.has(routeSegments.join("/"))) return null
 
   return locale ? `/${locale}/docs/install` : "/docs/install"
+}
+
+function getDownloadPath(pathname: string): string | null {
+  const segments = pathname.split("/").filter(Boolean)
+  const locale = getLocaleSegment(segments[0])
+  const routeSegments = locale ? segments.slice(1) : segments
+
+  if (!desktopPaths.has(routeSegments.join("/"))) return null
+
+  return locale ? `/${locale}/download` : "/download"
 }
 
 export default function proxy(request: NextRequest): NextResponse {
@@ -69,6 +81,12 @@ export default function proxy(request: NextRequest): NextResponse {
   const installGuidePath = getInstallGuidePath(request.nextUrl.pathname)
   if (installGuidePath) {
     redirectUrl.pathname = installGuidePath
+    shouldRedirect = true
+  }
+
+  const downloadPath = getDownloadPath(request.nextUrl.pathname)
+  if (downloadPath) {
+    redirectUrl.pathname = downloadPath
     shouldRedirect = true
   }
 

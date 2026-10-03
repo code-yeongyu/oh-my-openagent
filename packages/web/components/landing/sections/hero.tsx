@@ -45,6 +45,11 @@ export async function HeroSection(): Promise<JSX.Element> {
               <Button size="lg" asChild>
                 <Link href="/docs/install">{t("hero.getStarted")}</Link>
               </Button>
+              <Button variant="secondary" size="lg" asChild>
+                <Link href="/download" data-testid="hero-desktop-cta">
+                  {t("hero.downloadDesktop")}
+                </Link>
+              </Button>
               <Button variant="link" size="md" asChild>
                 <Link href="/manifesto">{t("hero.readManifesto")}</Link>
               </Button>

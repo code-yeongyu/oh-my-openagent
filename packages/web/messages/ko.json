@@ -36,6 +36,7 @@
       "subcopy": "당신의 토큰을 현실세계의 가치있는 결과물로 바꿔드립니다.\n10000개가 넘는 소스가 필요한 리서치, 이해하기 쉬운 정갈한 발표자료,\n다양한 맥락이 필요한 회사 일, 실험, 백엔드, 프론트엔드, 코딩,\n당신이 원하는 어떤 일이든.",
       "getStarted": "시작하기",
       "readManifesto": "매니페스토 읽기",
+      "downloadDesktop": "데스크톱 앱 다운로드",
       "installLabel": "명령 하나, 도구 하나"
     },
     "command": {
@@ -402,6 +403,86 @@
       "eyebrow": "구 버전 · 2026.01.19",
       "note": "사람이 코드를 읽지 않는 건 미친 짓이라고들 하고, 모두가 에이전트 앞에 상주하던 시절의 글입니다.",
       "back": "현재 버전 읽기"
+    }
+  },
+  "download": {
+    "metadata": {
+      "title": "OmO 데스크톱 앱 다운로드",
+      "description": "macOS, Windows, Linux용 OmO 데스크톱 앱을 내려받으세요. 모든 설치 파일에 크기와 SHA-256 체크섬이 함께 표시됩니다."
+    },
+    "eyebrow": "데스크톱 앱",
+    "title": "OmO 다운로드",
+    "lead": "Mac, Windows PC, Linux에서 쓰는 OmO 데스크톱 앱입니다. 내 컴퓨터에 맞는 설치 파일을 골라 드리고, 전체 목록은 체크섬과 함께 아래에 있습니다.",
+    "channel": {
+      "label": "릴리스 채널",
+      "stable": "안정",
+      "beta": "베타",
+      "betaNote": "베타는 안정 버전보다 먼저 나오고, 덜 다듬어져 있습니다."
+    },
+    "detecting": "내 컴퓨터에 맞는 설치 파일을 찾는 중…",
+    "arch": {
+      "mac-arm64": "Apple 실리콘",
+      "mac-x64": "Intel",
+      "win-x64": "64비트",
+      "linux-x64": "64비트",
+      "linux-arm64": "ARM64"
+    },
+    "kinds": {
+      "dmg": "디스크 이미지 (.dmg)",
+      "exe": "설치 프로그램 (.exe)",
+      "deb": "Debian 패키지 (.deb)",
+      "appimage": "AppImage"
+    },
+    "primary": {
+      "button": "{os}용 다운로드",
+      "meta": "OmO {version} · {arch} · {size}",
+      "metaNoSize": "OmO {version} · {arch}",
+      "intelPrompt": "Apple 실리콘 Mac이 아닌가요?",
+      "intelLink": "Intel Mac용 다운로드",
+      "released": "{date} 출시",
+      "notes": "릴리스 노트"
+    },
+    "noInstaller": {
+      "title": "내 시스템용 설치 파일이 아직 없습니다",
+      "body": "이 릴리스에는 내 컴퓨터용 설치 파일이 없습니다. 포함된 파일은 아래에 모두 있습니다."
+    },
+    "phone": {
+      "title": "데스크톱 앱은 컴퓨터가 필요합니다",
+      "body": "Mac, Windows, Linux 컴퓨터에서 이 페이지를 열어 내려받으세요. 설치 파일 목록은 아래에 있습니다."
+    },
+    "coming": {
+      "title": "{date} 공개 예정",
+      "body": "데스크톱 앱은 아직 공개 전입니다. 그동안은 명령줄로 OmO를 설치하세요.",
+      "cli": "명령줄로 설치하기"
+    },
+    "unavailable": {
+      "title": "지금은 다운로드할 수 없습니다",
+      "body": "다운로드 목록을 불러오지 못했습니다. 잠시 뒤에 다시 시도하거나 명령줄로 설치해 주세요.",
+      "cli": "명령줄로 설치하기"
+    },
+    "all": {
+      "title": "전체 다운로드",
+      "sha": "SHA-256"
+    },
+    "verify": {
+      "title": "다운로드 확인",
+      "body": "모든 설치 파일에는 SHA-256 체크섬이 있습니다. 내려받은 뒤 파일의 체크섬을 계산해 위에 적힌 값과 비교하세요. 같은 값이 이 릴리스의 SHA256SUMS 파일에도 있습니다.",
+      "checksums": "이 릴리스의 SHA256SUMS",
+      "macos": "macOS",
+      "windows": "Windows (PowerShell)",
+      "linux": "Linux",
+      "mismatch": "두 값이 다르면 파일을 지우고 다시 내려받으세요. 열지 마세요."
+    },
+    "supported": {
+      "title": "지원하는 시스템",
+      "macos": "macOS 14 이상, Apple 실리콘과 Intel",
+      "windows": "Windows 11, 64비트",
+      "linux": "Ubuntu 24.04, 64비트 (.deb 또는 AppImage)"
+    },
+    "os": {
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux"
     }
   }
 }

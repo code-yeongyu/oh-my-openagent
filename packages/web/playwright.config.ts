@@ -34,10 +34,18 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: "bun run build && bun --bun next start",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 180000,
-  },
+  webServer: [
+    {
+      command: "bun e2e/support/download-fixture-server.ts",
+      url: "http://127.0.0.1:4310/health",
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: "bun run build && bun --bun next start",
+      url: "http://127.0.0.1:3000",
+      reuseExistingServer: !process.env.CI,
+      timeout: 180000,
+      env: { DESKTOP_DOWNLOAD_BASE_URL: "http://127.0.0.1:4310" },
+    },
+  ],
 })

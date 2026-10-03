@@ -36,6 +36,7 @@
       "subcopy": "Turn your tokens into results that matter.\nResearch across ten thousand sources. A deck people actually get.\nCompany work, experiments, backends, frontends, code.\nWhatever you need done.",
       "getStarted": "Get started",
       "readManifesto": "Read the manifesto",
+      "downloadDesktop": "Download the desktop app",
       "installLabel": "One command, one tool"
     },
     "command": {
@@ -402,6 +403,86 @@
       "eyebrow": "Old version · Jan 19, 2026",
       "note": "Written when not reading the code was still called crazy, and everyone sat in front of the agent.",
       "back": "Read the current version"
+    }
+  },
+  "download": {
+    "metadata": {
+      "title": "Download OmO for desktop",
+      "description": "Download the OmO desktop app for macOS, Windows or Linux. Every installer is listed with its size and SHA-256 checksum."
+    },
+    "eyebrow": "Desktop app",
+    "title": "Download OmO",
+    "lead": "The OmO desktop app for your Mac, Windows PC or Linux machine. We pick the installer that fits your computer and list every installer below, each with its checksum.",
+    "channel": {
+      "label": "Release channel",
+      "stable": "Stable",
+      "beta": "Beta",
+      "betaNote": "Beta builds arrive before stable ones and are rougher."
+    },
+    "detecting": "Finding the right installer for your computer…",
+    "arch": {
+      "mac-arm64": "Apple silicon",
+      "mac-x64": "Intel",
+      "win-x64": "64-bit",
+      "linux-x64": "64-bit",
+      "linux-arm64": "ARM64"
+    },
+    "kinds": {
+      "dmg": "Disk image (.dmg)",
+      "exe": "Installer (.exe)",
+      "deb": "Debian package (.deb)",
+      "appimage": "AppImage"
+    },
+    "primary": {
+      "button": "Download for {os}",
+      "meta": "OmO {version} · {arch} · {size}",
+      "metaNoSize": "OmO {version} · {arch}",
+      "intelPrompt": "Not an Apple silicon Mac?",
+      "intelLink": "Download for Intel Mac",
+      "released": "Released {date}",
+      "notes": "Release notes"
+    },
+    "noInstaller": {
+      "title": "No installer for your system yet",
+      "body": "This release has no installer for your computer. Everything it does include is listed below."
+    },
+    "phone": {
+      "title": "OmO for desktop needs a computer",
+      "body": "Open this page on your Mac, Windows or Linux computer to download it. The installers are listed below."
+    },
+    "coming": {
+      "title": "Coming {date}",
+      "body": "The desktop app is not public yet. Until then, you can install OmO from the command line.",
+      "cli": "Install from the command line"
+    },
+    "unavailable": {
+      "title": "Downloads are unavailable right now",
+      "body": "We couldn't load the download list. Try again in a few minutes, or install OmO from the command line.",
+      "cli": "Install from the command line"
+    },
+    "all": {
+      "title": "All downloads",
+      "sha": "SHA-256"
+    },
+    "verify": {
+      "title": "Verify your download",
+      "body": "Every installer has a SHA-256 checksum. After downloading, compute the checksum of the file and compare it with the one listed above. The same checksums are in the SHA256SUMS file for this release.",
+      "checksums": "SHA256SUMS for this release",
+      "macos": "macOS",
+      "windows": "Windows (PowerShell)",
+      "linux": "Linux",
+      "mismatch": "If the two values differ, delete the file and download it again. Don't open it."
+    },
+    "supported": {
+      "title": "Supported systems",
+      "macos": "macOS 14 or later, Apple silicon and Intel",
+      "windows": "Windows 11, 64-bit",
+      "linux": "Ubuntu 24.04, 64-bit (.deb or AppImage)"
+    },
+    "os": {
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux"
     }
   }
 }

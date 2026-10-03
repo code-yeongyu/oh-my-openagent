@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = [
   "",
   "/docs",
   "/docs/install",
+  "/download",
   ...DOC_GUIDE_PAGES.map(({ slug }) => `/docs/${slug}`),
   "/manifesto",
   "/manifesto/2026-01",

@@ -36,6 +36,7 @@
       "subcopy": "あなたのトークンを、現実に価値のある成果へ。\n1万を超えるソースのリサーチ。すっと理解できる資料。\n会社の仕事、実験、バックエンド、フロントエンド、コーディング。\nあなたが望むどんな仕事でも。",
       "getStarted": "はじめる",
       "readManifesto": "マニフェストを読む",
+      "downloadDesktop": "デスクトップアプリをダウンロード",
       "installLabel": "コマンドひとつ、ツールひとつ"
     },
     "command": {
@@ -402,6 +403,86 @@
       "eyebrow": "旧版 · 2026.01.19",
       "note": "人がコードを読まないのは狂っていると言われ、みんながエージェントの前に張りついていた頃の文章です。",
       "back": "現在の版を読む"
+    }
+  },
+  "download": {
+    "metadata": {
+      "title": "OmO デスクトップアプリをダウンロード",
+      "description": "macOS・Windows・Linux 向けの OmO デスクトップアプリをダウンロードできます。すべてのインストーラーにサイズと SHA-256 チェックサムを表示しています。"
+    },
+    "eyebrow": "デスクトップアプリ",
+    "title": "OmO をダウンロード",
+    "lead": "Mac、Windows PC、Linux で使える OmO のデスクトップアプリです。お使いのコンピューターに合うインストーラーを選び、全一覧をチェックサム付きで下に載せています。",
+    "channel": {
+      "label": "リリースチャンネル",
+      "stable": "安定版",
+      "beta": "ベータ",
+      "betaNote": "ベータ版は安定版より先に公開され、完成度は低めです。"
+    },
+    "detecting": "お使いのコンピューターに合うインストーラーを探しています…",
+    "arch": {
+      "mac-arm64": "Apple シリコン",
+      "mac-x64": "Intel",
+      "win-x64": "64 ビット",
+      "linux-x64": "64 ビット",
+      "linux-arm64": "ARM64"
+    },
+    "kinds": {
+      "dmg": "ディスクイメージ (.dmg)",
+      "exe": "インストーラー (.exe)",
+      "deb": "Debian パッケージ (.deb)",
+      "appimage": "AppImage"
+    },
+    "primary": {
+      "button": "{os} 版をダウンロード",
+      "meta": "OmO {version} · {arch} · {size}",
+      "metaNoSize": "OmO {version} · {arch}",
+      "intelPrompt": "Apple シリコンの Mac ではありませんか?",
+      "intelLink": "Intel Mac 版をダウンロード",
+      "released": "{date} 公開",
+      "notes": "リリースノート"
+    },
+    "noInstaller": {
+      "title": "お使いのシステム向けインストーラーはまだありません",
+      "body": "このリリースにはお使いのコンピューター向けのインストーラーがありません。含まれているものは下にすべて載っています。"
+    },
+    "phone": {
+      "title": "デスクトップアプリにはコンピューターが必要です",
+      "body": "Mac、Windows、Linux のコンピューターでこのページを開いてダウンロードしてください。インストーラーの一覧は下にあります。"
+    },
+    "coming": {
+      "title": "{date} 公開予定",
+      "body": "デスクトップアプリはまだ公開前です。それまでは、コマンドラインから OmO をインストールできます。",
+      "cli": "コマンドラインでインストール"
+    },
+    "unavailable": {
+      "title": "現在ダウンロードできません",
+      "body": "ダウンロード一覧を読み込めませんでした。しばらくしてからもう一度お試しいただくか、コマンドラインでインストールしてください。",
+      "cli": "コマンドラインでインストール"
+    },
+    "all": {
+      "title": "すべてのダウンロード",
+      "sha": "SHA-256"
+    },
+    "verify": {
+      "title": "ダウンロードを検証する",
+      "body": "すべてのインストーラーには SHA-256 チェックサムがあります。ダウンロード後にファイルのチェックサムを計算し、上に載っている値と比べてください。同じ値はこのリリースの SHA256SUMS ファイルにもあります。",
+      "checksums": "このリリースの SHA256SUMS",
+      "macos": "macOS",
+      "windows": "Windows (PowerShell)",
+      "linux": "Linux",
+      "mismatch": "値が一致しない場合は、ファイルを削除してもう一度ダウンロードしてください。開かないでください。"
+    },
+    "supported": {
+      "title": "対応システム",
+      "macos": "macOS 14 以降、Apple シリコンと Intel",
+      "windows": "Windows 11、64 ビット",
+      "linux": "Ubuntu 24.04、64 ビット (.deb または AppImage)"
+    },
+    "os": {
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux"
     }
   }
 }
