@@ -123,6 +123,27 @@ export function readRuntimeModelVariants(
 	return normalizeVariantKeys(readRuntimeModelCapabilities(runtimeModel)?.variants)
 }
 
+// A provider config variant may carry its own effort (`variants: { high: { reasoningEffort: "high" } }`);
+// those values are the efforts the model accepts when no registry or heuristic knows the model.
+export function readRuntimeModelReasoningEfforts(
+	runtimeModel: Record<string, unknown> | undefined,
+): string[] | undefined {
+	const variants = isRecord(runtimeModel?.variants)
+		? runtimeModel.variants
+		: readRuntimeModelCapabilities(runtimeModel)?.variants
+	if (!isRecord(variants)) {
+		return undefined
+	}
+
+	const efforts = new Set<string>()
+	for (const variant of Object.values(variants)) {
+		if (isRecord(variant) && typeof variant.reasoningEffort === "string") {
+			efforts.add(variant.reasoningEffort.toLowerCase())
+		}
+	}
+	return efforts.size > 0 ? [...efforts] : undefined
+}
+
 export function readRuntimeModelModalities(
 	runtimeModel: Record<string, unknown> | undefined,
 ): ModelCapabilities["modalities"] | undefined {

@@ -34,7 +34,7 @@ export type ModelCapabilitiesDiagnostics = {
 	}
 	family: { source: "snapshot" | "heuristic" | "none" }
 	variants: { source: "none" | "runtime" | "override" | "heuristic" | "canonical" }
-	reasoningEfforts: { source: "none" | "override" | "heuristic" }
+	reasoningEfforts: { source: "none" | "runtime" | "override" | "heuristic" }
 	reasoning: { source: "runtime" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	supportsThinking: { source: "runtime" | "override" | "heuristic" | "runtime-snapshot" | "bundled-snapshot" | "none" }
 	supportsTemperature: { source: "runtime" | "override" | "runtime-snapshot" | "bundled-snapshot" | "none" }
