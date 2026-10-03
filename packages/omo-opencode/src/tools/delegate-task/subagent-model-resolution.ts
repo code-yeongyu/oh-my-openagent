@@ -3,7 +3,8 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
-import { flattenToFallbackModelStrings, normalizeFallbackModels } from "../../shared/model-resolver"
+import { flattenToFallbackModelStrings } from "../../shared/model-resolver"
+import { resolveEffectiveModelChain } from "../../shared/effective-model-chain"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
@@ -34,12 +35,13 @@ export async function resolveSubagentModel(
   const agentCategoryConfig = agentOverride?.category
     ? executorCtx.userCategories?.[agentOverride.category]
     : undefined
-  const agentCategoryModel = agentCategoryConfig?.model
-  const hasExplicitUserModel = Boolean(agentOverride?.model ?? agentCategoryModel)
-  const normalizedAgentFallbackModels = normalizeFallbackModels(
-    agentOverride?.fallback_models
-    ?? agentCategoryConfig?.fallback_models
-  )
+  const overrideChain = resolveEffectiveModelChain(agentOverride ?? {})
+  const categoryChain = resolveEffectiveModelChain(agentCategoryConfig ?? {})
+  const agentOverrideModel = overrideChain.primaryModel
+  const agentCategoryModel = categoryChain.primaryModel
+  const hasExplicitUserModel = Boolean(agentOverrideModel ?? agentCategoryModel)
+  const normalizedAgentFallbackModels =
+    overrideChain.fallbackEntries ?? categoryChain.fallbackEntries
 
   const availableModels = await getAvailableModelsForDelegateTask(executorCtx.client)
   const normalizedMatchedModel = matchedAgent.model
@@ -49,9 +51,9 @@ export async function resolveSubagentModel(
     ? `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
     : undefined
 
-  if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model) {
+  if (agentOverrideModel || agentCategoryModel || agentRequirement || matchedAgent.model) {
     const resolution = resolveModelForDelegateTask({
-      userModel: agentOverride?.model ?? agentCategoryModel,
+      userModel: agentOverrideModel ?? agentCategoryModel,
       userFallbackModels: flattenToFallbackModelStrings(normalizedAgentFallbackModels),
       categoryDefaultModel: matchedAgentModelStr,
       fallbackChain: agentRequirement?.fallbackChain,
@@ -68,8 +70,8 @@ export async function resolveSubagentModel(
         const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
         categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
       }
-    } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-      const explicitModel = agentOverride?.model ?? agentCategoryModel
+    } else if (resolutionSkipped && (agentOverrideModel ?? agentCategoryModel)) {
+      const explicitModel = agentOverrideModel ?? agentCategoryModel
       const normalized = explicitModel ? normalizeModelFormat(explicitModel) : undefined
       if (normalized) {
         const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
@@ -77,7 +79,7 @@ export async function resolveSubagentModel(
         categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         log("[delegate-task] Cold cache: using explicit user override for subagent", {
           agent: agentToUse,
-          model: agentOverride?.model ?? agentCategoryModel,
+          model: agentOverrideModel ?? agentCategoryModel,
         })
       }
     }
