@@ -145,4 +145,61 @@ describe("runtime-fallback fallback-models", () => {
     //#then
     expect(result).toEqual([])
   })
+
+  // #8402 — general agent must resolve fallback_models like any other named agent
+  test("resolves fallback_models for general agent (#8402)", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        general: {
+          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_general_task", "general", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+  })
+
+  test("resolves fallback_models for general agent via category (#8402)", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        general: {
+          category: "deep",
+        },
+      },
+      categories: {
+        deep: {
+          fallback_models: ["openai/gpt-5.5"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_general_cat", "general", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.5"])
+  })
+
+  test("resolves fallback_models for general agent via normalizeAgentName (#8402)", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        general: {
+          fallback_models: ["openai/gpt-5.5"],
+        },
+      },
+    })
+
+    //#when — agent name passed directly (as resolved by resolveAgentForSession)
+    const result = getFallbackModelsForSession("ses_any_session", "general", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.5"])
+  })
 })
