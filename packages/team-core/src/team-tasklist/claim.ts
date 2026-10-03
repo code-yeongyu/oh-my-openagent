@@ -22,7 +22,7 @@ async function lockExists(lockPath: string): Promise<boolean> {
 }
 
 function getBlockingTaskIds(task: Task, allTasks: Task[]): string[] {
-  return task.blockedBy.filter((blockerId) => {
+  return [...new Set(task.blockedBy)].filter((blockerId) => {
     const blockerTask = allTasks.find((candidateTask) => candidateTask.id === blockerId)
     return blockerTask !== undefined && blockerTask.status !== "completed"
   })

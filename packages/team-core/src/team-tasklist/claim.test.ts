@@ -72,6 +72,31 @@ test("claimTask rejects blocked tasks until blockers complete", async () => {
   }
 }, 30_000)
 
+test("claimTask reports duplicate blockers once", async () => {
+  // given
+  const fixture = await createTasklistFixture()
+
+  try {
+    const blockerTask = await createTask(fixture.teamRunId, createTaskInput({ subject: "blocker" }), fixture.config)
+    const blockedTask = await createTask(
+      fixture.teamRunId,
+      createTaskInput({ subject: "blocked", blockedBy: [blockerTask.id, blockerTask.id] }),
+      fixture.config,
+    )
+
+    // when
+    const blockedClaim = claimTask(fixture.teamRunId, blockedTask.id, "member-a", fixture.config)
+
+    // then
+    await expect(blockedClaim).rejects.toMatchObject({
+      blockers: [blockerTask.id],
+      message: `blocked by ${blockerTask.id}`,
+    })
+  } finally {
+    await fixture.cleanup()
+  }
+})
+
 test("claimTask reaps a stale claim lock before claiming", async () => {
   // given
   const fixture = await createTasklistFixture()
