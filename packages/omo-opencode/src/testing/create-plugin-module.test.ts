@@ -147,6 +147,22 @@ describe("createPluginModule()", () => {
     initI18n({ locale: "en", fallback: "en" })
   })
 
+  describe("#given OpenCode loads the plugin definition", () => {
+    it("#then it exposes both V1 and V2 entrypoints", () => {
+      // given
+      const pluginModule = createTestPluginModule()
+
+      // when
+      const setupResult = pluginModule.setup({})
+
+      // then
+      expect(pluginModule.id).toBe("oh-my-openagent")
+      expect(pluginModule.server).toBeFunction()
+      expect(pluginModule.setup).toBeFunction()
+      expect(setupResult).toBeUndefined()
+    })
+  })
+
   describe("#given plugin config sets i18n.locale to zh", () => {
     it("#then production startup applies the configured locale", async () => {
       // given
