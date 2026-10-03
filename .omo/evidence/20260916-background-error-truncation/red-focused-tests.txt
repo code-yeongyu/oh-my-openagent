@@ -1,0 +1,291 @@
+bun test v1.4.2 (744846f84)
+
+packages\omo-opencode\src\features\background-agent\background-task-notification-template.test.ts:
+(pass) buildBackgroundTaskNotificationText > #given one task still running after a completed task notification > #when building the partial notification #then it does not use the final completed heading [3.39ms]
+(pass) buildBackgroundTaskNotificationText > #given one task still running after a failed task notification > #when the task has a short error #then it preserves the error byte-for-byte [1.31ms]
+94 |         completedTasks: [],
+95 |       })
+96 |
+97 |       // then
+98 |       const renderedError = extractNotificationLineValue(notification, "**Error:** ")
+99 |       expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+                                        ^
+error: expect(received).toBeLessThanOrEqual(expected)
+
+Expected: <= 2000
+Received: 513039
+
+      at <anonymous> (<repo>\packages\omo-opencode\src\features\background-agent\background-task-notification-template.test.ts:99:36)
+(fail) buildBackgroundTaskNotificationText > #given one task still running after a failed task notification > #when the task has a 513039-character provider error #then it bounds only the notification copy [2.78ms]
+130 |       })
+131 |
+132 |       // then
+133 |       const summaryPrefix = `- \`${failedTask.id}\`: ${failedTask.description} [ERROR] - `
+134 |       const renderedError = extractNotificationLineValue(notification, summaryPrefix)
+135 |       expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+                                         ^
+error: expect(received).toBeLessThanOrEqual(expected)
+
+Expected: <= 2000
+Received: 513039
+
+      at <anonymous> (<repo>\packages\omo-opencode\src\features\background-agent\background-task-notification-template.test.ts:135:36)
+(fail) buildBackgroundTaskNotificationText > #given all sibling tasks completed with mixed outcomes > #when a failed task has a 513039-character provider error #then the final summary embeds a bounded copy [1.53ms]
+(pass) buildBackgroundTaskNotificationText > #given all tasks completed with undefined descriptions > #when building the final notification #then it uses task ID as fallback instead of 'undefined' [0.65ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it includes the final completed heading [0.48ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it tells the agent to collect outputs immediately [0.82ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it renders the spec-aligned balanced attempt timeline [0.88ms]
+325 |         completedTasks: [task],
+326 |       })
+327 |
+328 |       // then
+329 |       const renderedError = extractNotificationLineValue(notification, "    Error: ")
+330 |       expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+                                         ^
+error: expect(received).toBeLessThanOrEqual(expected)
+
+Expected: <= 2000
+Received: 513039
+
+      at <anonymous> (<repo>\packages\omo-opencode\src\features\background-agent\background-task-notification-template.test.ts:330:36)
+(fail) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when a failed retry attempt has a 513039-character provider error #then the attempt timeline embeds a bounded copy [2.42ms]
+(pass) buildBackgroundTaskNotificationText > #given a single task notification with undefined description > #when building the partial notification #then it uses task ID as fallback [0.51ms]
+
+packages\omo-opencode\src\features\background-agent\manager.test.ts:
+(pass) BackgroundManager tmux callback ordering > starts promptAsync before a blocking tmux callback resolves [29.65ms]
+(pass) BackgroundManager session.error fallback hydration > hydrates fallbackChain from session fallback state before retrying sync child-session errors [1.88ms]
+(pass) BackgroundManager delegated child-session bootstrap > registers launch bootstrap before first prompt and clears it after completion [4.45ms]
+(pass) BackgroundManager prompt rejection fallback routing > routes launch-time prompt rejections into tryFallbackRetry before marking interrupt [3.91ms]
+(pass) BackgroundManager prompt rejection fallback routing > keeps launch running when promptAsync returns ambiguous EOF after dispatch [2.81ms]
+(pass) BackgroundManager prompt rejection fallback routing > routes resume-time prompt rejections into tryFallbackRetry before marking interrupt [2.52ms]
+(pass) BackgroundManager prompt rejection fallback routing > keeps resumed task running when promptAsync returns ambiguous EOF after dispatch [1.17ms]
+(pass) BackgroundManager retry observability > queues a parent-visible retry notification when fallback retry is scheduled [5.84ms]
+ 999 |
+1000 |     //#then
+1001 |     const retryingNotification = cast<Array<[string, string]>>(queuePendingParentWake.mock.calls)[0]?.[1]
+1002 |     expect(retryingNotification).toBeDefined()
+1003 |     const renderedError = extractNotificationLineValue(retryingNotification ?? "", "- Error: ")
+1004 |     expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+                                        ^
+error: expect(received).toBeLessThanOrEqual(expected)
+
+Expected: <= 2000
+Received: 513039
+
+      at <anonymous> (<repo>\packages\omo-opencode\src\features\background-agent\manager.test.ts:1004:34)
+(fail) BackgroundManager retry observability > bounds a 513039-character provider error in the retrying parent notification without mutating attempt history [15.50ms]
+(pass) BackgroundManager retry observability > falls back to task parent agent when retrying wake cannot load parent messages [3.25ms]
+(pass) BackgroundManager retry observability > does not invent a parent agent when retrying wake has no context source [1.86ms]
+(pass) BackgroundManager retry observability > queues a second parent-visible notification once the retry session ID is created [2.27ms]
+1317 |     const retryReadyNotification = cast<Array<[string, string]>>(queuePendingParentWake.mock.calls)
+1318 |       .map((call) => call[1])
+1319 |       .find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
+1320 |     expect(retryReadyNotification).toBeDefined()
+1321 |     const renderedError = extractNotificationLineValue(retryReadyNotification ?? "", "- Error: ")
+1322 |     expect(renderedError.length).toBeLessThanOrEqual(MAX_EMBEDDED_ERROR_LENGTH)
+                                        ^
+error: expect(received).toBeLessThanOrEqual(expected)
+
+Expected: <= 2000
+Received: 513039
+
+      at <anonymous> (<repo>\packages\omo-opencode\src\features\background-agent\manager.test.ts:1322:34)
+(fail) BackgroundManager retry observability > bounds a 513039-character provider error in the retry-session-ready notification without mutating attempt history [2.41ms]
+(pass) BackgroundManager retry observability > builds retry-ready links from the parent session directory when it differs from the manager directory [2.13ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return empty array when no tasks exist [0.55ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return direct children only when no nested tasks [0.53ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return all nested descendants (2 levels deep) [0.41ms]
+(pass) BackgroundManager.getAllDescendantTasks > should return all nested descendants (3 levels deep) [0.67ms]
+(pass) BackgroundManager.getAllDescendantTasks > should handle multiple branches (tree structure) [0.65ms]
+(pass) BackgroundManager.getAllDescendantTasks > should not include tasks from unrelated sessions [0.58ms]
+(pass) BackgroundManager.getAllDescendantTasks > getTasksByParentSession should only return direct children (not recursive) [0.53ms]
+(pass) BackgroundManager.getTasksSnapshot > getTasksSnapshot empty returns an empty defensive snapshot [0.90ms]
+(pass) BackgroundManager.getTasksSnapshot > returns frozen snapshots without exposing the internal task map [1.07ms]
+(pass) BackgroundManager.notifyParentSession - release ordering > should unblock queued task even when prompt hangs [1.75ms]
+(pass) BackgroundManager.notifyParentSession - release ordering > should keep queue blocked if release is after prompt (demonstrates the bug) [52.97ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should not prune fresh tasks [1.09ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should prune tasks older than 30 minutes [0.91ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should prune stale notifications [0.74ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should clean up notifications when task is pruned [0.65ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications > should keep fresh tasks while pruning stale ones [0.59ms]
+(pass) BackgroundManager.resume > should throw error when task not found [2.38ms]
+(pass) BackgroundManager.resume > should resume existing task and reset state to running [0.48ms]
+(pass) BackgroundManager.resume > should preserve task identity while updating parent context [0.48ms]
+(pass) BackgroundManager.resume > should track resume calls with prompt [0.57ms]
+(pass) BackgroundManager.resume > should preserve existing tool call count in progress [0.46ms]
+(pass) BackgroundManager.resume > should reject resume when task is already running [0.52ms]
+(pass) LaunchInput.skillContent > skillContent should be optional in LaunchInput type [0.57ms]
+(pass) LaunchInput.skillContent > skillContent can be provided in LaunchInput [0.48ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should skip compaction agent and use nearest non-compaction message [257.14ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should use currentMessage model/agent when available [0.90ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should fallback to parentAgent when currentMessage.agent is undefined [0.75ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should not pass model when currentMessage.model is incomplete [0.55ms]
+(pass) BackgroundManager.notifyParentSession - dynamic message lookup > should handle null currentMessage gracefully [0.71ms]
+(pass) BackgroundManager.notifyParentSession - aborted parent > should fall back and still notify when parent session messages are aborted [269.39ms]
+(pass) BackgroundManager.notifyParentSession - aborted parent > should swallow aborted error from prompt [258.21ms]
+(pass) BackgroundManager.notifyParentSession - aborted parent > should queue notification when promptAsync aborts while parent is idle [254.09ms]
+(pass) BackgroundManager.notifyParentSession - notifications toggle > should skip parent prompt injection when notifications are disabled [1.03ms]
+(pass) BackgroundManager.notifyParentSession - variant propagation > should prefer parent session variant over child task variant in parent notification promptAsync body [254.61ms]
+(pass) BackgroundManager.notifyParentSession - variant propagation > should not include variant in promptAsync body when task has no variant [254.26ms]
+(pass) BackgroundManager.injectPendingNotificationsIntoChatMessage > should defer queued notifications without mutating user text [1.38ms]
+(pass) BackgroundManager.tryCompleteTask > should release concurrency and clear key on completion [1.64ms]
+(pass) BackgroundManager.tryCompleteTask > should prevent double completion and double release [1.78ms]
+(pass) BackgroundManager.tryCompleteTask > should abort session on completion [1.79ms]
+(pass) BackgroundManager.tryCompleteTask > should fire onSubagentSessionDeleted callback on completion [1.87ms]
+(pass) BackgroundManager.tryCompleteTask > #given the final child is mid-teardown #when its session abort is still pending #then hasPendingParentWake keeps reporting an owed wake [2.33ms]
+(pass) BackgroundManager.tryCompleteTask > should immediately clear completed subagent runtime-fallback eligibility [1.67ms]
+(pass) BackgroundManager.tryCompleteTask > should clean pendingByParent even when promptAsync notification fails [2.37ms]
+(pass) BackgroundManager.tryCompleteTask > should remove toast tracking before notifying completed task [2.16ms]
+(pass) BackgroundManager.tryCompleteTask > should release task concurrencyKey when startTask throws after assigning it [1.98ms]
+(pass) BackgroundManager.tryCompleteTask > should mark task as error when startTask throws after session creation [11.01ms]
+(pass) BackgroundManager.tryCompleteTask > should release queue slot when queued task is already interrupt [1.03ms]
+(pass) BackgroundManager.tryCompleteTask > should avoid overlapping promptAsync calls when tasks complete concurrently [255.87ms]
+(pass) BackgroundManager.trackTask > should not double acquire on duplicate registration [1.07ms]
+(pass) BackgroundManager.resume concurrency key > should re-acquire using external task concurrency key [1.77ms]
+(pass) BackgroundManager.resume concurrency key > should re-acquire persisted model group using provider concurrency key [2.45ms]
+(pass) BackgroundManager.resume running-task guard > rejects a running task without changing parent context or dispatching a prompt [1.03ms]
+(pass) BackgroundManager.resume promptAsync gate state > restores completed task state when resume prompt is skipped because the session is active [1.79ms]
+(pass) BackgroundManager.resume promptAsync gate state > restores completed task state when resume prompt is skipped by an existing reservation [2.30ms]
+(pass) BackgroundManager.resume model persistence > should pass model when task has a configured model [1.25ms]
+(pass) BackgroundManager.resume model persistence > should preserve promoted per-model settings when resuming a task [1.38ms]
+(pass) BackgroundManager.resume model persistence > should NOT pass model when task has no model (backward compatibility) [1.28ms]
+(pass) BackgroundManager process cleanup > should remove listeners after last shutdown [0.79ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should return task with pending status immediately [2.40ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should sanitize wrapped agent names before task creation and queueing [1.52ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should sanitize slash and quote wrapped agent names before task creation and queueing [1.43ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should reject wrapper-only agent names after sanitization [0.94ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should initialize attempt state for a newly launched task [2.03ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should return immediately even with concurrency limit [2.76ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should keep agent when launch has model and keep agent without model [3.22ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > launch() returns immediately with pending status > should queue multiple tasks without blocking [4.97ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > does not override parent session permission when creating child session [13.33ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should transition first task to running immediately [13.73ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should set startedAt when transitioning to running [14.27ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should track rootSessionID and spawnDepth from the parent chain [2.39ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should block launches that exceed maxDepth [1.09ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows multiple descendants without a root spawn cap [3.25ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows spawn assertions after reserveSubagentSpawn without a root spawn cap [9.99ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should fail closed when session lineage lookup fails [1.02ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows replacement launch when a queued task is cancelled before session starts [5.18ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows retry after session creation fails before session starts [12.88ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should only roll back the failed task reservation once when siblings still exist [1.72ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should keep the next queued task when the first task is cancelled during session creation [4.46ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should keep sibling launch running when concurrent launches share a parent and the first is cancelled during session creation [3.63ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should keep task cancelled and abort the session when cancellation wins during session creation [3.84ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > should start prompt before tmux callback cancellation [3.89ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows relaunch after task completes [3.80ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows relaunch after running task is cancelled [3.38ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows relaunch after task errors [105.01ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > task transitions pending→running when slot available > allows repeated relaunch after pending tasks are cancelled [5.73ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > pending task can be cancelled > should cancel pending task successfully [2.81ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > pending task can be cancelled > should not cancel running task [11.98ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > pending task can be cancelled > should remove cancelled task from queue [5.94ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > cancelTask > should cancel running task and release concurrency [2.65ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > cancelTask > should remove task from toast manager when notification is skipped [1.70ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should process different concurrency keys in parallel [13.65ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should respect per-key concurrency limits [3.09ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should process model-based keys in parallel [12.61ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should respect provider concurrency across different models on the same provider [3.27ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should resolve limits from raw model keys while queueing by provider key [2.96ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > multiple keys process in parallel > should remove cancelled pending model task from provider queue [2.29ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should use queuedAt for pending task TTL [1.94ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should use startedAt for running task TTL [13.22ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should have different timestamps for queuedAt and startedAt [155.54ms]
+(pass) BackgroundManager - Non-blocking Queue Integration > manual verification scenario > should handle 10 tasks with limit 5 returning immediately [6.99ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should NOT interrupt task running less than 30 seconds (min runtime guard) [2.18ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should NOT interrupt task with recent lastUpdate [0.65ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt task with stale lastUpdate (> 3min) [0.91ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should respect custom staleTimeoutMs config [0.66ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should release concurrency before abort [0.72ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should handle multiple stale tasks in same poll cycle [0.77ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should use default timeout when config not provided [0.71ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt running session when lastUpdate exceeds stale timeout [1.32ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt task when session is idle and lastUpdate exceeds stale timeout [0.75ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt running session even with very old lastUpdate [0.86ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt running session with no progress after message staleness timeout [0.77ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should interrupt task with no lastUpdate after messageStalenessTimeout [0.87ms]
+(pass) BackgroundManager.checkAndInterruptStaleTasks > should NOT interrupt task with no lastUpdate within session-gone timeout [0.55ms]
+(pass) BackgroundManager.shutdown session abort > should call session.abort for all running tasks during shutdown [0.55ms]
+(pass) BackgroundManager.shutdown session abort > should not call session.abort for completed or cancelled tasks [0.46ms]
+(pass) BackgroundManager.shutdown session abort > should call onShutdown callback during shutdown [0.41ms]
+(pass) BackgroundManager.shutdown session abort > should not throw when onShutdown callback throws [1.10ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should cancel descendant tasks and keep them until delayed cleanup [4.43ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should remove cancelled tasks from toast manager while preserving delayed cleanup [3.12ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should clean pending notifications for deleted sessions [0.75ms]
+(pass) BackgroundManager.handleEvent - session.deleted cascade > should clear session agent state for deleted sessions to prevent map leak [0.65ms]
+(pass) BackgroundManager.handleEvent - session.error > sets task to error, releases concurrency, and keeps it until delayed cleanup [2.97ms]
+(pass) BackgroundManager.handleEvent - session.error > should remove errored task from toast manager while preserving delayed cleanup [1.96ms]
+(pass) BackgroundManager.handleEvent - session.error > ignores session.error for non-running tasks [0.80ms]
+(pass) BackgroundManager.handleEvent - session.error > ignores session.error for unknown session [0.76ms]
+(pass) BackgroundManager.handleEvent - session.error > does not terminate task on session.error when session is still alive [1.06ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task and notifies parent on terminal session.error (e.g. no provider available) even when session is still alive [2.43ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task and notifies parent on terminal model lookup failure while session is still alive [2.01ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task and notifies parent on terminal credential failure while session is still alive [1.06ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task when agent-not-found arrives as async session.error after promptAsync accept [2.13ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when the wake prompt fails through session.error [307.64ms]
+(pass) BackgroundManager.handleEvent - session.error > pins the registered parent agent alias before dispatching a deferred parent wake [154.21ms]
+(pass) BackgroundManager.handleEvent - session.error > keeps dispatched parent wake tracked when message.updated only records the injected user wake [154.68ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when a late error follows the injected user wake part [308.30ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when split text deltas stream the injected user wake [318.59ms]
+(pass) BackgroundManager.handleEvent - session.error > does not requeue dispatched parent wake after real assistant text delta output [154.69ms]
+(pass) BackgroundManager.handleEvent - session.error > requeues dispatched parent wake when session.error arrives with only the injected user wake visible [308.07ms]
+(pass) BackgroundManager.handleEvent - session.error > does not requeue dispatched parent wake when session history already contains assistant output after the wake [306.07ms]
+(pass) BackgroundManager.handleEvent - session.error > terminates task on session.error when session is gone [1.92ms]
+(pass) BackgroundManager.handleEvent - session.error > completes task on session.idle after transient session.error [12.29ms]
+(pass) BackgroundManager.handleEvent - session.error > completes task when session.idle carries session id in info [12.53ms]
+(pass) BackgroundManager.handleEvent - session.error > completes task on session.status idle after todo-continuation finishes [2.35ms]
+(pass) BackgroundManager.handleEvent - session.error > retry path releases current concurrency slot and prefers current provider in fallback entry [2.61ms]
+(pass) BackgroundManager.handleEvent - session.error > retry path triggers on session.status retry events [2.27ms]
+(pass) BackgroundManager.handleEvent - session.error > retry path triggers on message.updated assistant error events [1.94ms]
+(pass) BackgroundManager queue processing - error tasks are skipped > does not start tasks with status=error [1.20ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey > removes stale pending task from queue [2.06ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey > removes stale task from toast manager [1.68ms]
+(pass) BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey > keeps stale task until notification cleanup after notifying parent [256.74ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should have completionTimers Map initialized [1.22ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should start per-task cleanup timers independently of sibling completion [2.63ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should clear all completion timers on shutdown [0.80ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should preserve cleanup timer when terminal task session is deleted [1.05ms]
+(pass) BackgroundManager.completionTimers - Memory Leak Fix > should not leak timers across multiple shutdown calls [0.58ms]
+(pass) BackgroundManager.handleEvent - early session.idle deferral > should defer and retry when session.idle fires before MIN_IDLE_TIME_MS [111.63ms]
+(pass) BackgroundManager.handleEvent - early session.idle deferral > should not defer when session.idle fires after MIN_IDLE_TIME_MS [11.55ms]
+(pass) BackgroundManager.handleEvent - early session.idle deferral > should not process deferred idle if task already completed by other means [203.20ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should update lastUpdate on text-type message.part.updated event [0.87ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should update lastUpdate when legacy message.part.updated only has part session id [0.92ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should update lastUpdate on thinking-type message.part.updated event [0.75ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should initialize progress on first non-tool event [0.76ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should NOT mark thinking model as stale when text events refresh lastUpdate [0.97ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should refresh lastUpdate on message.part.delta events (OpenCode >=1.2.0) [0.61ms]
+(pass) BackgroundManager.handleEvent - non-tool event lastUpdate > should complete idle task without fetching messages after output event was observed [11.06ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should keep resumed task in memory after previous completion timer deadline [1.46ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should start cleanup timer even when promptAsync aborts [1.60ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should keep completed task retrievable after scheduled removal [0.70ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should resolve a completed task registered by an earlier plugin manager instance [0.49ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should redact active task prompts resolved from an earlier plugin manager instance [0.56ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should resolve archived completed task from an earlier plugin manager instance [0.44ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should archive terminal registry tasks during earlier manager shutdown [0.50ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should forget active registry tasks during earlier manager shutdown [0.48ms]
+(pass) BackgroundManager regression fixes - resume and aborted notification > should cap completed task archive size at 100 entries [1.23ms]
+(pass) BackgroundManager - tool permission spread order > startTask respects explore agent restrictions [1.78ms]
+(pass) BackgroundManager - tool permission spread order > startTask keeps agent when explicit model is configured [1.47ms]
+(pass) BackgroundManager - tool permission spread order > startTask updates tracked session agent when launch falls back to general [12.59ms]
+(pass) BackgroundManager - tool permission spread order > resume respects explore agent restrictions [1.43ms]
+(pass) BackgroundManager - tool permission spread order > resume keeps agent when explicit model is configured [1.21ms]
+(pass) BackgroundManager.launch - attempt state initialization > newly launched task has attempt state with attemptNumber 1 and currentAttemptID pointing at it [3.30ms]
+(pass) BackgroundManager attempt lifecycle bindings > startTask binds the created session to the queued attempt ID and mirrors task projection [1.70ms]
+(pass) BackgroundManager attempt lifecycle bindings > startTask clears child session agent state when task is cancelled before launch binding [0.83ms]
+(pass) BackgroundManager attempt lifecycle bindings > historical attempt session IDs resolve to the task while stale session.error events leave the current attempt unchanged [0.81ms]
+(pass) BackgroundManager attempt lifecycle bindings > late launch prompt errors from a historical attempt do not interrupt the current retry attempt [1.36ms]
+
+5 tests failed:
+(fail) buildBackgroundTaskNotificationText > #given one task still running after a failed task notification > #when the task has a 513039-character provider error #then it bounds only the notification copy [2.78ms]
+(fail) buildBackgroundTaskNotificationText > #given all sibling tasks completed with mixed outcomes > #when a failed task has a 513039-character provider error #then the final summary embeds a bounded copy [1.53ms]
+(fail) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when a failed retry attempt has a 513039-character provider error #then the attempt timeline embeds a bounded copy [2.42ms]
+(fail) BackgroundManager retry observability > bounds a 513039-character provider error in the retrying parent notification without mutating attempt history [15.50ms]
+(fail) BackgroundManager retry observability > bounds a 513039-character provider error in the retry-session-ready notification without mutating attempt history [2.41ms]
+
+ 202 pass
+ 5 fail
+ 668 expect() calls
+Ran 207 tests across 2 files. [6.96s]
+
+focused_red_exit=1

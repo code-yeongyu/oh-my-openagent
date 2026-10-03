@@ -1,0 +1,101 @@
+{
+  "passed": true,
+  "providerCounts": {
+    "title": 0,
+    "parentToolCall": 1,
+    "parentAfterTool": 1,
+    "childError": 3,
+    "wake": 1,
+    "default": 0
+  },
+  "observation": {
+    "requestBodyLength": 126543,
+    "candidateStringCount": 2,
+    "boundedNotificationCount": 2,
+    "notificationKinds": [
+      "retry",
+      "all-finished"
+    ],
+    "boundedNotifications": [
+      {
+        "kinds": [
+          "retry"
+        ],
+        "notificationLength": 5056,
+        "renderedErrorLength": 2000,
+        "renderedErrorPrefix": "Forbidden: Selected provider is forbidden. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "hasExpectedPrefix": true,
+        "hasTruncationMarker": true,
+        "markerOriginalLength": 513039,
+        "hasTailSentinel": false
+      },
+      {
+        "kinds": [
+          "retry",
+          "all-finished"
+        ],
+        "notificationLength": 18738,
+        "renderedErrorLength": 2000,
+        "renderedErrorPrefix": "Forbidden: Selected provider is forbidden. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "hasExpectedPrefix": true,
+        "hasTruncationMarker": true,
+        "markerOriginalLength": 513039,
+        "hasTailSentinel": false
+      }
+    ],
+    "wakeTextLength": 18738,
+    "renderedErrorLength": 2000,
+    "renderedErrorPrefix": "Forbidden: Selected provider is forbidden. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "hasExpectedPrefix": true,
+    "hasTruncationMarker": true,
+    "markerOriginalLength": 513039,
+    "hasTailSentinel": false,
+    "requestContainsTailSentinel": false,
+    "fullErrorWasNotPersisted": true
+  },
+  "sseSummary": {
+    "counts": {
+      "server.connected": 1,
+      "session.created": 4,
+      "session.updated": 21,
+      "tui.toast.show": 53,
+      "message.updated": 29,
+      "message.part.updated": 19,
+      "session.status": 22,
+      "session.diff": 8,
+      "plugin.added": 45,
+      "catalog.updated": 2,
+      "reference.updated": 1,
+      "integration.updated": 1,
+      "project.directories.updated": 1,
+      "session.error": 3,
+      "session.idle": 8,
+      "message.part.delta": 2,
+      "server.heartbeat": 1
+    },
+    "sessionCount": 4,
+    "sessionErrorPayloadLengths": [
+      1026506,
+      1026506,
+      1026506
+    ],
+    "parseErrors": 0
+  },
+  "sandboxMetrics": {
+    "sessions": 4,
+    "messages": 12,
+    "parts": 15
+  },
+  "isolation": {
+    "realSessionCountBefore": 12,
+    "realSessionCountAfter": 12,
+    "unchanged": true,
+    "sandboxRoot": "<OMO_QA_TEMP_ROOT>/opencode-qa-*",
+    "sandboxRetainedForAudit": true
+  },
+  "processCleanup": {
+    "serveStopped": true,
+    "fakeProviderStopped": true
+  },
+  "failure": null
+}
