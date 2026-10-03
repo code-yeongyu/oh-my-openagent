@@ -1,0 +1,17 @@
+WHAT WAS TESTED
+Focused failing-first regression on current upstream/dev before changing `spawn.ts`:
+
+`bun test packages/senpi-task/src/runners/rpc/spawn.test.ts --test-name-pattern 'DAG-owned spec with a launcher and provider'`
+
+WHAT WAS OBSERVED
+- Bun 1.4.0 ran the one new regression; 36 neighboring tests were filtered out.
+- The actual RPC child extension sequence contained only the provider extension.
+- The catalog probe extension sequence contained the leading OMO launcher plus the provider extension.
+- The equality assertion failed with one extra received entry: `omo-launcher.js`.
+- Result: 0 pass, 1 fail, 2 assertions.
+
+WHY IT IS ENOUGH
+The fixture writes a DAG-owned task record using the production state-directory shape, then calls both public argument builders with the same spec. The failure isolates the reported defect: admission inspects an extension graph different from the child it admits.
+
+WHAT WAS OMITTED
+The randomized temporary-directory suffix and unrelated dependency-build noise were summarized. No credentials, environment dump, auth headers, or private user data were retained.
