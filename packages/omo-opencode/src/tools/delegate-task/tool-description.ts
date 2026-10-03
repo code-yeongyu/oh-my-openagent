@@ -1,6 +1,6 @@
 import type { AvailableCategory, AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeCategories } from "../../shared/merge-categories"
-import { CATEGORY_CALLER_GUIDANCE } from "./builtin-categories"
+import { builtinCategoryRequiredModels, CATEGORY_CALLER_GUIDANCE } from "./builtin-categories"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import type { DelegateTaskToolOptions } from "./types"
 
@@ -21,27 +21,30 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
   const allCategories = mergeCategories(userCategories)
   const categoryEntries = Object.entries(allCategories).map(([name, categoryConfig]) => ({
     name,
-    categoryConfig,
     description: userCategories?.[name]?.description || CATEGORY_DESCRIPTIONS[name],
-    callerGuidance: CATEGORY_CALLER_GUIDANCE[name],
+    model: categoryConfig.model,
   }))
-  const categoryNames = categoryEntries.map(({ name }) => name)
-  const categoryExamples = categoryNames.join(", ")
-
-  const availableCategories: AvailableCategory[] = options.availableCategories
-    ?? categoryEntries.map(({ name, categoryConfig, description }) => {
-      return {
-        name,
-        description: description || "General tasks",
-        model: categoryConfig.model,
+  const defaultAvailableCategories: AvailableCategory[] = categoryEntries.map(({ name, description, model }) => ({
+    name,
+    description: description || "General tasks",
+    model,
+  }))
+  const availableCategories: AvailableCategory[] = (options.availableCategories ?? defaultAvailableCategories)
+    .map((category) => {
+      if (category.requiredModels !== undefined || userCategories?.[category.name] !== undefined) {
+        return category
       }
-    })
 
+      const requiredModels = builtinCategoryRequiredModels(category.name)
+      return requiredModels.length > 0 ? { ...category, requiredModels } : category
+    })
+  const categoryExamples = availableCategories.map(({ name }) => name).join(", ")
   const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
-  const categoryList = categoryEntries.map(({ name, description, callerGuidance }) => {
-    const categoryLine = description ? `  - ${name}: ${description}` : `  - ${name}`
-    const indentedGuidance = callerGuidance?.replaceAll("\n", "\n    ")
+  const categoryList = availableCategories.map(({ name, description, requiredModels }) => {
+    const requirement = requiredModels?.length ? ` (requires ${requiredModels.join(" or ")})` : ""
+    const categoryLine = description ? `  - ${name}: ${description}${requirement}` : `  - ${name}${requirement}`
+    const indentedGuidance = CATEGORY_CALLER_GUIDANCE[name]?.replaceAll("\n", "\n    ")
     return indentedGuidance ? `${categoryLine}\n    ${indentedGuidance}` : categoryLine
   }).join("\n")
 

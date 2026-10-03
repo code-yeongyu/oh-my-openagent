@@ -20,6 +20,7 @@ import {
   readProviderModelsCache,
 } from "../shared"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
+import { isBuiltinCategoryAvailable } from "../tools/delegate-task/builtin-categories"
 import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
 import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
@@ -95,10 +96,16 @@ export async function createBuiltinAgents(
 
   const mergedCategories = mergeCategories(categories)
 
-  const availableCategories: AvailableCategory[] = Object.entries(mergedCategories).map(([name]) => ({
-    name,
-    description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
-  }))
+  const availableCategories: AvailableCategory[] = Object.entries(mergedCategories)
+    .filter(([name]) =>
+      isFirstRunNoCache ||
+      categories?.[name] !== undefined ||
+      isBuiltinCategoryAvailable(name, availableModels)
+    )
+    .map(([name]) => ({
+      name,
+      description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
+    }))
 
   // Collect general agents first (for availableAgents), but don't add to result yet
   const { pendingAgentConfigs, availableAgents } = collectPendingBuiltinAgents({

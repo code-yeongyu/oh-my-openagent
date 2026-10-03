@@ -4,6 +4,18 @@ import { CATEGORY_PROMPT_APPENDS } from "./builtin-categories"
 import { createDelegateTaskPresentation } from "./tool-description"
 
 describe("createDelegateTaskPresentation", () => {
+  test("#given a model-gated builtin #when presentation is built #then its required models are exposed", () => {
+    //#given
+    const expectedModels = ["gpt-6-astra"]
+
+    //#when
+    const category = createDelegateTaskPresentation({}).availableCategories
+      .find(({ name }) => name === "deep-high")
+
+    //#then
+    expect(category?.requiredModels).toEqual(expectedModels)
+  })
+
   test("#given caller-directed category guidance #when presentation is built #then guidance reaches only the caller", () => {
     //#given
     const callerDirectedCategories = ["quick", "unspecified-low", "unspecified-high"]

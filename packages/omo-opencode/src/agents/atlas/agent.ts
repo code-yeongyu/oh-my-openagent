@@ -26,6 +26,7 @@ import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynam
 import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
+import { builtinCategoryRequiredModels } from "../../tools/delegate-task/builtin-categories"
 
 import {
   getCategoryDescription,
@@ -75,14 +76,23 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const model = ctx?.model
 
   const allCategories = mergeCategories(userCategories)
-  const availableCategories: AvailableCategory[] = Object.entries(allCategories).map(([name]) => ({
+  const promptCategories = Object.fromEntries(
+    Object.entries(allCategories).map(([name, config]) => {
+      const requiredModels = userCategories?.[name] === undefined
+        ? builtinCategoryRequiredModels(name)
+        : []
+      const requirement = requiredModels.length > 0 ? ` (requires ${requiredModels.join(" or ")})` : ""
+      return [name, { ...config, description: getCategoryDescription(name, userCategories) + requirement }]
+    })
+  )
+  const availableCategories: AvailableCategory[] = Object.entries(promptCategories).map(([name, config]) => ({
     name,
-    description: getCategoryDescription(name, userCategories),
+    description: config.description ?? "General tasks",
   }))
 
-  const categorySection = buildCategorySection(userCategories)
+  const categorySection = buildCategorySection(promptCategories)
   const agentSection = buildAgentSelectionSection(agents)
-  const decisionMatrix = buildDecisionMatrix(agents, userCategories)
+  const decisionMatrix = buildDecisionMatrix(agents, promptCategories)
   const skillsSection = buildSkillsSection(skills)
   const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, skills)
   const source = getAtlasPromptSource(model)
