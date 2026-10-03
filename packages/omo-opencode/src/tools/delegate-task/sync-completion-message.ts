@@ -1,10 +1,17 @@
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import type { ParentContext } from "./executor-types"
+import type { SyncOutcomeState } from "./sync-session-turns"
 import { formatDuration } from "./time-formatter"
 import type { DelegatedModelConfig, DelegateTaskArgs } from "./types"
 
 function formatModelID(model: DelegatedModelConfig | ParentContext["model"] | undefined): string | undefined {
   return model ? `${model.providerID}/${model.modelID}` : undefined
+}
+
+function outcomeHeadline(endState: SyncOutcomeState | undefined, duration: string): string {
+  if (endState === "interrupted") return `Task ended before completion (session interrupted) in ${duration}.`
+  if (endState === "failed") return `Task failed in ${duration}.`
+  return `Task completed in ${duration}.`
 }
 
 export function buildRecoveredSyncTaskCompletion(input: {
@@ -15,6 +22,7 @@ export function buildRecoveredSyncTaskCompletion(input: {
   readonly parentContext: ParentContext
   readonly startTime: Date
   readonly textContent: string
+  readonly endState?: SyncOutcomeState
 }): string {
   const duration = formatDuration(input.startTime)
   const actualModelStr = formatModelID(input.effectiveCategoryModel)
@@ -24,7 +32,7 @@ export function buildRecoveredSyncTaskCompletion(input: {
     modelRoutingNote = `\n⚠️  Model fallback used: requested ${parentModelStr}, executed ${actualModelStr}`
   }
 
-  return `Task completed in ${duration}.\n\n---\n\n${input.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock({
+  return `${outcomeHeadline(input.endState, duration)}\n\n---\n\n${input.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock({
     sessionId: input.activeSessionID,
     taskId: input.activeSessionID,
     agent: input.agentToUse,
@@ -40,6 +48,7 @@ export function buildSyncTaskCompletion(input: {
   readonly parentContext: ParentContext
   readonly startTime: Date
   readonly textContent: string
+  readonly endState?: SyncOutcomeState
 }): string {
   const duration = formatDuration(input.startTime)
   const actualModelStr = formatModelID(input.effectiveCategoryModel)
@@ -51,7 +60,7 @@ export function buildSyncTaskCompletion(input: {
     modelRoutingNote = `\nModel: ${actualModelStr}${input.args.category ? ` (category: ${input.args.category})` : ""}`
   }
 
-  return `Task completed in ${duration}.
+  return `${outcomeHeadline(input.endState, duration)}
 
 Agent: ${input.agentToUse}${input.args.category ? ` (category: ${input.args.category})` : ""}${modelRoutingNote}
 
