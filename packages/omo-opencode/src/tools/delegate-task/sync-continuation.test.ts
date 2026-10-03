@@ -1001,6 +1001,104 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     })
   })
 
+  test("passes bound manager child/wake callbacks to the poller for continuation sessions", async () => {
+    //#given - a manager whose predicates depend on the receiver binding, so an
+    //#unbound hand-off would throw or report false instead of the manager verdict
+    class MockBackgroundManager {
+      readonly childSessionIDs = new Set<string>()
+      readonly wakeSessionIDs = new Set<string>()
+
+      hasActiveChildTasks(sessionID: string): boolean {
+        return this.childSessionIDs.has(sessionID)
+      }
+
+      hasPendingParentWake(sessionID: string): boolean {
+        return this.wakeSessionIDs.has(sessionID)
+      }
+    }
+    const manager = new MockBackgroundManager()
+    manager.childSessionIDs.add("ses_test_12345678")
+    manager.wakeSessionIDs.add("ses_test_12345678")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    type CapturedPollInput = {
+      sessionID: string
+      hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
+      hasPendingParentWake?: (sessionID: string) => boolean
+    }
+    let capturedPollInput: CapturedPollInput | undefined
+
+    const deps = {
+      pollSyncSession: async (
+        _ctx: unknown,
+        _client: unknown,
+        input: CapturedPollInput,
+      ) => {
+        capturedPollInput = input
+        return null
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      manager,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation polls the resumed session
+    await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then - the poller receives both manager predicates with their receiver
+    //#binding intact, and each predicate reports on the continuation session
+    if (!capturedPollInput) {
+      throw new Error("pollSyncSession was not called with the continuation input")
+    }
+    expect(capturedPollInput.sessionID).toBe("ses_test_12345678")
+    const childPredicate = capturedPollInput.hasActiveChildBackgroundTasks
+    const wakePredicate = capturedPollInput.hasPendingParentWake
+    expect(childPredicate).toBeDefined()
+    expect(wakePredicate).toBeDefined()
+    expect(childPredicate?.(capturedPollInput.sessionID)).toBe(true)
+    expect(wakePredicate?.(capturedPollInput.sessionID)).toBe(true)
+  })
+
   test("keeps task delegation enabled during prometheus sync continuation", async () => {
     //#given - a resumed prometheus session should keep plan-family task permission
     const promptAsyncCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
