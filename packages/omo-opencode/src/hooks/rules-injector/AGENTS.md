@@ -9,12 +9,22 @@
 ## HOW IT WORKS
 
 ```
-tool.execute.after (read/write/edit/multiedit)
-  → Extract file path from tool output
+tool.execute.before (read/write/edit/multiedit)
+  → Extract file path from tool args
   → Find rule files near that path (finder.ts)
   → Already injected this session? (cache.ts)
-  → Inject rule content into tool output (injector.ts)
+  → Register rule content with contextCollector (source: rules-injector,
+    priority: critical) so it reaches the model pre-decision via
+    experimental.chat.messages.transform
+tool.execute.after (fallback)
+  → Extract file path from tool output
+  → Same discovery; appends any not-yet-injected rules to tool output
 ```
+
+Pre-execution registration is the primary path (issue #2568): rules must be
+available before write/edit decisions, and must survive tool-output
+truncation/replacement. The shared session cache deduplicates between both
+paths.
 
 ## TRACKED TOOLS
 
