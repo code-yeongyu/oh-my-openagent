@@ -7,6 +7,18 @@ import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./t
 
 export interface GetMainSessionsOptions {
   directory?: string
+  includeArchived?: boolean
+}
+
+export interface GetAllSessionsOptions {
+  includeArchived?: boolean
+}
+
+export interface AllSessionsResult {
+  // Ordered active-first (recency within each group), then file-backed ids.
+  ids: string[]
+  // Archived ids among `ids`; empty when archived sessions were excluded.
+  archivedIds: Set<string>
 }
 
 // In multi-project server mode (opencode web / opencode serve) ctx.directory is the
@@ -53,7 +65,9 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
   const directory = normalizeProjectFilter(options.directory)
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkSessions = await getSdkMainSessions(sdkClient, directory)
+      const sdkSessions = await getSdkMainSessions(sdkClient, directory, {
+        includeArchived: options.includeArchived ?? false,
+      })
       const fileSessions = await getFileMainSessions(directory)
       return mergeSessionMetadataLists(sdkSessions, fileSessions)
     } catch (error) {
@@ -65,19 +79,29 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
   return getFileMainSessions(directory)
 }
 
-export async function getAllSessions(): Promise<string[]> {
+export async function getAllSessions(options: GetAllSessionsOptions = {}): Promise<AllSessionsResult> {
+  const includeArchived = options.includeArchived ?? false
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkSessionIds = await getSdkAllSessions(sdkClient)
+      const partition = await getSdkAllSessions(sdkClient)
       const fileSessionIds = await getFileAllSessions()
-      return mergeSessionIds(sdkSessionIds, fileSessionIds)
+      // Archived ids go after active ids so a bounded scan (MAX_SESSIONS_TO_SCAN)
+      // can never let archived sessions displace active ones from its window.
+      const ids = includeArchived
+        ? mergeSessionIds([...partition.active, ...partition.archived], fileSessionIds)
+        : mergeSessionIds(partition.active, fileSessionIds)
+      return {
+        ids,
+        archivedIds: includeArchived ? new Set(partition.archived) : new Set<string>(),
+      }
     } catch (error) {
       if (!shouldFallbackFromSdkError(error)) throw error
       log("[session-manager] falling back to file session ids after SDK unavailable error", { error: String(error) })
     }
   }
 
-  return getFileAllSessions()
+  const fileSessionIds = await getFileAllSessions()
+  return { ids: fileSessionIds, archivedIds: new Set<string>() }
 }
 
 export { getMessageDir } from "../../shared/opencode-message-dir"

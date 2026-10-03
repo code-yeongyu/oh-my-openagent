@@ -163,7 +163,7 @@ describe("session-manager storage fallback", () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
 
-    const sessionIds = await storage.getAllSessions()
+    const { ids: sessionIds } = await storage.getAllSessions()
 
     expect(sessionIds).toEqual(["ses_file"])
   })
@@ -177,7 +177,7 @@ describe("session-manager storage fallback", () => {
       ],
     }))
 
-    const sessionIds = await storage.getAllSessions()
+    const { ids: sessionIds } = await storage.getAllSessions()
 
     expect(sessionIds).toEqual(["ses_sdk", "ses_file"])
   })
