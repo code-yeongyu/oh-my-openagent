@@ -47,8 +47,20 @@ export function createModelFallbackStateController(input: {
   pendingModelFallbacks: Map<string, ModelFallbackStateLike>
   lastToastKey: Map<string, string>
   sessionFallbackChains: Map<string, FallbackEntry[]>
+  resolveUserConfiguredPrimary?: (agentName: string) => FallbackEntry | undefined
 }): ModelFallbackStateController {
-  const { pendingModelFallbacks, lastToastKey, sessionFallbackChains } = input
+  const { pendingModelFallbacks, lastToastKey, sessionFallbackChains, resolveUserConfiguredPrimary } = input
+
+  function prependDeduped(primary: FallbackEntry, chain: FallbackEntry[]): FallbackEntry[] {
+    const primaryKey = `${primary.providers[0]?.toLowerCase() ?? ""}/${primary.model.toLowerCase()}`
+    const alreadyPresent = chain.some((entry) =>
+      entry.providers.some(
+        (provider) => `${provider.toLowerCase()}/${entry.model.toLowerCase()}` === primaryKey,
+      ),
+    )
+    if (alreadyPresent) return chain
+    return [primary, ...chain]
+  }
 
   function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
     if (!sessionID) return
@@ -72,7 +84,15 @@ export function createModelFallbackStateController(input: {
   ): boolean {
     const agentKey = getAgentConfigKey(agentName)
     const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
-    const fallbackChain = sessionFallbackChains.get(sessionID) ?? requirements?.fallbackChain
+    const sessionChain = sessionFallbackChains.get(sessionID)
+    let fallbackChain = sessionChain ?? requirements?.fallbackChain
+
+    if (fallbackChain && !sessionChain && resolveUserConfiguredPrimary) {
+      const primary = resolveUserConfiguredPrimary(agentName)
+      if (primary) {
+        fallbackChain = prependDeduped(primary, fallbackChain)
+      }
+    }
 
     if (!fallbackChain?.length) {
       log(`[model-fallback] No fallback chain for agent: ${agentName} (key: ${agentKey})`)

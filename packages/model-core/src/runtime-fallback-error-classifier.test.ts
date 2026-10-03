@@ -178,6 +178,101 @@ describe("runtime fallback error classifier", () => {
     expect(retryable).toBe(false)
   })
 
+  test("classifies upstream gateway openai_error 400 as retryable fallback-to-next-model", () => {
+    //#given
+    const cases = [
+      {
+        label: "gateway 400 openai_error top-level",
+        error: {
+          name: "openai_error",
+          statusCode: 400,
+          message: "upstream gateway error: upstream channel failed",
+        },
+        expectedType: "upstream_gateway_error",
+        expectedRetryable: true,
+      },
+      {
+        label: "gateway 400 openai_error nested",
+        error: {
+          error: {
+            name: "openai_error",
+            statusCode: 400,
+            message: "upstream channel error",
+          },
+        },
+        expectedType: "upstream_gateway_error",
+        expectedRetryable: true,
+      },
+      {
+        label: "gateway 500 openai_error stays 5xx-retry-safe",
+        error: {
+          name: "openai_error",
+          statusCode: 500,
+          message: "upstream gateway error",
+        },
+        expectedType: "upstream_gateway_error",
+        expectedRetryable: true,
+      },
+      {
+        label: "openai_error without status stays non-retryable (conservative)",
+        error: {
+          name: "openai_error",
+          message: "upstream gateway error",
+        },
+        expectedType: "upstream_gateway_error",
+        expectedRetryable: false,
+      },
+    ] as const
+
+    //#when
+    const results = cases.map(({ error, ...metadata }) => ({
+      ...metadata,
+      actualType: classifyRuntimeFallbackError(error),
+      actualRetryable: isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES),
+    }))
+
+    //#then
+    for (const result of results) {
+      expect(result.actualType, result.label).toBe(result.expectedType)
+      expect(result.actualRetryable, result.label).toBe(result.expectedRetryable)
+    }
+  })
+
+  test("abort and context_overflow take precedence over upstream_gateway_error", () => {
+    //#given
+    const cases = [
+      {
+        label: "abort name wins over openai_error",
+        error: { name: "MessageAbortedError", statusCode: 400, message: "aborted" },
+        expectedType: "abort",
+        expectedRetryable: false,
+      },
+      {
+        label: "context_overflow wins over openai_error",
+        error: {
+          name: "ContextOverflowError",
+          statusCode: 400,
+          message: "context too large",
+        },
+        expectedType: "context_overflow",
+        expectedRetryable: false,
+      },
+    ] as const
+
+    //#when
+    const results = cases.map(({ error, ...metadata }) => ({
+      ...metadata,
+      actualType: classifyRuntimeFallbackError(error),
+      actualRetryable: isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES),
+    }))
+
+    //#then
+    for (const result of results) {
+      expect(result.actualType, result.label).toBe(result.expectedType)
+      expect(result.actualRetryable, result.label).toBe(result.expectedRetryable)
+    }
+  })
+
   test("extracts provider auto-retry signals from status summary or details", () => {
     //#given
     const retryInfo = {

@@ -1,0 +1,20 @@
+=== root bun test summary ===
+(fail) codex components doctor check > #given both a missing dist and missing sg #when checking components #then fail status wins and both surfaces report [5.84ms]
+ 15653 pass
+ 34 skip
+ 22 fail
+Ran 15709 tests across 2057 files. [261.75s]
+
+failing files (all pre-existing base-branch defects, none in changed scope):
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/claude-code-compat-core/src/features/claude-code-agent-loader/loader.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/features/claude-code-agent-loader/loader.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/features/opencode-skill-loader/loader.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/features/opencode-skill-loader/skill-content.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/hooks/auto-update-checker/checker.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/tools/delegate-task/skill-resolver.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-opencode/src/tools/delegate-task/tools.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/omo-senpi/src/components/memory/commands/doctor.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/skills-loader-core/src/features/opencode-skill-loader/loader-skill-lookup.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/skills-loader-core/src/features/opencode-skill-loader/skill-content-async-multiple.test.ts:
+/opt/dev-remote/my-dev/oh-my-openagent/.local-ignore/pr-gateway-fallback/packages/skills-loader-core/src/features/opencode-skill-loader/skill-content-async-resolution.test.ts:

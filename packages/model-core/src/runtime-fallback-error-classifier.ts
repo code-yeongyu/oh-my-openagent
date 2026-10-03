@@ -25,6 +25,7 @@ export type RuntimeFallbackErrorType =
   | "quota_exceeded"
   | "context_overflow"
   | "abort"
+  | "upstream_gateway_error"
 
 export interface RuntimeFallbackRetryOptions {
   onUnsafeRetryableSignalRejected?: (details: {
@@ -164,6 +165,10 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     return "quota_exceeded"
   }
 
+  if (errorName === "openaierror") {
+    return "upstream_gateway_error"
+  }
+
   return undefined
 }
 
@@ -184,6 +189,10 @@ export function isRuntimeFallbackRetryableError(
     errorType === "model_not_found" ||
     errorType === "quota_exceeded"
   ) {
+    return true
+  }
+
+  if (errorType === "upstream_gateway_error" && statusCode === 400) {
     return true
   }
 
