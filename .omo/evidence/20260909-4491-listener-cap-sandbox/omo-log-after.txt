@@ -1,0 +1,3 @@
+[2026-09-09T08:02:20.432Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/oqa-xdg.M0z1sr/proj"}
+[2026-09-09T08:02:36.475Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/oqa-xdg.M0z1sr/proj"}
+[2026-09-09T08:02:41.302Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/oqa-xdg.M0z1sr/proj"}
