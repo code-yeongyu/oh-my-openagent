@@ -125,4 +125,36 @@ describe("#given core skill tools are registered", () => {
     expect(createDelegateTask.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
     expect(createSkillMcpTool.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
   })
+
+  test("#when a cleanup delay is configured #then delegate task receives it", () => {
+    const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+    const factories = {
+      ...createFactories(() => fakeTool),
+      createDelegateTask,
+    }
+
+    createCoreTools({
+      ctx: unsafeTestValue({ directory: "/tmp/project", client: {} }),
+      pluginConfig: unsafeTestValue({
+        disabled_agents: ["multimodal-looker"],
+        background_task: { taskCleanupDelayMs: 120000 },
+      }),
+      managers: unsafeTestValue({
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+        modelFallbackControllerAccessor: {},
+      }),
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      factories,
+    })
+
+    expect(createDelegateTask.mock.calls[0]?.[0].taskCleanupDelayMs).toBe(120000)
+  })
 })
