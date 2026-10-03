@@ -1,0 +1,605 @@
+data: {"payload":{"id":"evt_03becdeae001nm4yJ3ftTKlO5P","type":"server.connected","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece29d001PiqMKGWdcMB4gA","type":"session.created","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","version":"1.18.23","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"New session - 2026-08-26T02:36:15.388Z","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711775388}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece29d001PiqMKGWdcMB4gA","type":"session.created.1","seq":0,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","version":"1.18.23","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"New session - 2026-08-26T02:36:15.388Z","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711775388}}}},"id":"evt_03bece29d001PiqMKGWdcMB4gA"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece3120014G6FV7YpgmgyXt","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"New session - 2026-08-26T02:36:15.388Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711775504}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece3120014G6FV7YpgmgyXt","type":"session.updated.1","seq":1,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"New session - 2026-08-26T02:36:15.388Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711775504}}}},"id":"evt_03bece3120014G6FV7YpgmgyXt"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece32a001fAwGoiY7xU1IkS","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece310001FH3jclSef6PxNc","role":"user","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece32a001fAwGoiY7xU1IkS","type":"message.updated.1","seq":2,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece310001FH3jclSef6PxNc","role":"user","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"}}}},"id":"evt_03bece32a001fAwGoiY7xU1IkS"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece58a001vG0KYP9OuYgdWb","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece5e8001KoaKHsSnDHTzlr","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"text","text":"QUESTION_RENDER_PROBE: delegate a sync task, then ask me a question.","messageID":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","id":"prt_03bece3190012gzdD5NPooROYN"},"time":1787711776232}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece5e8001KoaKHsSnDHTzlr","type":"message.part.updated.1","seq":3,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"text","text":"QUESTION_RENDER_PROBE: delegate a sync task, then ask me a question.","messageID":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","id":"prt_03bece3190012gzdD5NPooROYN"},"time":1787711776232}},"id":"evt_03bece5e8001KoaKHsSnDHTzlr"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece5ed001W5PVN8EZ38k2t5","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"New session - 2026-08-26T02:36:15.388Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711776236}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece5ed001W5PVN8EZ38k2t5","type":"session.updated.1","seq":4,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"New session - 2026-08-26T02:36:15.388Z","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711776236}}}},"id":"evt_03bece5ed001W5PVN8EZ38k2t5"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece5f6001CdP5nBOTlhW7FP","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece5fb0014T7pi6gss2Ccpb","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece5fb001QR8GOoApO9JOKB","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711776251},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece5fb0014T7pi6gss2Ccpb","type":"message.updated.1","seq":5,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece5fb001QR8GOoApO9JOKB","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711776251},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}},"id":"evt_03bece5fb0014T7pi6gss2Ccpb"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bece6ec001Sw8XRqUE13zNgq","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711776236}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bece6ec001Sw8XRqUE13zNgq","type":"session.updated.1","seq":6,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711776236}}}},"id":"evt_03bece6ec001Sw8XRqUE13zNgq"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03beceae1001JY5AzymoNs4NUv","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711777504}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03beceae1001JY5AzymoNs4NUv","type":"session.updated.1","seq":7,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711777504}}}},"id":"evt_03beceae1001JY5AzymoNs4NUv"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03beceae7001s5qG3IYeYbHm35","type":"session.diff","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","diff":[]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03beceae80017r0QicDGA29yGH","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","summary":{"diffs":[]}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03beceae80017r0QicDGA29yGH","type":"message.updated.1","seq":8,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","summary":{"diffs":[]}}}},"id":"evt_03beceae80017r0QicDGA29yGH"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec15001Sisw2YDub6D3eT","type":"plugin.added","properties":{"id":"core/config-reference"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec16001h4vHCmdEUm9l96","type":"plugin.added","properties":{"id":"agent"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec17001hxJw54Wu7LoPC1","type":"plugin.added","properties":{"id":"command"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec17002ahgTraBT2nvq8Q","type":"plugin.added","properties":{"id":"skill"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec1f001djWaBa6ybSNKf6","type":"plugin.added","properties":{"id":"models-dev"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec200011liW67O3awHhUg","type":"plugin.added","properties":{"id":"config-agent"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec21001zZsXfix0wtcnT2","type":"plugin.added","properties":{"id":"config-command"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec21002M57pbPgDx0eSwL","type":"plugin.added","properties":{"id":"config-skill"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec2200140rsM6jqsBT6fY","type":"plugin.added","properties":{"id":"alibaba"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec23001d4WFgQOjwTDz97","type":"plugin.added","properties":{"id":"amazon-bedrock"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec280016eJaExguhxW47V","type":"plugin.added","properties":{"id":"anthropic"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec29001Dud9GN3aDxqrkO","type":"plugin.added","properties":{"id":"azure-cognitive-services"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec49001T3O1T2Kvit9nIt","type":"plugin.added","properties":{"id":"azure"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4a001WMemosopLKr08e","type":"plugin.added","properties":{"id":"cerebras"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4a002wNqLks110h8kzL","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4b001hY0XL19rc0JjVa","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4b00263vVqkxDabNvTV","type":"plugin.added","properties":{"id":"cohere"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4c001ZUxFK5c930w656","type":"plugin.added","properties":{"id":"deepinfra"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4c002x5TQFWmxsmMPcM","type":"plugin.added","properties":{"id":"gateway"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4d001F6QiwS5tWEkTto","type":"plugin.added","properties":{"id":"github-copilot"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4e0012CSyhDYROe1ps9","type":"plugin.added","properties":{"id":"gitlab"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4f001YunBH783IFPoj0","type":"plugin.added","properties":{"id":"google"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec4f002gXy9kDWnPRArFZ","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec50001ZQNRSacG1KUtxi","type":"plugin.added","properties":{"id":"google-vertex"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec51001rD0KrTHXspRkoz","type":"plugin.added","properties":{"id":"groq"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec70001qGd3QIxfTyAiQP","type":"plugin.added","properties":{"id":"kilo"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec85001ztBkdX6Q02KUUH","type":"plugin.added","properties":{"id":"llmgateway"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec86001cfXozDs5PEsF8k","type":"plugin.added","properties":{"id":"mistral"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8700143BsBYQOJBjRHP","type":"plugin.added","properties":{"id":"nvidia"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec89001EpUGGzp6l253kK","type":"plugin.added","properties":{"id":"opencode"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8a001lmCg78pssYFV2N","type":"plugin.added","properties":{"id":"snowflake-cortex"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8a002obxyh8VWl83bvz","type":"plugin.added","properties":{"id":"openai-compatible"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8b001FmMc8plAun90Rl","type":"plugin.added","properties":{"id":"openai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8b002G1tTMMApwzuLHI","type":"plugin.added","properties":{"id":"openrouter"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8c001PmIbXlh220w9eM","type":"plugin.added","properties":{"id":"perplexity"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8c002Sv46TdqNiz0lHV","type":"plugin.added","properties":{"id":"sap-ai-core"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becec8c003o2TEkdKMh3IuPG","type":"plugin.added","properties":{"id":"togetherai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb0001tN7YXy6j20zbMR","type":"catalog.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb2001V6PxR8LO9fQ1hp","type":"plugin.added","properties":{"id":"vercel"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb3001UoYEkgg3IOfzOj","type":"plugin.added","properties":{"id":"venice"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb4001BCH3Wt5RPqC6hn","type":"plugin.added","properties":{"id":"xai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb4002RFeEe7oRL2Fh3x","type":"plugin.added","properties":{"id":"zenmux"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb5001CGmhF4v6LaNVY2","type":"plugin.added","properties":{"id":"dynamic-provider"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb8001Hbk0vURrWu0ZRz","type":"plugin.added","properties":{"id":"config-plugin"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb9001OLESNhfnPmNuQj","type":"plugin.added","properties":{"id":"config-provider"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedb9002iKZcjTZX8lvDWq","type":"plugin.added","properties":{"id":"variant"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedbb001GxoSWo2ffc04Lr","type":"reference.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becedef001dXAz76UM6nFpVg","type":"integration.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becee58001ha2yC6jpeq388S","type":"catalog.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becee600016NyyNb73DCpWwZ","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becee8e001kYbJ0xWDcIT3yP","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becee8d0011JnipauuJuijt6","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-start"},"time":1787711778446}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becee8e001kYbJ0xWDcIT3yP","type":"message.part.updated.1","seq":9,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becee8d0011JnipauuJuijt6","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-start"},"time":1787711778446}},"id":"evt_03becee8e001kYbJ0xWDcIT3yP"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becee93001c3t7fpiMWwi1WK","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becee930015n6HD4qMO6tJHl","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"tool","tool":"task","callID":"call_task_2","state":{"status":"pending","input":{},"raw":""}},"time":1787711778451}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becee93001c3t7fpiMWwi1WK","type":"message.part.updated.1","seq":10,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becee930015n6HD4qMO6tJHl","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"tool","tool":"task","callID":"call_task_2","state":{"status":"pending","input":{},"raw":""}},"time":1787711778451}},"id":"evt_03becee93001c3t7fpiMWwi1WK"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becee9d001UWQxVmUpW76KZH","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"task","callID":"call_task_2","state":{"status":"running","input":{"description":"qrp sync child","prompt":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else","subagent_type":"explore","run_in_background":false,"load_skills":[]},"time":{"start":1787711778461}},"id":"prt_03becee930015n6HD4qMO6tJHl","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","metadata":{"openai":{"itemId":"fc_2"}}},"time":1787711778461}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becee9d001UWQxVmUpW76KZH","type":"message.part.updated.1","seq":11,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"task","callID":"call_task_2","state":{"status":"running","input":{"description":"qrp sync child","prompt":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else","subagent_type":"explore","run_in_background":false,"load_skills":[]},"time":{"start":1787711778461}},"id":"prt_03becee930015n6HD4qMO6tJHl","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","metadata":{"openai":{"itemId":"fc_2"}}},"time":1787711778461}},"id":"evt_03becee9d001UWQxVmUpW76KZH"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becefba0016kOXTE1YZ5CF4d","type":"session.created","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","version":"1.18.23","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","model":{"id":"gpt-fake","providerID":"openai"},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711778745,"updated":1787711778745}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becefba0016kOXTE1YZ5CF4d","type":"session.created.1","seq":0,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","version":"1.18.23","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","model":{"id":"gpt-fake","providerID":"openai"},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711778745,"updated":1787711778745}}}},"id":"evt_03becefba0016kOXTE1YZ5CF4d"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becefec00136Wbpfy2gDs4TU","type":"tui.toast.show","properties":{"title":"New Task Executed","message":"Running (1):\n[RUN] qrp sync child (explore) - 0s ← NEW","variant":"info","duration":3000}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf0390017n0rCGRw3NQL5L","type":"session.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"time":{"created":1787711778745,"updated":1787711778871}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf0390017n0rCGRw3NQL5L","type":"session.updated.1","seq":1,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"time":{"created":1787711778745,"updated":1787711778871}}}},"id":"evt_03becf0390017n0rCGRw3NQL5L"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf043001OffkE87ARM0jtu","type":"message.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf03700148FeiMNop794V7","role":"user","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","time":{"created":1787711778871},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf043001OffkE87ARM0jtu","type":"message.updated.1","seq":2,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf03700148FeiMNop794V7","role":"user","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","time":{"created":1787711778871},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"}}}},"id":"evt_03becf043001OffkE87ARM0jtu"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf046001Odboi4kd6NlPfm","type":"message.part.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"type":"text","text":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else\n<!-- OMO_INTERNAL_INITIATOR -->","messageID":"msg_03becf03700148FeiMNop794V7","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","id":"prt_03becf042001zg7A76jDrdDEbq"},"time":1787711778886}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf046001Odboi4kd6NlPfm","type":"message.part.updated.1","seq":3,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"type":"text","text":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else\n<!-- OMO_INTERNAL_INITIATOR -->","messageID":"msg_03becf03700148FeiMNop794V7","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","id":"prt_03becf042001zg7A76jDrdDEbq"},"time":1787711778886}},"id":"evt_03becf046001Odboi4kd6NlPfm"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf048001f0w7JJwnX9V5eu","type":"session.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"time":{"created":1787711778745,"updated":1787711778888}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf048001f0w7JJwnX9V5eu","type":"session.updated.1","seq":4,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"time":{"created":1787711778745,"updated":1787711778888}}}},"id":"evt_03becf048001f0w7JJwnX9V5eu"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf04b001iYQBJw79uo4JEZ","type":"session.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1787711778745,"updated":1787711778890}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf04b001iYQBJw79uo4JEZ","type":"session.updated.1","seq":5,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1787711778745,"updated":1787711778890}}}},"id":"evt_03becf04b001iYQBJw79uo4JEZ"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf05100132qQ762h7OjNSg","type":"session.status","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf052001J7pNwcvwyxzHH9","type":"message.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf052001sR6xNqOBGfDHz0","parentID":"msg_03becf03700148FeiMNop794V7","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711778898},"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf052001J7pNwcvwyxzHH9","type":"message.updated.1","seq":6,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf052001sR6xNqOBGfDHz0","parentID":"msg_03becf03700148FeiMNop794V7","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711778898},"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7"}}},"id":"evt_03becf052001J7pNwcvwyxzHH9"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf06f001uXp86eouChohW6","type":"session.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1787711778745,"updated":1787711778927}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf06f001uXp86eouChohW6","type":"session.updated.1","seq":7,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1787711778745,"updated":1787711778927}}}},"id":"evt_03becf06f001uXp86eouChohW6"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf075001h5cq1I9KvwKFlp","type":"session.diff","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","diff":[]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf07a001NH66QqKyK0Io3E","type":"message.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"role":"user","time":{"created":1787711778871},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"},"id":"msg_03becf03700148FeiMNop794V7","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","summary":{"diffs":[]}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf07a001NH66QqKyK0Io3E","type":"message.updated.1","seq":8,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"role":"user","time":{"created":1787711778871},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"},"id":"msg_03becf03700148FeiMNop794V7","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","summary":{"diffs":[]}}}},"id":"evt_03becf07a001NH66QqKyK0Io3E"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf0e2001ULFvQUjPxciZ50","type":"session.status","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf0ed001MqPTgY2BneAmru","type":"message.part.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf0ed00196Th8zjmz41B17","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"step-start"},"time":1787711779053}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf0ed001MqPTgY2BneAmru","type":"message.part.updated.1","seq":9,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf0ed00196Th8zjmz41B17","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"step-start"},"time":1787711779053}},"id":"evt_03becf0ed001MqPTgY2BneAmru"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf0f30014xlgheuGsVZ91T","type":"message.part.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf0f1001EFnXL9JkiDEEPx","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"text","text":"","time":{"start":1787711779057},"metadata":{"openai":{"itemId":"msg_3"}}},"time":1787711779059}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf0f30014xlgheuGsVZ91T","type":"message.part.updated.1","seq":10,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf0f1001EFnXL9JkiDEEPx","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"text","text":"","time":{"start":1787711779057},"metadata":{"openai":{"itemId":"msg_3"}}},"time":1787711779059}},"id":"evt_03becf0f30014xlgheuGsVZ91T"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf0f7001vdDtfL4nz8gsr9","type":"message.part.delta","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","messageID":"msg_03becf052001sR6xNqOBGfDHz0","partID":"prt_03becf0f1001EFnXL9JkiDEEPx","field":"text","delta":"CHILD_RESULT_OK: verification finished cleanly"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf0f8001IwFzNS3ZPaudyd","type":"message.part.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf0f1001EFnXL9JkiDEEPx","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"text","text":"CHILD_RESULT_OK: verification finished cleanly","time":{"start":1787711779057,"end":1787711779064},"metadata":{"openai":{"itemId":"msg_3"}}},"time":1787711779064}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf0f8001IwFzNS3ZPaudyd","type":"message.part.updated.1","seq":11,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf0f1001EFnXL9JkiDEEPx","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"text","text":"CHILD_RESULT_OK: verification finished cleanly","time":{"start":1787711779057,"end":1787711779064},"metadata":{"openai":{"itemId":"msg_3"}}},"time":1787711779064}},"id":"evt_03becf0f8001IwFzNS3ZPaudyd"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf100001WLuACYPWXl2Bo1","type":"message.part.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf100001RbSR30tVq0KSng","reason":"stop","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711779072}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf100001WLuACYPWXl2Bo1","type":"message.part.updated.1","seq":12,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","part":{"id":"prt_03becf100001RbSR30tVq0KSng","reason":"stop","messageID":"msg_03becf052001sR6xNqOBGfDHz0","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711779072}},"id":"evt_03becf100001WLuACYPWXl2Bo1"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf107001zBzaDdwazn1AFU","type":"message.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf052001sR6xNqOBGfDHz0","parentID":"msg_03becf03700148FeiMNop794V7","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711778898,"completed":1787711779088},"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","finish":"stop"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf107001zBzaDdwazn1AFU","type":"message.updated.1","seq":13,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf052001sR6xNqOBGfDHz0","parentID":"msg_03becf03700148FeiMNop794V7","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711778898,"completed":1787711779088},"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","finish":"stop"}}},"id":"evt_03becf107001zBzaDdwazn1AFU"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf110001uurPbptRbXHZ1d","type":"message.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf052001sR6xNqOBGfDHz0","parentID":"msg_03becf03700148FeiMNop794V7","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711778898,"completed":1787711779088},"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","finish":"stop"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf110001uurPbptRbXHZ1d","type":"message.updated.1","seq":14,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"msg_03becf052001sR6xNqOBGfDHz0","parentID":"msg_03becf03700148FeiMNop794V7","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711778898,"completed":1787711779088},"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","finish":"stop"}}},"id":"evt_03becf110001uurPbptRbXHZ1d"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf114001v614M5Quyyhw4R","type":"session.status","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf11b00182PeW9nMk9TfRW","type":"session.status","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","status":{"type":"idle"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf11b002zBrimjlKYDIgno","type":"session.idle","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf120001QNUOVF5lHVkjA1","type":"session.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":10,"output":5,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1787711778745,"updated":1787711779103}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf120001QNUOVF5lHVkjA1","type":"session.updated.1","seq":15,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"id":"ses_fc4131046ffeNbUw70J3FpQjV7","slug":"stellar-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","parentID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","title":"qrp sync child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":10,"output":5,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1787711778745,"updated":1787711779103}}}},"id":"evt_03becf120001QNUOVF5lHVkjA1"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf123001fCxhGgTl5dL7ox","type":"session.diff","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","diff":[]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf124001m4Cr6FHH4ZTr34","type":"message.updated","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"role":"user","time":{"created":1787711778871},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03becf03700148FeiMNop794V7","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf124001m4Cr6FHH4ZTr34","type":"message.updated.1","seq":16,"aggregateID":"ses_fc4131046ffeNbUw70J3FpQjV7","data":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","info":{"role":"user","time":{"created":1787711778871},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03becf03700148FeiMNop794V7","sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7"}}},"id":"evt_03becf124001m4Cr6FHH4ZTr34"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf49c001kW5CsPOkSsCvt5","type":"session.status","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7","status":{"type":"idle"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf49d001YgwW8YJNma0FiN","type":"session.idle","properties":{"sessionID":"ses_fc4131046ffeNbUw70J3FpQjV7"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4aa001b6v8SQSniGIrpV","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"task","callID":"call_task_2","state":{"status":"completed","input":{"description":"qrp sync child","prompt":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else","subagent_type":"explore","run_in_background":false,"load_skills":[]},"output":"Task completed in 1s.\n\nAgent: explore\nModel: openai/gpt-fake\n\n---\n\nCHILD_RESULT_OK: verification finished cleanly\n\n<task_metadata>\nsession_id: ses_fc4131046ffeNbUw70J3FpQjV7\ntask_id: ses_fc4131046ffeNbUw70J3FpQjV7\nsubagent: explore\n</task_metadata>\n\nto continue: task(task_id=\"ses_fc4131046ffeNbUw70J3FpQjV7\", load_skills=[], run_in_background=false, prompt=\"...\")","metadata":{"truncated":false,"prompt":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else","agent":"explore","requested_subagent_type":"explore","load_skills":[],"description":"qrp sync child","run_in_background":false,"taskId":"ses_fc4131046ffeNbUw70J3FpQjV7","sessionId":"ses_fc4131046ffeNbUw70J3FpQjV7","sync":true,"spawnDepth":1,"model":{"providerID":"openai","modelID":"gpt-fake"}},"title":"qrp sync child","time":{"start":1787711778461,"end":1787711780010}},"metadata":{"openai":{"itemId":"fc_2"}},"id":"prt_03becee930015n6HD4qMO6tJHl","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03bece5fb001QR8GOoApO9JOKB"},"time":1787711780010}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4aa001b6v8SQSniGIrpV","type":"message.part.updated.1","seq":12,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"task","callID":"call_task_2","state":{"status":"completed","input":{"description":"qrp sync child","prompt":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else","subagent_type":"explore","run_in_background":false,"load_skills":[]},"output":"Task completed in 1s.\n\nAgent: explore\nModel: openai/gpt-fake\n\n---\n\nCHILD_RESULT_OK: verification finished cleanly\n\n<task_metadata>\nsession_id: ses_fc4131046ffeNbUw70J3FpQjV7\ntask_id: ses_fc4131046ffeNbUw70J3FpQjV7\nsubagent: explore\n</task_metadata>\n\nto continue: task(task_id=\"ses_fc4131046ffeNbUw70J3FpQjV7\", load_skills=[], run_in_background=false, prompt=\"...\")","metadata":{"truncated":false,"prompt":"QRP_CHILD_TASK: reply exactly CHILD_RESULT_OK and nothing else","agent":"explore","requested_subagent_type":"explore","load_skills":[],"description":"qrp sync child","run_in_background":false,"taskId":"ses_fc4131046ffeNbUw70J3FpQjV7","sessionId":"ses_fc4131046ffeNbUw70J3FpQjV7","sync":true,"spawnDepth":1,"model":{"providerID":"openai","modelID":"gpt-fake"}},"title":"qrp sync child","time":{"start":1787711778461,"end":1787711780010}},"metadata":{"openai":{"itemId":"fc_2"}},"id":"prt_03becee930015n6HD4qMO6tJHl","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03bece5fb001QR8GOoApO9JOKB"},"time":1787711780010}},"id":"evt_03becf4aa001b6v8SQSniGIrpV"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4ae001pLMePXupESL0qR","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becf4ad0013cj71q5Ffn0WNV","reason":"tool-calls","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711780014}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4ae001pLMePXupESL0qR","type":"message.part.updated.1","seq":13,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becf4ad0013cj71q5Ffn0WNV","reason":"tool-calls","messageID":"msg_03bece5fb001QR8GOoApO9JOKB","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711780014}},"id":"evt_03becf4ae001pLMePXupESL0qR"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4b000183FLfUYXcyHrDo","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece5fb001QR8GOoApO9JOKB","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711776251,"completed":1787711780022},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4b000183FLfUYXcyHrDo","type":"message.updated.1","seq":14,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece5fb001QR8GOoApO9JOKB","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711776251,"completed":1787711780022},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}},"id":"evt_03becf4b000183FLfUYXcyHrDo"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4b6001rpSJoipO5fhBt6","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece5fb001QR8GOoApO9JOKB","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711776251,"completed":1787711780022},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4b6001rpSJoipO5fhBt6","type":"message.updated.1","seq":15,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bece5fb001QR8GOoApO9JOKB","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711776251,"completed":1787711780022},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}},"id":"evt_03becf4b6001rpSJoipO5fhBt6"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4b8001pY3Ug7CKTZq2bX","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4b900131C1RmWKFXwFcC","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03becf4b9001h10F6KKJRJxAy5","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711780025},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4b900131C1RmWKFXwFcC","type":"message.updated.1","seq":16,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03becf4b9001h10F6KKJRJxAy5","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711780025},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}},"id":"evt_03becf4b900131C1RmWKFXwFcC"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4c8001Xv7ladwz90s9i7","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":10,"output":5,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711780039}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4c8001Xv7ladwz90s9i7","type":"session.updated.1","seq":17,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":10,"output":5,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711780039}}}},"id":"evt_03becf4c8001Xv7ladwz90s9i7"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4cd001TdWZ5Igo9Wuosq","type":"session.diff","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","diff":[]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf4d1001fbe3qB18ypsQCl","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf4d1001fbe3qB18ypsQCl","type":"message.updated.1","seq":18,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}},"id":"evt_03becf4d1001fbe3qB18ypsQCl"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf507001r0i1R2Ps6TSSn3","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf52f001kyHOHGyVaUsk7q","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becf52d001kUHYzGQ70qcdo3","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-start"},"time":1787711780141}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf52f001kyHOHGyVaUsk7q","type":"message.part.updated.1","seq":19,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becf52d001kUHYzGQ70qcdo3","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-start"},"time":1787711780141}},"id":"evt_03becf52f001kyHOHGyVaUsk7q"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf536001kbWoJ4qT9xJeQc","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becf536001LbOwMbVyf69DGe","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"tool","tool":"question","callID":"call_question_4","state":{"status":"pending","input":{},"raw":""}},"time":1787711780150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf536001kbWoJ4qT9xJeQc","type":"message.part.updated.1","seq":20,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03becf536001LbOwMbVyf69DGe","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"tool","tool":"question","callID":"call_question_4","state":{"status":"pending","input":{},"raw":""}},"time":1787711780150}},"id":"evt_03becf536001kbWoJ4qT9xJeQc"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf5450011xTJPqHrs2DxjN","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"question","callID":"call_question_4","state":{"status":"running","input":{"questions":[{"question":"Proceed with the implementation plan?","header":"Confirm","multiple":false,"options":[{"label":"Yes","description":"Start implementation"},{"label":"No","description":"Stop here"}]}]},"time":{"start":1787711780165}},"id":"prt_03becf536001LbOwMbVyf69DGe","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","metadata":{"openai":{"itemId":"fc_4"}}},"time":1787711780165}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03becf5450011xTJPqHrs2DxjN","type":"message.part.updated.1","seq":21,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"question","callID":"call_question_4","state":{"status":"running","input":{"questions":[{"question":"Proceed with the implementation plan?","header":"Confirm","multiple":false,"options":[{"label":"Yes","description":"Start implementation"},{"label":"No","description":"Stop here"}]}]},"time":{"start":1787711780165}},"id":"prt_03becf536001LbOwMbVyf69DGe","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","metadata":{"openai":{"itemId":"fc_4"}}},"time":1787711780165}},"id":"evt_03becf5450011xTJPqHrs2DxjN"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becf599002OQeZd2Sg66HWeY","type":"question.asked","properties":{"id":"que_03becf599001CXTh0PNzRcLnNe","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","questions":[{"question":"Proceed with the implementation plan?","header":"Confirm","options":[{"label":"Yes","description":"Start implementation"},{"label":"No","description":"Stop here"}],"multiple":false}],"tool":{"messageID":"msg_03becf4b9001h10F6KKJRJxAy5","callID":"call_question_4"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfac80014q36177ADOfPkg","type":"plugin.added","properties":{"id":"core/config-reference"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfac9001zqHAvLGyhEOdfN","type":"plugin.added","properties":{"id":"agent"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfac90022cqGY0hLg0w2XA","type":"plugin.added","properties":{"id":"command"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfac9003MM33440ZONMd2D","type":"plugin.added","properties":{"id":"skill"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfaca001UZgsBdPFt1RULR","type":"plugin.added","properties":{"id":"models-dev"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacb001JXnmRxRkphbraK","type":"plugin.added","properties":{"id":"config-agent"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacb0029JH4ZOe2286Q4q","type":"plugin.added","properties":{"id":"config-command"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacb003zrhGHFQj1YIz1T","type":"plugin.added","properties":{"id":"config-skill"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacb004l3qvHJFv2lmk6X","type":"plugin.added","properties":{"id":"alibaba"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacc001fysIKsV9MtJnZv","type":"plugin.added","properties":{"id":"amazon-bedrock"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacc002bcq4zIVgTXEJMA","type":"plugin.added","properties":{"id":"anthropic"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfacc003n9dxuppLaaOA4g","type":"plugin.added","properties":{"id":"azure-cognitive-services"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad8001g1WkyAhTjAXXVt","type":"plugin.added","properties":{"id":"azure"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad8002uInAhVlxpz0yrq","type":"plugin.added","properties":{"id":"cerebras"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad8003fbAETggQLORbdn","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad9001m3mZhy0oMNF373","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad9002B1doUxRRKz6Hg6","type":"plugin.added","properties":{"id":"cohere"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad9003yHQGQ552aeCUB0","type":"plugin.added","properties":{"id":"deepinfra"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad9004XjKCMpSCAWkWXW","type":"plugin.added","properties":{"id":"gateway"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfad9005QAvVPgUNF48p4R","type":"plugin.added","properties":{"id":"github-copilot"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfada001WuqV6YhxAA1lTs","type":"plugin.added","properties":{"id":"gitlab"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfadb001j0dGarscE2NKri","type":"plugin.added","properties":{"id":"google"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfadc001eto20nae57aWMc","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfadc002qL1ZLgXxiz6um9","type":"plugin.added","properties":{"id":"google-vertex"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfadc003cD0yM2RFV2WsD5","type":"plugin.added","properties":{"id":"groq"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfae0001xDmM2y4c06Iiuc","type":"plugin.added","properties":{"id":"kilo"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfae1001q7AC5XujSMS7Ou","type":"plugin.added","properties":{"id":"llmgateway"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfae1002xEDGsA01WXTnCy","type":"plugin.added","properties":{"id":"mistral"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfae1003RMpdCvIDtJN0XT","type":"plugin.added","properties":{"id":"nvidia"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfaf9001o0im0yfudmwXVs","type":"plugin.added","properties":{"id":"opencode"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafa0013TmlmFUbO661GZ","type":"plugin.added","properties":{"id":"snowflake-cortex"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafa0020RLQJRldt9pK3p","type":"plugin.added","properties":{"id":"openai-compatible"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafb001WHz2jwBiPW3L3a","type":"plugin.added","properties":{"id":"openai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafb0022mfIz7lcYTqyC4","type":"plugin.added","properties":{"id":"openrouter"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafb003q81j6AuBwsl0qV","type":"plugin.added","properties":{"id":"perplexity"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafb004m06OxuNM5XzGFz","type":"plugin.added","properties":{"id":"sap-ai-core"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfafb005nMksGZzduZ2Xjl","type":"plugin.added","properties":{"id":"togetherai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb63001xyJARLlNRqrxzK","type":"catalog.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb630021zyf1LM0SXetaY","type":"plugin.added","properties":{"id":"vercel"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb64001LXppE0P14gIeML","type":"plugin.added","properties":{"id":"venice"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb64002s3ReXwXjZlogt0","type":"plugin.added","properties":{"id":"xai"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb64003E6ijIcLSZjHtdN","type":"plugin.added","properties":{"id":"zenmux"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb64004Cpbt8640I7bM3Z","type":"plugin.added","properties":{"id":"dynamic-provider"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb66001mbqM6B0Rfdh5M5","type":"plugin.added","properties":{"id":"config-plugin"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb66002rdX73UovTFW6A1","type":"plugin.added","properties":{"id":"config-provider"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb66003S8YZJM8aPq5EoI","type":"plugin.added","properties":{"id":"variant"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfb66004h4HFCuAY3UlznX","type":"reference.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becfc57001AHO7hKLgknGrPX","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfc95001Vn21CkG95XKjDI","type":"integration.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","payload":{"id":"evt_03becfd25001pOKobQ7W1QHS9N","type":"catalog.updated","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becfd770015W6W40lYJcxJ6z","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becfe04001LOaHrVDNDYjgA6","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becfe7c001Kh7WBsOMwkAFkN","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becff01001pVgdvU8Q8Jzz4h","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03becff970014ecX7fR5LXlNjf","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0012001eBDDAt00BccmmI","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed00a6001v802hGLeiOIS1f","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0134001par7DPOMmveYJR","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed01b70016iwtzI3A331qBC","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed022d001Zu69fGgDxlp5gJ","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed02a10019QeImKjRmx6Y4q","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0320001bQ6TEFbl64bueJ","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0386001jcEI7ItOU5P10L","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed03f3001vQglVRkVCZ5hUG","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0460001cR6K3nmP7OBI7C","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed04d7001t55xtjgtmJiPJP","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0578001PZW8eDhEgslikl","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"payload":{"id":"evt_03bed05cf001VOqbsLnkaDTcYf","type":"server.heartbeat","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed05e3001yABUjHAx4GyU7p","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0653001RRK3Nfw03G8OCy","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed06db001ZhYYPQtMcliY7P","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0763001ywU77hYqre91Wm","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed07db001nGcplYNPu4zBQg","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0864001wT1SVx0AUuRxKT","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed090a001pJtpDyBI7KifZd","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed09810019d2I85RD6QANNJ","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0a14001C9yD0blds49Exm","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0a850010edDeX5M54XqJn","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0b00001OWBQycpovGHG5n","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0b70001O0aPaBz3NmbA92","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0beb001QNZx2xNkszYSHS","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0c7a001hR4xbybBvZI6Jh","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0cfd001CVka5YZ7mx4O2a","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0d7a001cBTAuKOqvvBoKX","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0dec001UZmzgTSJmg0LHS","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0e6c001VC1chrBNVPCnna","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0ee9001UwadkXQLiz0AKc","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0f5c001sc7ySf07H6K1DF","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed0fd8001gcmbb4TuNMV4yK","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1052001Y2fHTiAGLnU0VC","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed10bf001UT8jgXot3bVLea","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1139001yB7T5DcYT1wDOH","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed11b5001v0vrWa3fXsRcX6","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed122d001C6dK5WxszIkSsT","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed12ac001KAWUzCy1AlGN2o","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1326001AlwJG04eOAGBLY","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1394001AsD5EYRjqOtPnx","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1417001s9r8Kp2Zm8Vhqp","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1488001d3dzKyleYypaQn","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed1500001dD4AHDpASKH0RT","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.20","message":"Sisyphus on steroids is steering OpenCode.","variant":"info","duration":150}}}
+
+data: {"payload":{"id":"evt_03bed2cec001D3mkfHaRvekO71","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bed53fc0015vaY3dVU1xjyFN","type":"server.heartbeat","properties":{}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed6b5d001F2bspAgnrQtr9r","type":"tui.toast.show","properties":{"message":"The agent asked a question in session ses_fc4131d63ffe1n9Sq2kZj3kGUb and is waiting for your answer. If no question prompt is visible, reply to it as a normal chat message.","variant":"info","duration":10000}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed739f001m8uzI5CvyZeJ8E","type":"question.replied","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","requestID":"que_03becf599001CXTh0PNzRcLnNe","answers":[["Yes"]]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed73db001hCHYzN7ODjbKvH","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"question","callID":"call_question_4","state":{"status":"completed","input":{"questions":[{"question":"Proceed with the implementation plan?","header":"Confirm","multiple":false,"options":[{"label":"Yes","description":"Start implementation"},{"label":"No","description":"Stop here"}]}]},"output":"User has answered your questions: \"Proceed with the implementation plan?\"=\"Yes\". You can now continue with the user's answers in mind.","metadata":{"answers":[["Yes"]],"truncated":false},"title":"Asked 1 question","time":{"start":1787711780165,"end":1787711812571}},"metadata":{"openai":{"itemId":"fc_4"}},"id":"prt_03becf536001LbOwMbVyf69DGe","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03becf4b9001h10F6KKJRJxAy5"},"time":1787711812571}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed73db001hCHYzN7ODjbKvH","type":"message.part.updated.1","seq":22,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"type":"tool","tool":"question","callID":"call_question_4","state":{"status":"completed","input":{"questions":[{"question":"Proceed with the implementation plan?","header":"Confirm","multiple":false,"options":[{"label":"Yes","description":"Start implementation"},{"label":"No","description":"Stop here"}]}]},"output":"User has answered your questions: \"Proceed with the implementation plan?\"=\"Yes\". You can now continue with the user's answers in mind.","metadata":{"answers":[["Yes"]],"truncated":false},"title":"Asked 1 question","time":{"start":1787711780165,"end":1787711812571}},"metadata":{"openai":{"itemId":"fc_4"}},"id":"prt_03becf536001LbOwMbVyf69DGe","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03becf4b9001h10F6KKJRJxAy5"},"time":1787711812571}},"id":"evt_03bed73db001hCHYzN7ODjbKvH"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed73e70011pKwpcjTe2ec7U","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed73e6001ID2N4njLo5iVeC","reason":"tool-calls","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711812583}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed73e70011pKwpcjTe2ec7U","type":"message.part.updated.1","seq":23,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed73e6001ID2N4njLo5iVeC","reason":"tool-calls","messageID":"msg_03becf4b9001h10F6KKJRJxAy5","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711812583}},"id":"evt_03bed73e70011pKwpcjTe2ec7U"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed73ed001DbtAaLexStZ8tb","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03becf4b9001h10F6KKJRJxAy5","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711780025,"completed":1787711812601},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed73ed001DbtAaLexStZ8tb","type":"message.updated.1","seq":24,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03becf4b9001h10F6KKJRJxAy5","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711780025,"completed":1787711812601},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}},"id":"evt_03bed73ed001DbtAaLexStZ8tb"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed73f900131eLfqXhzffQIK","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03becf4b9001h10F6KKJRJxAy5","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711780025,"completed":1787711812601},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed73f900131eLfqXhzffQIK","type":"message.updated.1","seq":25,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03becf4b9001h10F6KKJRJxAy5","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711780025,"completed":1787711812601},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"tool-calls"}}},"id":"evt_03bed73f900131eLfqXhzffQIK"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed7402001zsLLbKiQJwLpr1","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed7409001p9Uh5Nwy6s4cGb","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bed740400149yimZ2BUXYafI","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711812617},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed7409001p9Uh5Nwy6s4cGb","type":"message.updated.1","seq":26,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bed740400149yimZ2BUXYafI","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711812617},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}},"id":"evt_03bed7409001p9Uh5Nwy6s4cGb"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed7428001uaR5Ay4AtYgtfv","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":20,"output":10,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711812647}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed7428001uaR5Ay4AtYgtfv","type":"session.updated.1","seq":27,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":20,"output":10,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711812647}}}},"id":"evt_03bed7428001uaR5Ay4AtYgtfv"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74320016Y0oZpKDfanC5b","type":"session.diff","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","diff":[]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74330011WeiQxHkMqqHAG","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74330011WeiQxHkMqqHAG","type":"message.updated.1","seq":28,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}},"id":"evt_03bed74330011WeiQxHkMqqHAG"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed748f001sbIYPE0i4nyZjy","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74b2001osrU5Iy2PaArfF","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74b2001TTIk1JMLhccu9L","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-start"},"time":1787711812786}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74b2001osrU5Iy2PaArfF","type":"message.part.updated.1","seq":29,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74b2001TTIk1JMLhccu9L","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-start"},"time":1787711812786}},"id":"evt_03bed74b2001osrU5Iy2PaArfF"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74b5001FPucZIHDsHptCw","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74b5001y6xf6ZbDwNyAqS","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"text","text":"","time":{"start":1787711812789},"metadata":{"openai":{"itemId":"msg_5"}}},"time":1787711812789}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74b5001FPucZIHDsHptCw","type":"message.part.updated.1","seq":30,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74b5001y6xf6ZbDwNyAqS","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"text","text":"","time":{"start":1787711812789},"metadata":{"openai":{"itemId":"msg_5"}}},"time":1787711812789}},"id":"evt_03bed74b5001FPucZIHDsHptCw"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74b80016rUuR7HPnAdKGp","type":"message.part.delta","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","messageID":"msg_03bed740400149yimZ2BUXYafI","partID":"prt_03bed74b5001y6xf6ZbDwNyAqS","field":"text","delta":"ALL_DONE_QRP"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74b8002Cz2GPDnxbMq3WV","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74b5001y6xf6ZbDwNyAqS","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"text","text":"ALL_DONE_QRP","time":{"start":1787711812789,"end":1787711812792},"metadata":{"openai":{"itemId":"msg_5"}}},"time":1787711812792}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74b8002Cz2GPDnxbMq3WV","type":"message.part.updated.1","seq":31,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74b5001y6xf6ZbDwNyAqS","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"text","text":"ALL_DONE_QRP","time":{"start":1787711812789,"end":1787711812792},"metadata":{"openai":{"itemId":"msg_5"}}},"time":1787711812792}},"id":"evt_03bed74b8002Cz2GPDnxbMq3WV"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74bd001OlP3RD3qchrb7g","type":"message.part.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74bd001dMg2MSHDm03kFw","reason":"stop","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711812797}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74bd001OlP3RD3qchrb7g","type":"message.part.updated.1","seq":32,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","part":{"id":"prt_03bed74bd001dMg2MSHDm03kFw","reason":"stop","messageID":"msg_03bed740400149yimZ2BUXYafI","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","type":"step-finish","tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787711812797}},"id":"evt_03bed74bd001OlP3RD3qchrb7g"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74c00013RZY026V6yAYSJ","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bed740400149yimZ2BUXYafI","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711812617,"completed":1787711812803},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"stop"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74c00013RZY026V6yAYSJ","type":"message.updated.1","seq":33,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bed740400149yimZ2BUXYafI","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711812617,"completed":1787711812803},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"stop"}}},"id":"evt_03bed74c00013RZY026V6yAYSJ"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74c3001H06BEOT5NL9QSO","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bed740400149yimZ2BUXYafI","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711812617,"completed":1787711812803},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"stop"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74c3001H06BEOT5NL9QSO","type":"message.updated.1","seq":34,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"msg_03bed740400149yimZ2BUXYafI","parentID":"msg_03bece310001FH3jclSef6PxNc","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/tmp/oqa-xdg.wrmEKV/proj","root":"/"},"cost":0,"tokens":{"total":15,"input":10,"output":5,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1787711812617,"completed":1787711812803},"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","finish":"stop"}}},"id":"evt_03bed74c3001H06BEOT5NL9QSO"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74c50011QS3kLdzYami5Z","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"busy"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74c7001Gm8rf4WVEs9lsz","type":"session.status","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","status":{"type":"idle"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74c70026MwWEtFqm7sk8n","type":"session.idle","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74c9001v0ySU96ulWMyXD","type":"session.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":30,"output":15,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711812809}}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74c9001v0ySU96ulWMyXD","type":"session.updated.1","seq":35,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"id":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","slug":"cosmic-nebula","projectID":"global","directory":"/tmp/oqa-xdg.wrmEKV/proj","path":"tmp/oqa-xdg.wrmEKV/proj","title":"qrp probe session","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.23","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":30,"output":15,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787711775388,"updated":1787711812809}}}},"id":"evt_03bed74c9001v0ySU96ulWMyXD"}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74cd001eX6j9UZZBlc40E","type":"session.diff","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","diff":[]}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"id":"evt_03bed74cf001ZJNApLfJFUXb5p","type":"message.updated","properties":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}}}
+
+data: {"directory":"/tmp/oqa-xdg.wrmEKV/proj","project":"global","payload":{"type":"sync","syncEvent":{"id":"evt_03bed74cf001ZJNApLfJFUXb5p","type":"message.updated.1","seq":36,"aggregateID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","data":{"sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb","info":{"role":"user","time":{"created":1787711775504},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"summary":{"diffs":[]},"id":"msg_03bece310001FH3jclSef6PxNc","sessionID":"ses_fc4131d63ffe1n9Sq2kZj3kGUb"}}},"id":"evt_03bed74cf001ZJNApLfJFUXb5p"}}
+
+data: {"payload":{"id":"evt_03bed7b2c001mEsg1PA6UAuVXr","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03beda266001PW9hs4xZJhhkq3","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bedc977001Oeti2eM6IhSAAi","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bedf087001EJViv91eFMJP61","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bee17ae001WnXez1ittyyew3","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bee3ef6001vY3BDYfGC6WIi4","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bee6624001rOC2FIRnaESgIk","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bee8d3e001Z3ne2HwG2HWkGT","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03beeb456001nRw3dzSs6JJv4t","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03beedb66001sddlfJhYR8nLXG","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bef02770014Uum1plpU666Sx","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bef298800116j1DobsVAgXuU","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bef50cb001IYhsfq4UjeBv5B","type":"server.heartbeat","properties":{}}}
+
+data: {"payload":{"id":"evt_03bef77dc001NVifFIb50raHrj","type":"server.heartbeat","properties":{}}}
