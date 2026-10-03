@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/lsp-core/src/lsp/connection-initialized-params.test.ts:
+111 | 		expect(initializedNotification["method"]).toBe("initialized");
+112 | 		expect("id" in initializedNotification).toBe(false);
+113 | 		// TypeScript 7 (typescript-go) UnmarshalParams rejects absent/null/scalar
+114 | 		// notification params; a dropped `initialized` leaves its session nil and the
+115 | 		// next document request crashes the server (#7165).
+116 | 		expect(isObjectOrArray(initializedNotification["params"])).toBe(true);
+                                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/viprix/projects/oom-wt-7165/packages/lsp-core/src/lsp/connection-initialized-params.test.ts:116:62)
+(fail) LspClientConnection initialize handshake wire contract > #given a strict language server that rejects params-less notifications #when the handshake runs #then initialized and didChangeConfiguration notifications carry object params in lifecycle order [29.83ms]
+
+ 1 pass
+ 1 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [474.00ms]
