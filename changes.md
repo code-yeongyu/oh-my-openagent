@@ -1,3 +1,11 @@
+## 2026-10-03 - Memory writes survive a Windows rename that a passing file hold refuses (#9471)
+
+On Windows, renaming a temporary file over a target that another handle holds open (a reader, the search indexer, an antivirus scan) fails with EPERM, EBUSY or EACCES, usually for a few milliseconds. The memory stack writes state atomically through that rename, so such a hold lost the write: `memory-core`'s transcript journal logged `memory bind-time reconcile failed` / `memory shutdown drain step failed` and left `state.json.tmp-<id>` behind. In the Windows task e2e, that diagnostic also landed in a killed child's stderr, so the kill classifier correctly read the exit as a crash and recorded `killed=false` (#9471, after #9228/#9387).
+
+`packages/memory-core/src/fs/rename-contention.ts` retries those three codes on win32 only, with a bounded backoff of about 0.8 s in total, and `fs/resilient.ts` routes the memory boundary's `rename` through it. Every atomic memory write gets the retry. POSIX keeps failing at once, because EPERM/EACCES there are real permission errors. `journal/store.ts` now removes the temporary state file when the rename finally fails, and takes an optional `renameFile` so a test can simulate a refused rename. The kill classifier is unchanged.
+
+`fs/rename-contention.test.ts` drives the retry with an injected rename and clock: two refusals then success; a refusal that never clears gives up after the budget; POSIX EPERM fails at once; ENOENT is not retried. `journal/store.test.ts` shows that a refused state rename rejects and leaves no temporary file; it fails on `dev`.
+
 ## 2026-10-03 - Adopt senpi 2026.10.3
 
 Every `@code-yeongyu/senpi` pin moves from 2026.10.2 to 2026.10.3: the root devDependency, `omo-native`, the `omo-senpi` and `senpi-task` peer and dev pins (with their `senpi-tui` and `senpi-ai` aliases), the pin tests and the engine named in `senpi-task`'s coverage test. The engine fixes MCP tools failing with `MCP server <name> is disabled` once a child session ends (#9461, senpi#2524 and senpi#2608); the generated plugin bundles are regenerated for it on Linux.
