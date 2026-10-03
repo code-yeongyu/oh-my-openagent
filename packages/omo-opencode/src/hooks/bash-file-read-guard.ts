@@ -2,7 +2,7 @@ import type { Hooks } from "@opencode-ai/plugin"
 
 import { log } from "../shared"
 
-const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
+export const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
 
 const FILE_READ_PATTERNS = [
   /^\s*cat\s+(?!-)[^\s|&;]+\s*$/,
@@ -15,6 +15,8 @@ function isSimpleFileReadCommand(command: string): boolean {
 }
 
 export function createBashFileReadGuardHook(): Hooks {
+  const pendingWarnings = new Set<string>()
+
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -33,11 +35,50 @@ export function createBashFileReadGuardHook(): Hooks {
         return
       }
 
-      output.message = WARNING_MESSAGE
+      pendingWarnings.add(input.callID)
 
       log("[bash-file-read-guard] warned on bash file read command", {
         sessionID: input.sessionID,
         command,
+      })
+    },
+    "tool.execute.after": async (
+      input: { tool: string; sessionID: string; callID: string; args: Record<string, unknown> },
+      output: { title: string; output: string; metadata: unknown },
+    ): Promise<void> => {
+      if (input.tool.toLowerCase() !== "bash") {
+        return
+      }
+
+      if (typeof output.output !== "string") {
+        return
+      }
+
+      let shouldWarn = pendingWarnings.has(input.callID)
+      if (shouldWarn) {
+        pendingWarnings.delete(input.callID)
+      } else {
+        const command = (input.args as Record<string, unknown> | undefined)?.command
+        if (typeof command === "string" && isSimpleFileReadCommand(command)) {
+          shouldWarn = true
+        }
+      }
+
+      if (!shouldWarn) {
+        return
+      }
+
+      if (output.output.includes(WARNING_MESSAGE)) {
+        return
+      }
+
+      output.output = `${WARNING_MESSAGE}\n\n${output.output}`
+
+      const commandForLog = (input.args as Record<string, unknown> | undefined)?.command
+      log("[bash-file-read-guard] appended warning to bash tool output", {
+        sessionID: input.sessionID,
+        callID: input.callID,
+        command: commandForLog,
       })
     },
   }
