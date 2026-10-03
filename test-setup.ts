@@ -13,6 +13,7 @@ import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-open
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
+import { installEnvironmentIntegrityCheck } from "./test-support/environment-integrity"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
 // out-of-band before `bun test`; mirror that here so fresh clones/worktrees pass too.
@@ -139,3 +140,5 @@ afterEach(() => {
     isGlobalMockCleanup = false
   }
 })
+
+installEnvironmentIntegrityCheck()
