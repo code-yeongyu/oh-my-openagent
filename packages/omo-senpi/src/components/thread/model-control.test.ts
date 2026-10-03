@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createThreadComponent } from "./component"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { createEngineSession, engineHost, type EngineModel as HarnessModel } from "./gateway/testing/engine-session"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
@@ -942,5 +943,51 @@ describe("#9429 the command path and the session's own observer share one store"
     await e.settle()
     await back
     expect(await e.recorded()).toMatchObject({ ...GPT_Y, provenance: "set", set_by: "user" })
+  })
+})
+
+/**
+ * The SDK over the pinned engine's own `setModel` and level clamp (`gateway/testing/engine-session.ts`),
+ * behind a host that answers like senpi's rpc host and the live surface: a switch senpi holds for a
+ * compaction, one it refuses, and a session it opens at a level the model cannot run.
+ */
+describe("#9425 set-model and create over the engine's own model code", () => {
+  const MODELS: readonly HarnessModel[] = [{ provider: "openai", id: "primary", levels: "xhigh" }, { provider: "openai", id: "candidate", levels: "xhigh" }, { provider: "openai", id: "capped", levels: "high" }]
+  function engineSdk(host?: (base: ThreadHost) => ThreadHost) {
+    const agentDir = scratch("thread-9429-setmodel-")
+    const store = createGatewayStore({ agentDir })
+    const engine = createEngineSession({ models: MODELS, initial: "primary", thinkingLevel: "high", handlers: () => new Map() })
+    const sessions = [engine]
+    const base = engineHost(MODELS, sessions)
+    const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: host === undefined ? base : host(base), store, modelProfile: () => ({ model_profile: "recommended" }) })
+    disposables.push(sdk)
+    const record = () => store.recordSessionModel({ now: Date.now(), durable_id: engine.durableId, model: { provider: "openai", id: "primary", thinking_level: "high", provenance: "set", set_by: "config", reason: null } })
+    return { engine, sessions, sdk, record }
+  }
+
+  test("#given a switch the engine holds for a compaction #when set-model runs #then it answers pending and models keeps naming the model in force", async () => {
+    const { engine, sdk, record } = engineSdk()
+    await record()
+    engine.verdicts.hold.add("candidate")
+    expect(await sdk.setModel({ thread: "lane-1", model: "candidate", set_by: "lead" })).toMatchObject({ kind: "ok", model: { id: "primary", set_by: "config" }, pending: { provider: "openai", id: "candidate" } })
+    expect(engine.session.model?.id).toBe("primary")
+    expect(await sdk.models({ thread: "lane-1" })).toMatchObject({ kind: "ok", current: { id: "primary", set_by: "config" } })
+  })
+
+  test("#given a switch the engine refuses after its model_select hook #when set-model runs #then it is unsupported with the engine's reason and nothing changes", async () => {
+    const { engine, sdk, record } = engineSdk()
+    await record()
+    engine.verdicts.refuse.add("candidate")
+    expect(await sdk.setModel({ thread: "lane-1", model: "candidate" })).toMatchObject({ kind: "error", error: { code: "unsupported", details: { model: "openai/candidate", reason: expect.stringContaining("does not fit candidate") } } })
+    expect(engine.session.model?.id).toBe("primary")
+    expect(await sdk.models({ thread: "lane-1" })).toMatchObject({ kind: "ok", current: { id: "primary", set_by: "config" } })
+  })
+
+  test("#given a host whose catalog names no thinking levels #when create asks for a level the model cannot run #then the record names the level the engine opened at", async () => {
+    const { sessions, sdk } = engineSdk((base) => ({ ...base, availableModels: async () => (await base.availableModels?.() ?? []).map(({ provider, id, name }) => ({ provider, id, ...(name === undefined ? {} : { name }) })) }))
+    const created = await sdk.create({ name: "capped-lane", model: "capped", thinking: "xhigh" })
+    expect(sessions.at(-1)?.session.thinkingLevel).toBe("high")
+    expect(created).toMatchObject({ kind: "ok", thread: { model: { id: "capped", thinking_level: "high" } } })
+    expect(await sdk.models({ thread: "capped-lane" })).toMatchObject({ kind: "ok", current: { id: "capped", thinking_level: "high" } })
   })
 })

@@ -1,4 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { engineHost, type EngineSession } from "../../omo-senpi/src/components/thread/gateway/testing/engine-session"
+import { createThreadSdk } from "../../omo-senpi/src/components/thread/sdk"
 
 import { loadThreadSdk, runThreadCommand, THREAD_EXIT } from "../bin/lib/thread.js"
 
@@ -125,38 +131,87 @@ describe("omo thread: argv to SDK calls", () => {
   })
 })
 
+/**
+ * Model control end to end: the CLI over the real thread SDK, a real gateway store in a scratch agent
+ * dir (each command opens and disposes its own, as `omo thread` does) and a host whose sessions run
+ * the pinned engine's own model and thinking-level code (omo-senpi `gateway/testing/engine-session.ts`).
+ * Assertions read the `--json` fields a connector consumes and the engine's own state.
+ */
+const MODELS = [
+  { provider: "openai", id: "primary", levels: "xhigh" },
+  { provider: "openai", id: "capped", levels: "high" },
+  { provider: "openai", id: "candidate", levels: "xhigh" },
+  { provider: "anthropic", id: "opus", levels: "high" },
+] as const
+
+function modelWorld() {
+  const agentDir = mkdtempSync(join(tmpdir(), "omo-thread-models-"))
+  const sessions: EngineSession[] = []
+  const host = engineHost(MODELS, sessions)
+  const importSdk = async () => ({ createThreadSdk: (options: Record<string, unknown>) => createThreadSdk({ ...(options as Parameters<typeof createThreadSdk>[0]), agentDir, host, modelProfile: () => ({ model_profile: "recommended" }) }) })
+  const cli = async (args: readonly string[]) => {
+    const result = await run(args, fakeSdk(), { importSdk, cwd: process.cwd() })
+    return { ...result, json: result.stdout.length > 0 && args.includes("--json") ? JSON.parse(result.stdout) : undefined }
+  }
+  return { cli, sessions, dispose: () => rmSync(agentDir, { recursive: true, force: true }) }
+}
+
 describe("omo thread: model control (#9425)", () => {
-  test("#given create with every model flag #when run #then the SDK creates with exactly them", async () => {
-    const result = await run(["create", "--name", "lane", "--cwd", "/repo", "--fork-from", "dur-1", "--provider", "openai", "--model", "gpt-x", "--thinking", "high", "--set-by", "config", "--json"])
-    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "create", request: { name: "lane", cwd: "/repo", fork_from: "dur-1", provider: "openai", model: "gpt-x", thinking: "high", set_by: "config" } })
+  test("#given create --cwd --fork-from and models --all-scope #when run #then the SDK request carries them", async () => {
+    const created = JSON.parse((await run(["create", "--cwd", "/repo", "--fork-from", "dur-1", "--json"])).stdout)
+    const models = JSON.parse((await run(["models", "lane", "--all-scope", "--json"])).stdout)
+    expect([created.request, models.request]).toEqual([{ cwd: "/repo", fork_from: "dur-1" }, { all_scope: true, thread: "lane" }])
   })
 
-  test("#given create with no model #when run #then the request names no model, so the SDK resolves auto", async () => {
-    const result = await run(["create", "--json"])
-    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "create", request: {} })
+  test("#given connected models #when create runs with model flags, then with none #then the engine opens on exactly that model, auto otherwise, and models reports what the record says", async () => {
+    const world = modelWorld()
+    try {
+      const set = await world.cli(["create", "--name", "lane", "--provider", "openai", "--model", "capped", "--thinking", "high", "--set-by", "config", "--json"])
+      expect({ exitCode: set.exitCode, model: set.json.thread.model }).toEqual({ exitCode: THREAD_EXIT.ok, model: { provider: "openai", id: "capped", thinking_level: "high", provenance: "set", set_by: "config", reason: null } })
+      expect({ model: world.sessions[0]?.session.model?.id, level: world.sessions[0]?.session.thinkingLevel }).toEqual({ model: "capped", level: "high" })
+      const auto = await world.cli(["create", "--json"])
+      expect(auto.json.thread.model).toMatchObject({ provenance: "auto", set_by: null })
+      expect(world.sessions[1]?.session.model?.id).toBe(auto.json.thread.model.id)
+      expect((await world.cli(["models", "lane", "--json"])).json.current).toEqual(set.json.thread.model)
+      expect((await world.cli(["models", "--provider", "anthropic", "--json"])).json.available.map((entry: { id: string }) => entry.id)).toEqual(["opus"])
+    } finally {
+      world.dispose()
+    }
   })
 
-  test("#given models, set-model and set-reasoning #when run #then each maps its positionals and flags", async () => {
-    const printed = [
-      JSON.parse((await run(["models", "--json"])).stdout),
-      JSON.parse((await run(["models", "lane", "--provider", "openai", "--all-scope", "--json"])).stdout),
-      JSON.parse((await run(["set-model", "lane", "openai/gpt-x", "--set-by", "lead", "--json"])).stdout),
-      JSON.parse((await run(["set-model", "lane", "gpt", "--provider", "openai", "--json"])).stdout),
-      JSON.parse((await run(["set-reasoning", "lane", "low", "--scope", "turn", "--json"])).stdout),
-    ]
-    expect(printed.map(({ method, request }) => ({ method, request }))).toEqual([
-      { method: "models", request: {} },
-      { method: "models", request: { all_scope: true, thread: "lane", provider: "openai" } },
-      { method: "setModel", request: { thread: "lane", model: "openai/gpt-x", set_by: "lead" } },
-      { method: "setModel", request: { thread: "lane", model: "gpt", provider: "openai" } },
-      { method: "setReasoning", request: { thread: "lane", level: "low", scope: "turn" } },
-    ])
+  test("#given a live thread #when set-model and set-reasoning run #then the engine switches and models reports the switch and who made it", async () => {
+    const world = modelWorld()
+    try {
+      await world.cli(["create", "--name", "lane", "--model", "openai/primary", "--json"])
+      const moved = await world.cli(["set-model", "lane", "opus", "--provider", "anthropic", "--set-by", "lead", "--json"])
+      expect({ exitCode: moved.exitCode, model: moved.json.model }).toMatchObject({ exitCode: THREAD_EXIT.ok, model: { provider: "anthropic", id: "opus", provenance: "set", set_by: "lead" } })
+      expect(world.sessions[0]?.session.model?.id).toBe("opus")
+      const level = await world.cli(["set-reasoning", "lane", "low", "--scope", "turn", "--json"])
+      expect(level.json).toMatchObject({ kind: "ok", level: "low", scope: "turn" })
+      expect(world.sessions[0]?.session.thinkingLevel).toBe("low")
+      expect((await world.cli(["models", "lane", "--json"])).json.current).toMatchObject({ provider: "anthropic", id: "opus", thinking_level: "low", set_by: "lead" })
+    } finally {
+      world.dispose()
+    }
   })
 
-  test("#given a refused set-model #when run with --json #then the refusal is on stdout with its details and the exit code is refused", async () => {
-    const refusal = { kind: "error", error: { code: "model_ambiguous", message: "m", next_action: "n", details: { candidates: ["openai/gpt-x", "openai/gpt-y"] } } }
-    const result = await run(["set-model", "lane", "gpt", "--json"], fakeSdk({ setModel: refusal }))
-    expect({ exitCode: result.exitCode, printed: JSON.parse(result.stdout) }).toEqual({ exitCode: THREAD_EXIT.refused, printed: refusal })
+  test("#given a refused set-model or set-reasoning #when run with --json #then the refusal is on stdout with its details, the exit code is refused, and neither the engine nor the record moves", async () => {
+    const world = modelWorld()
+    try {
+      await world.cli(["create", "--name", "lane", "--model", "capped", "--json"])
+      const before = (await world.cli(["models", "lane", "--json"])).json.current
+      const ambiguous = await world.cli(["set-model", "lane", "ca", "--json"])
+      expect({ exitCode: ambiguous.exitCode, error: ambiguous.json.error }).toMatchObject({ exitCode: THREAD_EXIT.refused, error: { code: "model_ambiguous", details: { candidates: ["openai/capped", "openai/candidate"] } } })
+      const unsupported = await world.cli(["set-reasoning", "lane", "xhigh", "--json"])
+      expect({ exitCode: unsupported.exitCode, error: unsupported.json.error }).toMatchObject({ exitCode: THREAD_EXIT.refused, error: { code: "thinking_level_unsupported", details: { supported: ["off", "minimal", "low", "medium", "high"] } } })
+      world.sessions[0]?.verdicts.refuse.add("candidate")
+      const refusedByEngine = await world.cli(["set-model", "lane", "openai/candidate", "--json"])
+      expect({ exitCode: refusedByEngine.exitCode, error: refusedByEngine.json.error }).toMatchObject({ exitCode: THREAD_EXIT.refused, error: { code: "unsupported", details: { model: "openai/candidate", reason: expect.stringContaining("does not fit candidate") } } })
+      expect({ model: world.sessions[0]?.session.model?.id, level: world.sessions[0]?.session.thinkingLevel }).toEqual({ model: "capped", level: before.thinking_level })
+      expect((await world.cli(["models", "lane", "--json"])).json.current).toEqual(before)
+    } finally {
+      world.dispose()
+    }
   })
 
   test("#given a created thread and a model listing #when printed for a person #then the model and its provenance are on the line", async () => {

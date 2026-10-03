@@ -215,7 +215,7 @@ export async function createThread(options: ThreadToolSurfaceOptions, current: T
   const session = await options.host.openSession({ ...opening, provider: entry.provider, modelId: entry.id, ...(thinking === undefined ? {} : { thinkingLevel: thinking }) })
   const thread = summary(session)
   const explicit = input.model !== undefined
-  const model: ThreadModel = { provider: entry.provider, id: entry.id, thinking_level: thinking ?? stateThinking(session), provenance: explicit ? "set" : "auto", set_by: explicit ? (input.set_by ?? defaults.set_by) : null, reason: null }
+  const model: ThreadModel = { provider: entry.provider, id: entry.id, thinking_level: stateThinking(session) ?? thinking ?? null, provenance: explicit ? "set" : "auto", set_by: explicit ? (input.set_by ?? defaults.set_by) : null, reason: null }
   await options.store.recordSessionModel({ now: (options.now ?? options.store.now)(), durable_id: thread.thread_id, model })
   return { kind: "ok", thread: { ...thread, model }, deduplicated: false }
 }
@@ -242,7 +242,16 @@ export async function setThreadModel(options: ThreadToolSurfaceOptions, current:
   // Without the running model there is nothing true to record: the set_model reply echoes the request even when the engine holds it.
   if (before === null) return failure("unsupported", "This host does not report the model its session runs.", "Upgrade the host, or switch the model inside the session.") as Failure
   const revisionBefore = (await options.store.sessionModelRecord(resolved.entry.thread_id))?.revision ?? null
-  const selected = await port.setModel(routingId(session), matched.entry.provider, matched.entry.id)
+  let selected: ModelRef
+  try {
+    selected = await port.setModel(routingId(session), matched.entry.provider, matched.entry.id)
+  } catch (error) {
+    // senpi's own refusal (a context the model cannot hold, a provider with no key; `live-surface.ts`
+    // maps the frame to `model_refused:`) is a refusal with the engine's reason, and nothing changed.
+    if (!(error instanceof Error) || !error.message.startsWith("model_refused:")) throw error
+    const reason = error.message.slice("model_refused:".length)
+    return failure("unsupported", `The session refused to switch to ${modelLabel(matched.entry)}: ${reason}`, "Choose another model from the available list, or compact the session first when its context does not fit.", { model: modelLabel(matched.entry), reason }) as Failure
+  }
   const requested: ModelRef = { provider: selected.provider, id: selected.id }
   const { row, reads, swappedFrom } = await persistEngineState(options, resolved.entry.thread_id, () => port.getState(routingId(session)), (read, current) => {
     // A read-back that names no model cannot confirm anything: the record is left as it is.

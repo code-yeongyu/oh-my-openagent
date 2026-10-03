@@ -22,6 +22,11 @@ function dataRecord(frame: RpcFrame, command: unknown): Record<string, unknown> 
   if (frame.success === false && command === "set_thinking_level" && typeof frame.error === "string" && /^Thinking level .+ is not supported by the active model\.$/.test(frame.error)) {
     throw new Error(`thinking_level_unsupported:${frame.error}`)
   }
+  // senpi's own refusals of a model switch (`AgentSession._setModel`): a context the model cannot hold
+  // (`ModelUsabilityBudgetError`) or a provider with no key. Anything else stays an RPC failure.
+  if (frame.success === false && command === "set_model" && typeof frame.error === "string" && /^(Model ".+" cannot (start|switch|resume): |No API key for )/.test(frame.error)) {
+    throw new Error(`model_refused:${frame.error}`)
+  }
   if (frame.success === false && frame.error === "unsupported") throw new Error(`unsupported:${String(command)}`)
   if (frame.success && frame.data === undefined && (command === "set_session_name" || command === "set_thinking_level")) return {}
   if (!frame.success || !record(frame.data)) throw new Error(`thread RPC request failed: ${JSON.stringify(frame.error ?? frame)}`)

@@ -118,7 +118,9 @@ a read-back still naming the model from before the switch is `pending` only when
 session's record in between (a switch that lands is recorded by the session itself, a held one is
 not); a session the gateway has no record of yet cannot show that, so there a switch replaced by a
 switch straight back reads as `pending`. A host whose state names no model is refused `unsupported`
-before anything switches. `--set-by` is recorded only on
+before anything switches. A switch the engine refuses (a context the model cannot hold, a provider
+with no key) is `unsupported` (exit 1) with `details.model` and `details.reason`, and nothing changes.
+`--set-by` is recorded only on
 the model this call asked for; a held or superseded switch leaves the running model's own record.
 A held switch that lands on a later turn is recorded with this call's `--set-by`; any switch that
 lands first (a `/model` in the session, a fallback) drops that choice.

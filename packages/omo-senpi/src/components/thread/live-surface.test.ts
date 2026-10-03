@@ -141,6 +141,22 @@ describe("live thread session-control RPCs", () => {
     })
   })
 
+  test.each([
+    'Model "alpha/alpha-tiny" cannot start: context window 1500 tokens is 50234 tokens short of the 51734-token minimum (system prompt 6469).',
+    'Model "alpha/alpha-mid" cannot switch: target context window 40000 tokens is 9000 tokens short of the 49000-token requirement (live context 30000). Compact the session, then revalidate and retry the model switch.',
+    "No API key for alpha/alpha-pro",
+  ])("set_model refusal frames from the engine become classified errors: %s", async (refusal) => {
+    await withRpc({ success: false, error: refusal }, async (surface) => {
+      await expect(surface.setModel("route-peer", "alpha", "alpha-tiny")).rejects.toThrow(/^model_refused:/)
+    })
+  })
+
+  test("unrelated set_model failures are not mislabeled as refusals", async () => {
+    await withRpc({ success: false, error: "Session not found" }, async (surface) => {
+      await expect(surface.setModel("route-peer", "alpha", "alpha-tiny")).rejects.toThrow(/^thread RPC request failed:/)
+    })
+  })
+
   test("unrelated set_thinking_level failures are not mislabeled as unsupported", async () => {
     await withRpc({ success: false, error: "Session not found" }, async (surface) => {
       expect(typeof surface.setThinkingLevel).toBe("function")
