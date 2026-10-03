@@ -1,0 +1,33 @@
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.20 pretest
+> npm run build --silent
+
+
+> @code-yeongyu/codex-lsp@5.0.0-beta.20 test
+> node scripts/test.mjs
+
+
+ RUN  v4.1.11 /home/viprix/projects/oom-wt-6304/packages/omo-codex/plugin/components/lsp
+
+
+ Test Files  6 passed (6)
+      Tests  29 passed (29)
+   Start at  04:19:46
+   Duration  788ms (transform 1.01s, setup 0ms, import 1.59s, tests 296ms, environment 1ms)
+
+✔ #given fresh daemon dist #when bootstrapping component #then local package link is created (98.153667ms)
+✔ #given client outputs are missing #when bootstrapping component #then daemon rebuild runs before linking (221.132365ms)
+✔ #given dist cli exists but required hook outputs are missing #when bootstrapping #then it rebuilds (199.530703ms)
+✔ #given package metadata is newer than required outputs #when bootstrapping #then it rebuilds (167.418107ms)
+✔ #given force flag #when bootstrapping #then it rebuilds even when dist exists (156.830089ms)
+✔ #given packaged dist without package metadata #when bootstrapping #then it uses bundled runtime (80.050438ms)
+✔ #given a built component runtime #when the manifest is inspected #then it pins sorted output hashes (10.861899ms)
+✔ #given a dist-only installed component #when output bytes are tampered #then validation fails actionably (54.799225ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 719.989608
