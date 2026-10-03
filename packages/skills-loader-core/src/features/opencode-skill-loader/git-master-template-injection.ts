@@ -1,6 +1,7 @@
 import type { GitMasterConfig } from "../../types"
 import { assertValidGitEnvPrefix } from "../../config/git-env-prefix"
 import { detectShellType, buildEnvPrefix, type ShellType } from "../../shared/shell-env"
+import { resolveGitAttribution, type GitAttributionCheckOptions } from "@oh-my-opencode/utils"
 
 const BASH_CODE_BLOCK_PATTERN = /```bash\r?\n([\s\S]*?)```/g
 const LEADING_GIT_COMMAND_PATTERN = /^([ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]+\s+)*)git(?=[ \t]|$)/gm
@@ -48,9 +49,15 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
  * Commit-identity contract: commits our tooling causes in a user's repository carry the
  * operator's own author/committer and never a GitHub-resolvable automation identity. The
  * body footer is opt-in (default off) and `include_co_authored_by` is a deprecated no-op.
+ * Env and Git-config overrides can still suppress or re-enable the footer.
  */
-export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
-	const commitFooter = config?.commit_footer ?? false
+export function injectGitMasterConfig(
+	template: string,
+	config?: GitMasterConfig,
+	options?: GitAttributionCheckOptions,
+): string {
+	const attribution = resolveGitAttribution(config, options)
+	const commitFooter = attribution.commitFooter
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
 	const shellType = detectShellType()
@@ -61,7 +68,10 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix, codeBlockLang) : template
 
 	if (commitFooter) {
-		const injection = buildCommitFooterInjection(commitFooter, shellPrefix)
+		const injection = buildCommitFooterInjection(
+			commitFooter === true ? true : commitFooter,
+			shellPrefix,
+		)
 		const insertionPoint = result.indexOf("```\n</execution>")
 
 		result =
