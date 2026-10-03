@@ -1,8 +1,8 @@
-import { describe, test, expect } from "bun:test"
-import { createSessionManagerTools } from "./tools"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { SessionInfo, SessionMessage, SearchResult, SessionMetadata, TodoItem } from "./types"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { createSessionManagerTools } from "./tools"
+import type { SearchResult, SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
@@ -160,6 +160,26 @@ describe("session-manager tools", () => {
     const result = await session_search.execute({ query: "test" }, mockContext)
     
     expect(typeof result).toBe("string")
+  })
+
+  test("session_search reports non-Error failures with object details", async () => {
+    //#given
+    const { session_search } = createSessionManagerTools(mockCtx, {
+      getAllSessions: (): Promise<string[]> =>
+        Promise.reject({
+          code: "SDK_SEARCH_FAILED",
+          message: "CJK query failed",
+          query: "配置 报错",
+        }),
+      setStorageClient: () => {},
+    })
+
+    //#when
+    const result = await session_search.execute({ query: "配置 报错" }, mockContext)
+
+    //#then
+    expect(result).toContain("CJK query failed")
+    expect(result).not.toContain("[object Object]")
   })
 
   test("session_search filters by session_id", async () => {
