@@ -1,0 +1,20 @@
+
+ oMoMoMoMo Doctor 
+
+ ⚠ 3 issues found:
+
+1. oh-my-openagent is not registered
+   Plugin entry is missing from OpenCode configuration.
+   Fix: Run: bunx oh-my-openagent install
+   Affects: all agents
+
+2. GitHub CLI not authenticated
+   gh CLI is installed but not logged in.
+   Fix: Run: gh auth login
+   Affects: GitHub automation
+
+3. Model cache not found
+   OpenCode model cache is missing, so model availability cannot be validated.
+   Fix: Run: opencode models --refresh
+   Affects: model resolution
+
