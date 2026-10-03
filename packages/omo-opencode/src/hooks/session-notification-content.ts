@@ -1,4 +1,5 @@
 import { normalizeSDKResponse } from "../shared"
+import { formatGatewayTelemetryLine, preferGatewayInferenceTelemetry } from "../shared/gateway-inference-telemetry"
 
 type ReadyNotificationContext = {
   client: {
@@ -23,6 +24,10 @@ type SessionMessage = {
   info?: {
     role?: string
     error?: unknown
+    cost?: number
+    modelID?: string
+    tokens_per_second?: number
+    usage?: Record<string, unknown>
   }
   parts?: SessionMessagePart[]
 }
@@ -133,13 +138,18 @@ export async function buildReadyNotificationContent(
   ])
 
   const lastUserText = collapseWhitespace(extractMessageText(findLastMessage(messages, "user")))
+  const lastAssistant = findLastMessage(messages, "assistant")
   const lastAssistantLine = getLastNonEmptyLine(
-    extractMessageText(findLastMessage(messages, "assistant")),
+    extractMessageText(lastAssistant),
   )
+  const gatewayLine = lastAssistant
+    ? formatGatewayTelemetryLine(preferGatewayInferenceTelemetry(lastAssistant))
+    : ""
 
   const detailLines = [
     lastUserText ? `User: ${lastUserText}` : "",
     lastAssistantLine ? `Assistant: ${lastAssistantLine}` : "",
+    gatewayLine,
   ].filter(Boolean)
 
   return {
