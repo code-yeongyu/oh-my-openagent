@@ -213,6 +213,9 @@ async function cleanupSenpiHost(child) {
   await waitForChildClose(child, 15_000)
 }
 
+/** The external-kill check proves a different, honest outcome per platform (#9471). */
+export const KILL_CHECK = process.platform === "win32" ? "external_termination_reports_unexpected_exit" : "kill_marks_error_killed_true"
+
 export async function runKillCheck(senpiBin) {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pk"), CHILD_STEPS_HANG, "drive the kill scenario")
@@ -222,7 +225,7 @@ export async function runKillCheck(senpiBin) {
       const seen = readRecordsLenient(stateDir).find((r) => r.name === "pk")
       const seenMessage = typeof seen?.error_message === "string" ? seen.error_message : ""
       return {
-        check: "kill_marks_error_killed_true",
+        check: KILL_CHECK,
         verdict: "FAIL",
         reason: "no running rpc child appeared to kill",
         facts: {
@@ -246,17 +249,20 @@ export async function runKillCheck(senpiBin) {
     } catch {
       // already gone counts as killed
     }
-    const errored = await waitForRecord(stateDir, (r) => r.task_id === running.task_id && r.status === "error" && r.killed === true, 15_000)
+    // POSIX: an external SIGKILL carries its signal, so the task records killed=true. Windows: an
+    // external TerminateProcess is a plain exit code 1, indistinguishable from a crash, and the runner
+    // never reads stderr to guess (#9471), so the task records an unexpected exit, killed=false.
+    const expectKilled = process.platform !== "win32"
+    const settled = await waitForRecord(stateDir, (r) => r.task_id === running.task_id && r.status === "error", 15_000)
     const latest = readRecords(stateDir).find((r) => r.task_id === running.task_id)
-    // When the classifier calls the exit a crash, the recorded error_message IS the child's stderr
-    // tail, so keep all of it, untruncated and line by line: the line that broke the kill
-    // classification must be visible, not guessed from a prefix.
     const errorMessage = typeof latest?.error_message === "string" ? latest.error_message : ""
+    const pass = settled !== undefined
+      && (expectKilled ? settled.killed === true : settled.killed !== true && errorMessage.startsWith("RPC child exited unexpectedly (exit code"))
     return {
-      check: "kill_marks_error_killed_true",
-      verdict: errored ? "PASS" : "FAIL",
-      ...(errored ? {} : { reason: "kill did not yield status=error killed:true" }),
-      facts: { pid: running.pid, killed: errored?.killed ?? false, status: latest?.status, recordedKilled: latest?.killed, error_message: errorMessage, error_message_lines: errorMessage.split("\n") },
+      check: KILL_CHECK,
+      verdict: pass ? "PASS" : "FAIL",
+      ...(pass ? {} : { reason: expectKilled ? "kill did not yield status=error killed:true" : "external termination did not yield status=error killed:false with an unexpected-exit message" }),
+      facts: { pid: running.pid, status: latest?.status, recordedKilled: latest?.killed, error_message: errorMessage, error_message_lines: errorMessage.split("\n") },
     }
   } finally {
     await cleanupSenpiHost(parent)

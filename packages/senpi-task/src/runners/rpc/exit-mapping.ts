@@ -8,79 +8,8 @@ export type ChildExitInput = {
   readonly error?: Error
   readonly pid?: number
   readonly stderr: string
-  /** Host platform; defaults to the running process. Injectable for tests. */
-  readonly platform?: NodeJS.Platform
-}
-
-/**
- * Exit code Windows reports for a process ended by `TerminateProcess` (which is
- * what Node's `process.kill`/`taskkill /F` become there).
- */
-const WINDOWS_TERMINATION_EXIT_CODE = 1
-/**
- * The sentence senpi's `startHostChildReaper` writes to stderr when Bun on Windows has no child
- * reaper (`packages/coding-agent/src/modes/rpc/child-reaper.ts`). Matched as source text: nothing else
- * a child writes is treated as this advisory.
- */
-const WINDOWS_BUN_REAPER_ADVISORY = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
-/** The shortest cut-short copy accepted at the very end of stderr, as #9347 already accepted it. */
-/** The advisory up to "until this": the shortest cut-short copy accepted even after a line end, as #9347 accepted it. */
-const WINDOWS_BUN_REAPER_ADVISORY_HEAD = WINDOWS_BUN_REAPER_ADVISORY.slice(
-  0,
-  WINDOWS_BUN_REAPER_ADVISORY.lastIndexOf(" until this") + " until this".length,
-)
-
-/**
- * True only when stderr is nothing but copies of the advisory sentence. Bun writes one copy per
- * terminated worker thread, and the handle classifies the last 4 KB of stderr, so:
- * - a copy may be split across lines at any point, and only that copy's own remaining words may
- *   follow it;
- * - when stderr fills the 4 KB tail, its first line may be any piece of a copy the tail cut, and that
- *   copy's remaining words must follow;
- * - the last copy may stop short: anywhere when the kill cut it mid-write (no line end after it),
- *   otherwise not before the advisory's head.
- * A line holding anything else - including the advisory's head followed by other text - makes the
- * exit a crash.
- */
-function hasOnlyWindowsStartupAdvisories(stderr: string): boolean {
-  const lines = stderr.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
-  const first = lines[0]
-  if (first === undefined) return false
-  let owed: string | undefined
-  let rest = lines
-  if (stderr.length >= STDERR_TAIL_CAP && !WINDOWS_BUN_REAPER_ADVISORY.startsWith(first)) {
-    const at = WINDOWS_BUN_REAPER_ADVISORY.indexOf(first)
-    if (at < 0) return false
-    owed = WINDOWS_BUN_REAPER_ADVISORY.slice(at + first.length).trim() || undefined
-    rest = lines.slice(1)
-  }
-  for (const line of rest) {
-    const expected = owed ?? WINDOWS_BUN_REAPER_ADVISORY
-    if (!expected.startsWith(line)) return false
-    owed = expected.slice(line.length).trim() || undefined
-  }
-  if (owed === undefined) return true
-  if (!/[\r\n]$/.test(stderr)) return true
-  const written = WINDOWS_BUN_REAPER_ADVISORY.slice(0, WINDOWS_BUN_REAPER_ADVISORY.length - owed.length).trimEnd()
-  return written.length >= WINDOWS_BUN_REAPER_ADVISORY_HEAD.length
-}
-
-/**
- * Windows has no POSIX signal provenance: an externally terminated child is
- * reported as a plain exit code with `signal === null`, indistinguishable by
- * signal alone from a self-inflicted crash. The one fact that still separates
- * them is stderr - a crashing child writes diagnostics before dying, while a
- * terminated one has no crash output. Bun can write a known child-reaper
- * advisory during startup; that advisory alone is not a crash diagnostic.
- * POSIX is unaffected: there a real kill always carries its signal.
- */
-function isWindowsExternalTermination(input: ChildExitInput, platform: NodeJS.Platform): boolean {
-  return (
-    platform === "win32"
-    && input.signal === null
-    && input.code === WINDOWS_TERMINATION_EXIT_CODE
-    && (input.stderr.trim().length === 0 || hasOnlyWindowsStartupAdvisories(input.stderr))
-  )
+  /** Set when the runner itself asked the child to stop (`terminate()`): the only source of a signal-less kill. */
+  readonly terminatedByRunner?: boolean
 }
 
 /** Keep only the last `cap` characters of a stderr buffer (default 4KB). */
@@ -90,8 +19,8 @@ export function tailStderr(stderr: string, cap: number = STDERR_TAIL_CAP): strin
 
 /**
  * Classify how a child process ended into a discriminated exit outcome. A
- * spawn error dominates; then exit-by-signal is `killed`; a zero code is
- * `clean`; any other code is `crashed`.
+ * spawn error dominates; then a runner-issued termination or an exit by signal
+ * is `killed`; a zero code is `clean`; any other code is `crashed`.
  */
 export function classifyChildExit(input: ChildExitInput): ChildExitOutcome {
   const facts: ChildExitFacts = {
@@ -103,7 +32,10 @@ export function classifyChildExit(input: ChildExitInput): ChildExitOutcome {
   if (input.error) {
     return { kind: "spawn_error", message: input.error.message, facts }
   }
-  if (input.signal !== null || isWindowsExternalTermination(input, input.platform ?? process.platform)) {
+  // A kill is either one the runner issued or one that carries its signal (POSIX). A signal-less exit the
+  // runner did not ask for (on Windows, TerminateProcess from outside) cannot be told from a crash, and
+  // stderr is never read to guess: teardown can write diagnostics into it (#9471).
+  if (input.terminatedByRunner === true || input.signal !== null) {
     return { kind: "killed", facts }
   }
   if (input.code === 0) {
@@ -133,7 +65,7 @@ export function mapExitOutcomeToError(
         killed: true,
         error_message:
           exit.signal === null
-            ? `RPC child terminated externally with exit code ${exit.code} (pid=${exit.pid ?? "unknown"})`
+            ? `RPC child was terminated by its runner (exit code ${exit.code}, pid=${exit.pid ?? "unknown"})`
             : `RPC child killed by signal ${exit.signal} (pid=${exit.pid ?? "unknown"})`,
         exit,
       }
@@ -141,7 +73,11 @@ export function mapExitOutcomeToError(
       return {
         status: "error",
         killed: false,
-        error_message: exit.stderrTail.trim() || `RPC child exited with code ${exit.code}`,
+        // A process exit (an exit code) gets the unexpected-exit lead line; a daemon session has no exit
+        // code and carries the host's own reason in the tail, which stays the whole message.
+        error_message: exit.code === null
+          ? exit.stderrTail.trim() || "RPC child ended unexpectedly"
+          : [`RPC child exited unexpectedly (exit code ${exit.code})`, exit.stderrTail.trim()].filter(Boolean).join("\n"),
         exit,
       }
     case "spawn_error":
