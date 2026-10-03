@@ -20,6 +20,7 @@ export function createPreemptiveCompactionHook(
   const compactedSessions = new Set<string>()
   const lastCompactionTime = new Map<string, number>()
   const tokenCache = new Map<string, CachedCompactionState>()
+  const contextLimitWarnedSessions = new Set<string>()
 
   const postCompactionMonitor = createPostCompactionDegradationMonitor({
     client: ctx.client,
@@ -42,6 +43,7 @@ export function createPreemptiveCompactionHook(
       compactionInProgress,
       compactedSessions,
       lastCompactionTime,
+      contextLimitWarnedSessions,
     })
   }
 
@@ -55,6 +57,7 @@ export function createPreemptiveCompactionHook(
         compactedSessions.delete(sessionID)
         lastCompactionTime.delete(sessionID)
         tokenCache.delete(sessionID)
+        contextLimitWarnedSessions.delete(sessionID)
         postCompactionMonitor.clear(sessionID)
       }
       return
