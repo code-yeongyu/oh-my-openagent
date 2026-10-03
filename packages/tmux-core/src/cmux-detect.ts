@@ -10,5 +10,6 @@ export function isCmuxCompatEnvironment(
 ): boolean {
 	const tmuxEnvironment = environment.TMUX
 	return tmuxEnvironment?.includes("cmuxterm") === true ||
+		tmuxEnvironment?.includes("cmux-omo") === true ||
 		(Boolean(environment.CMUX_SOCKET_PATH) && !tmuxEnvironment)
 }
