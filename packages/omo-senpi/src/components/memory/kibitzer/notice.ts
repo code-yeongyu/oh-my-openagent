@@ -45,8 +45,10 @@ export interface KibitzerGateRecord {
 export interface KibitzerUnavailableRecord {
   readonly version: 1
   readonly category: string
-  readonly cause: "category_unavailable" | "beyond_category"
+  readonly cause: "category_unavailable" | "beyond_category" | "pin_unserved"
   readonly missingProviders?: readonly string[]
+  /** `pin_unserved`: the bare model id the category pins, which no connected provider serves. */
+  readonly pinnedModel?: string
 }
 
 // Both renderers are fail-closed: a record that does not match the producer contract draws
@@ -106,6 +108,7 @@ export const renderKibitzerUnavailableEntry: EntryRenderer<unknown> = (entry, op
   if (typeof record.category !== "string") return undefined
   const category = normalizeRendererText(record.category).slice(0, UNAVAILABLE_CATEGORY_MAX_CHARS)
   if (category.length === 0) return undefined
+  if (record.cause === "pin_unserved") return renderUnservedPin(category, record.pinnedModel, options, theme)
   if (record.cause !== "category_unavailable" && record.cause !== "beyond_category") return undefined
   const providers = unavailableProviders(record.missingProviders)
   if (providers === undefined) return undefined
@@ -125,6 +128,29 @@ export const renderKibitzerUnavailableEntry: EntryRenderer<unknown> = (entry, op
     why,
     extra: fixes,
     detail: "Kibitzer is pinned to the memory.recall.category chain on purpose: an advisor reading the live transcript must never land on a frontier-priced model outside it.",
+  }, options, theme)
+}
+
+/** A bare category pin no connected provider serves (#9503): name the pin and the setting, not the chain. */
+function renderUnservedPin(
+  category: string,
+  pinnedModel: unknown,
+  options: Parameters<typeof renderKibitzerUnavailableEntry>[1],
+  theme: Parameters<typeof renderKibitzerUnavailableEntry>[2],
+): ReturnType<typeof renderKibitzerUnavailableEntry> {
+  if (typeof pinnedModel !== "string") return undefined
+  const pin = normalizeRendererText(pinnedModel).slice(0, UNAVAILABLE_CATEGORY_MAX_CHARS)
+  if (pin.length === 0) return undefined
+  return noticeComponent({
+    glyph: "⚠",
+    title: joinFields(["Kibitzer unavailable", category]),
+    tone: "warning",
+    why: `categories.${category}.model is "${pin}", and no connected provider serves that model, so recalled-memory judging is off; it resumes by itself once one does.`,
+    extra: [
+      { text: `connect a provider that serves ${pin} (run /login <provider>)`, tone: "dim" as const },
+      { text: `or set categories.${category}.model to a model a connected provider serves, e.g. <provider>/${pin}`, tone: "dim" as const },
+    ],
+    detail: "A model id without a provider runs on whichever connected provider serves it.",
   }, options, theme)
 }
 

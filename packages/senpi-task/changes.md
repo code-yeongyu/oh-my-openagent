@@ -1,3 +1,9 @@
+## 2026-10-03 - A bare category model pin runs on whichever connected provider serves it (#9503)
+
+`category/resolver.ts` `resolveCategory` passed a user's `categories.<name>.model` through unqualified when it named no provider (`deepseek-v4-flash`), and `parseModel` then refused it, so the category was `model_unavailable` for task children and for the memory/Kibitzer resolver even while a connected provider served that model. A bare `fallback_models` entry, and a bare id in a model profile, already meant "this model, from whichever connected provider serves it".
+
+A bare primary pin and bare fallback entries are now qualified with `qualifyBareModel` (new in `delegate-core`, the same `fuzzyMatchModel` match model profiles use): the first connected provider, in the registry's own order, whose catalog matches the id (an exact model id beats a longer id that contains it). A reasoning suffix (`deepseek-v4-flash high`) stays on the qualified id. A provider-qualified pin is used as written and never moved to another provider; a bare pin no connected provider serves stays unavailable, named as written.
+
 ## 2026-10-03 - Task tool wording stops naming few-read investigations and small foreground children as delegation targets (#9499)
 
 - `src/tools/task/description.ts`: the run_in_background guideline is "Spawn children with run_in_background=true." The deleted clause ("pass false only for a short child whose result gates your very next call") contradicted the GPT-6 preset's foreground rule and named a small child as a routine spawn; `run_in_background=false` stays documented in the tool description body.

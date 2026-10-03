@@ -207,6 +207,7 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       ...(configuration.missingProviders === undefined
         ? {}
         : { missingProviders: configuration.missingProviders.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), UNAVAILABLE_PROVIDER_MAX_CHARS)) }),
+      ...(configuration.pinnedModel === undefined ? {} : { pinnedModel: capped(redactKibitzerEventText(configuration.pinnedModel), WAKE_MODEL_MAX_CHARS) }),
     }
     try {
       options.appendEntry(UNAVAILABLE_ENTRY_TYPE, record)

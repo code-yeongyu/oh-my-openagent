@@ -283,3 +283,50 @@ describe("createKibitzerSidecarChildStarter", () => {
     expect(starts).toBe(0)
   })
 })
+
+// #9503: a bare pin means the model from whichever connected provider serves it, as in model profiles.
+describe("resolveKibitzerSidecarModel with a bare category pin", () => {
+  const bare: OmoConfig = { categories: { quick: { model: "deepseek-v4-flash" } } }
+  const catalog = (models: readonly SenpiModelPort[]) => ({
+    getAvailable: () => models,
+    find: (provider: string, modelId: string) => models.find((candidate) => candidate.provider === provider && candidate.id === modelId),
+  })
+
+  test("#given a bare pin a connected provider serves #when resolved #then the sidecar runs that provider's model", () => {
+    // when
+    const resolution = resolveKibitzerSidecarModel({ config: bare, registry: catalog([{ provider: "opencode-go", id: "deepseek-v4-flash" }]) })
+
+    // then
+    expect(resolution).toMatchObject({ kind: "resolved", category: "quick", model: "opencode-go/deepseek-v4-flash" })
+  })
+
+  test("#given a bare pin no connected provider serves #when resolved #then the refusal names the pin, with or without another usable model", () => {
+    // when
+    const otherModelConnected = resolveKibitzerSidecarModel({ config: bare, registry: catalog([{ provider: "zai", id: "glm-5.3-flash" }]) })
+    const nothingConnected = resolveKibitzerSidecarModel({ config: bare, registry: catalog([]) })
+
+    // then
+    for (const resolution of [otherModelConnected, nothingConnected]) {
+      expect(resolution).toEqual({ kind: "unavailable", category: "quick", cause: "pin_unserved", pinnedModel: "deepseek-v4-flash" })
+    }
+  })
+
+  test("#given a provider-qualified pin no connected provider serves #when resolved #then it is not reported as a bare-pin refusal", () => {
+    // when
+    const resolution = resolveKibitzerSidecarModel({
+      config: { categories: { quick: { model: "deepseek/deepseek-v4-flash" } } },
+      registry: catalog([{ provider: "zai", id: "glm-5.3-flash" }]),
+    })
+
+    // then
+    expect(resolution.kind === "unavailable" ? resolution.cause : resolution.kind).not.toBe("pin_unserved")
+  })
+
+  test("#given a bare-pin refusal at child start #when classified #then it is a configuration state carrying the pin", () => {
+    // given
+    const error = new KibitzerSidecarStartError("pin_unserved", "Kibitzer sidecar model unavailable: quick (pin_unserved)", { category: "quick", pinnedModel: "deepseek-v4-flash" })
+
+    // when / then
+    expect(kibitzerConfigurationFailure(error)).toEqual({ category: "quick", cause: "pin_unserved", pinnedModel: "deepseek-v4-flash" })
+  })
+})

@@ -21,8 +21,10 @@ export type KibitzerWakeFailureCause = "child_failed" | "child_failed_upstream" 
 /** Why the pinned recall category cannot serve a model, and which providers a connection would fix. */
 export interface KibitzerWakeConfiguration {
   readonly category: string
-  readonly cause: "category_unavailable" | "beyond_category"
+  readonly cause: "category_unavailable" | "beyond_category" | "pin_unserved"
   readonly missingProviders?: readonly string[]
+  /** `pin_unserved`: the bare model id no connected provider serves. */
+  readonly pinnedModel?: string
 }
 
 export type KibitzerWakeEnd =

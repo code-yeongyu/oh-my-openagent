@@ -98,5 +98,6 @@ function recordConfiguration(configuration: KibitzerWakeConfiguration | undefine
     ...(configuration.missingProviders === undefined
       ? {}
       : { missingProviders: configuration.missingProviders.slice(0, WAKE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), WAKE_PROVIDER_MAX_CHARS)) }),
+    ...(configuration.pinnedModel === undefined ? {} : { pinnedModel: capped(redactKibitzerEventText(configuration.pinnedModel), WAKE_MODEL_MAX_CHARS) }),
   }
 }

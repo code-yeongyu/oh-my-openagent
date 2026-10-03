@@ -1,4 +1,5 @@
 import {
+  qualifyBareModel,
   resolveModelForDelegateTask,
   type DelegateFallbackEntry,
 } from "@oh-my-opencode/delegate-core"
@@ -49,6 +50,8 @@ type ModelSelectionInput = {
 
 type AvailableModelsParseResult = {
   readonly models: readonly string[]
+  /** The same models in the registry's own order: a bare pin's provider tie-break (#9503). */
+  readonly registryOrder: readonly string[]
   readonly validContainer: boolean
 }
 
@@ -249,9 +252,10 @@ function getOwnRecordValue<TValue>(
 
 export function parseAvailableModels(models: unknown): AvailableModelsParseResult {
   if (!Array.isArray(models)) {
-    return { models: [], validContainer: false }
+    return { models: [], registryOrder: [], validContainer: false }
   }
-  return { models: models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
+  const registryOrder = models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel)
+  return { models: [...registryOrder].sort(), registryOrder, validContainer: true }
 }
 
 function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
@@ -384,13 +388,15 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const canonicalChain = config.models !== undefined && config.models.length > 0
     ? categoryModelCandidates(config)
     : undefined
+  const qualify = (model: string): string => qualifyBareModel(model, availableModelsResult.registryOrder)
   const canonicalReasoningByModel = new Map(
-    (canonicalChain ?? []).map((candidate) => [candidate.model, candidate.reasoningEffort]),
+    (canonicalChain ?? []).map((candidate) => [qualify(candidate.model), candidate.reasoningEffort]),
   )
-  const userModel = canonicalChain !== undefined ? canonicalChain[0].model : userConfig?.model
-  const userFallbackModels = canonicalChain !== undefined
+  const pinnedModel = canonicalChain !== undefined ? canonicalChain[0].model : userConfig?.model
+  const userModel = pinnedModel === undefined ? undefined : qualify(pinnedModel)
+  const userFallbackModels = (canonicalChain !== undefined
     ? canonicalChain.slice(1).map((candidate) => candidate.model)
-    : flattenFallbackModels(config.fallback_models)
+    : flattenFallbackModels(config.fallback_models))?.map(qualify)
   const resolution = resolveModelForDelegateTask(
     {
       userModel,

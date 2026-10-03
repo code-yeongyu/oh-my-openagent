@@ -315,6 +315,31 @@ describe("kibitzer diagnostic streak notice", () => {
     expect(f.warnings).toEqual([])
   })
 
+  test("#given repeated bare-pin refusals #when observed #then one notice names the pin and every wake record carries it, outside the diagnostic streak", async () => {
+    // given
+    const f = await fixture()
+    const configuration = { category: "quick", cause: "pin_unserved" as const, pinnedModel: "deepseek-v4-flash" }
+    const refusal = (wake: number): KibitzerWakeOutcome => outcome({
+      wake,
+      status: "failed",
+      cause: "start_failed",
+      reason: "Kibitzer sidecar model unavailable: quick (pin_unserved)",
+      diagnostic: false,
+      configuration,
+    })
+
+    // when
+    for (const wake of [1, 2, 3, 4]) f.observe.onWake(refusal(wake), f.context)
+    await f.idle()
+
+    // then
+    expect(f.gates()).toEqual([])
+    const notices = f.entries.filter((entry) => entry.customType === "omo-kibitzer:unavailable")
+    expect(notices.map((notice) => notice.data)).toEqual([{ version: 1, category: "quick", cause: "pin_unserved", pinnedModel: "deepseek-v4-flash" }])
+    const recorded = await f.wakes(SESSION_ID)
+    expect(recorded.map((record) => record.configuration)).toEqual(Array.from({ length: 4 }, () => configuration))
+  })
+
   test("#given consecutive category-configuration refusals #when observed #then no gate notice fires, exactly one actionable unavailable notice is appended per session, and the diagnostic streak is neither fed nor reset", async () => {
     const f = await fixture()
     // The builtin quick chain's twelve unconnected providers (resolver order) plus a user-extended tail:

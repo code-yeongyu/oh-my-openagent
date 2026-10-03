@@ -31,7 +31,7 @@ import type { AnyKibitzerSidecarTool } from "./tools/result"
 
 export const KIBITZER_SIDECAR_DEFAULT_CATEGORY = "quick"
 
-export type KibitzerSidecarModelUnavailableCause = "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category"
+export type KibitzerSidecarModelUnavailableCause = "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category" | "pin_unserved"
 
 export type KibitzerSidecarModelResolution =
   | {
@@ -48,6 +48,8 @@ export type KibitzerSidecarModelResolution =
     readonly cause: KibitzerSidecarModelUnavailableCause
     /** The category chain's providers with no connection, when the resolver knew them. */
     readonly missingProviders?: readonly string[]
+    /** `pin_unserved`: the bare model id the category pins, which no connected provider serves. */
+    readonly pinnedModel?: string
   }
 
 export interface KibitzerSidecarModelInput {
@@ -62,6 +64,12 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
   const category = input.category ?? KIBITZER_SIDECAR_DEFAULT_CATEGORY
   if (input.registry === undefined) return { kind: "unavailable", category, cause: "registry_snapshot_unavailable" }
   const resolution = resolveReflectionModel(category, input.config, input.registry)
+  // A bare pin resolves on whichever connected provider serves it (#9503), so a category that still
+  // did not resolve in-category means no connected provider serves it: name that pin, not the chain.
+  const bare = barePin(category, input.config)
+  if (bare !== undefined && (resolution.kind === "category_unavailable" || resolution.source !== undefined)) {
+    return { kind: "unavailable", category, cause: "pin_unserved", pinnedModel: bare }
+  }
   if (resolution.kind === "category_unavailable") {
     return {
       kind: "unavailable",
@@ -99,6 +107,12 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
     fallbacks: chosen.fallbacks,
     chain: childModelChainSpec({ model: chosen.model, fallbacks: chosen.fallbacks }),
   }
+}
+
+/** The category's own model pin when it names no provider (`deepseek-v4-flash`, not `opencode-go/...`). */
+function barePin(category: string, config: OmoConfig): string | undefined {
+  const pin = config.categories?.[category]?.model?.trim()
+  return pin !== undefined && pin.length > 0 && !pin.includes("/") ? pin : undefined
 }
 
 /** The category chain's unconnected providers, when the chain failed for exactly that reason. */
@@ -167,17 +181,20 @@ export class KibitzerSidecarStartError extends Error {
   readonly category?: string
   /** The category chain's providers with no connection, when the resolver knew them. */
   readonly missingProviders?: readonly string[]
+  /** The unserved bare model id a `pin_unserved` refusal names. */
+  readonly pinnedModel?: string
 
   constructor(
     code: KibitzerSidecarStartCode,
     message: string,
-    options?: { readonly cause?: unknown; readonly category?: string; readonly missingProviders?: readonly string[] },
+    options?: { readonly cause?: unknown; readonly category?: string; readonly missingProviders?: readonly string[]; readonly pinnedModel?: string },
   ) {
     super(message, options)
     this.name = "KibitzerSidecarStartError"
     this.code = code
     if (options?.category !== undefined) this.category = options.category
     if (options?.missingProviders !== undefined) this.missingProviders = options.missingProviders
+    if (options?.pinnedModel !== undefined) this.pinnedModel = options.pinnedModel
   }
 }
 
@@ -189,8 +206,11 @@ export class KibitzerSidecarStartError extends Error {
  */
 export function kibitzerConfigurationFailure(error: unknown): KibitzerWakeConfiguration | undefined {
   if (!(error instanceof KibitzerSidecarStartError)) return undefined
-  if (error.code !== "category_unavailable" && error.code !== "beyond_category") return undefined
   if (error.category === undefined) return undefined
+  if (error.code === "pin_unserved") {
+    return error.pinnedModel === undefined ? undefined : { category: error.category, cause: "pin_unserved", pinnedModel: error.pinnedModel }
+  }
+  if (error.code !== "category_unavailable" && error.code !== "beyond_category") return undefined
   return {
     category: error.category,
     cause: error.code,
@@ -235,6 +255,7 @@ export function createKibitzerSidecarChildStarter(
       throw new KibitzerSidecarStartError(resolution.cause, `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`, {
         category: resolution.category,
         ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
+        ...(resolution.pinnedModel === undefined ? {} : { pinnedModel: resolution.pinnedModel }),
       })
     }
     let systemPrompt: string

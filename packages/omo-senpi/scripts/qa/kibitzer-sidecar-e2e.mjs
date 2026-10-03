@@ -92,15 +92,20 @@ import {
   writeOmoConfig,
 } from "./kibitzer-sidecar-support.mjs"
 
-export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "cjk-auto", "query-expansion"]
+export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "bare-pin", "bare-pin-unserved", "cjk-auto", "query-expansion"]
 /** The pinned model the refused-pinned-model provider refuses, and the builtin quick rung it falls back to. */
 const REFUSED_MODEL = "refused-1"
 const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
+/** A bare pin (no provider) that no connected provider serves (#9503). */
+const UNSERVED_BARE_PIN = "not-served-1"
 /** Scenario-specific omo config on top of the lane's defaults; `{}` categories kills the recall chain. */
 const CONFIG = {
   "category-unavailable": { categories: {} },
   "refused-pinned-model": { categories: { quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` } } },
   "query-expansion": { recall: { query_expansion: true } },
+  // #9503: a bare id runs on whichever connected provider serves it; only omo-mock serves mock-1.
+  "bare-pin": { categories: { quick: { description: "QA bare pin", model: "mock-1" } } },
+  "bare-pin-unserved": { categories: { quick: { description: "QA bare pin nobody serves", model: UNSERVED_BARE_PIN } } },
 }
 /** A search whose own words match no seeded memory; only the added terms reach the helm memory. */
 const WIDENED_SEARCH = {
@@ -426,7 +431,12 @@ async function runContextReseed({ session, state, identity, router, facts, paren
 
 // ---- category-unavailable ------------------------------------------------------------------------------------
 
-async function runCategoryUnavailable({ session, state, identity, router, facts, parentTurns, record }) {
+/** The dead-chain notice the category-unavailable scenario expects. */
+const deadChainNotice = (notice) => notice?.cause === "category_unavailable" || notice?.cause === "beyond_category"
+/** The bare-pin notice: names the pin no connected provider serves (#9503). */
+const unservedPinNotice = (notice) => notice?.cause === "pin_unserved" && notice?.pinnedModel === UNSERVED_BARE_PIN
+
+async function runCategoryUnavailable({ session, state, identity, router, facts, parentTurns, record }, acceptsNotice = deadChainNotice) {
   const pending = pendingFile(identity, state.sessionId)
   router.setParentSteps(Array.from({ length: MAX_REFUSAL_TURNS + 2 }, () => ({ type: "text", text: "Checking." })))
   // The sidecar script is never consumed: no child can be started at all while the chain is dead.
@@ -459,7 +469,7 @@ async function runCategoryUnavailable({ session, state, identity, router, facts,
   const notice = notices[0]?.data
   record(
     "one-unavailable-notice",
-    notices.length === 1 && notice?.version === 1 && notice?.category === "quick" && (notice?.cause === "category_unavailable" || notice?.cause === "beyond_category"),
+    notices.length === 1 && notice?.version === 1 && notice?.category === "quick" && acceptsNotice(notice),
     `notices=${notices.length} data=${JSON.stringify(notice ?? null)}`,
   )
   record("no-gate-escalation", entries.filter(isGate).length === 0, `gateEntries=${entries.filter(isGate).length} refusals=${records.length}`)
@@ -471,6 +481,7 @@ async function runCategoryUnavailable({ session, state, identity, router, facts,
     childGenerations: lineage === undefined ? 0 : childTranscripts(lineage.dir).length,
     refusals: records.length,
     refusalCause: records[0]?.configuration?.cause,
+    refusalPin: records[0]?.configuration?.pinnedModel,
     missingProviders: records[0]?.configuration?.missingProviders,
     unavailableNotices: notices.length,
     gateNotices: entries.filter(isGate).length,
@@ -523,6 +534,34 @@ async function runRefusedPinnedModel({ session, state, identity, router, facts, 
     nudged: nudgedPaths(entries).length,
     parentRequests: parentTurns(),
   }
+}
+
+// ---- bare-pin -----------------------------------------------------------------------------------------------------
+
+async function runBarePin({ session, state, identity, router, facts, parentTurns, record }) {
+  const recallDir = join(identity, "runtime", "recall")
+  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+  router.setSidecarSteps([nudgeStep(MEMORIES.rollout)])
+
+  await prompt(session, MEMORIES.rollout.prompt)
+  const settled = await watchUntil(recallDir, () => {
+    const lineage = sidecarDirs(identity)[0]
+    const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
+    return records.length === 0 ? undefined : { lineage, records }
+  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "bare-pin wake 1: the wake settled" })
+  const wake = settled.records[0]
+  record("bare-pin-ran-on-serving-provider", wake?.status === "completed" && wake?.model === "omo-mock/mock-1" && wake?.diagnostic === false, `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })}`)
+  if (wake?.status !== "completed") {
+    facts.result = { wakeStatus: wake?.status, wakeCause: wake?.cause, wakeModel: wake?.model, sidecarRequests: router.state.sidecar, parentRequests: parentTurns() }
+    return
+  }
+  const held = await waitForAccepted(identity, state, MEMORIES.rollout, { description: "bare-pin: accepted nudge" })
+  record("nudge-accepted", held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path, `held=${JSON.stringify(held)}`)
+  await prompt(session, MEMORIES.rollout.prompt)
+  const entries = readEntries(state.sessionFile)
+  record("nudge-reached-parent", nudgedPaths(entries).join(",") === MEMORIES.rollout.path, `paths=${nudgedPaths(entries).join(",")}`)
+  record("no-unavailable-notice", entries.filter(isUnavailable).length === 0 && entries.filter(isGate).length === 0, `unavailable=${entries.filter(isUnavailable).length} gate=${entries.filter(isGate).length}`)
+  facts.result = { wakeStatus: wake.status, wakeModel: wake.model, nudged: nudgedPaths(entries).length, unavailableNotices: entries.filter(isUnavailable).length, sidecarRequests: router.state.sidecar, parentRequests: parentTurns() }
 }
 
 // ---- cjk-auto -----------------------------------------------------------------------------------------------------
@@ -594,7 +633,7 @@ async function runQueryExpansion({ session, state, identity, router, facts, pare
   }
 }
 
-const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
+const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "bare-pin": runBarePin, "bare-pin-unserved": (context) => runCategoryUnavailable(context, unservedPinNotice), "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
 
 // ---- main --------------------------------------------------------------------------------------------------------
 

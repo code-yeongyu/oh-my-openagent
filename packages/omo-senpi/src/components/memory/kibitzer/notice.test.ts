@@ -204,6 +204,20 @@ describe("kibitzer unavailable notice", () => {
     expect(rendered).toContain("/login")
   })
 
+  test("#given a bare-pin record #when rendered #then the notice names the pin and the setting it came from, and how to fix it", () => {
+    // given
+    const record: KibitzerUnavailableRecord = { version: 1, category: "quick", cause: "pin_unserved", pinnedModel: "deepseek-v4-flash" }
+
+    // when
+    const rendered = renderKibitzerUnavailableEntry(entry(record), { expanded: false }, theme)?.render(160).join("\n")
+
+    // then
+    expect(rendered).toContain("⚠")
+    expect(rendered).toContain("deepseek-v4-flash")
+    expect(rendered).toContain("categories.quick.model")
+    expect(rendered).toContain("/login")
+  })
+
   test("#given a malformed stored record #when rendered #then nothing is drawn", () => {
     for (const data of [
       undefined,
@@ -214,6 +228,8 @@ describe("kibitzer unavailable notice", () => {
       { version: 1, category: "", cause: "category_unavailable" },
       { version: 1, category: "quick", cause: "start_failed" },
       { version: 1, category: "quick", cause: "category_unavailable", missingProviders: "openai" },
+      { version: 1, category: "quick", cause: "pin_unserved" },
+      { version: 1, category: "quick", cause: "pin_unserved", pinnedModel: "" },
     ]) {
       expect(renderKibitzerUnavailableEntry(entry(data), { expanded: false }, theme)).toBeUndefined()
     }
