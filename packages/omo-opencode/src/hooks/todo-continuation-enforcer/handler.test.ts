@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createTodoContinuationHandler } from "./handler"
+import { MAX_CONSECUTIVE_FAILURES } from "./constants"
 import type { ContinuationProgressUpdate, SessionStateStore } from "./session-state"
 import type { SessionState } from "./types"
 
@@ -145,5 +146,89 @@ describe("createTodoContinuationHandler", () => {
     // then
     expect(state.unrecoverableErrorDetected).toBeUndefined()
     expect(cancelCalls).toEqual([])
+  })
+
+  test("#given an accepted continuation #when a retryable provider error arrives #then it advances the continuation failure streak", async () => {
+    // given
+    const sessionID = "ses_retryable_continuation_error"
+    const { state, store } = createRecordingStateStore()
+    state.awaitingPostInjectionProgressCheck = true
+    const handler = createTodoContinuationHandler({
+      ctx: {} as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await handler({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "APIError",
+              data: { message: "service unavailable", statusCode: 503, isRetryable: true },
+            },
+          },
+        },
+      })
+    }
+
+    // then
+    expect(state.consecutiveProviderFailures).toBe(MAX_CONSECUTIVE_FAILURES)
+    expect(state.consecutiveFailures).toBe(1)
+  })
+
+  test("#given an accepted continuation reaches the provider failure limit #when the session becomes idle #then it does not inject another continuation", async () => {
+    // given
+    const sessionID = "ses_provider_failure_limit_through_handler"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    state.awaitingPostInjectionProgressCheck = true
+    state.countdownStartedAt = undefined
+    state.countdownTimer = undefined
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          todo: async () => ({
+            data: [{ id: "todo-1", content: "Ship", status: "pending", priority: "high" }],
+          }),
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/test",
+    }
+    const handler = createTodoContinuationHandler({
+      ctx: ctx as never,
+      sessionStateStore: store,
+    })
+
+    try {
+      // when
+      for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+        await handler({
+          event: {
+            type: "session.error",
+            properties: {
+              sessionID,
+              error: {
+                name: "APIError",
+                data: { message: "service unavailable", statusCode: 503, isRetryable: true },
+              },
+            },
+          },
+        })
+      }
+      await handler({ event: { type: "session.idle", properties: { sessionID } } })
+
+      // then
+      expect(state.consecutiveProviderFailures).toBe(MAX_CONSECUTIVE_FAILURES)
+      expect(cancelCalls).toEqual([])
+      expect(state.countdownStartedAt).toBeUndefined()
+    } finally {
+      store.cancelCountdown(sessionID)
+    }
   })
 })
