@@ -1,6 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { callDiagnosticsViaDaemon } from "@code-yeongyu/lsp-daemon/client";
 import { collectPostEditDiagnostics, type PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
@@ -104,7 +104,10 @@ export async function runLspPostToolUseHook(
 	runDiagnostics: DiagnosticsRunner = runLspDiagnosticsText,
 ): Promise<string> {
 	const sessionId = sessionIdFrom(input);
-	const filePaths = extractMutatedFilePaths(input);
+	const filePaths = extractMutatedFilePaths(input).filter((filePath) => {
+		const pathFromCwd = relative(process.cwd(), resolve(filePath));
+		return pathFromCwd !== ".." && !pathFromCwd.startsWith(`..${sep}`) && !isAbsolute(pathFromCwd);
+	});
 	if (filePaths.length === 0) return "";
 
 	const cache = readLspPostEditCache(sessionId);
