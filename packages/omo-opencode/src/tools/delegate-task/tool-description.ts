@@ -68,7 +68,7 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
   - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
   - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
 
-  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+  **DO NOT provide both.** Providing both will cause an error.
 
   - load_skills: Optional. Defaults to [] when omitted. Pass ["skill-1", "skill-2"] for skill-specific tasks.
   - category: Use predefined category → Spawns Sisyphus-Junior with category config
