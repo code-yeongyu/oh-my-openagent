@@ -274,4 +274,40 @@ describe("validatePluginConfig", () => {
       ])
     })
   })
+
+  // regression: issue #8104 — installer/migration writes a mixed models[] chain
+  // (string primary + object fallbacks). Doctor used to treat `agents.*.models`
+  // as an unknown key even though the published schema declares it.
+  it("#given installer-shaped mixed agents.*.models #when validating the user layer #then the chain is known and materializes", () => {
+    withOmoConfig("installer-agent-models", (fixture) => {
+      const installerModels = [
+        "opencode-go/qwen3.7-plus",
+        { model: "opencode-go/minimax-m3" },
+        { model: "opencode-go/minimax-m2.7" },
+      ]
+      writeUserConfig(fixture, {
+        "[opencode]": {
+          agents: {
+            librarian: { models: installerModels },
+            explore: { models: installerModels },
+            atlas: { models: installerModels },
+            "sisyphus-junior": { models: installerModels },
+          },
+        },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.messages.filter((message) => message.includes("Unknown config key: agents."))).toEqual([])
+      expect(result.valid).toBe(true)
+      expect(result.config.agents?.librarian?.model).toBe("opencode-go/qwen3.7-plus")
+      expect(result.config.agents?.librarian?.fallback_models).toEqual([
+        { model: "opencode-go/minimax-m3" },
+        { model: "opencode-go/minimax-m2.7" },
+      ])
+      expect(result.config.agents?.explore?.model).toBe("opencode-go/qwen3.7-plus")
+      expect(result.config.agents?.atlas?.model).toBe("opencode-go/qwen3.7-plus")
+      expect(result.config.agents?.["sisyphus-junior"]?.model).toBe("opencode-go/qwen3.7-plus")
+    })
+  })
 })
