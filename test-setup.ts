@@ -9,6 +9,7 @@ import { _resetForTesting as resetModelFallbackState } from "./packages/omo-open
 import { RULES_INJECTOR_STORAGE } from "./packages/omo-opencode/src/hooks/rules-injector/constants"
 import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./packages/omo-opencode/src/shared/connected-providers-cache"
 import { getOmoOpenCodeCacheDir } from "./packages/omo-opencode/src/shared/data-path"
+import { _resetMemCacheForTesting as resetExhaustedProvidersCache } from "./packages/omo-opencode/src/shared/exhausted-providers-cache"
 import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-opencode/src/shared/prompt-async-gate"
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
@@ -92,6 +93,7 @@ beforeEach(() => {
   resetTaskToastManager()
   resetModelFallbackState()
   resetConnectedProvidersCache()
+  resetExhaustedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
 })
@@ -129,6 +131,7 @@ afterEach(() => {
   cleanupRulesInjectorStorage()
   resetTaskToastManager()
   resetConnectedProvidersCache()
+  resetExhaustedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
   isGlobalMockCleanup = true
