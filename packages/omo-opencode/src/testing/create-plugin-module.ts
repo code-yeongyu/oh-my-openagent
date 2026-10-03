@@ -335,7 +335,10 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
       "experimental.session.compacting": createSessionCompactingHandler(hooks),
 
-      "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
+      "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks, {
+        client: input.client,
+        directory: input.directory,
+      }),
 
       dispose: async (): Promise<void> => {
         runtimeSkillSource?.stop()
