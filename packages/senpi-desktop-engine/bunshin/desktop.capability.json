@@ -1,0 +1,985 @@
+{
+	"name": "desktop",
+	"kind": "sidecar",
+	"version": "<workspace>",
+	"description": "senpi desktop engine: screenshots, native input, accessibility, and the stop path",
+	"ops": [
+		"desktop.engine.hello",
+		"desktop.capabilities",
+		"desktop.displays",
+		"desktop.windows",
+		"desktop.capture",
+		"desktop.click",
+		"desktop.moveMouse",
+		"desktop.drag",
+		"desktop.scroll",
+		"desktop.typeText",
+		"desktop.keyChord",
+		"desktop.raiseWindow",
+		"desktop.clipboard.read",
+		"desktop.clipboard.write",
+		"desktop.ax.snapshot",
+		"desktop.ax.query",
+		"desktop.ax.elementAt",
+		"desktop.ax.focused",
+		"desktop.ax.node",
+		"desktop.ax.attributes",
+		"desktop.ax.children",
+		"desktop.ax.parent",
+		"desktop.ax.perform",
+		"desktop.ax.setValue",
+		"desktop.ax.focus",
+		"desktop.ax.click",
+		"desktop.stopPath.status",
+		"desktop.stop"
+	],
+	"effects": {
+		"desktop.engine.hello": "read",
+		"desktop.capabilities": "read",
+		"desktop.displays": "read",
+		"desktop.windows": "read",
+		"desktop.capture": "read",
+		"desktop.click": "mutate",
+		"desktop.moveMouse": "mutate",
+		"desktop.drag": "mutate",
+		"desktop.scroll": "mutate",
+		"desktop.typeText": "mutate",
+		"desktop.keyChord": "mutate",
+		"desktop.raiseWindow": "mutate",
+		"desktop.clipboard.read": "read",
+		"desktop.clipboard.write": "mutate",
+		"desktop.ax.snapshot": "read",
+		"desktop.ax.query": "read",
+		"desktop.ax.elementAt": "read",
+		"desktop.ax.focused": "read",
+		"desktop.ax.node": "read",
+		"desktop.ax.attributes": "read",
+		"desktop.ax.children": "read",
+		"desktop.ax.parent": "read",
+		"desktop.ax.perform": "mutate",
+		"desktop.ax.setValue": "mutate",
+		"desktop.ax.focus": "mutate",
+		"desktop.ax.click": "mutate",
+		"desktop.stopPath.status": "read",
+		"desktop.stop": "read"
+	},
+	"schemas": {
+		"desktop.engine.hello": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.capabilities": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.displays": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.windows": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.capture": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"caps": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/CaptureCaps"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target"
+			],
+			"description": "`capture`: one target (`desktop` or a window id) under optional caps.",
+			"additionalProperties": false,
+			"definitions": {
+				"CaptureCaps": {
+					"type": "object",
+					"properties": {
+						"maxWidth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxHeight": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"coordinateSafe": {
+							"type": "boolean",
+							"description": "Clamp to the coordinate-safe size for models that click in image pixels.",
+							"default": false
+						},
+						"maxBytes": {
+							"type": "integer",
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Inline byte budget; above it the capture degrades to JPEG, then artifact-only.",
+							"default": 5000000
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.click": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"x": {
+					"type": "number",
+					"format": "double"
+				},
+				"y": {
+					"type": "number",
+					"format": "double"
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					],
+					"description": "When present it must name the target's latest capture frame, otherwise\nthe call fails `InvalidCoordinateFrame`."
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"x",
+				"y"
+			],
+			"description": "`click` / `moveMouse`: a point in the pixels of the target's latest frame.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.moveMouse": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"x": {
+					"type": "number",
+					"format": "double"
+				},
+				"y": {
+					"type": "number",
+					"format": "double"
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					],
+					"description": "When present it must name the target's latest capture frame, otherwise\nthe call fails `InvalidCoordinateFrame`."
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"x",
+				"y"
+			],
+			"description": "`click` / `moveMouse`: a point in the pixels of the target's latest frame.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.drag": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"path": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/DesktopPoint"
+					}
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"path"
+			],
+			"description": "`drag`: a pointer path in the pixels of the target's latest frame.",
+			"additionalProperties": false,
+			"definitions": {
+				"DesktopPoint": {
+					"type": "object",
+					"properties": {
+						"x": {
+							"type": "number",
+							"format": "double"
+						},
+						"y": {
+							"type": "number",
+							"format": "double"
+						}
+					},
+					"required": [
+						"x",
+						"y"
+					],
+					"additionalProperties": false
+				},
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.scroll": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"x": {
+					"type": "number",
+					"format": "double"
+				},
+				"y": {
+					"type": "number",
+					"format": "double"
+				},
+				"dx": {
+					"type": "number",
+					"format": "double"
+				},
+				"dy": {
+					"type": "number",
+					"format": "double"
+				},
+				"frameId": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"x",
+				"y",
+				"dx",
+				"dy"
+			],
+			"description": "`scroll`: wheel deltas at a point in the target's latest frame.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.typeText": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"text"
+			],
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.keyChord": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"keys": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target",
+				"keys"
+			],
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.raiseWindow": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"additionalProperties": false
+		},
+		"desktop.clipboard.read": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.clipboard.write": {
+			"type": "object",
+			"properties": {
+				"text": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"text"
+			],
+			"description": "`clipboard.write` params and `clipboard.read` result.",
+			"additionalProperties": false
+		},
+		"desktop.ax.snapshot": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/AxSnapshotOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"target"
+			],
+			"additionalProperties": false,
+			"definitions": {
+				"AxSnapshotOptions": {
+					"type": "object",
+					"properties": {
+						"maxDepth": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"maxNodes": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"all": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.query": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"query": {
+					"$ref": "#/definitions/AxQuery"
+				}
+			},
+			"required": [
+				"target",
+				"query"
+			],
+			"additionalProperties": false,
+			"definitions": {
+				"AxQuery": {
+					"type": "object",
+					"properties": {
+						"role": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"title": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"value": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"limit": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.elementAt": {
+			"type": "object",
+			"properties": {
+				"target": {
+					"type": "string"
+				},
+				"x": {
+					"type": "number",
+					"format": "double"
+				},
+				"y": {
+					"type": "number",
+					"format": "double"
+				}
+			},
+			"required": [
+				"target",
+				"x",
+				"y"
+			],
+			"description": "`ax.elementAt`: hit-test at global logical desktop coordinates.",
+			"additionalProperties": false
+		},
+		"desktop.ax.focused": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.ax.node": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref"
+			],
+			"description": "An `eN` ref from `ax.snapshot` / `ax.query`.",
+			"additionalProperties": false
+		},
+		"desktop.ax.attributes": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref"
+			],
+			"description": "An `eN` ref from `ax.snapshot` / `ax.query`.",
+			"additionalProperties": false
+		},
+		"desktop.ax.children": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref"
+			],
+			"description": "An `eN` ref from `ax.snapshot` / `ax.query`.",
+			"additionalProperties": false
+		},
+		"desktop.ax.parent": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref"
+			],
+			"description": "An `eN` ref from `ax.snapshot` / `ax.query`.",
+			"additionalProperties": false
+		},
+		"desktop.ax.perform": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"action": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref",
+				"action"
+			],
+			"additionalProperties": false
+		},
+		"desktop.ax.setValue": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"value": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref",
+				"value"
+			],
+			"additionalProperties": false
+		},
+		"desktop.ax.focus": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"ref"
+			],
+			"description": "An `eN` ref from `ax.snapshot` / `ax.query`.",
+			"additionalProperties": false
+		},
+		"desktop.ax.click": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"ref"
+			],
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.stopPath.status": {
+			"type": "object",
+			"description": "Parameters of a method that takes none: `{}`.",
+			"additionalProperties": false
+		},
+		"desktop.stop": {
+			"type": "object",
+			"properties": {},
+			"additionalProperties": false
+		}
+	},
+	"sidecar": {
+		"executable": "<abs path to senpi-desktop-engine>",
+		"args": [
+			"--oneshot",
+			"--audit-path",
+			"<$BUNSHIN_HOME>/desktop-audit.jsonl",
+			"--stop-chord",
+			"ctrl+alt+shift+escape"
+		],
+		"protocol": "json-rpc-stdio",
+		"timeoutMs": 65000
+	},
+	"sandbox": {
+		"grant": "full_access"
+	}
+}

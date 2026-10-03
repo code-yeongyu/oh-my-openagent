@@ -9,6 +9,7 @@ import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { createSandbox, seedSandbox } from "./drive.mjs";
+import { isolatedChildEnv } from "./sandbox-child-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mockProvider = join(scriptDir, "fallback-architect-mock-provider.ts");
@@ -94,7 +95,7 @@ function driveSenpi(senpiBin, scenario) {
 		{
 			cwd: scenario.sandbox.cwd,
 			env: {
-				...process.env,
+				...isolatedChildEnv(process.env, scenario.sandbox.agentDir),
 				HOME: scenario.home,
 				USERPROFILE: scenario.home,
 				SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,

@@ -1,7 +1,6 @@
 // Recall message renderer: builds the late-hidden nudge block injected as a
 // hint message. The shape is a fixed contract consumed by the harness-side
-// recall wiring: one sourced block per judged nudge. Empty nudges render to an
-// empty string so callers inject nothing.
+// recall wiring: one sourced block per judged nudge.
 
 import type { RecallNudge } from "./gate"
 
@@ -30,9 +29,4 @@ export function renderNudgeBlock(nudge: RecallNudge): string {
     escapeMarkup(nudge.hint),
     "</recalled-memory>",
   ].join("\n")
-}
-
-export function renderNudgeMessage(nudges: readonly RecallNudge[]): string {
-  if (nudges.length === 0) return ""
-  return nudges.map(renderNudgeBlock).join("\n")
 }

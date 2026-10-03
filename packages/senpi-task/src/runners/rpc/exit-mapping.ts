@@ -17,21 +17,69 @@ export type ChildExitInput = {
  * what Node's `process.kill`/`taskkill /F` become there).
  */
 const WINDOWS_TERMINATION_EXIT_CODE = 1
+/**
+ * The sentence senpi's `startHostChildReaper` writes to stderr when Bun on Windows has no child
+ * reaper (`packages/coding-agent/src/modes/rpc/child-reaper.ts`). Matched as source text: nothing else
+ * a child writes is treated as this advisory.
+ */
+const WINDOWS_BUN_REAPER_ADVISORY = "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
+/** The shortest cut-short copy accepted at the very end of stderr, as #9347 already accepted it. */
+/** The advisory up to "until this": the shortest cut-short copy accepted even after a line end, as #9347 accepted it. */
+const WINDOWS_BUN_REAPER_ADVISORY_HEAD = WINDOWS_BUN_REAPER_ADVISORY.slice(
+  0,
+  WINDOWS_BUN_REAPER_ADVISORY.lastIndexOf(" until this") + " until this".length,
+)
+
+/**
+ * True only when stderr is nothing but copies of the advisory sentence. Bun writes one copy per
+ * terminated worker thread, and the handle classifies the last 4 KB of stderr, so:
+ * - a copy may be split across lines at any point, and only that copy's own remaining words may
+ *   follow it;
+ * - when stderr fills the 4 KB tail, its first line may be any piece of a copy the tail cut, and that
+ *   copy's remaining words must follow;
+ * - the last copy may stop short: anywhere when the kill cut it mid-write (no line end after it),
+ *   otherwise not before the advisory's head.
+ * A line holding anything else - including the advisory's head followed by other text - makes the
+ * exit a crash.
+ */
+function hasOnlyWindowsStartupAdvisories(stderr: string): boolean {
+  const lines = stderr.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
+  const first = lines[0]
+  if (first === undefined) return false
+  let owed: string | undefined
+  let rest = lines
+  if (stderr.length >= STDERR_TAIL_CAP && !WINDOWS_BUN_REAPER_ADVISORY.startsWith(first)) {
+    const at = WINDOWS_BUN_REAPER_ADVISORY.indexOf(first)
+    if (at < 0) return false
+    owed = WINDOWS_BUN_REAPER_ADVISORY.slice(at + first.length).trim() || undefined
+    rest = lines.slice(1)
+  }
+  for (const line of rest) {
+    const expected = owed ?? WINDOWS_BUN_REAPER_ADVISORY
+    if (!expected.startsWith(line)) return false
+    owed = expected.slice(line.length).trim() || undefined
+  }
+  if (owed === undefined) return true
+  if (!/[\r\n]$/.test(stderr)) return true
+  const written = WINDOWS_BUN_REAPER_ADVISORY.slice(0, WINDOWS_BUN_REAPER_ADVISORY.length - owed.length).trimEnd()
+  return written.length >= WINDOWS_BUN_REAPER_ADVISORY_HEAD.length
+}
 
 /**
  * Windows has no POSIX signal provenance: an externally terminated child is
  * reported as a plain exit code with `signal === null`, indistinguishable by
  * signal alone from a self-inflicted crash. The one fact that still separates
  * them is stderr - a crashing child writes diagnostics before dying, while a
- * terminated one is stopped mid-flight with an empty buffer. POSIX is
- * unaffected: there a real kill always carries its signal.
+ * terminated one has no crash output. Bun can write a known child-reaper
+ * advisory during startup; that advisory alone is not a crash diagnostic.
+ * POSIX is unaffected: there a real kill always carries its signal.
  */
 function isWindowsExternalTermination(input: ChildExitInput, platform: NodeJS.Platform): boolean {
   return (
     platform === "win32"
     && input.signal === null
     && input.code === WINDOWS_TERMINATION_EXIT_CODE
-    && input.stderr.trim().length === 0
+    && (input.stderr.trim().length === 0 || hasOnlyWindowsStartupAdvisories(input.stderr))
   )
 }
 

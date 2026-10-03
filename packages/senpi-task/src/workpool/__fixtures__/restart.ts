@@ -5,6 +5,7 @@ import { createTaskLifecycle } from "../../lifecycle"
 import type { ResidencyRegistry } from "../../lifecycle/port"
 import { fixtureHandle } from "./admission"
 import type { PendingSteeringEntry } from "../../state"
+import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
 
 export function restartedFixture(project: string) {
   const store = createTaskRecordStore({ project_dir: project })
@@ -34,7 +35,7 @@ export function restartedFixture(project: string) {
     forget: taskId => manager.forget(taskId), hasPendingSends: taskId => manager.hasPendingSends?.(taskId) ?? false,
     tryClaimEviction: taskId => manager.tryClaimEviction?.(taskId) ?? false, releaseEviction: taskId => manager.releaseEviction?.(taskId),
   }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   return { manager, store, queues, children,
     cleanup: async () => {
       manager.workpools.dispose()

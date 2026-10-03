@@ -45,13 +45,6 @@ describe("createNativeSkillSources", () => {
     }
   })
 
-  test("#given onboarding skill #when checked #then it is present in the registry at the correct position", () => {
-    const onboardingEntry = sources.find(({ name }) => name === "onboarding")
-    assert.ok(onboardingEntry, "onboarding must be in the registry")
-    assert.equal(sources.indexOf(onboardingEntry), 5, "onboarding must be at index 5 (alphabetical)")
-    assert.equal(onboardingEntry.source, join(nativeSkillsRoot, "onboarding"))
-  })
-
   test("#given the registry #when sharedAssets are read #then only ulw-research overlays the shared runtime and reference", () => {
     const withSharedAssets = sources.filter((entry) => entry.sharedAssets !== undefined).map(({ name }) => name)
     assert.deepEqual(withSharedAssets, ["ulw-research"])

@@ -1,6 +1,7 @@
 ---
 name: ulw-plan
 description: "Explore-first planning consultant that writes one decision-complete work plan before coding. Use only on an explicit user request for the ulw-plan workflow or a plan before implementation; it never self-activates on a bare ulw run."
+argument-hint: "<planning-request>"
 metadata:
   short-description: Explore-first planning consultant that waits for your okay before planning
 ---

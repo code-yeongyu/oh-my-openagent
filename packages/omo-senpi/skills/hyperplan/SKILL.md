@@ -1,6 +1,7 @@
 ---
 name: hyperplan
 description: "Adversarial multi-agent planning: a hostile team cross-critiques a plan before it is formalized. Use when planning needs maximum rigor or the user asks for a hyperplan / adversarial or cross-critique plan."
+argument-hint: "[planning-request]"
 metadata:
   short-description: Adversarial 5-member cross-critique planning, then a planner formalizes the survivors
 ---
@@ -36,7 +37,7 @@ Members receive your rounds as injected follow-ups inside their child process; t
 Before starting, verify:
 
 1. **The lead team tools must be available** — `team_create`, `task_send`, `team_delete`. They register by default with the task component. If they are absent, the task component was disabled; STOP and tell the user:
-   > "Hyperplan needs the omo-senpi team tools, which are disabled. Restart senpi without `--no-omo-task` (the task component is on by default), then retry."
+   > "Hyperplan needs the omo-senpi team tools, which are disabled. Restart without `--no-omo-task` (`omo` on OmO Native, `senpi` on a plain senpi install; the task component is on by default), then retry."
 2. **You are the current top-level lead session** — the team tools are lead-only and never reach a child. If you are yourself a spawned member/child, this skill is the wrong tool; a member cannot lead a team.
 
 ## THE 5 ADVERSARIAL MEMBERS — RnR & CHARACTERISTICS

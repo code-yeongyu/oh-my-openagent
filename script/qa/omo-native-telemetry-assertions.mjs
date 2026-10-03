@@ -16,15 +16,26 @@ const expectedNativeEvents = new Set([
   "delegation_completed",
   "category_config",
   "feature_used",
+  "computer_use_activation",
+  "computer_use_permission_denied",
+  "computer_use_engine_error",
   "kibitzer_summary",
   "parallelism_summary",
+  "process_crashed",
 ])
 
 // Session-conditional events the scripted scenario cannot produce: `kibitzer_summary` is emitted only
-// when the memory sidecar actually woke, which needs recall enabled and a committed memory corpus. They
+// when the memory sidecar actually woke, which needs recall enabled and a committed memory corpus, and
+// `process_crashed` only when an earlier process left a crash record on disk. They
 // stay in the coverage check above (a dropped or misspelled event still fails) but are not required to
 // appear in a capture, because demanding one here would only be satisfiable by faking the emission.
-const conditionalNativeEvents = new Set(["kibitzer_summary"])
+const conditionalNativeEvents = new Set([
+  "computer_use_activation",
+  "computer_use_permission_denied",
+  "computer_use_engine_error",
+  "kibitzer_summary",
+  "process_crashed",
+])
 
 export function assertAllowlistCoverage(allowlists) {
   const actual = new Set(Object.keys(allowlists))

@@ -46,6 +46,9 @@ describe("dead-chain category disabling", () => {
         "anthropic-subscription",
         "anthropic-api",
         "github-copilot",
+        "zai",
+        "zai-coding-cn",
+        "xiaomi",
       ])
     })
 
@@ -124,9 +127,21 @@ describe("dead-chain category disabling", () => {
       expect(result.availableCategories).not.toContain("writing")
     })
 
-    test("#when Copilot serves its dotted Fable id #then writing resolves on it", () => {
+    test("#when only Claude Fable 5.1 is connected #then writing is unavailable because Fable is no longer a writing rung", () => {
       // given
-      const models = registry([model("github-copilot", "claude-fable-5.1")])
+      const models = registry([model("anthropic", "claude-fable-5-1"), model("github-copilot", "claude-fable-5.1")])
+
+      // when
+      const result = resolveCategory("writing", {}, models)
+
+      // then
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("writing")
+    })
+
+    test("#when Copilot serves its dotted Opus 5.5 id #then writing resolves on it", () => {
+      // given
+      const models = registry([model("github-copilot", "claude-opus-5.5")])
 
       // when
       const result = resolveCategory("writing", {}, models)
@@ -137,16 +152,16 @@ describe("dead-chain category disabling", () => {
   })
 
   describe("#given a gateway-prefixed registry id", () => {
-    test("#when the unwrapped id matches a rung #then the category stays available", () => {
+    test("#when the gateway is not a rung provider #then its copy keeps the chain dead", () => {
       // given
-      const models = registry([model("vercel", "openai/gpt-6-sol")])
+      const models = registry([model("vercel", "openai/gpt-5.6-sol")])
 
       // when
       const result = resolveCategory("deep-low", {}, models)
 
       // then
-      expect(result.kind).toBe("resolved")
-      expect(result.availableCategories).toContain("deep-low")
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("deep-low")
     })
   })
 

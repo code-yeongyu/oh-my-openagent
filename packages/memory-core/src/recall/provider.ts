@@ -1,9 +1,13 @@
 // Recall corpus provider: reads committed memory files from HEAD, excluding only the
 // repo-root reserved `system/` tree.
 //
-// Compile-from-committed invariant: every read goes through repo.show at the
-// HEAD revision captured up front; the working tree is never consulted, so
+// Compile-from-committed invariant: every read goes through the committed tree of
+// the HEAD revision captured up front; the working tree is never consulted, so
 // uncommitted edits and untracked files can never leak into a recall corpus.
+//
+// Process budget: a load is one `ls-tree` plus at most one `cat-file --batch`, never one git
+// process per file. A memory repo with thousands of files moves HEAD on every memory write, and
+// reading it one `git show` per file from every live session was a machine-wide git storm.
 
 import { join } from "node:path"
 
@@ -35,21 +39,47 @@ function isRecallCandidatePath(path: string): boolean {
 export async function loadRecallCorpus(repo: GitMemoryRepo): Promise<RecallCorpus> {
   const revision = await repo.head()
   if (revision === null) return { revision: null, documents: [] }
-  return loadCorpusAtRevision(repo, revision)
+  return (await loadCorpusAtRevision(repo, revision, new Map())).corpus
 }
 
+/** A parsed file keyed by the blob it came from; `undefined` records an unparseable blob. */
+interface LoadedBlob {
+  readonly oid: string
+  readonly document: RecallDocument | undefined
+}
+
+type LoadedBlobs = ReadonlyMap<string, LoadedBlob>
+
+/**
+ * Reads only the blobs `previous` does not already hold for the same path and oid, so a HEAD move
+ * costs one `ls-tree` plus one `cat-file --batch` over the changed files. Reused documents keep
+ * their object identity; blob ids are content addresses, so a reused document is byte-identical.
+ */
 async function loadCorpusAtRevision(
   repo: GitMemoryRepo,
   revision: string,
-): Promise<RecallCorpus> {
+  previous: LoadedBlobs,
+): Promise<{ readonly corpus: RecallCorpus; readonly loaded: LoadedBlobs }> {
+  const entries = (await repo.lsTreeBlobs(revision)).filter((entry) => isRecallCandidatePath(entry.path))
+  const blobs = await repo.readBlobs(
+    entries.filter((entry) => previous.get(entry.path)?.oid !== entry.oid).map((entry) => entry.oid),
+  )
+  const loaded = new Map<string, LoadedBlob>()
   const documents: RecallDocument[] = []
-  for (const path of await repo.lsTree(revision)) {
-    if (!isRecallCandidatePath(path)) continue
-    const document = parseRecallDocument(path, await repo.show(revision, path))
+  for (const { path, oid } of entries) {
+    const reused = previous.get(path)
+    const document = reused?.oid === oid ? reused.document : parseRecallDocument(path, requireBlob(blobs, oid, path))
+    loaded.set(path, { oid, document })
     if (document !== undefined) documents.push(document)
   }
   documents.sort((left, right) => left.path.localeCompare(right.path))
-  return { revision, documents }
+  return { corpus: { revision, documents }, loaded }
+}
+
+function requireBlob(blobs: ReadonlyMap<string, string>, oid: string, path: string): string {
+  const content = blobs.get(oid)
+  if (content === undefined) throw new Error(`git cat-file did not return blob ${oid} for ${path}`)
+  return content
 }
 
 function parseRecallDocument(path: string, content: string): RecallDocument | undefined {
@@ -118,11 +148,13 @@ async function fileSignature(path: string): Promise<string> {
 /**
  * Caches the corpus keyed by HEAD sha; a moved HEAD invalidates the entry. Recall collection runs on
  * every prompt and every tool call, and resolving HEAD spawned `git rev-parse` each time (#8335), so
- * the sha is re-resolved only when the git ref files backing it changed.
+ * the sha is re-resolved only when the git ref files backing it changed. A moved HEAD re-reads only
+ * the blobs that changed since the last successful load of the same repository.
  */
 export class RecallCorpusCache {
   private entry: RecallCorpusCacheEntry | undefined
   private probe: HeadProbe | undefined
+  private blobs: { readonly dir: string; readonly loaded: LoadedBlobs } | undefined
   private readonly resolveHead: (repo: GitMemoryRepo) => Promise<string | null>
 
   constructor(options: RecallCorpusCacheOptions = {}) {
@@ -150,7 +182,7 @@ export class RecallCorpusCache {
     const pending =
       revision === null
         ? Promise.resolve<RecallCorpus>({ revision: null, documents: [] })
-        : loadCorpusAtRevision(repo, revision)
+        : this.loadRevision(repo, revision)
     const entry: RecallCorpusCacheEntry = { revision, pending }
     this.entry = entry
     this.probe = probe
@@ -168,5 +200,13 @@ export class RecallCorpusCache {
   clear(): void {
     this.entry = undefined
     this.probe = undefined
+    this.blobs = undefined
+  }
+
+  private async loadRevision(repo: GitMemoryRepo, revision: string): Promise<RecallCorpus> {
+    const previous = this.blobs?.dir === repo.dir ? this.blobs.loaded : new Map<string, LoadedBlob>()
+    const { corpus, loaded } = await loadCorpusAtRevision(repo, revision, previous)
+    this.blobs = { dir: repo.dir, loaded }
+    return corpus
   }
 }

@@ -62,3 +62,8 @@ export interface GitTreeSizedEntry {
   readonly path: string
   readonly bytes: number
 }
+
+export interface GitTreeBlobEntry {
+  readonly path: string
+  readonly oid: string
+}

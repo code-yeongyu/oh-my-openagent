@@ -135,7 +135,9 @@ describe("kibitzer registration wiring", () => {
 
     const results = await f.pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" }, f.eventCtx)
 
-    expect(f.pi.handlers.filter((registration) => registration.event === "before_agent_start")).toHaveLength(3)
+    const beforeAgentStartHandlers = f.pi.handlers.filter((registration) => registration.event === "before_agent_start")
+    expect(beforeAgentStartHandlers).toHaveLength(3)
+    expect(beforeAgentStartHandlers.every((registration) => registration.options?.previewSafe === true)).toBe(true)
     expect(results).toHaveLength(3)
     const [projection, recall, kibitzer] = results as Array<{ systemPrompt?: string; message?: { customType?: string; content?: string } } | undefined>
     // Projection first: it is the only writer of systemPrompt. Its memory notice is session-volatile,

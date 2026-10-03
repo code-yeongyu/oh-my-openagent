@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "no
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
@@ -150,7 +151,7 @@ function runScenario(resolvedSenpi, scenario) {
       ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", scenario.prompt],
       {
         cwd: sandbox.cwd,
-        env: { ...process.env, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
+        env: { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
         encoding: "utf8",
         timeout: 60_000,
       },

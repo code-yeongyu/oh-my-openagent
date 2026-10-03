@@ -22,6 +22,7 @@ export interface LiveTaskContext {
     getSessionFile?(): string | undefined
   }
   isIdle?(): boolean
+  isProjectTrusted?(): boolean
 }
 
 // The slice of senpi's ExtensionUIContext the task component drives (setStatus/setWidget power the
@@ -63,6 +64,7 @@ export class TaskRuntimeContext {
   #sessionId: string | undefined
   #sessionFile: string | undefined
   #mode: string | undefined
+  #projectTrusted: boolean | undefined
 
   constructor(cwd: string) {
     this.#cwd = cwd
@@ -82,6 +84,7 @@ export class TaskRuntimeContext {
       this.#sessionFile = ctx.sessionManager.getSessionFile?.()
     }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
+    if (typeof ctx.isProjectTrusted === "function") this.#projectTrusted = ctx.isProjectTrusted()
   }
 
   clearUi(): void {
@@ -124,6 +127,11 @@ export class TaskRuntimeContext {
 
   mode(): string | undefined {
     return this.#mode
+  }
+
+  // The parent session's project-trust decision at the last captured event; undefined until seen.
+  projectTrusted(): boolean | undefined {
+    return this.#projectTrusted
   }
 
   parentState(): ParentState {

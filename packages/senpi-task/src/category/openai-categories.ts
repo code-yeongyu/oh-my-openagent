@@ -188,7 +188,7 @@ const DEEP_HIGH_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Route here only when
 // The GPT flagship gate: either id present in the live registry keeps ultrabrain available. Each deep
 // lane is a single rung with no model fallback, so it gates on its own model and disappears without it.
 const GPT_FLAGSHIP_GATE_MODELS = ["gpt-6-astra", "gpt-5.6-sol"] as const
-const DEEP_LOW_GATE_MODELS = ["gpt-6-sol-fast", "gpt-6-sol"] as const
+const DEEP_LOW_GATE_MODELS = ["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"] as const
 const DEEP_HIGH_GATE_MODEL = "gpt-6-astra"
 
 export const OPENAI_CATEGORIES = [
@@ -202,7 +202,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "deep-low",
-    config: { model: "chatgpt-subscription/gpt-6-sol-fast", variant: "medium" },
+    config: { model: "chatgpt-subscription/gpt-6.1-sol", variant: "medium" },
     description: "Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads. **3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work is routed here.** Multiple goals fan out as parallel calls.",
     callerGuidance: DEEP_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_LOW_CATEGORY_PROMPT_APPEND,
@@ -211,7 +211,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "deep-high",
-    config: { model: "chatgpt-subscription/gpt-6-astra", variant: "xhigh" },
+    config: { model: "chatgpt-subscription/gpt-6-astra", variant: "high" },
     description: "Escalation deep lane: a goal whose central decision cannot be settled from evidence alone. Same one-goal, one-deliverable contract as deep-low.",
     callerGuidance: DEEP_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_HIGH_CATEGORY_PROMPT_APPEND,
@@ -227,7 +227,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "unspecified-low",
-    config: { model: "xiaomi/mimo-v2.6-pro", variant: "max" },
+    config: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
     description: "Tasks that don't fit other categories, low effort required",
     callerGuidance: UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,

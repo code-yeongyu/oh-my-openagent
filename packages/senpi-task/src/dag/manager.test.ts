@@ -130,7 +130,7 @@ async function raceStarts(projectDir: string, prompts: readonly string[]): Promi
   fs.mkdirSync(barrierDir)
   const children = prompts.map((prompt) => Bun.spawn(
     [process.execPath, "-e", raceWorkerSource(projectDir, prompt, barrierDir)],
-    { stdout: "pipe", stderr: "pipe" },
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env } },
   ))
   const readers = children.map((child) => lineReader(child.stdout))
   const errors = children.map((child) => new Response(child.stderr).text())

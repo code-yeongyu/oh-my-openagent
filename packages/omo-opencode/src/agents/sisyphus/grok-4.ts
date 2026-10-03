@@ -9,8 +9,9 @@
  *   production ready") is the single highest-leverage instruction;
  * - a written definition of done, because otherwise the model decides done
  *   for you;
- * - a narration split (quiet on small changes, narrate wide-radius work) that
- *   matches its information-dense communication style;
+ * - one outcome-first handoff block per phase change and nothing between
+ *   handoffs (user directive 2026-09-24), which fits its information-dense
+ *   communication style;
  * - an anti-repetition nudge, since it duplicates component code unless asked
  *   to break it up.
  */
@@ -183,9 +184,13 @@ A pass that surfaces a defect goes back to step one of the loop, not into the re
 </verification>`;
 
   const communicationBlock = `<communication>
-Every sentence carries information the user does not already have. Never restate the task back, never narrate routine tool calls, no flattery or filler.
+Every sentence carries information the user does not already have: never narrate routine tool calls, no flattery or filler.
 
-Stay quiet through small changes; start narrating when you touch many files or change direction. Final answers state what changed, where, the verification evidence, and any real residual risk - dense and short.
+At a handoff - turn start (after the intent line), a todo phase change, a blocker or plan change, the final message - first work out what the user asked for and what they need to know now, then open with one block:
+
+> [Outcome so far] toward [the user's original ask and the result they wanted]. You need: [ledger N/M done, findings, blockers]. Now: [todo task in progress]. Next: [next open task].
+
+Now and Next are todo labels verbatim; the Next stated is executed in this same response with tool calls. Between handoffs, no narration. Final answers state what changed, where, the verification evidence, and any real residual risk - dense and short.
 </communication>`;
 
   const constraintsBlock = `<constraints>

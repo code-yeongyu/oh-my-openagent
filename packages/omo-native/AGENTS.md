@@ -2,12 +2,12 @@
 
 **Role:** Adapter - distribution package for the senpi-based omo native edition.
 
-Publishes npm package `omo-ai` (bin `omo`) on the BETA channel only. The launcher in `bin/` runs the
+Publishes npm package `omo-ai` (bin `omo`) on the channel its version names: a prerelease on `beta`, a stable release on `latest`. The launcher in `bin/` runs the
 exact-pinned `@code-yeongyu/senpi` CLI with `--extension <pkgRoot>/plugin`, where `plugin/` is the staged
 omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, never committed).
 
 - `bin/omo.js` - launcher entry (dispatch, doctor, setup, senpi passthrough)
-- brand: the launcher injects a `SENPI_BRAND` profile (name, `~/.omo/agent` home, `OMO_*` env prefix, wire identity, omo-ai beta update channel) so the pinned engine presents as omo; `--version` and every self-update spelling are answered by the launcher. See `docs/reference/omo-ai-publishing.md`.
+- brand: the launcher injects a `SENPI_BRAND` profile (name, `~/.omo/agent` home, `OMO_*` env prefix, wire identity, omo-ai update channel of the running version) so the pinned engine presents as omo; `--version` and every self-update spelling are answered by the launcher. See `docs/reference/omo-ai-publishing.md`.
 - `bin/lib/` - launcher modules:
   - `launcher.js` — `runLauncher()` dispatch, senpi environment/brand/update routing
   - `agent-dir.js` — `canonicalAgentDir()`, `adoptLegacyFlatState()`, legacy flat-dir migration
@@ -29,13 +29,22 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     `OMO_SIGNAL_GRACE_MS` (default 10s), then re-raises an ignored signal. It waits for `SIGINT`
     without forwarding it twice. Never use `spawnSync` for these long-lived handoffs.
   - `bun-bin-shim.js` — `ensureBunBinShim`: keeps the user-facing bun-global bin an sh shim that
-    execs bun directly (POSIX only, self-healing across `bun add -g` updates, fail-open)
+    execs bun directly (POSIX only, fail-open). Every launch repairs it, under node or bun, and so
+    does postinstall (`bin/senpi-patch.mjs`), which bun runs on itself right after `bun add -g`
+    relinks the bin when node is not on PATH (#9293)
   - `doctor.js` — diagnostics plus stale-orphan detection: `classifyEngineProcesses` splits live
     engines into stale (interactive, PPID 1), attached and managed (`--mode`), and
     `reapStaleEngines` terminates ONLY explicitly named pids that are still stale at request time.
     Pattern-killing is forbidden.
   - `engine-prepare.js` / `claude-code-floor.js` - the installed-engine preparation (Claude Code UA floor, compile-safe css-tree data, RPC stream guard). postinstall (`bin/senpi-patch.mjs`) runs it and stamps the engine tree with `.omo-engine-prepared` (the omo-ai package version); the launcher runs `ensureEnginePrepared` before every engine start so an install whose scripts never ran (`ignore-scripts=true`, Bun's blocked postinstalls) is prepared on first launch (#8713). A failure warns with the reinstall command and never blocks the launch.
+  - `launch-spec-mode.js` - `normalizeLaunchSpecMode` strips group/world write bits from `plugin/daemon-launch-spec.json` (regular file owned by this user only, `lstat`, never through a symlink; no-op on win32) because npm/bun extraction applies the installer's umask and the task host refuses a writable spec (#9208). `engine-prepare.js` `preparePluginLaunchSpec` runs it fail-open on every launch (`preparedSenpi()`, before `omo doctor`) and in postinstall; `launchSpecDoctorLines` gives `omo doctor` (npm and compiled) a FAIL line with the fix when the host would still refuse the spec.
   - `rpc-stream-errors.js` - postinstall/launch preparation of the installed engine's stdio RPC serializer. A malformed streamed event produces a failed `prompt` response with `errorCode: invalid_stream_event` and shuts down with exit 1. The same preparation runs after an omob engine swap; repeated preparation is idempotent, and a missing RPC target, missing required binding (including `shutdown`), or unsupported serializer shape fails installation rather than silently missing the guard. Binding checks also run on already-prepared code.
+  - `category-coverage.js` - the task-category coverage lines of doctor and the setup summary: the pinned engine's
+    offline ModelRuntime (read-only auth.json, models.json, env keys; nothing written) classified by the senpi-task
+    resolver through `plugin/runtime/category-coverage/index.js`, which `build:omo-native` bundles from
+    `category-coverage-entry.ts`. Fail-open: any error prints no line and omits the row.
+  - `config-doctor.js` - doctor's `WARN config: <file>: <key> ignored (...)` lines, one per key the omo.json loader dropped and one per file it did not load, from `configDoctorLines` (`config-doctor-runtime.ts`) through the same staged runtime bundle; the compiled entry imports it directly. A runtime that cannot load prints `WARN config: diagnostics unavailable: <reason>`.
+  - `gateway.js` - the hook for a separately installed chat-surface gateway: `omo gateway ...` and the doctor gateway rows import `@oh-my-opencode/omo-gateway/host` by name from omo's own install, lazily (only for `omo gateway`, or for doctor when the user config has a `gateway` section), check its `HOST_CONTRACT_VERSION`, and hand it argv, stdio, env, cwd, the agent dir, home, the relaunch argv, `pluginRoot` (`<packageRoot>/plugin`) and `threadSdkUrl` (the `file:` URL of `<pluginRoot>/runtime/thread-sdk/sdk.js`; the doctor call gets the last two as well). omo ships no gateway code; the package validates its own section, and omo-config-core keeps only a permissive `gateway` key.
   - `package-paths.js`, `provider-map.json`, `legacy-bun-global-migration.js`
 - **agent state lives in ONE canonical directory: `~/.omo/agent`.** `bin/lib/agent-dir.js` owns that answer (`canonicalAgentDir`), and the launcher, `omo doctor`, `omo setup` and the locally installed launcher (`packages/omo-senpi/src/install/local-launcher.ts`) all resolve it from there - never by composing their own default. An explicit `OMO_CODING_AGENT_DIR` (or legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins, and `adoptLegacyFlatState` carries state left in the pre-unification flat `~/.omo` layout forward once, so unifying the location never reads as another reset.
 - `bin/omo-agent-toolkit.js` - internal delegate to the staged toolkit runtime, NOT an npm bin
@@ -64,4 +73,4 @@ Release mechanics and the beta-channel contract: `docs/reference/omo-ai-publishi
 
 ## omo daemon
 
-`bin/lib/daemon.js`: `omo daemon run|attach|status|stop|handoff`, a thin wrapper over the engine's `senpi host`. Exit codes 2/3/4/5; `run`/`attach` map to the engine's `ensure`. The compiled entry re-runs ITSELF with `host ...` to reach the engine (process.execPath is omo there). Reference: `docs/reference/omo-daemon.md`.
+`bin/lib/daemon.js`: `omo daemon run|attach|status|stop [--drain] [--all [--wait [--timeout <s>]]]|handoff|gc [--prune-store-index]|rollback-prepare`, a thin wrapper over the engine's `senpi host`. `run`/`attach` map to the engine's `ensure` of the operator daemon on `rpc.sock`; `status`, `gc`, `handoff`, `stop --all` and `rollback-prepare` cover every endpoint (the operator daemon, each session's `p-*` task host, each Desktop `i-*` thread host) through `daemon-operations.js`, `daemon-status.js` and `daemon-rollback.js`. `--foreground` on any subcommand exits 2 before the engine is called (after the unknown-subcommand check and the win32 refusal, which exits 4), because the engine host always detaches; `--persistent` is accepted and ignored. Exit codes 2/3/4/5 live in `daemon-args.js` with the flag sets and argv helpers; the `omo doctor` lines come from `daemon-doctor-report.js`. The compiled entry re-runs ITSELF with `host ...` to reach the engine (process.execPath is omo there). Reference: `docs/reference/omo-daemon.md`.

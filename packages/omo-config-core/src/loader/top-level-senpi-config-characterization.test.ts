@@ -80,8 +80,9 @@ const EXPECTED_CONFIG = {
     default_execution_mode: "auto",
     process_runner: "host",
     host_engine_policy: "upgrade",
+    host_shard_prewarm: "first-turn",
     max_depth: 1,
-    residency_max_children: Math.min(16, Math.max(8, availableParallelism() * 2)),
+    residency_max_children: "unlimited",
     resume_children: true,
     resident_idle_timeout_ms: 900000,
     team: {

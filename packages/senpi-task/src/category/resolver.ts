@@ -19,7 +19,7 @@ import {
   isCategoryChainViable,
   isCategoryGateSatisfied,
 } from "./builtins"
-import { buildRuntimeModelChain, chainRungCandidates, type ModelChainCandidate } from "../model-chain"
+import { availableChainCandidates, buildRuntimeModelChain, chainRungCandidates, type ModelChainCandidate } from "../model-chain"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
 import type {
   CategoryModelSelection,
@@ -174,14 +174,14 @@ function categoryModelCandidates(config: OmoCategoryConfig): readonly ModelChain
   return [...primary, ...fallbacks]
 }
 
-function availableCategoryNames(config: OmoConfig, availableModelIds?: ReadonlySet<string>): readonly string[] {
+function availableCategoryNames(config: OmoConfig, availableModels?: ReadonlySet<string>): readonly string[] {
   const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})])).sort()
-  if (availableModelIds === undefined) return names
+  if (availableModels === undefined) return names
   const userCategories = config.categories ?? {}
   return names.filter((name) => {
     const hasExplicitUserConfig = getOwnRecordValue(userCategories, name) !== undefined
-    return isCategoryGateSatisfied(name, hasExplicitUserConfig, availableModelIds)
-      && isCategoryChainViable(name, hasExplicitUserConfig, availableModelIds)
+    return isCategoryGateSatisfied(name, hasExplicitUserConfig, availableModels)
+      && isCategoryChainViable(name, hasExplicitUserConfig, availableModels)
   })
 }
 
@@ -195,7 +195,7 @@ function gatedAvailableCategories<TModel extends SenpiModelPort>(
   try {
     const parsed = parseAvailableModels(senpiModelRegistry.getAvailable())
     if (!parsed.validContainer) return availableCategoryNames(config)
-    return availableCategoryNames(config, modelIdsOf(parsed.models))
+    return availableCategoryNames(config, new Set(parsed.models))
   } catch {
     return availableCategoryNames(config)
   }
@@ -209,7 +209,7 @@ export function resolveAvailableCategoryNames<TModel extends SenpiModelPort>(
 }
 
 // Chain providers with no model in the live registry, in chain order, deduplicated.
-function missingChainProviders(
+export function missingChainProviders(
   chain: readonly DelegateFallbackEntry[],
   availableModels: readonly string[],
 ): readonly string[] {
@@ -223,25 +223,21 @@ function missingChainProviders(
   return missing
 }
 
-// A gateway provider re-publishes an upstream model under `<gateway>/<upstream-vendor>/<model-id>`
-// (e.g. `vercel/openai/gpt-5.6-sol`). Only these known upstream vendor prefixes are unwrapped, so an
-// unrelated model that merely ends in a gate model's name cannot open that gate.
-const GATEWAY_UPSTREAM_VENDOR_PREFIXES = ["openai", "anthropic", "google"] as const
-
-function modelIdsOf(models: readonly string[]): ReadonlySet<string> {
-  const ids = new Set<string>()
-  for (const entry of models) {
-    const modelId = entry.slice(entry.indexOf("/") + 1)
-    ids.add(modelId)
-    const separatorIndex = modelId.indexOf("/")
-    if (separatorIndex <= 0) continue
-    const vendor = modelId.slice(0, separatorIndex)
-    const upstreamId = modelId.slice(separatorIndex + 1)
-    if (!upstreamId.includes("/") && GATEWAY_UPSTREAM_VENDOR_PREFIXES.some((prefix) => prefix === vendor)) {
-      ids.add(upstreamId)
-    }
+// The first rung model, in chain order, that only an unlisted provider (a gateway or custom proxy)
+// serves. Builtin resolution never selects it; it is the exact pin a user may opt into (#9146).
+export function unlistedProviderModel(
+  chain: readonly DelegateFallbackEntry[],
+  availableModels: readonly string[],
+): string | undefined {
+  const available = new Set(availableModels)
+  for (const rung of chain) {
+    const match = resolveModelForDelegateTask(
+      { fallbackChain: [rung], allowUnlistedProviders: true, availableModels: available },
+      { connectedProviders: null, hasProviderModelsCache: true, hasConnectedProvidersCache: true },
+    )
+    if (match !== undefined && "model" in match) return match.model
   }
-  return ids
+  return undefined
 }
 
 function getOwnRecordValue<TValue>(
@@ -251,7 +247,7 @@ function getOwnRecordValue<TValue>(
   return Object.hasOwn(record, key) ? record[key] : undefined
 }
 
-function parseAvailableModels(models: unknown): AvailableModelsParseResult {
+export function parseAvailableModels(models: unknown): AvailableModelsParseResult {
   if (!Array.isArray(models)) {
     return { models: [], validContainer: false }
   }
@@ -283,6 +279,20 @@ function modelSelection(input: ModelSelectionInput): CategoryModelSelection {
     ...(fallbackEntry !== undefined ? { fallbackEntry } : {}),
     matchedFallback: matchedFallback === true,
   }
+}
+
+/**
+ * The builtin fallback chain of a category, resolved against the models the registry reports as
+ * available, in chain order. `resolveCategory` leaves a user-forced model's chain untouched; a
+ * background child that must not die with its one refused pin appends these rungs itself.
+ */
+export function builtinCategoryChainCandidates<TModel extends SenpiModelPort>(
+  requestedCategoryName: string,
+  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
+): readonly ModelChainCandidate[] {
+  const chain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, canonicalCategoryName(requestedCategoryName))
+  if (chain === undefined) return []
+  return availableChainCandidates(chain, new Set(parseAvailableModels(senpiModelRegistry.getAvailable()).models))
 }
 
 export function resolveCategory<TModel extends SenpiModelPort>(
@@ -326,16 +336,23 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     }
   }
 
-  const availableModelIds = modelIdsOf(availableModels)
-  const gatedCategories = availableCategoryNames(omoConfig, availableModelIds)
+  const availableModelSet: ReadonlySet<string> = new Set(availableModels)
+  const gatedCategories = availableCategoryNames(omoConfig, availableModelSet)
   const fallbackChain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, categoryName)
   const chainDead = fallbackChain !== undefined
     && fallbackChain.length > 0
-    && !fallbackChain.some((rung) => isCategoryChainRungResolvable(rung, availableModelIds))
-  const deadChain = chainDead && fallbackChain !== undefined
-    ? { attempted_chain: fallbackChain, missing_providers: missingChainProviders(fallbackChain, availableModels) }
+    && !fallbackChain.some((rung) => isCategoryChainRungResolvable(rung, availableModelSet))
+  const unlistedModel = chainDead && fallbackChain !== undefined
+    ? unlistedProviderModel(fallbackChain, availableModels)
     : undefined
-  if (!isCategoryGateSatisfied(categoryName, userConfig !== undefined, availableModelIds)) {
+  const deadChain = chainDead && fallbackChain !== undefined
+    ? {
+        attempted_chain: fallbackChain,
+        missing_providers: missingChainProviders(fallbackChain, availableModels),
+        ...(unlistedModel !== undefined ? { unlisted_provider_model: unlistedModel } : {}),
+      }
+    : undefined
+  if (!isCategoryGateSatisfied(categoryName, userConfig !== undefined, availableModelSet)) {
     return {
       kind: "model_unavailable",
       category: categoryName,
@@ -431,7 +448,6 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const effectiveReasoningEffort = canonicalReasoningByModel.get(selection.selectedModel)
       ?? config.reasoning
       ?? config.reasoningEffort
-  const availableModelSet = new Set(availableModels)
   // Builtin chain rungs remaining after the selected one extend the runtime retry chain, appended
   // after any user-configured fallback_models so user entries keep priority (dedupe keeps firsts).
   const chainCandidates = fallbackChain === undefined

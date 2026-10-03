@@ -1,11 +1,11 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import { assembleAddressBook, toThreadAddressEntries, type AddressBookHost } from "../address-book"
+import { assembleAddressBook, toThreadAddressEntries, type AddressEntry } from "../address-book"
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
-import type { ThreadToolName, ThreadToolResult } from "../contracts"
+import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
 import { createReceiptStore, type ReceiptStore } from "../receipts"
-import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession, type ThreadToolSurfaceOptions } from "./ports"
+import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -61,8 +61,44 @@ export function summary(session: ThreadHostSession): ThreadToolSummary {
   }
 }
 
-export function resolveEntries(options: ThreadToolSurfaceOptions, sessions: readonly ThreadHostSession[]): ThreadAddressEntry[] {
-  return toThreadAddressEntries(assembleAddressBook([{ socket: options.host.socket, list_sessions: { sessions } } as AddressBookHost], options.diskSessions?.() ?? []))
+/**
+ * One call's view of the host. A multi-endpoint surface answers it whole (`listView`); a host that
+ * reaches one endpoint is that endpoint's listing, exactly as before endpoints were enumerated.
+ */
+export async function hostView(options: ThreadToolSurfaceOptions): Promise<ThreadHostView> {
+  if (options.host.listView !== undefined) return await options.host.listView()
+  const sessions = await options.host.listSessions()
+  return { sessions, hosts: [{ socket: options.host.socket, list_sessions: { sessions } }], disk: [] }
+}
+
+export function addressBook(options: ThreadToolSurfaceOptions, view: ThreadHostView): AddressEntry[] {
+  return assembleAddressBook(view.hosts, [...(options.diskSessions?.() ?? []), ...view.disk])
+}
+
+/** A thread listed from disk because its endpoint is dead: resumable, addressed by its durable id. */
+export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { readonly error_note?: string } {
+  return {
+    sessionId: entry.durable_id,
+    durableSessionId: entry.durable_id,
+    ...(entry.session_path === null ? {} : { sessionPath: entry.session_path }),
+    ...(entry.source_host === null ? {} : { socket: entry.source_host }),
+    cwd: entry.cwd,
+    thread_id: entry.thread_id,
+    name: entry.name ?? entry.thread_id,
+    status: "resumable",
+    created_at: entry.created_at,
+    updated_at: entry.updated_at,
+    ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
+  }
+}
+
+export function resolveEntries(options: ThreadToolSurfaceOptions, view: ThreadHostView): ThreadAddressEntry[] {
+  return toThreadAddressEntries(addressBook(options, view))
+}
+
+/** The per-session methods of the endpoint that listed `session`: routing ids are only unique per endpoint. */
+export function sessionPort(options: ThreadToolSurfaceOptions, session: ThreadHostSession): ThreadSessionPort {
+  return session.socket !== undefined && options.host.endpoint !== undefined ? options.host.endpoint(session.socket) : options.host
 }
 
 export function resolution(options: ThreadToolSurfaceOptions, entries: readonly ThreadAddressEntry[], target: string, callerId: string, allScope?: boolean) {
@@ -79,8 +115,14 @@ export function resolution(options: ThreadToolSurfaceOptions, entries: readonly 
 
 export function routingId(session: ThreadHostSession): string { return session.sessionId }
 
-export function targetSession(sessions: readonly ThreadHostSession[], durableId: string): ThreadHostSession | undefined {
-  return sessions.find((session) => (session.durableSessionId ?? session.sessionId) === durableId)
+/** One role vocabulary for both read paths: engine `toolResult` is `tool`; every other non-chat kind is `system`. */
+export function transcriptRole(role: unknown): ThreadTranscriptItem["role"] {
+  if (role === "user" || role === "assistant") return role
+  return role === "toolResult" ? "tool" : "system"
+}
+
+export function targetSession(view: ThreadHostView, durableId: string): ThreadHostSession | undefined {
+  return view.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === durableId)
 }
 
 export function makeReceipts(options: ThreadToolSurfaceOptions): ReceiptStore { return createReceiptStore({ directory: options.stateDirectory }) }

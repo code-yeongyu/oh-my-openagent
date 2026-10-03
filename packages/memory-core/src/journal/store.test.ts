@@ -2,16 +2,17 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
 import { spawn } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { TranscriptJournal, withLocalJournalLock } from "./store"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createJournal(): Promise<{ dir: string; journal: TranscriptJournal }> {

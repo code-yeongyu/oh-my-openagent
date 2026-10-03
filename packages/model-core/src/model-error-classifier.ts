@@ -1,6 +1,7 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { ProviderCache } from "./provider-cache"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { classifyRuntimeFallbackError, isTerminalQuotaError } from "./runtime-fallback-error-classifier"
 
 /**
  * Error names that indicate a retryable model error.
@@ -12,12 +13,6 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
-])
-
-const STOP_ERROR_NAMES = new Set([
-  "quotaexceedederror",
-  "insufficientcreditserror",
-  "freeusagelimiterror",
 ])
 
 /**
@@ -88,41 +83,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "upstream request failed",
 ]
 
-/**
- * Message patterns that indicate a non-retryable STOP error (quota/billing exhaustion).
- * These take precedence over RETRYABLE_MESSAGE_PATTERNS.
- */
-const STOP_MESSAGE_PATTERNS = [
-  "quota will reset after",
-  "quota exceeded",
-  "free usage limit",
-  "billing limit",
-  "billing hard limit",
-  "monthly limit",
-  "plan limit",
-  "subscription quota",
-  "subscription limit",
-  "payment required",
-  "out of credits",
-  "credits exhausted",
-  "insufficient credits",
-  "insufficient balance",
-  "credit balance",
-  "usage limit for this month",
-  "exhausted your capacity",
-  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
-  "daily call limit",
-  "daily limit",
-  "usage limit reached for",
-  "in arrears",
-  "fair use policy",
-  "recharge and try",
-  "使用上限",
-  "额度不足",
-  "余额不足",
-  "已耗尽",
-]
-
 const AUTO_RETRY_GATE_PATTERNS = [
   "rate limit",
   "cooling down",
@@ -148,29 +108,25 @@ export interface ErrorInfo {
  * Returns true if it's a known retryable type OR matches retryable message patterns.
  */
 export function isRetryableModelError(error: ErrorInfo): boolean {
-  // If we have an error name, check against known lists
-  if (error.name) {
-    const errorNameLower = error.name.toLowerCase()
-    // Explicit non-retryable takes precedence
-    if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
-      return false
-    }
-    if (STOP_ERROR_NAMES.has(errorNameLower)) {
-      return false
-    }
-    // Check if it's a known retryable error
-    if (RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
-      return true
-    }
-  }
-
-  // Check message patterns for unknown errors
-  const msg = error.message?.toLowerCase() ?? ""
-
-  // STOP patterns take precedence over retryable patterns
-  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+  const errorNameLower = error.name?.toLowerCase()
+  if (errorNameLower !== undefined && NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
     return false
   }
+
+  // One vocabulary for both classifiers: a usage, quota, or billing limit moves the chain to the next
+  // model; only a quota the provider marks as terminal stops it.
+  if (isTerminalQuotaError(error)) {
+    return false
+  }
+  if (classifyRuntimeFallbackError(error) === "quota_exceeded") {
+    return true
+  }
+
+  if (errorNameLower !== undefined && RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
+    return true
+  }
+
+  const msg = error.message?.toLowerCase() ?? ""
 
   if (hasProviderAutoRetrySignal(msg)) {
     return true

@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 
 import { createSandbox, digestDirectory } from "./drive.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 // Isolation gate: auth/models/trust byte-identical plus settings.json compared with the live
 // host session's own bookkeeping keys stripped (workflow-skills/tipsHistory/skills - proven to
@@ -242,7 +243,7 @@ function seedScenario(pluginRoot, script, omoConfig) {
   mkdirSync(omoDir, { recursive: true })
   writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(omoConfig, null, 2)}\n`)
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify(script, null, 2)}\n`)
-  return { sandbox, sessionDir, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
+  return { sandbox, sessionDir, stateDir: sandboxStateDir(sandbox) }
 }
 
 function collectText(root) {
@@ -313,7 +314,7 @@ const SENPI_TIMEOUT_MS = 120_000
 // retired-config scenario (drive.mjs convention).
 function senpiEnv(sandbox, sessionDir) {
   return {
-    ...process.env,
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     HOME: sandbox.homeDir,
     USERPROFILE: sandbox.homeDir,

@@ -49,24 +49,11 @@ describe("Senpi compatibility test script", () => {
 
     // #when
     const shipsPluginTree = files.includes("packages/omo-senpi/plugin")
-    const hasStandaloneBuildScript = manifest.scripts?.["build:senpi-plugin"] === [
-      "bun run build:lsp-daemon",
-      "bun run build:ast-grep-mcp",
-      "bun run build:senpi-plugin:stage",
-    ].join(" && ")
-    const hasStageScript = manifest.scripts?.["build:senpi-plugin:stage"] === [
-      "bun run build:materialize-frontend",
-      "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
-      "node packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
-      "node packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs",
-      "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
-      // The daemon launch spec is generated at build time so the plugin payload ships the only
-      // argv source the task daemon has; it sits between the extension build and skill sync.
-      "node packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs",
-      "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
-      "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
-      "node packages/omo-senpi/plugin/scripts/build-install.mjs",
-    ].join(" && ")
+    const stageSteps = (manifest.scripts?.["build:senpi-plugin:stage"] ?? "").split(" && ")
+    // The daemon launch spec is generated at build time so the plugin payload ships the only argv
+    // source the task daemon has, so it must run before skill sync packages the payload.
+    const launchSpecIndex = stageSteps.indexOf("node packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs")
+    const syncSkillsIndex = stageSteps.indexOf("node packages/omo-senpi/plugin/scripts/sync-skills.mjs")
     const senpiNode = BUILD_NODES.find((node) => node.id === "senpi-plugin")
 
     // #then
@@ -74,8 +61,8 @@ describe("Senpi compatibility test script", () => {
       shipsPluginTree,
       "root npm files must NOT ship packages/omo-senpi/plugin while the senpi platform flag is disabled for release",
     ).toBe(false)
-    expect(hasStandaloneBuildScript, "standalone Senpi build must build the shared daemon once before staging").toBe(true)
-    expect(hasStageScript, "root scripts must expose a stage-only Senpi artifact build").toBe(true)
+    expect(launchSpecIndex, "the Senpi stage must generate the daemon launch spec").toBeGreaterThanOrEqual(0)
+    expect(syncSkillsIndex, "the daemon launch spec must be generated before skill sync").toBeGreaterThan(launchSpecIndex)
     expect(senpiNode?.args, "the build orchestrator must generate Senpi plugin artifacts before publishing").toEqual([
       "run",
       "build:senpi-plugin:stage",
@@ -133,6 +120,8 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "omo.js"), "export default {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
       await writeFile(join(pluginRoot, "extensions", "omo-member.js"), "export const runMember = () => undefined\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-computer-use.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")

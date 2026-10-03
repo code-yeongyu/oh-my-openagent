@@ -152,6 +152,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       // manager decides, so no run is pinned to a guess.
       autoMode: () => deps.engine.host.executionModeGate.current(),
     },
+    ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
   }
@@ -439,6 +440,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
     // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
     isRunHeldInProcess: (runId) => schedulers.has(runId),
+    ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     stopAdmission: (runId) => stoppedAdmissions.add(runId),

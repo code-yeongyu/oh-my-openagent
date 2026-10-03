@@ -55,6 +55,9 @@ setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
 const HERMETIC_HOME = mkdtempSync(join(tmpdir(), "omo-test-home-"))
 process.env.HOME = HERMETIC_HOME
 process.env.USERPROFILE = HERMETIC_HOME
+// A run started inside a live omo session inherits its agent dir; drop it so agent-dir state
+// (task stores, sessions) resolves under the hermetic HOME exactly as it does in CI.
+for (const name of ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"]) delete process.env[name]
 delete process.env.OPENCODE_SERVER_PASSWORD
 
 let isGlobalMockCleanup = false

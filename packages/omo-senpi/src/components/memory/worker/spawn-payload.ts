@@ -14,6 +14,7 @@ import type {
   ReflectionSpawnPaths,
 } from "./spawn-types"
 import { resolveMemoryChildLaunch, withoutForeignPackageDirEnv } from "./senpi-command"
+import { OMO_SENPI_DISABLED_ENV } from "../../../extension/disable-env"
 
 export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput): Promise<ReflectionSpawnArgs> {
   const sessionDir = join(input.reflectionSessionsDir, safeRunId(input.run.runId))
@@ -91,6 +92,9 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
       ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
     }),
     SENPI_MEMORY_REFLECTION: "1",
+    // Extensions load only for the provider one of them registers; omo's own components would
+    // write runtime state into the memory worktree and dirty it (#9175).
+    ...(input.loadExtensions === true ? { [OMO_SENPI_DISABLED_ENV]: "1" } : {}),
     // A detached child has no controlling terminal, so senpi's PTY-backed bash session fails with
     // "Native PTY session handle is missing write()" and the child could never git-commit its
     // reflection. pi-pty's documented non-interactive override selects the pipe session backend.
@@ -98,14 +102,16 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   }
   // Verified against senpi packages/coding-agent/src/cli/args.ts and cli/file-processor.ts:
   // -p selects print mode; --system-prompt reads a file path; --tools is a comma allowlist;
-  // --no-extensions/--no-skills/--no-prompt-templates/--no-context-files disable discovery;
+  // --no-extensions/--no-skills/--no-prompt-templates/--no-context-files disable discovery, except
+  // that a model only an extension-registered provider serves keeps extensions (#9175; the
+  // SENPI_MEMORY_REFLECTION sentinel still disables memory inside the child);
   // --session-dir isolates JSONL storage; --model/--thinking select the category result; @file
   // loads the mechanics prompt as the initial non-interactive message.
   const args = [
     "-p",
     "--system-prompt", persona,
     "--tools", "bash,edit",
-    "--no-extensions",
+    ...(input.loadExtensions === true ? [] : ["--no-extensions"]),
     "--no-skills",
     "--no-prompt-templates",
     "--no-context-files",
@@ -163,10 +169,12 @@ export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnIn
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${base.paths.prompt}`,
   ]
+  const { [OMO_SENPI_DISABLED_ENV]: _omoDisabled, ...env } = base.env
   return {
     ...base,
     fork: { parentSessionFile },
     args,
+    env,
     cwd: input.parentCwd ?? base.cwd,
   }
 }

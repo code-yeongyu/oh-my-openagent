@@ -28,7 +28,7 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
-export async function fixture() {
+export async function fixture(now?: () => Date) {
   const root = await mkdtemp(join(tmpdir(), "omo-facts-runner-"))
   tempDirs.push(root)
   const identity: MemoryIdentity = {
@@ -36,7 +36,7 @@ export async function fixture() {
     safeSlug: "facts-agent",
     paths: buildIdentityPaths(root, "facts-agent"),
   }
-  const queue = new FactsQueue({ identityPaths: identity.paths })
+  const queue = new FactsQueue({ identityPaths: identity.paths, ...(now === undefined ? {} : { now }) })
   await enqueue(queue, identity, "session-1", "m1", "The project uses Bun.")
   return { root, identity, queue }
 }
@@ -47,7 +47,7 @@ export async function fixture() {
  * exist - the shipped catalog would otherwise satisfy the quick chain on its own. An in-process
  * child shares this exact instance, so the facts child cannot drift onto another engine's model set.
  */
-export function registrySnapshot(models: readonly { readonly id: string }[] = [{ id: "mock-1" }]): ChildModelRegistry {
+export function registrySnapshot(models: readonly { readonly id: string; readonly contextWindow?: number; readonly maxTokens?: number }[] = [{ id: "mock-1" }]): ChildModelRegistry {
   const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
   registry.registerProvider("omo-mock", {
     api: "openai-completions",
@@ -59,8 +59,8 @@ export function registrySnapshot(models: readonly { readonly id: string }[] = [{
       reasoning: false,
       input: ["text"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 1,
-      maxTokens: 1,
+      contextWindow: model.contextWindow ?? 1,
+      maxTokens: model.maxTokens ?? 1,
     })),
   })
   return registry

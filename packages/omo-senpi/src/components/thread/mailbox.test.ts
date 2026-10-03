@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -178,6 +178,23 @@ describe("ordered delivery mailbox", () => {
     rmSync(directory, { recursive: true, force: true })
   })
 
+  test("keeps retryable non-Error host pushback queued", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "omo-mailbox-non-error-pushback-"))
+    const port: MailboxTargetPort = {
+      snapshot: async () => ({ turn_id: "turn-1", active: true }),
+      steer: async () => Promise.reject("Agent is already processing"),
+      start: async () => ({ turn_id: "new" }),
+    }
+    const mailbox = createOrderedDeliveryMailbox({ directory, portFor: () => port })
+
+    const result = await mailbox.accept("target", "queued", { delivery: "steer", expected_turn_id: "turn-1" })
+    expect(result).toMatchObject({ kind: "ok", delivery: "queued", message_seq: 1 })
+    expect(mailbox.pending("target").map((item) => item.message)).toEqual(["queued"])
+
+    mailbox.close()
+    rmSync(directory, { recursive: true, force: true })
+  })
+
   test("returns message_too_large for one message over the byte budget", async () => {
     const h = setup()
     const result = await h.mailbox.accept("target", "x".repeat(1024 * 1024 + 1), { delivery: "follow_up" })
@@ -190,28 +207,41 @@ describe("ordered delivery mailbox", () => {
   test("persists pending messages and enforces count and byte caps", async () => {
     const directory = mkdtempSync(join(tmpdir(), "omo-mailbox-"))
     mkdirSync(directory, { recursive: true })
+    const maxMessages = 3
+    const maxBytes = 10
+    const byteMessage = "xxxx"
     const blocked: MailboxTargetPort = {
       snapshot: async () => ({ turn_id: "busy", active: true }),
       steer: async () => { await new Promise<void>(() => {}) },
       start: async () => ({ turn_id: "new" }),
     }
-    const mailbox = createOrderedDeliveryMailbox({ directory, portFor: () => blocked })
-    for (let i = 0; i < 128; i++) await mailbox.accept("target", `m-${i}`, { delivery: "follow_up" })
+    const mailbox = createOrderedDeliveryMailbox({ directory, portFor: () => blocked, max_messages: maxMessages })
+    for (let i = 0; i < maxMessages; i++) await mailbox.accept("target", `m-${i}`, { delivery: "follow_up" })
     const full = await mailbox.accept("target", "overflow", { delivery: "follow_up" })
     expect(full).toMatchObject({ kind: "error", error: { code: "queue_full" } })
-    expect(mailbox.pending("target")).toHaveLength(128)
+    expect(mailbox.pending("target")).toHaveLength(maxMessages)
+    const journalEvents = readFileSync(join(directory, "mailbox.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(journalEvents).toMatchObject([
+      { kind: "snapshot", next_seq: 1, items: [] },
+      { kind: "enqueue", item: { message: "m-0" } },
+      { kind: "enqueue", item: { message: "m-1" } },
+      { kind: "enqueue", item: { message: "m-2" } },
+    ])
     const byteDirectory = mkdtempSync(join(tmpdir(), "omo-mailbox-bytes-"))
-    const byteMailbox = createOrderedDeliveryMailbox({ directory: byteDirectory, portFor: () => blocked })
-    for (let i = 0; i < 5; i++) await byteMailbox.accept("target", "x".repeat(200 * 1024), { delivery: "follow_up" })
-    const byteFull = await byteMailbox.accept("target", "x".repeat(200 * 1024), { delivery: "follow_up" })
+    const byteMailbox = createOrderedDeliveryMailbox({ directory: byteDirectory, portFor: () => blocked, max_bytes: maxBytes })
+    for (let i = 0; i < 2; i++) await byteMailbox.accept("target", byteMessage, { delivery: "follow_up" })
+    const byteFull = await byteMailbox.accept("target", byteMessage, { delivery: "follow_up" })
     expect(byteFull).toMatchObject({ kind: "error", error: { code: "queue_full" } })
-    expect(byteMailbox.pending("target")).toHaveLength(5)
-    const restarted = createOrderedDeliveryMailbox({ directory, portFor: () => blocked })
-    expect(restarted.pending("target").map((item) => item.message)).toHaveLength(128)
+    expect(byteMailbox.pending("target")).toHaveLength(2)
+    const restarted = createOrderedDeliveryMailbox({ directory, portFor: () => blocked, max_messages: maxMessages })
+    expect(restarted.pending("target").map((item) => item.message)).toHaveLength(maxMessages)
     mailbox.close()
     restarted.close()
     byteMailbox.close()
     rmSync(directory, { recursive: true, force: true })
     rmSync(byteDirectory, { recursive: true, force: true })
-  }, { timeout: 15_000 })
+  })
 })

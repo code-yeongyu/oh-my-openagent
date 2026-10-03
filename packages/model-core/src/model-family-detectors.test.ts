@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
+  DEVIN_SWE2_SERVED_LANES,
+  isUnservedDevinSWE2Selector,
   isClaudeFable5Model,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
@@ -87,6 +89,19 @@ describe("model family detectors", () => {
     expect(isKimiK3Model("kimi-for-coding/k2p7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p5")).toBe(false)
     expect(isKimiK3Model("anthropic/claude-opus-4-7")).toBe(false)
+  })
+
+  test("#given Devin selectors #then only an explicit devin SWE-2 id outside the served lanes is unserved", () => {
+    expect(DEVIN_SWE2_SERVED_LANES).toEqual(["swe-2-medium", "swe-2-high", "swe-2-max"])
+    for (const served of ["devin/swe-2-medium", "devin/swe-2-high", "devin/swe-2-max", "Devin/SWE-2-High", "devin/swe-2-high:max", "devin/swe-2-medium (high)"]) {
+      expect(isUnservedDevinSWE2Selector(served)).toBe(false)
+    }
+    for (const unserved of ["devin/swe-2", "devin/swe-2-low", "devin/swe-2-high-lite", "devin/swe-2.0", "devin/swe-2-low:high"]) {
+      expect(isUnservedDevinSWE2Selector(unserved)).toBe(true)
+    }
+    for (const other of ["swe-2-low", "gateway/swe-2-low", "devin/swe-1-6", "devin/swe-20", "devin/adaptive"]) {
+      expect(isUnservedDevinSWE2Selector(other)).toBe(false)
+    }
   })
 
   test("#given Devin SWE-2 model ids #then detects SWE-2 effort lanes only", () => {

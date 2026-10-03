@@ -112,6 +112,7 @@ export function buildManagedSpec(input: {
     ...(instructions !== undefined ? { instructions } : {}),
     ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
     ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
+    includeTaskTools: record.owner?.kind !== "dag",
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
     ...(spec.memberScopedTools !== undefined
       ? { memberScopedToolNames: spec.memberScopedTools.map((tool) => tool.name) }
@@ -175,6 +176,7 @@ export function buildRespawnManagedSpec(record: TaskRecord, stateDir: string): B
       ...(spawnSpec.instructions !== undefined ? { instructions: spawnSpec.instructions } : {}),
       ...(record.tool_allow !== undefined ? { toolAllowlist: record.tool_allow } : {}),
       ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
+      includeTaskTools: record.owner?.kind !== "dag",
       ...(spawnSpec.member_scoped_tool_names !== undefined
         ? { memberScopedToolNames: spawnSpec.member_scoped_tool_names }
         : {}),
@@ -206,16 +208,42 @@ export function recordSpawnedRunner(
   hostSession: ManagedChildHandle["hostSession"],
 ): TaskRecord | undefined {
   if (isTerminalRecord(record) || kind !== "host-session" || hostSession === undefined) return undefined
+  return { ...record, runner_kind: "host-session", host_session: hostSessionFacts(hostSession) }
+}
+
+function hostSessionFacts(hostSession: NonNullable<ManagedChildHandle["hostSession"]>): NonNullable<TaskRecord["host_session"]> {
   return {
-    ...record,
-    runner_kind: "host-session",
-    host_session: {
-      socket: hostSession.socket,
-      routing_id: hostSession.routingId,
-      session_path: hostSession.sessionPath,
-      instance_id: hostSession.instanceId,
-    },
+    socket: hostSession.socket,
+    routing_id: hostSession.routingId,
+    session_path: hostSession.sessionPath,
+    instance_id: hostSession.instanceId,
   }
+}
+
+/**
+ * What reaches a child from outside this process: its OS pid, or its daemon session. An in-process
+ * child has neither - it ends with this process - so its identity is empty.
+ */
+export type ChildIdentity = Pick<TaskRecord, "pid" | "runner_kind" | "host_session">
+
+export function childIdentityOf(source: TaskRecord | ManagedChildHandle): ChildIdentity {
+  if ("notification" in source) {
+    return {
+      ...(source.pid === undefined ? {} : { pid: source.pid }),
+      ...(source.runner_kind === undefined ? {} : { runner_kind: source.runner_kind }),
+      ...(source.host_session === undefined ? {} : { host_session: source.host_session }),
+    }
+  }
+  return {
+    ...(source.pid === undefined ? {} : { pid: source.pid }),
+    ...(source.kind !== "host-session" || source.hostSession === undefined
+      ? {}
+      : { runner_kind: "host-session" as const, host_session: hostSessionFacts(source.hostSession) }),
+  }
+}
+
+export function hasChildIdentity(identity: ChildIdentity): boolean {
+  return identity.pid !== undefined || identity.host_session !== undefined
 }
 
 // Fold the spawned child's own session id onto its record. External readers join a grandchild

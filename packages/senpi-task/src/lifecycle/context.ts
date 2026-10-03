@@ -6,6 +6,7 @@ import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { TaskRecordStore } from "../store"
 import {
   DEFAULT_HOST_SESSION_RETRY_POLICY,
+  type HostEndpointPort,
   type HostSessionCloser,
   type HostSessionProbe,
   type HostSessionRetryPolicy,
@@ -19,6 +20,7 @@ import { defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
 export { createIdleReclaimerScheduler, defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"
 
 const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
+const DEFAULT_HOST_CLOSE_TIMEOUT_MS = 10_000
 
 export type LifecycleContext = {
   readonly revivePolicy?: LifecycleDeps["revivePolicy"]
@@ -41,6 +43,8 @@ export type LifecycleContext = {
   readonly hostSessionProbe: HostSessionProbe
   readonly hostSessionClose: HostSessionCloser | undefined
   readonly hostRetry: HostSessionRetryPolicy
+  readonly hostEndpoint: HostEndpointPort
+  readonly hostCloseTimeoutMs: number
   readonly isolation: IsolationRuntime | undefined
   readonly isolationProbe: OwnerProbe | undefined
 }
@@ -84,6 +88,8 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     hostSessionProbe: deps.hostSessionProbe ?? defaultHostSessionProbe(),
     hostSessionClose: deps.hostSessionClose ?? defaultHostSessionCloser,
     hostRetry: deps.hostRetry ?? DEFAULT_HOST_SESSION_RETRY_POLICY,
+    hostEndpoint: deps.hostEndpoint,
+    hostCloseTimeoutMs: deps.hostCloseTimeoutMs ?? DEFAULT_HOST_CLOSE_TIMEOUT_MS,
     isolation: deps.isolation,
     isolationProbe: deps.isolationProbe,
   }

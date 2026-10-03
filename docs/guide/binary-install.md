@@ -2,7 +2,24 @@
 
 Each GitHub Release of oh-my-openagent attaches per-OS/arch single-file `omo` executables plus a `SHA256SUMS` checksum file. The binary is self-contained: it embeds the senpi engine, the omo plugin payload, and every runtime resource, and provisions them into `~/.omo/binary-runtime/<version>/` on first run. No node, npm, or bun install is required.
 
-## Install (per OS)
+## One-line install (recommended)
+
+[Install OmO](install.md) is the full guide: every platform, channels, fixing your `PATH`, updating and uninstalling.
+
+```sh
+curl -fsSL https://get.omo.dev/install.sh | bash            # latest
+curl -fsSL https://get.omo.dev/install.sh | bash -s -- beta # beta channel, or pass a version such as 5.1.1
+```
+
+```powershell
+irm https://get.omo.dev/install.ps1 | iex
+```
+
+The script picks the asset for your OS, CPU, libc and AVX2 support (Rosetta shells get the Apple Silicon build), verifies it against the release `SHA256SUMS`, and installs it as `~/.local/bin/omo` (`%USERPROFILE%\.local\bin\omo.exe` on Windows). If that directory is not on `PATH` it adds a marked block to your shell profile (or your Windows user `PATH`). It writes a receipt to `~/.omo/install.json` and reports any npm `omo-ai` install it finds without removing it. It refuses to run as root.
+
+Binaries come from the get.omo.dev mirror, a Cloudflare R2 copy of each release behind the CDN. When the mirror does not have a version, or is unreachable, the script downloads the same file from GitHub Releases and verifies it the same way. Settings: `OMO_INSTALL_DIR` (install directory), `OMO_NO_MODIFY_PATH=1` (never edit profiles).
+
+## Manual install (per OS)
 
 Download the asset for your platform with `curl`, make it executable, and run it. Replace `<VERSION>` with the release tag (for example `5.0.0-beta.20`) and `<TARGET>` with your platform from the table below.
 
@@ -81,7 +98,7 @@ On first run the binary writes its runtime to `~/.omo/binary-runtime/<version>/`
 
 ## Updating
 
-There is no in-place updater. Reinstall: download the new release's asset the same way and replace the binary. The `update` subcommand prints the exact `curl` command for your platform.
+Re-run the one-line installer: it replaces the binary when the channel has a newer version and does nothing otherwise. For a manual install, download the new release's asset the same way and replace the binary; the `update` subcommand prints the exact `curl` command for your platform.
 
 ## Notes and limits
 

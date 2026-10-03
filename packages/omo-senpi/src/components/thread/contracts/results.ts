@@ -14,6 +14,8 @@ export type ThreadSummary = {
   readonly cwd: string
   readonly created_at: string
   readonly updated_at: string
+  /** Present only on a thread listed from disk because its endpoint stopped answering. */
+  readonly error_note?: string
 }
 
 export type ThreadDelivery =
@@ -27,7 +29,7 @@ export type ThreadReadSource = "live_host" | "session_jsonl"
 
 export type ThreadTranscriptItem = {
   readonly seq: number
-  readonly role: "user" | "assistant" | "system"
+  readonly role: "user" | "assistant" | "tool" | "system"
   readonly content: string
 }
 
@@ -47,6 +49,9 @@ export type ThreadReadResult =
       readonly truncated: boolean
       readonly next_cursor?: string
       readonly source: ThreadReadSource
+      /** Set on the JSONL fallback for a thread whose endpoint is dead: the file may lag the session. */
+      readonly source_incomplete?: boolean
+      readonly error_note?: string
     }
   | ThreadDataError
 

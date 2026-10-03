@@ -1,0 +1,622 @@
+{
+  "description": "Synthetic, fictional recall benchmark corpus (English, Korean, Japanese, Chinese and code-switched queries). Contains no real user memory.",
+  "documents": [
+    {
+      "path": "reference/projects/lighthouse-deploy.md",
+      "description": "Lighthouse web app deployment runbook",
+      "body": "Lighthouse deploys through the blue-green pipeline. Promote with `make promote ENV=prod` after the canary holds for 15 minutes. Rollback: `make rollback ENV=prod` restores the previous slot. The health endpoint is /healthz and must return 200 before promotion."
+    },
+    {
+      "path": "reference/projects/lighthouse-release.md",
+      "description": "Lighthouse release checklist",
+      "body": "Every Lighthouse release needs a signed changelog entry, a green e2e suite and an approval from the security reviewer. Tags follow vYYYY.MM.patch. Release notes are drafted in docs/releases and published on Thursday."
+    },
+    {
+      "path": "reference/projects/pebble-cli.md",
+      "description": "Pebble CLI publishing notes",
+      "body": "Pebble is published to the package registry from CI only. The publish token lives in the CI secret store under PEBBLE_PUBLISH; local publishing is disabled because the registry enforces two-factor auth. Bump the version with `pebble release minor`."
+    },
+    {
+      "path": "reference/projects/pebble-bugs.md",
+      "description": "Known Pebble bugs",
+      "body": "Pebble crashes on Windows paths longer than 260 characters; workaround: enable long paths. The progress bar flickers in tmux when TERM is screen; set TERM=tmux-256color."
+    },
+    {
+      "path": "reference/tools/tmux-rules.md",
+      "description": "tmux session targeting rules",
+      "body": "Always target tmux sessions with an exact match: `tmux kill-session -t =build`. Without the = prefix tmux prefix-matches and can kill build-cache instead. Avoid session names that are prefixes of other sessions."
+    },
+    {
+      "path": "reference/tools/backup.md",
+      "description": "Laptop backup routine",
+      "body": "Backups run nightly with restic to the object storage bucket nightly-archive. Verify weekly with `restic check`. Photos are excluded because they already sync to the photo service."
+    },
+    {
+      "path": "reference/tools/vpn.md",
+      "description": "Office VPN access",
+      "body": "The office network is reached through the mesh VPN. The build server answers at 10.20.0.14; SSH user is ci. The key is stored in the system keychain entry build-ssh."
+    },
+    {
+      "path": "reference/tools/editor.md",
+      "description": "Editor setup",
+      "body": "Use the monospace font Iosevka at 14pt. Format on save is enabled for TypeScript and Python; Python uses ruff."
+    },
+    {
+      "path": "people/dana/preferences.md",
+      "description": "Dana's communication preferences",
+      "body": "Dana wants weekly status updates on Friday with the release date first and timestamps in UTC. She prefers a table over long prose."
+    },
+    {
+      "path": "people/dana/background.md",
+      "description": "Dana's background",
+      "body": "Dana is a data engineer who maintains the ingestion jobs. She is not the team lead; route approvals to Minho."
+    },
+    {
+      "path": "people/minho/card.md",
+      "description": "Minho, backend engineer",
+      "body": "Minho owns the payments service and reviews every schema migration. He prefers written RFCs over meetings."
+    },
+    {
+      "path": "notes/decisions/model-routing.md",
+      "description": "Model routing decision",
+      "body": "Batch summarization jobs run on the small model; code review and release gates run on the large model. Revisit at the quarterly budget review."
+    },
+    {
+      "path": "notes/decisions/merge-policy.md",
+      "description": "Pull request merge policy",
+      "body": "A maintainer merges a pull request once CI is green and one reviewer approved the latest commit. Stacked PRs: retarget children to main before deleting the parent branch."
+    },
+    {
+      "path": "notes/decisions/promo-cadence.md",
+      "description": "Promotion cadence",
+      "body": "Promotion limits: at most two promotion posts per network per week, on the blog and the community forum. Send a plain-text weekly report on Sunday."
+    },
+    {
+      "path": "notes/incidents/2026-08-cache.md",
+      "description": "August cache incident",
+      "body": "The CDN cache served stale bundles for two hours after the Lighthouse deploy because the purge job used the old distribution id. Fix: purge by tag instead of id."
+    },
+    {
+      "path": "notes/incidents/2026-09-dns.md",
+      "description": "September DNS incident",
+      "body": "A DNS record for the status page expired; renewal is now automated with a 30-day reminder."
+    },
+    {
+      "path": "notes/journal/2026-09-12.md",
+      "description": "Weekly journal",
+      "body": "Spent the week on the onboarding flow. Session replay showed users dropping at the pricing step."
+    },
+    {
+      "path": "notes/journal/2026-09-19.md",
+      "description": "Weekly journal",
+      "body": "Reviewed analytics dashboards and cleaned up old sessions and branches."
+    },
+    {
+      "path": "reference/projects/garden-app.md",
+      "description": "Garden planner mobile app",
+      "body": "The garden planner stores plant schedules locally and syncs through the sync service every six hours. Push notifications remind users to water."
+    },
+    {
+      "path": "reference/projects/newsletter.md",
+      "description": "Newsletter workflow",
+      "body": "The newsletter is written in markdown, rendered with the static site generator and sent every Monday at 07:00 KST."
+    },
+    {
+      "path": "reference/ko/배포-절차.md",
+      "description": "라이트하우스 배포 절차 (한국어)",
+      "body": "라이트하우스 배포는 블루그린 파이프라인으로 진행한다. 카나리를 15분 유지한 뒤 프로덕션으로 승격한다. 문제가 생기면 롤백 명령으로 이전 슬롯을 복구한다."
+    },
+    {
+      "path": "reference/ko/회의-받아쓰기.md",
+      "description": "회의 녹음 받아쓰기 설정",
+      "body": "회의 녹음은 로컬 받아쓰기 엔진으로 텍스트로 변환한다. 모델 파일은 medium 크기를 쓰고, 44kHz 스테레오 녹음을 16kHz 모노 wav로 먼저 변환한다."
+    },
+    {
+      "path": "reference/ko/답변-서명.md",
+      "description": "답변 끝 서명 규칙",
+      "body": "모든 답변 끝에 팀 이름과 작성 날짜를 짧게 표시한다. 형식은 괄호 안에 두 값을 넣는다."
+    },
+    {
+      "path": "reference/ko/원격-서버.md",
+      "description": "원격 리눅스 서버 접속",
+      "body": "사내 리눅스 서버는 메시 VPN으로 접속한다. 재부팅 후 SSH 서버가 자동으로 켜지도록 서비스로 등록했다. 메모리 상한은 4GB로 설정했다."
+    },
+    {
+      "path": "reference/ko/블로그-규칙.md",
+      "description": "블로그 글 작성 규칙",
+      "body": "블로그 글 제목은 40자 이내로 쓴다. 코드 예제는 실행 가능한 것만 넣는다. 이미지 첨부가 되는 게시판에는 구성도를 넣는다."
+    },
+    {
+      "path": "reference/ko/디스크-정리.md",
+      "description": "노트북 디스크 정리 기록",
+      "body": "디스크 용량이 커진 원인은 오래된 컨테이너 이미지 캐시였다. 오래된 이미지를 목록으로 뽑아 검증한 뒤 삭제했다."
+    },
+    {
+      "path": "reference/ko/크레딧.md",
+      "description": "클라우드 빌드 크레딧 소진 대응",
+      "body": "클라우드 빌드 크레딧이 떨어지면 야간 빌드를 멈추고 수동 빌드만 돌린다. 충전은 팀장이 한다."
+    },
+    {
+      "path": "reference/ko/스프린트-일정.md",
+      "description": "주간 스프린트 일정",
+      "body": "매주 월요일 아홉 시에 스프린트 보드를 보고 이번 주 할 일을 캘린더에 올린다. 다른 팀의 일은 올리지 않는다."
+    },
+    {
+      "path": "reference/tools/password-manager.md",
+      "description": "Password manager conventions",
+      "body": "Shared credentials live in the team vault; personal tokens live in the OS keychain. Never paste secrets into chat or notes."
+    },
+    {
+      "path": "reference/tools/monitoring.md",
+      "description": "Monitoring stack",
+      "body": "Uptime checks run every minute; alerts page the on-call phone. Dashboards live in the metrics UI under the ops folder."
+    },
+    {
+      "path": "reference/ja/経費精算.md",
+      "description": "経費精算のルール",
+      "body": "出張の経費は月末までに精算システムで申請する。領収書は写真で添付し、原本は三か月保管する。"
+    },
+    {
+      "path": "reference/ja/鍵管理.md",
+      "description": "サーバー鍵の管理",
+      "body": "本番サーバーの秘密鍵は保管庫にだけ置く。鍵の更新は半年ごとに行い、古い鍵はすぐに無効化する。"
+    },
+    {
+      "path": "reference/ja/会議室予約.md",
+      "description": "会議室の予約方法",
+      "body": "会議室は社内カレンダーから予約する。十名以上の会議は大会議室を使い、前日までに予約を確定する。"
+    },
+    {
+      "path": "reference/zh/发布流程.md",
+      "description": "移动应用发布流程",
+      "body": "移动应用每两周发布一次。发布前需要完成回归测试，并由产品负责人签字确认。版本号采用年份加周数。"
+    },
+    {
+      "path": "reference/zh/数据库备份.md",
+      "description": "数据库备份策略",
+      "body": "生产数据库每天凌晨三点全量备份，备份文件保留三十天。恢复演练每季度进行一次。"
+    },
+    {
+      "path": "reference/zh/值班规则.md",
+      "description": "值班安排规则",
+      "body": "值班每周轮换一次，交接在周一上午完成。紧急告警必须在十五分钟内响应。"
+    }
+  ],
+  "queries": [
+    {
+      "id": "e01",
+      "lang": "en",
+      "text": "how do I roll back the lighthouse production deploy",
+      "gold": [
+        "reference/projects/lighthouse-deploy.md",
+        "reference/ko/배포-절차.md"
+      ]
+    },
+    {
+      "id": "e02",
+      "lang": "en",
+      "text": "what does a lighthouse release need before tagging",
+      "gold": [
+        "reference/projects/lighthouse-release.md"
+      ]
+    },
+    {
+      "id": "e03",
+      "lang": "en",
+      "text": "where is the pebble publish token kept",
+      "gold": [
+        "reference/projects/pebble-cli.md"
+      ]
+    },
+    {
+      "id": "e04",
+      "lang": "en",
+      "text": "pebble progress bar flickers inside tmux",
+      "gold": [
+        "reference/projects/pebble-bugs.md"
+      ]
+    },
+    {
+      "id": "e05",
+      "lang": "en",
+      "text": "killing a tmux session also killed another one",
+      "gold": [
+        "reference/tools/tmux-rules.md"
+      ]
+    },
+    {
+      "id": "e06",
+      "lang": "en",
+      "text": "how are nightly laptop backups verified",
+      "gold": [
+        "reference/tools/backup.md"
+      ]
+    },
+    {
+      "id": "e07",
+      "lang": "en",
+      "text": "build server address over the vpn",
+      "gold": [
+        "reference/tools/vpn.md"
+      ]
+    },
+    {
+      "id": "e08",
+      "lang": "en",
+      "text": "which font and size does the editor use",
+      "gold": [
+        "reference/tools/editor.md"
+      ]
+    },
+    {
+      "id": "e09",
+      "lang": "en",
+      "text": "how should status updates to Dana be written",
+      "gold": [
+        "people/dana/preferences.md"
+      ]
+    },
+    {
+      "id": "e10",
+      "lang": "en",
+      "text": "is Dana the team lead",
+      "gold": [
+        "people/dana/background.md"
+      ]
+    },
+    {
+      "id": "e11",
+      "lang": "en",
+      "text": "who reviews schema migrations for payments",
+      "gold": [
+        "people/minho/card.md"
+      ]
+    },
+    {
+      "id": "e12",
+      "lang": "en",
+      "text": "which model handles code review",
+      "gold": [
+        "notes/decisions/model-routing.md"
+      ]
+    },
+    {
+      "id": "e13",
+      "lang": "en",
+      "text": "when can a pull request be merged",
+      "gold": [
+        "notes/decisions/merge-policy.md"
+      ]
+    },
+    {
+      "id": "e14",
+      "lang": "en",
+      "text": "weekly promotion posting limits per network",
+      "gold": [
+        "notes/decisions/promo-cadence.md"
+      ]
+    },
+    {
+      "id": "e15",
+      "lang": "en",
+      "text": "why did the CDN serve stale bundles",
+      "gold": [
+        "notes/incidents/2026-08-cache.md"
+      ]
+    },
+    {
+      "id": "e16",
+      "lang": "en",
+      "text": "status page DNS record expired",
+      "gold": [
+        "notes/incidents/2026-09-dns.md"
+      ]
+    },
+    {
+      "id": "e17",
+      "lang": "en",
+      "text": "where did users drop in onboarding",
+      "gold": [
+        "notes/journal/2026-09-12.md"
+      ]
+    },
+    {
+      "id": "e18",
+      "lang": "en",
+      "text": "how often does the garden planner sync",
+      "gold": [
+        "reference/projects/garden-app.md"
+      ]
+    },
+    {
+      "id": "e19",
+      "lang": "en",
+      "text": "when is the newsletter sent",
+      "gold": [
+        "reference/projects/newsletter.md"
+      ]
+    },
+    {
+      "id": "e20",
+      "lang": "en",
+      "text": "where do personal tokens live",
+      "gold": [
+        "reference/tools/password-manager.md"
+      ]
+    },
+    {
+      "id": "e21",
+      "lang": "en",
+      "text": "how often do uptime checks run",
+      "gold": [
+        "reference/tools/monitoring.md"
+      ]
+    },
+    {
+      "id": "e22",
+      "lang": "en",
+      "text": "retarget stacked pull requests before deleting the base branch",
+      "gold": [
+        "notes/decisions/merge-policy.md"
+      ]
+    },
+    {
+      "id": "k01",
+      "lang": "ko",
+      "text": "라이트하우스 배포 롤백은 어떻게 해?",
+      "gold": [
+        "reference/ko/배포-절차.md"
+      ]
+    },
+    {
+      "id": "k02",
+      "lang": "ko",
+      "text": "회의 녹음 받아쓰기는 어떤 모델 쓰지?",
+      "gold": [
+        "reference/ko/회의-받아쓰기.md"
+      ]
+    },
+    {
+      "id": "k03",
+      "lang": "ko",
+      "text": "답변 끝에 서명 표시하는 형식 알려줘",
+      "gold": [
+        "reference/ko/답변-서명.md"
+      ]
+    },
+    {
+      "id": "k04",
+      "lang": "ko",
+      "text": "리눅스 서버 재부팅하면 SSH 다시 켜야 돼?",
+      "gold": [
+        "reference/ko/원격-서버.md"
+      ]
+    },
+    {
+      "id": "k05",
+      "lang": "ko",
+      "text": "블로그 글 제목은 몇 자까지 쓰지",
+      "gold": [
+        "reference/ko/블로그-규칙.md"
+      ]
+    },
+    {
+      "id": "k06",
+      "lang": "ko",
+      "text": "디스크 용량이 커진 원인이 뭐였어",
+      "gold": [
+        "reference/ko/디스크-정리.md"
+      ]
+    },
+    {
+      "id": "k07",
+      "lang": "ko",
+      "text": "크레딧 떨어졌을 때는 어떻게 하기로 했지",
+      "gold": [
+        "reference/ko/크레딧.md"
+      ]
+    },
+    {
+      "id": "k08",
+      "lang": "ko",
+      "text": "스프린트 일정은 몇 시에 캘린더에 올려?",
+      "gold": [
+        "reference/ko/스프린트-일정.md"
+      ]
+    },
+    {
+      "id": "k09",
+      "lang": "ko",
+      "text": "카나리는 몇 분 유지해야 승격하지",
+      "gold": [
+        "reference/ko/배포-절차.md",
+        "reference/projects/lighthouse-deploy.md"
+      ]
+    },
+    {
+      "id": "k10",
+      "lang": "ko",
+      "text": "원격 서버 메모리 상한 얼마로 했어",
+      "gold": [
+        "reference/ko/원격-서버.md"
+      ]
+    },
+    {
+      "id": "k11",
+      "lang": "ko",
+      "text": "게시판에 이미지 첨부할 때 규칙",
+      "gold": [
+        "reference/ko/블로그-규칙.md"
+      ]
+    },
+    {
+      "id": "k12",
+      "lang": "ko",
+      "text": "받아쓰기 전에 오디오를 무슨 형식으로 바꿔?",
+      "gold": [
+        "reference/ko/회의-받아쓰기.md"
+      ]
+    },
+    {
+      "id": "k13",
+      "lang": "ko",
+      "text": "다른 팀 일정도 캘린더에 넣어?",
+      "gold": [
+        "reference/ko/스프린트-일정.md"
+      ]
+    },
+    {
+      "id": "k14",
+      "lang": "ko",
+      "text": "오래된 이미지 정리하고 나서 삭제했어?",
+      "gold": [
+        "reference/ko/디스크-정리.md"
+      ]
+    },
+    {
+      "id": "m01",
+      "lang": "mixed",
+      "text": "lighthouse 카나리 승격 기준",
+      "gold": [
+        "reference/ko/배포-절차.md",
+        "reference/projects/lighthouse-deploy.md"
+      ]
+    },
+    {
+      "id": "m02",
+      "lang": "mixed",
+      "text": "tmux 세션 kill 할 때 주의점",
+      "gold": [
+        "reference/tools/tmux-rules.md"
+      ]
+    },
+    {
+      "id": "m03",
+      "lang": "mixed",
+      "text": "pebble 퍼블리시 토큰 위치",
+      "gold": [
+        "reference/projects/pebble-cli.md"
+      ]
+    },
+    {
+      "id": "m04",
+      "lang": "mixed",
+      "text": "SSH 서버 자동 시작 설정",
+      "gold": [
+        "reference/ko/원격-서버.md"
+      ]
+    },
+    {
+      "id": "m05",
+      "lang": "mixed",
+      "text": "CDN 캐시 stale 사고 원인",
+      "gold": [
+        "notes/incidents/2026-08-cache.md"
+      ]
+    },
+    {
+      "id": "m06",
+      "lang": "mixed",
+      "text": "UTC 기준 status update 규칙",
+      "gold": [
+        "people/dana/preferences.md"
+      ]
+    },
+    {
+      "id": "j01",
+      "lang": "ja",
+      "text": "経費はいつまでに精算すればいい?",
+      "gold": [
+        "reference/ja/経費精算.md"
+      ]
+    },
+    {
+      "id": "j02",
+      "lang": "ja",
+      "text": "領収書の原本は何か月保管しますか",
+      "gold": [
+        "reference/ja/経費精算.md"
+      ]
+    },
+    {
+      "id": "j03",
+      "lang": "ja",
+      "text": "秘密鍵はどこに保管していますか",
+      "gold": [
+        "reference/ja/鍵管理.md"
+      ]
+    },
+    {
+      "id": "j04",
+      "lang": "ja",
+      "text": "鍵を更新する頻度は?",
+      "gold": [
+        "reference/ja/鍵管理.md"
+      ]
+    },
+    {
+      "id": "j05",
+      "lang": "ja",
+      "text": "大会議室を予約したいです",
+      "gold": [
+        "reference/ja/会議室予約.md"
+      ]
+    },
+    {
+      "id": "j06",
+      "lang": "ja",
+      "text": "十名以上の会議はどの部屋を使う",
+      "gold": [
+        "reference/ja/会議室予約.md"
+      ]
+    },
+    {
+      "id": "z01",
+      "lang": "zh",
+      "text": "应用多久发布一次",
+      "gold": [
+        "reference/zh/发布流程.md"
+      ]
+    },
+    {
+      "id": "z02",
+      "lang": "zh",
+      "text": "发布前谁需要签字",
+      "gold": [
+        "reference/zh/发布流程.md"
+      ]
+    },
+    {
+      "id": "z03",
+      "lang": "zh",
+      "text": "数据库备份保留多少天",
+      "gold": [
+        "reference/zh/数据库备份.md"
+      ]
+    },
+    {
+      "id": "z04",
+      "lang": "zh",
+      "text": "恢复演练多久做一次",
+      "gold": [
+        "reference/zh/数据库备份.md"
+      ]
+    },
+    {
+      "id": "z05",
+      "lang": "zh",
+      "text": "值班什么时候交接",
+      "gold": [
+        "reference/zh/值班规则.md"
+      ]
+    },
+    {
+      "id": "z06",
+      "lang": "zh",
+      "text": "紧急告警要多快响应",
+      "gold": [
+        "reference/zh/值班规则.md"
+      ]
+    }
+  ]
+}

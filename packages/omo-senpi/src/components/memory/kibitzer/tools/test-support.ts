@@ -61,6 +61,7 @@ export interface HarnessOptions {
   readonly budgetLimit?: number
   readonly maxItems?: number
   readonly caps?: KibitzerSidecarToolsInput["caps"]
+  readonly queryExpansion?: boolean
 }
 
 export function harness(options: HarnessOptions): Harness {
@@ -72,7 +73,7 @@ export function harness(options: HarnessOptions): Harness {
   const created = createKibitzerSidecarTools({
     workspaceRoot: options.workspaceRoot,
     session: snapshot,
-    memory: { repo: options.repo },
+    memory: { repo: options.repo, ...(options.queryExpansion === undefined ? {} : { queryExpansion: options.queryExpansion }) },
     nudge: { offered, surfaced, maxItems: options.maxItems ?? 2, accepted: () => accepted },
     budget: () => budget,
     ...(options.caps === undefined ? {} : { caps: options.caps }),

@@ -38,8 +38,11 @@ function sessionHooks(delivery: KibitzerDelivery, context: ReturnType<typeof cre
   return pi
 }
 
+const TOOL_CALL = { type: "tool_call", toolName: "read", toolCallId: "call-1", input: { path: "README.md" } }
+const TOOL_RESULT = { type: "tool_result", toolName: "read", toolCallId: "call-1", input: { path: "README.md" }, content: [], isError: false }
+
 describe("kibitzer accept-time delivery", () => {
-  test("#given a running prompt session #when nudges are accepted #then one steer batches every nudge", async () => {
+  test("#given a tool in flight #when nudges are accepted #then one steer batches every nudge", async () => {
     // given
     const f = await fixture()
     const sends = new FakeExtensionAPI()
@@ -49,7 +52,9 @@ describe("kibitzer accept-time delivery", () => {
       sendMessage: (message, options) => sends.sendMessage(message, options), appendEntry: () => {},
     })
     const pi = sessionHooks(delivery, f.context)
-    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), eventContext([], SESSION_ID))
+    const ctx = eventContext([], SESSION_ID)
+    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+    await pi.dispatch("tool_call", TOOL_CALL, ctx)
     // when
     await delivery.accept(SESSION_ID, f.context, nudges)
     // then
@@ -58,7 +63,35 @@ describe("kibitzer accept-time delivery", () => {
     for (const nudge of nudges) expect(sends.messages[0]?.message.content).toContain(nudge.path)
   })
 
-  test("#given a running session with a rejecting sender #when nudges are accepted #then it warns and preserves every fallback", async () => {
+  test.each(["no tool call", "a finished tool call", "an ended tool turn"] as const)("#given a running session with %s #when a late verdict is accepted #then it is held for the next prompt instead of steering an extra turn", async (state) => {
+    // given
+    const f = await fixture()
+    let sends = 0
+    const delivery = createKibitzerDelivery({ ledgerFor: () => f.ledger, pendingFor: () => f.pending, sendMessage: () => { sends += 1 }, appendEntry: () => {} })
+    const pi = sessionHooks(delivery, f.context)
+    const ctx = eventContext([], SESSION_ID)
+    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+    switch (state) {
+      case "no tool call": break
+      case "a finished tool call":
+        await pi.dispatch("tool_call", TOOL_CALL, ctx)
+        await pi.dispatch("tool_result", TOOL_RESULT, ctx)
+        break
+      case "an ended tool turn":
+        await pi.dispatch("tool_call", TOOL_CALL, ctx)
+        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, ctx)
+        break
+      default: state satisfies never
+    }
+    // when
+    await delivery.accept(SESSION_ID, f.context, [NUDGE])
+    // then
+    expect(sends).toBe(0)
+    expect(delivery.drainForPrompt(SESSION_ID, f.context)).toEqual([NUDGE])
+    await expect(f.pending.take(SESSION_ID)).resolves.toEqual([NUDGE])
+  })
+
+  test("#given a running session with a tool in flight and a rejecting sender #when nudges are accepted #then it warns and preserves every fallback", async () => {
     // given
     const f = await fixture()
     const warnings: unknown[] = []
@@ -70,7 +103,9 @@ describe("kibitzer accept-time delivery", () => {
       logger: { warn: (_message, details) => { warnings.push(details) }, info: () => {}, error: () => {} },
     })
     const pi = sessionHooks(delivery, f.context)
-    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), eventContext([], SESSION_ID))
+    const ctx = eventContext([], SESSION_ID)
+    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+    await pi.dispatch("tool_call", TOOL_CALL, ctx)
     // when
     await delivery.accept(SESSION_ID, f.context, [NUDGE])
     // then
@@ -106,7 +141,9 @@ describe("kibitzer accept-time delivery", () => {
       sendMessage: () => { sends += 1; sent.resolve(); return release.promise },
     })
     const pi = sessionHooks(delivery, f.context)
-    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), eventContext([], SESSION_ID))
+    const ctx = eventContext([], SESSION_ID)
+    await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+    await pi.dispatch("tool_call", TOOL_CALL, ctx)
     const first = delivery.accept(SESSION_ID, f.context, [NUDGE])
     try {
       await Promise.race([sent.promise, first])
@@ -120,7 +157,7 @@ describe("kibitzer accept-time delivery", () => {
     }
   }, 5_000)
 
-  test.each(["settled", "compacted", "shutdown"] as const)("#given a %s session after a prompt event #when a late verdict is accepted #then it stays queued", async (state) => {
+  test.each(["settled", "compacted", "shutdown"] as const)("#given a %s session with a tool in flight #when a late verdict is accepted #then it stays queued", async (state) => {
     // given
     const f = await fixture()
     let sends = 0
@@ -128,6 +165,7 @@ describe("kibitzer accept-time delivery", () => {
     const pi = sessionHooks(delivery, f.context)
     const ctx = eventContext([], SESSION_ID)
     await pi.dispatch("before_agent_start", beforeAgentStart("rollout"), ctx)
+    await pi.dispatch("tool_call", TOOL_CALL, ctx)
     switch (state) {
       case "settled": await pi.dispatch("agent_settled", {}, ctx); break
       case "compacted": await delivery.onCompactionAccepted(SESSION_ID, f.context); break

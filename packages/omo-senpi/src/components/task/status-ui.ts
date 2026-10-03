@@ -2,6 +2,7 @@ import {
   assistantLastLine,
   excerptRendererText,
   formatToolActivity,
+  HOST_TURN_RESUMED_EVENT,
   type ListScope,
   type ListedTask,
   type ManagedChildEvent,
@@ -231,6 +232,8 @@ function activityFromEvent(event: ManagedChildEvent): string | undefined {
     return excerptRendererText(formatToolActivity(event.toolName, event.args ?? event.input), 32)
   }
   if (event.type === "tool_execution_end") return "running"
+  // A host reattach found this child's turn in flight and it runs again on the new generation.
+  if (event.type === HOST_TURN_RESUMED_EVENT) return "running"
   if (event.type === "message_end") {
     const line = assistantLastLine(event.message)
     return line === undefined ? undefined : excerptRendererText(line, 32)

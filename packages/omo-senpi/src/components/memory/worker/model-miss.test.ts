@@ -46,8 +46,11 @@ describe("classifyRetryableModelMiss", () => {
     })
   })
 
-  test("#given a billing exhaustion child failure #when classified #then it is not retryable because another model cannot fix it", () => {
-    expect(classifyRetryableModelMiss(result("Error: quota exceeded for this organization"))).toBeUndefined()
+  test("#given a quota exhaustion child failure #when classified #then the next candidate may serve it (#6808)", () => {
+    expect(classifyRetryableModelMiss(result("Error: quota exceeded for this organization"))).toEqual({
+      kind: "provider_unavailable",
+      detail: "Error: quota exceeded for this organization",
+    })
   })
 
   test("#given a prompt-shaped child failure #when classified #then it is a context overflow the next candidate may fit", () => {

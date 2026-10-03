@@ -33,6 +33,8 @@ export const DAEMON_LAUNCH_PARENT_ENV_FIXTURE: Readonly<Record<string, string | 
   // A value the daemon's env must NOT carry: the spec is the whole producer, never a parent copy.
   ANTHROPIC_API_KEY: "fixture-not-a-real-key",
   OMO_SENPI_TASK_RPC_CHILD: "1",
+  OMO_SENPI_TASK_DEPTH: "1",
+  OMO_SENPI_TASK_ROOT_SESSION_ID: "root-session",
   SENPI_CODING_AGENT_SESSION_DIR: "/tmp/parent-session",
   SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::builder",
   SENPI_TASK_MEMBER_TASK_ID: "t-1",
@@ -59,6 +61,8 @@ export const DAEMON_LAUNCH_FIXTURE = {
     env: {
       OMO_NATIVE: "1",
       OMO_SENPI_TASK_RPC_CHILD: null,
+      OMO_SENPI_TASK_DEPTH: null,
+      OMO_SENPI_TASK_ROOT_SESSION_ID: null,
       SENPI_CODING_AGENT_SESSION_DIR: null,
       SENPI_TASK_MEMBER: null,
       SENPI_TASK_MEMBER_TASK_ID: null,

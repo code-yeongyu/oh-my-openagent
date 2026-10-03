@@ -62,11 +62,11 @@ describe("writing category availability", () => {
 
     expect(result.actualModel).toBeUndefined()
     expect(result.error).toContain('Category "writing" has no available model')
-    expect(result.error).toContain("claude-fable-5-1")
+    expect(result.error).toContain("claude-opus-5-5")
     expect(result.error).not.toContain(SYSTEM_DEFAULT_MODEL)
   })
 
-  test("#given only the third Claude rung #when writing is spawned #then it runs on that rung", async () => {
+  test("#given only the second Claude rung #when writing is spawned #then it runs on that rung", async () => {
     stubProviderCache({ anthropic: ["claude-opus-4-6"], openai: ["gpt-6-sol"] })
 
     const result = await resolveCategoryExecution(args, executorContext(), undefined, SYSTEM_DEFAULT_MODEL)
@@ -75,10 +75,10 @@ describe("writing category availability", () => {
     expect(result.actualModel).toBe("anthropic/claude-opus-4-6")
   })
 
-  test("#given Copilot's dotted Fable id #when writing config resolves #then the lane stays open", () => {
-    stubProviderCache({ "github-copilot": ["claude-fable-5.1"] })
+  test("#given Copilot's dotted Opus 5.5 id #when writing config resolves #then the lane stays open", () => {
+    stubProviderCache({ "github-copilot": ["claude-opus-5.5"] })
 
-    expect(resolveCategoryConfig("writing", { availableModels: new Set(["github-copilot/claude-fable-5.1"]) })).not.toBeNull()
+    expect(resolveCategoryConfig("writing", { availableModels: new Set(["github-copilot/claude-opus-5.5"]) })).not.toBeNull()
   })
 
   test("#given an explicit omo.json writing model #when only GPT is available #then the user choice opens the lane", async () => {

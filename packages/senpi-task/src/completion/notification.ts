@@ -46,6 +46,9 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
     final_response: finalResponse.text,
     ...(finalResponse.file === undefined ? {} : { final_response_file: finalResponse.file }),
     continuation_hint: continuationHint(record),
+    ...(record.resumed_run_epoch !== undefined && record.resumed_run_epoch === record.notification.run_epoch
+      ? { resumed_turn: true as const }
+      : {}),
     ...(record.owner?.kind === "dag"
       ? { dag: { run_id: record.owner.runId, node_id: record.owner.nodeId } }
       : {}),
@@ -99,7 +102,7 @@ function continuationHint(record: TaskRecord): string {
 
 function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {
   const identity = joinRendererTokens([
-    "task completion",
+    detail.resumed_turn === true ? "task completion (resumed turn)" : "task completion",
     `name:${normalizeRendererText(detail.name)}`,
     `id:${normalizeRendererText(detail.task_id)}`,
     formatTargetWithModel({

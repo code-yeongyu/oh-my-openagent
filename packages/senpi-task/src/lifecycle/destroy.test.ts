@@ -11,6 +11,7 @@ import {
   tempStore,
   type CallLog,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -23,7 +24,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     const order: CallLog = []
     const handle = fakeHandle("st_0000000a", "in-process", order)
     registry.add(handle)
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000a", "cancel")
@@ -43,7 +44,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     const registry = new FakeRegistry()
     const order: CallLog = []
     registry.add(fakeHandle("st_00000007", "in-process", order, { abortRejects: true }))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_00000007", "cancel_without_abort")
@@ -62,7 +63,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     const order: CallLog = []
     const handle = fakeHandle("st_0000000e", "in-process", order, { abortRejects: true })
     registry.add(handle)
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000e", "cancel")
@@ -86,7 +87,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     const registry = new FakeRegistry()
     const order: CallLog = []
     registry.add(fakeHandle("st_0000000f", "rpc", order, { pid: 4242 }))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000f", "fallback_handoff")
@@ -105,7 +106,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     const registry = new FakeRegistry()
     const order: CallLog = []
     registry.add(fakeHandle("st_0000000b", "rpc", order, { pid: 4242 }))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000b", "cancel")
@@ -121,7 +122,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     seedRecord(store, { task_id: "st_0000000c", status: "completed", residency_state: "resident" })
     const registry = new FakeRegistry()
     registry.add(fakeHandle("st_0000000c", "in-process", []))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000c", "evict")
@@ -145,7 +146,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     const registry = new FakeRegistry()
     const order: CallLog = []
     registry.add(fakeHandle(record.task_id, "rpc", order, { pid: 4242 }))
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
 
     await lifecycle.destroyResidentTask(record.task_id, "revive_failure")
 
@@ -187,7 +188,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
         store.replace({ ...revived, host_pid: 7000 })
       },
     })
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings(), hostPid: 6000 })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), hostPid: 6000 })
 
     await lifecycle.destroyResidentTask(prior.task_id, "revive_failure")
     const result = lifecycle.rollbackDetachedRevival(prior)
@@ -223,7 +224,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
       error_message: "cancelled by user",
       notification: { ...prior.notification, run_epoch: 5 },
     })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
 
     const result = lifecycle.rollbackDetachedRevival(withTerminalFacts)
     const current = store.load(prior.task_id)
@@ -263,7 +264,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
       host_pid: 6000,
       notification: { ...prior.notification, run_epoch: 5 },
     })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
 
     const result = lifecycle.rollbackDetachedRevival(withTerminalFacts)
     const restored = store.load(prior.task_id)
@@ -287,7 +288,7 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_0000000d", status: "cancelled", residency_state: "resident" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000d", "cancel")

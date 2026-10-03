@@ -74,9 +74,9 @@ describe("category activation gating", () => {
       expect(result.availableCategories).toContain("architect")
     })
 
-    test("#when the registry offers gpt-5.6-sol alone #then deep-low is unavailable, because GPT-5.6 Sol is not a deep-low model", () => {
+    test("#when the registry offers gpt-6-sol alone #then deep-low is unavailable, because GPT-6 Sol is not a deep-low model", () => {
       // given
-      const models = registry([model("openai", "gpt-5.6-sol")])
+      const models = registry([model("openai", "gpt-6-sol")])
 
       // when
       const result = resolveCategory("deep-low", {}, models)
@@ -196,7 +196,7 @@ describe("category activation gating", () => {
       expect(low.availableCategories).not.toContain("deep-high")
     })
 
-    test("#when the registry offers gpt-6-astra alone #then deep-high resolves at xhigh and deep-low stays unavailable", () => {
+    test("#when the registry offers gpt-6-astra alone #then deep-high resolves at high and deep-low stays unavailable", () => {
       // given
       const models = registry([model("openai", "gpt-6-astra")])
 
@@ -208,15 +208,15 @@ describe("category activation gating", () => {
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
       expect(result.spec.modelId).toBe("gpt-6-astra")
-      expect(result.spec.variant).toBe("xhigh")
+      expect(result.spec.variant).toBe("high")
       expect(result.availableCategories).toContain("deep-high")
       expect(result.availableCategories).not.toContain("deep-low")
       expect(resolveCategory("deep-low", {}, models).kind).toBe("model_unavailable")
     })
 
-    test("#when the registry offers gpt-6-sol alone #then deep-low resolves at medium and deep-high stays unavailable", () => {
+    test("#when the registry offers gpt-5.6-sol alone #then deep-low resolves at medium and deep-high stays unavailable", () => {
       // given
-      const models = registry([model("openai", "gpt-6-sol")])
+      const models = registry([model("openai", "gpt-5.6-sol")])
 
       // when
       const result = resolveCategory("deep-low", {}, models)
@@ -225,7 +225,7 @@ describe("category activation gating", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
-      expect(result.spec.modelId).toBe("gpt-6-sol")
+      expect(result.spec.modelId).toBe("gpt-5.6-sol")
       expect(result.spec.variant).toBe("medium")
       expect(result.availableCategories).toContain("deep-low")
       expect(result.availableCategories).not.toContain("deep-high")
@@ -316,7 +316,7 @@ describe("category activation gating", () => {
       expect(result.availableCategories).not.toContain("ultrabrain")
     })
 
-    test("#when a real vercel gateway id is present #then the gate still opens", () => {
+    test("#when only an unlisted gateway re-publishes the gate model #then the gate stays closed", () => {
       // given
       const models = registry([model("vercel", "openai/gpt-5.6-sol")])
 
@@ -324,8 +324,8 @@ describe("category activation gating", () => {
       const result = resolveCategory("ultrabrain", {}, models)
 
       // then
-      expect(result.kind).toBe("resolved")
-      expect(result.availableCategories).toContain("ultrabrain")
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("ultrabrain")
     })
   })
 

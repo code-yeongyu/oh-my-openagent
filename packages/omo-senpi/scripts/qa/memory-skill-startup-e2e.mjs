@@ -10,6 +10,7 @@ import {
 import { join } from "node:path"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const sandbox = createSandbox()
 const senpiBin = process.env.SENPI_BIN ?? Bun.which("senpi")
@@ -28,7 +29,7 @@ async function runSenpi() {
   ], {
     cwd: sandbox.cwd,
     env: {
-      ...process.env,
+      ...isolatedChildEnv(process.env, sandbox.agentDir),
       SENPI_CODING_AGENT_DIR: sandbox.agentDir,
       XDG_CONFIG_HOME: sandbox.xdgConfigHome,
       OMO_MEMORY_HOME: join(sandbox.root, "memory"),

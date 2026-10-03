@@ -18,9 +18,9 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,json,css,md}\"",
     "type-check": "node ./scripts/generate-docs-content.mjs && tsgo --noEmit",
     "test": "bun test lib",
-    "test:e2e": "bun --bun playwright test",
-    "test:e2e:ui": "bun --bun playwright test --ui",
-    "test:e2e:headed": "bun --bun playwright test --headed",
+    "test:e2e": "bunx playwright test",
+    "test:e2e:ui": "bunx playwright test --ui",
+    "test:e2e:headed": "bunx playwright test --headed",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"

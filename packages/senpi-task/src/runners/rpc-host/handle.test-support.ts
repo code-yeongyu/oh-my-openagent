@@ -80,6 +80,8 @@ export function fakeSessionPort(
       closedListeners.add(listener)
       return () => closedListeners.delete(listener)
     },
+    getEntries: () => Promise.resolve({ entries: [], leafId: null }),
+    switchSession: () => Promise.resolve({ cancelled: false }),
     close: () => {
       closes += 1
       return Promise.resolve()
@@ -114,6 +116,7 @@ export function handleOverPort(client: FakeSessionPort, heartbeatIntervalMs = 60
     heartbeatIntervalMs,
     now: () => 7,
     closeGraceMs: 25,
+    openDisposition: "attached",
   })
 }
 
@@ -131,5 +134,6 @@ export async function openHostSessionHandle(input: {
     heartbeatIntervalMs: 60_000,
     now: () => 11,
     closeGraceMs: input.closeGraceMs ?? 100,
+    openDisposition: opened.attached ? "attached" : "reopened",
   })
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { accessSync, constants, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import type { CommentCheckerReleaseAsset } from "@oh-my-opencode/comment-checker-core"
+import { COMMENT_CHECKER_RELEASE_VERSION, COMMENT_CHECKER_VERSION_MARKER, type CommentCheckerReleaseAsset } from "@oh-my-opencode/comment-checker-core"
 
 import { CACHE_DIR_NAME } from "../../../../omo-opencode/src/shared/plugin-identity"
 import { createRecordingLogger, createTempCwd } from "./comment-checker.test-support"
@@ -54,16 +54,17 @@ describe("omo-senpi comment-checker downloader", () => {
     expect(binaryPath).toBe(join(cacheDir, "comment-checker"))
     expect(existsSync(binaryPath ?? "")).toBe(true)
     expect(() => accessSync(binaryPath ?? "", constants.X_OK)).not.toThrow()
-    expect(readdirSync(cacheDir)).toEqual(["comment-checker"])
+    expect(readdirSync(cacheDir).sort()).toEqual(["comment-checker", COMMENT_CHECKER_VERSION_MARKER].sort())
     expect(requests()).toBe(1)
     expect(logger.entries.map((entry) => entry.level)).toEqual(["info"])
   })
 
-  it("#given a cached binary #when downloading again #then the cache answers without a request", async () => {
+  it("#given a cached binary recorded at the pinned release #when downloading again #then the cache answers without a request", async () => {
     // given
     const cacheDir = join(createTempCwd(), "bin")
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, "comment-checker"), "#!/bin/sh\n", { mode: 0o755 })
+    writeFileSync(join(cacheDir, COMMENT_CHECKER_VERSION_MARKER), `${COMMENT_CHECKER_RELEASE_VERSION}\n`)
     const logger = createRecordingLogger()
     const { url, requests } = await serveArchive()
 

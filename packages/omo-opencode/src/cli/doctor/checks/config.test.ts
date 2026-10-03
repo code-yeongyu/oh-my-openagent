@@ -31,6 +31,41 @@ describe("config check", () => {
       expect(Array.isArray(result.issues)).toBe(true)
     })
 
+    it("#given a user config with one invalid value #when running the config check #then it warns once, naming the file and the dotted key", async () => {
+      const originalHome = process.env.HOME
+      const originalCwd = process.cwd()
+      const testRootDir = join(tmpdir(), `omo-doctor-config-invalid-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      const projectDir = join(testRootDir, "project")
+
+      try {
+        //#given a user omo.jsonc whose task.host_engine_policy is not an allowed value
+        mkdirSync(projectDir, { recursive: true })
+        mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+        writeFileSync(
+          join(testRootDir, ".omo", "omo.jsonc"),
+          JSON.stringify({ task: { host_engine_policy: "sometimes", default_concurrency: 3 } }),
+          "utf-8",
+        )
+        process.env.HOME = testRootDir
+        process.chdir(projectDir)
+
+        //#when running the consolidated config check
+        const result = await config.checkConfig()
+
+        //#then the file still counts as loaded and the ignored key is one warning
+        expect(result.status).toBe("warn")
+        const ignored = result.issues.filter((issue) => issue.affects?.includes("configuration"))
+        expect(ignored.map((issue) => [issue.severity, issue.title])).toEqual([
+          ["warning", "config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"],
+        ])
+      } finally {
+        process.chdir(originalCwd)
+        rmSync(testRootDir, { recursive: true, force: true })
+        if (originalHome === undefined) delete process.env.HOME
+        else process.env.HOME = originalHome
+      }
+    })
+
     it("uses the OPENCODE_CONFIG_DIR profiles tail after module import", async () => {
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
       const originalHome = process.env.HOME

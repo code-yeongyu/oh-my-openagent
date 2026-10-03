@@ -18,6 +18,7 @@ export {
   getWorkByPlanName,
   getWorkForSession,
   getWorkResumeOptions,
+  isStructuredTaskRow,
   normalizeSessionId,
   readBoulderState,
   reconcileStaleWorks,

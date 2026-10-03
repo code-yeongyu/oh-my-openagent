@@ -16,7 +16,7 @@ import {
   resolveMemoryConfig,
 } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE } from "./kibitzer/notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
 
@@ -152,6 +152,7 @@ describe("createMemoryComponent", () => {
       RECALL_CUSTOM_TYPE,
       NUDGED_ENTRY_TYPE,
       GATE_ENTRY_TYPE,
+      UNAVAILABLE_ENTRY_TYPE,
       "omo-memorian:recall",
       "omo-memorian:nudged",
       "omo-memorian:gate",
@@ -190,6 +191,13 @@ describe("createMemoryComponent", () => {
       entries: [{ type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: recorded }],
       notifications,
     })
+    const beforeAgentStartHandlers = pi.handlers.filter((registration) => registration.event === "before_agent_start")
+
+    expect(beforeAgentStartHandlers).toHaveLength(4)
+    expect(beforeAgentStartHandlers.every((registration) => registration.options?.previewSafe === true)).toBe(true)
+    await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, resumed)
+    expect(pi.entries).toEqual([])
+    expect(memoryModuleSupervisor.refCount).toBe(before)
 
     await pi.dispatch("before_agent_start", {}, resumed)
     await pi.dispatch("before_agent_start", {}, resumed)

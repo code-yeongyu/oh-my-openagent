@@ -1,5 +1,5 @@
 import { isTeamMemberProcess } from "../../team/member-extension/identity"
-import { OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
+import { OMO_SENPI_TASK_DEPTH, OMO_SENPI_TASK_ROOT_SESSION_ID, OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
 
 /**
  * The READER of what `buildChildContext` writes. One extension set serves every session of the
@@ -13,6 +13,14 @@ import { OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
 export const SESSION_ROLES = ["child", "dag_child", "member"] as const
 
 export type SessionRole = (typeof SESSION_ROLES)[number]
+
+/** Session-context key of the throwaway session that warms a fresh task host (`host-warmup.ts`). */
+export const HOST_WARMUP_CONTEXT = "host_warmup"
+
+/** A host warm-up session: no user and no task behind it, so nothing may report it as a session. */
+export function isHostWarmupSession(pi: unknown): boolean {
+  return readSessionContext(pi)?.[HOST_WARMUP_CONTEXT] === "1"
+}
 
 /**
  * The per-session labels the opener attached (senpi `open_session.context` -> `pi.sessionContext`).
@@ -38,6 +46,32 @@ export function readSessionRole(pi: unknown, env: NodeJS.ProcessEnv = process.en
   if (role !== undefined && role.length > 0) return isSessionRole(role) ? role : "child"
   if (isTeamMemberProcess(env)) return "member"
   return env[OMO_SENPI_TASK_RPC_CHILD] === "1" ? "child" : undefined
+}
+
+/** Where an omo-spawned session sits in the task tree its root session started. */
+export interface SessionAncestry {
+  readonly depth: number
+  readonly rootSessionId?: string
+}
+
+/**
+ * This session's own task depth, read from the same two channels as its role: the daemon session
+ * context, else the per-child process env. Undefined only for an ordinary top-level session. A
+ * session known to be a child but launched without a depth (an older parent) reads as depth 1, never
+ * 0: it IS one level down, and reading it as top-level is exactly the unbounded recursion of #9036.
+ */
+export function readSessionAncestry(pi: unknown, env: NodeJS.ProcessEnv = process.env): SessionAncestry | undefined {
+  const context = readSessionContext(pi)
+  const role = context?.["role"]
+  if (role !== undefined && role.length > 0) return childAncestry(context?.["depth"], context?.["root_session_id"])
+  if (!isTeamMemberProcess(env) && env[OMO_SENPI_TASK_RPC_CHILD] !== "1") return undefined
+  return childAncestry(env[OMO_SENPI_TASK_DEPTH], env[OMO_SENPI_TASK_ROOT_SESSION_ID])
+}
+
+function childAncestry(depth: string | undefined, rootSessionId: string | undefined): SessionAncestry {
+  const parsed = depth === undefined || depth.length === 0 ? Number.NaN : Number(depth)
+  const resolved = Number.isInteger(parsed) && parsed >= 1 ? parsed : 1
+  return rootSessionId === undefined || rootSessionId.length === 0 ? { depth: resolved } : { depth: resolved, rootSessionId }
 }
 
 /** The member identity the daemon carries on the session, in place of the per-process env trio. */

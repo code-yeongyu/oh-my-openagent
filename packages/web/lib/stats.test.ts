@@ -6,6 +6,8 @@ import { FALLBACK_STATS_DATA, formatStats, getStats, resetStatsCacheForTests } f
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
 const GITHUB = /api\.github\.com\/repos\//
+const RELEASES_PAGE =
+  /api\.github\.com\/repos\/code-yeongyu\/oh-my-openagent\/releases\?per_page=30&page=(\d+)$/
 const NPM_POINT = /api\.npmjs\.org\/downloads\/point\/([^/]+)\/([^/?]+)/
 
 function json(body: unknown, status = 200): Response {
@@ -17,6 +19,8 @@ function json(body: unknown, status = 200): Response {
 
 interface NpmScript {
   readonly onPoint: (period: string, pkg: string, call: number) => number | Response
+  readonly onReleasesPage?: (page: number) => unknown
+  readonly onInstallerStats?: () => unknown
 }
 
 function installFetch(script: NpmScript): { calls: () => readonly string[] } {
@@ -25,6 +29,15 @@ function installFetch(script: NpmScript): { calls: () => readonly string[] } {
   const fake: FetchLike = async (input) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
     seen.push(url)
+    const releasesPage = RELEASES_PAGE.exec(url)
+    if (releasesPage) {
+      const out = script.onReleasesPage?.(Number(releasesPage[1])) ?? []
+      return out instanceof Response ? out : json(out)
+    }
+    if (url === "https://get.omo.dev/stats/downloads") {
+      const out = script.onInstallerStats?.() ?? { uncountedByGitHub: 0 }
+      return out instanceof Response ? out : json(out)
+    }
     if (GITHUB.test(url)) {
       return json({ stargazers_count: 69_000, description: "OmO" })
     }
@@ -104,6 +117,84 @@ describe("getStats aggregation is all-or-nothing", () => {
     const stats = await getStats()
     expect(stats.weeklyDownloads).toBe(1_000)
     expect(stats.monthlyDownloads).toBe(1_000)
+  })
+})
+
+function release(...assets: readonly (readonly [string, number])[]) {
+  return { assets: assets.map(([name, download_count]) => ({ name, download_count })) }
+}
+
+describe("compiled binary downloads from GitHub releases", () => {
+  test("only omo-* binaries on every page are added to the total, never to the npm figure", async () => {
+    const { calls } = installFetch({
+      onPoint: () => 1,
+      onReleasesPage: (page) =>
+        page === 1
+          ? Array.from({ length: 30 }, () =>
+              release(
+                ["omo-linux-x64", 1],
+                ["SHA256SUMS", 50],
+                ["senpi-desktop-engine-darwin-arm64", 7],
+              ),
+            )
+          : [release(["omo-windows-x64-baseline.exe", 5])],
+    })
+
+    const stats = await getStats()
+
+    expect(stats.nativeDownloads).toBe(35)
+    expect(stats.totalDownloads).toBe(stats.npmTotalDownloads + 35)
+    expect(calls().filter((url) => RELEASES_PAGE.test(url))).toHaveLength(2)
+  })
+
+  test("installs served by the get.omo.dev mirror join the total once, GitHub redirects do not", async () => {
+    installFetch({
+      onPoint: () => 100,
+      onReleasesPage: (page) =>
+        page === 1 ? [{ assets: [{ name: "omo-linux-x64", download_count: 50 }] }] : [],
+      onInstallerStats: () => ({ uncountedByGitHub: 7, redirectedToGitHub: 30 }),
+    })
+
+    const stats = await getStats()
+
+    expect(stats.installerDownloads).toBe(7)
+    expect(stats.totalDownloads).toBe(stats.npmTotalDownloads + 50 + 7)
+  })
+
+  test("a malformed get.omo.dev stats reply rejects the refresh instead of counting zero", async () => {
+    installFetch({ onPoint: () => 100, onInstallerStats: () => ({ uncountedByGitHub: -3 }) })
+
+    await expect(getStats()).rejects.toThrow("uncountedByGitHub")
+  })
+
+  test("the walk stops at the first page of releases that predate the compiled binaries", async () => {
+    const { calls } = installFetch({
+      onPoint: () => 1,
+      onReleasesPage: (page) =>
+        page === 1
+          ? Array.from({ length: 30 }, () => release(["omo-darwin-arm64", 2]))
+          : Array.from({ length: 30 }, () => release(["oh-my-opencode-darwin-arm64.tgz", 9])),
+    })
+
+    const stats = await getStats()
+
+    expect(stats.nativeDownloads).toBe(60)
+    expect(calls().filter((url) => RELEASES_PAGE.test(url))).toHaveLength(2)
+  })
+
+  test("a release page without download counts rejects instead of counting it as zero", async () => {
+    installFetch({
+      onPoint: () => 1,
+      onReleasesPage: () => [{ assets: [{ name: "omo-linux-x64" }] }],
+    })
+
+    await expect(getStats()).rejects.toThrow()
+  })
+
+  test("a failing release page rejects the refresh like a failing npm range", async () => {
+    installFetch({ onPoint: () => 1, onReleasesPage: () => json({ message: "rate limited" }, 403) })
+
+    await expect(getStats()).rejects.toThrow()
   })
 })
 

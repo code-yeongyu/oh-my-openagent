@@ -10,7 +10,6 @@ Harness-neutral logic for walking a file path UP its directory tree, discovering
 
 | Export | Source | Role |
 |--------|--------|------|
-| `AGENTS_FILENAME` | `constants.ts` | re-exported from `rules-engine` (value `"AGENTS.md"`) |
 | `resolveFilePath(rootDir, path)` | `finder.ts` | resolve + `realpathSync` validate path is inside `rootDir`; `null` if escapes |
 | `formatAgentsMdContextBlock({agentsPath, content, truncated})` | `formatter.ts` | wrap content in directory-context block + optional truncation notice |
 | `getSessionCache({sessionCaches, sessionID, storage})` | `injection-cache.ts` | per-session `Set<string>` of already-injected dirs, backed by storage |

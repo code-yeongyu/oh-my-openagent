@@ -10,6 +10,8 @@ import { isRecord } from "./senpi-settings"
 export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo.js"),
   join("extensions", "omo-task.js"),
+  join("extensions", "omo-computer-use.js"),
+  join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),
   ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),

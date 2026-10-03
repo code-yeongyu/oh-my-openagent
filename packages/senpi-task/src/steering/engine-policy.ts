@@ -76,6 +76,8 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
   const {
     final_response: _final,
     error_message: _error,
+    failure_kind: _failureKind,
+    failure_reason: _failureReason,
     run_stats: _stats,
     terminal_at: _terminalAt,
     ...rest
@@ -86,5 +88,14 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
     residency_state: "resident",
     updated_at: timestamp,
     notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
+  }
+}
+
+export function evictionRefusal(taskId: string): SendOutcome {
+  return {
+    kind: "not_continuable",
+    task_id: taskId,
+    reason: `Task ${taskId} is being evicted; send was not started.`,
+    suggestion: "Use task_output to read the final result.",
   }
 }

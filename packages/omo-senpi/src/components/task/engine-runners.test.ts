@@ -49,8 +49,8 @@ function createFakeSession(sessionId = "child-session-1"): { readonly session: C
         settle = { resolve }
       })
     },
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe(listener: ChildSessionListener) {
       listeners.add(listener)
@@ -77,15 +77,15 @@ function baseSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
   }
 }
 
-describe("task child memory tool exclusion", () => {
-  test("#given the ui-only tool names passed to the in-process runner #when inspected #then memory and both question tools are listed", () => {
+describe("task child parent-only tool exclusion", () => {
+  test("#given the ui-only tool names passed to the in-process runner #when inspected #then only the question tools are listed", () => {
     // given / when / then
-    expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("memory")
+    expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).not.toContain("memory")
     expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("request_user_input")
     expect(TASK_CHILD_UI_ONLY_TOOL_NAMES).toContain("ask_user_question")
   })
 
-  test("#given shared parent tools including memory and question tools #when an in-process child starts #then the child tool set excludes them", async () => {
+  test("#given shared parent tools including memory and question tools #when an in-process child starts #then memory matches process mode while question tools remain excluded", async () => {
     // given
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
@@ -105,8 +105,8 @@ describe("task child memory tool exclusion", () => {
 
     // then
     const names = (captured?.customTools ?? []).map((tool) => tool.name)
-    expect(names).toEqual(["grep"])
-    expect(names).not.toContain("memory")
+    expect(names).toEqual(["grep", "memory"])
+    expect(names).toContain("memory")
     expect(names).not.toContain("ask_user_question")
     expect(names).not.toContain("request_user_input")
   })

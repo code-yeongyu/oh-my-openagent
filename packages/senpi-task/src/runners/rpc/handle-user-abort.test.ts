@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test"
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { createRpcChildHandle } from "./handle"
 import type { RpcProtocolClient } from "./protocol-client"
+import { createChildExtensionEvents } from "../child-extension-events"
 
 type TrackedHandle = ReturnType<typeof createRpcChildHandle> & {
   waitForOutcome(): Promise<RunnerOutcome>
@@ -18,6 +19,7 @@ function createHarness(): {
   const child = Object.assign(new EventEmitter(), { pid: 4243 }) as unknown as ChildProcess
   const listeners = new Set<(event: AgentSessionEvent) => void>()
   const client = {
+    extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
     send: () => Promise.resolve({ success: true }),
     onEvent: (listener: (event: AgentSessionEvent) => void) => {
@@ -49,6 +51,7 @@ describe("rpc turn outcome user abort classification", () => {
       // when
       await harness.handle.abort()
       harness.emit(event({ type: "agent_end", willRetry: false, messages: [] }))
+      harness.emit(event({ type: "agent_idle" }))
       const outcome = await harness.handle.waitForOutcome()
 
       // then
@@ -69,6 +72,7 @@ describe("rpc turn outcome user abort classification", () => {
         message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider exploded" },
       }))
       harness.emit(event({ type: "agent_end", willRetry: false, messages: [] }))
+      harness.emit(event({ type: "agent_idle" }))
       const outcome = await harness.handle.waitForOutcome()
 
       // then
@@ -85,6 +89,7 @@ describe("rpc turn outcome user abort classification", () => {
       await harness.handle.startInitialPrompt("work")
       await harness.handle.abort()
       harness.emit(event({ type: "agent_end", willRetry: false, messages: [] }))
+      harness.emit(event({ type: "agent_idle" }))
       expect((await harness.handle.waitForOutcome()).status).toBe("cancelled")
 
       // when
@@ -94,6 +99,7 @@ describe("rpc turn outcome user abort classification", () => {
         message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" },
       }))
       harness.emit(event({ type: "agent_end", willRetry: false, messages: [] }))
+      harness.emit(event({ type: "agent_idle" }))
       const outcome = await harness.handle.waitForOutcome()
 
       // then

@@ -14,6 +14,8 @@ export interface GitExecResult {
   code: number
   stdout: string
   stderr: string
+  /** Raw stdout for byte-framed output (`git cat-file --batch`); injected execs may omit it. */
+  stdoutBytes?: Buffer
 }
 
 export interface GitExec {
@@ -129,10 +131,12 @@ function runGitCommand(
         reject(new GitTimeoutError(argv, options.timeoutMs))
         return
       }
+      const stdoutBytes = Buffer.concat(stdout)
       resolve({
         code: code ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
+        stdout: stdoutBytes.toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
+        stdoutBytes,
       })
     })
   })

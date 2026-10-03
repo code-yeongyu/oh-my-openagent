@@ -184,11 +184,11 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(low).toBeDefined()
-      expect(low.model).toBe("openai/gpt-6-sol-fast")
+      expect(low.model).toBe("openai/gpt-6.1-sol")
       expect(low.variant).toBe("medium")
       expect(high).toBeDefined()
       expect(high.model).toBe("openai/gpt-6-astra")
-      expect(high.variant).toBe("xhigh")
+      expect(high.variant).toBe("high")
     })
 
     test("unspecified-high category uses Claude Opus 5.5 medium as primary", () => {
@@ -889,11 +889,13 @@ describe("sisyphus-task", () => {
     })
 
     test.each([
-      ["openai/gpt-6-sol-fast"],
-      ["openai/gpt-6-sol"],
-    ])("keeps deep-low open on either GPT-6 Sol tier (%s) while deep-high stays Astra-only", (solId) => {
-      // #given: deep-low gates on gpt-6-sol-fast OR gpt-6-sol; the builtin default config is the
-      // GPT-6 Sol Fast tier and the runtime chain walk (category-resolver) picks the rung the registry carries
+      ["openai/gpt-6.1-sol"],
+      ["openai/gpt-6.1-sol-fast"],
+      ["openai/gpt-5.6-sol-fast"],
+      ["openai/gpt-5.6-sol"],
+    ])("keeps deep-low open on any GPT-6.1 Sol or GPT-5.6 Sol tier (%s) while deep-high stays Astra-only", (solId) => {
+      // #given: deep-low gates on either GPT-6.1 Sol tier OR either GPT-5.6 Sol tier; the builtin default
+      // config is plain GPT-6.1 Sol and the runtime chain walk (category-resolver) picks the rung the registry carries
       const availableModels = new Set<string>([solId])
 
       // #when
@@ -904,14 +906,14 @@ describe("sisyphus-task", () => {
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("openai/gpt-6-sol-fast")
+      expect(resolved.config.model).toBe("openai/gpt-6.1-sol")
       expect(resolved.config.variant).toBe("medium")
       expect(resolveCategoryConfig("deep-high", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels })).toBeNull()
     })
 
-    test("gates deep-low closed when the registry only carries GPT-5.6 Sol", () => {
+    test("gates deep-low closed when the registry only carries GPT-6 Sol", () => {
       // #given
-      const availableModels = new Set<string>(["openai/gpt-5.6-sol"])
+      const availableModels = new Set<string>(["openai/gpt-6-sol"])
 
       // #when
       const result = resolveCategoryConfig("deep-low", {
@@ -937,7 +939,7 @@ describe("sisyphus-task", () => {
       // #then
       const resolved = expectResolvedCategoryConfig(result)
       expect(resolved.config.model).toBe("openai/gpt-6-astra")
-      expect(resolved.config.variant).toBe("xhigh")
+      expect(resolved.config.variant).toBe("high")
     })
 
     test("bypasses requiresModel when explicit user config provided", () => {
@@ -3859,8 +3861,8 @@ describe("sisyphus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.config.model).toBe("xiaomi/mimo-v2.6-pro")
-      expect(category.config.variant).toBe("max")
+      expect(category.config.model).toBe("anthropic/claude-sonnet-5-5")
+      expect(category.config.variant).toBe("medium")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {

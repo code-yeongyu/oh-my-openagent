@@ -112,7 +112,7 @@ export function NavHeader({ stars }: NavHeaderProps): JSX.Element {
             </Chip>
           </a>
           <Button size="sm" className="hidden md:inline-flex" asChild>
-            <Link href="/docs#installation">{t("install")}</Link>
+            <Link href="/docs/install">{t("install")}</Link>
           </Button>
           <Button
             variant="ghost"
@@ -154,7 +154,7 @@ export function NavHeader({ stars }: NavHeaderProps): JSX.Element {
             <li className="p-3">
               <Button size="md" className="w-full" asChild>
                 <Link
-                  href="/docs#installation"
+                  href="/docs/install"
                   tabIndex={isOpen ? undefined : -1}
                   onClick={() => setIsOpen(false)}
                 >

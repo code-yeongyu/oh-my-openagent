@@ -10,6 +10,7 @@ const COPIED_MS = 2000
 
 export interface CommandBarProps {
   readonly command: string
+  readonly prompt?: string
   readonly className?: string
 }
 
@@ -34,10 +35,11 @@ function useCopy(): { copied: boolean; copy: (text: string) => void } {
 
 /**
  * DESIGN.md §5 CommandBar — the site's primary CTA. Prompt cell (40px, `--accent` glyph on
- * `--ink-2`), mono command on `--ink-1`, fixed-width COPY cell that action-swaps to COPIED
- * for 2s. 48px tall, 0px radius, `focus-within` selection ring.
+ * `--ink-2`), mono command on `--ink-1`, fixed-width COPY cell. A copy grows an `--accent-8`
+ * wash across the cell on `--ease-spring` and blur-swaps the label to a drawn check for 2s;
+ * the cell's width never changes. 48px tall, 0px radius, `focus-within` selection ring.
  */
-export function CommandBar({ command, className }: CommandBarProps): JSX.Element {
+export function CommandBar({ command, prompt = "$", className }: CommandBarProps): JSX.Element {
   const t = useTranslations("landing.command")
   const { copied, copy } = useCopy()
 
@@ -53,9 +55,9 @@ export function CommandBar({ command, className }: CommandBarProps): JSX.Element
         aria-hidden="true"
         className="bg-ink-2 text-accent border-line flex w-10 shrink-0 items-center justify-center border-r font-mono text-sm"
       >
-        $
+        {prompt}
       </span>
-      <code className="text-text-hi flex min-w-0 flex-1 scrollbar-none items-center overflow-x-auto px-3 font-mono text-[0.8125rem] leading-[1.55] tracking-[-0.01em] whitespace-nowrap sm:text-sm">
+      <code className="text-text-hi flex w-0 min-w-0 flex-1 scrollbar-none items-center overflow-x-auto px-3 font-mono text-[0.8125rem] leading-[1.55] tracking-[-0.01em] whitespace-nowrap sm:text-sm">
         {command}
       </code>
       <button
@@ -63,14 +65,29 @@ export function CommandBar({ command, className }: CommandBarProps): JSX.Element
         onClick={() => copy(command)}
         aria-label={t("copyAria")}
         data-copied={copied ? "true" : undefined}
-        className="eyebrow border-line hover:text-text-hi data-[copied=true]:text-accent ease-standard focus-visible:outline-accent-32 w-20 shrink-0 border-l transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2"
+        className="copy-cell eyebrow border-line hover:text-text-hi data-[copied=true]:text-accent ease-standard focus-visible:outline-accent-32 w-20 shrink-0 border-l transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2"
       >
-        {copied ? t("copied") : t("copy")}
+        <span aria-hidden="true" className="copy-wash" />
+        <span aria-hidden="true" className="copy-label" data-shown={copied ? "false" : "true"}>
+          {t("copy")}
+        </span>
+        <span aria-hidden="true" className="copy-label" data-shown={copied ? "true" : "false"}>
+          <svg
+            data-testid="copy-check"
+            viewBox="0 0 12 12"
+            className="copy-check size-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          >
+            <path d="M2 6.4 4.8 9 10 3" strokeLinecap="square" />
+          </svg>
+          {t("copied")}
+        </span>
       </button>
+      <span role="status" aria-live="polite" className="sr-only">
+        {copied ? t("copiedStatus") : ""}
+      </span>
     </div>
   )
-}
-
-export function InstallCommand(props: CommandBarProps): JSX.Element {
-  return <CommandBar {...props} />
 }

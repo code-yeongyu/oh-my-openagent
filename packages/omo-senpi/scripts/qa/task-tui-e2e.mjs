@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, snapshotDir } from "./task-e2e-analysis.mjs"
 import { OMO_CONFIG, SCENARIOS, scenarioUsage } from "./task-tui-scenarios.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -76,7 +77,7 @@ function childEnv(baseEnv, sandbox, sessionDir, senpiBin) {
     env[key] = value
   }
   return {
-    ...env,
+    ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_BIN: senpiBin,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
@@ -175,7 +176,7 @@ function runSelfTest() {
   const activeCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "active")
   const teamCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team")
   const teamActiveCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team-active")
-  const env = childEnv({ ...process.env, SENPI_CODING_AGENT_DIR: "/real/agent", OPENAI_API_KEY: "secret" }, prepared.sandbox, prepared.sessionDir, "/tmp/senpi")
+  const env = childEnv({ PATH: process.env.PATH, OMO_CODING_AGENT_DIR: "/real/agent", SENPI_CODING_AGENT_DIR: "/real/agent", OPENAI_API_KEY: "secret" }, prepared.sandbox, prepared.sessionDir, "/tmp/senpi")
   if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: TUI command must not force print/json mode")
   if (!command.args.includes(mockProviderEntry) || !command.args.includes("omo-mock") || !command.args.includes("mock-1")) throw new Error("self-test: mock provider command is incomplete")
   if (!activeCommand.args.includes(SCENARIOS.active.prompt)) throw new Error("self-test: active command prompt is incomplete")

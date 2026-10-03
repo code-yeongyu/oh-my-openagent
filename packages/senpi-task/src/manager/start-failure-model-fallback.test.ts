@@ -187,3 +187,39 @@ describe("category chain fallback on a start-time admission refusal", () => {
     expect(store.load(first.task_id)?.status).toBe("completed")
   })
 })
+
+describe("a start-time fallback whose model lane is full (omo#9069)", () => {
+  test("#given the fallback model's lane is full #when the refused start walks the chain #then the task reports pending with its queue position and launches once the lane frees", async () => {
+    // given - one slot per model, and a task already holding the fallback model's slot
+    const runner = new AdmissionRefusingRunner(new Set([PACKAGE_MODEL.display]))
+    const { manager, store } = makeManager({
+      planner: chainPlanner([BUILTIN_MODEL]),
+      inProcess: runner,
+      config: settings({ default_concurrency: 1, max_depth: 1 }),
+    })
+    const holder = await manager.start({ prompt: "hold", parent_session_id: "parent-1", depth: 1, model: BUILTIN_MODEL.display })
+    if (holder.kind !== "started") throw new Error("expected the holder to start")
+
+    // when
+    const result = await manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "unspecified-high" })
+
+    // then - not reported as running while no child exists
+    if (result.kind !== "started") throw new Error(`expected started, got ${JSON.stringify(result)}`)
+    expect(result.status).toBe("pending")
+    expect(result.queue_position).toBe(1)
+    const queued = store.load(result.task_id)
+    expect(queued?.start_queued?.model).toBe(BUILTIN_MODEL.display)
+    expect(runner.handles.has(result.task_id)).toBe(false)
+    const eventLog = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
+    expect(eventLog).toContain('"type":"task_start_queued"')
+
+    // when - the holder finishes and frees the lane
+    runner.handles.get(holder.task_id)?.settle({ status: "completed", finalResponse: "done" })
+    await flush()
+    await flush()
+
+    // then
+    expect(runner.handles.has(result.task_id)).toBe(true)
+    expect(store.load(result.task_id)?.start_queued).toBeUndefined()
+  })
+})

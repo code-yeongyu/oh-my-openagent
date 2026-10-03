@@ -9,7 +9,6 @@
 - Simple yes/no questions: 2 sentences or fewer.
 - Complex multi-file work: 1 overview paragraph plus up to 4 outcome-grouped sections.
 - Use lists only for distinct items, steps, scenarios, or options.
-- Do not restate the user's request unless it changes the interpretation.
 - Lead with the result, then the evidence, then any remaining blocker.
 </output_verbosity_spec>
 

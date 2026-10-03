@@ -14,6 +14,9 @@ export async function runDetachedProbe(scenario: string): Promise<{
   const sandbox = mkdtempSync(join(tmpdir(), "omo-detached-probe-"))
   const env: NodeJS.ProcessEnv = {
     ...process.env, HOME: sandbox, USERPROFILE: sandbox, TMPDIR: sandbox, TMP: sandbox, TEMP: sandbox,
+    // The sandboxed profile is a cold transpiler-cache location; writing it blocks a Windows child for
+    // seconds (#9029). The probe measures heartbeat/teardown containment, not Bun's cache.
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
   }
   for (const prefix of ["OMO", "SENPI", "PI"]) {
     const dir = join(sandbox, prefix.toLowerCase())

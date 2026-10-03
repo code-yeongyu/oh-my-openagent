@@ -25,15 +25,20 @@ export type { ThreadTranscriptEntry } from "./reader"
 import { createReceiptStore, type ReceiptStore } from "./receipts"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
-import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession, type ThreadToolSurfaceOptions } from "./tools/ports"
+import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
 import {
+  addressBook,
+  degradedSummary,
   failure,
+  hostView,
   makeReceipts,
   metadata,
   output,
   resolution,
   resolveEntries,
   routingId,
+  sessionPort,
+  transcriptRole,
   summary,
   targetSession,
   type AnyTool,
@@ -45,19 +50,19 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   const mailbox = createOrderedDeliveryMailbox({
     directory: `${options.stateDirectory}/mailbox`,
     portFor: (target): MailboxTargetPort | undefined => ({
-      snapshot: async () => { const session = await findSession(target); const state = await options.host.getState(session.sessionId); return { active: state.isStreaming === true, ...(state.activeTurnId === undefined ? {} : { turn_id: state.activeTurnId }) } },
-      steer: async (message, expected) => { await options.host.prompt((await findSession(target)).sessionId, message, { streamingBehavior: "steer" }); void expected },
-      start: async (message) => { const result = await options.host.prompt((await findSession(target)).sessionId, message, { streamingBehavior: "followUp" }); return { turn_id: result.turnId ?? `turn-${Date.now()}` } },
+      snapshot: async () => { const session = await findSession(target); const state = await sessionPort(options, session).getState(session.sessionId); return { active: state.isStreaming === true, ...(state.activeTurnId === undefined ? {} : { turn_id: state.activeTurnId }) } },
+      steer: async (message, expected) => { const session = await findSession(target); await sessionPort(options, session).prompt(session.sessionId, message, { streamingBehavior: "steer" }); void expected },
+      start: async (message) => { const session = await findSession(target); const result = await sessionPort(options, session).prompt(session.sessionId, message, { streamingBehavior: "followUp" }); return { turn_id: result.turnId ?? `turn-${Date.now()}` } },
     }),
   })
 
-  async function sessions(): Promise<readonly ThreadHostSession[]> { await options.ensureHost?.(); return options.host.listSessions() }
+  async function view(): Promise<ThreadHostView> { await options.ensureHost?.(); return hostView(options) }
   async function findSession(id: string): Promise<ThreadHostSession> {
-    const found = targetSession(await sessions(), id)
+    const found = targetSession(await view(), id)
     if (found === undefined) throw new Error(`thread ${id} is not live`)
     return found
   }
-  async function execute<T extends ThreadToolName>(name: T, callId: string, args: unknown, ectx: unknown, sideEffect: (sessions: readonly ThreadHostSession[], value: Static<(typeof threadToolParamSchemas)[T]>, operationId: string, callerId: string) => Promise<ThreadToolResult>): Promise<ToolOutput> {
+  async function execute<T extends ThreadToolName>(name: T, callId: string, args: unknown, ectx: unknown, sideEffect: (view: ThreadHostView, value: Static<(typeof threadToolParamSchemas)[T]>, operationId: string, callerId: string) => Promise<ThreadToolResult>): Promise<ToolOutput> {
     const callerId = (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ?? options.callerSessionId()
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
@@ -68,7 +73,7 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
     if (admission.kind === "in_progress") return output(failure("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry."))
     if (admission.kind === "uncertain") return output(failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry."))
     try {
-      const result = await sideEffect(await sessions(), value, admission.operation_id, callerId)
+      const result = await sideEffect(await view(), value, admission.operation_id, callerId)
       receipts.complete(admission, result)
       return output(result)
     } catch (error) {
@@ -94,15 +99,17 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       // Default scope is the caller's workspace, the same test thread_send applies before it
       // delivers; the address book itself spans every workspace the host knows.
       const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
-      const visible = value.all_scope === true
-        ? current
-        : current.filter((session) => scoped.some((entry) => entry.thread_id === (session.durableSessionId ?? session.sessionId)))
-      return { kind: "ok", threads: visible.map(summary), scope: value.all_scope === true ? "all" : "workspace" }
+      const inScope = (threadId: string) => value.all_scope === true || scoped.some((entry) => entry.thread_id === threadId)
+      const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
+      // A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
+      // as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
+      const degraded = addressBook(options, current).filter((entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id))
+      return { kind: "ok", threads: [...visible.map(summary), ...degraded.map(degradedSummary)], scope: value.all_scope === true ? "all" : "workspace" }
     }),
   }
-  const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const messages = await options.host.getMessages(routingId(session)); const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); if (live.kind === "error") return { kind: "error", error: live.error }; return { kind: "ok", thread_id: resolved.entry.thread_id, items: live.items.map((item, index) => ({ seq: index + 1, role: item.role === "user" || item.role === "assistant" || item.role === "system" ? item.role : "system", content: JSON.stringify(item.content ?? item) })), truncated: live.truncated, ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }), source: live.source } }) }
+  const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return readDegraded(current, resolved.entry.thread_id, value); const messages = await sessionPort(options, session).getMessages(routingId(session)); const live = readTranscript({ kind: "live", entries: () => messages }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor }); if (live.kind === "error") return { kind: "error", error: live.error }; return { kind: "ok", thread_id: resolved.entry.thread_id, items: live.items.map((item, index) => ({ seq: index + 1, role: transcriptRole(item.role), content: JSON.stringify(item.content ?? item) })), truncated: live.truncated, ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }), source: live.source } }) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
-  const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await options.host.interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
+  const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
   const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { const entries = resolveEntries(options, current); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
@@ -118,7 +125,7 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
       const existing = visible.find((entry) => entry.thread_id !== resolved.entry.thread_id && entry.name.trim().toLowerCase() === name.toLowerCase())
       if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
-      await options.host.setSessionName(routingId(session), name)
+      await sessionPort(options, session).setSessionName(routingId(session), name)
       return { kind: "ok", thread_id: resolved.entry.thread_id, name }
     }),
   }
@@ -132,14 +139,14 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
       const pattern = value.model.trim().toLowerCase()
       if (pattern.length === 0) return failure("invalid_arguments", "The model pattern is empty.", "Pass a model id or display-name fragment.")
-      const catalog = await options.host.getAvailableModels(routingId(session))
+      const catalog = await sessionPort(options, session).getAvailableModels(routingId(session))
       const available = value.provider === undefined ? catalog : catalog.filter((model) => model.provider.toLowerCase() === value.provider?.trim().toLowerCase())
       let matches = available.filter((model) => `${model.provider}/${model.id}`.toLowerCase() === pattern)
       if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase() === pattern)
       if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase().includes(pattern) || model.name?.toLowerCase().includes(pattern))
       if (matches.length === 0) return failure("model_not_found", `No available model matches "${value.model}".`, "Choose a provider/id from the available list and retry.", { available: catalog.slice(0, 20).map((model) => `${model.provider}/${model.id}`) })
       if (matches.length > 1) return failure("model_ambiguous", `Several available models match "${value.model}".`, "Pass an exact provider/id or narrow the pattern with provider.", { candidates: matches.slice(0, 10).map((model) => `${model.provider}/${model.id}`) })
-      const selected = await options.host.setModel(routingId(session), matches[0].provider, matches[0].id)
+      const selected = await sessionPort(options, session).setModel(routingId(session), matches[0].provider, matches[0].id)
       return { kind: "ok", thread_id: resolved.entry.thread_id, model: { provider: selected.provider, id: selected.id } }
     }),
   }
@@ -152,10 +159,10 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
       const session = targetSession(current, resolved.entry.thread_id)
       if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
       try {
-        await options.host.setThinkingLevel(routingId(session), value.level, value.scope === "turn" ? "turn" : undefined)
+        await sessionPort(options, session).setThinkingLevel(routingId(session), value.level, value.scope === "turn" ? "turn" : undefined)
       } catch (error) {
         if (!(error instanceof Error) || !error.message.startsWith("thinking_level_unsupported:")) throw error
-        const supported = await options.host.getAvailableThinkingLevels(routingId(session))
+        const supported = await sessionPort(options, session).getAvailableThinkingLevels(routingId(session))
         return failure("thinking_level_unsupported", `Thinking level "${value.level}" is not supported by the active model.`, "Choose a level from the supported list and retry.", { supported })
       }
       return { kind: "ok", thread_id: resolved.entry.thread_id, level: value.level, scope: value.scope ?? "session" }
@@ -163,7 +170,28 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   }
   return [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning]
 
-  async function deliver(current: readonly ThreadHostSession[], address: string, value: ThreadSendInput | ThreadHandoffInput, operationId: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
+  /**
+   * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
+   * book then carries the durable path and the endpoint's failure. Any other non-live thread stays
+   * `not_resumable`, as before endpoints were enumerated.
+   */
+  function readDegraded(current: ThreadHostView, threadId: string, value: ThreadReadInput): ThreadToolResult {
+    const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
+    if (entry === undefined || entry.error_note === undefined || entry.session_path === null) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
+    const durable = readTranscript({ kind: "jsonl", path: entry.session_path, live_host_present: false }, { mode: "tail", max_bytes: value.max_bytes, cursor: value.cursor })
+    if (durable.kind === "error") return { kind: "error", error: durable.error }
+    // A session file interleaves messages with bookkeeping (the session header, model and thinking
+    // changes, names): only message entries are transcript, rendered with the live path's roles.
+    const messages = durable.items.flatMap((item) => {
+      const message = item.message
+      if (item.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
+      return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
+    })
+    const items = messages.map((message, index) => ({ seq: index + 1, role: transcriptRole(message.role), content: JSON.stringify(message.content ?? message) }))
+    return { kind: "ok", thread_id: threadId, items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
+  }
+
+  async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, operationId: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
     const resolved = resolution(options, resolveEntries(options, current), address, callerId, value.all_scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
     const session = targetSession(current, resolved.entry.thread_id)

@@ -26,6 +26,7 @@ export type {
   ChildSession,
   ChildSessionEvent,
   ChildSessionListener,
+  QueuedInputDisposition,
   RunnerFailure,
   RunnerOutcome,
 } from "./in-process/child-handle"
@@ -56,6 +57,9 @@ export type ChildSpec = {
   // typed session-create-failed, never a silent inMemory/default-dir fallback.
   readonly sessionDir: string
   readonly agentDir?: string
+  // The parent session's project-trust decision. The child's settings include the project layer
+  // only when the parent trusted it; unknown means untrusted.
+  readonly projectTrusted?: boolean
   readonly authStorage?: CreateAgentSessionOptions["authStorage"]
   readonly modelRegistry?: CreateAgentSessionOptions["modelRegistry"]
   readonly modelRuntime?: CreateAgentSessionOptions["modelRuntime"]
@@ -75,6 +79,9 @@ export type ChildSpec = {
   // Denylist mapped onto senpi's real deny field `excludeTools` (`tools:` is the allowlist and does
   // NOT deny). Sourced from record.tool_deny (the agent definition's disallowedTools).
   readonly toolDenylist?: readonly string[]
+  // Ordinary task children match process mode's nested task/workpool surface. DAG/workpool/member
+  // children leave this false and retain the stricter orchestration exclusion.
+  readonly includeTaskTools?: boolean
   // Names of the member-scoped tools, carried for persistence so a later resume can re-resolve
   // them against the live shared parent tools (todo 10). Start uses `memberScopedTools` directly.
   readonly memberScopedToolNames?: readonly string[]
@@ -129,8 +136,15 @@ export type InProcessRunnerOptions = {
   readonly kernelToolBindings?: KernelToolBindingRegistry
 }
 
-const defaultCreateChildSession: CreateChildSession = async (options) =>
-  (await (await loadSenpiBarrel()).createAgentSession(options)).session
+const defaultCreateChildSession: CreateChildSession = async (options) => {
+  // SDK callers that supply a ResourceLoader own its reload and extension binding. Load the
+  // builtin-only child surface, then run session_start so model-aware builtins (apply_patch, web
+  // search, terminal) select the same variants and active names as a process child.
+  await options.resourceLoader?.reload()
+  const session = (await (await loadSenpiBarrel()).createAgentSession(options)).session
+  await session.bindExtensions({ mode: "print" })
+  return session
+}
 
 export class InProcessRunner {
   readonly #sharedParentTools: readonly ToolDefinition[]
@@ -202,7 +216,9 @@ export class InProcessRunner {
       })
     } catch (error) {
       this.#kernelToolBindings?.release(spec.taskId)
-      discardUnstartedChildSession(session)
+      await discardUnstartedChildSession(session).catch((shutdownError: unknown) => {
+        throw new AggregateError([error, shutdownError], "child handle construction failed, and shutting down its session failed")
+      })
       throw error
     }
     // Runtime-only, and only once the child actually exists: the grant is bound under this child's

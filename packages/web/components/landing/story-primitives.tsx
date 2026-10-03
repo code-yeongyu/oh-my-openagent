@@ -38,13 +38,21 @@ export function Marquee({
 
 export interface TickerProps {
   readonly rows: readonly { readonly key: string; readonly content: ReactNode }[]
+  /** Height of the window the rows scroll through; reduced motion shows every row and drops it. */
+  readonly maxHeight: string
   readonly durationSeconds?: number
   readonly className?: string
 }
 
-export function Ticker({ rows, durationSeconds = 30, className }: TickerProps): JSX.Element {
-  const style: CSSProperties & { "--ticker-dur": string } = {
+export function Ticker({
+  rows,
+  maxHeight,
+  durationSeconds = 30,
+  className,
+}: TickerProps): JSX.Element {
+  const style: CSSProperties & { "--ticker-dur": string; "--ticker-max-h": string } = {
     "--ticker-dur": `${durationSeconds}s`,
+    "--ticker-max-h": maxHeight,
   }
   const track = (hidden: boolean): JSX.Element => (
     <ul className="divide-line divide-y" aria-hidden={hidden || undefined}>

@@ -36,13 +36,24 @@
       "subcopy": "あなたのトークンを、現実に価値のある成果へ。\n1万を超えるソースのリサーチ。すっと理解できる資料。\n会社の仕事、実験、バックエンド、フロントエンド、コーディング。\nあなたが望むどんな仕事でも。",
       "getStarted": "はじめる",
       "readManifesto": "マニフェストを読む",
-      "installLabel": "コマンドひとつ、ツールひとつ",
-      "installCommand": "bun install -g omo-ai@beta"
+      "installLabel": "コマンドひとつ、ツールひとつ"
     },
     "command": {
       "copy": "コピー",
       "copied": "コピー済み",
-      "copyAria": "インストールコマンドをコピー"
+      "copyAria": "インストールコマンドをコピー",
+      "copiedStatus": "インストールコマンドをコピーしました"
+    },
+    "install": {
+      "tabsLabel": "お使いのシステム向けのインストールコマンド",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "新しいターミナルを開いて omo を実行します。",
+      "onComputer": "Mac、Linux、Windows のコンピューターで実行してください。"
     },
     "proof": {
       "label": "ライブ指標",
@@ -118,7 +129,25 @@
       "item6Name": "生き残るゴール",
       "item6Desc": "長い作業は証拠と共にチェックポイントされ、セッションが再開しても止まった場所から続きます。",
       "item7Name": "すべてホットリロード",
-      "item7Desc": "設定、スキル、プロンプトがライブで再読み込みされます。試すために再起動は不要です。"
+      "item7Desc": "設定、スキル、プロンプトがライブで再読み込みされます。試すために再起動は不要です。",
+      "item8Name": "コンピュータ操作",
+      "item8Desc": "macOS、Linux、Windows のネイティブアプリで画面とアクセシビリティツリーを読み取り、バックグラウンドでクリックと入力を行います。あなたのフォーカスとカーソルはそのまま。停止ショートカットで止まり、再開できるのはあなただけです。",
+      "stage": {
+        "roundTrip": "往復は1回",
+        "oneStep": "1ステップ",
+        "repaired": "実行前に修正",
+        "splits": "仕事を分担",
+        "parallel": "並列で作業中",
+        "waiting": "待機中 · ポーリング0回",
+        "woke": "起動",
+        "goalProgress": "ゴール · 4つ中3つ確認済み",
+        "resumes": "再起動 → 4つ目から再開",
+        "saved": "保存済み",
+        "reloaded": "即反映 · 再起動なし",
+        "background": "バックグラウンドで",
+        "focusKept": "クリック完了 · フォーカスはそのまま",
+        "stageLabel": "選んだ項目をひとつのセルが実演します"
+      }
     },
     "platforms": {
       "titlePrefix": "そして、あなたの",
@@ -147,8 +176,7 @@
       "title": "コマンドひとつ。そして仕事へ戻る。",
       "subtitle": "OmOをインストールし、プロジェクトを開いて、やることを伝える。セットアップはそれだけです。",
       "installNow": "今すぐインストール",
-      "readTheDocs": "ドキュメントを読む",
-      "installCommand": "bun install -g omo-ai@beta"
+      "readTheDocs": "ドキュメントを読む"
     },
     "dag": {
       "region": "ワークフローグラフを開いた OmO デスクトップ",
@@ -175,7 +203,11 @@
   },
   "docs": {
     "mobileHeader": "OmO ドキュメント",
-    "searchPlaceholder": "ドキュメントを検索..."
+    "searchPlaceholder": "ドキュメントを検索...",
+    "install": {
+      "title": "OmO のインストール",
+      "description": "macOS、Linux、WSL、Windows でコマンドひとつで OmO をインストールします。"
+    }
   },
   "manifesto": {
     "badge": "マニフェスト",

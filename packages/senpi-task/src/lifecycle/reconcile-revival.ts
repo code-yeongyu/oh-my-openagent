@@ -11,13 +11,10 @@ import {
   type SuspendedResidency,
 } from "./reconcile-reclamation"
 import { admitSuspendedBatch } from "./residency"
+import { isRevivalCandidate, isSuspendedResidency } from "./revival-selection"
 import type { ReconcileOutcome } from "./types"
 
 export { beginLocalReclamation } from "./reconcile-reclamation"
-
-const SUSPENDED_RESIDENCIES = new Set(["persisted_only", "rpc_detached"])
-// `interrupted` is terminal by status, but remains in the revival set here for in-flight session recovery.
-const SESSION_REVIVABLE_STATUSES = new Set(["pending", "running", "interrupted"])
 
 type RevivalCandidate = {
   readonly record: TaskRecord
@@ -117,7 +114,7 @@ function disposeSuspendedTerminalWithoutTranscript(
   let applied = false
   try {
     context.store.mutate(observed.task_id, (fresh) => {
-      if (!SUSPENDED_RESIDENCIES.has(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
+      if (!isSuspendedResidency(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
       applied = true
       const { host_pid: _hostPid, ...rest } = fresh
       return { ...rest, residency_state: "disposed", updated_at: nowIso(context) }
@@ -129,13 +126,10 @@ function disposeSuspendedTerminalWithoutTranscript(
 }
 
 function suspendedCandidates(context: LifecycleContext, parentSessionId: string): readonly RevivalCandidate[] {
-  return context.store.list().records.flatMap((record): readonly RevivalCandidate[] => {
-    if (record.parent_session_id !== parentSessionId || !isSuspended(record)) return []
-    if (!SESSION_REVIVABLE_STATUSES.has(record.status) || record.killed === true) return []
-    return [{ record, priorResidency: record.residency_state }]
-  })
+  return context.store.list().records.flatMap((record): readonly RevivalCandidate[] =>
+    isRevivalCandidate(record, parentSessionId) && isSuspended(record) ? [{ record, priorResidency: record.residency_state }] : [])
 }
 
 function isSuspended(record: TaskRecord): record is TaskRecord & { readonly residency_state: SuspendedResidency } {
-  return record.residency_state === "persisted_only" || record.residency_state === "rpc_detached"
+  return isSuspendedResidency(record.residency_state)
 }

@@ -107,6 +107,32 @@ describe("createParentRegistrySessionContext", () => {
     expect(context).toEqual({})
   })
 
+  test("#given the parent did not trust its project #when a child starts or resumes #then the child is told the project is untrusted", () => {
+    // given
+    const registry = registryWithMockProvider()
+    const resolved: ResolvedModelRecord = { provider: "omo-mock", model_id: "mock-1", display: "omo-mock/mock-1", source: "category" }
+    const provide = createParentRegistrySessionContext(() => registry, () => false)
+
+    // when
+    const started = provide(baseSpec({ model: "omo-mock/mock-1" }))
+    const resumed = provide.resolveResumeContext?.(baseSpec({ resolvedModel: resolved }))
+
+    // then
+    expect(started.projectTrusted).toBe(false)
+    expect(resumed).toMatchObject({ ok: true, context: { projectTrusted: false } })
+  })
+
+  test("#given the parent trusted its project but has no registry yet #when a child starts #then the trust decision still reaches the child", () => {
+    // given
+    const provide = createParentRegistrySessionContext(() => undefined, () => true)
+
+    // when
+    const context = provide(baseSpec())
+
+    // then
+    expect(context).toEqual({ projectTrusted: true })
+  })
+
   test("#given a parent registry with a dynamically-registered provider #when a child spec names that model #then the registry, its auth storage, and the resolved Model are threaded", () => {
     // given
     const registry = registryWithMockProvider()

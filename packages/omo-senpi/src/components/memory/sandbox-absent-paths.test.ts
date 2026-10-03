@@ -137,6 +137,7 @@ describe("reflection sandbox with not-yet-created paths", () => {
       env: { PATH: process.env.PATH },
       platform: "linux",
       which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: true }),
     })
     const args = unwrapTransformResult(transform(spawnArgs(setup.worktree))).args
 

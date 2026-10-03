@@ -132,7 +132,7 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first" })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first", expiresAt: expect.any(Number) })
     expect(calls).toEqual(["async"])
   })
 
@@ -506,7 +506,7 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:queue-defer:first" })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:queue-defer:first", expiresAt: expect.any(Number) })
     expect(calls).toEqual(["first"])
   })
 
@@ -1500,7 +1500,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first).toMatchObject({ status: "failed", dispatchAttempted: true })
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:retryable-reject:first" })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:retryable-reject:first", expiresAt: expect.any(Number) })
     expect(promptCalls).toBe(1)
   })
 

@@ -32,6 +32,7 @@ import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { createDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
+import { wireHostPrewarm } from "./host-prewarm"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
@@ -167,6 +168,9 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
+      // Ahead of the recovery chain's session_start, so a revived child's host boots during the reconcile.
+      wireHostPrewarm(pi, engine)
+
       wireDagLifecycle(pi, dagRuntime, () => {
         wireEventBridge(pi, ctx, engine, statusUi, transitions, {
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
@@ -245,11 +249,15 @@ function registerTaskTools(
 
 function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {
   const sessionId = (): string => engine.runtime.sessionId() ?? ""
+  const rootSessionId = (): string => {
+    const id = sessionId()
+    return engine.resolveAncestry(id)?.rootSessionId ?? id
+  }
   pi.registerTool({
     ...createDagTool({
       manager: runtime.manager,
       parentSessionId: sessionId,
-      rootSessionId: sessionId,
+      rootSessionId,
       wait: runtime.wait,
       cancel: runtime.cancel,
       retry: runtime.retry,
@@ -287,6 +295,7 @@ function createTeamToolContext(
     omoConfig: engine.omoConfig,
     cwd: engine.runtime.cwd(),
     agentNames: new Set(Object.keys(engine.agents)),
+    ...(engine.ancestry === undefined ? {} : { ancestry: engine.ancestry }),
   }
   const baseService = createTeamService(serviceDeps)
   const stateDir = {

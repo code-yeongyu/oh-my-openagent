@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { GitExec, GitExecOptions, GitExecResult } from "./index"
@@ -10,6 +10,7 @@ import {
   NoEffectiveChangesError,
   createNodeGitExec,
 } from "./index"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
@@ -21,7 +22,7 @@ async function createRepo(agentId = "agent-one") {
 
 afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
+    await removeTree(dir, { maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
   }
 })
 

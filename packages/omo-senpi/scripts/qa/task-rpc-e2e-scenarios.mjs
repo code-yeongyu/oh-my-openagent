@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { mkdirSync, rmSync, watch, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { createSandbox, seedSandbox } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
@@ -46,7 +47,7 @@ function childArgv(sessionDir, prompt) {
 }
 
 function childEnv(sandbox, sessionDir, senpiBin) {
-  return { ...process.env, SENPI_BIN: senpiBin, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" }
+  return { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_BIN: senpiBin, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" }
 }
 
 function writeScript(sandbox, parentSteps, childSteps) {
@@ -77,7 +78,7 @@ export function prepareScenarioSandbox(projectConfig = PROJECT_OMO_CONFIG) {
   mkdirSync(sessionDir, { recursive: true })
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
   writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify(projectConfig, null, 2)}\n`)
-  const stateDir = join(sandbox.cwd, ".omo", "senpi-task")
+  const stateDir = sandboxStateDir(sandbox)
   mkdirSync(join(stateDir, "tasks"), { recursive: true })
   mkdirSync(join(stateDir, "logs"), { recursive: true })
   return { sandbox, sessionDir, stateDir }
@@ -135,17 +136,22 @@ function waitForChildClose(child, timeoutMs) {
   })
 }
 
+// The task state may not exist yet, or a record may be mid-write: neither is a harness failure.
+function readRecordsLenient(stateDir) {
+  try {
+    return readRecords(stateDir)
+  } catch (error) {
+    if (error?.code === "ENOENT" || error instanceof SyntaxError) return []
+    throw error
+  }
+}
+
+const RECORD_RECHECK_MS = 250
+
 function waitForRecord(stateDir, predicate, timeoutMs) {
   const tasksDir = join(stateDir, "tasks")
   const logsDir = join(stateDir, "logs")
-  const find = () => {
-    try {
-      return readRecords(stateDir).find(predicate)
-    } catch (error) {
-      if (error?.code === "ENOENT" || error instanceof SyntaxError) return undefined
-      throw error
-    }
-  }
+  const find = () => readRecordsLenient(stateDir).find(predicate)
   const existing = find()
   if (existing !== undefined) return Promise.resolve(existing)
   return new Promise((resolve, reject) => {
@@ -154,7 +160,17 @@ function waitForRecord(stateDir, predicate, timeoutMs) {
       const match = find()
       if (match !== undefined) finish(match)
     }))
-    const closeWatchers = () => watchers.forEach((watcher) => watcher.close())
+    // File watchers drop events under load (macOS FSEvents, Windows runners), and a dropped create
+    // event would read as a missing child. A short re-read backs the watchers up until the wait ends.
+    const recheck = setInterval(() => {
+      const match = find()
+      if (match !== undefined) finish(match)
+    }, RECORD_RECHECK_MS)
+    recheck.unref?.()
+    const closeWatchers = () => {
+      clearInterval(recheck)
+      watchers.forEach((watcher) => watcher.close())
+    }
     const finish = (match) => {
       if (settled) return
       settled = true
@@ -178,6 +194,19 @@ function waitForRecord(stateDir, predicate, timeoutMs) {
   })
 }
 
+// The parent Senpi host starts cold on every scenario: on a loaded Windows runner its startup alone
+// can take most of a minute before it even creates the task. Give that phase its own budget, then
+// time the child spawn separately, so a slow parent start is not misread as a missing child.
+const PARENT_TASK_CREATE_MS = 120_000
+const CHILD_SPAWN_MS = 40_000
+
+export async function waitForRunningRpcChild(stateDir, name, budgets = {}) {
+  const { parentTaskCreateMs = PARENT_TASK_CREATE_MS, childSpawnMs = CHILD_SPAWN_MS } = budgets
+  const created = await waitForRecord(stateDir, (r) => r.name === name, parentTaskCreateMs)
+  if (created === undefined) return undefined
+  return waitForRecord(stateDir, (r) => r.name === name && runningRpcChild(r), childSpawnMs)
+}
+
 async function cleanupSenpiHost(child) {
   const terminated = await killSenpiHost(child)
   if (!terminated) throw new Error(`could not terminate Senpi host pid=${child.pid ?? "unknown"}`)
@@ -188,9 +217,29 @@ export async function runKillCheck(senpiBin) {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pk"), CHILD_STEPS_HANG, "drive the kill scenario")
   try {
-    const running = await waitForRecord(stateDir, (r) => r.name === "pk" && runningRpcChild(r), 40_000)
+    const running = await waitForRunningRpcChild(stateDir, "pk")
     if (running === undefined) {
-      return { check: "kill_marks_error_killed_true", verdict: "FAIL", reason: "no running rpc child appeared to kill" }
+      const seen = readRecordsLenient(stateDir).find((r) => r.name === "pk")
+      const seenMessage = typeof seen?.error_message === "string" ? seen.error_message : ""
+      return {
+        check: "kill_marks_error_killed_true",
+        verdict: "FAIL",
+        reason: "no running rpc child appeared to kill",
+        facts: {
+          recordSeen: seen !== undefined,
+          status: seen?.status,
+          pid: seen?.pid,
+          execution_mode: seen?.execution_mode,
+          runner_kind: seen?.runner_kind,
+          host_session: seen?.host_session !== undefined,
+          residency_state: seen?.residency_state,
+          created_at: seen?.created_at,
+          updated_at: seen?.updated_at,
+          checked_at: new Date().toISOString(),
+          error_message: seenMessage,
+          error_message_lines: seenMessage.split("\n"),
+        },
+      }
     }
     try {
       process.kill(running.pid, "SIGKILL")
@@ -198,11 +247,16 @@ export async function runKillCheck(senpiBin) {
       // already gone counts as killed
     }
     const errored = await waitForRecord(stateDir, (r) => r.task_id === running.task_id && r.status === "error" && r.killed === true, 15_000)
+    const latest = readRecords(stateDir).find((r) => r.task_id === running.task_id)
+    // When the classifier calls the exit a crash, the recorded error_message IS the child's stderr
+    // tail, so keep all of it, untruncated and line by line: the line that broke the kill
+    // classification must be visible, not guessed from a prefix.
+    const errorMessage = typeof latest?.error_message === "string" ? latest.error_message : ""
     return {
       check: "kill_marks_error_killed_true",
       verdict: errored ? "PASS" : "FAIL",
       ...(errored ? {} : { reason: "kill did not yield status=error killed:true" }),
-      facts: { pid: running.pid, killed: errored?.killed ?? false, error_excerpt: (errored?.error_message ?? "").slice(0, 120) },
+      facts: { pid: running.pid, killed: errored?.killed ?? false, status: latest?.status, recordedKilled: latest?.killed, error_message: errorMessage, error_message_lines: errorMessage.split("\n") },
     }
   } finally {
     await cleanupSenpiHost(parent)
@@ -215,7 +269,7 @@ export async function runReconcileCheck(senpiBin) {
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pr"), CHILD_STEPS_HANG, "drive the reconcile scenario")
   let orphanPid
   try {
-    const running = await waitForRecord(stateDir, (r) => r.name === "pr" && runningRpcChild(r), 40_000)
+    const running = await waitForRunningRpcChild(stateDir, "pr")
     if (running === undefined) {
       return { check: "reconcile_lost_terminates_orphan", verdict: "FAIL", reason: "no running rpc child appeared to reconcile" }
     }

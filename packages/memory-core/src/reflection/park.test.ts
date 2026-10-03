@@ -65,6 +65,20 @@ describe("reflection park policy", () => {
     expect(state.parkedAt).toBe(at((REFLECTION_PARK_NON_RETRYABLE_STREAK - 1) * 60_000))
   })
 
+  test("#given a definitive failure #when it is the first failure #then the identity parks immediately", () => {
+    // when
+    const state = applyReflectionParkFailure(emptyReflectionParkState(), {
+      runId: "run-1",
+      at: at(0),
+      fingerprint: "spawn_failed:model_unreachable_with_extensions",
+      retryable: false,
+      definitive: true,
+    })
+
+    // then
+    expect({ streak: state.streak, parkedAt: state.parkedAt }).toEqual({ streak: 1, parkedAt: at(0) })
+  })
+
   test("#given retryable failures below their higher threshold #when applied #then nothing is parked", () => {
     // when
     const state = failNTimes(REFLECTION_PARK_RETRYABLE_STREAK - 1, true)

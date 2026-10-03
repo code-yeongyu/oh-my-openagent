@@ -7,6 +7,7 @@ declare const process: {
 }
 
 interface FsModule {
+  appendFileSync(path: string, data: string): void
   existsSync(path: string): boolean
   readFileSync(path: string, encoding: string): string
   rmSync(path: string, options?: { force?: boolean; recursive?: boolean }): void
@@ -23,11 +24,11 @@ interface UrlModule {
   pathToFileURL(path: string): { href: string }
 }
 
-const { existsSync, readFileSync, rmSync, writeFileSync } = process.getBuiltinModule<FsModule>("fs")
+const { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } = process.getBuiltinModule<FsModule>("fs")
 const { dirname, join } = process.getBuiltinModule<PathModule>("path")
 const { fileURLToPath, pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 
-type MockStep =
+export type MockStep =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
 
@@ -47,6 +48,8 @@ interface Model<TApi extends string = Api> {
 
 interface Context {
   cwd?: string
+  messages?: unknown
+  tools?: Array<{ name?: unknown }>
 }
 
 interface SimpleStreamOptions {
@@ -164,11 +167,25 @@ export function stepToAssistantMessage(step: MockStep, callCount: number): Assis
 
 let callCount = 0
 
+/** A driver that drops `mock-record-tools` in the cwd gets one line per request naming the tools it declared. */
+function recordDeclaredTools(cwd: string, context: Context): void {
+  if (!existsSync(join(cwd, "mock-record-tools"))) return
+  const names = (context.tools ?? []).map((tool) => tool.name).filter((name) => typeof name === "string")
+  appendFileSync(join(cwd, "mock-tools.jsonl"), `${JSON.stringify(names)}\n`)
+}
+
 function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
-  const stream = createLocalAssistantMessageEventStream()
-  const script = loadMockScript(context.cwd ?? process.cwd())
+  const cwd = context.cwd ?? process.cwd()
+  recordDeclaredTools(cwd, context)
+  const script = loadMockScript(cwd)
   const step = script.steps[Math.min(callCount, script.steps.length - 1)]
   callCount += 1
+  return streamMockStep(step, callCount, options)
+}
+
+/** Streams one scripted step; for drivers that choose the step themselves instead of by call order. */
+export function streamMockStep(step: MockStep, callCount: number, options?: SimpleStreamOptions) {
+  const stream = createLocalAssistantMessageEventStream()
   const message = stepToAssistantMessage(step, callCount)
 
   queueMicrotask(() => {

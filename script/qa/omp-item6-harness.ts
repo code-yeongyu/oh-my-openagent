@@ -11,7 +11,7 @@ import type { KernelToolInvokeOptions, KernelToolsCapability } from "../../packa
 import { createTaskManager } from "../../packages/senpi-task/src/manager/manager"
 import { createInProcessManagedRunner } from "../../packages/senpi-task/src/manager/runner"
 import { InProcessRunner } from "../../packages/senpi-task/src/runners/in-process"
-import { createTaskLifecycle } from "../../packages/senpi-task/src/lifecycle"
+import { createTaskLifecycle, NO_HOST_ENDPOINT } from "../../packages/senpi-task/src/lifecycle"
 import { createManagerResidencyRegistry } from "../../packages/omo-senpi/src/components/task/residency-registry"
 import { createTaskRecordStore } from "../../packages/senpi-task/src/store"
 import { createTaskTool } from "../../packages/senpi-task/src/tools/task"
@@ -244,6 +244,7 @@ export async function openChildEnv(turn: ProviderTurnDecider, options: ChildEnvO
     planner: options.planner ?? (() => ({ kind: "resolved", plan: { model: "omp-fixture/fixture" } })),
   })
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store, config, kernelToolBindings, now: () => now,
     registry: createManagerResidencyRegistry(() => manager),
     idleReclaimerScheduler: { setInterval: (callback) => { tick = callback; return { unref: () => undefined } }, clearInterval: () => undefined },

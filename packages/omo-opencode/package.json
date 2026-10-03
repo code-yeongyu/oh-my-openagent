@@ -44,7 +44,6 @@
     "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "picomatch": "^4.0.7",
     "zod": "^4.6.5"
   }
 }

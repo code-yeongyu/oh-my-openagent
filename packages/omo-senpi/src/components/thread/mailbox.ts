@@ -1,9 +1,5 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
-
-import { writeFileAtomically } from "@oh-my-opencode/utils/atomic-write"
-
 import { threadToolFailure, type ThreadErrorCode } from "./errors"
+import { createMailboxJournal } from "./mailbox-journal"
 
 export const MAILBOX_MAX_MESSAGES = 128
 export const MAILBOX_MAX_BYTES = 1024 * 1024
@@ -37,8 +33,6 @@ export type MailboxSuccess =
   | { readonly kind: "ok"; readonly message_seq: number; readonly delivery: "queued"; readonly queue_position: number }
 export type MailboxResult = MailboxSuccess | { readonly kind: "error"; readonly error: ReturnType<typeof threadToolFailure> }
 
-type StoredState = { readonly next_seq: number; readonly queues: Readonly<Record<string, readonly MailboxItem[]>> }
-
 export type OrderedDeliveryMailbox = {
   readonly accept: (target: string, message: string, options?: { readonly delivery?: DeliveryMode; readonly expected_turn_id?: string }) => Promise<MailboxResult>
   /** Call after a target becomes idle; pending follow_up/auto messages are then dispatched. */
@@ -56,9 +50,7 @@ export type MailboxOptions = {
 }
 
 export function createOrderedDeliveryMailbox(options: MailboxOptions): OrderedDeliveryMailbox {
-  mkdirSync(options.directory, { recursive: true, mode: 0o700 })
-  const statePath = join(options.directory, "mailbox.json")
-  let state = readState(statePath)
+  const journal = createMailboxJournal(options.directory)
   const workers = new Map<string, Promise<void>>()
   const retryTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const waiters = new Map<number, (result: MailboxResult) => void>()
@@ -67,24 +59,8 @@ export function createOrderedDeliveryMailbox(options: MailboxOptions): OrderedDe
   const maxMessages = options.max_messages ?? MAILBOX_MAX_MESSAGES
   const maxBytes = options.max_bytes ?? MAILBOX_MAX_BYTES
 
-  function persist(): void {
-    writeFileAtomically(statePath, JSON.stringify(state))
-  }
-
   function queueFor(target: string): MailboxItem[] {
-    return [...(state.queues[target] ?? [])]
-  }
-
-  function replaceQueue(target: string, queue: readonly MailboxItem[]): void {
-    const queues = { ...state.queues }
-    if (queue.length === 0) delete queues[target]
-    else queues[target] = queue
-    state = { ...state, queues }
-    persist()
-  }
-
-  function removeItem(target: string, messageSeq: number): void {
-    replaceQueue(target, queueFor(target).filter((item) => item.message_seq !== messageSeq))
+    return [...journal.pending(target)]
   }
 
   // Bounded-cadence retry: one 50ms timer per target (deduped), cleared by close(). Attempts
@@ -113,7 +89,7 @@ export function createOrderedDeliveryMailbox(options: MailboxOptions): OrderedDe
       const port = options.portFor(target)
       if (port === undefined) {
         settle(item, error("not_resumable", `Thread ${target} has no live owner.`, "Retry when the target is live, or use thread_list to choose a live thread."))
-        removeItem(target, item.message_seq)
+        journal.remove(item.message_seq)
         continue
       }
       let snapshot: MailboxTurnSnapshot
@@ -142,47 +118,47 @@ export function createOrderedDeliveryMailbox(options: MailboxOptions): OrderedDe
       }
       if (item.delivery === "steer" && !snapshot.active) {
         settle(item, error("no_active_turn", `Thread ${target} has no active turn to steer.`, "Use delivery auto or follow_up, or retry while the target turn is active."))
-        removeItem(target, item.message_seq)
+        journal.remove(item.message_seq)
         continue
       }
       if (item.delivery === "steer" && item.expected_turn_id === undefined) {
         settle(item, error("invalid_arguments", "Steer delivery needs expected_turn_id.", "Read the active turn id and retry with expected_turn_id."))
-        removeItem(target, item.message_seq)
+        journal.remove(item.message_seq)
         continue
       }
       if (item.delivery === "steer" || (item.delivery === "auto" && snapshot.active)) {
         const expected = item.expected_turn_id ?? snapshot.turn_id
         if (expected === undefined || snapshot.turn_id !== expected) {
           settle(item, error("turn_conflict", `The active turn for ${target} changed before delivery.`, "Read the target again and retry with the current turn id."))
-          removeItem(target, item.message_seq)
+          journal.remove(item.message_seq)
           continue
         }
         try {
           await port.steer(item.message, expected, item.operation_id, "steer")
           settle(item, { kind: "ok", message_seq: item.message_seq, delivery: "steered", turn_id: expected })
-          removeItem(target, item.message_seq)
-        } catch (failure) {
+          journal.remove(item.message_seq)
+        } catch (failure) { // no-excuse-ok: catch -- host ports may reject with non-Error pushback values.
           if (isRetryableHostPushback(failure)) {
             settle(item, queued(item, queue.length))
             retryLater(target)
             return
           }
           settle(item, error("turn_conflict", `The active turn for ${target} changed before delivery.`, "Read the target again and retry with the current turn id."))
-          removeItem(target, item.message_seq)
+          journal.remove(item.message_seq)
         }
       } else {
         try {
           const started = await port.start(item.message, item.operation_id, "followUp")
           settle(item, { kind: "ok", message_seq: item.message_seq, delivery: "started", turn_id: started.turn_id })
-          removeItem(target, item.message_seq)
-        } catch (failure) {
+          journal.remove(item.message_seq)
+        } catch (failure) { // no-excuse-ok: catch -- host ports may reject with non-Error pushback values.
           if (isRetryableHostPushback(failure)) {
             settle(item, queued(item, queue.length))
             retryLater(target)
             return
           }
           settle(item, error("internal_error", `Delivery to ${target} could not start a turn.`, "Retry the message after checking the target status."))
-          removeItem(target, item.message_seq)
+          journal.remove(item.message_seq)
         }
       }
     }
@@ -210,14 +186,14 @@ export function createOrderedDeliveryMailbox(options: MailboxOptions): OrderedDe
     if (messageBytes > maxBytes) return error("message_too_large", `The message is ${messageBytes} bytes, above the ${maxBytes}-byte mailbox limit.`, "Shorten the message below the mailbox limit and retry.")
     const bytes = queue.reduce((total, item) => total + Buffer.byteLength(item.message), 0) + messageBytes
     if (queue.length >= maxMessages || bytes > maxBytes) return error("queue_full", `The delivery queue for ${target} is full.`, "Wait for queued messages to drain, then retry.")
+    const messageSequence = journal.nextSequence()
     const item: MailboxItem = {
-      target, message, message_seq: state.next_seq, delivery,
+      target, message, message_seq: messageSequence, delivery,
       ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: request.expected_turn_id }),
-      operation_id: `${target}-${state.next_seq}`,
+      operation_id: `${target}-${messageSequence}`,
       accepted_at: new Date(now()).toISOString(),
     }
-    state = { next_seq: state.next_seq + 1, queues: { ...state.queues, [target]: [...queue, item] } }
-    persist()
+    journal.enqueue(item)
     const result = new Promise<MailboxResult>((resolve) => waiters.set(item.message_seq, resolve))
     void run(target)
     const snapshot = await options.portFor(target)?.snapshot()
@@ -236,12 +212,6 @@ export function createOrderedDeliveryMailbox(options: MailboxOptions): OrderedDe
       retryTimers.clear()
     },
   }
-}
-
-function readState(path: string): StoredState {
-  if (!existsSync(path)) return { next_seq: 1, queues: {} }
-  const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<StoredState>
-  return { next_seq: typeof parsed.next_seq === "number" ? parsed.next_seq : 1, queues: parsed.queues ?? {} }
 }
 
 function queued(item: MailboxItem, queuePosition: number): MailboxSuccess {

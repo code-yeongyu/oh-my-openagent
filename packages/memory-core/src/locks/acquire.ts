@@ -28,13 +28,21 @@ import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from
 export type AcquireLockOptions = {
   readonly waitTimeoutMs?: number
   readonly retryDelayMs?: number
+  readonly incompleteLockGraceMs?: number
+  readonly now?: () => number
   readonly signal?: AbortSignal
 }
 
 type OwnerSnapshot = {
   readonly raw: string
   readonly record: LockRecord | null
+  readonly dev: bigint | number
+  readonly ino: bigint | number
+  readonly mtimeMs: number
 }
+
+const INCOMPLETE_LOCK_GRACE_MS = 5_000
+const LINK_FALLBACK_ERRORS = new Set(["EACCES", "EPERM", "ENOTSUP"])
 
 export class LockContentionError extends Error {
   readonly retriable = true
@@ -105,11 +113,18 @@ export function delay(milliseconds: number, signal?: AbortSignal): Promise<void>
 async function readOwner(lockPath: string): Promise<OwnerSnapshot | null> {
   try {
     const raw = await readFile(lockPath, "utf8")
-    return { raw, record: parseLockRecord(raw) }
+    const identity = await stat(lockPath, { bigint: true })
+    return {
+      raw,
+      record: parseLockRecord(raw),
+      dev: identity.dev,
+      ino: identity.ino,
+      mtimeMs: Number(identity.mtimeMs),
+    }
   } catch (error) {
     const code = errorCode(error)
     if (code === "ENOENT") return null
-    if (path.sep === "\\" && code === "EPERM") return { raw: "", record: null }
+    if (path.sep === "\\" && code === "EPERM") return { raw: "", record: null, dev: 0, ino: 0, mtimeMs: Date.now() }
     throw error
   }
 }
@@ -132,6 +147,23 @@ async function openFreshCandidate(
   }
 }
 
+async function publishFallback(lockPath: string, record: LockRecord): Promise<boolean> {
+  let handle: FileHandle
+  try {
+    handle = await open(lockPath, "wx", 0o600)
+  } catch (error) {
+    if (errorCode(error) === "EEXIST") return false
+    throw error
+  }
+  try {
+    await (candidateFs.writeFallback ?? writeHandleAll)(handle, `${JSON.stringify(record)}\n`, "utf8")
+    await handle.sync()
+    return true
+  } finally {
+    await handle.close()
+  }
+}
+
 async function publishExclusive(lockPath: string, record: LockRecord): Promise<boolean> {
   await mkdir(path.dirname(lockPath), { recursive: true, mode: 0o700 })
   const { candidatePath, handle } = await openFreshCandidate(lockPath)
@@ -144,10 +176,13 @@ async function publishExclusive(lockPath: string, record: LockRecord): Promise<b
     }
 
     try {
-      await link(candidatePath, lockPath)
+      await (candidateFs.link ?? link)(candidatePath, lockPath)
       return true
     } catch (error) {
       if (isCandidatePublishRace(error)) return false
+      // Awaited so the finally below removes the candidate only after the fallback settles; a bare
+      // return would leave a fallback rejection unhandled while the candidate unlink is pending.
+      if (LINK_FALLBACK_ERRORS.has(errorCode(error) ?? "")) return await publishFallback(lockPath, record)
       throw error
     }
   } finally {
@@ -166,7 +201,9 @@ export function isCandidatePublishRace(error: unknown): boolean {
 const sweptLockDirectories = new Set<string>()
 
 export interface LockCandidateFs {
+  readonly link?: typeof link
   readonly unlink?: (path: string) => Promise<void>
+  readonly writeFallback?: typeof writeHandleAll
   readonly isSharingError?: (error: unknown) => boolean
 }
 
@@ -200,9 +237,9 @@ export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean>
 }
 
 // The recovery lock's only remover is its holder's nonce-matched releaseLock, so a holder
-// SIGKILLed inside recoverDeadOwner leaks a file that would otherwise block every future
-// eviction of the primary. Apply the same proven-dead test the primary gets; no age-based
-// reaping, and an unparsable record fails closed exactly as it does for the primary.
+// SIGKILLed inside recoverStaleOwner leaks a file that would otherwise block every future
+// eviction of the primary. Apply the same proven-dead test the primary gets; an incomplete
+// record stays held through the same grace period before it can be reclaimed.
 //
 // rename-then-inspect instead of unlink: rename is atomic, so exactly one reaper obtains the
 // inode. If the bytes it obtained are not the dead record it saw, another contender already
@@ -210,9 +247,22 @@ export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean>
 // with link (EEXIST means yet another contender republished first, and nothing is lost).
 // The tombstone name must not match LEAKED_CANDIDATE_NAME in candidate-sweep.ts, otherwise a
 // concurrent stale-candidate sweep could delete it while it is still being inspected.
-async function reclaimDeadRecoveryLock(recoveryPath: string): Promise<boolean> {
+function isSameOwner(left: OwnerSnapshot, right: OwnerSnapshot): boolean {
+  return left.dev === right.dev && left.ino === right.ino && left.mtimeMs === right.mtimeMs && left.raw === right.raw
+}
+
+async function isRecoverableOwner(owner: OwnerSnapshot, now: number, incompleteLockGraceMs: number): Promise<boolean> {
+  if (owner.record !== null) return isLockOwnerProvenDead(owner.record)
+  return now - owner.mtimeMs > incompleteLockGraceMs
+}
+
+async function reclaimStaleRecoveryLock(
+  recoveryPath: string,
+  now: number,
+  incompleteLockGraceMs: number,
+): Promise<boolean> {
   const stale = await readOwner(recoveryPath)
-  if (stale === null || stale.record === null || !(await isLockOwnerProvenDead(stale.record))) return false
+  if (stale === null || !(await isRecoverableOwner(stale, now, incompleteLockGraceMs))) return false
 
   const tombstonePath = `${recoveryPath}.reaping-${randomUUID()}`
   try {
@@ -225,7 +275,7 @@ async function reclaimDeadRecoveryLock(recoveryPath: string): Promise<boolean> {
   }
 
   const moved = await readOwner(tombstonePath)
-  if (moved !== null && moved.raw === stale.raw) {
+  if (moved !== null && isSameOwner(moved, stale)) {
     await unlink(tombstonePath)
     return true
   }
@@ -239,12 +289,14 @@ async function reclaimDeadRecoveryLock(recoveryPath: string): Promise<boolean> {
   return false
 }
 
-async function recoverDeadOwner(
+async function recoverStaleOwner(
   lockPath: string,
   snapshot: OwnerSnapshot,
   contender: LockRecord,
+  now: number,
+  incompleteLockGraceMs: number,
 ): Promise<boolean> {
-  if (snapshot.record === null || !(await isLockOwnerProvenDead(snapshot.record))) return false
+  if (!(await isRecoverableOwner(snapshot, now, incompleteLockGraceMs))) return false
 
   const recoveryPath = `${lockPath}.recovery`
   const recoveryRecord: LockRecord = {
@@ -257,14 +309,14 @@ async function recoverDeadOwner(
   // reconcile path) recovers a doubly-stale lock in a single pass without introducing a spin.
   for (let attempt = 0; ; attempt += 1) {
     if (await publishExclusive(recoveryPath, recoveryRecord)) break
-    if (attempt > 0 || !(await reclaimDeadRecoveryLock(recoveryPath))) return false
+    if (attempt > 0 || !(await reclaimStaleRecoveryLock(recoveryPath, now, incompleteLockGraceMs))) return false
   }
 
   try {
     const current = await readOwner(lockPath)
     if (current === null) return true
-    if (current.raw !== snapshot.raw || current.record === null) return false
-    if (!(await isLockOwnerProvenDead(current.record))) return false
+    if (!isSameOwner(current, snapshot)) return false
+    if (!(await isRecoverableOwner(current, now, incompleteLockGraceMs))) return false
     // Fence: only unlink the primary while this contender still owns the recovery lock. A
     // reaper that grabbed our live record and handed it back may have lost that hand-back to
     // a third contender's publish; in that case the critical section is no longer ours.
@@ -284,7 +336,9 @@ export async function acquireLock(
 ): Promise<void> {
   const waitTimeoutMs = options.waitTimeoutMs ?? 0
   const retryDelayMs = options.retryDelayMs ?? 25
-  if (waitTimeoutMs < 0 || retryDelayMs <= 0) throw new Error("lock wait options must be positive")
+  const incompleteLockGraceMs = options.incompleteLockGraceMs ?? INCOMPLETE_LOCK_GRACE_MS
+  const now = options.now ?? Date.now
+  if (waitTimeoutMs < 0 || retryDelayMs <= 0 || incompleteLockGraceMs < 0) throw new Error("lock wait options must be positive")
   const lockDirectory = path.dirname(lockPath)
   if (!sweptLockDirectories.has(lockDirectory)) {
     sweptLockDirectories.add(lockDirectory)
@@ -298,7 +352,7 @@ export async function acquireLock(
       rearmCandidateSweep(lockDirectory)
     })
   }
-  const deadline = Date.now() + waitTimeoutMs
+  const deadline = now() + waitTimeoutMs
 
   for (;;) {
     options.signal?.throwIfAborted()
@@ -319,10 +373,10 @@ export async function acquireLock(
       owner = await readOwner(lockPath)
       if (owner === null) continue
     }
-    if (await recoverDeadOwner(lockPath, owner, record)) continue
+    if (await recoverStaleOwner(lockPath, owner, record, now(), incompleteLockGraceMs)) continue
     options.signal?.throwIfAborted()
-    if (Date.now() >= deadline) throw new LockContentionError(lockPath, owner.record)
-    await delay(Math.min(retryDelayMs, Math.max(1, deadline - Date.now())), options.signal)
+    if (now() >= deadline) throw new LockContentionError(lockPath, owner.record)
+    await delay(Math.min(retryDelayMs, Math.max(1, deadline - now())), options.signal)
   }
 }
 

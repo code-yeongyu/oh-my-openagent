@@ -13,6 +13,7 @@ import {
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { SpawnAdmission, TaskManager } from "./types"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(cleanupProjects)
 
@@ -29,14 +30,14 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
   }
 }
 
-function makeUnlimitedManager(): TaskManager {
+function makeUnlimitedManager(residency: Record<string, unknown> = { residency_max_children: "unlimited" }): TaskManager {
   const project = tempProject()
   const store = createTaskRecordStore({ project_dir: project })
   const runner = new FakeRunner()
   const config = settings({
     default_concurrency: 16,
     max_depth: 1,
-    residency_max_children: "unlimited",
+    ...residency,
   })
   let managerRef: TaskManager | undefined
   const manager = (): TaskManager => {
@@ -52,7 +53,7 @@ function makeUnlimitedManager(): TaskManager {
     forget: (taskId) => manager().forget(taskId),
     hasPendingSends: () => false,
   }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   managerRef = createTaskManager({
     store,
     runners: { "in-process": runner, process: runner },
@@ -83,5 +84,23 @@ describe("TaskManager unlimited residency", () => {
     // then
     expect(results.every((result) => result.kind === "started")).toBe(true)
     expect(manager.residentTaskIds()).toHaveLength(16)
+  })
+})
+
+// #8999: no residency cap unless a user sets one. The former default (8) rejected the ninth running
+// child of a parent with AgentLimitReached.
+describe("TaskManager default residency", () => {
+  test("#given no residency setting #when nine children start from one parent #then every child is admitted and started", async () => {
+    // given
+    const manager = makeUnlimitedManager({})
+
+    // when
+    const results = await Promise.all(
+      Array.from({ length: 9 }, (_, index) => manager.start(baseSpec({ name: `child-${index + 1}` }))),
+    )
+
+    // then
+    expect(results.map((result) => result.kind)).toEqual(Array.from({ length: 9 }, () => "started"))
+    expect(manager.residentTaskIds()).toHaveLength(9)
   })
 })

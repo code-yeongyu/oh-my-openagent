@@ -1,7 +1,9 @@
 import { createAstGrepComponent } from "../components/ast-grep"
 import { createBuiltinMcpsComponent } from "../components/builtin-mcps"
 import { createBundledSkillsComponent } from "../components/bundled-skills"
+import { createClaudeCodeComponent } from "../components/claude-code"
 import { createCommentCheckerComponent } from "../components/comment-checker"
+import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
@@ -12,6 +14,7 @@ import { createMemoryComponent } from "../components/memory"
 import { createModelProfileComponent } from "../components/model-profile"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent } from "../components/onboarding"
+import { createSkillCommandsComponent } from "../components/skill-commands"
 import { createSkillPointersComponent } from "../components/skill-pointers"
 import { createOmoNativeTelemetryComponent } from "../components/telemetry"
 import { createTodoFanoutReminderComponent } from "../components/todo-fanout-reminder"
@@ -31,6 +34,9 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     // outside the native-badge -> onboarding -> advisor adjacency that session-start
     // ordering pins (session-start-ordering.test.ts).
     createBundledSkillsComponent(),
+    // Its input handler must run before every other omo input handler: it rewrites a bare
+    // `/<bundled-skill>` into the `/skill:` form the later handlers and senpi's expansion read.
+    createSkillCommandsComponent(),
     createNativeBadgeComponent(),
     createOnboardingComponent(),
     createInitDeepAdvisorComponent(),
@@ -46,6 +52,8 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createBuiltinMcpsComponent(),
     createLspComponent(),
     createXSearchComponent(),
+    createComputerUseComponent(),
+    createClaudeCodeComponent(),
     createCommentCheckerComponent(),
     taskComponent,
     createThreadComponent(),

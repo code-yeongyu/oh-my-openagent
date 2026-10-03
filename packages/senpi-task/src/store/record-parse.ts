@@ -19,6 +19,10 @@ import {
   readOptionalSuspensionReason,
   validateHostSessionConsistency,
 } from "./record-blocks-parse"
+import {
+  readOptionalTaskStartFailureKind,
+  readOptionalTaskStartFailureReason,
+} from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
 import {
   isRecord,
@@ -72,10 +76,18 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const configGeneration = readOptionalNumber(value, "config_generation")
   const backgroundMode = readOptionalBackgroundMode(value)
   const reviveDeliveryUncertain = parseOptionalReviveDeliveryUncertainty(value)
+  const resumedRunEpoch = readOptionalNumber(value, "resumed_run_epoch")
+  const startQueued = parseOptionalStartQueued(value)
   const runnerKind = readOptionalRunnerKind(value)
   const suspensionReason = readOptionalSuspensionReason(value)
+  const failureKind = readOptionalTaskStartFailureKind(value)
+  const failureReason = readOptionalTaskStartFailureReason(value)
   const hostSession = parseOptionalHostSession(value)
   validateHostSessionConsistency(runnerKind, hostSession)
+  const fallbackHandoffEpoch = readOptionalNumber(value, "fallback_handoff_epoch")
+  const closingChild = parseOptionalClosingChild(value)
+  const residencyClaim = readOptionalString(value, "residency_claim")
+  const cancelRequested = parseOptionalCancelRequest(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -118,15 +130,51 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(isolation === undefined ? {} : { isolation }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
+    ...(failureKind === undefined ? {} : { failure_kind: failureKind }),
+    ...(failureReason === undefined ? {} : { failure_reason: failureReason }),
     ...(killed === undefined ? {} : { killed }),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
     ...(taskSeq === undefined ? {} : { task_seq: taskSeq }),
     ...(configGeneration === undefined ? {} : { config_generation: configGeneration }),
     ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
     ...(reviveDeliveryUncertain === undefined ? {} : { revive_delivery_uncertain: reviveDeliveryUncertain }),
+    ...(resumedRunEpoch === undefined ? {} : { resumed_run_epoch: resumedRunEpoch }),
+    ...(startQueued === undefined ? {} : { start_queued: startQueued }),
     ...(suspensionReason === undefined ? {} : { suspension_reason: suspensionReason }),
     ...(runnerKind === undefined ? {} : { runner_kind: runnerKind }),
     ...(hostSession === undefined ? {} : { host_session: hostSession }),
+    ...(fallbackHandoffEpoch === undefined ? {} : { fallback_handoff_epoch: fallbackHandoffEpoch }),
+    ...(closingChild === undefined ? {} : { fallback_closing_child: closingChild }),
+    ...(residencyClaim === undefined ? {} : { residency_claim: residencyClaim }),
+    ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
+  }
+}
+
+function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {
+  const value = record["cancel_requested"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("cancel_requested is not an object")
+  const reason = readOptionalString(value, "reason")
+  return { requested_at: readString(value, "requested_at"), ...(reason === undefined ? {} : { reason }) }
+}
+
+function parseOptionalClosingChild(record: Record<string, unknown>): TaskRecord["fallback_closing_child"] {
+  const value = record["fallback_closing_child"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("fallback_closing_child is not an object")
+  const pid = readOptionalNumber(value, "pid")
+  const hostSession = parseOptionalHostSession(value)
+  return { ...(pid === undefined ? {} : { pid }), ...(hostSession === undefined ? {} : { host_session: hostSession }) }
+}
+
+function parseOptionalStartQueued(record: Record<string, unknown>): TaskRecord["start_queued"] {
+  const value = record["start_queued"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("start_queued is not an object")
+  return {
+    model: readString(value, "model"),
+    queued_at: readString(value, "queued_at"),
+    queue_position: readNumber(value, "queue_position"),
   }
 }
 

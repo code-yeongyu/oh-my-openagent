@@ -22,6 +22,7 @@ import { hasFailureReader, readLaunchableFailures, type FactsFailureReadPort } f
 import { ledgerTargets, preflightFailureId, queueEntryTargets, type FactsFailurePort } from "./facts-failure-recording"
 import { drainFactsLaunches } from "./facts-drain"
 import { classifyOversizePayload } from "./facts-oversize"
+import { admitOversizedFacts } from "./facts-oversized-budget"
 import { FactsTerminalWrites } from "./facts-terminal-writes"
 import { readFactsPeoplePayload } from "./facts-people-payload"
 import { launchFactsInProcess } from "./facts-in-process-launch"
@@ -149,10 +150,15 @@ export class FactsExtractorRunner {
     const people = await readFactsPeoplePayload(repo.dir)
     const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people } as const
     const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
+    const oversizedModel = capped.oversized.length === 0 ? undefined
+      : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)
+    const admitted = capped.envelopeOversized ? [] : capped.oversized.filter((entry) =>
+      admitOversizedFacts({ ...envelope, entries: [entry] }, oversizedModel),
+    )
     const envelopeRefused = await classifyOversizePayload({
       terminal: this.terminal,
       envelope,
-      oversized: capped.oversized,
+      oversized: capped.oversized.filter((entry) => !admitted.includes(entry)),
       pending: entries,
       envelopeOversized: capped.envelopeOversized,
       ...(this.options.createPreflightId === undefined ? {} : { createFailureId: this.options.createPreflightId }),
@@ -162,7 +168,8 @@ export class FactsExtractorRunner {
       await releaseClaim()
       return { status: "skipped" }
     }
-    if (capped.selected.length === 0) {
+    const batch: readonly FactsQueueEntry[] = capped.selected.length > 0 ? capped.selected : admitted.slice(0, 1)
+    if (batch.length === 0) {
       this.options.logger?.warn("facts batch selection carried nothing within the payload cap", {
         pending: entries.length,
         oversized: capped.oversized.length,
@@ -170,7 +177,6 @@ export class FactsExtractorRunner {
       await releaseClaim()
       return { status: "empty" }
     }
-    const batch: readonly FactsQueueEntry[] = capped.selected
     await this.queue.releaseClaim(entries.filter((entry) => !batch.includes(entry)), claimId)
     const batchId = (this.options.createBatchId ?? randomUUID)()
     const launchedAt = this.now().getTime(); if (isAborted()) {
@@ -206,6 +212,7 @@ export class FactsExtractorRunner {
         runId,
         runDir,
         payload,
+        oversized: capped.selected.length === 0,
         resolution,
         modelRegistry: childModelRegistry,
         options: this.options,

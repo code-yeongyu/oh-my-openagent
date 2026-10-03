@@ -1,14 +1,30 @@
 import { describe, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
-import { RpcHostRunner, RpcProcessRunner } from "@oh-my-opencode/senpi-task"
+import { createLiveHostChildren, RpcHostRunner, RpcProcessRunner } from "@oh-my-opencode/senpi-task"
 
 import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { DEFAULT_RUNNER_FACTORIES } from "./engine-runners"
 import { TaskRuntimeContext } from "./runtime-context"
+import type { TaskHostRouting } from "./shard-routing"
+
+// Every start below is stubbed on the runner prototype, so no host is ever resolved or ensured.
+const STUBBED_HOST_ROUTING: TaskHostRouting = {
+  ensureDaemon: () => Promise.reject(new Error("the runner start is stubbed; nothing is ensured")),
+  shardResolver: () => {
+    throw new Error("the runner start is stubbed; no shard is resolved")
+  },
+  ownHostSocket: () => undefined,
+  insideHost: () => false,
+  probeHost: () => Promise.resolve(undefined),
+  onNotice: () => undefined,
+  shardEvents: {},
+  liveChildren: createLiveHostChildren({}),
+  storeDir: "/state",
+}
 
 describe("package extension inheritance", () => {
   test("#given one managed host runner #when starting twice consecutively #then both starts use the same underlying instance", async () => {
@@ -25,6 +41,7 @@ describe("package extension inheritance", () => {
         settings: OmoTaskSettingsSchema.parse({ process_runner: "host" }),
         platform: "darwin",
         agentDir: "/agent",
+        hostRouting: STUBBED_HOST_ROUTING,
       })
       const spec = {
         taskId: "st_package",
@@ -45,8 +62,9 @@ describe("package extension inheritance", () => {
   })
 
   test("#given no package-root override #when the real package lookup is empty or throws #then argv-only extensions still reach the runner", async () => {
-    const { DefaultPackageManager } = await loadSenpiBarrel()
+    const { CONFIG_DIR_NAME, DefaultPackageManager } = await loadSenpiBarrel()
     const cwd = mkdtempSync(join(tmpdir(), "omo-package-extensions-"))
+    mkdirSync(join(cwd, CONFIG_DIR_NAME))
     const originalArgv = process.argv
     process.argv = ["bun", "omo", "-e", "/installed/omo/plugin"]
     const stopped = new Error("stop before spawning")
@@ -194,6 +212,7 @@ describe("package extension inheritance", () => {
           settings: OmoTaskSettingsSchema.parse({ process_runner: processRunner }),
           platform: "darwin",
           agentDir: "/agent",
+          hostRouting: STUBBED_HOST_ROUTING,
           listInstalledPackageRoots: () => {
             resolutions += 1
             return roots

@@ -49,8 +49,8 @@ function runnerHarness() {
       return {
         sessionId: "child-session",
         prompt: async () => undefined,
-        steer: async () => undefined,
-        followUp: async () => undefined,
+        steer: async () => "handled",
+        followUp: async () => "handled",
         abort: async () => undefined,
         subscribe: () => () => undefined,
         getLastAssistantText: () => undefined,

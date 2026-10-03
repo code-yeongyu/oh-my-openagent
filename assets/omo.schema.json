@@ -39,12 +39,15 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "mode",
-        "maxFileBytes",
-        "timeoutMs"
-      ],
       "additionalProperties": false
+    },
+    "gateway": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {},
+      "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
     },
     "$schema": {
       "type": "string"
@@ -798,6 +801,88 @@
           },
           "disable": {
             "type": "boolean"
+          },
+          "permission": {
+            "type": "object",
+            "properties": {
+              "edit": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "bash": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "webfetch": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "task": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "doom_loop": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "external_directory": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ask",
+                "allow",
+                "deny"
+              ]
+            }
+          },
+          "prompt_append": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -818,10 +903,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "commit_footer",
-        "include_co_authored_by"
-      ],
       "additionalProperties": false
     },
     "task": {
@@ -876,13 +957,6 @@
               ]
             }
           },
-          "required": [
-            "enabled",
-            "backend",
-            "apply",
-            "merge",
-            "commits"
-          ],
           "additionalProperties": false
         },
         "default_execution_mode": {
@@ -914,6 +988,15 @@
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
+        },
+        "host_shard_prewarm": {
+          "default": "first-turn",
+          "type": "string",
+          "enum": [
+            "off",
+            "first-turn",
+            "session-start"
+          ]
         },
         "default_concurrency": {
           "default": 5,
@@ -956,7 +1039,7 @@
           "maximum": 9007199254740991
         },
         "residency_max_children": {
-          "default": 8,
+          "default": "unlimited",
           "anyOf": [
             {
               "type": "integer",
@@ -1002,9 +1085,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "unavailable_categories"
-          ],
           "additionalProperties": false
         },
         "wait": {
@@ -1034,11 +1114,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "min_ms",
-            "default_ms",
-            "max_ms"
-          ],
           "additionalProperties": false
         },
         "team": {
@@ -1068,11 +1143,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "max_members",
-            "max_parallel_members",
-            "max_wall_clock_minutes"
-          ],
           "additionalProperties": false
         },
         "dag": {
@@ -1127,35 +1197,9 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "max_nodes_per_run",
-            "max_runs_per_session",
-            "subscriber_ring",
-            "heartbeat_ms",
-            "history_default_limit",
-            "history_max_limit",
-            "retention_days",
-            "max_prompt_bytes"
-          ],
           "additionalProperties": false
         }
       },
-      "required": [
-        "isolation",
-        "default_execution_mode",
-        "process_runner",
-        "host_engine_policy",
-        "default_concurrency",
-        "global_concurrency",
-        "max_depth",
-        "residency_max_children",
-        "resident_idle_timeout_ms",
-        "ttl_ms",
-        "resume_children",
-        "warnings",
-        "wait",
-        "team"
-      ],
       "additionalProperties": false
     },
     "teams": {
@@ -1252,8 +1296,6 @@
                   },
                   "required": [
                     "name",
-                    "backendType",
-                    "isActive",
                     "kind",
                     "category",
                     "prompt"
@@ -1309,8 +1351,6 @@
                   },
                   "required": [
                     "name",
-                    "backendType",
-                    "isActive",
                     "kind",
                     "subagent_type"
                   ],
@@ -1321,7 +1361,6 @@
           }
         },
         "required": [
-          "version",
           "members"
         ],
         "additionalProperties": false
@@ -1592,10 +1631,6 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "step_count",
-                "on_compaction"
-              ],
               "additionalProperties": false
             },
             "merge": {
@@ -1627,14 +1662,6 @@
               ]
             }
           },
-          "required": [
-            "enabled",
-            "trigger",
-            "merge",
-            "category",
-            "timeout_minutes",
-            "sandbox"
-          ],
           "additionalProperties": false
         },
         "nudge": {
@@ -1655,10 +1682,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "every_user_turns"
-          ],
           "additionalProperties": false
         },
         "facts": {
@@ -1679,10 +1702,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "debounce_settles"
-          ],
           "additionalProperties": false
         },
         "dream": {
@@ -1729,14 +1748,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "idle_minutes",
-            "min_hours_between",
-            "shutdown_launch",
-            "auto_select_max",
-            "auto_select_max_chars"
-          ],
           "additionalProperties": false
         },
         "people": {
@@ -1764,11 +1775,6 @@
               "maximum": 500
             }
           },
-          "required": [
-            "enabled",
-            "max_entries",
-            "max_entry_chars"
-          ],
           "additionalProperties": false
         },
         "soul": {
@@ -1782,9 +1788,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "edit_notice"
-          ],
           "additionalProperties": false
         },
         "write_notice": {
@@ -1798,9 +1801,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         },
         "sync": {
@@ -1818,9 +1818,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         },
         "search": {
@@ -1834,9 +1831,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "enabled"
-          ],
           "additionalProperties": false
         },
         "recall": {
@@ -1852,7 +1846,8 @@
             },
             "sidecar_max_tokens": 48000,
             "max_concurrent_wakes": 2,
-            "tool_budget": 8
+            "tool_budget": 8,
+            "query_expansion": false
           },
           "type": "object",
           "properties": {
@@ -1905,12 +1900,6 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "tool_args",
-                "result_head",
-                "assistant",
-                "prompt"
-              ],
               "additionalProperties": false
             },
             "sidecar_max_tokens": {
@@ -1930,17 +1919,12 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
+            },
+            "query_expansion": {
+              "default": false,
+              "type": "boolean"
             }
           },
-          "required": [
-            "enabled",
-            "max_items",
-            "category",
-            "event_caps",
-            "sidecar_max_tokens",
-            "max_concurrent_wakes",
-            "tool_budget"
-          ],
           "additionalProperties": false
         },
         "compile_warn_tokens": {
@@ -2186,6 +2170,9 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "query_expansion": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -2200,22 +2187,6 @@
           }
         }
       },
-      "required": [
-        "enabled",
-        "agent",
-        "reflection",
-        "nudge",
-        "facts",
-        "dream",
-        "people",
-        "soul",
-        "write_notice",
-        "sync",
-        "search",
-        "recall",
-        "compile_warn_tokens",
-        "agents"
-      ],
       "additionalProperties": false
     },
     "telemetry": {
@@ -2226,10 +2197,86 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "enabled"
-      ],
       "additionalProperties": false
+    },
+    "computer": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_width": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_height": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "screenshot_max_bytes": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stop_hotkey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allow_host_relay_only_stop": {
+          "type": "boolean"
+        },
+        "macos_canary": {
+          "type": "string",
+          "enum": [
+            "session",
+            "off"
+          ]
+        },
+        "audit_log": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "screenshot_gc": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "stale_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "scan_interval_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "engine_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cua_adapter": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
     },
     "disabled_skills": {
       "type": "array",
@@ -11137,10 +11184,6 @@
                       "maximum": 10
                     }
                   },
-                  "required": [
-                    "enabled",
-                    "turns"
-                  ],
                   "additionalProperties": false
                 },
                 "protected_tools": {
@@ -11169,9 +11212,6 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "enabled"
-                      ],
                       "additionalProperties": false
                     },
                     "supersede_writes": {
@@ -11186,10 +11226,6 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "enabled",
-                        "aggressive"
-                      ],
                       "additionalProperties": false
                     },
                     "purge_errors": {
@@ -11206,21 +11242,12 @@
                           "maximum": 20
                         }
                       },
-                      "required": [
-                        "enabled",
-                        "turns"
-                      ],
                       "additionalProperties": false
                     }
                   },
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "enabled",
-                "notification",
-                "protected_tools"
-              ],
               "additionalProperties": false
             },
             "task_system": {
@@ -11385,11 +11412,6 @@
               "maximum": 1000
             }
           },
-          "required": [
-            "enabled",
-            "auto_start",
-            "default_max_iterations"
-          ],
           "additionalProperties": false
         },
         "ralph_loop": {
@@ -11605,10 +11627,6 @@
                     "type": "number"
                   }
                 },
-                "required": [
-                  "type",
-                  "method"
-                ],
                 "additionalProperties": false
               }
             },
@@ -11633,7 +11651,6 @@
                   }
                 },
                 "required": [
-                  "enabled",
                   "gateway",
                   "instruction"
                 ],
@@ -11682,21 +11699,9 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "authorizedDiscordUserIds",
-                "pollIntervalMs",
-                "rateLimitPerMinute",
-                "maxMessageLength",
-                "includePrefix"
-              ],
               "additionalProperties": false
             }
           },
-          "required": [
-            "enabled",
-            "gateways",
-            "hooks"
-          ],
           "additionalProperties": false
         },
         "i18n": {
@@ -11774,18 +11779,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "live_mode_enabled",
-            "max_monitors_per_session",
-            "max_runtime_ms",
-            "batch_max_lines",
-            "batch_max_bytes",
-            "flush_interval_ms",
-            "ring_max_lines",
-            "line_max_bytes",
-            "pattern_max_length"
-          ],
           "additionalProperties": false
         },
         "team_mode": {
@@ -11851,18 +11844,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "enabled",
-            "tmux_visualization",
-            "max_parallel_members",
-            "max_members",
-            "max_messages_per_run",
-            "max_wall_clock_minutes",
-            "max_member_turns",
-            "message_payload_max_bytes",
-            "recipient_unread_max_bytes",
-            "mailbox_poll_interval_ms"
-          ],
           "additionalProperties": false
         },
         "keyword_detector": {
@@ -11903,9 +11884,6 @@
               "type": "number"
             }
           },
-          "required": [
-            "timeout_ms"
-          ],
           "additionalProperties": false
         },
         "git_master": {
@@ -11932,11 +11910,6 @@
               "type": "string"
             }
           },
-          "required": [
-            "commit_footer",
-            "include_co_authored_by",
-            "git_env_prefix"
-          ],
           "additionalProperties": false
         },
         "browser_automation_engine": {
@@ -11958,9 +11931,6 @@
               }
             }
           },
-          "required": [
-            "provider"
-          ],
           "additionalProperties": false
         },
         "websearch": {
@@ -12020,14 +11990,6 @@
               ]
             }
           },
-          "required": [
-            "enabled",
-            "layout",
-            "main_pane_size",
-            "main_pane_min_width",
-            "agent_pane_min_width",
-            "isolation"
-          ],
           "additionalProperties": false
         },
         "tui": {
@@ -12049,15 +12011,9 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "enabled"
-              ],
               "additionalProperties": false
             }
           },
-          "required": [
-            "sidebar"
-          ],
           "additionalProperties": false
         },
         "sisyphus": {
@@ -12077,9 +12033,6 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "claude_code_compat"
-              ],
               "additionalProperties": false
             }
           },
@@ -12093,9 +12046,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "auto_commit"
-          ],
           "additionalProperties": false
         },
         "start_work": {
@@ -12106,9 +12056,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "auto_commit"
-          ],
           "additionalProperties": false
         },
         "default_mode": {
@@ -12123,10 +12070,6 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "ultrawork",
-            "goal"
-          ],
           "additionalProperties": false
         },
         "_migrations": {
@@ -12136,9 +12079,6 @@
           }
         }
       },
-      "required": [
-        "git_master"
-      ],
       "additionalProperties": false
     },
     "[native]": {
@@ -12176,6 +12116,14 @@
             }
           },
           "additionalProperties": false
+        },
+        "gateway": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -12926,6 +12874,88 @@
               },
               "disable": {
                 "type": "boolean"
+              },
+              "permission": {
+                "type": "object",
+                "properties": {
+                  "edit": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "bash": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "webfetch": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "task": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "doom_loop": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "external_directory": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                }
+              },
+              "prompt_append": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -13014,6 +13044,14 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
+            },
+            "host_shard_prewarm": {
+              "type": "string",
+              "enum": [
+                "off",
+                "first-turn",
+                "session-start"
+              ]
             },
             "default_concurrency": {
               "type": "integer",
@@ -13278,8 +13316,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "category",
                         "prompt"
@@ -13335,8 +13371,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "subagent_type"
                       ],
@@ -13794,6 +13828,9 @@
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
+                },
+                "query_expansion": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -14039,6 +14076,9 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "query_expansion": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -14063,6 +14103,85 @@
             }
           },
           "additionalProperties": false
+        },
+        "computer": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+            },
+            "display": {
+              "type": "string",
+              "minLength": 1
+            },
+            "max_width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "screenshot_max_bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "stop_hotkey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "allow_host_relay_only_stop": {
+              "type": "boolean"
+            },
+            "macos_canary": {
+              "type": "string",
+              "enum": [
+                "session",
+                "off"
+              ]
+            },
+            "audit_log": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "screenshot_gc": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "stale_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "scan_interval_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "engine_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cua_adapter": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
           "type": "array",
@@ -14109,6 +14228,14 @@
           },
           "additionalProperties": false
         },
+        "gateway": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -14858,6 +14985,88 @@
               },
               "disable": {
                 "type": "boolean"
+              },
+              "permission": {
+                "type": "object",
+                "properties": {
+                  "edit": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "bash": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "webfetch": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "task": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "doom_loop": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "external_directory": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                }
+              },
+              "prompt_append": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -14946,6 +15155,14 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
+            },
+            "host_shard_prewarm": {
+              "type": "string",
+              "enum": [
+                "off",
+                "first-turn",
+                "session-start"
+              ]
             },
             "default_concurrency": {
               "type": "integer",
@@ -15210,8 +15427,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "category",
                         "prompt"
@@ -15267,8 +15482,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "subagent_type"
                       ],
@@ -15726,6 +15939,9 @@
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
+                },
+                "query_expansion": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -15971,6 +16187,9 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "query_expansion": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -15995,6 +16214,85 @@
             }
           },
           "additionalProperties": false
+        },
+        "computer": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+            },
+            "display": {
+              "type": "string",
+              "minLength": 1
+            },
+            "max_width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "screenshot_max_bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "stop_hotkey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "allow_host_relay_only_stop": {
+              "type": "boolean"
+            },
+            "macos_canary": {
+              "type": "string",
+              "enum": [
+                "session",
+                "off"
+              ]
+            },
+            "audit_log": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "screenshot_gc": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "stale_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "scan_interval_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "engine_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cua_adapter": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
           "type": "array",
@@ -16041,6 +16339,14 @@
           },
           "additionalProperties": false
         },
+        "gateway": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+        },
         "categories": {
           "type": "object",
           "propertyNames": {
@@ -16790,6 +17096,88 @@
               },
               "disable": {
                 "type": "boolean"
+              },
+              "permission": {
+                "type": "object",
+                "properties": {
+                  "edit": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "bash": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "webfetch": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "task": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "doom_loop": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  "external_directory": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                }
+              },
+              "prompt_append": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -16878,6 +17266,14 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
+            },
+            "host_shard_prewarm": {
+              "type": "string",
+              "enum": [
+                "off",
+                "first-turn",
+                "session-start"
+              ]
             },
             "default_concurrency": {
               "type": "integer",
@@ -17142,8 +17538,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "category",
                         "prompt"
@@ -17199,8 +17593,6 @@
                       },
                       "required": [
                         "name",
-                        "backendType",
-                        "isActive",
                         "kind",
                         "subagent_type"
                       ],
@@ -17658,6 +18050,9 @@
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
+                },
+                "query_expansion": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -17903,6 +18298,9 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "query_expansion": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -17927,6 +18325,85 @@
             }
           },
           "additionalProperties": false
+        },
+        "computer": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+            },
+            "display": {
+              "type": "string",
+              "minLength": 1
+            },
+            "max_width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "screenshot_max_bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "stop_hotkey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "allow_host_relay_only_stop": {
+              "type": "boolean"
+            },
+            "macos_canary": {
+              "type": "string",
+              "enum": [
+                "session",
+                "off"
+              ]
+            },
+            "audit_log": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "screenshot_gc": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "stale_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "scan_interval_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "engine_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cua_adapter": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
           "type": "array",
@@ -18728,6 +19205,88 @@
                 },
                 "disable": {
                   "type": "boolean"
+                },
+                "permission": {
+                  "type": "object",
+                  "properties": {
+                    "edit": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    "bash": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "ask",
+                              "allow",
+                              "deny"
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "webfetch": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    "task": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    "doom_loop": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    "external_directory": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    }
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                },
+                "prompt_append": {
+                  "type": "string"
                 }
               },
               "additionalProperties": false
@@ -18816,6 +19375,14 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              "host_shard_prewarm": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "first-turn",
+                  "session-start"
+                ]
               },
               "default_concurrency": {
                 "type": "integer",
@@ -19080,8 +19647,6 @@
                         },
                         "required": [
                           "name",
-                          "backendType",
-                          "isActive",
                           "kind",
                           "category",
                           "prompt"
@@ -19137,8 +19702,6 @@
                         },
                         "required": [
                           "name",
-                          "backendType",
-                          "isActive",
                           "kind",
                           "subagent_type"
                         ],
@@ -19596,6 +20159,9 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "query_expansion": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -19841,6 +20407,9 @@
                           "type": "integer",
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
+                        },
+                        "query_expansion": {
+                          "type": "boolean"
                         }
                       },
                       "additionalProperties": false
@@ -19865,6 +20434,85 @@
               }
             },
             "additionalProperties": false
+          },
+          "computer": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+              },
+              "display": {
+                "type": "string",
+                "minLength": 1
+              },
+              "max_width": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "max_height": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "screenshot_max_bytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "stop_hotkey": {
+                "type": "string",
+                "minLength": 1
+              },
+              "allow_host_relay_only_stop": {
+                "type": "boolean"
+              },
+              "macos_canary": {
+                "type": "string",
+                "enum": [
+                  "session",
+                  "off"
+                ]
+              },
+              "audit_log": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "screenshot_gc": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "stale_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "scan_interval_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "engine_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cua_adapter": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
           },
           "disabled_skills": {
             "type": "array",
@@ -28772,10 +29420,6 @@
                             "maximum": 10
                           }
                         },
-                        "required": [
-                          "enabled",
-                          "turns"
-                        ],
                         "additionalProperties": false
                       },
                       "protected_tools": {
@@ -28804,9 +29448,6 @@
                                 "type": "boolean"
                               }
                             },
-                            "required": [
-                              "enabled"
-                            ],
                             "additionalProperties": false
                           },
                           "supersede_writes": {
@@ -28821,10 +29462,6 @@
                                 "type": "boolean"
                               }
                             },
-                            "required": [
-                              "enabled",
-                              "aggressive"
-                            ],
                             "additionalProperties": false
                           },
                           "purge_errors": {
@@ -28841,21 +29478,12 @@
                                 "maximum": 20
                               }
                             },
-                            "required": [
-                              "enabled",
-                              "turns"
-                            ],
                             "additionalProperties": false
                           }
                         },
                         "additionalProperties": false
                       }
                     },
-                    "required": [
-                      "enabled",
-                      "notification",
-                      "protected_tools"
-                    ],
                     "additionalProperties": false
                   },
                   "task_system": {
@@ -29020,11 +29648,6 @@
                     "maximum": 1000
                   }
                 },
-                "required": [
-                  "enabled",
-                  "auto_start",
-                  "default_max_iterations"
-                ],
                 "additionalProperties": false
               },
               "ralph_loop": {
@@ -29240,10 +29863,6 @@
                           "type": "number"
                         }
                       },
-                      "required": [
-                        "type",
-                        "method"
-                      ],
                       "additionalProperties": false
                     }
                   },
@@ -29268,7 +29887,6 @@
                         }
                       },
                       "required": [
-                        "enabled",
                         "gateway",
                         "instruction"
                       ],
@@ -29317,21 +29935,9 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "authorizedDiscordUserIds",
-                      "pollIntervalMs",
-                      "rateLimitPerMinute",
-                      "maxMessageLength",
-                      "includePrefix"
-                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "enabled",
-                  "gateways",
-                  "hooks"
-                ],
                 "additionalProperties": false
               },
               "i18n": {
@@ -29409,18 +30015,6 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "enabled",
-                  "live_mode_enabled",
-                  "max_monitors_per_session",
-                  "max_runtime_ms",
-                  "batch_max_lines",
-                  "batch_max_bytes",
-                  "flush_interval_ms",
-                  "ring_max_lines",
-                  "line_max_bytes",
-                  "pattern_max_length"
-                ],
                 "additionalProperties": false
               },
               "team_mode": {
@@ -29486,18 +30080,6 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "enabled",
-                  "tmux_visualization",
-                  "max_parallel_members",
-                  "max_members",
-                  "max_messages_per_run",
-                  "max_wall_clock_minutes",
-                  "max_member_turns",
-                  "message_payload_max_bytes",
-                  "recipient_unread_max_bytes",
-                  "mailbox_poll_interval_ms"
-                ],
                 "additionalProperties": false
               },
               "keyword_detector": {
@@ -29538,9 +30120,6 @@
                     "type": "number"
                   }
                 },
-                "required": [
-                  "timeout_ms"
-                ],
                 "additionalProperties": false
               },
               "git_master": {
@@ -29567,11 +30146,6 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "commit_footer",
-                  "include_co_authored_by",
-                  "git_env_prefix"
-                ],
                 "additionalProperties": false
               },
               "browser_automation_engine": {
@@ -29593,9 +30167,6 @@
                     }
                   }
                 },
-                "required": [
-                  "provider"
-                ],
                 "additionalProperties": false
               },
               "websearch": {
@@ -29655,14 +30226,6 @@
                     ]
                   }
                 },
-                "required": [
-                  "enabled",
-                  "layout",
-                  "main_pane_size",
-                  "main_pane_min_width",
-                  "agent_pane_min_width",
-                  "isolation"
-                ],
                 "additionalProperties": false
               },
               "tui": {
@@ -29684,15 +30247,9 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "enabled"
-                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "sidebar"
-                ],
                 "additionalProperties": false
               },
               "sisyphus": {
@@ -29712,9 +30269,6 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "claude_code_compat"
-                    ],
                     "additionalProperties": false
                   }
                 },
@@ -29728,9 +30282,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "auto_commit"
-                ],
                 "additionalProperties": false
               },
               "start_work": {
@@ -29741,9 +30292,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "auto_commit"
-                ],
                 "additionalProperties": false
               },
               "default_mode": {
@@ -29758,10 +30306,6 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "ultrawork",
-                  "goal"
-                ],
                 "additionalProperties": false
               },
               "_migrations": {
@@ -29771,9 +30315,6 @@
                 }
               }
             },
-            "required": [
-              "git_master"
-            ],
             "additionalProperties": false
           },
           "[native]": {
@@ -29811,6 +30352,14 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "gateway": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -30561,6 +31110,88 @@
                     },
                     "disable": {
                       "type": "boolean"
+                    },
+                    "permission": {
+                      "type": "object",
+                      "properties": {
+                        "edit": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "bash": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "ask",
+                                "allow",
+                                "deny"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "string",
+                                "enum": [
+                                  "ask",
+                                  "allow",
+                                  "deny"
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        "webfetch": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "task": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "doom_loop": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "external_directory": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      }
+                    },
+                    "prompt_append": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -30649,6 +31280,14 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "host_shard_prewarm": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "first-turn",
+                      "session-start"
+                    ]
                   },
                   "default_concurrency": {
                     "type": "integer",
@@ -30913,8 +31552,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "category",
                               "prompt"
@@ -30970,8 +31607,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "subagent_type"
                             ],
@@ -31429,6 +32064,9 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "query_expansion": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -31674,6 +32312,9 @@
                               "type": "integer",
                               "exclusiveMinimum": 0,
                               "maximum": 9007199254740991
+                            },
+                            "query_expansion": {
+                              "type": "boolean"
                             }
                           },
                           "additionalProperties": false
@@ -31698,6 +32339,85 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "computer": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+                  },
+                  "display": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "max_width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "screenshot_max_bytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "stop_hotkey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "allow_host_relay_only_stop": {
+                    "type": "boolean"
+                  },
+                  "macos_canary": {
+                    "type": "string",
+                    "enum": [
+                      "session",
+                      "off"
+                    ]
+                  },
+                  "audit_log": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "screenshot_gc": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "stale_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "scan_interval_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "engine_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cua_adapter": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
                 "type": "array",
@@ -31744,6 +32464,14 @@
                 },
                 "additionalProperties": false
               },
+              "gateway": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -32493,6 +33221,88 @@
                     },
                     "disable": {
                       "type": "boolean"
+                    },
+                    "permission": {
+                      "type": "object",
+                      "properties": {
+                        "edit": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "bash": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "ask",
+                                "allow",
+                                "deny"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "string",
+                                "enum": [
+                                  "ask",
+                                  "allow",
+                                  "deny"
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        "webfetch": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "task": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "doom_loop": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "external_directory": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      }
+                    },
+                    "prompt_append": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -32581,6 +33391,14 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "host_shard_prewarm": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "first-turn",
+                      "session-start"
+                    ]
                   },
                   "default_concurrency": {
                     "type": "integer",
@@ -32845,8 +33663,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "category",
                               "prompt"
@@ -32902,8 +33718,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "subagent_type"
                             ],
@@ -33361,6 +34175,9 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "query_expansion": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -33606,6 +34423,9 @@
                               "type": "integer",
                               "exclusiveMinimum": 0,
                               "maximum": 9007199254740991
+                            },
+                            "query_expansion": {
+                              "type": "boolean"
                             }
                           },
                           "additionalProperties": false
@@ -33630,6 +34450,85 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "computer": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+                  },
+                  "display": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "max_width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "screenshot_max_bytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "stop_hotkey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "allow_host_relay_only_stop": {
+                    "type": "boolean"
+                  },
+                  "macos_canary": {
+                    "type": "string",
+                    "enum": [
+                      "session",
+                      "off"
+                    ]
+                  },
+                  "audit_log": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "screenshot_gc": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "stale_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "scan_interval_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "engine_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cua_adapter": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
                 "type": "array",
@@ -33676,6 +34575,14 @@
                 },
                 "additionalProperties": false
               },
+              "gateway": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+              },
               "categories": {
                 "type": "object",
                 "propertyNames": {
@@ -34425,6 +35332,88 @@
                     },
                     "disable": {
                       "type": "boolean"
+                    },
+                    "permission": {
+                      "type": "object",
+                      "properties": {
+                        "edit": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "bash": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "ask",
+                                "allow",
+                                "deny"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "string",
+                                "enum": [
+                                  "ask",
+                                  "allow",
+                                  "deny"
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        "webfetch": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "task": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "doom_loop": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        },
+                        "external_directory": {
+                          "type": "string",
+                          "enum": [
+                            "ask",
+                            "allow",
+                            "deny"
+                          ]
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      }
+                    },
+                    "prompt_append": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -34513,6 +35502,14 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "host_shard_prewarm": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "first-turn",
+                      "session-start"
+                    ]
                   },
                   "default_concurrency": {
                     "type": "integer",
@@ -34777,8 +35774,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "category",
                               "prompt"
@@ -34834,8 +35829,6 @@
                             },
                             "required": [
                               "name",
-                              "backendType",
-                              "isActive",
                               "kind",
                               "subagent_type"
                             ],
@@ -35293,6 +36286,9 @@
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "query_expansion": {
+                        "type": "boolean"
                       }
                     },
                     "additionalProperties": false
@@ -35538,6 +36534,9 @@
                               "type": "integer",
                               "exclusiveMinimum": 0,
                               "maximum": 9007199254740991
+                            },
+                            "query_expansion": {
+                              "type": "boolean"
                             }
                           },
                           "additionalProperties": false
@@ -35562,6 +36561,85 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "computer": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"
+                  },
+                  "display": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "max_width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "screenshot_max_bytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "stop_hotkey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "allow_host_relay_only_stop": {
+                    "type": "boolean"
+                  },
+                  "macos_canary": {
+                    "type": "string",
+                    "enum": [
+                      "session",
+                      "off"
+                    ]
+                  },
+                  "audit_log": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "screenshot_gc": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "stale_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "scan_interval_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "engine_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cua_adapter": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
                 "type": "array",
@@ -35590,8 +36668,5 @@
       "additionalProperties": {}
     }
   },
-  "required": [
-    "profiles"
-  ],
   "additionalProperties": false
 }

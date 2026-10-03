@@ -1,3 +1,5 @@
+import { edgeCountStore, type CountSnapshot, type SharedCountStore } from "./shared-count-store"
+
 export type OgCount =
   | { readonly count: number; readonly source: "live"; readonly expiresAt: number }
   | { readonly count: number; readonly source: "stale" }
@@ -8,24 +10,65 @@ export interface OgCountSource {
   readonly reset: () => void
 }
 
+const LOAD_ATTEMPTS = 2
+
 /**
- * A bounded, coalesced cache for one live social-image figure. Failures are never cached:
- * the last known good value is served for at most `maxStaleMs`, then the figure is withheld.
+ * A bounded, coalesced cache for one live social-image figure. The last good value is kept
+ * in the isolate and in a colo-shared store, so a cold isolate can still render it; failures
+ * are never cached, stale values are served for at most `maxStaleMs`, then the figure is withheld.
  */
 export function createOgCountSource(options: {
+  readonly key: string
   readonly label: string
   readonly freshMs: number
   readonly maxStaleMs: number
   readonly load: () => Promise<number>
+  readonly store?: SharedCountStore
 }): OgCountSource {
-  let cache: { readonly count: number; readonly timestamp: number } | null = null
+  const store = options.store ?? edgeCountStore
+  let cache: CountSnapshot | null = null
   let pending: Promise<OgCount> | null = null
 
-  async function refresh(): Promise<OgCount> {
+  const isFresh = (snapshot: CountSnapshot) => Date.now() - snapshot.timestamp < options.freshMs
+  const live = (snapshot: CountSnapshot): OgCount => ({
+    count: snapshot.count,
+    source: "live",
+    expiresAt: snapshot.timestamp + options.freshMs,
+  })
+
+  async function adoptShared(): Promise<void> {
     try {
-      const count = await options.load()
-      cache = { count, timestamp: Date.now() }
-      return { count, source: "live", expiresAt: cache.timestamp + options.freshMs }
+      const shared = await store.read(options.key)
+      if (shared && (!cache || shared.timestamp > cache.timestamp)) cache = shared
+    } catch (error) {
+      console.warn(`Unable to read shared OG ${options.label}`, error)
+    }
+  }
+
+  async function loadWithRetry(): Promise<number> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= LOAD_ATTEMPTS; attempt++) {
+      try {
+        return await options.load()
+      } catch (error) {
+        lastError = error
+      }
+    }
+    throw lastError
+  }
+
+  async function resolve(): Promise<OgCount> {
+    await adoptShared()
+    if (cache && isFresh(cache)) return live(cache)
+    try {
+      const snapshot = { count: await loadWithRetry(), timestamp: Date.now() }
+      cache = snapshot
+      try {
+        await store.write(options.key, snapshot, Math.floor(options.maxStaleMs / 1_000))
+      } catch (error) {
+        console.warn(`Unable to share OG ${options.label}`, error)
+      }
+      return live(snapshot)
     } catch (error) {
       console.warn(`Unable to refresh OG ${options.label}`, error)
       if (cache && Date.now() - cache.timestamp <= options.maxStaleMs) {
@@ -37,11 +80,9 @@ export function createOgCountSource(options: {
 
   return {
     async get() {
-      if (cache && Date.now() - cache.timestamp < options.freshMs) {
-        return { count: cache.count, source: "live", expiresAt: cache.timestamp + options.freshMs }
-      }
+      if (cache && isFresh(cache)) return live(cache)
       if (pending) return pending
-      pending = refresh()
+      pending = resolve()
       try {
         return await pending
       } finally {

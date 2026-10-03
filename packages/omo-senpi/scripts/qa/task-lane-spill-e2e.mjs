@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, classifyRealSenpiChanges, parseJsonEvents, snapshotDir } from "./task-e2e-analysis.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-lane-spill-mock-provider.ts")
@@ -247,7 +248,7 @@ function runScenario(scenario, senpiBin, outDir, pids, helpers) {
   // The children park until released, so the release must happen WHILE senpi is still running.
   // The watcher runs concurrently and keys off the task records the engine actually wrote, so the
   // release is triggered by observed state rather than by a wall-clock guess.
-  const stateDir = join(sandbox.cwd, ".omo", "senpi-task")
+  const stateDir = sandboxStateDir(sandbox)
   const expectedTasks = scenario.script.parentSteps[0]?.arguments?.tasks?.length ?? 1
   // Attached and NOT unref'd on purpose: a detached+unref'd helper is never wait()ed on, so it
   // lingers as an unreaped zombie and `kill(pid, 0)` keeps reporting it alive, which would make the
@@ -277,7 +278,7 @@ function runScenario(scenario, senpiBin, outDir, pids, helpers) {
     {
       cwd: sandbox.cwd,
       env: {
-        ...process.env,
+        ...isolatedChildEnv(process.env, sandbox.agentDir),
         HOME: homeDir,
         // resolveAgentHome() reads OMO_CODING_AGENT_DIR, then SENPI_CODING_AGENT_DIR, then
         // PI_CODING_AGENT_DIR, and the FIRST one wins. An omo session exports OMO_CODING_AGENT_DIR

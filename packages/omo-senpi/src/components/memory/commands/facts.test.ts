@@ -2,7 +2,7 @@
 // a double that answers "no failures" would let a broken retry pass silently.
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { FactsFailureStore, factsQueuePaths } from "@oh-my-opencode/memory-core"
@@ -11,12 +11,13 @@ import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke, tempIdentity, type FakeDeps } from "./commands.test-support"
 import { registerFactsCommand } from "./facts"
 import type { MemoryCommandIdentity } from "./types"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
   )
 })
 

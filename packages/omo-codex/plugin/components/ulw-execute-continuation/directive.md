@@ -52,7 +52,7 @@ Before completion, run your own manual QA on the real surface and a self-review 
 
 # Output discipline
 
-- Surface only state changes: sub-agent dispatched, scenario PASS/FAIL with artifact path, checkbox marked, evidence appended.
+- At every handoff - checkbox marked, blocker, plan change, before a long pass - open with one block composed after weighing what the user asked and needs to know now: `[Outcome so far] toward [ask + wanted]. You need: [sub-agents dispatched, scenario PASS/FAIL with artifact path, checkbox marked, evidence appended]. Now: [checkbox in progress]. Next: [next open checkbox].`; nothing between handoffs.
 - Do NOT print "Should I continue?", restate the plan, or recap prior turns — the Stop hook continues you; the ledger and plan are the durable record.
 
 Begin now. If no checkbox remains, run the Final gate; otherwise pick the next checkbox, dispatch the parallel sub-agents, verify, mark, continue.

@@ -64,6 +64,57 @@ describe("ulw-execute plan checklist consumption", () => {
 		expect(checklist).toEqual({ completed: 1, remaining: 2, total: 3, nextTaskLabel: "1. Build hook" });
 	});
 
+	it("#given T, F and H task IDs and blocked rows #when parsed #then they count like the shared boulder-state parser", () => {
+		// given
+		const planPath = createPlan(
+			[
+				"## TODOs",
+				"- [x] T1.1 Completed implementation",
+				"- [~] T1.2 \u2014 Blocked on a user decision",
+				"- [ ] T6.3a Remaining implementation",
+				"## Final Verification Wave",
+				"- [ ] F1 \u2014 Plan compliance audit",
+				"- [x] H1 \u2014 User approval",
+			].join("\n"),
+		);
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({
+			completed: 2,
+			remaining: 2,
+			total: 5,
+			nextTaskLabel: "T6.3a Remaining implementation",
+		});
+	});
+
+	it("#given template-only counted sections and rows under another heading #when parsed #then top-level rows are counted", () => {
+		// given
+		const planPath = createPlan(
+			[
+				"## TODOs",
+				"Template task guidance.",
+				"## Progress Tracker",
+				"- [x] T1.1 \u2014 Schema",
+				"- [~] T5.1 \u2014 Verification engine \u2014 BLOCKED: user decision",
+				"- [ ] F5 \u2014 Delta verification",
+			].join("\n"),
+		);
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({
+			completed: 1,
+			remaining: 1,
+			total: 3,
+			nextTaskLabel: "F5 \u2014 Delta verification",
+		});
+	});
+
 	it("#given all top-level tasks complete #when parsed #then next task is null", () => {
 		// given
 		const planPath = createPlan(

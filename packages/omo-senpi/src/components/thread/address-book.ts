@@ -12,7 +12,8 @@ export type HostSession = {
   readonly sessionPath?: string
   readonly cwd: string
   readonly name?: string
-  readonly status: HostSessionStatus
+  /** Absent on hosts that predate the field; anything but `closed` is live. */
+  readonly status?: HostSessionStatus
   readonly createdAt?: string
   readonly updatedAt?: string
   readonly created_at?: string
@@ -203,7 +204,8 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function readDiskSession(path: string, sourceHost: string | null): DiskSession | null {
+/** One session file's durable identity, or null when the file is unreadable or has no header. */
+export function readDiskSession(path: string, sourceHost: string | null): DiskSession | null {
   let content: string
   let modified: string
   try {

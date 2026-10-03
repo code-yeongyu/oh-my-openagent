@@ -11,131 +11,74 @@ import {
   senpiProbeHost,
   type EnsureHostInput,
   type HostEnginePolicy,
+  type SenpiHostProtocolInfo,
   type TaskDaemonHostPort,
 } from "../../lazy/senpi-barrel"
+import {
+  HostUnavailableError,
+  TASK_DAEMON_CACHE_TTL_MS,
+  TASK_DAEMON_PROTOCOL_VERSION,
+  TASK_DAEMON_REQUIRED_CAPABILITIES,
+  type EnsuredTaskDaemon,
+  type EnsureTaskDaemonInput,
+  type HostUnavailableReason,
+  type LoadedDaemonLaunchSpec,
+} from "./daemon-contract"
 import { daemonLaunchOptions, daemonLaunchProfileId } from "./launch-options"
-import { DAEMON_LAUNCH_SPEC_FILENAME, readDaemonLaunchSpec, type DaemonLaunchSpec } from "./launch-spec"
+import { DAEMON_LAUNCH_SPEC_FILENAME, DaemonLaunchSpecError, readDaemonLaunchSpec } from "./launch-spec"
+import { shareDaemonEnsure } from "./daemon-single-flight"
+import { classifyEnsureFailure } from "./ensure-failure"
+import { writeStartedShardSidecar } from "./shard-sidecar"
+import { log } from "@oh-my-opencode/utils"
 
 // The daemon's launch surface is documented from this module: `omo daemon run` and a
 // child-triggered ensure must reach the same producer.
 export { daemonLaunchOptions, daemonLaunchProfileId }
+export {
+  HostUnavailableError,
+  TASK_DAEMON_CACHE_TTL_MS,
+  TASK_DAEMON_PROTOCOL_VERSION,
+  TASK_DAEMON_REQUIRED_CAPABILITIES,
+  TASK_HOST_SOCKET_ENV_NAMES,
+  isHostIncompatible,
+  resolveTaskHostSocket,
+} from "./daemon-contract"
 export type { DaemonLaunchOptions, DaemonLaunchOptionsInput } from "./launch-options"
+export type {
+  EnsuredTaskDaemon,
+  EnsureTaskDaemonInput,
+  HostUnavailableReason,
+  LoadedDaemonLaunchSpec,
+  TaskDaemonPorts,
+} from "./daemon-contract"
 export type { HostEnginePolicy }
-
-/**
- * Socket overrides, most specific first - the engine's own brand-prefixed `RPC_SOCKET` names, then
- * `OMO_RPC_SOCKET_PATH`, which the desktop sets on the host it spawns. Every omo client (the task
- * daemon here, the thread surface in omo-senpi) reads THIS list, so a socket that one of them
- * reaches is a socket all of them reach.
- */
-export const TASK_HOST_SOCKET_ENV_NAMES = [
-  "OMO_RPC_SOCKET",
-  "SENPI_RPC_SOCKET",
-  "PI_RPC_SOCKET",
-  "OMO_RPC_SOCKET_PATH",
-] as const
-
-/** The ONE public socket of the machine-wide daemon: an override, else `<agentDir>/rpc/rpc.sock`. */
-export function resolveTaskHostSocket(
-  env: Readonly<Record<string, string | undefined>>,
-  agentDir: string,
-): string {
-  for (const name of TASK_HOST_SOCKET_ENV_NAMES) {
-    const configured = env[name]?.trim()
-    if (configured) return configured
-  }
-  return join(agentDir, "rpc", "rpc.sock")
-}
-
-/** Capabilities a daemon must advertise before omo will run task children as its sessions. */
-export const TASK_DAEMON_REQUIRED_CAPABILITIES = [
-  "multi_session",
-  "extension_events",
-  "session_context",
-  "session_kind",
-] as const
-
-/** The protocol generation this omo build speaks (senpi `get_protocol_info.protocolVersion`). */
-export const TASK_DAEMON_PROTOCOL_VERSION = 1
-
-/** How long an ensured daemon is trusted before the socket is probed again. */
-export const TASK_DAEMON_CACHE_TTL_MS = 5_000
-
-export type HostUnavailableReason =
-  | "protocol"
-  | "capability"
-  | "engine_mismatch"
-  | "engine_refused"
-  | "win32"
-  | "runtime"
-  | "ensure_failed"
-
-/**
- * The daemon cannot host this child. `fallbackAllowed` marks the LOUD fallbacks to the per-child
- * runner: a pre-change or narrower daemon (`capability`), an engine the caller asked to fall back
- * from (`engine_mismatch`), win32 (no daemon runner path), and a Node runtime with no bun. Every
- * other reason fails fast - a refused client must never start a second host beside the daemon.
- */
-export class HostUnavailableError extends Error {
-  override readonly name = "HostUnavailableError"
-  readonly reason: HostUnavailableReason
-  readonly fallbackAllowed: boolean
-
-  constructor(reason: HostUnavailableReason, options: { readonly fallbackAllowed: boolean; readonly detail?: string }) {
-    super(`task daemon unavailable (${reason})${options.detail === undefined ? "" : `: ${options.detail}`}`)
-    this.reason = reason
-    this.fallbackAllowed = options.fallbackAllowed
-  }
-}
-
-export interface LoadedDaemonLaunchSpec {
-  readonly path: string
-  readonly spec: DaemonLaunchSpec
-}
-
-export interface TaskDaemonPorts {
-  readonly host?: TaskDaemonHostPort
-  readonly launchSpec?: LoadedDaemonLaunchSpec
-  readonly idleExitMs?: number
-  readonly platform?: NodeJS.Platform
-  readonly bunRuntimeAvailable?: boolean
-  readonly now?: () => number
-}
-
-export interface EnsureTaskDaemonInput {
-  readonly agentDir: string
-  readonly env: Readonly<Record<string, string | undefined>>
-  readonly policy: HostEnginePolicy
-  readonly ports?: TaskDaemonPorts
-}
-
-export interface EnsuredTaskDaemon {
-  readonly action: "start" | "reuse" | "handoff"
-  readonly reason: string
-  readonly socket: string
-  readonly pid: number
-  readonly reused: boolean
-  readonly upgradeable: boolean
-  readonly instanceId?: string
-  readonly engineVersion?: string
-  // What this daemon advertises (`get_protocol_info.capabilities`). Absent only when a host this
-  // call just started did not answer a probe - never guessed, because the `auto` execution mode is
-  // decided from this list.
-  readonly capabilities?: readonly string[]
-}
 
 interface DaemonCacheEntry {
   readonly socket: string
   readonly expiresAt: number
   readonly ensured: EnsuredTaskDaemon
+  // The host generation the entry vouches for, when the ensure learned it.
+  readonly hostInstanceId?: string
 }
 
-// One daemon per machine means one live entry per process; a probe + decide round trip per child
-// spawn would otherwise hit the socket on every task.
-let cached: DaemonCacheEntry | undefined
+// One live entry per endpoint; a probe + decide round trip per child spawn would otherwise hit the
+// socket on every task.
+const cached = new Map<string, DaemonCacheEntry>()
 
 /**
- * Attach to the machine-wide daemon, or create it from the launch spec. The engine owns every
+ * Drop the cached ensure for `socket`: its host was seen gone, so the next ensure probes again
+ * instead of vouching for a dead endpoint until the TTL runs out. With `instanceId`, an entry that
+ * already vouches for a different (newer) generation is kept.
+ */
+export function forgetTaskDaemon(socket: string, instanceId?: string): void {
+  const entry = cached.get(socket)
+  if (entry === undefined) return
+  if (instanceId !== undefined && entry.hostInstanceId !== undefined && entry.hostInstanceId !== instanceId) return
+  cached.delete(socket)
+}
+
+/**
+ * Attach to the task host listening on `input.socket`, or create it from the launch spec. The engine owns every
  * protocol decision: omo probes, asks `decideHostAction`, and either calls `ensureHost` or fails
  * with a typed `HostUnavailableError`. It never signals, replaces or takes over a host (I1).
  */
@@ -145,18 +88,28 @@ export async function ensureTaskDaemon(input: EnsureTaskDaemonInput): Promise<En
     throw new HostUnavailableError("win32", { fallbackAllowed: true })
   }
   // Under Node the host cannot arm its child reaper (it needs `bun:ffi`), so children orphaned by a
-  // terminated session worker stay zombies for the life of a machine-wide daemon - measured on
+  // terminated session worker stay zombies for the life of the host - measured on
   // every spawn API in todo 13's matrix. The per-child runner has no such path.
   if (!(ports.bunRuntimeAvailable ?? bunRuntimeAvailable(input.env))) {
     throw new HostUnavailableError("runtime", { fallbackAllowed: true })
   }
 
-  const socket = resolveTaskHostSocket(input.env, input.agentDir)
+  const socket = input.socket
   const now = ports.now ?? Date.now
-  if (cached !== undefined && cached.socket === socket && cached.expiresAt > now()) return cached.ensured
+  const hit = cached.get(socket)
+  if (hit !== undefined && hit.expiresAt > now()) return hit.ensured
 
+  return shareDaemonEnsure(socket, () => ensureTaskDaemonOnce(input, socket, now))
+}
+
+async function ensureTaskDaemonOnce(
+  input: EnsureTaskDaemonInput,
+  socket: string,
+  now: () => number,
+): Promise<EnsuredTaskDaemon> {
+  const ports = input.ports ?? {}
   const host = ports.host ?? (await loadTaskDaemonHostPort())
-  const launchSpec = ports.launchSpec ?? loadDaemonLaunchSpec()
+  const launchSpec = ports.launchSpec ?? loadDaemonLaunchSpec(ports.launchSpecPath)
   const launch = daemonLaunchOptions({
     spec: launchSpec.spec,
     specPath: launchSpec.path,
@@ -201,11 +154,25 @@ export async function ensureTaskDaemon(input: EnsureTaskDaemonInput): Promise<En
     policy: launch.policy,
   }
   const ensured = await host.ensureHost(request).catch((error: unknown) => {
-    throw new HostUnavailableError("ensure_failed", { fallbackAllowed: false, detail: sanitize(error) })
+    throw new HostUnavailableError(classifyEnsureFailure(error), {
+      fallbackAllowed: false,
+      detail: sanitize(error),
+    })
   })
   // A host that was already up answered the probe above; one this call started is asked once, so
-  // the caller learns what it can do without opening a second connection of its own.
-  const capabilities = running?.capabilities ?? (await host.probeHost({ socket: ensured.socket }))?.capabilities
+  // the caller learns what it can do without opening a second connection of its own. That probe is
+  // this ensure's last use of the host, so the engine's attach hold (senpi #2242) ends with it: the
+  // daemon is transient, and a hold kept for the life of this omo process would stop its idle exit.
+  // Children attach on their own connections; the idle window (minutes) covers the gap.
+  let answered: SenpiHostProtocolInfo | undefined = running
+  try {
+    answered ??= await host.probeHost({ socket: ensured.socket })
+  } finally {
+    ensured.release?.()
+  }
+  const capabilities = answered?.capabilities
+  // A handoff's probe answer names the predecessor, so only the engine's own answer counts there.
+  const hostInstanceId = ensured.instanceId ?? (decision.action === "handoff" ? undefined : answered?.instanceId)
   const result: EnsuredTaskDaemon = {
     action: decision.action,
     reason: decision.reason,
@@ -217,8 +184,30 @@ export async function ensureTaskDaemon(input: EnsureTaskDaemonInput): Promise<En
     ...(ensured.engineVersion === undefined ? {} : { engineVersion: ensured.engineVersion }),
     ...(capabilities === undefined ? {} : { capabilities }),
   }
-  cached = { socket, expiresAt: now() + TASK_DAEMON_CACHE_TTL_MS, ensured: result }
+  if (decision.action === "start") await recordStartedEndpoint(input, ensured.socket, now)
+  cached.set(socket, {
+    socket,
+    expiresAt: now() + TASK_DAEMON_CACHE_TTL_MS,
+    ensured: result,
+    ...(hostInstanceId === undefined ? {} : { hostInstanceId }),
+  })
   return result
+}
+
+// The sidecar is informational (the agent-dir store index is authoritative), so a write failure is
+// logged and never fails an ensure whose host is already up.
+async function recordStartedEndpoint(input: EnsureTaskDaemonInput, socket: string, now: () => number): Promise<void> {
+  try {
+    await writeStartedShardSidecar({
+      socket,
+      now,
+      pid: process.pid,
+      ...(input.owner === undefined ? {} : { owner: input.owner }),
+      ...(input.sidecarNotice === undefined ? {} : { notice: input.sidecarNotice }),
+    })
+  } catch (error) {
+    log("senpi-task shard sidecar write failed", { socket, error: String(error) })
+  }
 }
 
 async function loadTaskDaemonHostPort(): Promise<TaskDaemonHostPort> {
@@ -236,9 +225,19 @@ async function loadTaskDaemonHostPort(): Promise<TaskDaemonHostPort> {
  * location inside `<pluginRoot>/extensions/` - the same contract `resolveMemberExtensionEntryPath`
  * relies on, and the reason both are only meaningful from the built plugin.
  */
-function loadDaemonLaunchSpec(moduleUrl = import.meta.url): LoadedDaemonLaunchSpec {
-  const path = fileURLToPath(new URL(`../${DAEMON_LAUNCH_SPEC_FILENAME}`, moduleUrl))
-  return { path, spec: readDaemonLaunchSpec(path) }
+function loadDaemonLaunchSpec(
+  path = fileURLToPath(new URL(`../${DAEMON_LAUNCH_SPEC_FILENAME}`, import.meta.url)),
+): LoadedDaemonLaunchSpec {
+  try {
+    return { path, spec: readDaemonLaunchSpec(path) }
+  } catch (error) {
+    // A refused spec is a typed, fixable host refusal (#9208), never a reason-less failure, and it
+    // never falls back: the check stays exactly as strict as the reader makes it.
+    if (error instanceof DaemonLaunchSpecError && error.code === "launch_spec_insecure") {
+      throw new HostUnavailableError("launch_spec_insecure", { fallbackAllowed: false, launchSpecPath: path })
+    }
+    throw error
+  }
 }
 
 /** omo-native `bun-runtime.js` semantics, POSIX half: this process is bun, or a bun is installed. */
@@ -250,7 +249,7 @@ function bunRuntimeAvailable(env: Readonly<Record<string, string | undefined>>):
 }
 
 function hostUnavailableReason(reason: string): HostUnavailableReason {
-  if (reason === "protocol" || reason === "capability" || reason === "engine_mismatch") return reason
+  if (reason === "protocol" || reason === "capability" || reason === "legacy_host" || reason === "engine_mismatch") return reason
   return "engine_refused"
 }
 

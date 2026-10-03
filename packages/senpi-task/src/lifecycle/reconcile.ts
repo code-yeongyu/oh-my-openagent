@@ -6,14 +6,15 @@ import { needsCrashSalvage, salvageCrashedIsolation, sweepIsolations } from "../
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { isFallbackHandoff } from "./fallback-handoff"
 import { isHostSessionRecord } from "./host-session"
 import { reconcileHostSessionOrphan } from "./host-session-revive"
+import { reviveClaimed } from "./reconcile-reclamation"
 import { getLifecycleReattachPorts } from "./port"
 import { beginLocalReclamation, reconcileScopedRevival } from "./reconcile-revival"
 import { reclaimOrphanedResident } from "./residency"
-import { detachTerminalResident } from "./reconcile-terminal"
 import { newestSessionPath } from "./session-path"
-import { terminateClaimedPid } from "./reconcile-terminal"
+import { reconcileLegacyTerminal, terminateClaimedPid } from "./reconcile-terminal"
 import type { ReconcileOutcome, ReconcileResult } from "./types"
 
 const HEARTBEAT_FRESH_MS = 30_000
@@ -32,7 +33,7 @@ export async function reconcileOnSessionStart(
   // Ownership is checked before terminality, residency, or mode. A live sibling owns the record in
   // every status and this process must not mutate it.
   for (const record of context.store.list().records) {
-    if (hasForeignLiveOwner(context, record)) {
+    if (await hasForeignLiveOwner(context, record, parentSessionId)) {
       outcomes.push(parentSessionId === undefined
         ? {
             task_id: record.task_id,
@@ -135,6 +136,11 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 
   const pid = record.pid
   if (pid === undefined) {
+    // A runtime-fallback handoff whose owner died is revived onto its selected next model; any other
+    // pid-less child (queued, or a workpool worker that may never be replayed) has nothing to revive.
+    if (isFallbackHandoff(record) && context.config.reattach_on_reconcile !== false) {
+      return reviveClaimed(context, record, "rpc_detached", undefined)
+    }
     await markLost(context, record.task_id, "rpc task had no recorded pid")
     return { task_id: record.task_id, kind: "lost", reason: "no recorded pid" }
   }
@@ -175,23 +181,6 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
   }
   return reattachLegacyRecord(context, context.store.load(record.task_id) ?? record, sessionPath)
-}
-
-async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (record.status === "lost" || record.status === "cancelled") {
-    if (record.residency_state === "resident") await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return { task_id: record.task_id, kind: record.status === "lost" ? "lost" : "resumed", reason: `already ${record.status}` }
-  }
-  if (record.residency_state !== "resident") return { task_id: record.task_id, kind: "resumed" }
-  if (newestSessionPath(context, record.task_id) === undefined) {
-    await destroyResidentTask(context, record.task_id, "reconcile_lost")
-    return {
-      task_id: record.task_id,
-      kind: "resumed",
-      reason: "terminal without transcript disposed; persisted result preserved",
-    }
-  }
-  return detachTerminalResident(context, record)
 }
 
 async function reattachLegacyRecord(
@@ -244,8 +233,26 @@ async function reattachLegacyRecord(
   return { task_id: record.task_id, kind: "resumed", reason: "respawned and reattached" }
 }
 
-function hasForeignLiveOwner(context: LifecycleContext, record: TaskRecord): boolean {
+async function hasForeignLiveOwner(
+  context: LifecycleContext,
+  record: TaskRecord,
+  parentSessionId: string | undefined,
+): Promise<boolean> {
+  if (isHostSessionRecord(record)) {
+    if (record.residency_state !== "resident") return false
+    const sessionLive = await context.hostSessionProbe.daemonAlive(record.host_session)
+      && await context.hostSessionProbe.sessionLive(record.host_session)
+    if (!sessionLive) return false
+    // The child's session outlives the process that owned its manager (the parent's own host).
+    // When that owner is dead, the parent session reopening elsewhere is the only one left to
+    // observe the child, so it must reclaim the record instead of deferring to a dead owner.
+    return !(record.parent_session_id === parentSessionId && isDeadForeignOwner(context, record))
+  }
   return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+}
+
+function isDeadForeignOwner(context: LifecycleContext, record: TaskRecord): boolean {
+  return record.host_pid !== undefined && record.host_pid !== context.hostPid && !context.signaller.isAlive(record.host_pid)
 }
 
 // A record stamped with THIS host pid that reached the candidate list is owned by another engine in

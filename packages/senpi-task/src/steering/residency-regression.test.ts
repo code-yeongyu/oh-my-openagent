@@ -9,6 +9,7 @@ import { createTaskManager } from "../manager/manager"
 import { createTaskLifecycle } from "../lifecycle/create"
 import { FakeRegistry, settings } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { roots, cleanupRoots, detachedTerminal, fakeHandle, rpcHandle, portFor } from "./__fixtures__/residency"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(cleanupRoots)
 
@@ -33,7 +34,7 @@ describe("task_send lazy terminal RPC revival", () => {
         },
       },
     })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
 
     const outcome = await manager.sendToTask({ idOrName: record.task_id, message: "second pass" })
 

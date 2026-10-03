@@ -182,6 +182,9 @@ function handleNotification(message) {
 	}
 	if (message.method === "textDocument/didOpen") {
 		applyPublishSteps("didOpen", message.params.textDocument.uri, message.params.textDocument.version);
+		if (scenario.unscopedApplyEditOnDidOpen) {
+			sendApplyEdit(scenario.unscopedApplyEditOnDidOpen, { kind: "unscoped" });
+		}
 	}
 	if (message.method === "textDocument/didChange" && Array.isArray(scenario.diagnostics)) {
 		send({

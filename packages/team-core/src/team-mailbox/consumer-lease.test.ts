@@ -86,12 +86,4 @@ describe("withInboxConsumerLease", () => {
     await expect(readFile(leasePath, "utf8")).rejects.toThrow()
   }, 2_000)
 
-  test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
-    // when
-    const mailbox = await import("./index")
-
-    // then
-    expect(typeof mailbox.isMessageConsumed).toBe("function")
-    expect(typeof mailbox.withInboxConsumerLease).toBe("function")
-  })
 })

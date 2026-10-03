@@ -5,6 +5,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { childFailureCause, failureFingerprint } from "./failure-detail"
+import { isModelUnreachableDetail } from "./memory-model-attempts"
 
 export interface ReflectionFailureDecision {
   readonly outcome: ReflectionOutcome
@@ -33,6 +34,7 @@ export function classifyReflectionFailure(decision: ReflectionFailureDecision): 
   return {
     fingerprint: failureFingerprint(decision.reason, decision.detail),
     retryable: isRetryable(decision),
+    ...(isModelUnreachableDetail(decision.detail) ? { definitive: true } : {}),
     ...(decision.reason === undefined ? {} : { reason: decision.reason }),
     ...(detail === undefined ? {} : { detail }),
   }

@@ -180,6 +180,7 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
       status: end.status,
       ...("cause" in end ? { cause: end.cause } : {}),
       ...("reason" in end && end.reason !== undefined ? { reason: end.reason } : {}),
+      ...("configuration" in end && end.configuration !== undefined ? { configuration: end.configuration } : {}),
       ...(provenance === undefined ? {} : { model: provenance }),
       nudges,
       candidateCount: turn.candidateCount,

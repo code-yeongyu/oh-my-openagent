@@ -10,6 +10,7 @@ import { buildExtension, SENPI_LOADER_ALIASES } from "../plugin/scripts/build-ex
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 const builtTaskExtensionPath = join(packageRoot, "plugin", "extensions", "omo-task.js")
+const builtComputerUseExtensionPath = join(packageRoot, "plugin", "extensions", "omo-computer-use.js")
 
 const EXPECTED_SENPI_LOADER_ALIASES = [
   "@earendil-works/pi-coding-agent",
@@ -54,7 +55,7 @@ describe("omo-senpi bundle purity", () => {
 
   it("#given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external", () => {
     const allowed = new Set<string>(SENPI_LOADER_ALIASES)
-    for (const path of [builtExtensionPath, builtTaskExtensionPath]) {
+    for (const path of [builtExtensionPath, builtTaskExtensionPath, builtComputerUseExtensionPath]) {
       expect(existsSync(path), `missing built extension at ${path}`).toBe(true)
       const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
       const forbidden = imports.filter((specifier) => !specifier.startsWith("node:") && !allowed.has(specifier))

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { floorClaudeCodeVersion } from "./claude-code-floor.js"
 import { prepareCompileSafeEngine } from "./compile-safe-engine.js"
+import { LAUNCH_SPEC_FILENAME, normalizeLaunchSpecMode } from "./launch-spec-mode.js"
 import { prepareRpcStreamErrors } from "./rpc-stream-errors.js"
 
 // Written inside the engine tree, so reinstalling or upgrading the engine drops it with the tree.
@@ -28,6 +29,20 @@ function isPreparedFor(senpiRoot, omoVersion) {
  * A failure is reported with the reinstall command and never blocks the launch: an unprepared
  * engine still runs, only without the guards.
  */
+/**
+ * The plugin's launch spec is re-checked on every launch, not behind the engine stamp: a reinstall
+ * of omo-ai under a loose umask rewrites the plugin while the engine tree keeps its stamp (#9208).
+ * Fail-open like the engine preparation: a failure warns with the manual fix and never blocks.
+ */
+export function preparePluginLaunchSpec({ pluginRoot, report = (line) => { process.stderr.write(line) }, io = {} }) {
+  try {
+    normalizeLaunchSpecMode(pluginRoot, io)
+  } catch (error) {
+    const path = join(pluginRoot, LAUNCH_SPEC_FILENAME)
+    report(`omo: could not make ${path} private (${error.message}); task children and teams need it, run: chmod 644 ${path}\n`)
+  }
+}
+
 export function ensureEnginePrepared({ senpiRoot, omoVersion, reinstallCommand, report = (line) => { process.stderr.write(line) } }) {
   if (isPreparedFor(senpiRoot, omoVersion)) return
   try {

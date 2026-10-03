@@ -1,6 +1,6 @@
 import { resolveContext } from "./context"
 import { destroyResidentTask } from "./destroy"
-import { parkHostSessionOnDaemonLoss, type HostSessionParkOptions } from "./host-session-revive"
+import { parkHostSessionOnDaemonLoss, retryDeferredHostSessions, type HostSessionParkOptions } from "./host-session-revive"
 import { registerLifecycleDetachedRevival, registerLifecycleDetachedRevivalRollback, type DestroyCause, type LifecycleDeps } from "./port"
 import { admitResident, reclaimIdleResidents, startIdleResidentReclaimer } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"
@@ -31,7 +31,11 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
       context.kernelToolBindings?.releaseAll()
     },
     admitResident: (parentSessionId: string) => admitResident(context, parentSessionId),
-    reconcileOnSessionStart: (parentSessionId?: string) => reconcileOnSessionStart(context, parentSessionId),
+    reconcileOnSessionStart: async (parentSessionId?: string) => {
+      const result = await reconcileOnSessionStart(context, parentSessionId)
+      retryDeferredHostSessions(context, result.outcomes)
+      return result
+    },
     parkHostSessionOnDaemonLoss: (taskId: string, options?: HostSessionParkOptions) =>
       parkHostSessionOnDaemonLoss(context, taskId, options),
     cleanupExpiredRecords: cleanup,

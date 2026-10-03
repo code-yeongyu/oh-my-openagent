@@ -65,10 +65,30 @@ const childFixture = join(import.meta.dir, "__fixtures__", "reflection-child.ts"
 function isChainMode(childMode: string): boolean {
   return childMode === "model-fallback" || childMode === "model-exhausted" || childMode === "provider-cooldown"
 }
+
+/**
+ * Modes whose only model comes from a provider an extension registers (#9175): a child started with
+ * `--no-extensions` never sees it. `extension-provider` lists it once extensions load;
+ * `extension-provider-unreachable` never lists it, so even the extension-loading child misses it.
+ */
+function isExtensionProviderMode(childMode: string): boolean {
+  return childMode === "extension-provider" || childMode === "extension-provider-unreachable"
+}
+
+function fakeSenpiCatalog(childMode: string, listed: readonly HarnessModel[]): string {
+  const rows = (models: readonly SenpiModelPort[]) =>
+    JSON.stringify(`${models.map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)
+  if (!isExtensionProviderMode(childMode)) return `process.stdout.write(${rows(listed)})`
+  const core: readonly SenpiModelPort[] = [{ provider: "builtin", id: "other" }]
+  const withExtensions = childMode === "extension-provider" ? [...listed, ...core] : core
+  return `process.stdout.write(process.argv.includes("--no-extensions") ? ${rows(core)} : ${rows(withExtensions)})`
+}
 const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 
 export async function createRunnerHarness(options: {
-  readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
+  readonly childMode:
+    | "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
+    | "extension-provider" | "extension-provider-unreachable"
   readonly categoryAvailable?: boolean
   readonly config?: OmoConfig
   readonly models?: readonly HarnessModel[]
@@ -121,8 +141,11 @@ export async function createRunnerHarness(options: {
     { provider: "extension-only", id: "primary" },
     { provider: "kimi-coding", id: "fallback" },
   ]
+  const extensionModel: SenpiModelPort = { provider: "extension-only", id: "primary" }
   const models = options.models
-    ?? (isChainMode(options.childMode) ? fallbackModels : [model])
+    ?? (isChainMode(options.childMode)
+      ? fallbackModels
+      : isExtensionProviderMode(options.childMode) ? [extensionModel] : [model])
   const categoryAvailable = options.categoryAvailable ?? true
   const memory = OmoMemorySettingsSchema.parse({
     reflection: { category: "quick", timeout_minutes: 15, merge: "auto" },
@@ -138,7 +161,9 @@ export async function createRunnerHarness(options: {
                   { model: "kimi-coding/fallback", reasoning: "minimal" },
                 ],
               }
-            : { model: "omo-mock/mock-1", reasoning: "high" },
+            : isExtensionProviderMode(options.childMode)
+              ? { model: "extension-only/primary", reasoning: "off" }
+              : { model: "omo-mock/mock-1", reasoning: "high" },
         }
       : {},
   }
@@ -147,7 +172,7 @@ export async function createRunnerHarness(options: {
   const preflightProbeLog = join(root, "preflight-probes.log")
   await writeFile(
     senpiLauncher,
-    `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(preflightProbeLog)}, "probe\\n")\nprocess.stdout.write(${JSON.stringify(`${(options.preflightModels ?? models).map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)})\n`,
+    `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(preflightProbeLog)}, "probe\\n")\n${fakeSenpiCatalog(options.childMode, options.preflightModels ?? models)}\n`,
     "utf8",
   )
   const api = new CapturedCompletionApi()
@@ -192,7 +217,11 @@ export async function createRunnerHarness(options: {
           ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "auth-missing"
           : options.childMode === "provider-cooldown"
             ? spawnArgs.args.includes("extension-only/primary") ? "provider-cooldown" : "commit"
-            : options.childMode
+            : options.childMode === "extension-provider"
+              ? spawnArgs.args.includes("--no-extensions") ? "model-not-found" : "commit"
+              : options.childMode === "extension-provider-unreachable"
+                ? "model-not-found"
+                : options.childMode
       return {
         ...spawnArgs,
         command: process.execPath,

@@ -67,6 +67,20 @@ let ticketSequence = 0
 /** In-process publication order: a later ticket is never visible before an earlier one. */
 let publishing: Promise<unknown> = Promise.resolve()
 
+export interface RecallWakeTicketFs {
+  readonly readFile?: (filePath: string, encoding: "utf8") => Promise<string>
+  readonly isSharingError?: (error: unknown) => boolean
+}
+
+let ticketFs: RecallWakeTicketFs = {}
+
+/** Test seam for deterministic Windows ticket-sharing coverage; production uses resilient fs. */
+export function setRecallWakeTicketFsForTests(next: RecallWakeTicketFs | undefined): () => void {
+  const previous = ticketFs
+  ticketFs = next ?? {}
+  return () => { ticketFs = previous }
+}
+
 function ticketName(): string {
   ticketSequence = (ticketSequence + 1) % 1_000_000
   const issued = String(Date.now()).padStart(16, "0")
@@ -100,15 +114,25 @@ async function unlinkIfPresent(filePath: string): Promise<void> {
   }
 }
 
+function isTicketReadSharingError(error: unknown): boolean {
+  if (ticketFs.isSharingError !== undefined) return ticketFs.isSharingError(error)
+  if (process.platform !== "win32") return false
+  const code = errorCode(error)
+  return code === "EBUSY" || code === "EPERM" || code === "EACCES"
+}
+
 /** Reaps the head ticket when its owner is proven dead; an unreadable or unparsable ticket keeps its place. */
 async function reapDeadHead(ticketDirectory: string, head: string): Promise<boolean> {
   const ticketPath = path.join(ticketDirectory, head)
   let raw: string
   try {
-    raw = await readFile(ticketPath, "utf8")
+    raw = await (ticketFs.readFile ?? readFile)(ticketPath, "utf8")
   } catch (error) {
     // Gone already: its owner acquired or withdrew between our readdir and this read.
     if (errorCode(error) === "ENOENT") return true
+    // Windows can deny the open while the ticket owner is publishing or withdrawing it. The
+    // unreadable ticket remains the queue head; wait for the next normal poll instead of rejecting.
+    if (isTicketReadSharingError(error)) return false
     throw error
   }
   const owner = parseLockRecord(raw)

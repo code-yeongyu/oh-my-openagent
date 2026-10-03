@@ -25,17 +25,12 @@ export function classifyRetryableModelMiss(result: ModelMissResult): RetryableMo
   if (model !== undefined) return { kind: "model_not_visible", id: model }
   const provider = API_KEY_NOT_FOUND_PATTERN.exec(output)?.[1]
   if (provider !== undefined) return { kind: "auth_missing", provider }
-  // A provider-side outage (cooldown, 429/503, overload) says nothing about THIS model being wrong,
-  // so the reflection chain must move to the next candidate instead of recording a dead run. The
-  // shared classifier owns the pattern table, including the billing/quota STOP cases that another
-  // model cannot fix - those stay non-retryable so a burnt budget never burns the whole chain.
   const detail = providerFailureDetail(result)
   if (detail === undefined) return undefined
   if (isContextOverflowMessage(detail)) return { kind: "context_overflow", detail }
-  // A provider-side outage (cooldown, 429/503, overload) says nothing about THIS model being wrong,
-  // so the reflection chain must move to the next candidate instead of recording a dead run. The
-  // shared classifier owns the pattern table, including the billing/quota STOP cases that another
-  // model cannot fix - those stay non-retryable so a burnt budget never burns the whole chain.
+  // A provider-side outage or a spent usage/quota limit says nothing about THIS model being wrong,
+  // so the reflection chain moves to the next candidate instead of recording a dead run. The shared
+  // classifier owns the pattern table; only a quota the provider marks as terminal stays a stop.
   const statusCode = Number.parseInt(HTTP_STATUS_PATTERN.exec(detail)?.[1] ?? "", 10)
   return isRetryableModelError({
     message: detail,

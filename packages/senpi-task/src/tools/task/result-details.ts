@@ -17,6 +17,8 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
     execution_mode: record.execution_mode,
     model: record.model,
     run_stats: record.run_stats,
+    failure_kind: record.failure_kind,
+    failure_reason: record.failure_reason,
     ...(includeLifecycle && {
           description: record.description,
           agent_type: record.agent_type,

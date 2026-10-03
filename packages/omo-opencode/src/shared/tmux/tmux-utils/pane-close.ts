@@ -1,7 +1,4 @@
-import {
-  closeTmuxPaneWithDependencies,
-  type CloseTmuxPaneDependencies,
-} from "@oh-my-opencode/tmux-core"
+import { closeTmuxPaneWithDependencies } from "@oh-my-opencode/tmux-core"
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -23,6 +20,3 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
 		delay,
 	})
 }
-
-export { closeTmuxPaneWithDependencies }
-export type { CloseTmuxPaneDependencies }

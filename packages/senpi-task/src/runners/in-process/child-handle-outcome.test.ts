@@ -22,8 +22,8 @@ function createEmittingSession(sessionId = "child-session-1"): EmittingSessionCo
         settle = resolve
       })
     },
-    async steer() {},
-    async followUp() {},
+    async steer() { return "handled" },
+    async followUp() { return "handled" },
     async abort() {},
     subscribe(listener: ChildSessionListener) {
       listeners.add(listener)

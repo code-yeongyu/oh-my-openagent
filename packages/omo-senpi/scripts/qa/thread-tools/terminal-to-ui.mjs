@@ -31,6 +31,7 @@ import {
   writeMockModelsJson,
 } from "./lib/harness.mjs"
 import { loadMirror, startDesktopShell } from "./lib/desktop-shell.mjs"
+import { isolatedChildEnv } from "../sandbox-child-env.mjs"
 
 const report = createReport("terminal-to-ui")
 installCleanupHooks()
@@ -73,7 +74,7 @@ try {
       binaryPath,
       cwd: scratch.cwd,
       socketPath,
-      env: { ...scratch.env, SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
+      env: { ...isolatedChildEnv(scratch.env, scratch.agentDir), SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
     })
     const mirror = yield* makeOmoSessionMirror({
       shared,

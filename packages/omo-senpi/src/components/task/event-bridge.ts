@@ -151,7 +151,8 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", (_payload, eventCtx) => {
+  pi.on("before_agent_start", (payload, eventCtx) => {
+    if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
     const sessionId = engine.runtime.sessionId() ?? "unknown-session"
@@ -161,7 +162,7 @@ export function wireEventBridge(
       {},
     )
     return undefined
-  })
+  }, { previewSafe: true })
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {
@@ -190,4 +191,8 @@ function asLiveContext(value: unknown): LiveTaskContext {
 
 function isLiveContext(value: unknown): value is LiveTaskContext {
   return typeof value === "object" && value !== null
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }

@@ -6,6 +6,7 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
@@ -86,7 +87,7 @@ function runScenario(senpiBin, gitMasterConfig) {
       {
         cwd: sandbox.cwd,
         env: {
-          ...cleanEnv,
+          ...isolatedChildEnv(cleanEnv, sandbox.agentDir),
           SENPI_CODING_AGENT_DIR: sandbox.agentDir,
           XDG_CONFIG_HOME: sandbox.xdgConfigHome,
           SENPI_CODING_AGENT_SESSION_DIR: sessionDir,

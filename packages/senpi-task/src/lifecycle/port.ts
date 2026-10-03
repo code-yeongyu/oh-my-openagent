@@ -5,7 +5,7 @@ import type { TaskRecord } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
-import type { HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
+import type { HostEndpointPort, HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
 import type { BatchAdmissionOptions } from "./residency"
 import type { RevivePolicyPort } from "./revive-policy"
 
@@ -73,6 +73,10 @@ export type RespawnFailureCode =
   // A previous generation of the daemon still holds this session path while it drains. Retryable
   // by construction: the child is NEVER lost for it.
   | "host_draining"
+  // The agent-dir store index could not be written, or the recorded host is incompatible: the child
+  // was opened nowhere and waits for the next reconcile.
+  | "store_index_unavailable"
+  | "host_incompatible"
   | "respawn_failed"
 
 export type RespawnResult =
@@ -199,6 +203,12 @@ export type LifecycleDeps = {
   readonly hostSessionProbe?: HostSessionProbe
   readonly hostSessionClose?: HostSessionCloser
   readonly hostRetry?: HostSessionRetryPolicy
+  // REQUIRED so a composition cannot silently drop the revival ensure and the own-host guard. A
+  // lifecycle without a task host passes `NO_HOST_ENDPOINT` explicitly.
+  readonly hostEndpoint: HostEndpointPort
+  // How long a close this process must see confirmed (a failed rung, an expired record) waits for the
+  // daemon's answer before it counts as unconfirmed. Defaults to 10s.
+  readonly hostCloseTimeoutMs?: number
 }
 
 export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {

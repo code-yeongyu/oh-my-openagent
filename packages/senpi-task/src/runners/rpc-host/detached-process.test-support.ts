@@ -97,6 +97,7 @@ async function drive(): Promise<void> {
         heartbeatIntervalMs: scenario?.startsWith("site-1") ? 1 : 60_000,
         now: () => 7,
         closeGraceMs: 100,
+        openDisposition: "attached",
       })
       cleanup = () => handle.dispose()
       if (scenario === "site-3") void handle.terminate()

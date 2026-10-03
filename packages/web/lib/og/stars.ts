@@ -28,6 +28,7 @@ async function loadStars(): Promise<number> {
 }
 
 const stars = createOgCountSource({
+  key: "github-stars",
   label: "GitHub stars",
   freshMs: 300_000,
   maxStaleMs: 86_400_000,

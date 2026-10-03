@@ -6,7 +6,7 @@ import { createContext, Script } from "node:vm"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { IdleInjectionCoordinator } from "../../packages/omo-senpi/src/extension/idle-injection-coordinator.ts"
 import { FakeExtensionAPI } from "../../packages/omo-senpi/test-support/fake-extension-api.ts"
-import { createTaskLifecycle } from "../../packages/senpi-task/src/lifecycle"
+import { createTaskLifecycle, NO_HOST_ENDPOINT } from "../../packages/senpi-task/src/lifecycle"
 import type { ResidencyRegistry } from "../../packages/senpi-task/src/lifecycle/port"
 import { createTaskManager } from "../../packages/senpi-task/src/manager/manager"
 import { TaskConcurrency } from "../../packages/senpi-task/src/manager/concurrency"
@@ -39,7 +39,7 @@ function openEnv(lanes = 1) {
     return { task_id: spec.taskId, sessionId: `worker-${spec.taskId}`, pid: undefined, waitForOutcome: () => new Promise<never>(() => {}), followUp: async () => undefined, steer: async () => undefined, abort: async () => undefined, dispose: async () => undefined, subscribe: () => () => undefined, lastAssistantText: () => undefined }
   } }
   const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: () => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
     planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }), destruction: lifecycle, admit: async () => ({ kind: "admitted" }) })
   const caller = { sessionId: "parent", rootSessionId: "root", depth: 0, cwd: root }
@@ -169,7 +169,7 @@ function openReset(root: string) {
   const concurrency = new TaskConcurrency(config)
   const runner = { start: async (spec: { taskId: string }) => ({ task_id: spec.taskId, sessionId: `worker-${spec.taskId}`, pid: undefined, waitForOutcome: () => new Promise<never>(() => {}), followUp: async () => undefined, steer: async () => undefined, abort: async () => undefined, dispose: async () => undefined, subscribe: () => () => undefined, lastAssistantText: () => undefined }) }
   const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: () => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
     planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }), destruction: lifecycle, admit: async () => ({ kind: "admitted" }) })
   return { manager, lifecycle }

@@ -51,6 +51,14 @@ The "mechanism" field is the acid test. If you can't write the causal chain from
 
 Red, green, refactor. No shortcuts.
 
+### 0. Look for the owner test first
+
+Before writing a reproduction test, find the test that already owns this contract at the strongest boundary. Run it on the pre-fix code:
+
+- **It already fails for this bug.** It is the red proof. Record its failure and skip step 1.
+- **It passes but covers the path.** Extend it with the failing case (a table row, a fixture case) instead of adding a parallel test.
+- **No owner exists.** Write the new reproduction test in step 1, and apply the repository's test-authoring gate if it has one.
+
 ### 1. Red — the reproduction as a test
 
 Write a test that fails *specifically because of this bug*. Requirements:

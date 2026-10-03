@@ -32,7 +32,18 @@ const PACKED_ARTIFACTS = [
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
+  "plugin/runtime/category-coverage/index.js",
+  "plugin/runtime/category-coverage/assets.generated.json",
+  "plugin/runtime/task-config/index.js",
 ] as const
+
+const CATEGORY_COVERAGE_BUNDLE = "plugin/runtime/category-coverage/index.js"
+const CATEGORY_COVERAGE_ASSET = "plugin/runtime/category-coverage/assets.generated.json"
+// The unminified read the 5.1.1 category-coverage bundle carries.
+const BUNDLED_SIBLING_READ =
+  'ASSETS_JSON_PATH=join3(dirname3(fileURLToPath2(import.meta.url)),"assets.generated.json");\n'
+// The terser-minified shape of the same read in plugin/extensions/*.js.
+const MINIFIED_SIBLING_READ = 'const a=t(i(o(import.meta.url)),"assets.generated.json");\n'
 
 const PACKED_SKILL_COUNT = 23
 
@@ -47,7 +58,10 @@ function writeFixtureFile(packageDir: string, relativePath: string, content: str
   writeFileSync(target, content, "utf8")
 }
 
-function runVerifierOnPayload(payloadPaths: readonly string[]): VerifierRun {
+function runVerifierOnPayload(
+  payloadPaths: readonly string[],
+  contents: Readonly<Record<string, string>> = {},
+): VerifierRun {
   const fakeRepoRoot = mkdtempSync(join(tmpdir(), "omo-ai-payload-guard-"))
   try {
     mkdirSync(join(fakeRepoRoot, "script"), { recursive: true })
@@ -66,7 +80,7 @@ function runVerifierOnPayload(payloadPaths: readonly string[]): VerifierRun {
       "utf8",
     )
     for (const relativePath of payloadPaths) {
-      writeFixtureFile(packageDir, relativePath, "// fixture\n")
+      writeFixtureFile(packageDir, relativePath, contents[relativePath] ?? "// fixture\n")
     }
 
     const result = spawnSync(
@@ -94,6 +108,12 @@ describe("omo-ai payload verifier", () => {
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
   })
 
+  test("#given a payload missing only the omo daemon task-config runtime #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([...PACKED_ARTIFACTS.filter(path => path !== "plugin/runtime/task-config/index.js"), ...skillPaths(PACKED_SKILL_COUNT)])
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("missing artifact: plugin/runtime/task-config/index.js")
+  })
+
   describe("#given a packed payload whose only gap is the dag eval sdk", () => {
     describe("#when the verifier runs", () => {
       test("#then it fails naming plugin/runtime/dag/sdk.js as a missing artifact", () => {
@@ -110,6 +130,55 @@ describe("omo-ai payload verifier", () => {
         expect(run.output).toContain("missing artifact: plugin/runtime/dag/sdk.js")
         expect(run.exitCode).toBe(1)
       })
+    })
+  })
+
+  describe("#given the 5.1.1 layout: the category-coverage bundle reads a sibling asset only extensions/ ships", () => {
+    test("#then it fails naming the unpacked sibling asset", () => {
+      const payload = [
+        ...PACKED_ARTIFACTS.filter((path) => path !== CATEGORY_COVERAGE_ASSET),
+        "plugin/extensions/assets.generated.json",
+        ...skillPaths(PACKED_SKILL_COUNT),
+      ]
+
+      const run = runVerifierOnPayload(payload, { [CATEGORY_COVERAGE_BUNDLE]: BUNDLED_SIBLING_READ })
+
+      expect(run.output).toContain(
+        `missing sibling asset: ${CATEGORY_COVERAGE_BUNDLE} reads ${CATEGORY_COVERAGE_ASSET}, which is not packed`,
+      )
+      expect(run.exitCode).toBe(1)
+    })
+  })
+
+  describe("#given any packed bundle that reads a sibling file the payload does not ship", () => {
+    test("#then the sibling-asset rule fails on its own, beyond the pinned artifact list", () => {
+      const bundle = "plugin/runtime/dag/library.js"
+      const payload = [...PACKED_ARTIFACTS, bundle, ...skillPaths(PACKED_SKILL_COUNT)]
+
+      const run = runVerifierOnPayload(payload, { [bundle]: MINIFIED_SIBLING_READ.replace("assets.generated.json", "library-data.json") })
+
+      expect(run.output).not.toContain("missing artifact:")
+      expect(run.output).toContain(`missing sibling asset: ${bundle} reads plugin/runtime/dag/library-data.json, which is not packed`)
+      expect(run.exitCode).toBe(1)
+    })
+  })
+
+  describe("#given every sibling-asset reader ships its asset beside it", () => {
+    test("#then both the bundled and the minified read shapes pass", () => {
+      const payload = [
+        ...PACKED_ARTIFACTS,
+        "plugin/extensions/omo-computer-use.js",
+        "plugin/extensions/assets.generated.json",
+        ...skillPaths(PACKED_SKILL_COUNT),
+      ]
+
+      const run = runVerifierOnPayload(payload, {
+        [CATEGORY_COVERAGE_BUNDLE]: BUNDLED_SIBLING_READ,
+        "plugin/extensions/omo-computer-use.js": MINIFIED_SIBLING_READ,
+      })
+
+      expect(run.output).not.toContain("missing sibling asset:")
+      expect(run.exitCode).toBe(0)
     })
   })
 

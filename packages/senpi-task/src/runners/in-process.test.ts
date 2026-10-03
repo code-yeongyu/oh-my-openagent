@@ -69,7 +69,7 @@ describe("InProcessRunner", () => {
     expect(handle.lastAssistantText()).toBe("final answer")
   })
 
-  test("#given shared and member-scoped tools #when a child is started #then only member-scoped tools cross the family exclusion", async () => {
+  test("#given shared and member-scoped tools #when a restricted child is started #then only member-scoped tools cross the family exclusion", async () => {
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
