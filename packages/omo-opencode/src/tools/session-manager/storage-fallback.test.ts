@@ -168,7 +168,7 @@ describe("session-manager storage fallback", () => {
     expect(sessionIds).toEqual(["ses_file"])
   })
 
-  test("#given SDK and file session ids overlap #when getAllSessions runs #then returns deduped union", async () => {
+  test("#given unavailable global SDK route and overlapping scoped/file sessions #when getAllSessions runs #then returns the scoped deduped union", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     createSessionMessage("ses_sdk", "msg_002", 2_000)
     mockClient.session.list.mockImplementation(() => Promise.resolve({
@@ -176,10 +176,50 @@ describe("session-manager storage fallback", () => {
         { id: "ses_sdk" },
       ],
     }))
+    const globalList = mock(() => Promise.resolve({ error: { name: "NotFoundError" } }))
+    storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
 
     const sessionIds = await storage.getAllSessions()
 
     expect(sessionIds).toEqual(["ses_sdk", "ses_file"])
+    expect(globalList).toHaveBeenCalledWith({ limit: 100 })
+  })
+
+  test("#given 1000 global sessions #when bounded search and directory list run #then they stop paging after enough rows", async () => {
+    const globalSessions = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `ses_global_${index}`, projectID: "other", directory: "/workspace/other",
+      time: { created: 10_000 - index, updated: 10_000 - index },
+    }))
+    const globalList = mock((input?: { roots?: boolean; cursor?: number; limit?: number }): Promise<unknown> => {
+      if (input?.roots) {
+        const targetPage = input.cursor === 100
+          ? ["ses_target_new", "ses_target_old"].map((id, index) => ({ id, projectID: "target", directory: "/workspace/target", time: { created: 1_000 - index, updated: 1_000 - index } }))
+          : Array.from({ length: 100 }, (_, index) => ({ id: `ses_other_${index}`, projectID: "other", directory: "/workspace/other", time: { created: 5_000 - index, updated: 5_000 - index } }))
+        return Promise.resolve({
+          data: targetPage,
+          response: new Response(null, { headers: input.cursor === 100 ? new Headers() : new Headers([["x-next-cursor", "100"]]) }),
+        })
+      }
+
+      const start = input?.cursor ?? 0
+      const page = globalSessions.slice(start, start + (input?.limit ?? 100))
+      const nextCursor = start + page.length
+      return Promise.resolve({
+        data: page,
+        response: new Response(null, { headers: nextCursor < globalSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers() }),
+      })
+    })
+    storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
+
+    const mainSessions = await storage.getMainSessions({ directory: "/workspace/target", limit: 2 })
+    const allSessionIDs = await storage.getAllSessions(50)
+
+    expect(globalList).toHaveBeenCalledTimes(3)
+    expect(mainSessions.map((session) => session.id)).toEqual(["ses_target_new", "ses_target_old"])
+    expect(allSessionIDs).toEqual(globalSessions.slice(0, 50).map((session) => session.id))
+    expect(globalList).toHaveBeenNthCalledWith(1, { roots: true, limit: 100 })
+    expect(globalList).toHaveBeenNthCalledWith(2, { roots: true, cursor: 100, limit: 100 })
+    expect(globalList).toHaveBeenNthCalledWith(3, { limit: 50 })
   })
 
   test("#given unreachable SDK messages error #when readSessionMessages runs #then falls back to file messages", async () => {
