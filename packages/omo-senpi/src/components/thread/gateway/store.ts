@@ -20,6 +20,7 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
+import type { ModelSetter, ObserveModelRequest, ObserveModelResult, SessionModelRecord, ThreadModel } from "./session-models"
 import type { DeliveryReceipt } from "./store-ops"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
@@ -121,6 +122,20 @@ export type GatewayStore = StoreExtensionApi & {
   readonly releaseAnswer: (request: AnswerClaimRef) => Promise<boolean>
   readonly confirmAnswer: (request: AnswerDelivered) => Promise<boolean>
   readonly markPriorDelivered: (request: AnswerClaimRef & { readonly prior: PriorAnswer }) => Promise<boolean>
+  /** #9425: the gateway's own model choice for a session it created or re-modelled. */
+  readonly recordSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly model: ThreadModel }) => Promise<ThreadModel>
+  /** Compare-and-swap variant (#9429 B2): writes only while the record is still at `expect_revision` (null: no record); `record` is the record after the call. */
+  readonly recordSessionModelIfCurrent: (request: { readonly now: number; readonly durable_id: string; readonly expect_revision: number | null; readonly model: ThreadModel }) => Promise<{ readonly applied: boolean; readonly record: SessionModelRecord | null }>
+  /** A new thinking level for a session with a model record; false when there is none. */
+  readonly updateSessionThinking: (request: { readonly now: number; readonly durable_id: string; readonly thinking_level: string }) => Promise<boolean>
+  /** A held set-model's choice, waiting on the record until the switch lands (#9429); false without a record. */
+  readonly recordPendingSessionModel: (request: { readonly now: number; readonly durable_id: string; readonly provider: string; readonly id: string; readonly set_by: ModelSetter }) => Promise<boolean>
+  /** The session's own `model_select`: keeps its record true and writes a fallback switch's milestone rows. */
+  readonly observeModelSelect: (request: ObserveModelRequest) => Promise<ObserveModelResult>
+  /** The model records of these sessions that exist, keyed by durable id; a plain read that takes no write lock. */
+  readonly sessionModels: (durableIds: readonly string[]) => Promise<Readonly<Record<string, ThreadModel>>>
+  /** One session's model record with its revision, null when it has none; a plain read that takes no write lock. */
+  readonly sessionModelRecord: (durableId: string) => Promise<SessionModelRecord | null>
   readonly onEvent: (listener: (event: GatewayStoreEvent) => void) => () => void
   /** Releases a `pause` test hook. */
   readonly resume: (hook: "beforeDbCommit" | "afterDbCommit") => void
@@ -344,6 +359,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     releaseAnswer: (request) => call("release_answer", request),
     confirmAnswer: (request) => call("confirm_answer", request),
     markPriorDelivered: (request) => call("mark_prior_delivered", request),
+    recordSessionModel: (request) => call("record_session_model", request),
+    recordSessionModelIfCurrent: (request) => call("record_session_model_if_current", request),
+    updateSessionThinking: (request) => call("update_session_thinking", request),
+    recordPendingSessionModel: (request) => call("record_pending_session_model", request),
+    observeModelSelect: (request) => call("observe_model_select", request),
+    sessionModels: (durableIds) => call("session_models", durableIds),
+    sessionModelRecord: (durableId) => call("session_model_record", durableId),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

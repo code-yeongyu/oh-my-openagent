@@ -22,7 +22,7 @@ function fakeSdk(answers: Record<string, unknown> = {}) {
     calls.push({ method: name, request })
     return answers[name] ?? { kind: "ok", method: name, request }
   }
-  const sdk = Object.fromEntries(["list", "read", "send", "bind", "unbind", "rebind", "bindings", "report", "outbox", "ack", "answer"].map((name) => [name, method(name)]))
+  const sdk = Object.fromEntries(["list", "read", "send", "bind", "unbind", "rebind", "bindings", "report", "outbox", "ack", "answer", "create", "models", "setModel", "setReasoning"].map((name) => [name, method(name)]))
   return {
     calls,
     disposed: () => disposed,
@@ -125,6 +125,56 @@ describe("omo thread: argv to SDK calls", () => {
   })
 })
 
+describe("omo thread: model control (#9425)", () => {
+  test("#given create with every model flag #when run #then the SDK creates with exactly them", async () => {
+    const result = await run(["create", "--name", "lane", "--cwd", "/repo", "--fork-from", "dur-1", "--provider", "openai", "--model", "gpt-x", "--thinking", "high", "--set-by", "config", "--json"])
+    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "create", request: { name: "lane", cwd: "/repo", fork_from: "dur-1", provider: "openai", model: "gpt-x", thinking: "high", set_by: "config" } })
+  })
+
+  test("#given create with no model #when run #then the request names no model, so the SDK resolves auto", async () => {
+    const result = await run(["create", "--json"])
+    expect(JSON.parse(result.stdout)).toEqual({ kind: "ok", method: "create", request: {} })
+  })
+
+  test("#given models, set-model and set-reasoning #when run #then each maps its positionals and flags", async () => {
+    const printed = [
+      JSON.parse((await run(["models", "--json"])).stdout),
+      JSON.parse((await run(["models", "lane", "--provider", "openai", "--all-scope", "--json"])).stdout),
+      JSON.parse((await run(["set-model", "lane", "openai/gpt-x", "--set-by", "lead", "--json"])).stdout),
+      JSON.parse((await run(["set-model", "lane", "gpt", "--provider", "openai", "--json"])).stdout),
+      JSON.parse((await run(["set-reasoning", "lane", "low", "--scope", "turn", "--json"])).stdout),
+    ]
+    expect(printed.map(({ method, request }) => ({ method, request }))).toEqual([
+      { method: "models", request: {} },
+      { method: "models", request: { all_scope: true, thread: "lane", provider: "openai" } },
+      { method: "setModel", request: { thread: "lane", model: "openai/gpt-x", set_by: "lead" } },
+      { method: "setModel", request: { thread: "lane", model: "gpt", provider: "openai" } },
+      { method: "setReasoning", request: { thread: "lane", level: "low", scope: "turn" } },
+    ])
+  })
+
+  test("#given a refused set-model #when run with --json #then the refusal is on stdout with its details and the exit code is refused", async () => {
+    const refusal = { kind: "error", error: { code: "model_ambiguous", message: "m", next_action: "n", details: { candidates: ["openai/gpt-x", "openai/gpt-y"] } } }
+    const result = await run(["set-model", "lane", "gpt", "--json"], fakeSdk({ setModel: refusal }))
+    expect({ exitCode: result.exitCode, printed: JSON.parse(result.stdout) }).toEqual({ exitCode: THREAD_EXIT.refused, printed: refusal })
+  })
+
+  test("#given a created thread and a model listing #when printed for a person #then the model and its provenance are on the line", async () => {
+    const model = { provider: "openai", id: "gpt-x", thinking_level: "high", provenance: "set", set_by: "config", reason: null }
+    const created = await run(["create", "--model", "gpt-x"], fakeSdk({ create: { kind: "ok", thread: { thread_id: "dur-9", name: "lane", model }, deduplicated: false } }))
+    const listed = await run(["models"], fakeSdk({ models: { kind: "ok", thread_id: null, current: null, available: [{ provider: "openai", id: "gpt-x", name: "GPT X", thinking_levels: ["low", "high"] }] } }))
+    expect(created.stdout).toBe("created dur-9 lane  model openai/gpt-x (high, set by config)\n")
+    expect(listed.stdout).toBe("openai/gpt-x  GPT X  thinking low,high\n")
+  })
+
+  test("#given a set-model the engine held for compaction #when printed for a person #then the pending switch is named on its own line", async () => {
+    const model = { provider: "anthropic", id: "", thinking_level: "high", provenance: "set", set_by: "user", reason: null }
+    const pending = { provider: "openai", id: "gpt-y" }
+    const result = await run(["set-model", "lane", "gpt-y"], fakeSdk({ setModel: { kind: "ok", thread_id: "dur-1", model, pending } }))
+    expect(result.stdout).toBe("dur-1: model anthropic/ (high, set by user)\nmodel openai/gpt-y pending until the engine applies it\n")
+  })
+})
+
 describe("omo thread: the connector outbox", () => {
   test("#given outbox --after --ack #when rows come back #then the read continues after that cursor and the ack goes through the newest row", async () => {
     const fake = fakeSdk({
@@ -180,6 +230,14 @@ describe("omo thread: exit codes", () => {
     [["bind", "my-tui", "--platform", "p", "--account", "a", "--chat", "c", "--direction", "inbound"], "--direction must be one of in, out, both"],
     [["send", "my-tui", "   "], "<text> is empty"],
     [["send", "--binding", "b-1", ""], "<text> is empty"],
+    [["create", "--model", "gpt-x", "--set-by", "robot"], "--set-by must be one of config, user, lead"],
+    [["create", "--set-by", "config"], "--set-by needs --model"],
+    [["create", "--thinking", "loud"], "--thinking must be one of off, minimal, low, medium, high, xhigh, max"],
+    [["set-model", "lane", "gpt-x", "--set-by", "me"], "--set-by must be one of config, user, lead"],
+    [["set-model", "lane", "  "], "<model> is empty"],
+    [["set-model", "lane"], "expects 2 argument(s), got 1"],
+    [["set-reasoning", "lane", "high", "--scope", "forever"], "--scope must be one of session, turn"],
+    [["set-reasoning", "lane", "loud"], "<level> must be one of off, minimal, low, medium, high, xhigh, max"],
   ])("#given %p #when run #then it is a usage error and the SDK is never loaded", async (args, message) => {
     const result = await run(args)
     expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
@@ -229,6 +287,29 @@ describe("omo thread: SDK loading", () => {
     expect(result.stderr).toContain("worker gone")
   })
 
+  test("#given the staged task-config runtime #when the SDK resolves an auto model #then it reads omo.json's model_profile view for the cwd and env, and a broken runtime falls back to the default profile", async () => {
+    const asked: unknown[] = []
+    const profileOf = async (loadTaskConfig: (root: string) => unknown) => {
+      let received: Record<string, unknown> = {}
+      await loadThreadSdk({
+        pluginRoot: "/plugin",
+        agentDir: "/agent",
+        env: { KEEP: "1" },
+        cwd: "/work",
+        engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
+        loadSqlite: async () => ({}),
+        importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
+        identity: { uid: 501, user: "qa" },
+        loadTaskConfig,
+      })
+      return (received.modelProfile as () => unknown)()
+    }
+    const view = { model_profile: "geeky-heavy", model_profiles: { mine: { models: ["openai/gpt-x"] } } }
+    expect(await profileOf((root) => { asked.push(root); return { resolveThreadModelProfile: (input: unknown) => { asked.push(input); return view } } })).toEqual(view)
+    expect(asked).toEqual(["/plugin", { cwd: "/work", env: { KEEP: "1" } }])
+    expect(await profileOf(() => { throw new Error("Cannot find module index.js") })).toEqual({})
+  })
+
   test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd, cli identity, and an engine status reader over host status --all", async () => {
     const engineCalls: { args: readonly string[]; env: Record<string, string> }[] = []
     let received: Record<string, unknown> = {}
@@ -241,6 +322,7 @@ describe("omo thread: SDK loading", () => {
       loadSqlite: async () => ({}),
       importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
       identity: { uid: 501, user: "qa" },
+      loadTaskConfig: () => { throw new Error("Cannot find module index.js") },
     })
     expect(loaded.error).toBeUndefined()
     expect({ agentDir: received.agentDir, cwd: received.cwd, uid: received.uid, user: received.user }).toEqual({ agentDir: "/agent", cwd: "/work", uid: 501, user: "qa" })

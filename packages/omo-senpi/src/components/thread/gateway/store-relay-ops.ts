@@ -30,6 +30,7 @@ import {
 } from "./bindings"
 import { answerShape, isUiRequestKind, type UiRequestKind } from "./answer-shape"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
+import type { ModelChange } from "./session-models"
 import type { SqlRow, SqlValue } from "./sql"
 import { gatewayOutboxMarkerPath } from "./paths"
 import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
@@ -106,7 +107,7 @@ function bindingFrom(record: SqlRow): BindingRecord {
   }
 }
 
-function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], page?: { readonly orderBy: string; readonly limit: number }): BindingRecord[] {
+export function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], page?: { readonly orderBy: string; readonly limit: number }): BindingRecord[] {
   const sql = `SELECT ${BINDING_COLUMNS.join(", ")} FROM bindings WHERE ${where}${page === undefined ? "" : ` ORDER BY ${page.orderBy} LIMIT ?`}`
   return ctx.sql.all(BINDING_COLUMNS, sql, page === undefined ? params : [...params, page.limit], page?.orderBy).map(bindingFrom)
 }
@@ -121,7 +122,7 @@ function meta(ctx: StoreContext, key: string): string {
   return String(found.value)
 }
 
-function expireDue(ctx: StoreContext, now: number): void {
+export function expireDue(ctx: StoreContext, now: number): void {
   const at = rfc3339(now)
   write(ctx, "UPDATE bindings SET status = 'expired', updated_at = ? WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= ?", [at, at])
 }
@@ -459,12 +460,12 @@ function reportBindingDefault(ctx: StoreContext, sessionDurableId: string, origi
   return refused("invalid_arguments", `This session has ${outbound.length} active outbound bindings and its current run answers no bound message; name binding_id.`, { binding_ids: outbound })
 }
 
-function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly ui_request_kind?: UiRequestKind; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome }): number {
+export function insertOutbox(ctx: StoreContext, row: { readonly binding: BindingRecord; readonly event: OutboundEvent; readonly text: string; readonly now: number; readonly reply_token?: string; readonly ui_request_id?: string; readonly ui_request_kind?: UiRequestKind; readonly incarnation?: string | null; readonly outcome?: CompletionOutcome; readonly model_change?: ModelChange }): number {
   write(
     ctx,
     "INSERT INTO outbox (binding_id, revision, event_kind, payload, state, provider_message_id, created_at, acked_at, session_durable_id, reply_token, ui_request_id, ui_request_kind, incarnation, question_state, answer, answered_at, outcome) VALUES (?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
     [
-      row.binding.binding_id, row.binding.revision, row.event, JSON.stringify({ text: row.text }), row.now, row.binding.session_durable_id,
+      row.binding.binding_id, row.binding.revision, row.event, JSON.stringify({ text: row.text, ...(row.model_change === undefined ? {} : { model_change: row.model_change }) }), row.now, row.binding.session_durable_id,
       row.reply_token ?? null, row.ui_request_id ?? null, row.ui_request_kind ?? null, row.incarnation ?? null, row.reply_token === undefined ? null : "pending", row.outcome ?? null,
     ],
   )
@@ -562,12 +563,14 @@ export function latestCompletionArm(ctx: StoreContext, durableId: string): numbe
 
 function outboxRowFrom(record: SqlRow, binding: BindingRecord): OutboxRow {
   const event = record.event_kind as OutboundEvent
+  const payload = JSON.parse(String(record.payload)) as { text?: unknown; model_change?: ModelChange }
   return {
     cursor: Number(record.cursor),
     binding_id: String(record.binding_id),
     revision: Number(record.revision),
     event,
-    text: String((JSON.parse(String(record.payload)) as { text?: unknown }).text ?? ""),
+    text: String(payload.text ?? ""),
+    ...(payload.model_change === undefined ? {} : { model_change: payload.model_change }),
     state: record.state as OutboxRow["state"],
     created_at: rfc3339(Number(record.created_at)),
     edit_message_id: event === "milestone" ? binding.progress_message_id : null,

@@ -1,4 +1,5 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
+import type { ModelSelectSource } from "./session-models"
 
 export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
@@ -195,6 +196,7 @@ export type GatewayStoreEvent =
   | { readonly kind: "busy"; readonly op: string }
   | { readonly kind: "lock_wait_exceeded"; readonly op: string; readonly waited_ms: number }
   | { readonly kind: "completions_emitted"; readonly session_durable_id: string; readonly cursors: readonly number[] }
+  | { readonly kind: "model_observed"; readonly session_durable_id: string; readonly source: ModelSelectSource; readonly updated: boolean; readonly cursors: readonly number[] }
   | { readonly kind: "paused"; readonly hook: string }
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }

@@ -1,3 +1,4 @@
+import { createRequire } from "node:module"
 import { userInfo } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -15,9 +16,13 @@ export { THREAD_EXIT } from "./thread-args.js"
  */
 
 const USAGE = [
-  "usage: omo thread <list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
+  "usage: omo thread <list|create|models|set-model|set-reasoning|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
   "",
   "  list      [--all-scope]",
+  "  create    [--name <n>] [--cwd <dir>] [--fork-from <id>] [--provider <p>] [--model <m>] [--thinking <level>] [--set-by config|user|lead]",
+  "  models    [<thread>] [--provider <p>]",
+  "  set-model <thread> <model> [--provider <p>] [--set-by config|user|lead]",
+  "  set-reasoning <thread> <level> [--scope session|turn]",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
   "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
   "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
@@ -43,6 +48,15 @@ const AUTHOR_FLAGS = ["--author-id", "--author-name", "--author-user-id"]
 
 const COMMANDS = {
   list: { values: [], booleans: [], arity: [0, 0], call: (sdk, _p, _o, scope) => sdk.list(scope) },
+  create: {
+    values: ["--name", "--cwd", "--fork-from", "--provider", "--model", "--thinking", "--set-by"],
+    booleans: [],
+    arity: [0, 0],
+    call: (sdk, _p, o, scope) => sdk.create({ ...scope, name: o["--name"], cwd: o["--cwd"], fork_from: o["--fork-from"], provider: o["--provider"], model: o["--model"], thinking: o["--thinking"], set_by: o["--set-by"] }),
+  },
+  models: { values: ["--provider"], booleans: [], arity: [0, 1], call: (sdk, p, o, scope) => sdk.models({ ...scope, thread: p[0], provider: o["--provider"] }) },
+  "set-model": { values: ["--provider", "--set-by"], booleans: [], arity: [2, 2], call: (sdk, p, o, scope) => sdk.setModel({ ...scope, thread: p[0], model: p[1], provider: o["--provider"], set_by: o["--set-by"] }) },
+  "set-reasoning": { values: ["--scope"], booleans: [], arity: [2, 2], call: (sdk, p, o, scope) => sdk.setReasoning({ ...scope, thread: p[0], level: p[1], scope: o["--scope"] }) },
   send: {
     values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", ...AUTHOR_FLAGS],
     booleans: [],
@@ -82,7 +96,8 @@ const COMMANDS = {
 
 const REQUIRED = { unbind: ["--revision"], rebind: ["--revision"], bind: ["--platform", "--account", "--chat"], answer: ["--binding", "--token"] }
 const INTEGER_FLAGS = ["--expected-turn", "--limit", "--max-bytes", "--revision", "--after"]
-const CHOICE_FLAGS = { "--mode": ["auto", "steer", "follow_up"], "--direction": ["in", "out", "both"] }
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+const CHOICE_FLAGS = { "--mode": ["auto", "steer", "follow_up"], "--direction": ["in", "out", "both"], "--set-by": ["config", "user", "lead"], "--scope": ["session", "turn"], "--thinking": THINKING_LEVELS }
 
 function sendTarget(positionals, options) {
   if (positionals.length === 2) return { thread: positionals[0], text: positionals[1] }
@@ -157,6 +172,9 @@ function validate(name, parsed) {
     if (author !== undefined) return author
   }
   if (name === "ack" && !/^\d+$/.test(parsed.positionals[1])) return "<cursor> must be a non-negative integer"
+  if (name === "create" && parsed.options["--set-by"] !== undefined && parsed.options["--model"] === undefined) return "--set-by needs --model: it names who chose the model"
+  if (name === "set-model" && parsed.positionals[1].trim() === "") return "<model> is empty"
+  if (name === "set-reasoning" && !THINKING_LEVELS.includes(parsed.positionals[1])) return `<level> must be one of ${THINKING_LEVELS.join(", ")}, got '${parsed.positionals[1]}'`
   return undefined
 }
 
@@ -186,7 +204,23 @@ export function threadExitCode(result) {
  * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
  * plugin SDK that cannot be imported (a broken or partial install).
  */
-export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, identity }) {
+const requireRuntime = createRequire(import.meta.url)
+
+/**
+ * The omo.json `model_profile` view a `create` with no model resolves from (#9425), read through the
+ * staged task-config runtime (the omo-config-core loader; `daemon-config.js` reads `task.*` the same way).
+ * Fail-open like that reader: without the runtime, auto uses the default profile.
+ */
+function threadModelProfile(pluginRoot, cwd, env, loadTaskConfig) {
+  try {
+    const runtime = (loadTaskConfig ?? ((root) => requireRuntime(join(root, "runtime", "task-config", "index.js"))))(pluginRoot)
+    return runtime.resolveThreadModelProfile({ cwd, env })
+  } catch {
+    return {}
+  }
+}
+
+export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, identity, loadTaskConfig }) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {
@@ -200,7 +234,8 @@ export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, lo
   }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
   const engineStatusAll = async () => engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } }).stdout
-  return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll }) }
+  const modelProfile = () => threadModelProfile(pluginRoot, cwd, env, loadTaskConfig)
+  return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll, modelProfile }) }
 }
 
 export async function runThreadCommand(args, options) {

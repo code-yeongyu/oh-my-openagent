@@ -17,6 +17,10 @@ import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
+import type { OmoModelProfile } from "@oh-my-opencode/omo-config-core"
+
+import { createThread, listThreadModels, modelProfileChoice, setThreadModel, setThreadReasoning, type CreateThreadInput, type ModelsResult, type SetModelOk } from "./model-control"
+import type { ModelSetter } from "./gateway/session-models"
 import { listThreads, readThread } from "./tools/read-ops"
 
 export type ThreadSdkOptions = {
@@ -33,6 +37,8 @@ export type ThreadSdkOptions = {
   readonly host?: ThreadHost
   readonly store?: GatewayStore
   readonly now?: () => number
+  /** omo.json's `model_profile` / `model_profiles` (senpi view) a session created with no model resolves from; absent: the default profile. */
+  readonly modelProfile?: () => { readonly model_profile?: string; readonly model_profiles?: Readonly<Record<string, OmoModelProfile>> }
 }
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -63,6 +69,12 @@ export type ThreadSdk = StoreExtensionApi & {
   readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Relayed<"outbox">
   readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Relayed<"ack">
   readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly author?: ExternalAuthor }) => Relayed<"answer">
+  /** A new host session: an explicit model is `set` (by `set_by`, default user); none is `auto` from the connected providers. */
+  readonly create: (request: Scoped & CreateThreadInput) => Promise<ThreadToolResult>
+  /** With no thread, what a new session could run; with one, what its live session can switch to, and its recorded model. */
+  readonly models: (request: Scoped & { readonly thread?: string; readonly provider?: string }) => Promise<ModelsResult | Failure>
+  readonly setModel: (request: Scoped & { readonly thread: string; readonly model: string; readonly provider?: string; readonly set_by?: ModelSetter }) => Promise<SetModelOk | Failure>
+  readonly setReasoning: (request: Scoped & { readonly thread: string; readonly level: string; readonly scope?: "session" | "turn" }) => Promise<ThreadToolResult>
   readonly locate: (request: Scoped & { readonly thread: string }) => Promise<{ readonly kind: "ok"; readonly thread: LocatedThread } | Failure>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
   readonly release: (thread: LocatedThread, request: Omit<ReleaseSessionRequest, "reason">) => Promise<ReleaseSessionReply>
@@ -104,7 +116,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   })
   const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const now = options.now ?? store.now
-  const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
+  const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now, ...(options.modelProfile === undefined ? {} : { modelProfile: () => modelProfileChoice(options.modelProfile?.() ?? {}) }) }
   const view = () => hostView(surface)
   const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))
   // An extension call resolves its target while the store worker runs that call's transaction, so it
@@ -212,6 +224,13 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     outbox: (request) => guarded(() => relay.outbox(request)),
     ack: (request) => guarded(() => relay.ack(request)),
     answer: (request) => guarded(() => relay.answer({ binding_id: request.binding_id, reply_token: request.reply_token, answer: request.answer, ...(request.author === undefined ? {} : { author: request.author }) })),
+    create: (request) => guarded(async () => {
+      const { all_scope: _allScope, ...input } = request
+      return await createThread(surface, await view(), input, { set_by: "user", cwd: options.cwd })
+    }),
+    models: (request) => guarded(async () => await listThreadModels(surface, await view(), request, UNKNOWN_CALLER)),
+    setModel: (request) => guarded(async () => await setThreadModel(surface, await view(), request, UNKNOWN_CALLER, request.set_by ?? "user")),
+    setReasoning: (request) => guarded(async () => await setThreadReasoning(surface, await view(), request, UNKNOWN_CALLER, true)),
     locate: (request) => guarded(async () => {
       const current = await view()
       const resolved = resolution(surface, resolveEntries(surface, current), request.thread, UNKNOWN_CALLER, request.all_scope)
