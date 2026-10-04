@@ -17,6 +17,7 @@ describe("mapOmoConfigAgents", () => {
       reviewer: {
         description: "Reviews diffs",
         prompt: "You are a reviewer.",
+        prompt_append: "Prefer the smallest correct change.",
         model: "openai/gpt-5",
         models: ["openai/gpt-5", "anthropic/claude"],
         execution_mode: "process",
@@ -36,6 +37,7 @@ describe("mapOmoConfigAgents", () => {
       name: "reviewer",
       description: "Reviews diffs",
       prompt: "You are a reviewer.",
+      promptAppend: "Prefer the smallest correct change.",
       model: "openai/gpt-5",
       models: ["openai/gpt-5", "anthropic/claude"],
       executionMode: "process",

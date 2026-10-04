@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { BUILTIN_AGENTS } from "./builtin"
+import { mapOmoConfigAgents } from "./omo-config-agents"
 import { resolveAgent } from "./resolve-agent"
 import type { AgentDefinition } from "./types"
 
@@ -99,6 +100,39 @@ describe("resolveAgent", () => {
     expect(result.agentType).toBe("explore")
     expect(result.instructions).toBe("Inspect the codebase")
     expect(result.agentExecutionMode).toBe("in-process")
+  })
+
+  test("#given a mapped omo config prompt_append #when the agent resolves #then the append lands in the persona instructions", () => {
+    // given
+    const agents = mapOmoConfigAgents({
+      agents: {
+        explore: {
+          prompt: "Inspect the codebase",
+          prompt_append: "Prefer the smallest correct change.",
+        },
+      },
+    })
+    const models = registry([model("openai", "gpt-6-luna-fast")])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.instructions).toBe("Inspect the codebase\nPrefer the smallest correct change.")
+  })
+
+  test("#given a mapped omo config prompt_append without a prompt #when the agent resolves #then there is nothing to append to and no instructions are forced", () => {
+    // given
+    const agents = mapOmoConfigAgents({
+      agents: { explore: { prompt_append: "Prefer the smallest correct change." } },
+    })
+    const models = registry([model("openai", "gpt-6-luna-fast")])
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.instructions).toBeUndefined()
   })
 
   test("#given def.model and def.models are both available #when resolved #then def.model wins", () => {

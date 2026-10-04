@@ -99,4 +99,22 @@ describe("loadSenpiOmoConfig", () => {
       reasoning: "low",
     })
   })
+
+  test("#given an agent prompt_append file URI #when the Senpi config resolves #then the file content replaces the reference", () => {
+    // given
+    const { home, project } = fixture()
+    writeFileSync(join(home, ".omo", "append.md"), "Prefer the smallest correct change.", "utf8")
+    writeConfig(home, {
+      agents: {
+        explore: { model: "kimi-coding/kimi-for-coding-highspeed", prompt_append: "file://~/.omo/append.md" },
+      },
+    })
+
+    // when
+    const result = loadSenpiOmoConfig({ cwd: project, env: { HOME: home }, platform: "linux" })
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.config.agents?.explore?.prompt_append).toBe("Prefer the smallest correct change.")
+  })
 })

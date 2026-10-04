@@ -30,6 +30,7 @@ function toAgentDefinition(name: string, def: OmoAgentDef): AgentDefinition {
     name,
     ...(def.description === undefined ? {} : { description: def.description }),
     ...(def.prompt === undefined ? {} : { prompt: def.prompt }),
+    ...(def.prompt_append === undefined ? {} : { promptAppend: def.prompt_append }),
     ...(def.model === undefined ? {} : { model: def.model }),
     ...(def.models === undefined ? {} : { models: def.models }),
     ...(def.variant === undefined ? {} : { variant: def.variant }),

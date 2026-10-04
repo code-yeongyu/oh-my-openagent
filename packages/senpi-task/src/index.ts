@@ -335,6 +335,7 @@ export {
   mapOmoConfigAgents,
   registerAgent,
   resolveAgent,
+  resolvePromptAppend,
   resolveToolRule,
 } from "./agents"
 export type {

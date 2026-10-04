@@ -11,6 +11,9 @@ export type AgentDefinition = {
   readonly name: string
   readonly description?: string
   readonly prompt?: string
+  /** Appended to the resolved prompt when one exists; carries omo.json `agents.<name>.prompt_append`,
+   *  expanded from `file://` URIs at config load (OpenCode-edition parity). */
+  readonly promptAppend?: string
   readonly mode?: string
   readonly model?: string
   readonly models?: readonly AgentModelEntry[]

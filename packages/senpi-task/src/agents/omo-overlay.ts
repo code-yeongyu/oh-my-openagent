@@ -8,6 +8,7 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 
 import { mapOmoConfigAgents } from "./omo-config-agents"
+import { resolvePromptAppend } from "./prompt-append"
 import type { AgentDefinition, AgentLoaderDiagnostic, LoadAgentsOptions } from "./types"
 
 type OmoAgentOverlayResult = {
@@ -29,7 +30,18 @@ export function loadOmoAgentOverlays(options: Required<LoadAgentsOptions>): OmoA
   const loaded = loadOmoConfig({ cwd: options.projectDir, env, harness: "senpi" })
   const resolvedModels = resolveModelReferences(loaded.config)
   const diagnostics = [...loaded.diagnostics, ...resolvedModels.diagnostics].map(toAgentLoaderDiagnostic)
-  return { agents: Object.values(mapOmoConfigAgents(resolvedModels.view)), diagnostics }
+  const agents = Object.values(mapOmoConfigAgents(resolvedModels.view)).map((definition) =>
+    definition.promptAppend === undefined
+      ? definition
+      : {
+          ...definition,
+          promptAppend: resolvePromptAppend(definition.promptAppend, {
+            projectDir: options.projectDir,
+            homeDir: options.homeDir,
+          }),
+        },
+  )
+  return { agents, diagnostics }
 }
 
 function toAgentLoaderDiagnostic(diagnostic: ConfigDiagnostic): AgentLoaderDiagnostic {

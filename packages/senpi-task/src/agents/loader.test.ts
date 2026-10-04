@@ -97,6 +97,22 @@ describe("loadAgents", () => {
     expect(result.agents.finder?.prompt).toBe("file prompt\n")
   })
 
+  test("#given an omo config prompt_append file URI #when loading #then the overlay carries the resolved file content", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(join(fixture.project, "append.md"), "Resolved append content")
+    writeText(
+      join(fixture.project, ".omo", "omo.json"),
+      `{"agents":{"finder":{"prompt_append":"file://./append.md"}}}`,
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.finder?.promptAppend).toBe("Resolved append content")
+  })
+
   test("#given malformed and valid frontmatter #when loading #then diagnostics are per file and valid agents still load", () => {
     // given
     const fixture = makeFixture()

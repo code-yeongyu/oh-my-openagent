@@ -201,14 +201,22 @@ export function resolveAgent<TModel extends SenpiModelPort>(
 
 function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
   const agentExecutionMode = toExecutionMode(definition.executionMode)
+  const instructions = composePersonaInstructions(definition)
   return {
     agentType: name,
-    ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
+    ...(instructions !== undefined ? { instructions } : {}),
     ...agentToolPolicy(definition),
     ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),
   }
+}
+
+// OpenCode-edition parity (`mergeAgentConfig` in omo-opencode): the append only lands when a prompt
+// exists; with no prompt there is nothing to append to and no instructions are forced.
+function composePersonaInstructions(definition: AgentDefinition): string | undefined {
+  if (definition.prompt === undefined) return undefined
+  return definition.promptAppend ? `${definition.prompt}\n${definition.promptAppend}` : definition.prompt
 }
 
 function firstConfiguredModel(definition: AgentDefinition): string | undefined {
