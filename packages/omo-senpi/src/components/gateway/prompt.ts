@@ -6,6 +6,8 @@ import { GATEWAY_RULES_EXTENSION_NAME } from "./store-extension/migrations"
 
 export interface GatewayRulesStore {
   readonly extensionCall: <T = unknown>(name: string, op: string, args: unknown) => Promise<StoreExtensionResult<T>>
+  /** An internal session op, run as `caller` (the store stamps it; a public extensionCall of the op is refused). */
+  readonly extensionSessionAwait: <T = unknown>(name: string, op: string, args: unknown, caller: { readonly callerDurableId: string }) => Promise<StoreExtensionResult<T>>
 }
 
 export interface GatewayRulesPromptOptions {
@@ -33,10 +35,11 @@ export function createGatewayRulesPromptHandler(
     if (sessionId === undefined) return undefined
     const store = await options.ensureStore()
     if (store === undefined) return undefined
-    const result = await store.extensionCall<{ readonly version: string; readonly block: string } | null>(
+    const result = await store.extensionSessionAwait<{ readonly version: string; readonly block: string } | null>(
       GATEWAY_RULES_EXTENSION_NAME,
       "blockForSession",
-      { session_durable_id: sessionId },
+      {},
+      { callerDurableId: sessionId },
     )
     if (result.kind !== "ok") {
       if (!lookupWarned) {

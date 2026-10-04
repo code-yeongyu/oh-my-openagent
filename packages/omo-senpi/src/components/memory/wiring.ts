@@ -21,6 +21,7 @@ import { createMemoryRuntimeWiring, type MemoryRuntimeWiring } from "./wiring-ru
 import { registerMemoryStatic } from "./wiring-static"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
+import { gatewayMemoryPolicyGrant } from "./gateway-scope"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
@@ -41,6 +42,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
   )
   const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
+  const policies = new Set<string>()
 
   const nudgeWiring = createMemoryNudgeWiring({
     resolveContext,
@@ -176,7 +178,12 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       activeSession.current = sessionId
       lastEventCtx.current = eventCtx
       reflectionLive.attach(sessionId)
-      registerMemoryFilesystemPolicy(pi, identity)
+      if (!policies.has(sessionId)) {
+        registerMemoryFilesystemPolicy(pi, identity, options.scopeAccess === undefined ? undefined : gatewayMemoryPolicyGrant({
+          access: options.scopeAccess, sessionId, cwd: options.cwd(), context: () => resolveContext(sessionId),
+        }))
+        policies.add(sessionId)
+      }
       await runtimeFor(identity).reconcile()
       if (branchEntryCount(eventCtx) > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)

@@ -7,11 +7,13 @@ import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import type { ComponentContext } from "../../extension/types"
+import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createGatewayHarness, type GatewayHarness } from "../thread/gateway/testing/harness"
 import type { GatewayStore } from "../thread/gateway/store"
 import { createGatewayComponent } from "./index"
 import { createGatewayRulesPromptHandler, type GatewayRulesStore } from "./prompt"
 import { GATEWAY_RULES_EXTENSION_NAME, GATEWAY_RULES_MIGRATIONS } from "./store-extension/migrations"
+import { GATEWAY_RULES_SESSION_OPS } from "./store-extension/session-ops"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => { await harness?.dispose(); harness = undefined })
@@ -39,9 +41,9 @@ const sessionCtx = (id: string) => ({ sessionManager: { getSessionId: () => id }
 const silentCtx = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } } as unknown as ComponentContext
 
 function componentHandler(component: ReturnType<typeof createGatewayComponent>) {
-  const handlers = new Map<string, (payload: unknown, eventCtx?: unknown) => unknown>()
-  component.register({ on: (name: string, handler: never) => { handlers.set(name, handler); return () => undefined } } as never, silentCtx)
-  const handler = handlers.get("before_agent_start")
+  const pi = new FakeExtensionAPI()
+  component.register(pi, silentCtx)
+  const handler = pi.handlers.find((entry) => entry.event === "before_agent_start")?.handler
   if (handler === undefined) throw new Error("the gateway component registers no before_agent_start handler")
   return handler as (payload: unknown, eventCtx?: unknown) => Promise<{ readonly systemPrompt: string } | undefined>
 }
@@ -88,7 +90,7 @@ describe("gateway rules prompt handler", () => {
     // given
     const h = (harness = createGatewayHarness())
     const store = h.store()
-    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl, sessionCallable: GATEWAY_RULES_SESSION_OPS })
     const handler = createGatewayRulesPromptHandler({ ensureStore: async () => store })
 
     // when + then
@@ -99,7 +101,7 @@ describe("gateway rules prompt handler", () => {
     // given
     const h = (harness = createGatewayHarness())
     const store = h.store()
-    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl, sessionCallable: GATEWAY_RULES_SESSION_OPS })
     h.phantom("sess-1")
     await committedBlock(store, "sess-1", "v1", ["answer in bullet points"])
     const handler = createGatewayRulesPromptHandler({ ensureStore: async () => store })
@@ -117,7 +119,7 @@ describe("gateway rules prompt handler", () => {
     // given
     const h = (harness = createGatewayHarness())
     const store = h.store()
-    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl, sessionCallable: GATEWAY_RULES_SESSION_OPS })
     h.phantom("sess-1")
     await committedBlock(store, "sess-1", "v1", ["rule one"])
     const handler = createGatewayRulesPromptHandler({ ensureStore: async () => store })
@@ -134,7 +136,7 @@ describe("gateway rules prompt handler", () => {
     // given
     const h = (harness = createGatewayHarness())
     const store = h.store()
-    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl, sessionCallable: GATEWAY_RULES_SESSION_OPS })
     h.phantom("sess-1")
     await committedBlock(store, "sess-1", "v1", ["rule one"])
     const handler = createGatewayRulesPromptHandler({ ensureStore: async () => store })
@@ -160,7 +162,8 @@ describe("gateway rules prompt handler", () => {
 
   test("#given a lookup failure #when the handler runs #then it passes the prompt through and warns once", async () => {
     // given
-    const failing: GatewayRulesStore = { extensionCall: async () => ({ kind: "refused", code: "extension_operation_failed", message: "worker died" }) }
+    const refused = async () => ({ kind: "refused", code: "extension_operation_failed", message: "worker died" }) as const
+    const failing: GatewayRulesStore = { extensionCall: refused, extensionSessionAwait: refused }
     const warnings: string[] = []
     const handler = createGatewayRulesPromptHandler({ ensureStore: async () => failing, onLookupError: (message) => warnings.push(message) })
 
@@ -220,7 +223,7 @@ describe("gateway component activation", () => {
       resolveModuleUrl: () => moduleUrl,
     })
     const handler = componentHandler(component)
-    const registered = await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+    const registered = await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl, sessionCallable: GATEWAY_RULES_SESSION_OPS })
     if (registered.kind !== "ok") throw new Error(`register failed: ${JSON.stringify(registered)}`)
     await committedBlock(store, "sess-1", "v1", ["answer in bullet points"])
 

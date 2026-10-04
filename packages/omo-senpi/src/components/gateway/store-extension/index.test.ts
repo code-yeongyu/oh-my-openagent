@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createGatewayHarness, type GatewayHarness } from "../../thread/gateway/testing/harness"
 import type { GatewayStore } from "../../thread/gateway/store"
 import { GATEWAY_RULES_EXTENSION_NAME, GATEWAY_RULES_MIGRATIONS } from "./migrations"
+import { GATEWAY_RULES_SESSION_OPS } from "./session-ops"
 
 type DeliverySummary = { readonly kind: "ok"; readonly delivery_id: string; readonly deduplicated: boolean } | { readonly kind: "error" }
 type CommittedOutcome = { readonly session_durable_id: string; readonly outcome: string; readonly delivery?: DeliverySummary }
@@ -36,7 +37,7 @@ afterAll(() => { rmSync(buildDir, { recursive: true, force: true }) })
 
 async function storeWithRules(h: GatewayHarness): Promise<GatewayStore> {
   const store = h.store()
-  const registered = await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+  const registered = await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl, sessionCallable: GATEWAY_RULES_SESSION_OPS })
   expect(registered.kind).toBe("ok")
   return store
 }
@@ -80,7 +81,7 @@ describe("gateway_rules store extension", () => {
 
     // then
     expect(committed.kind).toBe("ok")
-    const block = await store.extensionCall(GATEWAY_RULES_EXTENSION_NAME, "blockForSession", { session_durable_id: "sess-1" })
+    const block = await store.extensionSessionAwait(GATEWAY_RULES_EXTENSION_NAME, "blockForSession", {}, { callerDurableId: "sess-1" })
     expect(block).toEqual({
       kind: "ok",
       value: {
@@ -158,7 +159,7 @@ describe("gateway_rules store extension", () => {
 
     // then
     expect(cleared).toEqual({ kind: "ok", value: { scope: "team", version: "v2", outcomes: [{ session_durable_id: "sess-1", outcome: "removed" }] } })
-    const block = await store.extensionCall(GATEWAY_RULES_EXTENSION_NAME, "blockForSession", { session_durable_id: "sess-1" })
+    const block = await store.extensionSessionAwait(GATEWAY_RULES_EXTENSION_NAME, "blockForSession", {}, { callerDurableId: "sess-1" })
     expect(block).toEqual({ kind: "ok", value: null })
   })
 
@@ -172,7 +173,7 @@ describe("gateway_rules store extension", () => {
 
     // then
     expect(result.kind).toBe("refused")
-    const block = await store.extensionCall(GATEWAY_RULES_EXTENSION_NAME, "blockForSession", { session_durable_id: "42" })
+    const block = await store.extensionSessionAwait(GATEWAY_RULES_EXTENSION_NAME, "blockForSession", {}, { callerDurableId: "42" })
     expect(block).toEqual({ kind: "ok", value: null })
   })
 })

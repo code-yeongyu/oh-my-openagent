@@ -8,14 +8,17 @@ import type { KibitzerChildStarterSeams } from "./kibitzer"
 import type { ShutdownDrainInput, ShutdownEvaluator } from "./shutdown-drain"
 import type { refreshMemoryStatus } from "./status"
 import type { MemoryFooterTimers } from "./status-live"
+import type { GatewayScopeAccess } from "../gateway/scope-access"
 
 export interface MemorySessionStateLike {
+  readonly scopeIdentity?: string
   readonly context?: MemoryIdentityContext
   /** Set once the status footer has been attempted for this session, so it shows at most once. */
   memoryStatusAttempted?: boolean
 }
 
 export interface MemoryWiringOptions {
+  readonly scopeAccess?: GatewayScopeAccess
   readonly sessions: Map<string, MemorySessionStateLike>
   readonly loadConfig: (options: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly cwd: () => string

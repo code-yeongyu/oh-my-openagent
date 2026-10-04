@@ -34,6 +34,7 @@ import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
 import { createProjectionPins, PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
+import { gatewayMemoryContext, gatewayReadRepo } from "./gateway-scope"
 
 export function registerMemoryStatic(input: {
   readonly pi: SenpiExtensionAPI
@@ -132,7 +133,15 @@ export function registerMemoryStatic(input: {
     return result
   })
   registerMemoryWriteListener(pi, options, onMemoryWrite)
-  registerMemoryToolSurface(pi, () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)), {
+  registerMemoryToolSurface(pi, async () => {
+    const sessionId = activeSession.current
+    if (sessionId === undefined) return undefined
+    const project = resolveContext(sessionId)
+    return options.scopeAccess === undefined ? project : gatewayMemoryContext({
+      access: options.scopeAccess, sessionId, cwd: options.cwd(), project,
+      ...(options.sessions.get(sessionId)?.scopeIdentity === undefined ? {} : { boundScopeIdentity: options.sessions.get(sessionId)?.scopeIdentity }),
+    })
+  }, {
     onCommit: (commit) => {
       const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
       if (context !== undefined) noticeWiring.onCommit(context, commit)
@@ -146,7 +155,12 @@ export function registerMemoryStatic(input: {
       resolveSessionId: () => activeSession.current,
     },
   })
+  const scopeAccess = options.scopeAccess
   registerMemoryGuard(pi, ctx, {
+    ...(scopeAccess === undefined ? {} : {
+      readRepoFor: (sessionId: string) => gatewayReadRepo(scopeAccess, sessionId, options.cwd()),
+      additionalDeniedRoots: [join(scopeAccess.memoryHome(options.cwd()), "agents"), join(scopeAccess.memoryHome(options.cwd()), "gateway-scopes")],
+    }),
     getContext: (eventContext) => {
       const sessionId = sessionIdFrom(eventContext)
       return sessionId === undefined ? undefined : resolveContext(sessionId)

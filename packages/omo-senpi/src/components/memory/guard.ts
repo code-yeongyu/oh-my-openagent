@@ -6,6 +6,7 @@ import type { ToolCallEventResult } from "@code-yeongyu/senpi"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
+import { insideGatewayRepo } from "./gateway-scope"
 
 const FILE_TOOL_NAMES = ["read", "write", "edit", "ls", "find", "grep", "glob"] as const
 const ENUMERATION_TOOL_NAMES = new Set(["ls", "find", "grep", "glob"])
@@ -13,6 +14,8 @@ const PATH_ARGUMENT_NAMES = ["path", "filePath", "file_path", "target"] as const
 const BASH_ADVISORY = "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary"
 
 export interface MemoryGuardOptions {
+  readonly additionalDeniedRoots?: readonly string[]
+  readonly readRepoFor?: (sessionId: string) => Promise<string | undefined>
   readonly getContext: (eventContext: unknown) => MemoryIdentityContext | undefined
   readonly resolveCwd?: () => string
 }
@@ -43,14 +46,15 @@ export function registerMemoryGuard(
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   const warnedBashSessions = new Set<string>()
 
-  pi.on("tool_call", (payload, eventContext): ToolCallEventResult | undefined => {
+  pi.on("tool_call", async (payload, eventContext): Promise<ToolCallEventResult | undefined> => {
     const context = options.getContext(eventContext)
     if (context === undefined) return undefined
 
     const event = readToolCall(payload)
     if (event === undefined) return undefined
 
-    const roots = resolveGuardRoots(context)
+    const baseRoots = resolveGuardRoots(context)
+    const roots = { ...baseRoots, deniedRoots: [...baseRoots.deniedRoots, ...options.additionalDeniedRoots ?? []] }
     if (matchesToolName(event.toolName, "bash")) {
       adviseBashOnce(event, eventContext, roots, warnedBashSessions, componentContext)
       return undefined
@@ -60,7 +64,12 @@ export function registerMemoryGuard(
     if (operation === undefined) return undefined
 
     const recursive = ENUMERATION_TOOL_NAMES.has(operation)
+    const readRepo = options.readRepoFor === undefined ? undefined : await options.readRepoFor(readSessionId(eventContext))
     for (const rawPath of extractTargetPaths(event.input, operation === "patch")) {
+      const target = resolve(resolveCwd(), rawPath)
+      const canonical = canonicalizeFromNearestExisting(target) ?? target
+      const scopeRoot = readRepo === undefined ? undefined : canonicalizeFromNearestExisting(readRepo) ?? readRepo
+      if ((operation === "read" || recursive) && scopeRoot !== undefined && insideGatewayRepo(scopeRoot, canonical)) continue
       if (!isForbiddenTarget(rawPath, resolveCwd(), roots, recursive)) continue
       return {
         block: true,

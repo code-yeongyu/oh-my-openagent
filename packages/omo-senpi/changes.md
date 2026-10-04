@@ -37,6 +37,13 @@ Tests (`model-miss.test.ts`, the exact advisory text):
 
 **Known limit:** an advisory with neither a runtime marker nor a log-level prefix, and nothing after it, is still taken as the detail. There is no better line to report then.
 
+## 2026-10-04 - Shared scope memory for gateway sessions (#9190, todo 19)
+
+- Connector-pushed membership uses a persisted per-scope CAS counter. Competing pushes cannot overwrite the winning membership, and removals revoke learning access on the next call.
+- Leads resolve the explicit scope memory identity; workers keep their project memory and receive a bounded scope reference index plus read-only scope access. Scope repositories are namespaced by scope, independently of workspace, account, and personal identity.
+- The engine-stamped `gateway_learning` tool commits one learning file under the memory writer lock. Lead digest cursors advance only for rendered entries; prompt previews do not consume them. Connector operations are not declared session-callable.
+- Session binding and write-notice collection are split into their own modules without changing ordinary memory behavior.
+
 ## 2026-10-04 - Gateway operating-rules injection into lead and bound sessions (#9190)
 
 - New `components/gateway`: the scope lead and every session with an active binding get the scope's compiled behavioral rules as one `<operating-rules version="<rules sha>">` block in the system prompt through `before_agent_start`, rendered beside the memory block. The component lazily connects only when the `gateway.scopes` config is non-empty and the store database exists; every other session's prompt passes through byte-identical. Rules are computed by the gateway package; omo owns only the `gateway_rules` store extension (a `gateway_rules_blocks` table plus the `rulesCommitted`/`blockForSession` ops) and the exactly-once `rules_changed` fanout per session and version. `plugin/scripts/build-extension-core.mjs` emits the ops module as `extensions/gateway-rules-extension.mjs` beside `omo.js`, covered by the build freshness check.

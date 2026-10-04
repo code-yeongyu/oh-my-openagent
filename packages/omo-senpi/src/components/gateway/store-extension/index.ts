@@ -1,6 +1,9 @@
 import type { StoreExtensionTransaction } from "../../thread/gateway/store-extensions"
 import { escapeRuleText, renderOperatingRulesBlock } from "../rules-block"
 
+export { memberForSession, scopeMembersCommitted, scopeMembersVersion } from "./scope-members"
+export { digestDelivered, digestForSession, learningCommitted } from "./learnings"
+
 type RulesCommittedTarget = {
   readonly session_durable_id: string
   readonly binding_id: string | undefined
@@ -32,7 +35,7 @@ function targetOf(value: unknown): RulesCommittedTarget {
 }
 
 export function blockForSession(tx: StoreExtensionTransaction, args: unknown): { readonly version: string; readonly block: string } | null {
-  const session = requiredString(asRecord(args, "blockForSession args"), "session_durable_id")
+  const session = requiredString(asRecord(args, "blockForSession args"), "caller_session_durable_id")
   const row = tx.one(["version", "block"], "SELECT version, block FROM gateway_rules_blocks WHERE session_durable_id = ?", [session])
   return row === undefined ? null : { version: String(row.version), block: String(row.block) }
 }

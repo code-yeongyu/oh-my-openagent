@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { TRANSIENT_DIRNAME, isDurableIdentityRoot } from "./transient-identity"
+import { insideGatewayRepo } from "./gateway-scope"
 
 // Structural mirror of the Senpi filesystem policy API (senpi branch feat/extension-fs-policy:
 // pi.registerFilesystemPolicy(policy), deny-wins composition across policies, deniedRoots
@@ -40,6 +41,12 @@ export type MemoryPolicyRegistration =
   | { readonly status: "unbound" }
   | { readonly status: "unsupported" }
 
+export interface ScopeMemoryPolicyGrant {
+  readonly readRepoFor: () => Promise<string | undefined>
+  readonly denied: readonly string[]
+  readonly context: () => MemoryIdentityContext | undefined
+}
+
 /**
  * Registers the hard cross-identity filesystem policy when the host exposes the Senpi
  * filesystem policy API.
@@ -52,10 +59,11 @@ export type MemoryPolicyRegistration =
 export function registerMemoryFilesystemPolicy(
   pi: SenpiExtensionAPI,
   context: MemoryIdentityContext | undefined,
+  scopeGrant?: ScopeMemoryPolicyGrant,
 ): MemoryPolicyRegistration {
   if (context === undefined) return { status: "unbound" }
   if (!hasFilesystemPolicySupport(pi)) return { status: "unsupported" }
-  pi.registerFilesystemPolicy(buildMemoryFilesystemPolicy(context))
+  pi.registerFilesystemPolicy(buildMemoryFilesystemPolicy(context, scopeGrant))
   return { status: "registered" }
 }
 
@@ -76,11 +84,8 @@ export function registerMemoryFilesystemPolicy(
  * memoised, so a host that asks repeatedly - per spawned sandbox, say - still pays one enumeration
  * per bound session, exactly as binding used to.
  */
-function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): FilesystemPolicy {
-  const ownRoot = resolve(context.identityPaths.root)
+function buildMemoryFilesystemPolicy(context: MemoryIdentityContext, scopeGrant?: ScopeMemoryPolicyGrant): FilesystemPolicy {
   const durableAgentsRoot = dirname(resolve(context.durableRoot))
-  const ownRoots = stableRoots([ownRoot])
-  const deniedAreas = stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)])
   let resolvedDeniedRoots: readonly string[] | undefined
 
   return {
@@ -88,8 +93,18 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
       resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
       return resolvedDeniedRoots
     },
-    check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
+    async check(request: Readonly<FilesystemPolicyRequest>): Promise<FilesystemPolicyDecision> {
       const target = resolve(request.canonicalPath)
+      const current = scopeGrant?.context() ?? context
+      const ownRoot = resolve(current.identityPaths.root)
+      const ownRoots = stableRoots([ownRoot])
+      const deniedAreas = stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME), ...scopeGrant?.denied ?? []])
+      const scopeRepo = await scopeGrant?.readRepoFor()
+      if (scopeRepo !== undefined && stableRoots([scopeRepo]).some((root) => insideGatewayRepo(root, target))) {
+        return request.operation === "write"
+          ? { allow: false, reason: "scope memory is read-only for workers; use gateway_learning" }
+          : { allow: true }
+      }
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
       if (deniedAreas.some((root) => isWithin(root, target))) {
         return {

@@ -123,7 +123,7 @@ export async function dispatchEvent(
   ctx: unknown,
 ): Promise<BeforeAgentStartEventResult | undefined> {
   const results = await pi.dispatch("before_agent_start", payload, ctx)
-  return results[0] as BeforeAgentStartEventResult | undefined
+  return (results.find((entry) => (entry as BeforeAgentStartEventResult | undefined)?.systemPrompt !== undefined) ?? results[0]) as BeforeAgentStartEventResult | undefined
 }
 
 export function boundHandler(repo: CountingRepo, context: MemoryIdentityContext) {

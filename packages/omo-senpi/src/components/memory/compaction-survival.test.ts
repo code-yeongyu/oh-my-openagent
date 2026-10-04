@@ -168,7 +168,8 @@ async function beforeAgentStart(pi: MemoryFakeExtensionAPI): Promise<string> {
     { type: "before_agent_start", prompt: "continue", systemPrompt: BASE_SYSTEM_PROMPT },
     sessionEventContext(),
   )
-  const result = results[0] as BeforeAgentStartEventResult | undefined
+  // senpi chains systemPrompt through the handlers; a handler with nothing to change returns undefined.
+  const result = results.find((entry) => (entry as BeforeAgentStartEventResult | undefined)?.systemPrompt !== undefined) as BeforeAgentStartEventResult | undefined
   expect(result?.systemPrompt).toBeDefined()
   return result?.systemPrompt ?? ""
 }

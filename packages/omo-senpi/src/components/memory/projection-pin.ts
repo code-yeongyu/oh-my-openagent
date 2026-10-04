@@ -62,7 +62,7 @@ export function createProjectionPins(options: { readonly now?: () => number } = 
 
   const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[]) => {
     const compactionId = latestCompactionId(branch)
-    const cached = live.get(sessionId)
+    const cached = live.get(JSON.stringify([repo.dir, sessionId]))
     const state = cached?.record ?? readPinRecord(branch, sessionId)
     const staleByRefresh = cached === undefined
       ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
@@ -91,16 +91,16 @@ export function createProjectionPins(options: { readonly now?: () => number } = 
           compactionId,
           pinnedAtMs: now(),
         }
-        live.set(sessionId, { record: fresh, epoch: refreshEpoch })
+        live.set(JSON.stringify([repo.dir, sessionId]), { record: fresh, epoch: refreshEpoch })
         record(fresh)
         return { revision: head, repinned: reason ?? "first-turn" }
       }
 
-      live.set(sessionId, { record: state, epoch: refreshEpoch })
+      live.set(JSON.stringify([repo.dir, sessionId]), { record: state, epoch: refreshEpoch })
       if (state.noticedThrough === head) return { revision: state.revision }
       const changes = await projectedChangesBetween(repo, state.noticedThrough, head, { excludeSessionId: sessionId })
       const advanced: ProjectionPinRecord = { ...state, noticedThrough: head }
-      live.set(sessionId, { record: advanced, epoch: refreshEpoch })
+      live.set(JSON.stringify([repo.dir, sessionId]), { record: advanced, epoch: refreshEpoch })
       record(advanced)
       return isEmptyProjectedChanges(changes) ? { revision: state.revision } : { revision: state.revision, changes }
     },
