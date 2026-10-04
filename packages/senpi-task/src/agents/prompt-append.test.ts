@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { resolvePromptAppend } from "./prompt-append"
+import { promptAppendFailureMessage, resolvePromptAppend } from "./prompt-append"
 
 describe("resolvePromptAppend", () => {
   const fixtureRoot = join(tmpdir(), `senpi-prompt-append-${Date.now()}`)
@@ -16,6 +16,7 @@ describe("resolvePromptAppend", () => {
     writeFileSync(join(projectDir, "relative.md"), "relative-content", "utf8")
     writeFileSync(join(homeDir, ".omo", "prompts", "persona.md"), "home-content", "utf8")
     writeFileSync(join(fixtureRoot, "outside.md"), "outside-content", "utf8")
+    mkdirSync(join(projectDir, "directory.md"), { recursive: true })
   })
 
   afterAll(() => {
@@ -30,7 +31,7 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe(value)
+    expect(resolved).toEqual({ ok: true, value })
   })
 
   test("#given an absolute file URI #when resolving #then the file content is returned", () => {
@@ -41,7 +42,7 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe("relative-content")
+    expect(resolved).toEqual({ ok: true, value: "relative-content" })
   })
 
   test("#given a project-relative file URI #when resolving #then the path resolves against the project directory", () => {
@@ -52,10 +53,10 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe("relative-content")
+    expect(resolved).toEqual({ ok: true, value: "relative-content" })
   })
 
-  test("#given a tilde file URI under the omo home #when resolving #then it expands against the provided home directory", () => {
+  test("#given a home-relative file URI #when resolving #then the path resolves against the home directory", () => {
     // given
     const value = "file://~/.omo/prompts/persona.md"
 
@@ -63,10 +64,10 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe("home-content")
+    expect(resolved).toEqual({ ok: true, value: "home-content" })
   })
 
-  test("#given a file URI outside the project and allowed home roots #when resolving #then the rejection warning is returned", () => {
+  test("#given a file URI outside the project and allowed home roots #when resolving #then the failure names a rejected path", () => {
     // given
     const value = `file://${join(fixtureRoot, "outside.md")}`
 
@@ -74,12 +75,14 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe(
-      `[WARNING: Path rejected: ${value} (resolved outside the project directory and allowed home directories; file:// prompts must reside within the project directory, ~/.omo/, or ~/.senpi/)]`,
-    )
+    expect(resolved).toEqual({
+      ok: false,
+      reason: "path_rejected",
+      targetPath: join(fixtureRoot, "outside.md"),
+    })
   })
 
-  test("#given a missing file #when resolving #then the could-not-resolve warning is returned", () => {
+  test("#given a missing file #when resolving #then the failure names the missing file", () => {
     // given
     const value = "file://./missing.md"
 
@@ -87,10 +90,29 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe(`[WARNING: Could not resolve file URI: ${value}]`)
+    expect(resolved).toEqual({
+      ok: false,
+      reason: "missing_file",
+      targetPath: join(projectDir, "missing.md"),
+    })
   })
 
-  test("#given invalid percent-encoding #when resolving #then the malformed-URI warning is returned", () => {
+  test("#given a path that cannot be read as a file #when resolving #then the failure names an unreadable file", () => {
+    // given
+    const value = "file://./directory.md"
+
+    // when
+    const resolved = resolvePromptAppend(value, { projectDir, homeDir })
+
+    // then
+    expect(resolved).toEqual({
+      ok: false,
+      reason: "unreadable_file",
+      targetPath: join(projectDir, "directory.md"),
+    })
+  })
+
+  test("#given invalid percent-encoding #when resolving #then the failure names a malformed URI", () => {
     // given
     const value = "file://bad%ZZ"
 
@@ -98,6 +120,17 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(value, { projectDir, homeDir })
 
     // then
-    expect(resolved).toBe(`[WARNING: Malformed file URI (invalid percent-encoding): ${value}]`)
+    expect(resolved).toEqual({ ok: false, reason: "malformed_uri" })
+  })
+
+  test("#given a failure #when the diagnostic message is composed #then it names the agent, the value and the reason", () => {
+    // given / when
+    const message = promptAppendFailureMessage("explore", "file://./missing.md", "missing_file", "/tmp/project/missing.md")
+
+    // then
+    expect(message).toContain("agents.explore.prompt_append")
+    expect(message).toContain("file://./missing.md")
+    expect(message).toContain("file does not exist")
+    expect(message).toContain("/tmp/project/missing.md")
   })
 })

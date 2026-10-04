@@ -35,7 +35,7 @@ export type AgentDefinition = {
 
 export type AgentDefinitionInput = AgentDefinition
 
-export type AgentLoaderDiagnosticKind = "frontmatter" | "read" | "validation" | "config_parse"
+export type AgentLoaderDiagnosticKind = "frontmatter" | "read" | "validation" | "config_parse" | "prompt_append"
 
 export type AgentLoaderDiagnostic = {
   readonly kind: AgentLoaderDiagnosticKind

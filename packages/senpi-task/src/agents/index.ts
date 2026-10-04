@@ -23,7 +23,7 @@ export type { AgentInvocationCondition, InvocationGuardVerdict, PlanArtifactRefe
 export { agentToolPolicy, type AgentToolPolicy } from "./agent-tool-policy"
 export { loadAgents } from "./loader"
 export { mapOmoConfigAgents } from "./omo-config-agents"
-export { resolvePromptAppend } from "./prompt-append"
+export { findPromptAppendConfigPath, promptAppendFailureMessage, resolvePromptAppend } from "./prompt-append"
 export { resolveAgent } from "./resolve-agent"
 export { defineAgent } from "./schema"
 export { registerAgent } from "./registry"

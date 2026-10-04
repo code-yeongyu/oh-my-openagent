@@ -8,7 +8,7 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 
 import { mapOmoConfigAgents } from "./omo-config-agents"
-import { resolvePromptAppend } from "./prompt-append"
+import { findPromptAppendConfigPath, promptAppendFailureMessage, resolvePromptAppend } from "./prompt-append"
 import type { AgentDefinition, AgentLoaderDiagnostic, LoadAgentsOptions } from "./types"
 
 type OmoAgentOverlayResult = {
@@ -30,17 +30,28 @@ export function loadOmoAgentOverlays(options: Required<LoadAgentsOptions>): OmoA
   const loaded = loadOmoConfig({ cwd: options.projectDir, env, harness: "senpi" })
   const resolvedModels = resolveModelReferences(loaded.config)
   const diagnostics = [...loaded.diagnostics, ...resolvedModels.diagnostics].map(toAgentLoaderDiagnostic)
-  const agents = Object.values(mapOmoConfigAgents(resolvedModels.view)).map((definition) =>
-    definition.promptAppend === undefined
-      ? definition
-      : {
-          ...definition,
-          promptAppend: resolvePromptAppend(definition.promptAppend, {
-            projectDir: options.projectDir,
-            homeDir: options.homeDir,
-          }),
-        },
-  )
+  const roots = { projectDir: options.projectDir, homeDir: options.homeDir }
+  const fallbackPath = join(options.homeDir, ".omo", "omo.jsonc")
+  const agents: AgentDefinition[] = []
+  for (const definition of Object.values(mapOmoConfigAgents(resolvedModels.view))) {
+    const value = definition.promptAppend
+    if (value === undefined) {
+      agents.push(definition)
+      continue
+    }
+    const resolution = resolvePromptAppend(value, roots)
+    if (resolution.ok) {
+      agents.push({ ...definition, promptAppend: resolution.value })
+      continue
+    }
+    diagnostics.push({
+      kind: "prompt_append",
+      path: findPromptAppendConfigPath(loaded.layers, definition.name, value, fallbackPath),
+      message: promptAppendFailureMessage(definition.name, value, resolution.reason, resolution.targetPath),
+    })
+    const { promptAppend: _unresolved, ...base } = definition
+    agents.push(base)
+  }
   return { agents, diagnostics }
 }
 

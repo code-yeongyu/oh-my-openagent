@@ -1,3 +1,9 @@
+## 2026-10-04 - `agents.<name>.prompt_append` now applies on the Native edition (#9560)
+
+`omo.json` `agents.<name>.prompt_append` was accepted by the strict schema but dropped on the way to a child spawn: the omo-senpi bridge mapped `prompt`, `model`, `tools` and the other fields onto the agent definition but never `prompt_append`, so the agent's instructions always stayed the base persona. It now follows the OpenCode edition's `mergeAgentConfig`: the value is composed onto the agent's prompt (only when a prompt exists, joined with a newline), and a `file://` value is expanded at config load - `~` expansion, paths relative to the project directory, allowed roots being the project directory, `~/.omo`, and `~/.senpi`.
+
+Anyone carrying an existing `agents.<name>.prompt_append` in `omo.json` will start seeing that text in the agent's instructions after upgrading, which is the intended parity behaviour. An unresolvable `file://` value (malformed URI, rejected path, missing file, unreadable file) is reported as a config diagnostic naming the agent, the value, and the reason, and the append is dropped so the agent spawns with its unmodified base persona; one broken agent never stops the others from loading.
+
 ## 2026-10-04 - Package-local test runs get the hermetic home (#9578)
 
 `test-support/warm-lazy-runtime.ts`, the package's own `bun test` preload, now installs the repo's hermetic home and agent dir before warming the lazy barrels, so `bun test` from inside `packages/senpi-task` can no longer start a task host in the real agent dir.

@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
-import { BUILTIN_AGENTS, buildTaskToolDescription } from "@oh-my-opencode/senpi-task"
+import { BUILTIN_AGENTS, buildTaskToolDescription, resolveAgent } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine, type TaskEngine } from "./engine"
@@ -58,6 +58,11 @@ function advertisedPlanGatedAgentNames(engine: TaskEngine): string {
   return (end < 0 ? rest : rest.slice(0, end)).trim()
 }
 
+function resolvedInstructions(result: ReturnType<typeof resolveAgent>): string | undefined {
+  if (result.kind !== "resolved") throw new Error(`expected a resolved agent, got ${result.kind}`)
+  return result.instructions
+}
+
 describe("task engine builtin agent overlay", () => {
   test("#given no omo.json agents #when the engine resolves agents #then the builtin curated agents are present", () => {
     // given / when
@@ -91,6 +96,31 @@ describe("task engine builtin agent overlay", () => {
     expect(explore?.prompt).toBe(BUILTIN_AGENTS["explore"]?.prompt)
     expect(explore?.tools?.length).toBe(BUILTIN_AGENTS["explore"]?.tools?.length)
     expect(explore?.tools).toContainEqual({ pattern: "x_search", allow: false })
+  })
+
+  test("#given an omo.json prompt_append for a builtin agent #when resolved #then the append lands after the builtin prompt", () => {
+    // given
+    const cwd = tempProject()
+    writeOmoJson(cwd, { agents: { explore: { prompt_append: "Prefer the smallest correct change." } } })
+
+    // when
+    const result = resolveAgent("explore", composeIn(cwd).agents, undefined, { modelOverride: "acme/any-1" })
+
+    // then
+    expect(resolvedInstructions(result)).toBe(
+      `${BUILTIN_AGENTS["explore"]?.prompt}\nPrefer the smallest correct change.`,
+    )
+  })
+
+  test("#given no prompt_append for a builtin agent #when resolved #then the persona is the builtin prompt byte for byte", () => {
+    // given
+    const cwd = tempProject()
+
+    // when
+    const result = resolveAgent("explore", composeIn(cwd).agents, undefined, { modelOverride: "acme/any-1" })
+
+    // then
+    expect(resolvedInstructions(result)).toBe(BUILTIN_AGENTS["explore"]?.prompt)
   })
 
   test("#given an omo.json-only agent #when the engine resolves agents #then it is appended alongside the builtins", () => {

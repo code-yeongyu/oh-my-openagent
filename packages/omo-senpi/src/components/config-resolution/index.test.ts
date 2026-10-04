@@ -117,4 +117,39 @@ describe("loadSenpiOmoConfig", () => {
     expect(result.diagnostics).toEqual([])
     expect(result.config.agents?.explore?.prompt_append).toBe("Prefer the smallest correct change.")
   })
+
+  test("#given an agent prompt_append file URI that cannot be resolved #when the Senpi config resolves #then a diagnostic is reported and the append is dropped", () => {
+    // given
+    const { home, project } = fixture()
+    writeConfig(home, { agents: { explore: { model: "kimi-coding/x", prompt_append: "file://~/.omo/missing.md" } } })
+
+    // when
+    const result = loadSenpiOmoConfig({ cwd: project, env: { HOME: home }, platform: "linux" })
+
+    // then
+    const diagnostic = result.diagnostics.find((entry) => entry.kind === "prompt_append")
+    expect(diagnostic?.message).toContain("agents.explore.prompt_append")
+    expect(diagnostic?.message).toContain("file does not exist")
+    expect(diagnostic?.path).toBe(join(home, ".omo", "omo.jsonc"))
+    expect(result.config.agents?.explore?.prompt_append).toBeUndefined()
+    expect(result.config.agents?.explore?.model).toBe("kimi-coding/x")
+  })
+
+  test("#given a prompt_append path that cannot be read as a file #when the Senpi config resolves #then the append is dropped without throwing", () => {
+    // given
+    const { home, project } = fixture()
+    mkdirSync(join(home, ".omo", "append-dir.md"), { recursive: true })
+    writeConfig(home, { agents: { explore: { prompt_append: "file://~/.omo/append-dir.md" } } })
+
+    // when
+    const result = loadSenpiOmoConfig({ cwd: project, env: { HOME: home }, platform: "linux" })
+
+    // then
+    expect(
+      result.diagnostics.some(
+        (entry) => entry.kind === "prompt_append" && entry.message.includes("file could not be read"),
+      ),
+    ).toBe(true)
+    expect(result.config.agents?.explore?.prompt_append).toBeUndefined()
+  })
 })
