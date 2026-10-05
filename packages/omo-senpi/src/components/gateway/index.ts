@@ -1,6 +1,7 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { createGatewayConnection, type GatewayConnectionOptions } from "./connection"
 import { registerGatewayLearning } from "./learning-tool"
+import { registerGatewayLeadToolGuard } from "./lead-tool-guard"
 import { createGatewayRulesPromptHandler } from "./prompt"
 import { createGatewayScopeAccess, type GatewayScopeAccess } from "./scope-access"
 import { createScopeMemoryPromptHandler } from "./scope-prompt"
@@ -30,6 +31,7 @@ export function createGatewayComponent(options: GatewayComponentOptions = {}): O
         return await scope(scopePayload, eventCtx) ?? ruleResult
       }, { previewSafe: true })
       registerGatewayLearning(pi, access)
+      registerGatewayLeadToolGuard(pi, access, ctx.logger)
     },
   }
 }

@@ -32,6 +32,10 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "dag-library"),
     },
     {
+      name: "gateway-lead",
+      source: join(nativeSkillsRoot, "gateway-lead"),
+    },
+    {
       name: "give-me-tips",
       source: join(nativeSkillsRoot, "give-me-tips"),
     },
