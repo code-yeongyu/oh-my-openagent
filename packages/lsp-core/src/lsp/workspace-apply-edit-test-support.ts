@@ -71,10 +71,9 @@ export function createWorkspaceEditTestHarness() {
 }
 
 function createFixture(scenario: Record<string, unknown>, tempDirectories: string[]) {
-	// Realpath the temp root: the client opens documents under their canonical URI but sends pull
-	// requests under the path it was given, and the fake server echoes the request URI into
-	// `diagnosticRequest` publishes. On macOS tmpdir() is a /var -> /private/var symlink, so a
-	// non-canonical root made those publishes target a document the client never opened (#9476).
+	// The fixture server echoes URIs built from the canonical temp path, so the client root must be
+	// canonical too. On macOS tmpdir() is a /var -> /private/var symlink; without realpath the
+	// publishes target a document the client never opened (#9476).
 	const workspace = mkdtempSync(join(realpathSync(tmpdir()), "lsp-apply-edit-"));
 	tempDirectories.push(workspace);
 	const source = join(workspace, "source.ts");
