@@ -103,7 +103,8 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // Reduced for #9515: lazy /doctor and /memfs keep maintenance code in sidecars.
 // Bun 1.4.2: tracked dev 1,451,838 -> 1,443,567 bytes (8,271 removed);
 // 1,487,000 leaves approximately 3% headroom. Other memory/thread/LSP slices remain follow-up.
-const BUDGET_BYTES = 1_487_000
+// Memory compile/cache deferred for #9515: 1,448,321 -> 1,445,605 bytes (2,716 removed); ~2.7% headroom without increasing the existing ceiling.
+const BUDGET_BYTES = 1_484_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

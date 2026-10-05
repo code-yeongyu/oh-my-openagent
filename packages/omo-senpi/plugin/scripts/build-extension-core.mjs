@@ -76,8 +76,10 @@ const computerUseEntryPath = join(packageRoot, "src", "components", "computer-us
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
 const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "commands", "doctor-runtime.ts")
 const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
+const memoryCompileEntryPath = join(packageRoot, "src", "components", "memory", "memory-compile-runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
 const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
+const memoryCompileOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-compile.js")
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
 // same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
 export const COMPUTER_PRELUDE_ASSET_NAME = "assets.generated.json"
@@ -90,6 +92,7 @@ const externalSpecifiers = [
   "#omo-computer-use-runtime",
   "#omo-memory-doctor-runtime",
   "#omo-memory-memfs-runtime",
+  "#omo-memory-compile-runtime",
   "#omo-agent-toolkit-sdk",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
@@ -122,6 +125,7 @@ export const extensionBuildPaths = {
   computerUseOutputPath,
   memoryDoctorOutputPath,
   memoryMemfsOutputPath,
+  memoryCompileOutputPath,
   gatewayStoreWorkerOutputPath,
   gatewayRulesExtensionOutputPath,
 }
@@ -142,6 +146,7 @@ export function resolveOutputs(options) {
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     memoryDoctorOutput: sibling(options.memoryDoctorOutputPath, memoryDoctorOutputPath, "omo-memory-doctor.js"),
     memoryMemfsOutput: sibling(options.memoryMemfsOutputPath, memoryMemfsOutputPath, "omo-memory-memfs.js"),
+    memoryCompileOutput: sibling(options.memoryCompileOutputPath, memoryCompileOutputPath, "omo-memory-compile.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
     gatewayRulesExtensionOutput: sibling(options.gatewayRulesExtensionOutputPath, gatewayRulesExtensionOutputPath, GATEWAY_RULES_EXTENSION_NAME),
@@ -169,6 +174,7 @@ export async function buildExtension(options = {}) {
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
+    memoryCompileOutput,
     gatewayStoreWorkerOutput,
     gatewayRulesExtensionOutput,
   } = resolveOutputs(options)
@@ -181,6 +187,7 @@ export async function buildExtension(options = {}) {
   const rollbackRuntimeInputs = await buildEntry(rollbackRuntimeEntryPath, rollbackRuntimeOutput, buildDefines, sdkExternalSpecifiers)
   const memoryDoctorInputs = await buildEntry(memoryDoctorEntryPath, memoryDoctorOutput, buildDefines)
   const memoryMemfsInputs = await buildEntry(memoryMemfsEntryPath, memoryMemfsOutput, buildDefines)
+  const memoryCompileInputs = await buildEntry(memoryCompileEntryPath, memoryCompileOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
   const gatewayRulesExtensionInputs = await buildEntry(gatewayRulesExtensionEntryPath, gatewayRulesExtensionOutput, buildDefines)
@@ -202,6 +209,7 @@ export async function buildExtension(options = {}) {
     computerUseInputs,
     memoryDoctorInputs,
     memoryMemfsInputs,
+    memoryCompileInputs,
     gatewayStoreWorkerInputs,
     gatewayRulesExtensionInputs,
     threadSdkInputs,

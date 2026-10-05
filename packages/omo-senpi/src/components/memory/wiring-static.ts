@@ -1,9 +1,10 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { consumeSoulNoticeDelta, type MemoryBlockCache, type ReservedRun } from "@oh-my-opencode/memory-core"
+import { consumeSoulNoticeDelta, type ReservedRun } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
+import type { MemoryCompileCache } from "./lazy-compile-cache"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
@@ -39,7 +40,7 @@ export function registerMemoryStatic(input: {
   readonly pi: SenpiExtensionAPI
   readonly ctx: ComponentContext
   readonly options: MemoryWiringOptions
-  readonly promptCache: MemoryBlockCache
+  readonly promptCache: MemoryCompileCache
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
   readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
   readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>

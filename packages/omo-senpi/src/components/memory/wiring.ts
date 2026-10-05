@@ -1,4 +1,6 @@
-import { MemoryBlockCache, RecallCorpusCache } from "@oh-my-opencode/memory-core"
+import { RecallCorpusCache } from "@oh-my-opencode/memory-core"
+
+import { createLazyMemoryCompileCache } from "./lazy-compile-cache"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
@@ -25,7 +27,7 @@ import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
-  const promptCache = new MemoryBlockCache()
+  const promptCache = createLazyMemoryCompileCache()
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
   const skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> } = { current: new Map() }

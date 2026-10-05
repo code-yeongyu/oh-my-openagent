@@ -1,10 +1,11 @@
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
 import {
   GitMemoryRepo,
-  MemoryBlockCache,
   markMemoryBlock,
   replaceMemoryBlock,
 } from "@oh-my-opencode/memory-core"
+
+import { createLazyMemoryCompileCache, type MemoryCompileCache } from "./lazy-compile-cache"
 
 import type { MemoryIdentityContext } from "./context"
 import {
@@ -33,7 +34,7 @@ export interface MemoryPromptSession {
 export interface MemoryPromptInjectionOptions {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
   readonly createRepo?: (context: MemoryIdentityContext) => GitMemoryRepo
-  readonly cache?: MemoryBlockCache
+  readonly cache?: MemoryCompileCache
   readonly pins?: ProjectionPins
   /** Persists a pin as a session entry so a resumed or restarted session reproduces the same bytes. */
   readonly recordPin?: (record: ProjectionPinRecord) => void
@@ -59,7 +60,7 @@ export interface MemoryPromptInjectionOptions {
 export function createMemoryPromptHandler(
   options: MemoryPromptInjectionOptions,
 ): (payload: unknown, eventCtx?: unknown) => Promise<BeforeAgentStartEventResult | undefined> {
-  const cache = options.cache ?? new MemoryBlockCache()
+  const cache = options.cache ?? createLazyMemoryCompileCache()
   const pins = options.pins ?? createProjectionPins()
   const recordPin = options.recordPin ?? (() => undefined)
   const createRepo = options.createRepo ?? defaultCreateRepo

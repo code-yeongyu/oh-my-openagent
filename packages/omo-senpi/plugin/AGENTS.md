@@ -42,3 +42,5 @@ bun run test:senpi                                   # repo gate: build + stage 
 ```
 
 The `/memfs` registrar remains synchronous; its handlers are loaded on first invocation from `src/components/memory/commands/memfs-runtime.ts` via `#omo-memory-memfs-runtime`, mapped to `extensions/omo-memory-memfs.js` in the published plugin. Build freshness, required artifacts and bundle audits include this sidecar.
+
+`extensions/omo-memory-compile.js` lazily supplies the prompt compiler/cache; the plugin import map resolves `#omo-memory-compile-runtime` there, while the source map resolves the TypeScript runtime.
