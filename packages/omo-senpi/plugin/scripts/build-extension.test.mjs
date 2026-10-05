@@ -249,6 +249,13 @@ describe("checkExtensionCurrent", () => {
     }
   })
 
+  test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
+    const { mainInputs, threadClientInputs } = await sharedOutputs()
+    const suffix = "/components/thread/live-surface.ts"
+    expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+    expect(threadClientInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+  })
+
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
@@ -257,6 +264,7 @@ describe("checkExtensionCurrent", () => {
 
     expect(main).toContain('import("#omo-task-runtime")')
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
+    expect(main).toContain('import("#omo-thread-client-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
     expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
@@ -265,6 +273,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
       "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
+      "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })
   })

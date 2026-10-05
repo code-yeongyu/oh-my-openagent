@@ -236,3 +236,5 @@ A `DEFECT <scenario>/<check> PD-n` line is a documented behavior the product doe
 - Don't touch the gateway store from a lifecycle edge every session runs (`agent_end`, `agent_settled`) unless this runtime has work there, and never hold such an edge on a store call: the store's write lock is shared with other processes.
 - Don't auto-cancel a relayed question the way the headless task client does; it stays pending until `thread_answer` resolves it through its own binding.
 - Don't send into sessions from the mirror, and don't write desktop data back into the host.
+
+The live thread RPC client is loaded on the first asynchronous thread/gateway operation via `#omo-thread-client-runtime` (`src/components/thread/live-surface.ts` in source, `extensions/omo-thread-client.js` in the plugin). The component still registers tools, the store and lifecycle handlers synchronously; the registrar captures the operator socket before loading. One runtime promise/client is shared per facade, including concurrent operations and load failures. Build freshness, required installation artifacts and bundle purity include this sidecar.

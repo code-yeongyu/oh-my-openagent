@@ -9,7 +9,8 @@ import { gatewayDatabasePath } from "./gateway/paths"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
-import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
+import { createLazyLiveThreadSurface } from "./lazy-live-surface"
+import { defaultThreadStateDirectory } from "./live-surface-paths"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -183,7 +184,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
   return {
     name: "thread",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      const host = options.host ?? createLiveThreadSurface(pi)
+      const host = options.host ?? createLazyLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
       const agentDir = options.agentDir ?? (() => resolveAgentHome({ env: process.env }))
       const runtimeInstance = hostInstanceOf(pi)

@@ -45,3 +45,5 @@ bun test plugin/scripts/                          # colocated suite
 ```
 
 The `/memfs` registrar remains synchronous; its handlers are loaded on first invocation from `src/components/memory/commands/memfs-runtime.ts` via `#omo-memory-memfs-runtime`, mapped to `extensions/omo-memory-memfs.js` in the published plugin. Build freshness, required artifacts and bundle audits include this sidecar.
+
+The live thread RPC client is loaded on the first asynchronous thread/gateway operation via `#omo-thread-client-runtime` (`src/components/thread/live-surface.ts` in source, `extensions/omo-thread-client.js` in the plugin). The component still registers tools, the store and lifecycle handlers synchronously; the registrar captures the operator socket before loading. One runtime promise/client is shared per facade, including concurrent operations and load failures. Build freshness, required installation artifacts and bundle purity include this sidecar.
