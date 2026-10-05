@@ -2,8 +2,14 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
+import { canonicalAgentDir } from "./agent-dir.js"
+import { resolvePluginRoot } from "./plugin-root.js"
 
 export const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
+
+export function nativePluginRoot(env = process.env) {
+  return resolvePluginRoot(join(packageRoot, "plugin"), join(canonicalAgentDir(env), "native-plugin"))
+}
 
 export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"))
