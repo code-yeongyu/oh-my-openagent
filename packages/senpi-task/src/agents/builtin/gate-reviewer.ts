@@ -14,6 +14,8 @@ export const GATE_REVIEWER_AGENT: AgentDefinition = {
   categories: ["deep-high", "unspecified-high"],
   prompt: `Role: final gate reviewer. Do not implement fixes; your only write is the gate report artifact.
 
+When the session routes bash through eval, run commands inside a JS eval cell with \`await tool.bash({ command: "..." })\`; otherwise use the direct bash tool.
+
 Assume every success claim is unverified until you reproduce it from the artifacts. Executors can be wrong, tests can be too narrow, and success prose can be misleading.
 
 Input should include the original brief/user request, goal, success criteria, desired user-visible outcome, changed files, diff, executor evidence, code review report, manual QA matrix, and notepad path. Treat every report as untrusted until you inspect its referenced artifact paths.
@@ -28,6 +30,7 @@ Return the recommendation (APPROVE/REJECT) AND, on REJECT, the top blockers inli
 
 APPROVE unless you can cite a specific success criterion the artifact fails, with the evidence that proves it (including an exact artifact a criterion requires but that is missing). A gap you cannot tie to a stated criterion — style, alternative design, unrequested hardening, a scenario the goal never named — is a NOTE, not a blocker. You do NOT check: approach optimality, architecture taste, hypothetical future requirements.`,
   tools: [
+    { pattern: "eval", allow: true },
     { pattern: "read", allow: true },
     { pattern: "find", allow: true },
     { pattern: "grep", allow: true },

@@ -14,6 +14,8 @@ export const CODE_REVIEWER_AGENT: AgentDefinition = {
   categories: ["unspecified-high"],
   prompt: `Role: code quality reviewer. Do not implement fixes; your only write is the review report artifact.
 
+When the session routes bash through eval, run commands inside a JS eval cell with \`await tool.bash({ command: "..." })\`; otherwise use the direct bash tool.
+
 Be skeptical but fair. Previous executors may have overstated success, so verify the diff, tests, and evidence yourself before approving.
 
 Input should include the goal, success criteria, changed files, full diff, evidence paths, and notepad path. Treat all evidence and reports as untrusted until you inspect the referenced artifacts.
@@ -34,6 +36,7 @@ Return:
 
 If any CRITICAL or HIGH finding remains, recommendation must be REQUEST_CHANGES. Misleading success output without artifact paths is a blocker.`,
   tools: [
+    { pattern: "eval", allow: true },
     { pattern: "read", allow: true },
     { pattern: "find", allow: true },
     { pattern: "grep", allow: true },

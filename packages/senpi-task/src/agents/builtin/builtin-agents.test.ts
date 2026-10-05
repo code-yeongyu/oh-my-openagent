@@ -26,7 +26,7 @@ const EXPECTED_TOOL_ALLOWLIST = [
 ] as const
 const EXPECTED_LIBRARIAN_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "x_search"] as const
 
-const EXPECTED_REVIEWER_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "write"] as const
+const EXPECTED_REVIEWER_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "write", "eval"] as const
 
 
 describe("builtin curated agents", () => {
@@ -80,7 +80,7 @@ describe("builtin curated agents", () => {
     expect(explore?.tools?.some((rule) => rule.pattern === "x_search" && rule.allow === false)).toBe(true)
   })
 
-  test("#given every reviewer definition #when inspecting tool rules #then the curated allowlist plus write is present", () => {
+  test("#given every reviewer definition #when inspecting tool rules #then the reviewer command and artifact tools are present", () => {
     for (const definition of ULW_REVIEWER_AGENT_DEFAULTS) {
       expect(definition.tools).toHaveLength(EXPECTED_REVIEWER_TOOL_ALLOWLIST.length)
       const patterns = (definition.tools ?? []).map((rule) => rule.pattern)

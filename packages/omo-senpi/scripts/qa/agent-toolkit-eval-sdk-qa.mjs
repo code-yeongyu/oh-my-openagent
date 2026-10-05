@@ -145,6 +145,51 @@ async function runSession(sandbox) {
       assert.equal(process.env.PI_GOAL_STORE_FILE, undefined)
       console.log(`HOST_PI_GOAL_STORE_FILE=undefined KERNEL_PI_GOAL_STORE_FILE=${goalStoreFile}`)
     })
+    await check(8, "builtin reviewer children execute their artifact instructions", async () => {
+      const { ULW_REVIEWER_AGENT_DEFAULTS } = await import("../../../senpi-task/src/agents/builtin/index.ts")
+      const { agentToolPolicy } = await import("../../../senpi-task/src/agents/agent-tool-policy.ts")
+      const { buildChildSessionOptions } = await import("../../../senpi-task/src/runners/in-process/child-options.ts")
+      const { loadSenpiBarrel } = await import("../../../senpi-task/src/lazy/senpi-barrel.ts")
+      await loadSenpiBarrel()
+      ok(await envelope('print(JSON.stringify(await agentToolkit.completeGoals()))'))
+      const parentStatus = ok(await envelope('print(JSON.stringify(await agentToolkit.status()))'))
+      for (const definition of ULW_REVIEWER_AGENT_DEFAULTS) {
+        const options = buildChildSessionOptions({
+          spec: { taskId: `qa-${definition.name}`, cwd, agentDir, sessionDir: cwd,
+            depth: 1, parentSessionId: session.sessionManager.getSessionId(),
+            rootSessionId: session.sessionManager.getSessionId(), prompt: "Verify report artifact access",
+            agentType: definition.name, systemPrompt: definition.prompt, ...agentToolPolicy(definition) },
+          sessionManager: SessionManager.inMemory(cwd),
+          sharedParentTools: session.extensionRunner.getAllRegisteredTools().map(tool => tool.definition),
+        })
+        const { session: child } = await createAgentSession(options)
+        try {
+          await child.bindExtensions({})
+          const tools = child.getAllTools().map(tool => tool.name)
+          console.log(`REVIEWER_CHILD ${JSON.stringify({ name: definition.name, sessionId: child.sessionManager.getSessionId(), tools })}`)
+          const lookup = definition.prompt.match(/``(const \{ agentToolkit \}[^]*?print\(s.result\?\.currentAttemptDir\))``/)?.[1]
+          assert.ok(lookup, "prompt must provide the actual directory lookup")
+          assert.ok(tools.includes("eval"), `${definition.name}: prompt requires unavailable eval`)
+          const result = await child.executeTool("eval", { language: "js", code: lookup, summary: "Locate reviewer attempt directory" })
+          assert.notEqual(result.isError, true, JSON.stringify(result))
+          const text = result.content.filter(part => part.type === "text").map(part => part.text).join("\n")
+          assert.ok(typeof parentStatus.currentAttemptDir === "string")
+          assert.ok(text.includes(parentStatus.currentAttemptDir), text)
+          const reportPath = join(parentStatus.currentAttemptDir, `${definition.name}-qa.md`)
+          const report = await child.executeTool("eval", { language: "js",
+            code: `const command = await tool.bash({command:"printf reviewer-command-ok"}); print(command); print(await tool.write({path:${JSON.stringify(reportPath)},content:"Reviewer QA report artifact\\n"}))`,
+            summary: "Execute reviewer command and write report through eval" })
+          assert.notEqual(report.isError, true, JSON.stringify(report))
+          assert.notEqual(report.details?.isError, true, JSON.stringify(report))
+          assert.ok(report.content.some(part => part.type === "text" && part.text.includes("reviewer-command-ok")), JSON.stringify(report))
+          assert.ok(readFileSync(join(cwd, reportPath), "utf8").includes("Reviewer QA report artifact"))
+          console.log(`REVIEWER_ARTIFACT ${JSON.stringify({ name: definition.name, reportPath, lookupExecutable: true })}`)
+        } finally {
+          await child.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
+          child.dispose()
+        }
+      }
+    })
   } finally {
     if (session) {
       await session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
@@ -154,8 +199,8 @@ async function runSession(sandbox) {
   }
   const passed = results.filter(result => result.status === "PASS").length
   const skipped = results.filter(result => result.status === "SKIP").length
-  console.log(`${passed}/7 checks${skipped ? ` + ${skipped} explicit SKIP` : ""}`)
-  return results.length === 7 && passed + skipped === 7 ? 0 : 1
+  console.log(`${passed}/8 checks${skipped ? ` + ${skipped} explicit SKIP` : ""}`)
+  return results.length === 8 && passed + skipped === 8 ? 0 : 1
 }
 
 async function supervise() {

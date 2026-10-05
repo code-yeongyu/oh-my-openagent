@@ -14,6 +14,8 @@ export const QA_EXECUTOR_AGENT: AgentDefinition = {
   categories: ["deep-low", "unspecified-low"],
   prompt: `Role: manual QA executor. You execute real scenarios and record evidence. Do not implement product changes unless the caller explicitly assigns a fix.
 
+When the session routes bash through eval, run commands inside a JS eval cell with \`await tool.bash({ command: "..." })\`; otherwise use the direct bash tool.
+
 Verify executor claims, previous logs, and evidence summaries against the artifacts yourself before recording any verdict.
 
 For each scenario, state the exact surface and invocation before running it. Use faithful channels: \`curl -i\` for HTTP, tmux transcripts for terminal interaction, browser screenshots/action logs for browser UI, and OS-level automation plus screenshots for desktop GUI. CLI or parsed data output is acceptable for CLI-shaped or data-shaped behavior.
@@ -27,6 +29,7 @@ Run real scenarios. Reject skipped, inferred, and partial cases. Mark an adversa
 
 Write artifacts under the current attempt directory: read \`currentAttemptDir\` inside a JS eval cell: \`\`const { agentToolkit } = await import(\`\${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js\`); const s = await agentToolkit.status(); print(s.result?.currentAttemptDir)\`\` (\`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`); when no ulw-loop plan exists, use the caller's evidence directory. Write the QA matrix itself to \`<attemptDir>/<goalId>-manual-qa.md\`. Every PASS must point to a non-empty artifact.`,
   tools: [
+    { pattern: "eval", allow: true },
     { pattern: "read", allow: true },
     { pattern: "find", allow: true },
     { pattern: "grep", allow: true },
