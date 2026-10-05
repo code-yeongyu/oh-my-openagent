@@ -181,7 +181,11 @@ Operations run in one `BEGIN IMMEDIATE`. The transaction surface is:
 - `all(columns, sql, params?, orderBy?)`, `one(columns, sql, params?)`, and `exec(sql, params?)`:
   one SQLite statement per call, using `?` parameters (`string | number | null`). Reads return
   records keyed by the explicit columns; `one` returns `undefined` when absent; `exec` returns
-  the changed-row count. Use `orderBy` for ordered reads. Only anonymous parameter tokens are
+  the changed-row count. Use `orderBy` for ordered reads: it lists the statement's output columns,
+  each optionally with `COLLATE`, `ASC`/`DESC` or `NULLS FIRST`/`NULLS LAST` (`"created_at, id"`).
+  Anything else, such as a `LIMIT`, an `OFFSET` or a table-qualified column, is refused with
+  `extension_schema_violation`; put a `LIMIT` in the statement itself
+  (`... ORDER BY created_at, id LIMIT ?`). Only anonymous parameter tokens are
   replaced; literal question marks in SQL strings, quoted identifiers and comments are preserved.
   `exec` can also create, alter and drop the extension's own objects during an operation, not
   just during migration. Identifiers and schema qualifiers follow SQLite's ASCII case folding.
