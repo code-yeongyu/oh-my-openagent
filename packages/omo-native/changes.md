@@ -1,3 +1,13 @@
+## 2026-10-05 - `omo doctor` reports an unresolvable agent prompt_append value (#9560)
+
+`configDoctorLines` (`config-doctor-runtime.ts`) read only `omo-config-core`'s loader view, which never runs the
+omo-senpi `agents.<name>.prompt_append` resolution, so a `file://` value that cannot be read stayed invisible:
+the loader accepted it, the extension dropped the append and reported a diagnostic, and `omo doctor` printed
+nothing. Doctor now emits those diagnostics as
+`WARN config: <file>: agents.<name>.prompt_append could not be resolved (<reason>): <value>` through the same
+`loadSenpiOmoConfig` resolution the extension runs (exposed as the `@oh-my-opencode/omo-senpi/config-resolution`
+subpath), and a resolvable value adds no line.
+
 ## 2026-10-04 - Every bun is held to the engine's 1.4 floor; a too-old bun you chose says so at startup (#9563)
 
 The engine needs bun 1.4 (`node:sqlite`, and the `worker_threads` compatibility the JS eval kernel uses), and `BUN_MIN_VERSION` said so, but `bin/lib/bun-runtime.js` applied the floor only to a bun it discovered on an npm install. A `bun add -g` install re-exec'd under its bun with no probe, and the POSIX bun-global shim runs bun directly, where "already on bun" stayed put whatever the version. So on bun 1.3.x, `/computer on` failed with `ResolveMessage: No such built-in module: node:sqlite`, the first of several things that could not work there.
